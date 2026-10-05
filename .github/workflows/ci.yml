@@ -12,8 +12,10 @@ on:
 permissions:
   contents: read
 
+# A branch's newer push cancels its older run. Every commit on main runs in a group of its own,
+# so one stuck run never holds up the next; the deploy job's own group puts deploys in order.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
@@ -58,7 +60,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     concurrency:
-      group: pages
+      group: github-pages-deploy
       cancel-in-progress: false
     steps:
       - id: deployment
