@@ -1,8 +1,8 @@
 # Repworks: plan
 
 Status: plan of 2026-10-05, written in a planning session and updated the same day with the
-owner's answers to its questions (§8). Nothing is built. Read with `DECISIONS.md`, which this
-plan updates (its revision log lists every change and why).
+owner's answers to its questions and with the organization they created (§8). Nothing is built.
+Read with `DECISIONS.md`, which this plan updates (its revision log lists every change and why).
 
 Contents:
 1. Summary
@@ -47,9 +47,10 @@ What changed from DECISIONS.md, in short (details in its revision log):
 - **Progress files** are daily per device, with monthly compaction, so a sync uploads one
   day's events rather than the whole month.
 - **UI framework (D7):** Preact with signals.
-- **Hosting (D17):** the site gets its own origin through a free GitHub organization's Pages
-  site, not `skaeglund.github.io`. mistake-lab and puzzle-explorer live there, and both of
-  their service workers delete every cache that isn't their own. The owner chose this (§8).
+- **Hosting (D17):** the site is served at `https://dubious-moves.github.io/repworks/`, the
+  Pages site of a free GitHub organization the owner created for it, so it doesn't share
+  `skaeglund.github.io`. mistake-lab and puzzle-explorer live there, and both of their service
+  workers delete every cache that isn't their own. The owner chose this (§8).
 - **Auto-play** mostly stops being a separate feature. With one card per position and move,
   a shared prefix is one card, so the trainer simply plays the moves that aren't due.
 - **Qchess first (D18):** the owner's newest repertoire is in Qchess studies, so Phase 0's
@@ -96,6 +97,8 @@ GitHub's documentation was read from its source repository (`github/docs` at `86
 | chessground and pieces | GPL-3.0-or-later. Its npm package embeds the 12 cburnett pieces in `assets/chessground.cburnett.css`. cburnett is GPLv2+ according to lila's COPYING.md. Arrows start only on right-click or Shift, so the phone needs a draw mode. | chessground 9.2.1 from npm; lila `COPYING.md` |
 | The merge rules hold together | A ~90-line prototype of D4's tree merge passed 20,000 random concurrent edits: nothing added or written was lost, untouched deletions held, and the identity laws held. 3,000 random two-device runs converged. Re-merging one's own landed commit nests conflict markers, which is why sync needs commit IDs (§4.9). | scratch prototype and simulation |
 | A Qchess study can be exported with each chapter's side (added after the owner's answers) | Qchess's "Download study PGN" writes every chapter's stored PGN to one file, regenerating the open chapter first. It leaves out each chapter's side (`perspective`), its folder and its "exclude from MoveTrainer" flag. Qchess's writer puts one comment block on a move with `[%csl]`/`[%cal]` before the text, turns `{ }` typed in a comment into `( )`, writes glyphs as `$n` from Lichess's set (`$146` included), and numbers Black's moves only at the start of a line or a variation. Its study API (`/api/studies/<uuid>`, with the login token from Qchess's localStorage) answers any origin and allows `Authorization`. `studyData`, `saveCurrentChapterPgn`, `_introPgnIsDefault` and the folder helpers are top-level in the page's script, so a console script can use them. chessops parses a sample written to these rules with no errors: shapes come out of the shared block, and the glyphs and a start FEN with Black to move are kept. | the study page's source, fetched without login (1.0 MB): `generatePGN`, `buildPGNMoves`, `buildNodePGNComment`, the download handler and the study loader; an API call without login (403 "This study is private", with the CORS headers); an acorn parse of the page's script; chessops 0.15.1 on a synthetic sample |
+| Pages from a free organization (added with the organization) | GitHub Free for organizations publishes Pages from public repositories only; a private repo needs Pro, Team or Enterprise. So the code repo must be public, as §3 has it. This session can't see the repo's visibility, so §8 asks the owner to check it. | github/docs `data/reusables/gated-features/pages.md` |
+| The old address after the transfer (added with the organization) | `git push` to `skAeglund/repworks` lands in `dubious-moves/repworks`, and the remote prints the new location; the GitHub tools used by Claude sessions also answer for the old name. The redirect is deleted for good if a new repo or fork is ever created at the old address. The repo was empty, so the first branch pushed became its default. | this plan's own push and a branch listing, 2026-10-05; github/docs `transferring-a-repository.md` |
 
 Not verified, and where each gets verified:
 - Real Lichess exports round-tripping byte for byte: Phase 0, §4.5, from the owner's own test study.
@@ -123,7 +126,7 @@ app-shell cache vanishing on Android. Fix: delete only caches carrying your own 
 
 ```
  code repo (public, GPL-3)              data repo (private)
- <org>/repworks                         skAeglund/repworks-data
+ dubious-moves/repworks                 skAeglund/repworks-data
  ├── src/core      pure logic           ├── repworks.json            format version
  ├── src/platform  browser adapters     ├── studies/<sid>/study.json name, kind, chapter order
  ├── src/app       wiring, sync loop    ├── studies/<sid>/<cid>.pgn  one chapter, Lichess dialect
@@ -131,7 +134,7 @@ app-shell cache vanishing on Android. Fix: delete only caches carrying your own 
  ├── src/sw        service worker       ├── progress/<dev>/<month>.jsonl compacted
  └── test          node --test + sim    └── devices/<dev>.json       name, created
           │                                        ▲
-          ▼  <org>.github.io/repworks/             │ GraphQL createCommitOnBranch (write)
+          ▼  dubious-moves.github.io/repworks/     │ GraphQL createCommitOnBranch (write)
    PWA on desktop and phone ── IndexedDB ──────────┘ REST trees/blobs, ETag (read)
           │
           ├── Qchess: a study exported to a file    import only
@@ -199,8 +202,8 @@ Rules:
   implemented in `platform`, and faked in `test`.
 - The service worker names its caches `repworks-*` and deletes only those.
 - Routes live in the hash (`#/study/<sid>/<cid>`), because GitHub Pages has no SPA fallback.
-- The site is served at `https://<org>.github.io/repworks/` (D17). The organization publishes
-  nothing else on Pages, since a second site there would share the origin again.
+- The site is served at `https://dubious-moves.github.io/repworks/` (D17). The organization
+  publishes nothing else on Pages, since a second site there would share the origin again.
 
 Tasks:
 1. Scaffold: package.json (vite, typescript, preact, @preact/signals, chessops, chessground;
@@ -220,8 +223,8 @@ airplane mode after one online visit.
 
 ### 4.2 Remote spike (gate for §4.9)
 
-A throwaway page on the organization's origin (D17), run on both devices with the real
-fine-grained token against the real data repo. It records:
+A throwaway page on the site's own origin, `dubious-moves.github.io` (D17), run on both devices
+with the real fine-grained token against the real data repo. It records:
 1. GET ref, conditional GET (304), recursive tree, raw blob, all from the browser (CORS).
 2. `createCommitOnBranch` adding two files and deleting one, then the same call with a stale
    `expectedHeadOid`: the exact error shape.
@@ -925,18 +928,23 @@ The first draft asked four questions. The owner answered them on 2026-10-05:
 No question is open. Two items stay open in DECISIONS.md because nothing depends on them yet:
 the repo layout once the tools move, and the name.
 
-Setup, in this order (actions, no decisions):
-1. Create a free GitHub organization. Its name becomes the address,
-   `https://<name>.github.io/repworks/`, and changing it later means setting each device up
-   again, because a browser keeps local data per address (the data repo is unaffected).
-   `repworks` would match the working name.
-2. Transfer `skAeglund/repworks` to it (the repo's Settings → Transfer ownership). GitHub
-   redirects the old address.
-3. Install the Claude GitHub App on the organization, with access to that repo
-   (https://github.com/apps/claude/installations/select_target), so Claude sessions can push
-   to it.
-4. In the repo's Settings → Pages, set the source to GitHub Actions. The workflow arrives with
+Done on 2026-10-05: the owner created the organization `dubious-moves` and transferred the repo
+into it, so the site's address is `https://dubious-moves.github.io/repworks/`. Claude sessions
+can push to it: this plan went up to its `claude/ecstatic-tesla-8txo26` branch through the old
+address, which GitHub redirects (§2).
+
+Still to do, in this order (actions, no decisions):
+1. Check that `dubious-moves/repworks` is public (Settings → General, at the bottom). A free
+   organization publishes Pages only from a public repo (§2); the plan has it public anyway.
+2. Create `main` from `claude/ecstatic-tesla-8txo26` and make it the default branch (Settings →
+   General → Default branch). The plan branch is the default only because it was the first push
+   into the empty repo, and Phase 0 deploys from `main` (§4.1). Telling the first build session
+   to push `main` works too.
+3. In the repo's Settings → Pages, set the source to GitHub Actions. The workflow arrives with
    Phase 0's skeleton.
+4. Start build sessions with `dubious-moves/repworks` as the source, not the old name. The old
+   name still works through the redirect, but one session can't hold both names (both check out
+   to the same directory), and the redirect ends if anything is ever created at the old address.
 5. When Phase 0 reaches §4.2: create the private data repo under your own account
    (`skAeglund/repworks-data`, created with a README) and a fine-grained token for that repo
    only, with Contents read/write. Expiry is up to you: none is allowed; I'd take a year with a

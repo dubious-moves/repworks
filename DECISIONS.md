@@ -2,14 +2,16 @@
 
 Status: draft of 2026-10-05, written before planning started, revised the same day after a
 review, then by the planning session, then with the owner's answers to the planning session's
-questions. Each revision is described at the end. Everything marked **Decided** was agreed in
-discussion, answered by the owner, or settled as a technical call in planning; **Open** items
-are for the owner. `PLAN.md` is the plan built on this file. Nothing is built yet.
+questions, then with the organization the owner created. Each revision is described at the end.
+Everything marked **Decided** was agreed in discussion, answered by the owner, or settled as a
+technical call in planning; **Open** items are for the owner. `PLAN.md` is the plan built on
+this file. Nothing is built yet.
 
 Working name for the new project: **Repworks** ("rep" is both repertoire and a gym repetition;
-chosen 2026-10-05 as a working name and open to change). Code repo: `skAeglund/repworks`
-(created by the owner, empty), to move into a free GitHub organization (D17). Data repo,
-suggested: `skAeglund/repworks-data` (private, not yet created).
+chosen 2026-10-05 as a working name and open to change). Code repo: `dubious-moves/repworks`
+(created by the owner as `skAeglund/repworks` and transferred into the organization
+`dubious-moves`, D17; it holds the plan and nothing built). Data repo, suggested:
+`skAeglund/repworks-data` (private, not yet created).
 
 ## Purpose
 
@@ -409,8 +411,10 @@ prefix is one card. So:
 lichessable §25's range juggling is not needed.
 
 ### D17. The site's own origin, through a GitHub organization (Decided by the owner, 2026-10-05; `PLAN.md` §8, question 1)
-- A free GitHub organization holds the code repo, transferred from `skAeglund/repworks`. Its
-  Pages site serves Repworks at `https://<org>.github.io/repworks/`, an origin of its own.
+- A free GitHub organization, `dubious-moves`, holds the code repo, transferred from
+  `skAeglund/repworks` on 2026-10-05. Its Pages site serves Repworks at
+  `https://dubious-moves.github.io/repworks/`, an origin of its own. A free organization
+  publishes Pages only from a public repo, so the code repo stays public.
 - Why not `skaeglund.github.io`: mistake-lab's and puzzle-explorer's service workers each delete
   every Cache Storage cache that isn't their own (checked in their `sw.js`), so they would wipe
   the site's offline cache. That origin also shares a storage quota with them, and their pages
@@ -420,9 +424,12 @@ lichessable §25's range juggling is not needed.
 - Deploys use GitHub Actions with the built-in `GITHUB_TOKEN`; no secret is stored anywhere.
 - The data repo stays private under the owner's own account (D4), so the fine-grained token
   belongs to the person, and no organization token policy applies to it.
-- The organization's name is the owner's choice. It becomes the address, and changing it later
-  means setting up each device again, since a browser keeps local data per origin. The data repo
-  is unaffected.
+- The owner named the organization `dubious-moves`. That name is part of the origin, so
+  changing it would mean setting up each device again, since a browser keeps local data per
+  origin; the data repo would be unaffected. The project's name appears only in the path
+  (`/repworks/`, the repo's name). GitHub doesn't redirect a project site after a rename, so
+  renaming the repo would mean installing the app again from the new address, but every
+  device's local data would stay, the origin being the same.
 - Multi-threaded Stockfish needs COOP/COEP. On Pages the site's own service worker can add them.
   Login already uses the redirect flow, and the explorer, ChessDB and the GitHub API all answer
   with CORS, so isolation stays possible. It isn't needed until Phase 3, if at all.
@@ -496,8 +503,9 @@ Neither blocks Phase 0.
 1. Repo layout: an eventual monorepo (`app/`, `tools/`, `shared/`) is likely. The tools join last
    (D8), so this only needs settling when they move.
 2. Whether "Repworks" stays as the name (checked only against GitHub repo names; domain and
-   trademark not checked). The organization's name makes the site's address (D17), so it is best
-   settled before the organization is created.
+   trademark not checked). Less pressing now: the organization's name fixes the origin, and the
+   project's name appears only as the repo's name and the address's path, so a rename would keep
+   every device's local data (D17).
 
 ## Guidance for the build sessions
 - `PLAN.md` is the plan; §4 is Phase 0 in build order, starting with the live remote spike
@@ -629,3 +637,25 @@ Each change, with its reason:
 - **Open questions reduced to two (repo layout, the name) and renumbered.** The rest were
   answered. The note on COOP/COEP moved from the hosting question into D17.
 - **Reading status: Qchess's study page source added.**
+
+## Revision of 2026-10-05 (organization created)
+The owner created the organization `dubious-moves` and transferred the code repo into it. Each
+change, with its reason:
+- **D17: the organization is `dubious-moves`, so the address is
+  `https://dubious-moves.github.io/repworks/`.** Recorded now that the name exists; it replaces
+  the `<org>` placeholder throughout `PLAN.md`.
+- **D17: a free organization publishes Pages only from a public repo,** so the code repo must stay
+  public. The plan always had it public; the rule is from GitHub's docs, and the owner checks the
+  setting, which this session can't see (`PLAN.md` §8).
+- **D17: what a rename would cost, now that the two names differ.** The organization's name is
+  part of the origin, the project's name only of the path. Renaming the repo would keep each
+  device's local data and cost a reinstall of the app, since GitHub doesn't redirect project
+  sites after a rename (from GitHub's docs).
+- **Open question 2 eased accordingly.** "Best settled before the organization is created" no
+  longer applies.
+- **Status and the code repo's name updated.** The plan was pushed to
+  `claude/ecstatic-tesla-8txo26` through the old address, which GitHub redirects; being the first
+  push into the empty repo, that branch became its default.
+- **`PLAN.md` §8's setup: the first three steps are done.** Added: check that the repo is public,
+  create `main` as the default branch, and start build sessions with the new name. §2 gains two
+  rows: Pages on a free organization, and the old address after the transfer.
