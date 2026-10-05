@@ -10,6 +10,7 @@ import type { Position } from 'chessops/chess';
 import { dedupeShapes, LICHESS_COMMENT_LIMIT, parseComment } from './comment.ts';
 import { mergeNags } from './nags.ts';
 import type { Chapter, MoveNode, NodeData, RootNode } from '../study/model.ts';
+import { liftStartingComments } from '../study/tree.ts';
 
 export type ImportNote =
   | { kind: 'illegal'; path: string[]; san: string }
@@ -62,7 +63,7 @@ function convert(children: ChildNode<PgnNodeData>[], pos: Position, path: string
     after.play(move);
     out.push({ san, ...nodeData(child.data.comments, child.data.nags, child.data.startingComments, here, notes), children: convert(child.children, after, here, notes) });
   }
-  return mergeSiblings(out, path, notes);
+  return liftStartingComments(mergeSiblings(out, path, notes));
 }
 
 const withoutCheck = (san: string) => san.replace(/[+#]$/, '');
@@ -115,7 +116,7 @@ function mergeSiblings(nodes: MoveNode[], path: string[], notes: ImportNote[]): 
     if (same.clock === undefined && node.clock !== undefined) same.clock = node.clock;
     if (same.emt === undefined && node.emt !== undefined) same.emt = node.emt;
     if (same.eval === undefined && node.eval !== undefined) same.eval = node.eval;
-    same.children = mergeSiblings([...same.children, ...node.children], [...path, node.san], notes);
+    same.children = liftStartingComments(mergeSiblings([...same.children, ...node.children], [...path, node.san], notes));
   }
   return out;
 }

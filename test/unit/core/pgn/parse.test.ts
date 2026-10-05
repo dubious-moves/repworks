@@ -77,3 +77,10 @@ test('headers are kept exactly as read, in order', () => {
   const parsed = ok(parseChapterFile('[ChapterName "B"]\n[Event "A"]\n[Custom_Tag "x:y"]\n[White "W"]\n\n1. e4 *', 'Chapter1'));
   assert.deepEqual(parsed.headers, [['ChapterName', 'B'], ['Event', 'A'], ['Custom_Tag', 'x:y'], ['White', 'W']]);
 });
+
+test("a duplicate variation's before-move comment, merged into the main line, joins its comments", () => {
+  const parsed = ok(parseChapterFile('[Event "x"]\n\n1. e4 e5 ( { also } 1... e5 { same } 2. Nf3) 2. Nc3 *', 'Chapter1'));
+  const e5 = parsed.root.children[0]!.children[0]!;
+  assert.deepEqual([e5.startingComments, e5.comments], [[], ['also', 'same']]);
+  assert.deepEqual(e5.children.map((c) => c.san), ['Nc3', 'Nf3']);
+});
