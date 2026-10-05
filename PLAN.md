@@ -1,8 +1,9 @@
 # Repworks: plan
 
 Status: plan of 2026-10-05, written in a planning session and updated the same day with the
-owner's answers to its questions and with the organization they created (§8). Nothing is built.
-Read with `DECISIONS.md`, which this plan updates (its revision log lists every change and why).
+owner's answers to its questions and with the organization they created (§8). The owner approved
+it the same day; Phase 0 is next and nothing is built yet. Read with `DECISIONS.md`, which this
+plan updates (its revision log lists every change and why).
 
 Contents:
 1. Summary
@@ -73,7 +74,8 @@ repositories through git. It could not reach docs.github.com, lichess.org, githu
 developer.chrome.com.
 GitHub's documentation was read from its source repository (`github/docs` at `86c19ef`,
 2026-10-05). Lichess behaviour was read from `lichess-org/lila` (`ba0725c`) and
-`lichess-org/scalachess` (`2ab0a40`), both cloned the same day.
+`lichess-org/scalachess` (`2ab0a40`), both cloned the same day. The scratch code behind the
+findings below is kept in `prototypes/`, whose README says which finding each file backs.
 
 | Claim in DECISIONS.md | Finding | How it was checked |
 | --- | --- | --- |
@@ -928,26 +930,28 @@ The first draft asked four questions. The owner answered them on 2026-10-05:
 No question is open. Two items stay open in DECISIONS.md because nothing depends on them yet:
 the repo layout once the tools move, and the name.
 
-Done on 2026-10-05: the owner created the organization `dubious-moves` and transferred the repo
-into it, so the site's address is `https://dubious-moves.github.io/repworks/`. Claude sessions
-can push to it: this plan went up to its `claude/ecstatic-tesla-8txo26` branch through the old
-address, which GitHub redirects (§2).
+Done on 2026-10-05:
+- The owner created the organization `dubious-moves` and transferred the repo into it, so the
+  site's address is `https://dubious-moves.github.io/repworks/`.
+- The repo is public, as a free organization's Pages site requires (§2), and Pages' source is
+  GitHub Actions; the owner confirmed both.
+- Claude sessions can push to it. This plan went up to `claude/ecstatic-tesla-8txo26` through
+  the old address, which GitHub redirects (§2), and `main` was pushed from that branch with the
+  owner's permission. The plan branch is the default only because it was the first push into
+  the empty repo.
+- Build sessions start with `dubious-moves/repworks` as the source, not the old name: one session
+  can't hold both names (both check out to the same directory), and the redirect ends if anything
+  is ever created at the old address.
 
 Still to do, in this order (actions, no decisions):
-1. Check that `dubious-moves/repworks` is public (Settings → General, at the bottom). A free
-   organization publishes Pages only from a public repo (§2); the plan has it public anyway.
-2. Create `main` from `claude/ecstatic-tesla-8txo26` and make it the default branch (Settings →
-   General → Default branch). The plan branch is the default only because it was the first push
-   into the empty repo, and Phase 0 deploys from `main` (§4.1). Telling the first build session
-   to push `main` works too.
-3. In the repo's Settings → Pages, set the source to GitHub Actions. The workflow arrives with
-   Phase 0's skeleton.
-4. Start build sessions with `dubious-moves/repworks` as the source, not the old name. The old
-   name still works through the redirect, but one session can't hold both names (both check out
-   to the same directory), and the redirect ends if anything is ever created at the old address.
-5. When Phase 0 reaches §4.2: create the private data repo under your own account
+1. Make `main` the default branch (Settings → General → Default branch). Phase 0 deploys from
+   `main` (§4.1), and this setting is out of a Claude session's reach.
+2. Look at Settings → Environments → `github-pages`, if it exists yet. If its deployment branches
+   name `claude/ecstatic-tesla-8txo26` (the default branch when the Pages source was set), change
+   that to `main`, or the first deploy is refused.
+3. When Phase 0 reaches §4.2: create the private data repo under your own account
    (`skAeglund/repworks-data`, created with a README) and a fine-grained token for that repo
    only, with Contents read/write. Expiry is up to you: none is allowed; I'd take a year with a
    reminder.
-6. When Phase 0 reaches §4.5: the Lichess test study (§4.5 (a)), plus a Qchess export of each
+4. When Phase 0 reaches §4.5: the Lichess test study (§4.5 (a)), plus a Qchess export of each
    repertoire study and a sample of your Chessable script's output, all kept in the data repo.

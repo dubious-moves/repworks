@@ -5,7 +5,7 @@ review, then by the planning session, then with the owner's answers to the plann
 questions, then with the organization the owner created. Each revision is described at the end.
 Everything marked **Decided** was agreed in discussion, answered by the owner, or settled as a
 technical call in planning; **Open** items are for the owner. `PLAN.md` is the plan built on
-this file. Nothing is built yet.
+this file; the owner approved it, and nothing is built yet.
 
 Working name for the new project: **Repworks** ("rep" is both repertoire and a gym repetition;
 chosen 2026-10-05 as a working name and open to change). Code repo: `dubious-moves/repworks`
@@ -659,3 +659,15 @@ change, with its reason:
 - **`PLAN.md` §8's setup: the first three steps are done.** Added: check that the repo is public,
   create `main` as the default branch, and start build sessions with the new name. §2 gains two
   rows: Pages on a free organization, and the old address after the transfer.
+
+## Revision of 2026-10-05 (setup finished, plan approved)
+- **The owner approved the plan; Phase 0 starts in a new session** started from
+  `dubious-moves/repworks`, so it has the repo under its new name and a fresh context.
+- **`PLAN.md` §8's setup brought up to date.** The owner confirmed that the repo is public and set
+  Pages' source to GitHub Actions, and `main` was pushed from the plan branch with the owner's
+  permission. Left for the owner: making `main` the default branch, and the `github-pages`
+  environment's branch rule if it names the plan branch, which would refuse deploys from `main`.
+- **`prototypes/` added: the planning session's scratch code behind `PLAN.md` §2,** kept so its
+  findings can be re-run and Phase 0 can start from it, rather than being lost with the planning
+  session's container. Re-run from the repo with the pinned versions, it gives the same results.
+  It goes once Phase 0 has replaced it.
