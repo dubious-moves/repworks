@@ -1,0 +1,15 @@
+{
+  "format": 1,
+  "id": "Rep0Najd",
+  "name": "Test repertoire",
+  "kind": "repertoire",
+  "chapters": [
+    "Ch1Najdf",
+    "Ch2Alapn"
+  ],
+  "source": {
+    "kind": "file",
+    "name": "made-up.pgn",
+    "imported": "2026-10-05T12:00:00.000Z"
+  }
+}

@@ -294,8 +294,8 @@ progress/<dev>/<YYYY-MM>.jsonl     a closed month, compacted by <dev>
 devices/<dev>.json                 { "name": "phone", "created": "…" }, written once by <dev>
 ```
 
-- IDs: 8 random characters `[A-Za-z0-9]`, like Lichess's. Provenance goes in `source`, so
-  re-importing a study never clashes with an old one.
+- IDs (studies, chapters and devices): 8 random characters `[A-Za-z0-9]`, like Lichess's.
+  Provenance goes in `source`, so re-importing a study never clashes with an old one.
 - Chapter-level facts live in the chapter's PGN headers (`ChapterName`, `Orientation`,
   `FEN`/`SetUp`, any other tags, kept in order). Study-level facts live in `study.json`, which
   is the truth for the study's name.

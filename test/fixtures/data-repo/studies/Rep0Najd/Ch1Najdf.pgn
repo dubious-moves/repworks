@@ -1,0 +1,7 @@
+[Event "Test repertoire: Main line"]
+[Result "*"]
+[StudyName "Test repertoire"]
+[ChapterName "Main line"]
+[Orientation "black"]
+
+1. e4 c5 2. Nf3 { A made-up comment } { [%csl Gd4][%cal Gd2d4] } 2... d6 (2... Nc6 3. d4) 3. d4 cxd4 *
