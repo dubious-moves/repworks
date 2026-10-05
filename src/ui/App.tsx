@@ -18,6 +18,9 @@ export function App() {
       )}
       <main class="content">
         <p>Phase 0 is being built: studies, sync and the editor come next.</p>
+        <p>
+          <a href={`${import.meta.env.BASE_URL}spike.html`}>Remote spike</a> (temporary test page)
+        </p>
       </main>
       <footer class="footer">
         build {__BUILD_ID__}

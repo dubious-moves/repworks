@@ -18,8 +18,11 @@ export default defineConfig({
   build: {
     target: 'es2022',
     sourcemap: true,
+    // Every browser the site supports preloads modules natively.
+    modulePreload: { polyfill: false },
     rolldownOptions: {
-      input: { main: 'index.html' },
+      // spike.html is the throwaway remote spike (PLAN.md §4.2).
+      input: { main: 'index.html', spike: 'spike.html' },
     },
   },
   preview: {

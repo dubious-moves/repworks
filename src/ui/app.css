@@ -82,3 +82,7 @@ body {
   color: var(--muted);
   font-size: 0.8rem;
 }
+
+a {
+  color: #9fd3a8;
+}

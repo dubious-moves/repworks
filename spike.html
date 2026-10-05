@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#22412e" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Repworks: remote spike</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
+    <style>
+      :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #161a17; color: #d6dbd5; line-height: 1.45; }
+      body { margin: 0 auto; max-width: 760px; padding: 12px 12px 48px; }
+      h1 { font-size: 1.25rem; margin: 4px 0; }
+      h2 { font-size: 1.05rem; margin: 22px 0 6px; border-top: 1px solid #2c362e; padding-top: 14px; }
+      p, li { font-size: 0.95rem; }
+      .muted { color: #8d978e; font-size: 0.85rem; }
+      input, button, textarea { font: inherit; }
+      input { width: 100%; min-height: 44px; padding: 6px 10px; margin: 4px 0; box-sizing: border-box; background: #202621; color: inherit; border: 1px solid #3a463c; border-radius: 6px; }
+      button { min-height: 44px; padding: 0 14px; margin: 4px 6px 4px 0; border-radius: 6px; border: 1px solid #3f6b4f; background: #22412e; color: #e8efe9; }
+      button:disabled { opacity: 0.45; }
+      #qr svg { width: min(320px, 90vw); height: auto; background: #fff; padding: 8px; border-radius: 6px; margin-top: 8px; }
+      #log { white-space: pre-wrap; background: #101311; border: 1px solid #2c362e; border-radius: 6px; padding: 8px; max-height: 220px; overflow: auto; font-size: 0.85rem; }
+      #steps { padding-left: 18px; font-size: 0.85rem; }
+      #steps .ok { color: #9fd3a8; } #steps .bad { color: #e0a070; }
+      textarea { width: 100%; height: 160px; box-sizing: border-box; }
+      .warn { color: #c99a3e; }
+    </style>
+  </head>
+  <body>
+    <h1>Repworks: remote spike</h1>
+    <p class="muted">A throwaway test page (PLAN.md §4.2). <span id="where"></span> Build <span id="build"></span>.</p>
+
+    <h2>1. GitHub</h2>
+    <p id="saved"></p>
+    <label>Data repo (owner/name)<input id="repo" value="skAeglund/repworks-data" autocomplete="off" /></label>
+    <label>Fine-grained token<input id="token" type="password" autocomplete="off" placeholder="github_pat_…" /></label>
+    <button id="github-save" type="button">Save on this device</button>
+    <button id="github-forget" type="button">Forget</button>
+    <br />
+    <button id="qr-show" type="button">Show setup QR for the phone</button>
+    <button id="qr-hide" type="button" hidden>Hide QR</button>
+    <p class="muted warn">The QR holds the token: show it only on your own screen, and hide it after scanning.</p>
+    <div id="qr"></div>
+    <button id="github-run" type="button">Run the GitHub checks</button>
+    <p class="muted">Creates a throwaway branch in the data repo, commits to it through GraphQL and REST (including two deliberately stale commits), then deletes it. About 40 requests.</p>
+
+    <h2>2. Lichess</h2>
+    <p id="lichess-state"></p>
+    <button id="lichess-login" type="button">Log in with Lichess</button>
+    <label>A private study of yours (URL or ID)<input id="study" autocomplete="off" placeholder="https://lichess.org/study/…" /></label>
+    <button id="lichess-run" type="button">Run the Lichess checks</button>
+    <button id="lichess-revoke" type="button">Log out (revoke the token)</button>
+
+    <h2>3. Storage and the puzzle dataset</h2>
+    <button id="other-run" type="button">Run the storage and dataset checks</button>
+
+    <h2>Report (<span id="count">0</span> results)</h2>
+    <ol id="steps"></ol>
+    <button id="report-copy" type="button">Copy report</button>
+    <button id="report-download" type="button">Download report</button>
+    <button id="report-clear" type="button">Clear results</button>
+    <textarea id="report-text" hidden readonly></textarea>
+    <p class="muted">The report never contains a token. It is kept on this device until cleared, so it survives the Lichess login and a switch between the tab and the installed app.</p>
+    <pre id="log"></pre>
+
+    <script type="module" src="/src/spike/spike.ts"></script>
+  </body>
+</html>
