@@ -542,6 +542,10 @@ Tests (`test/unit/merge`, `test/sim`):
   - Retention becomes a setting: 0.9 in mistake-lab, 0.93 in puzzle-explorer.
   - No fuzz, so replay is deterministic.
   - The weights are stored with the parameters, so changing them simply re-replays.
+  - As built: a card's `due` is an instant (the last review plus the interval), not
+    puzzle-explorer's local-date string, so every device computes the same state whatever its
+    time zone; "due today" is asked with the device's own calendar, in the app. The port gives
+    puzzle-explorer's numbers exactly on 509 recorded review steps at retention 0.9 and 0.93.
 
 Tests:
 - Shuffled input gives the same state.
