@@ -1,0 +1,5 @@
+{
+  "//": "Core alone, with no DOM and no Node types: a DOM or Node global used in core fails here.",
+  "extends": "../../tsconfig.base.json",
+  "include": ["."]
+}

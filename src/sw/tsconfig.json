@@ -1,0 +1,8 @@
+{
+  "//": "The service worker, against the WebWorker library instead of the DOM.",
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2024", "WebWorker"]
+  },
+  "include": ["."]
+}

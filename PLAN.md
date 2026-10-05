@@ -72,6 +72,9 @@ Phase 4. mistake-lab goes after Phase 5.
 The container could reach npm, ChessDB, the Lichess explorer, qchess.net and public GitHub
 repositories through git. It could not reach docs.github.com, lichess.org, github.io or
 developer.chrome.com.
+(The Phase 0 build session's container reaches lichess.org as well; github.io, docs.github.com
+and developer.chrome.com are still refused by its network policy, so checks of the deployed
+site stay with the owner.)
 GitHub's documentation was read from its source repository (`github/docs` at `86c19ef`,
 2026-10-05). Lichess behaviour was read from `lichess-org/lila` (`ba0725c`) and
 `lichess-org/scalachess` (`2ab0a40`), both cloned the same day. The scratch code behind the
@@ -96,7 +99,7 @@ findings below is kept in `prototypes/`, whose README says which finding each fi
 | An HTTPS site calling `http://localhost` | Allowed with the user's permission. Chrome 142 (2025-10-28) shipped Local Network Access: a prompt (`loopback-network`, formerly `local-network-access`), no preflight, and `http://localhost` exempt from mixed-content blocking. Normal CORS still applies. `explorerdb serve` sends no `Access-Control-Allow-Origin` and answers `OPTIONS` with 405, so it needs a small change in q_extension. | WICG/local-network-access at `067168a`; release date from search results; read `tools/explorerdb/server.mjs` |
 | ChessDB and the explorer from a web page | ChessDB echoes the page's origin in `Access-Control-Allow-Origin`. The explorer answers 401 without a token, allows any origin, and its preflight allows `Authorization`. | live requests from this container |
 | Node runs the logic tests with no build | Node ≥22.18 strips types by default. `node --test` on a `.ts` file importing chessops passes on Node 22.22. | scratch test |
-| chessground and pieces | GPL-3.0-or-later. Its npm package embeds the 12 cburnett pieces in `assets/chessground.cburnett.css`. cburnett is GPLv2+ according to lila's COPYING.md. Arrows start only on right-click or Shift, so the phone needs a draw mode. | chessground 9.2.1 from npm; lila `COPYING.md` |
+| chessground and pieces | GPL-3.0-or-later. Its npm package embeds the 12 cburnett pieces in `assets/chessground.cburnett.css`. cburnett is GPLv2+ according to lila's COPYING.md. Arrows start only on right-click or Shift, so the phone needs a draw mode. The unscoped `chessground` package is deprecated on npm; Lichess now publishes `@lichess-org/chessground`, which Phase 0 uses (10.4.2): same licence, same embedded pieces, same draw trigger. | chessground 9.2.1 from npm; lila `COPYING.md`; the build session read `@lichess-org/chessground` 10.4.2's package and source (`draw.ts`, `events.ts`) |
 | The merge rules hold together | A ~90-line prototype of D4's tree merge passed 20,000 random concurrent edits: nothing added or written was lost, untouched deletions held, and the identity laws held. 3,000 random two-device runs converged. Re-merging one's own landed commit nests conflict markers, which is why sync needs commit IDs (§4.9). | scratch prototype and simulation |
 | A Qchess study can be exported with each chapter's side (added after the owner's answers) | Qchess's "Download study PGN" writes every chapter's stored PGN to one file, regenerating the open chapter first. It leaves out each chapter's side (`perspective`), its folder and its "exclude from MoveTrainer" flag. Qchess's writer puts one comment block on a move with `[%csl]`/`[%cal]` before the text, turns `{ }` typed in a comment into `( )`, writes glyphs as `$n` from Lichess's set (`$146` included), and numbers Black's moves only at the start of a line or a variation. Its study API (`/api/studies/<uuid>`, with the login token from Qchess's localStorage) answers any origin and allows `Authorization`. `studyData`, `saveCurrentChapterPgn`, `_introPgnIsDefault` and the folder helpers are top-level in the page's script, so a console script can use them. chessops parses a sample written to these rules with no errors: shapes come out of the shared block, and the glyphs and a start FEN with Black to move are kept. | the study page's source, fetched without login (1.0 MB): `generatePGN`, `buildPGNMoves`, `buildNodePGNComment`, the download handler and the study loader; an API call without login (403 "This study is private", with the CORS headers); an acorn parse of the page's script; chessops 0.15.1 on a synthetic sample |
 | Pages from a free organization (added with the organization) | GitHub Free for organizations publishes Pages from public repositories only; a private repo needs Pro, Team or Enterprise. So the code repo must be public, as §3 has it. This session can't see the repo's visibility, so §8 asks the owner to check it. | github/docs `data/reusables/gated-features/pages.md` |
@@ -108,8 +111,11 @@ Not verified, and where each gets verified:
   §4.5 (b).
 - GraphQL commits with a fine-grained token from a browser, and the exact error for a stale
   head: Phase 0 spike, §4.2.
-- Lichess's API answering a web page (study export, `/api/token`): mistake-lab and
-  puzzle-explorer do it today, so I'm taking it from their code. The spike confirms it.
+- Lichess's API answering a web page (study export, `/api/token`): checked live from the
+  build session's container on 2026-10-05, once lichess.org was reachable. `GET
+  /api/study/by/<user>` answers `Access-Control-Allow-Origin: *`, and the preflights of a
+  `POST /api/token` and of a study export with `Authorization` both answer 204 with any origin
+  and `Authorization` allowed. The spike still runs the OAuth round trip and a private export.
 - GitHub Pages sending `Access-Control-Allow-Origin: *`, which puzzle-explorer-data's fetches
   need now that the site has its own origin (D17). github.io is still unreachable from here, so
   the spike checks it (§4.2).
@@ -192,7 +198,7 @@ repworks/
 ├── scripts/
 │   ├── check-boundaries.mjs   core imports nothing outside core and chessops, and uses no DOM
 │   └── validate-data.ts       checks a data-repo checkout before a Claude session pushes
-└── .github/workflows/      ci.yml (check, test, build), pages.yml (deploy main)
+└── .github/workflows/      ci.yml (check, test, build, e2e; then main deploys to Pages)
 ```
 
 Rules:
@@ -208,14 +214,17 @@ Rules:
   publishes nothing else on Pages, since a second site there would share the origin again.
 
 Tasks:
-1. Scaffold: package.json (vite, typescript, preact, @preact/signals, chessops, chessground;
-   dev: @playwright/test), tsconfig, vite config with the base path `/repworks/`, GPL-3 LICENSE,
-   README, CLAUDE.md.
+1. Scaffold: package.json (vite, typescript, preact, @preact/signals, chessops,
+   @lichess-org/chessground; dev: @playwright/test), tsconfig, vite config with the base path
+   `/repworks/`, GPL-3 LICENSE, README, CLAUDE.md.
 2. `npm test` = `node --test "test/unit/**/*.test.ts" "test/sim/**/*.test.ts"`; `npm run
-   check` = `tsc --noEmit && node scripts/check-boundaries.mjs`.
+   check` = `tsc` on each project (the app; core alone, with no DOM or Node types, so a DOM
+   global in core fails to compile; the service worker against the WebWorker library; the
+   tests and scripts) and `node scripts/check-boundaries.mjs`.
 3. The boundary check. Control: a deliberate `import … from '../platform/…'` in core fails it.
 4. CI on push; Pages deploy from main through GitHub Actions, with the built-in
-   `GITHUB_TOKEN` and no stored secret.
+   `GITHUB_TOKEN` and no stored secret. The deploy is a second job of the same workflow, so
+   main deploys only after its checks and tests pass.
 5. PWA shell: manifest without an `orientation` key (mistake-lab's lesson), icons, a service
    worker precaching the built assets, and an offline start.
 

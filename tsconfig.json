@@ -1,0 +1,9 @@
+{
+  "//": "The browser app: core, platform, app and ui, with the DOM and Vite's client types.",
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"]
+  },
+  "include": ["src/core", "src/platform", "src/app", "src/ui", "src/spike"]
+}

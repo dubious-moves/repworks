@@ -671,3 +671,11 @@ change, with its reason:
   findings can be re-run and Phase 0 can start from it, rather than being lost with the planning
   session's container. Re-run from the repo with the pinned versions, it gives the same results.
   It goes once Phase 0 has replaced it.
+
+## Revision of 2026-10-05 (Phase 0 build)
+Changes made while building Phase 0, each with its reason:
+- **D6: chessground comes from the npm package `@lichess-org/chessground`.** The unscoped
+  `chessground` package is marked deprecated on npm; Lichess publishes the board under its
+  organization's scope now (10.4.2 at the start of Phase 0). Same library, same licence, same
+  embedded cburnett pieces, and arrows still start only on right-click or Shift (read in its
+  source), so the phone's draw mode stays.

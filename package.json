@@ -1,0 +1,31 @@
+{
+  "name": "repworks",
+  "private": true,
+  "version": "0.0.0",
+  "description": "A personal chess study, repertoire and training site.",
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node --test \"test/unit/**/*.test.ts\" \"test/sim/**/*.test.ts\"",
+    "check": "tsc -p tsconfig.json && tsc -p src/core && tsc -p src/sw && tsc -p test && node scripts/check-boundaries.mjs",
+    "e2e": "vite build && playwright test"
+  },
+  "dependencies": {
+    "@lichess-org/chessground": "10.4.2",
+    "@preact/signals": "2.11.3",
+    "chessops": "0.15.1",
+    "preact": "10.29.8"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "24.19.1",
+    "typescript": "7.0.2",
+    "vite": "8.3.2"
+  }
+}
