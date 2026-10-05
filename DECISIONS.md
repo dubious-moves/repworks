@@ -679,3 +679,6 @@ Changes made while building Phase 0, each with its reason:
   organization's scope now (10.4.2 at the start of Phase 0). Same library, same licence, same
   embedded cburnett pieces, and arrows still start only on right-click or Shift (read in its
   source), so the phone's draw mode stays.
+- **`prototypes/` removed.** Phase 0 replaced each part with tested code: the position key
+  (§4.3), the Lichess-dialect writer (§4.5) and the merge (§4.7). It is in the history at
+  `469d081`.

@@ -78,7 +78,8 @@ site stay with the owner.)
 GitHub's documentation was read from its source repository (`github/docs` at `86c19ef`,
 2026-10-05). Lichess behaviour was read from `lichess-org/lila` (`ba0725c`) and
 `lichess-org/scalachess` (`2ab0a40`), both cloned the same day. The scratch code behind the
-findings below is kept in `prototypes/`, whose README says which finding each file backs.
+findings below was kept in `prototypes/` until Phase 0 replaced it with tested code (§4.3, §4.5,
+§4.7); it is in the repo's history at `469d081`.
 
 | Claim in DECISIONS.md | Finding | How it was checked |
 | --- | --- | --- |
@@ -488,7 +489,18 @@ A file that won't parse is never rewritten. If both sides changed it, theirs is 
 is saved beside it as `<cid>.conflict-<dev>.pgn`.
 
 Markers are plain text in PGN comments. They survive Lichess's sanitizer, which only deletes
-braces and tidies whitespace. The **conflicts view** lists every comment containing `<<<<<<<`.
+braces and tidies whitespace. As built:
+- the caller passes the two labels (device name and date), so the merge stays pure;
+- when both sides changed a comment list, what they share at its start and end stays outside
+  the markers (so another author's unchanged comment isn't duplicated), and only the differing
+  middle goes between them;
+- a list changed on one side only (glyphs, shapes, headers) is taken from that side exactly, so
+  the identity laws hold to the byte;
+- when both sides add moves or chapters after the same neighbour, ours come first;
+- a move that becomes its parent's first child carries a "before the move" comment into its
+  comments, since PGN can't hold one before a main-line move;
+- a restored study keeps the chapters the restoring side edited (each marked) and its
+  study.json; chapters nobody edited stay deleted. The **conflicts view** lists every comment containing `<<<<<<<`.
 Resolving a conflict is an edit: pick one side, edit the text, or, for "kept after delete",
 delete the line now or keep it. So any device sees the same open conflicts, and nothing
 outside the PGN needs syncing.
@@ -506,6 +518,8 @@ Tests (`test/unit/merge`, `test/sim`):
   - the result is deterministic.
   (The planning prototype passed this on 20,000 cases.)
 - Simulation: random two- and three-device histories converge (3,000 runs in the prototype).
+  Built: 2,500 property runs in CI (20,000 checked once with `REPWORKS_MERGE_RUNS`), 1,500
+  two-device and 600 three-device histories.
 
 ### 4.8 Progress log and replay
 
