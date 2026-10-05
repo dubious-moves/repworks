@@ -1,7 +1,8 @@
 # Repworks: plan
 
-Status: plan of 2026-10-05, written in a planning session. Nothing is built. Read with
-`DECISIONS.md`, which this plan updates (its revision log lists every change and why).
+Status: plan of 2026-10-05, written in a planning session and updated the same day with the
+owner's answers to its questions (§8). Nothing is built. Read with `DECISIONS.md`, which this
+plan updates (its revision log lists every change and why).
 
 Contents:
 1. Summary
@@ -11,7 +12,7 @@ Contents:
 5. Later phases (outline)
 6. Phase order and retirement
 7. Risks
-8. Questions for the owner
+8. The owner's answers, and setup
 
 ---
 
@@ -46,22 +47,29 @@ What changed from DECISIONS.md, in short (details in its revision log):
 - **Progress files** are daily per device, with monthly compaction, so a sync uploads one
   day's events rather than the whole month.
 - **UI framework (D7):** Preact with signals.
-- **Hosting (open question 2):** I recommend the site gets its own origin, not
-  `skaeglund.github.io`. mistake-lab and puzzle-explorer already live there, and both of
-  their service workers delete every cache that isn't their own. This is the owner's
-  decision (question 1).
+- **Hosting (D17):** the site gets its own origin through a free GitHub organization's Pages
+  site, not `skaeglund.github.io`. mistake-lab and puzzle-explorer live there, and both of
+  their service workers delete every cache that isn't their own. The owner chose this (§8).
 - **Auto-play** mostly stops being a separate feature. With one card per position and move,
   a shared prefix is one card, so the trainer simply plays the moves that aren't due.
+- **Qchess first (D18):** the owner's newest repertoire is in Qchess studies, so Phase 0's
+  import starts there. A short console script on the Qchess study page downloads every
+  chapter together with the side it is for, and the site imports that file (§4.10).
+- **A fresh start for cards (D19):** every repertoire card starts new. Nothing is seeded from
+  Chessable, nor later from mistake-lab's repertoire reviews. New cards come in line by line,
+  within a daily limit.
 
-Retirement: lichessable can go after Phase 1 plus a Chessable course export (Phase 4 too if
-the storm is daily use). mistake-lab goes after Phase 5.
+Retirement: lichessable can go after Phase 1, since the owner's own script already exports the
+Chessable courses. The storm will be daily use eventually but isn't needed early, so it stays in
+Phase 4. mistake-lab goes after Phase 5.
 
 ---
 
 ## 2. What was checked, and how
 
-The container could reach npm, ChessDB, the Lichess explorer and public GitHub repositories
-through git. It could not reach docs.github.com, lichess.org, github.io or developer.chrome.com.
+The container could reach npm, ChessDB, the Lichess explorer, qchess.net and public GitHub
+repositories through git. It could not reach docs.github.com, lichess.org, github.io or
+developer.chrome.com.
 GitHub's documentation was read from its source repository (`github/docs` at `86c19ef`,
 2026-10-05). Lichess behaviour was read from `lichess-org/lila` (`ba0725c`) and
 `lichess-org/scalachess` (`2ab0a40`), both cloned the same day.
@@ -87,15 +95,19 @@ GitHub's documentation was read from its source repository (`github/docs` at `86
 | Node runs the logic tests with no build | Node ≥22.18 strips types by default. `node --test` on a `.ts` file importing chessops passes on Node 22.22. | scratch test |
 | chessground and pieces | GPL-3.0-or-later. Its npm package embeds the 12 cburnett pieces in `assets/chessground.cburnett.css`. cburnett is GPLv2+ according to lila's COPYING.md. Arrows start only on right-click or Shift, so the phone needs a draw mode. | chessground 9.2.1 from npm; lila `COPYING.md` |
 | The merge rules hold together | A ~90-line prototype of D4's tree merge passed 20,000 random concurrent edits: nothing added or written was lost, untouched deletions held, and the identity laws held. 3,000 random two-device runs converged. Re-merging one's own landed commit nests conflict markers, which is why sync needs commit IDs (§4.9). | scratch prototype and simulation |
+| A Qchess study can be exported with each chapter's side (added after the owner's answers) | Qchess's "Download study PGN" writes every chapter's stored PGN to one file, regenerating the open chapter first. It leaves out each chapter's side (`perspective`), its folder and its "exclude from MoveTrainer" flag. Qchess's writer puts one comment block on a move with `[%csl]`/`[%cal]` before the text, turns `{ }` typed in a comment into `( )`, writes glyphs as `$n` from Lichess's set (`$146` included), and numbers Black's moves only at the start of a line or a variation. Its study API (`/api/studies/<uuid>`, with the login token from Qchess's localStorage) answers any origin and allows `Authorization`. `studyData`, `saveCurrentChapterPgn`, `_introPgnIsDefault` and the folder helpers are top-level in the page's script, so a console script can use them. chessops parses a sample written to these rules with no errors: shapes come out of the shared block, and the glyphs and a start FEN with Black to move are kept. | the study page's source, fetched without login (1.0 MB): `generatePGN`, `buildPGNMoves`, `buildNodePGNComment`, the download handler and the study loader; an API call without login (403 "This study is private", with the CORS headers); an acorn parse of the page's script; chessops 0.15.1 on a synthetic sample |
 
 Not verified, and where each gets verified:
 - Real Lichess exports round-tripping byte for byte: Phase 0, §4.5, from the owner's own test study.
+- The Qchess export script on the owner's real studies, and their import: Phase 0, §4.10 and
+  §4.5 (b).
 - GraphQL commits with a fine-grained token from a browser, and the exact error for a stale
   head: Phase 0 spike, §4.2.
 - Lichess's API answering a web page (study export, `/api/token`): mistake-lab and
   puzzle-explorer do it today, so I'm taking it from their code. The spike confirms it.
-- GitHub Pages sending `Access-Control-Allow-Origin: *`: needed only if the site moves off
-  `skaeglund.github.io` (question 1). Checked at first deploy.
+- GitHub Pages sending `Access-Control-Allow-Origin: *`, which puzzle-explorer-data's fetches
+  need now that the site has its own origin (D17). github.io is still unreachable from here, so
+  the spike checks it (§4.2).
 - How durable IndexedDB is on the phone, and the Lichess OAuth redirect inside an installed
   PWA: Phase 0 live checks on the phone.
 
@@ -111,7 +123,7 @@ app-shell cache vanishing on Android. Fix: delete only caches carrying your own 
 
 ```
  code repo (public, GPL-3)              data repo (private)
- skAeglund/repworks                     skAeglund/repworks-data
+ <org>/repworks                         skAeglund/repworks-data
  ├── src/core      pure logic           ├── repworks.json            format version
  ├── src/platform  browser adapters     ├── studies/<sid>/study.json name, kind, chapter order
  ├── src/app       wiring, sync loop    ├── studies/<sid>/<cid>.pgn  one chapter, Lichess dialect
@@ -119,9 +131,10 @@ app-shell cache vanishing on Android. Fix: delete only caches carrying your own 
  ├── src/sw        service worker       ├── progress/<dev>/<month>.jsonl compacted
  └── test          node --test + sim    └── devices/<dev>.json       name, created
           │                                        ▲
-          ▼  GitHub Pages (own origin)             │ GraphQL createCommitOnBranch (write)
+          ▼  <org>.github.io/repworks/             │ GraphQL createCommitOnBranch (write)
    PWA on desktop and phone ── IndexedDB ──────────┘ REST trees/blobs, ETag (read)
           │
+          ├── Qchess: a study exported to a file    import only
           ├── Lichess: OAuth (PKCE), study export, explorer
           ├── ChessDB: queryall / querypv only
           ├── puzzle-explorer-data (Pages)          later phases
@@ -186,15 +199,18 @@ Rules:
   implemented in `platform`, and faked in `test`.
 - The service worker names its caches `repworks-*` and deletes only those.
 - Routes live in the hash (`#/study/<sid>/<cid>`), because GitHub Pages has no SPA fallback.
+- The site is served at `https://<org>.github.io/repworks/` (D17). The organization publishes
+  nothing else on Pages, since a second site there would share the origin again.
 
 Tasks:
 1. Scaffold: package.json (vite, typescript, preact, @preact/signals, chessops, chessground;
-   dev: @playwright/test), tsconfig, vite config with the base path, GPL-3 LICENSE, README,
-   CLAUDE.md.
+   dev: @playwright/test), tsconfig, vite config with the base path `/repworks/`, GPL-3 LICENSE,
+   README, CLAUDE.md.
 2. `npm test` = `node --test "test/unit/**/*.test.ts" "test/sim/**/*.test.ts"`; `npm run
    check` = `tsc --noEmit && node scripts/check-boundaries.mjs`.
 3. The boundary check. Control: a deliberate `import … from '../platform/…'` in core fails it.
-4. CI on push; Pages deploy from main.
+4. CI on push; Pages deploy from main through GitHub Actions, with the built-in
+   `GITHUB_TOKEN` and no stored secret.
 5. PWA shell: manifest without an `orientation` key (mistake-lab's lesson), icons, a service
    worker precaching the built assets, and an offline start.
 
@@ -204,8 +220,8 @@ airplane mode after one online visit.
 
 ### 4.2 Remote spike (gate for §4.9)
 
-A throwaway page on the chosen origin, run on both devices with the real fine-grained token
-against the real data repo. It records:
+A throwaway page on the organization's origin (D17), run on both devices with the real
+fine-grained token against the real data repo. It records:
 1. GET ref, conditional GET (304), recursive tree, raw blob, all from the browser (CORS).
 2. `createCommitOnBranch` adding two files and deleting one, then the same call with a stale
    `expectedHeadOid`: the exact error shape.
@@ -213,6 +229,8 @@ against the real data repo. It records:
 4. Lichess: a study export with `orientation=true` and the token endpoint, from the page.
 5. Whether the token works from the installed PWA after being entered in a normal Chrome tab
    on the phone. The two should share storage; the spike confirms it.
+6. A fetch of puzzle-explorer-data's `meta.json`: from this origin it is cross-origin, so it
+   needs GitHub Pages' `Access-Control-Allow-Origin: *` (D12).
 
 Exit: the write path is chosen (GraphQL if 2 behaves, else REST), and the real error shapes
 are copied into the fake remote used by `test/sim`.
@@ -254,7 +272,8 @@ Data repo files (format 1):
 ```
 repworks.json                      { "format": 1 }
 studies/<sid>/study.json           { "format": 1, "id", "name", "kind": "repertoire" | "reference",
-                                     "chapters": ["<cid>", …], "source"?: { "kind": "lichess", "study": "…" } }
+                                     "chapters": ["<cid>", …],
+                                     "source"?: { "kind": "qchess" | "lichess" | "file", "id"?, "name"?, "imported" } }
 studies/<sid>/<cid>.pgn            exactly one game: one chapter
 progress/<dev>/<YYYY-MM-DD>.jsonl  events of that UTC day, written only by <dev>
 progress/<dev>/<YYYY-MM>.jsonl     a closed month, compacted by <dev>
@@ -300,9 +319,9 @@ Progress events, one JSON object per line:
 
 - `n` counts up per device, and (device, `n`) is unique. `t` is the device clock. `k` is the
   kind.
-- Phase 0 kinds: `review`, `snapshot` (an FSRS state, for migration), `suspend`,
-  `unsuspend`, `forget`. Later phases add their own kinds (`mistake`, `pin`, `storm`,
-  `puzzle`, …).
+- Phase 0 kinds: `review`, `suspend`, `unsuspend`, `forget`. Later phases add their own kinds
+  (`snapshot`, a migrated FSRS state, in Phase 5; `mistake`, `pin`, `storm`, `puzzle`, …).
+  Every card starts new (D19), so nothing before Phase 5 needs a snapshot.
 - Readers skip kinds they don't know, and a device's compaction keeps them verbatim.
 - Card IDs carry a kind letter: `r|key|uci` is a repertoire move. Later: `p|key` plan recall,
   `m|…` game mistake, `z|id` puzzle.
@@ -348,17 +367,23 @@ Tasks:
      move; nested variations; all six move glyphs and some position glyphs; a multi-line
      comment; a comment typed with `{ }` (it should arrive stripped); castling both ways, en
      passant and a promotion; one long chapter.
-   - (b) Exports of two or three real studies. The owner may not want their repertoire in a
-     public repo, so these stay in the private data repo and run locally through
+   - (b) The owner's real studies: two or three Lichess exports, the Qchess export of each
+     repertoire study (§4.10), and a sample of the owner's Chessable export script's output.
+     The owner may not want their repertoire in a public repo, and course content must not go
+     there, so these stay in the private data repo and run locally through
      `REPWORKS_FIXTURES=<path>`.
-   - (c) PGN from other writers: repgen, deeprep, Qchess export, ChessBase. Synthetic samples
-     go in the public repo.
+   - (c) PGN from other writers. Qchess comes first, as the home of the owner's newest
+     repertoire: a synthetic sample written to the rules of its `generatePGN` (§2). Then
+     repgen, deeprep and ChessBase. Synthetic samples go in the public repo.
 
 Tests:
-- (a) and (b): `write(parse(F)) === F` byte for byte, per chapter. A Lichess export is
-  rewritten exactly.
-- (c): `parse(write(parse(F)))` equals `parse(F)` in the model, and `write` is stable (writing
-  twice gives the same text).
+- (a), and the Lichess exports in (b): `write(parse(F)) === F` byte for byte, per chapter. A
+  Lichess export is rewritten exactly.
+- (c), and the other files in (b): `parse(write(parse(F)))` equals `parse(F)` in the model, and
+  `write` is stable (writing twice gives the same text).
+- Qchess: its single `{[%csl …][%cal …] text}` block becomes text plus shapes, written back as
+  Lichess's two blocks; every glyph Qchess offers lands in the right group (move, position,
+  observation); a Black move with no number after a comment parses.
 - Property: random legal trees with random comments, shapes and NAGs survive write → parse.
 - The parser cuts an illegal move and reports it. `Ndb5` becomes `Nb5`. Two siblings that are
   both `Nb5` after canonicalizing are merged.
@@ -469,8 +494,8 @@ Tests (`test/unit/merge`, `test/sim`):
 - **Replay** (`core/progress/replay.ts`):
   - collect every device's events, drop duplicate (device, `n`), and sort by
     (`t`, device, `n`);
-  - fold per card: `snapshot` sets the state, `review` applies FSRS at `t`, `suspend` and
-    `unsuspend` flag the card, `forget` resets it;
+  - fold per card: `review` applies FSRS at `t`, `suspend` and `unsuspend` flag the card,
+    `forget` resets it;
   - a negative gap between reviews (clock skew between devices) counts as zero, as
     mistake-lab's `fsrs_review` does;
   - replay is per card, so new events replay only the cards they touch.
@@ -487,7 +512,6 @@ Tests:
 - Two devices interleaved by time give the same result as one device doing all the reviews.
 - A duplicate line is applied once. An unknown kind is skipped and survives compaction. A
   corrupt line is reported and skipped.
-- `snapshot` then `review` continues from the snapshot.
 - 100,000 events replay in under 200 ms on the desktop in Node, measured in CI.
 
 Live: the phone's replay time with a year of synthetic events (the target is under 1 s). The
@@ -555,7 +579,7 @@ That stays far under 500 commits an hour even with two devices editing at once.
 The status shows synced / N changes waiting / offline / error, with the time of the last
 successful sync.
 
-**Setup**:
+**Setup** (§8 lists the owner's steps in order):
 - The owner creates the data repo (private, with a README, because GitHub can't create a
   branch in an empty repo) and a fine-grained token: that repo only, Contents read/write.
 - A device is set up by opening `…/#setup?repo=<owner/name>&token=<token>`, typed, pasted or
@@ -577,30 +601,60 @@ debug panel, against the limits above.
 
 ### 4.10 Import
 
+Every import makes a new study and records its source (D3). The owner chooses *repertoire* or
+*reference*.
+
+- **Qchess study** (D18), first because the owner's newest repertoire is there.
+  - `scripts/qchess-export.js` is pasted into DevTools on the Qchess study page. It calls
+    Qchess's own `saveCurrentChapterPgn()`, so the open chapter's latest edits are included,
+    and downloads one file with every chapter's stored PGN, adding:
+    - `[Orientation]` from the chapter's `perspective`;
+    - `[QchessFolder "<name>"]` for a chapter in a folder;
+    - `[QchessTrain "false"]` for a chapter, or a folder, excluded from Qchess's MoveTrainer.
+
+    The intro chapter is skipped while it still holds Qchess's default text
+    (`_introPgnIsDefault`). The script changes nothing on Qchess.
+  - Its core, `qchessStudyToPgn(studyData)`, is a pure function; the page part only calls
+    Qchess and saves the file.
+  - Qchess's own "Download study PGN" also imports. It lacks those headers, so the import asks
+    the side once for the study, changeable per chapter, and folders and exclusions are lost.
+  - In the site the file is an ordinary PGN file import (below). Chapters marked
+    `[QchessTrain "false"]` go into a companion reference study, `<name> (reference)`, because a
+    study is repertoire or reference as a whole (D3).
+  - Until Phase 1 is in daily use the owner keeps editing in Qchess, so earlier imports are
+    trial copies. At the switch each study is imported a last time and the trial copies are
+    deleted.
 - **Lichess study.**
   - Paste a URL or ID (puzzle-explorer's `extractStudyId`, ported), or pick from
     `/api/study/by/<user>`.
   - Fetch `/api/study/<id>.pgn?clocks=false&orientation=true`, with the token for private
-    studies.
-  - Split it into chapters, parse, and create a new study (always new). The owner chooses
-    *repertoire* or *reference*. The source is recorded.
+    studies, and split it into chapters.
   - A chapter without `[Orientation]` asks for its perspective.
 - **Lichess OAuth**: PKCE with a redirect, scope `study:read`, ported from puzzle-explorer's
   `lib/lichessAuth.js`, with one change: the verifier goes in localStorage, not
   sessionStorage. On Android the redirect may come back in a Chrome Custom Tab rather than the
   PWA window, and only origin storage is shared between them; the spike checks this. The token
   is stored per device (never in a repo). The explorer reuses it in Phase 2.
-- **PGN file or paste**: repgen, deeprep, Qchess, ChessBase, later Chessable exports. Several
-  games become chapters, and a chapter without `[Orientation]` asks for its side.
+- **PGN file or paste**: the Qchess export; the output of the owner's Chessable export script
+  (D14: bought courses become reference studies, in the private data repo only); repgen,
+  deeprep, ChessBase. Several games become chapters. A chapter's side comes from
+  `[Orientation]`, else Qchess's own `[ChapterPerspective]`, else the import asks.
 - **Import report**: illegal moves cut (with their paths), siblings merged, comments over
   4,000 characters, headers kept.
 
-Tests: the fixtures of §4.5 import with the expected report; a study whose IDs already exist
-still imports as a new study.
+Tests:
+- the fixtures of §4.5 import with the expected report;
+- a study whose IDs already exist still imports as a new study;
+- `qchessStudyToPgn` on a hand-built `studyData` (a Black chapter, a folder, an excluded
+  folder, a default intro, a chapter stored without headers, a folder name with a quote) gives
+  the expected headers, and the result imports with the right sides and the right companion
+  reference study.
 
 Live:
-- desktop: import a private study through OAuth, and check the chapter count, comments and
-  arrows against Lichess's own view;
+- desktop: export each Qchess repertoire study with the script and import it. Check the chapter
+  count, each chapter's side, and a sample of comments and arrows against Qchess's own view;
+- desktop: import a private Lichess study through OAuth, and check the chapter count, comments
+  and arrows against Lichess's own view;
 - phone: the study appears after one sync; the OAuth flow from the installed PWA.
 
 ### 4.11 Study editor on chessground, and the Phase 0 acceptance test
@@ -643,7 +697,8 @@ Live (desktop and phone): every editor action above by hand, including draw mode
 and offline editing with the PWA killed and reopened.
 
 **Acceptance test (live, desktop + Android phone).**
-1. Both devices synced, with the same repertoire study open.
+1. Both devices synced, with the same repertoire study open: an imported copy of one of the
+   owner's Qchess studies.
 2. Both offline: airplane mode on the phone, offline in DevTools on the desktop.
 3. Desktop: add a variation in chapter A; rewrite the comment on node N; delete the subtree S;
    draw an arrow on node P; record two test reviews in the debug panel.
@@ -676,6 +731,9 @@ Scope:
   chapters reaching one position share its card.
 - **Daily queue**: due cards plus a limit on new ones. Grades follow mistake-lab's repertoire
   rule (under 3 s Easy, under 15 s Good, slower Hard, wrong or hint Again), adjustable.
+- **New cards.** Every card starts new (D19). They are introduced line by line in chapter
+  order, up to a daily limit of new moves (a setting), so a day's new material is whole lines
+  rather than scattered moves.
 - **The line trainer.** It walks a line through due cards and quizzes those. A move whose card
   isn't due (or was answered earlier in the session) is played by the trainer at a readable
   pace, which is what lichessable's auto-play did. Its lessons carry over as spec: pacing (no
@@ -694,14 +752,15 @@ Scope:
 - **Show and grade**: two keys, media keys from a ring, optional speech.
 
 Risks:
-- The first import of 400–800 variations makes thousands of cards at once: new-card limits,
-  ordering, and seeding the lines already learnt on Chessable (question 4).
+- The switch brings thousands of cards at once, all new (D19). The daily limit decides how
+  many weeks the whole repertoire takes to come in; the queue simulation below picks its
+  default.
 - Two cards in one position: the unplayed one could stay due for ever if one line is always
   preferred. The trainer then routes through that line.
 - Pace and input speed on the phone.
 
 Checks:
-- a 90-day replay simulation of queue sizes;
+- a 90-day replay simulation of queue sizes on the owner's real repertoire, from all-new cards;
 - the trainer's state machine in Node;
 - a Playwright review session;
 - a week of daily use on the phone before Chessable reviewing stops.
@@ -790,11 +849,13 @@ Scope:
 
 Migration (one-off, re-runnable as a dry run):
 - Read the Gist with a token entered once.
-- `positions[pid].srs` becomes one `snapshot` event per card, re-keyed through `positionKey`:
-  - `r_<key>` becomes `r|key|uci` through the repertoire index, and is reported if the
-    position has no or several repertoire moves;
+- `positions[pid].srs` becomes one `snapshot` event per card (a kind added in this phase),
+  re-keyed through `positionKey`:
   - `p_<key>` becomes `p|key`;
-  - game items become `m|…`.
+  - game items become `m|…`;
+  - `r_<key>` repertoire states are left behind and counted in the report. By then the site's
+    own repertoire cards have been in use since Phase 1, started fresh (D19), and a migrated
+    state would overwrite them.
 - Notes become a "Notes" reference study: one chapter per position, from its FEN, with the note
   as the root comment and its arrows as shapes.
 - Plan-card enrolments, custom deviations and dismissals become events.
@@ -802,8 +863,7 @@ Migration (one-off, re-runnable as a dry run):
 
 Risks:
 - mistake-lab's breadth (about 30,000 lines of features);
-- the size of the game data on the phone;
-- `r_` cards whose position has two repertoire moves.
+- the size of the game data on the phone.
 
 Checks:
 - for the same games, the same mistakes extracted as mistake-lab (per-game counts);
@@ -816,23 +876,21 @@ Checks:
 
 | Order | Phase | Retires |
 | --- | --- | --- |
-| 0 | Foundation | Qchess for study editing can stop once 0 and 1 are in daily use (not asked, but it falls out) |
-| 1 | Train and review | **lichessable**, once Chessable course export (below) is done, if the storm can wait |
+| 0 | Foundation | |
+| 1 | Train and review | **lichessable** (D20): training moves here, and the owner's own script exports the Chessable courses. **Editing in Qchess** ends here too: its studies are imported a last time when Phase 1 goes into daily use (D18) |
 | 2 | Explorer, ChessDB, Practical | |
 | 3 | Analysis, Stockfish, Maia | |
-| 4 | Storm and puzzles | lichessable at the latest, if the storm is daily use |
+| 4 | Storm and puzzles | lichessable's storm, if it was still used on Chessable courses until then |
 | 5 | Mistake review and migration | **mistake-lab** (the PWA; its analyzer keeps running from its repo until the tools move) |
 
 Side tasks, outside this repo:
-- **Chessable course export** (open question 9), in lichessable, since it already has the
-  course reader and the login token. `getList` gives every variation's moves (it works on
-  bought courses); one `getLesson` per variation adds the comments, clickable lines and
-  arrows. It outputs one PGN per course chapter, written only to the private data repo. It
-  must run before lichessable is retired (question 3).
+- **Chessable courses**: the owner's own export script (D14). Its PGN imports like any other
+  file; bought courses become reference studies, in the private data repo only. It doesn't
+  depend on lichessable, so retiring lichessable sets it no deadline.
 - **`explorerdb serve` CORS**, in q_extension, at the start of Phase 2.
 
-If the storm is daily use, Phase 4 can move up to straight after Phase 1. Phases 2 and 3 don't
-depend on it.
+Phase 4 stays after Phases 2 and 3: the storm will be daily use eventually, but the owner
+doesn't need it early (§8). Nothing in Phases 2 and 3 depends on it, so it can still move up.
 
 ---
 
@@ -840,7 +898,8 @@ depend on it.
 
 | Risk | Effect | Mitigation |
 | --- | --- | --- |
-| A shared origin with mistake-lab and puzzle-explorer | Their service workers delete the site's caches (offline start fails); a shared quota and token exposure | A separate origin (question 1); caches named `repworks-*` either way |
+| A second site published from the organization | It would share the origin again: caches, quota, token | The organization publishes Repworks only (D17); caches are named `repworks-*` anyway |
+| Qchess changes its page | The export script stops working | It is needed only until the switch; Qchess's own download still imports, with the side asked once per study |
 | Android clears site storage before a sync | Unsynced edits or reviews lost | Short push delay; push on hide; a visible "N changes waiting"; `persist()`; the risk named in settings |
 | GitHub secondary limits | Writes refused for a while | One commit per sync; at most one push a minute; backoff; nothing lost locally |
 | A Lichess dialect change | The byte round trip breaks | Fixtures re-exported when it happens; the semantic suite still holds |
@@ -850,32 +909,37 @@ depend on it.
 
 ---
 
-## 8. Questions for the owner
+## 8. The owner's answers, and setup
 
-1. **Hosting origin.** I recommend the site doesn't live on `skaeglund.github.io`, where
-   mistake-lab and puzzle-explorer already sit and delete each other's caches (§2). The
-   options:
-   - **(a)** a free GitHub organization (e.g. `repworks`), whose Pages site gets its own
-     origin, `https://repworks.github.io`. GitHub Pages is unchanged and there's no new vendor;
-     the organization's name is your choice.
-   - **(b)** Cloudflare Pages (`repworks.pages.dev`): a Cloudflare account, real headers, but
-     Maia must be split under the 25 MiB file limit.
-   - **(c)** a domain of yours on Pages.
-   - **(d)** stay on the shared origin and fix those two service workers.
+The first draft asked four questions. The owner answered them on 2026-10-05:
 
-   Recommendation: (a).
-2. **When can lichessable go?** If the intuition storm and puzzles are daily use, Phase 4
-   moves up to right after Phase 1 and lichessable retires then. Recommendation: Phase 1 plus
-   course export, with the storm following, unless you use it daily.
-3. **Chessable course export in lichessable.** May I plan it as a lichessable feature
-   (personal use, output only to the private data repo), to run before lichessable is retired?
-   Recommendation: yes, early in Phase 1.
-4. **Starting state of your cards.** When you switch from Chessable, should the lines you
-   already know start as known? The alternative is that every move starts new and the new-card
-   limit spreads them over weeks. Recommendation: mark imported repertoire moves as known with
-   first intervals spread over 2–8 weeks, so failures relearn naturally.
+1. **Hosting origin**: a free GitHub organization's Pages site, as recommended (D17).
+2. **The storm**: it will be daily use eventually, but isn't needed early. Phase 4 stays where
+   it is, and lichessable can go after Phase 1 (D20).
+3. **Chessable export**: the owner already has a script, so nothing is built in lichessable
+   (D14). The owner's newest repertoire is in Qchess studies, so import starts there (D18,
+   §4.10).
+4. **Starting state of cards**: a fresh start. Every card starts new (D19). For the same reason,
+   mistake-lab's repertoire reviews aren't migrated in Phase 5 (D15).
 
-Setup you'll need when Phase 0 reaches §4.2 (no decision needed, just actions): create the
-private data repo (suggested name `repworks-data`, created with a README), and a fine-grained
-token for that repo only, with Contents read/write. Expiry is up to you: none is allowed; I'd
-take a year with a reminder.
+No question is open. Two items stay open in DECISIONS.md because nothing depends on them yet:
+the repo layout once the tools move, and the name.
+
+Setup, in this order (actions, no decisions):
+1. Create a free GitHub organization. Its name becomes the address,
+   `https://<name>.github.io/repworks/`, and changing it later means setting each device up
+   again, because a browser keeps local data per address (the data repo is unaffected).
+   `repworks` would match the working name.
+2. Transfer `skAeglund/repworks` to it (the repo's Settings → Transfer ownership). GitHub
+   redirects the old address.
+3. Install the Claude GitHub App on the organization, with access to that repo
+   (https://github.com/apps/claude/installations/select_target), so Claude sessions can push
+   to it.
+4. In the repo's Settings → Pages, set the source to GitHub Actions. The workflow arrives with
+   Phase 0's skeleton.
+5. When Phase 0 reaches §4.2: create the private data repo under your own account
+   (`skAeglund/repworks-data`, created with a README) and a fine-grained token for that repo
+   only, with Contents read/write. Expiry is up to you: none is allowed; I'd take a year with a
+   reminder.
+6. When Phase 0 reaches §4.5: the Lichess test study (§4.5 (a)), plus a Qchess export of each
+   repertoire study and a sample of your Chessable script's output, all kept in the data repo.
