@@ -1,0 +1,12 @@
+[Event "Rep: Endgame"]
+[Result "*"]
+[Variant "Standard"]
+[ECO "?"]
+[Opening "?"]
+[StudyName "Rep"]
+[ChapterName "Endgame"]
+[FEN "8/8/4k3/8/3PK3/8/8/8 b - - 0 40"]
+[SetUp "1"]
+[Orientation "white"]
+
+40... Kd6 (40... Kf6 41. Kd5) 41. Kf5?? *

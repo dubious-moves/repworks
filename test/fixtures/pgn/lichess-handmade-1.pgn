@@ -1,0 +1,15 @@
+[Event "Rep: Najdorf"]
+[Site "https://lichess.org/study/abcdefgh/ijklmnop"]
+[Result "*"]
+[Variant "Standard"]
+[ECO "B90"]
+[Opening "Sicilian Defense: Najdorf Variation"]
+[StudyName "Rep"]
+[ChapterName "Najdorf"]
+[ChapterURL "https://lichess.org/study/abcdefgh/ijklmnop"]
+[Annotator "https://lichess.org/@/someone"]
+[Orientation "black"]
+
+{ Root comment, before the first move } { second root comment }
+1. e4 c5 2. Nf3 { A comment } { [%csl Gd4][%cal Gd2d4,Rc5d4] } 2... d6 (2... Nc6 { Old line.
+Two lines here } 3. d4 (3. Bb5 g6!? 4. O-O $14) 3... cxd4) 3. d4!! cxd4?! 4. Nxd4 Nf6 5. Nc3 a6 $10 { [%anno "Other", other] by another author } *

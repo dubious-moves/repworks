@@ -3,6 +3,8 @@
 // Errors are what the app would refuse or lose; warnings are what it works around.
 import { parseStudyMeta } from '../study/studyMeta.ts';
 import { parseLog } from '../progress/events.ts';
+import { parseChapterFile } from '../pgn/parse.ts';
+import { chapterFileText } from '../pgn/write.ts';
 import { classifyPath, DATA_FORMAT, FORMAT_FILE, utcDay, utcMonth } from './layout.ts';
 
 export interface Issue {
@@ -17,14 +19,35 @@ export interface ValidationReport {
 }
 
 export interface ValidateOptions {
-  /** Problems with one chapter file's PGN; §4.5's parser supplies it. */
-  checkChapter?: (text: string) => { errors: string[]; warnings: string[] };
+  /** Problems with one chapter file's PGN; checkChapterText by default. */
+  checkChapter?: (text: string, id: string) => { errors: string[]; warnings: string[] };
+}
+
+/**
+ * A chapter file must be one game the app can read, with only legal moves. Anything else the
+ * app would change on its next write (SAN spelling, duplicate siblings, the layout) is a warning.
+ */
+export function checkChapterText(text: string, id: string): { errors: string[]; warnings: string[] } {
+  const parsed = parseChapterFile(text, id);
+  if (!parsed.ok) return { errors: [`the app can't read it, so it will never rewrite it: ${parsed.reason}`], warnings: [] };
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  for (const note of parsed.notes) {
+    const at = note.path.length ? ` after ${note.path.join(' ')}` : ' at the start';
+    if (note.kind === 'illegal') errors.push(`illegal move ${note.san}${at}: the app would cut it and everything after it`);
+    else if (note.kind === 'canonical') warnings.push(`${note.from} is written ${note.path[note.path.length - 1]} by the app (at ${note.path.join(' ')})`);
+    else if (note.kind === 'merged') warnings.push(`the same move twice at ${note.path.join(' ')}: the app merges them`);
+    else warnings.push(`a comment of ${note.length} characters${at}: Lichess keeps 4,000`);
+  }
+  if (!errors.length && chapterFileText(parsed.chapter) !== text) warnings.push("not in the app's own layout: its next edit rewrites the whole file");
+  return { errors, warnings };
 }
 
 const ROOT_FILES_ALLOWED = new Set(['README.md', '.gitattributes', '.gitignore']);
 const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/;
 
 export function validateDataRepo(files: ReadonlyMap<string, string>, options: ValidateOptions = {}): ValidationReport {
+  const checkChapter = options.checkChapter ?? checkChapterText;
   const errors: Issue[] = [];
   const warnings: Issue[] = [];
   const error = (path: string, message: string, line?: number) => errors.push(line === undefined ? { path, message } : { path, line, message });
@@ -66,8 +89,8 @@ export function validateDataRepo(files: ReadonlyMap<string, string>, options: Va
       case 'chapter': {
         study(where.sid).chapters.add(where.cid);
         if (text.trim() === '') error(path, 'empty chapter file');
-        else if (options.checkChapter) {
-          const result = options.checkChapter(text);
+        else {
+          const result = checkChapter(text, where.cid);
           for (const message of result.errors) error(path, message);
           for (const message of result.warnings) warn(path, message);
         }

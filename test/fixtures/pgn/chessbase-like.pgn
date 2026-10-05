@@ -1,0 +1,17 @@
+[Event "Made-up training game"]
+[Site "?"]
+[Date "2026.10.05"]
+[Round "?"]
+[White "White, Player"]
+[Black "Black, Player"]
+[Result "1-0"]
+[ECO "C65"]
+[Annotator "Someone"]
+[PlyCount "21"]
+
+{A made-up game for tests, written the way ChessBase writes PGN: comments
+without inner spaces, line breaks inside the movetext, symbols as NAGs.} 1. e4
+e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Nxe4 {[%cal Gf1e1,Rd2d4]} 5. d4 ({Also} 5.
+Re1 Nd6 6. Nxe5 Be7 7. Bf1 Nxe5 8. Rxe5 O-O $11) 5... Nd6 6. Bxc6 dxc6 7. dxe5
+Nf5 8. Qxd8+ Kxd8 $14 9. Nc3 Ke8 {[%csl Ge8][%cal Rh7h6]} 10. h3 h5 11. Bf4 $36
+1-0

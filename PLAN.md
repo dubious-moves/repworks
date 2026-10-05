@@ -89,8 +89,8 @@ findings below is kept in `prototypes/`, whose README says which finding each fi
 | Token expiry | A personal account may create fine-grained tokens with no expiry. A token unused for a year is revoked. A token pushed to a public repo or gist is revoked automatically. | `managing-your-personal-access-tokens.md`, `token-expiration-and-revocation.md` |
 | CORS on the GitHub API | REST answers any origin, allows `Authorization` and `If-None-Match`, and exposes `ETag` and the rate-limit headers. | `using-cors-and-jsonp-to-make-cross-origin-requests.md` |
 | chessops has a full PGN tree | Yes: variations, `startingComments`, several comments per move, NAGs, comments before the first move, and parsing of `[%csl]`, `[%cal]`, `[%clk]`, `[%emt]`, `[%eval]`. It accepts Chessable's over-disambiguated `Ndb5` and `makeSan` normalizes it to `Nb5`. Its `makePgn` is not Lichess's dialect: NAGs come out as `$n`, the rules for Black's move numbers differ, and `}` is deleted from comments. Its parser accepts three real repgen files with no illegal moves. | chessops 0.15.1 from npm, tested in a scratch project |
-| Lichess's export dialect | Text comments first, then shapes in a separate `{ [%csl …][%cal …] }`. Glyphs 1–6 are a SAN suffix (`e4!?`), others ` $n`. `1. e4`, with `1... e5` only after a comment or a variation. The movetext is one line. `[Orientation]` appears only with `?orientation=true`. Comments by other authors get a `[%anno "Name", id]` prefix. On save Lichess deletes `{` and `}`, normalizes whitespace and caps a comment at 4,000 characters. On import, several comments by one author on a move are merged with a newline. | lila `PgnDump.scala`, `tree.scala` (`sanitize`), `StudyPgnImport.scala`; scalachess `Pgn.scala`, `PgnNodeEncoder.scala` |
-| "A round trip loses nothing" | Feasible: chessops's parser (with `emptyHeaders`) plus a ~60-line writer reproduced two fixtures byte for byte. The fixtures were hand-built in the dialect: a custom FEN with Black to move, nested variations, a multi-line comment, all glyph kinds, shapes, `[%anno]`. **Real exports are still needed** (§4.5). | scratch prototype |
+| Lichess's export dialect | Text comments first, then shapes in a separate `{ [%csl …][%cal …] }`. Glyphs 1–6 are a SAN suffix (`e4!?`), others ` $n`. `1. e4`, with `1... e5` only after a comment or a variation. The movetext is one line. `[Orientation]` appears only with `?orientation=true`. Comments by other authors get a `[%anno "Name", id]` prefix. On save Lichess deletes `{` and `}`, normalizes whitespace and caps a comment at 4,000 characters. On import, several comments by one author on a move are merged with a newline. Added by the build session: a chapter with server analysis has `{ [%eval …] }` before its text comments; tags are written with the seven-tag roster first; each chapter of a study export ends with three newlines; and the export then replaces every `] } { [` with `] [`, which merges a block ending in `]` with the next one starting with `[` (`Annotator.toPgnString`). | lila `PgnDump.scala`, `tree.scala` (`sanitize`), `StudyPgnImport.scala`, `Annotator.scala` (`1dc9cb2`); scalachess `Pgn.scala`, `PgnNodeEncoder.scala`, `Tag.scala`; scalalib `StringOps.softCleanUp` |
+| "A round trip loses nothing" | Feasible: chessops's parser (with `emptyHeaders`) plus a ~60-line writer reproduced two fixtures byte for byte. The fixtures were hand-built in the dialect: a custom FEN with Black to move, nested variations, a multi-line comment, all glyph kinds, shapes, `[%anno]`. Build session: the Phase 0 writer rewrote **448 of 449 chapters of 24 public Lichess studies byte for byte** (FEN starts with either side to move, Black orientation, shapes, `[%anno]`, `[%eval]`, glyphs of every group, nested variations, multi-line and root comments, empty chapters, results). The 449th holds a move Lichess stored although it is illegal (an annotated broadcast game); the parser cuts it and reports it, as designed. The owner's own test study is still needed (§4.5 (a)). | scratch prototype; live exports fetched from lichess.org on 2026-10-05, kept out of the repo |
 | chess.js 1.x drops variations | Confirmed, and worse: 1.4.0 silently drops variations *and* NAGs, and **throws** on two comments after one move, which is how Lichess writes a comment plus arrows. | scratch tests against chess.js 1.4.0 |
 | Puzzle-explorer's en passant rule | `posKey.js` keeps the en passant square when a side-to-move pawn stands beside it on the right rank (pseudo-legal). But `build-index.js` keys the FENs from chess.js 1.4.0's `history({verbose: true})`, and those only carry a *legal* en passant square. The published keys therefore follow the legal rule. 1,763,576 keys from 256 of the 4,096 index shards (every 16th): all are fixed points of a chessops canonical key, 3,810 carry an en passant square, and every key hashes to its shard. | read `lib/posKey.js`, `analyzer/build-index.js`; chess.js 1.4.0, chessops and chess.js 0.10.3 on pinned-pawn positions; scan of the dataset checkout |
 | mistake-lab's key | Same pseudo-legal rule as `posKey.js`. It differs from the dataset only when the neighbouring pawn can't legally capture (pinned, or the horizontal discovered check). | `index.html` `fenPositionKey`, `isEnPassantPseudoLegal`; the same tests |
@@ -106,7 +106,8 @@ findings below is kept in `prototypes/`, whose README says which finding each fi
 | The old address after the transfer (added with the organization) | `git push` to `skAeglund/repworks` lands in `dubious-moves/repworks`, and the remote prints the new location; the GitHub tools used by Claude sessions also answer for the old name. The redirect is deleted for good if a new repo or fork is ever created at the old address. The repo was empty, so the first branch pushed became its default. | this plan's own push and a branch listing, 2026-10-05; github/docs `transferring-a-repository.md` |
 
 Not verified, and where each gets verified:
-- Real Lichess exports round-tripping byte for byte: Phase 0, §4.5, from the owner's own test study.
+- Real Lichess exports round-tripping byte for byte: checked on 24 public studies (above); the
+  owner's own test study (§4.5 (a)) still runs through the suite.
 - The Qchess export script on the owner's real studies, and their import: Phase 0, §4.10 and
   §4.5 (b).
 - GraphQL commits with a fine-grained token from a browser, and the exact error for a stale
@@ -368,12 +369,20 @@ Tasks:
    - headers in order, a blank line, root comments as `{ a } { b }` plus a newline;
    - `N. ` before White's moves, `N... ` before Black's only at a line start or after a
      comment or variation;
-   - glyphs 1–6 as a suffix, others as ` $n`;
-   - each text comment as ` { text }`, then shapes as ` { [%csl …][%cal …] }`;
-   - variations as ` (…)`, all on one line, then the result.
-4. **Sanitize** on edit, Lichess's rules (`tree.scala` `Comment.sanitize`): delete `{` and `}`,
-   CRLF→LF, strip line-leading and trailing spaces, collapse runs of blank lines. Warn above
-   4,000 characters, which Lichess would cut. Imported text is kept as parsed.
+   - glyphs 1–6 as a suffix, others as ` $n` (and never two suffixes in a row, which would
+     read back as one);
+   - ` { [%eval …] }` when the node has one, each text comment as ` { text }`, then shapes as
+     ` { [%csl …][%cal …] }`, then ` { [%clk …] }`;
+   - variations as ` (…)`, all on one line, then ` <Result>` when there is a Result header;
+   - last, every `] } { [` becomes `] [`, as lila's export does. The parser joins two text
+     comments the same way, so a write then a read changes nothing.
+   A chapter file is that text plus one newline; a study export is the chapters each followed by
+   three newlines.
+4. **Sanitize** on edit, Lichess's rules (`tree.scala` `Comment.sanitize`, after scalalib's
+   `softCleanUp`: NFKC, invisible and control characters out): delete `{` and `}`, CRLF→LF,
+   strip line-leading and trailing spaces, collapse runs of blank lines, and then drop blank
+   lines altogether as the export does. Warn above 4,000 characters, which Lichess would cut.
+   Imported text is kept as parsed.
 5. **Fixtures.**
    - (a) A Lichess test study the owner creates for this, exported with
      `?clocks=false&orientation=true`. It needs: chapters for both perspectives; a custom FEN

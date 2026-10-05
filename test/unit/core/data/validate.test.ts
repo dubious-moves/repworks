@@ -50,7 +50,7 @@ test('a progress line that will not parse is a warning, and the rest of the file
 test('other problems: unknown format, unlisted chapter, missing device, a clashing n, stray files', () => {
   const files = fixture();
   files.set('repworks.json', '{ "format": 2 }');
-  files.set('studies/Rep0Najd/Ch3Extra.pgn', '[Event "x"]\n\n1. d4 *\n');
+  files.set('studies/Rep0Najd/Ch3Extra.pgn', '[Event "x"]\n[Result "*"]\n\n1. d4 *\n');
   files.delete('devices/Phone001.json');
   files.set('progress/Desktop1/2026-10-06.jsonl', '{"v":1,"n":2,"t":"2026-10-06T08:00:00.000Z","k":"forget","card":"r|x|e2e4"}\n');
   files.set('notes.txt', 'hello');
@@ -71,4 +71,21 @@ test('scripts/validate-data.ts prints the issues and fails on errors', () => {
   const ok = spawnSync(process.execPath, [script, FIXTURE], { encoding: 'utf8' });
   assert.equal(ok.status, 0, ok.stderr);
   assert.match(ok.stdout, /9 files, 0 error\(s\), 0 warning\(s\)/);
+});
+
+test('chapter files: unreadable or illegal is an error; what the app would rewrite is a warning', () => {
+  const files = fixture();
+  const ch = 'studies/Rep0Najd/Ch2Alapn.pgn';
+  files.set(ch, '[Event "x"]\n[Variant "Atomic"]\n\n1. e4 *\n');
+  assert.deepEqual(messages(validateDataRepo(files).errors), [`${ch}: the app can't read it, so it will never rewrite it: only standard chess is supported, not Atomic`]);
+  files.set(ch, '[Event "x"]\n[Result "*"]\n\n1. e4 c5 2. Ke3 *\n');
+  assert.deepEqual(messages(validateDataRepo(files).errors), [`${ch}: illegal move Ke3 after e4 c5: the app would cut it and everything after it`]);
+  // The c3 knight is pinned, so only the d4 knight can go to b5: "Ndb5" says more than it needs.
+  files.set(ch, '[Event "x"]\n[Result "*"]\n\n1. e4 e5 2. Nf3 Nc6 3. d4 exd4 4. Nxd4 Qh4 5. Nc3 Bb4 6. Ndb5 *\n');
+  const report = validateDataRepo(files);
+  assert.deepEqual(report.errors, []);
+  assert.deepEqual(messages(report.warnings), [
+    `${ch}: Ndb5 is written Nb5 by the app (at e4 e5 Nf3 Nc6 d4 exd4 Nxd4 Qh4 Nc3 Bb4 Nb5)`,
+    `${ch}: not in the app's own layout: its next edit rewrites the whole file`,
+  ]);
 });
