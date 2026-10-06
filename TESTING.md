@@ -34,5 +34,8 @@ Qchess and Lichess imports on the desktop (§4.10), and the study editor on desk
 - §5.10: the Read and Interactive views on the phone and the desktop, from the chapter view and
   the move menu: reading a long line with comments (the text size, ← →), playing a line by tap
   and drag, and the walk following a variation's move.
+- §5.11: the transposition badges on the real repertoire (how many moves carry `⇄` or `+k`,
+  whether the marks crowd the notation on the phone, the time the chapter view takes to open a
+  big chapter); copy continuation pasted where the owner uses it.
 - §5.15: the study cards, a study made and managed without an import, and train ↔ study during
   a real session (desktop and phone).

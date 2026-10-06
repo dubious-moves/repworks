@@ -2,7 +2,7 @@
 // with the fake GitHub holding the fixture repertoire (Main line: 1. e4 c5 2. Nf3 d6 (2... Nc6
 // 3. d4) 3. d4 cxd4, a comment on 2. Nf3). A line read through from the chapter view and back; a
 // line played with one wrong move and the other line's move, which the walk follows; nothing
-// recorded.
+// recorded. Then the transposition badges and copy continuation (§5.11).
 import { test, expect, type Page } from '@playwright/test';
 import type { FakeGit } from '../support/fakeGit.ts';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
@@ -128,4 +128,56 @@ test('play from the move menu, from the move shown; read the line from the end',
   await expect(page.locator('.read-move')).toContainText('2. Nf3');
   await page.getByRole('button', { name: 'Play from here' }).click();
   await expect(page).toHaveURL(/#\/play\/Rep0Najd\/Ch1Najdf\?at=e4,c5,Nf3$/);
+});
+
+test('transposition badges: a new move order shows ⇄1 both ways and leads to the other; +1 leads to the other chapter', async ({ page, isMobile }) => {
+  await setUp(page);
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf`);
+  await expect(page.locator('.notation')).toBeVisible();
+  // 1. e4 is reached in the Alapin chapter too: a small +1, no ⇄.
+  const e4 = page.locator('.move[data-path="e4"]');
+  await expect(e4.locator('.xref')).toHaveText('+1');
+  await expect(e4.locator('.badge')).toHaveCount(0);
+
+  // A new variation from the start, 1. Nf3 c5 2. e4, reaches 1. e4 c5 2. Nf3's position.
+  await page.locator('.move.start').click();
+  for (const [from, to] of [['g1', 'f3'], ['c7', 'c5'], ['e2', 'e4']] as const) {
+    await clickSquare(page, from, 'black');
+    await clickSquare(page, to, 'black');
+  }
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'Nf3 c5 e4');
+  await expect(page.locator('.move[data-path="Nf3 c5 e4"] .badge')).toHaveText('⇄1');
+  await expect(page.locator('.move[data-path="e4 c5 Nf3"] .badge')).toHaveText('⇄1');
+
+  await page.locator('.move[data-path="Nf3 c5 e4"] .badges').click();
+  const list = page.getByRole('menu', { name: 'Same position' });
+  await expect(list.getByRole('menuitem')).toHaveText(['1. e4 c5 2. Nf3']);
+  await list.getByRole('menuitem').click();
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3');
+  await expect(list).toHaveCount(0);
+
+  // The +1 on 1... c5 opens the Alapin at its 1... c5.
+  await page.locator('.move[data-path="e4 c5"] .badges').click();
+  await expect(list.getByRole('menuitem')).toHaveText(['Test repertoire · Alapin: 1. e4 c5']);
+  if (!isMobile) await page.keyboard.press('Enter');
+  else await list.getByRole('menuitem').click();
+  await expect(page).toHaveURL(/#\/study\/Rep0Najd\/Ch2Alapn\?at=e4,c5$/);
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5');
+});
+
+test('copy continuation: from the variation’s first move to the end of its line', async ({ page, context, browserName }) => {
+  test.skip(browserName !== 'chromium', 'clipboard permissions are Chromium-only here');
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await setUp(page);
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf?at=e4,c5,Nf3,Nc6`);
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 Nc6');
+  await page.getByRole('button', { name: 'Move menu' }).click();
+  await page.getByRole('menuitem', { name: 'Copy continuation' }).click();
+  await expect(page.locator('.cv-board .feedback')).toHaveText('Continuation copied');
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('2... Nc6 3. d4');
+  // On the main line after the fork: from the main line's move at the fork.
+  await page.locator('.move[data-path="e4 c5 Nf3 d6 d4 cxd4"]').click();
+  await page.getByRole('button', { name: 'Move menu' }).click();
+  await page.getByRole('menuitem', { name: 'Copy continuation' }).click();
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('2... d6 3. d4 cxd4');
 });

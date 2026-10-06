@@ -1706,6 +1706,35 @@ where they apply); the continuation of a main-line move, a variation's move and 
 numbering from a Black move. Playwright: click a badge and land on the other line; copy a
 continuation.
 
+**As built** (2026-10-06):
+- `src/core/study/transpositions.ts`: `transpositions(chapter)` keys the position each move
+  reaches (D10's key: clocks ignored, an en passant square only when the capture is legal) and
+  keeps the positions reached by more than one move; `otherOrders(t, path)` lists the others.
+  Worked out from the open chapter on every edit, so a new move order shows its badge at once.
+- The index (§5.1) gains `reached`: every position a move reaches, with the moves reaching it,
+  across the repertoire. Each position is now keyed once while walking (before, a position was
+  keyed again for each of its moves), so this costs no extra key per move.
+- The notation (`Notation.tsx`, `Transpositions.tsx`): after a move, `⇄n` (n other move orders in
+  the chapter) and a smaller `+k` (k other repertoire chapters reaching the position, from the
+  training data's index, so as last saved). Either opens a list, placed like the move menu and
+  driven by the same keys: "Other move orders here" (each `1. e4 c5 2. Nf3`, going to that move)
+  and "Other chapters" (`Study · Chapter: moves`, opening that chapter at that move). Reference
+  studies get `⇄` from their own moves; `+k` counts repertoire chapters only.
+- Copy continuation: "Copy continuation" in the move menu, after "Copy line as PGN";
+  `continuation(chapter, path)` in `core/study/ops.ts`, sharing its numbering with `linePgn`.
+  On a main line with no fork above the move, it is the whole line from the start.
+- q_extension wasn't checked out in this session's container, so its harness cases weren't
+  ported; the tests are hand-built from this section's description. A later session with
+  q_extension at hand can port them.
+- Tests: `test/unit/core/study/transpositions.test.ts` (move orders both ways, a three-move
+  order, clocks ignored, the en passant rule both ways, the continuation of a main-line move, a
+  move after a fork, a variation's move and a nested one, from a set-up position with Black to
+  move, and the index's `reached` across two chapters) and `test/e2e/views.spec.ts` (the `+1` on
+  1. e4, a new order 1. Nf3 c5 2. e4 played on the board giving `⇄1` both ways, the list leading
+  to the other order, `+1` on 1... c5 opening the Alapin at it; a continuation copied from a
+  variation and from the main line past the fork). 200 runs of the views and editor specs under
+  `--repeat-each=8 --workers=4` passed before pushing.
+
 #### 5.12 Clickable lines and line jumping
 
 - `core/repertoire/lines.ts`: `parseCommentLines(text)`, a port of q_extension's `clParse`

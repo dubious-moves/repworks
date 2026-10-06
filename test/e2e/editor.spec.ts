@@ -114,7 +114,7 @@ test('line actions: promote, make main line, delete from here', async ({ page })
   await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 Nc6');
   await openMoveMenu(page, 'e4 c5 Nf3 Nc6');
   // The second of two moves can be promoted; it isn't the main line.
-  await expect(page.getByRole('menuitem')).toHaveText(['Comment', 'Promote', 'Make main line', 'Delete from here', 'Copy line as PGN', 'Read from here', 'Play from here']);
+  await expect(page.getByRole('menuitem')).toHaveText(['Comment', 'Promote', 'Make main line', 'Delete from here', 'Copy line as PGN', 'Copy continuation', 'Read from here', 'Play from here']);
   await page.getByRole('menuitem', { name: 'Make main line' }).click();
   await expect(page.locator('.notation .pair .move[data-path="e4 c5 Nf3 Nc6"]')).toBeVisible();
   await expect(page.locator('.notation .variation')).toHaveText(['2... d6 3. d4 cxd4']);
@@ -122,7 +122,7 @@ test('line actions: promote, make main line, delete from here', async ({ page })
   // Now first and on the main line: neither promote nor make main line. The ⋯ button opens the
   // menu of the move shown.
   await openMoveMenu(page);
-  await expect(page.getByRole('menuitem')).toHaveText(['Comment', 'Delete from here', 'Copy line as PGN', 'Read from here', 'Play from here']);
+  await expect(page.getByRole('menuitem')).toHaveText(['Comment', 'Delete from here', 'Copy line as PGN', 'Copy continuation', 'Read from here', 'Play from here']);
   await page.getByRole('menuitem', { name: 'Delete from here' }).click();
   await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3');
   await expect(page.locator('.notation')).not.toContainText('Nc6');

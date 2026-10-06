@@ -1217,3 +1217,42 @@ a.button.secondary {
   background: var(--accent);
   color: var(--accent-text);
 }
+
+/* Transposition badges (PLAN.md §5.11): small marks after a move, and the list they open. */
+
+.badges {
+  margin-left: 3px;
+  font-size: 0.75em;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.badges .badge {
+  color: #7ec8e3;
+}
+
+.badges .xref {
+  margin-left: 2px;
+  color: var(--muted);
+  font-size: 0.9em;
+}
+
+.move.current .badges .badge,
+.move.current .badges .xref {
+  color: inherit;
+}
+
+.transpositions {
+  max-width: min(420px, calc(100vw - 8px));
+}
+
+.transpositions button {
+  min-height: 36px;
+  white-space: normal;
+}
+
+.menu-heading {
+  padding: 6px 16px 2px;
+  color: var(--muted);
+  font-size: 0.75rem;
+}

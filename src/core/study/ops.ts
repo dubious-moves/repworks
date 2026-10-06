@@ -1,12 +1,13 @@
 // Edits to a chapter and a study (PLAN.md §4.6). Each returns a new value and leaves its input
 // alone, sharing the subtrees it didn't touch, so undo is keeping the old value. Every edit
 // keeps a chapter valid: legal moves from the start position, canonical SAN, distinct siblings.
+import type { Position } from 'chessops/chess';
 import { makeSan, parseSan } from 'chessops/san';
 import type { Color } from 'chessops/types';
 import { dedupeShapes, sanitizeComment } from '../pgn/comment.ts';
 import { glyphGroup } from '../pgn/nags.ts';
 import { emptyNodeData, header, type Chapter, type MoveNode, type Shape, type StudyKind, type StudyMeta } from './model.ts';
-import { liftStartingComments, nodeAt, positionAt, updateAt, type Path, type TreeNode } from './tree.ts';
+import { liftStartingComments, lineThrough, nodeAt, positionAt, updateAt, type Path, type TreeNode } from './tree.ts';
 
 export type Edit<T = Chapter> = { ok: true; value: T } | { ok: false; error: string };
 
@@ -200,14 +201,38 @@ export function newChapter(id: string, studyName: string, name: string, orientat
 export function linePgn(chapter: Chapter, path: Path): string {
   const pos = positionAt(chapter, []);
   if (!pos || !nodeAt(chapter, path)) return '';
+  return numberedMoves(pos, path);
+}
+
+/** Moves as bare SAN numbered from `pos` (`4... c5 5. d4 cxd4`); `pos` is played through. */
+function numberedMoves(pos: Position, moves: readonly string[]): string {
   const parts: string[] = [];
-  for (const [i, san] of path.entries()) {
+  for (const [i, san] of moves.entries()) {
     const number = pos.fullmoves;
     if (pos.turn === 'white') parts.push(`${number}. ${san}`);
     else parts.push(i === 0 ? `${number}... ${san}` : san);
     pos.play(parseSan(pos, san)!);
   }
   return parts.join(' ');
+}
+
+/**
+ * Copy continuation (PLAN.md §5.11, q_extension's): the moves from the branch the move at `path`
+ * is on (its nearest ancestor-or-self with a sibling; the chapter's start when there is none) to
+ * the end of the line, following first children, numbered from the branch's position.
+ */
+export function continuation(chapter: Chapter, path: Path): string {
+  const line = lineThrough(chapter, path);
+  if (!line) return '';
+  let from = 0;
+  for (let i = path.length; i >= 1; i--) {
+    if (nodeAt(chapter, path.slice(0, i - 1))!.children.length > 1) {
+      from = i - 1;
+      break;
+    }
+  }
+  const pos = positionAt(chapter, line.slice(0, from));
+  return pos ? numberedMoves(pos, line.slice(from)) : '';
 }
 
 // Study level: study.json and the chapter headers that repeat it.

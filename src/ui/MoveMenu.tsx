@@ -8,7 +8,7 @@ import { chapter, doc, edit, feedback, goTo, study } from '../app/editor.ts';
 import { open } from '../app/mode.ts';
 import { LICHESS_COMMENT_LIMIT, sanitizeComment } from '../core/pgn/comment.ts';
 import { GLYPHS, MOVE_GLYPHS, OBSERVATION_GLYPHS, POSITION_GLYPHS } from '../core/pgn/nags.ts';
-import { deletePath, linePgn, makeMainline, ownComment, promote, setComment, setNags, toggleGlyph, variationStart } from '../core/study/ops.ts';
+import { continuation, deletePath, linePgn, makeMainline, ownComment, promote, setComment, setNags, toggleGlyph, variationStart } from '../core/study/ops.ts';
 import { nodeAt, type Path } from '../core/study/tree.ts';
 
 const GLYPH_ROWS: readonly (readonly number[])[] = [
@@ -36,12 +36,12 @@ export function openMenu(path: Path, x: number, y: number, above = y): void {
 
 const close = () => (menu.value = undefined);
 
-async function copyLine(path: Path) {
+async function copyLine(path: Path, how: 'line' | 'continuation') {
   const c = chapter.peek();
   if (!c) return;
   try {
-    await navigator.clipboard.writeText(linePgn(c, path));
-    feedback.value = 'Line copied';
+    await navigator.clipboard.writeText(how === 'line' ? linePgn(c, path) : continuation(c, path));
+    feedback.value = how === 'line' ? 'Line copied' : 'Continuation copied';
   } catch {
     feedback.value = 'The browser did not allow copying';
   }
@@ -92,7 +92,9 @@ export function MoveMenu() {
   if (editable && isMove && !first) items.push({ label: 'Promote', class: 'promote', run: () => edit((ch) => promote(ch, m.path)) });
   if (editable && variationStart(c, m.path)) items.push({ label: 'Make main line', class: 'promote', run: () => edit((ch) => makeMainline(ch, m.path)) });
   if (editable && isMove) items.push({ label: 'Delete from here', class: 'delete', run: () => edit((ch) => deletePath(ch, m.path), m.path.slice(0, -1)) });
-  if (isMove) items.push({ label: 'Copy line as PGN', run: () => void copyLine(m.path) });
+  if (isMove) items.push({ label: 'Copy line as PGN', run: () => void copyLine(m.path, 'line') });
+  // From the branch's first move to the line's end, numbered from there (§5.11).
+  if (isMove) items.push({ label: 'Copy continuation', run: () => void copyLine(m.path, 'continuation') });
   const s = study.value;
   if (s) {
     // Qchess's two training views of the line through this move (§5.10).

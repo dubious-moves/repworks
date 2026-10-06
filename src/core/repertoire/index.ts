@@ -31,6 +31,8 @@ export interface Occurrence {
 
 export interface IndexedMove {
   key: PositionKey;
+  /** The position the move reaches. */
+  after: PositionKey;
   uci: string;
   /** Set for an own move; an opponent's move makes no card. */
   card?: CardId;
@@ -72,6 +74,8 @@ export interface RepertoireIndex {
   positions: Map<PositionKey, PositionMoves>;
   /** Every card, with where its move is played. */
   cards: Map<CardId, Occurrence[]>;
+  /** Every position a move reaches, with the moves that reach it (transpositions, §5.11). */
+  reached: Map<PositionKey, Occurrence[]>;
   lines: Line[];
   /** Chapters that make no cards, and why. */
   skipped: { sid: string; cid: string; reason: string }[];
@@ -90,17 +94,20 @@ export function indexChapter(sid: string, chapter: Chapter): ChapterIndexing {
   const moves: IndexedMove[] = [];
   const lines: Line[] = [];
 
-  const walk = (node: RootNode | MoveNode, pos: Position, path: string[], cards: CardId[], plies: number[]) => {
+  // Each position is keyed once, as the move reaching it is indexed, and handed to its children.
+  const walk = (node: RootNode | MoveNode, pos: Position, key: PositionKey, path: string[], cards: CardId[], plies: number[]) => {
     let walked = 0;
     for (const child of node.children) {
       const move = parseSan(pos, child.san);
       // A chapter as parsed holds legal moves only (§4.5); anything else is left out with what
       // follows it, as the parser would have cut it.
       if (!move || !isNormal(move)) continue;
-      const key = positionKeyOf(pos);
       const uci = standardUci(pos, move);
       const childPath = [...path, child.san];
-      const indexed: IndexedMove = { key, uci, at: { sid, cid, path: childPath, san: child.san } };
+      const after = pos.clone();
+      after.play(move);
+      const afterKey = positionKeyOf(after);
+      const indexed: IndexedMove = { key, after: afterKey, uci, at: { sid, cid, path: childPath, san: child.san } };
       let childCards = cards;
       let childPlies = plies;
       if (pos.turn === side) {
@@ -109,15 +116,13 @@ export function indexChapter(sid: string, chapter: Chapter): ChapterIndexing {
         childPlies = [...plies, path.length];
       }
       moves.push(indexed);
-      const after = pos.clone();
-      after.play(move);
       walked++;
-      walk(child, after, childPath, childCards, childPlies);
+      walk(child, after, afterKey, childPath, childCards, childPlies);
     }
     // A line ends where the walk stops: at a leaf, or before moves that were left out.
     if (path.length > 0 && walked === 0) lines.push({ sid, cid, known, path, cards, plies });
   };
-  walk(chapter.root, start, [], [], []);
+  walk(chapter.root, start, positionKeyOf(start), [], [], []);
   return { ok: true, index: { sid, cid, side, known, moves, lines } };
 }
 
@@ -125,6 +130,7 @@ export function indexChapter(sid: string, chapter: Chapter): ChapterIndexing {
 export function combineIndex(parts: readonly ChapterIndexing[]): RepertoireIndex {
   const positions = new Map<PositionKey, PositionMoves>();
   const cards = new Map<CardId, Occurrence[]>();
+  const reached = new Map<PositionKey, Occurrence[]>();
   const lines: Line[] = [];
   const skipped: RepertoireIndex['skipped'] = [];
   for (const part of parts) {
@@ -139,6 +145,9 @@ export function combineIndex(parts: readonly ChapterIndexing[]): RepertoireIndex
       let at = byUci.get(m.uci);
       if (!at) byUci.set(m.uci, (at = []));
       at.push(m.at);
+      const to = reached.get(m.after);
+      if (to) to.push(m.at);
+      else reached.set(m.after, [m.at]);
       if (m.card) {
         let of = cards.get(m.card);
         if (!of) cards.set(m.card, (of = []));
@@ -147,7 +156,7 @@ export function combineIndex(parts: readonly ChapterIndexing[]): RepertoireIndex
     }
     lines.push(...part.index.lines);
   }
-  return { positions, cards, lines, skipped };
+  return { positions, cards, reached, lines, skipped };
 }
 
 /** The repertoire studies' chapters, in order: reference studies make no cards (D3). */

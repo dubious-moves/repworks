@@ -889,3 +889,14 @@ Technical calls made while building `PLAN.md` §5.10, each with its reason:
   between training a line and editing it. This adds §5.15 to Phase 1, before its acceptance
   test. Renaming and the rest already existed in a drawer under the notation, but the owner
   didn't find them, so they move where Qchess has them.
+
+## Revision of 2026-10-06 (transposition badges and copy continuation)
+Technical calls made while building `PLAN.md` §5.11, each with its reason:
+- **D10: transpositions use the site's position key,** so two move orders meet whatever their
+  move counters, and differ only when an en passant capture is really possible: the same rule
+  cards use, so a badge never disagrees with a shared card.
+- **The badge counts other move orders (`⇄1` for two paths in all),** and the chapter mark the
+  other chapters; the chapter's own badge comes from the open chapter (live), the other
+  chapters' from the index (as last saved), which is enough for a count.
+- **Copy continuation on a main line with no fork above the move copies from the start,** the
+  plan's rule read literally (no ancestor with a sibling: the branch is the whole line).

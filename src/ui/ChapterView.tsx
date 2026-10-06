@@ -43,6 +43,7 @@ import { Board } from './Board.tsx';
 import { CardPanel } from './CardPanel.tsx';
 import { CommentDialog, MoveMenu, openMenu } from './MoveMenu.tsx';
 import { Notation } from './Notation.tsx';
+import { TranspositionList } from './Transpositions.tsx';
 
 const BRUSH_NAMES: Brush[] = ['green', 'red', 'blue', 'yellow'];
 
@@ -246,6 +247,7 @@ export function ChapterView() {
       {!(c && board) && <ChapterDrawer />}
       {/* Outside the frame, whose size containment would place a fixed menu inside it. */}
       <MoveMenu />
+      <TranspositionList />
       <CommentDialog />
     </div>
   );
