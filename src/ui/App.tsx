@@ -10,10 +10,12 @@ import { Debug } from './Debug.tsx';
 import { ImportScreen } from './Import.tsx';
 import { SetupForm } from './Setup.tsx';
 import { SyncBanners, SyncChip } from './Sync.tsx';
+import { TrainScreen } from './Train.tsx';
+import { TrainCard } from './TrainCard.tsx';
 
 export function App() {
   return (
-    <div class={`shell${mode.value.name === 'chapter' ? ' shell-chapter' : ''}`}>
+    <div class={`shell${mode.value.name === 'chapter' ? ' shell-chapter' : ''}${mode.value.name === 'train' ? ' shell-train' : ''}`}>
       <header class="topbar">
         <img class="topbar-icon" src={`${import.meta.env.BASE_URL}icons/icon.svg`} alt="" width={28} height={28} />
         <h1>Repworks</h1>
@@ -50,6 +52,8 @@ function Screen() {
       return <ConflictsView />;
     case 'chapter':
       return <ChapterView />;
+    case 'train':
+      return <TrainScreen {...(mode.value.sid ? { sid: mode.value.sid } : {})} />;
     case 'list':
       return <Home />;
   }
@@ -64,6 +68,7 @@ function Home() {
   }, [version]);
   return (
     <>
+      <TrainCard />
       <section class="card">
         <div class="card-head">
           <h2>Studies</h2>
@@ -82,6 +87,14 @@ function Home() {
                 </a>
                 <span class="muted">
                   {s.kind} · {s.chapters} chapter{s.chapters === 1 ? '' : 's'}
+                  {s.kind === 'repertoire' && (
+                    <>
+                      {' · '}
+                      <a href={`#/train/${s.id}`} aria-label={`Train ${s.name}`}>
+                        Train
+                      </a>
+                    </>
+                  )}
                 </span>
               </li>
             ))}

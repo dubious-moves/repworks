@@ -813,3 +813,23 @@ Technical calls made while building `PLAN.md` §5.3–§5.5, each with its reaso
   (keyboard, and a phone whose long-press doesn't reach the page); glyphs apply at once and
   Cancel drops only the text, as Qchess does; the conflict boxes stay in the panel, since they
   appear only at a conflicted move and need room. `PLAN.md` §4.11 (as built).
+
+## Revision of 2026-10-06 (the trainer and the training screen)
+Technical calls made while building `PLAN.md` §5.6–§5.7, each with its reason:
+- **D3: after a conflict move, the note doesn't name the other move.** The plan's wording
+  ("Your repertoire also plays Nc6 here") would show the answer before it is asked; the trainer
+  says the repertoire has another move here and asks it. The conflict move played again then
+  counts as a wrong try.
+- **D3: the session always follows the planned line.** The user only moves where the line's own
+  move is asked, so after a conflict move the line's move is asked and played; the other move's
+  later asks come on their own planned lines. "Follow the line played" never arises.
+- **D16: a move never answered is never auto-played, even after a skipped line.** The trainer
+  decides where each move is met, so a move a skipped line would have taught is taught (or, if
+  known, asked) on the next line that passes it.
+- **D16: a line sharing its first moves with the board starts there,** up to its first ask or
+  teach, rather than replaying them at the pace: the planner orders lines so that consecutive
+  ones share prefixes.
+- **D16: comments are hidden while a move is asked,** since a comment on the opponent's move
+  often names the reply; they show while a move is taught and after it is played.
+- **D4: a suspend made during training is recorded even when grading is off** (Interactive
+  view, retry, drill): it is the owner's choice about the card, not a grade.

@@ -36,7 +36,7 @@ async function sync(page: Page, git: FakeGit, until: (text: string) => boolean) 
 
 test('open a chapter, move through it, and edit it: variation, comment, glyph, arrow, undo and redo', async ({ page, isMobile }) => {
   const git = await setUp(page);
-  await page.getByRole('link', { name: 'Test repertoire' }).click();
+  await page.getByRole('link', { name: 'Test repertoire', exact: true }).click();
   // The study opens at its first chapter, from Black's side.
   await expect(page).toHaveURL(/#\/study\/Rep0Najd\/Ch1Najdf$/);
   await expect(page.getByLabel('Chapter', { exact: true })).toHaveValue('Ch1Najdf');

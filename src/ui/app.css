@@ -1062,3 +1062,59 @@ table.cards td {
     border-left-color: #319a28;
   }
 }
+
+/* The training screen (PLAN.md §5.7): the board first, then the feedback and the actions. */
+
+.train-feedback {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.train-feedback.note-correct,
+.train-feedback.note-taught {
+  color: #8fd18a;
+}
+
+.train-feedback.note-wrong {
+  color: #e08a7a;
+}
+
+.train-counters {
+  margin: 4px 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.train-line {
+  margin: 4px 0 8px;
+}
+
+.train-comments {
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 4px 10px;
+  max-height: 30dvh;
+  overflow-y: auto;
+}
+
+.train-actions {
+  margin: 10px 0;
+}
+
+.train-pace {
+  display: block;
+  color: var(--muted);
+  margin-top: 8px;
+}
+
+@media (min-width: 900px) {
+  .train-grid {
+    display: grid;
+    grid-template-columns: min(calc(100dvh - 200px), 640px) minmax(280px, 420px);
+    justify-content: center;
+    gap: 20px;
+  }
+
+  .train-board .board {
+    width: 100%;
+  }
+}

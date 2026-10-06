@@ -4,6 +4,7 @@
 //   #/import                            import a study
 //   #/conflicts                         every open conflict
 //   #/study/<sid>[/<cid>][?at=e4,e5]    a chapter, at a move
+//   #/train[/<sid>]                     training: the whole repertoire, or one study (§5.7)
 // A setup link (#setup?…) is read and removed before any of this (src/app/setup.ts).
 import { isId } from '../study/ids.ts';
 
@@ -12,7 +13,9 @@ export type Mode =
   | { name: 'import' }
   | { name: 'conflicts' }
   /** A study's chapter; without `cid`, its first. `at` is a move path, [] the start. */
-  | { name: 'chapter'; sid: string; cid?: string; at?: string[] };
+  | { name: 'chapter'; sid: string; cid?: string; at?: string[] }
+  /** A training session: the whole repertoire, or one study's lines. */
+  | { name: 'train'; sid?: string };
 
 export type ModeEvent =
   | { type: 'open'; mode: Mode }
@@ -56,6 +59,8 @@ export function parseHash(hash: string): Mode {
   const parts = rawPath.split('/').filter(Boolean);
   if (parts.length === 1 && parts[0] === 'import') return { name: 'import' };
   if (parts.length === 1 && parts[0] === 'conflicts') return { name: 'conflicts' };
+  if (parts[0] === 'train' && parts.length === 1) return { name: 'train' };
+  if (parts[0] === 'train' && parts.length === 2 && isId(parts[1])) return { name: 'train', sid: parts[1] };
   if (parts[0] === 'study' && isId(parts[1]) && parts.length <= 3) {
     const mode: Mode = { name: 'chapter', sid: parts[1] };
     if (parts.length === 3) {
@@ -80,6 +85,8 @@ export function modeHash(mode: Mode): string {
       return '#/import';
     case 'conflicts':
       return '#/conflicts';
+    case 'train':
+      return mode.sid ? `#/train/${mode.sid}` : '#/train';
     case 'chapter': {
       const base = `#/study/${mode.sid}${mode.cid ? `/${mode.cid}` : ''}`;
       // encoded: a query reads a bare + as a space (exd8=Q+).

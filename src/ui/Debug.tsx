@@ -8,6 +8,51 @@ import { cardStates, type CardRow } from '../app/overview.ts';
 import type { LocalState } from '../core/sync/ports.ts';
 import { OtherDeviceCode, SetupForm } from './Setup.tsx';
 import { formatTime } from './Sync.tsx';
+import { trainData } from '../app/train.ts';
+import { conflicts } from '../core/repertoire/index.ts';
+
+/** The repertoire index (§5.1, §5.7): its size and build time, positions with more than one own move, chapters left out. */
+function Repertoire() {
+  const data = trainData.value;
+  if (!data) return null;
+  const { index } = data;
+  const list = conflicts(index);
+  return (
+    <>
+      <h3>Repertoire</h3>
+      <p class="repertoire-stats">
+        {index.cards.size} cards · {index.lines.length} lines · {index.positions.size} positions · index built in {Math.round(data.indexMs)} ms
+      </p>
+      {index.skipped.length > 0 && (
+        <ul>
+          {index.skipped.map((x) => (
+            <li key={`${x.sid}/${x.cid}`}>
+              {data.studyNames.get(x.sid) ?? x.sid} / {x.cid}: {x.reason}
+            </li>
+          ))}
+        </ul>
+      )}
+      <h4>Positions with more than one repertoire move ({list.length})</h4>
+      {list.length > 0 && (
+        <ul class="repertoire-conflicts">
+          {list.map(({ key, ucis }) => {
+            const here = index.positions.get(key)!.own;
+            const first = here.get(ucis[0]!)![0]!;
+            const before = first.path.slice(0, -1);
+            return (
+              <li key={key}>
+                <a href={`#/study/${first.sid}/${first.cid}?at=${before.map(encodeURIComponent).join(',')}`}>
+                  {data.studyNames.get(first.sid) ?? first.sid}: {before.join(' ') || 'start'}
+                </a>{' '}
+                → {ucis.map((u) => here.get(u)![0]!.san).join(', ')}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </>
+  );
+}
 
 export function Debug() {
   const [state, setState] = useState<LocalState | undefined>(undefined);
@@ -71,6 +116,7 @@ export function Debug() {
           Record a test review
         </button>
       </div>
+      <Repertoire />
       <h3>Card states (replay of every device's log)</h3>
       {cards.length === 0 ? (
         <p class="muted">No reviews yet.</p>

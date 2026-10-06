@@ -40,6 +40,7 @@ import { header, type Brush, type Chapter } from '../core/study/model.ts';
 import { setShapes } from '../core/study/ops.ts';
 import { nodeAt, positionAt, samePath, type Path } from '../core/study/tree.ts';
 import { Board } from './Board.tsx';
+import { CardPanel } from './CardPanel.tsx';
 import { CommentDialog, MoveMenu, openMenu } from './MoveMenu.tsx';
 import { Notation } from './Notation.tsx';
 
@@ -185,6 +186,7 @@ export function ChapterView() {
               <Notation chapter={c} />
               <div class="cv-tools">
                 {doc.value && <Conflicts />}
+                <CardPanel />
                 <ChapterDrawer />
               </div>
               {drawMode && (

@@ -1462,6 +1462,43 @@ continuing where it was. Repeated under load (`--repeat-each=8 --workers=4`) bef
 Live (phone, then desktop): a real day's session with the owner's repertoire. Moving by tap and
 by drag at the pace, reading the feedback, the wake lock, the time a session takes.
 
+**As built** (2026-10-06):
+- `src/app/train.ts`: `loadTraining(store)` reads the working view (studies, progress, and
+  `settings.json`), builds the index from per-chapter parts kept while a chapter file's text is
+  unchanged (the cache §5.1 left to the app: keyed by the text rather than the blob SHA, which
+  the working view doesn't carry for edited files), and replays every device's log plus this
+  device's unsent events at the synced retention. `trainData` holds the result, read again on
+  every data change, for the home card, the chapter view and the debug panel. The session runs
+  the trainer with `setTimeout` for its waits and records each `record` effect at once through
+  `store.record`, so nothing about a session is saved beyond the log: a reload rebuilds the
+  queue and the plan, and carries on.
+- `src/core/app/fsm.ts`: modes `train` (`#/train`) and `train` with a study (`#/train/<sid>`).
+- `src/ui/Train.tsx`: the board, the feedback line, the counters (due and new left, line n of
+  m), the chapter's name and the moves so far, the comments of the move reached (hidden while a
+  move is asked, as they could give it away; shown while a move is taught), and the buttons:
+  Hint, "Always play this for me" (with "Undo: ask Nc6 again" until the next line), Skip line,
+  Stop; the pace (fast, normal, relaxed; per device, changeable mid-session). Space is Hint,
+  Escape stops. The screen's wake lock is held while a session runs and taken again when the
+  page comes back into view. The end shows the session's numbers, "Train again" and "Home".
+- `src/ui/TrainCard.tsx`: the home screen's "Train: 1 due · 3 new", the moves whose learning
+  step ends later today ("2 more today from 14:00"), the known pool, and orphaned cards. The
+  study list has a Train link per repertoire study.
+- `src/ui/CardPanel.tsx`: in the chapter view, for an own move of a repertoire chapter: new,
+  learning (with its first review's time), or its due date and reviews; whether it is played
+  for the user; how many other places reach the same card; and the suspend toggle.
+- The debug panel gains the repertoire's size, the index build time (§5.1's live check), the
+  chapters left out, and the positions with more than one repertoire move, each a link to it.
+- Pin (§5.8) and show and grade (§5.9) are not on the screen yet.
+- Tests: `test/unit/core/app/fsm.test.ts` (the routes) and `test/e2e/train.spec.ts` on desktop and
+  the emulated phone, with Playwright's clock at 2026-12-01: the home counts; a session that
+  auto-plays 1. e4, takes 1... e5 back, accepts 1... c5 (Again, with `w`), plays the suspended
+  2... d6 for the user, teaches 3... cxd4; a reload that carries on with 2... Nc6, suspended from
+  the screen; 2... Nf6 taught on the Alapin; the four events reaching the fake repo in order;
+  the taught moves due again 4 hours later and asked. A study's session from the study list,
+  Hint by Space and Stop by Escape (desktop) or the buttons (phone). The card panel and its
+  toggle, and the debug panel's conflict list. 48 runs under `--repeat-each=8 --workers=4`
+  passed before pushing.
+
 #### 5.8 Mistakes: the log, retry, drill and pins
 
 - **The day's mistakes** are the day's reviews graded Again, read from the log (§5.2), so they

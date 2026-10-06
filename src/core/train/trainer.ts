@@ -157,7 +157,7 @@ type Kind = 'ask' | 'teach' | 'auto';
 
 export class Trainer {
   private readonly setup: TrainerSetup;
-  private readonly pace: number;
+  private pace: number;
   private readonly record: boolean;
   private readonly toAsk = new Set<CardId>();
   private readonly toTeach = new Set<CardId>();
@@ -187,6 +187,11 @@ export class Trainer {
       for (const c of l.teach) this.toTeach.add(c);
     }
     this.known = knownCardsOf(setup.index);
+  }
+
+  /** A new pace, from the next move played for the user. */
+  setPace(ms: number): void {
+    this.pace = Math.max(MIN_PACE_MS, ms);
   }
 
   get view(): TrainerView {

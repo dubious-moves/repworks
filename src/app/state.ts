@@ -11,6 +11,7 @@ import { IdbStore, type DeviceRecord, type RemoteSettings } from '../platform/id
 import { finishLichessLogin } from './lichess.ts';
 import { applySetup, publicRepoWarning, takeSetupFromAddress, type Notice } from './setup.ts';
 import { dataVersion, SyncController } from './sync.ts';
+import { refreshTrainData, startSession } from './train.ts';
 
 export interface StudyRow {
   id: string;
@@ -51,6 +52,7 @@ export async function startApp(link: SetupParse | undefined, lichessCallback?: s
   effect(() => {
     void dataVersion.value;
     void reload();
+    if (store) void refreshTrainData(store);
   });
   addEventListener('hashchange', () => {
     const next = takeSetupFromAddress();
@@ -129,6 +131,18 @@ export async function recordTestReview(): Promise<void> {
   if (!store) return;
   await store.record({ t: new Date().toISOString(), k: 'review', card: 'r|test|e2e4', g: 3 });
   await controller?.changed();
+}
+
+/** Records a progress event at once; the sync sends it with the next push. */
+export async function recordEvent(event: Parameters<IdbStore['record']>[0]): Promise<void> {
+  if (!store) return;
+  await store.record(event);
+  await controller?.changed();
+}
+
+/** Starts a training session (§5.7) over today's queue: everything, or one study. */
+export async function beginTraining(scope?: string): Promise<void> {
+  if (store) await startSession(store, recordEvent, scope);
 }
 
 export function syncNow(): void {

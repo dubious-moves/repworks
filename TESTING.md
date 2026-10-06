@@ -19,3 +19,7 @@ fixes them and updates this file.
 - §5.1: the index build time on the phone, with the real repertoire.
 - §5.5: the queue simulation on the real repertoire, to choose the default daily limit (needs
   the data repo, by `REPWORKS_FIXTURES`).
+- §5.7: a real day's training session with the real repertoire (phone, then desktop): moving by
+  tap and by drag at the pace, the feedback line, the screen staying on (wake lock), the time a
+  session takes; the home screen's counts the same on both devices after a sync. The index
+  build time is in the debug panel (§5.1's target: under 300 ms on the phone).

@@ -13,6 +13,8 @@ test('hashes parse to modes, and modes write back to the same hash', () => {
     ['#/', { name: 'list' }],
     ['#/import', { name: 'import' }],
     ['#/conflicts', { name: 'conflicts' }],
+    ['#/train', { name: 'train' }],
+    ['#/train/Rep0Najd', { name: 'train', sid: 'Rep0Najd' }],
     ['#/study/Rep0Najd', { name: 'chapter', sid: 'Rep0Najd' }],
     ['#/study/Rep0Najd/Ch1Najdf', { name: 'chapter', sid: 'Rep0Najd', cid: 'Ch1Najdf' }],
     ['#/study/Rep0Najd/Ch1Najdf?at=e4,c5,Nf3', { name: 'chapter', sid: 'Rep0Najd', cid: 'Ch1Najdf', at: ['e4', 'c5', 'Nf3'] }],
@@ -24,7 +26,7 @@ test('hashes parse to modes, and modes write back to the same hash', () => {
   }
   assert.equal(modeHash({ name: 'chapter', sid: 'Rep0Najd', cid: 'Ch1Najdf', at: [] }), '#/study/Rep0Najd/Ch1Najdf');
   // Anything else is the list: unknown pages, malformed IDs, a path with a stray character.
-  for (const hash of ['#/nope', '#/study/short', '#/study/Rep0Najd/bad', '#/study/Rep0Najd/Ch1Najdf/x']) assert.deepEqual(parseHash(hash), { name: 'list' }, hash);
+  for (const hash of ['#/train/short', '#/train/Rep0Najd/x', '#/nope', '#/study/short', '#/study/Rep0Najd/bad', '#/study/Rep0Najd/Ch1Najdf/x']) assert.deepEqual(parseHash(hash), { name: 'list' }, hash);
   assert.deepEqual(parseHash('#/study/Rep0Najd/Ch1Najdf?at=e4,<script>'), { name: 'chapter', sid: 'Rep0Najd', cid: 'Ch1Najdf' });
 });
 
@@ -33,6 +35,8 @@ test('transitions: open, back, a missing chapter, the move shown', () => {
   assert.deepEqual(transition({ name: 'list' }, { type: 'open', mode: chapter }), chapter);
   assert.deepEqual(transition(chapter, { type: 'back' }), { name: 'list' });
   assert.deepEqual(transition({ name: 'conflicts' }, { type: 'back' }), { name: 'list' });
+  assert.deepEqual(transition({ name: 'train', sid: 'Rep0Najd' }, { type: 'back' }), { name: 'list' });
+  assert.deepEqual(transition({ name: 'train' }, { type: 'at', path: ['e4'] }), { name: 'train' });
   assert.equal(transition(chapter, { type: 'missing', chapters: ['Ch2Alapn', 'Ch1Najdf'] }), chapter);
   assert.deepEqual(transition(chapter, { type: 'missing', chapters: ['Ch2Alapn'] }), { name: 'chapter', sid: 'Rep0Najd', cid: 'Ch2Alapn' });
   assert.deepEqual(transition({ name: 'chapter', sid: 'Rep0Najd' }, { type: 'missing', chapters: ['Ch2Alapn'] }), { name: 'chapter', sid: 'Rep0Najd', cid: 'Ch2Alapn' });
