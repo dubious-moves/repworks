@@ -7,7 +7,7 @@ where the build differed). What remains is live: the spike's re-run (§4.2), the
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
 with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
-for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06). Read with `DECISIONS.md`, which this plan updates (its
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
