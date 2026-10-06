@@ -71,9 +71,10 @@ const trainer = (w: World, plan: SessionPlan, states: Map<string, CardState>, ex
 type Answerer = (view: TrainerView, asked: number) => TrainerCommand | undefined;
 
 /** Runs a session to its end: ticks every wait, lets `answer` answer every ask and teach. */
-function run(t: Trainer, answer: Answerer, now = day.now) {
+function run(t: Trainer, answer: Answerer, now = day.now, prior: readonly TrainerEffect[] = []) {
   const effects: TrainerEffect[] = [];
-  let pendingWait: { ms: number; id: number } | undefined;
+  // A session already under way: its last timer, if it is still pending.
+  let pendingWait = prior.filter((e) => e.type === 'wait').at(-1) as { ms: number; id: number } | undefined;
   const send = (c: TrainerCommand) => {
     const out = t.send(c);
     effects.push(...out);
@@ -83,6 +84,11 @@ function run(t: Trainer, answer: Answerer, now = day.now) {
   let asked = 0;
   for (let guard = 0; guard < 10_000 && t.view.phase !== 'sessionDone'; guard++) {
     const phase = t.view.phase;
+    // Show sequence: watched to its end, then replayed.
+    if (phase === 'previewed') {
+      send({ type: 'ready', now });
+      continue;
+    }
     if (phase === 'ask' || phase === 'teach' || phase === 'wrong' || phase === 'shown') {
       now += 1000;
       const c = answer(t.view, asked++);
@@ -519,6 +525,56 @@ test('try first: a new move is asked with no arrow; a wrong move then Hint show 
   assert.deepEqual(notes(done)[0], { kind: 'taught', san: 'e4' });
 });
 
+test('show sequence: new moves are watched up to the n-th, stepped through, then replayed with no arrow', () => {
+  const w = world(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O'));
+  const plan = planOf(w, new Map(), 20);
+  const t = trainer(w, plan, new Map(), { sequence: 2 });
+  const first = t.send({ type: 'start', now: 0 });
+  assert.equal(t.view.phase, 'preview');
+  assert.deepEqual(notes(first), [{ kind: 'sequence', count: 2 }]);
+  assert.deepEqual(t.view.sequence, { from: 0, to: 3 });
+  const watched: TrainerEffect[] = [];
+  for (let i = 0; i < 3; i++) {
+    const wait = [...first, ...watched].filter((e) => e.type === 'wait').at(-1) as { id: number; ms: number };
+    assert.equal(wait.ms, 1200, 'twice the pace');
+    watched.push(...t.send({ type: 'tick', id: wait.id, now: i }));
+  }
+  assert.deepEqual(plays(watched), ['preview:e4', 'preview:e5', 'preview:Nf3']);
+  assert.equal(t.view.phase, 'previewed');
+  assert.ok(!watched.slice(watched.findLastIndex((e) => e.type === 'play')).some((e) => e.type === 'wait'), 'it waits for the user');
+  // Stepping stays within the sequence; nothing is recorded.
+  t.send({ type: 'seek', ply: 1, now: 5 });
+  assert.deepEqual(t.view.path, ['e4']);
+  t.send({ type: 'seek', ply: 9, now: 6 });
+  assert.deepEqual(t.view.path, ['e4', 'e5', 'Nf3']);
+  // Replayed: from its start, the new move asked with no arrow.
+  const replay = t.send({ type: 'ready', now: 7 });
+  assert.deepEqual(t.view.path, []);
+  assert.equal(t.view.phase, 'ask');
+  assert.equal(t.view.sequence, undefined);
+  assert.ok(!replay.some((e) => e.type === 'arrow' && e.uci));
+  assert.deepEqual(notes(replay), [{ kind: 'newTry' }]);
+  const e4 = t.send({ type: 'move', uci: 'e2e4', now: 8 });
+  assert.deepEqual(e4.flatMap((e) => (e.type === 'record' ? [e.event] : [])), [{ k: 'taught', card: card('e4') }]);
+  assert.deepEqual(notes(e4)[0], { kind: 'taught', san: 'e4', found: true });
+  // The sequence's second new move after the opponent's; then the third new move starts another.
+  const { effects, records } = run(t, right, day.now, e4);
+  assert.deepEqual(records.map((r) => r.k), ['taught', 'taught', 'taught', 'taught']);
+  assert.deepEqual(plays(effects).filter((p) => p.startsWith('preview')), ['preview:Bb5', 'preview:a6', 'preview:Ba4', 'preview:O-O']);
+});
+
+test('show sequence: a due move ends the sequence before it, so it is not given away', () => {
+  const w = world(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 Nc6 3. Bb5'));
+  const states = new Map<string, CardState>([[card('e4 e5 Nf3'), dueNow]]);
+  const plan = planOf(w, states, 20);
+  const t = trainer(w, plan, states, { sequence: 5, lineStart: 'auto' });
+  const shown: unknown[] = [];
+  const { effects, records } = run(t, (view, n) => (shown.push(view.sequence), right(view, n)));
+  assert.deepEqual(plays(effects).filter((p) => p.startsWith('preview')), ['preview:e4', 'preview:e5', 'preview:Bb5']);
+  assert.deepEqual(shown.filter(Boolean), [], 'no sequence is shown while a move is asked');
+  assert.deepEqual(records.map((r) => `${r.k}:${r.card === card('e4 e5 Nf3') ? 'Nf3' : r.card === card('e4') ? 'e4' : 'Bb5'}`), ['taught:e4', 'review:Nf3', 'taught:Bb5']);
+});
+
 {
   // 1. e4 and 2. Nf3 not due, 3. Bb5 and 4. Ba4 due.
   const w = world(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4'));
@@ -616,6 +672,7 @@ test('random repertoires under every auto-play mode and line start: every planne
       autoPlay: AUTO_PLAYS[seed % 4]!,
       lineStart: LINE_STARTS[Math.floor(seed / 4) % 3]!,
       tryNew: random() < 0.5,
+      sequence: random() < 0.3 ? 1 + Math.floor(random() * 5) : 0,
       holdLineEnd: random() < 0.5,
       practice: random() < 0.3,
     };

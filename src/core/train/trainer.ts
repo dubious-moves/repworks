@@ -20,6 +20,10 @@
 //   where the line's own move is asked or taught, so the line followed is always the planned one,
 //   except with `follow` (the Interactive view, §5.10): a move that starts another line of the
 //   chapter from the board's moves is right, and the walk goes on along that line.
+// - Show sequence (`sequence`, Chessable's way with new moves): at a new move, the line's next
+//   moves up to the n-th new own move (or a due one) are played for the user to watch, at twice
+//   the pace; the user steps within them (`seek`) and, when ready, replays them from their start,
+//   each new move asked with no arrow, as with `tryNew`.
 import type { Position } from 'chessops/chess';
 import { makeSan, parseSan } from 'chessops/san';
 import { isNormal, type NormalMove } from 'chessops/types';
@@ -74,6 +78,10 @@ export type Phase =
   | 'auto'
   | 'ask'
   | 'teach'
+  /** Show sequence: the sequence's moves are played for the user to watch. */
+  | 'preview'
+  /** Show sequence: all shown; the user steps within it, then replays it (`ready`). */
+  | 'previewed'
   /** A first wrong move was taken back; the move is asked again. */
   | 'wrong'
   /** The move is shown (a second wrong move, or Hint); the user plays it. */
@@ -90,8 +98,10 @@ export type Note =
   | { kind: 'wrong' }
   | { kind: 'shown'; san: string }
   | { kind: 'newMove'; san: string }
-  /** A new move asked before it is shown (`tryNew`). */
+  /** A new move asked before it is shown (`tryNew`, or a sequence replayed). */
   | { kind: 'newTry' }
+  /** Show sequence: `count` new moves are shown, to be replayed. */
+  | { kind: 'sequence'; count: number }
   /** A taught move played; `found` when it was found with no arrow, wrong move or hint. */
   | { kind: 'taught'; san: string; found?: boolean }
   /** A conflict move was accepted; the repertoire has another move here, asked now. */
@@ -117,7 +127,7 @@ export type TrainerEffect =
   /** A line starts: show the position after `path` (a prefix shared with the board, or []). */
   | { type: 'line'; line: Line; number: number; total: number; kind: PlannedLine['kind']; path: string[] }
   /** Play a move; the board's arrows go with it. `path` is the line's moves up to and including it. */
-  | { type: 'play'; uci: string; san: string; path: string[]; by: 'opponent' | 'auto' | 'user' }
+  | { type: 'play'; uci: string; san: string; path: string[]; by: 'opponent' | 'auto' | 'user' | 'preview' }
   /** The user's move is refused: show the position after `path` again. */
   | { type: 'takeback'; path: string[] }
   /** An arrow for a move; undefined clears it. */
@@ -143,6 +153,10 @@ export type TrainerCommand =
   | { type: 'show' }
   /** Show and grade: the move was known or not; the card is graded and the line goes on. */
   | { type: 'tell'; knew: boolean; now: number }
+  /** Show sequence: the board at `ply` of the sequence shown (between its start and end). */
+  | { type: 'seek'; ply: number; now: number }
+  /** Show sequence: replay it from its start, its new moves asked. */
+  | { type: 'ready'; now: number }
   /** "Always play this for me" on the move asked or taught. */
   | { type: 'suspend'; now: number }
   | { type: 'skipLine'; now: number }
@@ -178,6 +192,8 @@ export interface TrainerSetup {
   autoPlay?: AutoPlay;
   /** New moves are asked before they are shown (§5.17): the arrow comes after a wrong move or Hint. */
   tryNew?: boolean;
+  /** Show sequence: a new move starts a sequence of this many new own moves, shown then replayed. */
+  sequence?: number;
   /** Where a line starts (§5.17). Unset: where the board already is when the line shares its moves, else at its start. */
   lineStart?: LineStart;
   /** At a line's end, wait for `next` rather than going on (§5.17). */
@@ -187,7 +203,7 @@ export interface TrainerSetup {
 }
 
 /** The options a running session can change (the training settings, §5.17). */
-export type TrainerOptions = Pick<TrainerSetup, 'autoPlay' | 'tryNew' | 'lineStart' | 'holdLineEnd' | 'lineEndPaces'>;
+export type TrainerOptions = Pick<TrainerSetup, 'autoPlay' | 'tryNew' | 'sequence' | 'lineStart' | 'holdLineEnd' | 'lineEndPaces'>;
 
 interface Ply {
   san: string;
@@ -225,6 +241,8 @@ export interface TrainerView {
   shown?: { uci: string; san: string };
   /** At a line's end: the line that comes next, if any. */
   upcoming?: PlannedLine;
+  /** Show sequence, while shown: the plies it spans (the board's path between `from` and `to`). */
+  sequence?: { from: number; to: number };
   summary: Summary;
 }
 
@@ -259,6 +277,8 @@ export class Trainer {
   /** At a line's end: the next line found, and its moves. */
   private upcoming: { at: number; plies: Ply[]; positions: Position[] } | undefined;
   private pending: Pending | undefined;
+  /** Show sequence: the plies shown (`from` to `to`), and whether it is being replayed. */
+  private seq: { from: number; to: number; replay: boolean } | undefined;
   /** Show and grade: a move played and waiting for its grade. */
   private waiting: { card: CardId; mode: 'ask' | 'teach'; san: string; since: number; failed: boolean; graded: boolean } | undefined;
   /** Show and grade, on from the setup and switched during the session (§5.16). */
@@ -269,8 +289,8 @@ export class Trainer {
 
   constructor(setup: TrainerSetup) {
     this.setup = setup;
-    const { autoPlay, tryNew, lineStart, holdLineEnd, lineEndPaces } = setup;
-    this.options = { autoPlay, tryNew, lineStart, holdLineEnd, lineEndPaces };
+    const { autoPlay, tryNew, sequence, lineStart, holdLineEnd, lineEndPaces } = setup;
+    this.options = { autoPlay, tryNew, sequence, lineStart, holdLineEnd, lineEndPaces };
     this.pace = Math.max(MIN_PACE_MS, setup.paceMs);
     this.record = setup.record ?? true;
     this.lines = [...setup.plan.lines];
@@ -315,6 +335,7 @@ export class Trainer {
     const position = this.positions[this.ply];
     if (position) v.position = position;
     if (this.phase === 'lineDone' && this.upcoming) v.upcoming = this.lines[this.upcoming.at]!;
+    if (this.seq && !this.seq.replay) v.sequence = { from: this.seq.from, to: this.seq.to };
     const p = this.pending;
     if (p?.shown) v.shown = { uci: p.uci, san: p.san };
     else if (this.waiting) v.shown = { uci: '', san: this.waiting.san };
@@ -345,6 +366,12 @@ export class Trainer {
       case 'show':
         this.showMove(out);
         break;
+      case 'seek':
+        this.seek(command.ply, out);
+        break;
+      case 'ready':
+        this.replay(command.now, out);
+        break;
       case 'tell':
         this.tell(command.knew, command.now, out);
         break;
@@ -356,6 +383,7 @@ export class Trainer {
         this.waitId++;
         this.pending = undefined;
         this.waiting = undefined;
+        this.seq = undefined;
         out.push({ type: 'arrow' });
         this.nextLine(command.now, out);
         break;
@@ -453,6 +481,7 @@ export class Trainer {
   private nextLine(now: number, out: TrainerEffect[]) {
     const found = this.upcoming ?? this.findNext();
     this.upcoming = undefined;
+    this.seq = undefined;
     // The last line's end is the session's: the board stays on it (§5.17).
     if (!found) return this.finish(out);
     const lines = this.lines;
@@ -536,8 +565,12 @@ export class Trainer {
       this.wait(this.pace, out);
       return;
     }
-    // With `tryNew` a new move is asked like a due one, and shown only after a wrong move or Hint.
-    const shown = kind === 'teach' && !this.options.tryNew;
+    if (this.seq && this.ply >= this.seq.to) this.seq = undefined;
+    // Show sequence: a new move met outside a sequence replayed starts one.
+    if (kind === 'teach' && !this.seq && (this.options.sequence ?? 0) > 0 && !this.selfGrading) return this.startSequence(out);
+    // With `tryNew`, or in a sequence replayed, a new move is asked like a due one, and shown only
+    // after a wrong move or Hint.
+    const shown = kind === 'teach' && !this.options.tryNew && !this.seq;
     this.pending = { mode: kind, card: p.card, uci: p.uci, san: p.san, wrong: [], hint: false, shown, since: now, also: false };
     this.phase = shown ? 'teach' : 'ask';
     if (shown) {
@@ -546,8 +579,62 @@ export class Trainer {
     } else out.push({ type: 'note', note: kind === 'teach' ? { kind: 'newTry' } : { kind: 'yourMove' } });
   }
 
+  /**
+   * Show sequence: from the new move asked, the line's moves up to its n-th new own move, stopping
+   * before an own move asked (a due move would be given away) or at the line's end; played to watch.
+   */
+  private startSequence(out: TrainerEffect[]) {
+    const n = this.options.sequence!;
+    let to = this.ply;
+    let count = 0;
+    for (let i = this.ply; i < this.end && count < n; i++) {
+      const card = this.plies[i]!.card;
+      if (card) {
+        const kind = this.kindOf(card, i < this.prefix);
+        if (kind === 'ask') break;
+        if (kind === 'teach') count++;
+      }
+      to = i + 1;
+    }
+    this.seq = { from: this.ply, to, replay: false };
+    this.phase = 'preview';
+    out.push({ type: 'arrow' });
+    out.push({ type: 'note', note: { kind: 'sequence', count } });
+    this.wait(this.pace * 2, out);
+  }
+
+  /** Show sequence: the board anywhere in the sequence shown; the playing stops there. */
+  private seek(ply: number, out: TrainerEffect[]) {
+    const q = this.seq;
+    if (!q || q.replay || (this.phase !== 'preview' && this.phase !== 'previewed')) return;
+    this.waitId++;
+    this.ply = Math.max(q.from, Math.min(q.to, Math.round(ply)));
+    this.phase = 'previewed';
+    out.push({ type: 'takeback', path: this.path() });
+  }
+
+  /** Show sequence: back to its start, to be played by the user. */
+  private replay(now: number, out: TrainerEffect[]) {
+    const q = this.seq;
+    if (!q || q.replay || (this.phase !== 'preview' && this.phase !== 'previewed')) return;
+    this.waitId++;
+    q.replay = true;
+    this.ply = q.from;
+    out.push({ type: 'takeback', path: this.path() });
+    this.advance(now, out);
+  }
+
   private tick(now: number, out: TrainerEffect[]) {
     if (this.phase === 'lineDone') return this.nextLine(now, out);
+    if (this.phase === 'preview') {
+      const q = this.seq!;
+      const p = this.plies[this.ply]!;
+      this.ply++;
+      out.push({ type: 'play', uci: p.uci, san: p.san, path: this.path(), by: 'preview' });
+      if (this.ply >= q.to) this.phase = 'previewed';
+      else this.wait(this.pace * 2, out);
+      return;
+    }
     if (this.phase !== 'opponent' && this.phase !== 'auto') return;
     const p = this.plies[this.ply]!;
     this.ply++;

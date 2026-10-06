@@ -3,6 +3,7 @@ import { h, render } from 'preact';
 import '../ui/app.css';
 import { App } from '../ui/App.tsx';
 import { registerServiceWorker } from '../platform/serviceWorker.ts';
+import { closeDialogsOnBackdrop } from './lightDismiss.ts';
 import { takeLichessCallback } from './lichess.ts';
 import { takeSetupFromAddress } from './setup.ts';
 import { shellVersion, updateReady } from './shell.ts';
@@ -14,6 +15,7 @@ const link = takeSetupFromAddress();
 const lichessCallback = takeLichessCallback();
 
 render(h(App, {}), document.getElementById('app')!);
+closeDialogsOnBackdrop();
 void startApp(link, lichessCallback);
 
 if (import.meta.env.PROD) {

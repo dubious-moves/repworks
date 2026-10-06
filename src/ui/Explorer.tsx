@@ -46,6 +46,12 @@ const TABS: { tab: ExplorerTab; label: string }[] = [
 ];
 
 const fmtCount = (n: number) => n.toLocaleString('en-US');
+/** The width of the longest count, in rem at the rows' size: a digit about 0.48rem, a comma half that. */
+function countWidth(counts: readonly number[]): number {
+  const longest = Math.max(1000, ...counts);
+  const digits = String(longest).length;
+  return Math.max(2.4, digits * 0.48 + Math.floor((digits - 1) / 3) * 0.24 + 0.2);
+}
 
 /** Qchess's Maia: likelihoods for its top 20 moves; its top four added as rows, scored (Ms). */
 const MAIA_SHOWN = 20;
@@ -198,8 +204,12 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
     </button>
   );
 
+  // One width for the games' count on every row and the header, so the bars line up (Qchess's).
+  const counted = (stale ?? { table }).table;
+  const style: Record<string, string> = { '--ex-count-w': `${countWidth([...counted.rows.map((r) => r.games), counted.total?.games ?? 0]).toFixed(2)}rem` };
+  if (p.height) style['--ex-height'] = `${p.height}px`;
   return (
-    <section class="explorer" aria-label="Explorer" ref={box} style={p.height ? { '--ex-height': `${p.height}px` } : undefined}>
+    <section class="explorer" aria-label="Explorer" ref={box} style={style}>
       <Grip box={box} />
       <div class="explorer-tabs" role="tablist">
         {TABS.map((t) => (

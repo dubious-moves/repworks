@@ -194,6 +194,8 @@ export interface SessionView {
   total: number;
   /** At a line's end: the line that comes next in the session (§5.17). */
   upcoming?: Line;
+  /** Show sequence, while shown: the plies it spans. */
+  sequence?: { from: number; to: number };
   /** The planned asks and teaches not answered yet. */
   dueLeft: number;
   newLeft: number;
@@ -309,7 +311,7 @@ export async function startSession(store: IdbStore, record: (event: Parameters<I
  * the Interactive view keep their own walk.
  */
 export function optionsFor(of: SessionKind, prefs: TrainPrefs): TrainerOptions {
-  const common: TrainerOptions = { autoPlay: prefs.autoPlay, tryNew: prefs.newMoves === 'try' };
+  const common: TrainerOptions = { autoPlay: prefs.autoPlay, tryNew: prefs.newMoves === 'try', sequence: prefs.newMoves === 'sequence' ? prefs.sequenceLength : 0 };
   switch (of.kind) {
     case 'queue':
     case 'show':
@@ -374,8 +376,12 @@ function stopTimer() {
 }
 
 /** A command from the screen, with the time now. */
-export function command(type: 'hint' | 'suspend' | 'skipLine' | 'stop' | 'next'): void {
+export function command(type: 'hint' | 'suspend' | 'skipLine' | 'stop' | 'next' | 'ready'): void {
   send({ type, now: Date.now() });
+}
+/** Show sequence: the board at a ply of the sequence shown. */
+export function seekSequence(ply: number): void {
+  send({ type: 'seek', ply, now: Date.now() });
 }
 export function playMove(uci: string): void {
   send({ type: 'move', uci, now: Date.now() });
@@ -523,6 +529,8 @@ function apply(t: Trainer, effects: readonly ShowGradeEffect[]): void {
   next.total = v.total;
   if (v.upcoming) next.upcoming = v.upcoming.line;
   else delete next.upcoming;
+  if (v.sequence) next.sequence = v.sequence;
+  else delete next.sequence;
   next.dueLeft = s.plan.lines.flatMap((l) => l.ask).filter((c) => !answered.has(c)).length;
   next.newLeft = s.plan.lines.flatMap((l) => l.teach).filter((c) => !answered.has(c)).length;
   session.value = next;

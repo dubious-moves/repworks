@@ -1083,3 +1083,21 @@ account. The technical calls, each with its reason:
 - **Threads (§5.36) through cross-origin isolation added by the service worker**, built only if
   it checks out in the container's Chromium (every cross-origin request the site makes is CORS,
   and the login is a redirect).
+
+## Revision of 2026-10-06 (the owner's third testing notes)
+`PLAN.md` §5.38, built in a session beside Phase 3's. The calls, each with its reason:
+- **§5.18's storage is answered: events in the progress log** (the owner: "fine as long as it
+  works as expected"). §5.18 is built next.
+- **New moves gain a third way, "Show a sequence"** (Chessable's), per device like the other two,
+  with its length (default 5) counting new own moves, so that "x moves" means the moves to learn
+  whatever the opponent's replies between them. A sequence stops before a due move, which it
+  would otherwise show, and isn't used in show and grade, whose keys already show each move.
+- **A dialog closes on a click on its backdrop, through its `cancel` event**, so every dialog
+  keeps one way of closing (Escape's) and one that must stay open can refuse.
+- **The explorer's count column has one width per table**, from its longest count: a grid per
+  row can't share an `auto` width, and a fixed width would be too narrow for Lichess's totals or
+  too wide for the masters'.
+- **Sessions the owner starts from the desktop app run at its effort setting**, not the repo's
+  `.claude/settings.json` (`effortLevel: high`): the app passes `CLAUDE_EFFORT` to the session,
+  which wins. Sessions chained by `create_session` do run at high. The owner sets High in the
+  app's picker before starting a session.

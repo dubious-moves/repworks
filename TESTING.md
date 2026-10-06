@@ -68,6 +68,14 @@ couldn't be tested then (the day's limit was used up), so the training items bel
   moves due, and "Back to now". Difficult moves are two lapses or FSRS difficulty 7: say if the
   `difficult` mode asks too much or too little.
 
+- §5.38: the third testing notes, built (desktop; the phone for the dialogs and the "+"): the
+  explorer's bars lined up on real counts (up to 1,531,092,892) and the Eval column further right;
+  the Practical column's "+" on a row's hover (faint on the phone); the training settings and the
+  other dialogs wider on the desktop, and closed by a click outside them; "Show a sequence" for
+  new moves on a real learning session: whether the sequence's length should count new moves (as
+  built) or all moves, whether twice the pace is right for watching, and whether Chessable shows
+  the whole variation instead.
+
 ## Phase 2
 
 - §5.23: the explorer panel with the owner's Lichess login, on desktop and phone: on 1. e4 c5

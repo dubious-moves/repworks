@@ -350,6 +350,13 @@ button.danger {
   border-radius: 8px;
 }
 
+/* Wider on a desktop (the owner's third notes). */
+@media (min-width: 900px) {
+  .study-dialog {
+    width: min(600px, calc(100vw - 32px));
+  }
+}
+
 .study-dialog::backdrop {
   background: rgb(0 0 0 / 55%);
 }
@@ -1799,6 +1806,9 @@ a.button.secondary {
    its eval, share, count and a white/grey/black bar of its results, novelties, and Σ. */
 
 .explorer {
+  /* The Move and Eval columns: Eval further right where there is room (the owner's third notes). */
+  --ex-move-w: 58px;
+  --ex-eval-w: 50px;
   font-size: 0.85rem;
   border-top: 1px solid rgb(255 255 255 / 10%);
   display: flex;
@@ -1900,7 +1910,7 @@ a.button.secondary {
 .explorer-head,
 .ex-row {
   display: grid;
-  grid-template-columns: 58px 50px 40px minmax(44px, auto) minmax(60px, 1fr);
+  grid-template-columns: var(--ex-move-w) var(--ex-eval-w) 40px var(--ex-count-w, 64px) minmax(60px, 1fr);
   align-items: center;
   column-gap: 6px;
   padding: 0 8px;
@@ -1908,7 +1918,7 @@ a.button.secondary {
 
 .explorer-head.no-games,
 .explorer-rows.no-games .ex-row {
-  grid-template-columns: 58px 50px 1fr;
+  grid-template-columns: var(--ex-move-w) var(--ex-eval-w) 1fr;
 }
 
 .explorer-head {
@@ -2084,6 +2094,11 @@ a.button.secondary {
 }
 
 @media (min-width: 900px) {
+  .explorer {
+    --ex-move-w: 62px;
+    --ex-eval-w: 60px;
+  }
+
   .cv-panel .explorer {
     height: var(--ex-height, calc(50% - var(--engine-h, 0px)));
     /* The engine's bar and lines (§5.31) come out of its room: --engine-h is their height. */
@@ -2155,10 +2170,11 @@ a.button.secondary {
 
 /* The Practical column (PLAN.md §5.24), after Eval, as q_extension's: a value, `d3` while it
    deepens, green on the best at one depth, `·` computing, `–` no value, `?` an error, `×` left
-   out; an empty cell computes on a click. */
+   out; an empty cell computes on a click. The games' count has one width for all rows (set from
+   the longest count), so the bars line up as Qchess's. */
 .explorer-head.with-prac,
 .explorer-rows.with-prac .ex-row {
-  grid-template-columns: 58px 50px 44px 40px minmax(44px, auto) minmax(60px, 1fr);
+  grid-template-columns: var(--ex-move-w) var(--ex-eval-w) 44px 40px var(--ex-count-w, 64px) minmax(60px, 1fr);
 }
 
 .ex-prac {
@@ -2178,10 +2194,26 @@ a.button.secondary {
   color: #4caf50;
 }
 
+/* An empty cell: a "+" on the row's hover (Qchess's), always shown faintly where there is no hover. */
 .ex-prac.empty {
   cursor: pointer;
-  border: 1px dashed rgb(255 255 255 / 20%);
-  border-radius: 3px;
+  color: var(--muted);
+}
+
+.ex-prac.empty::after {
+  content: '+';
+  opacity: 0;
+}
+
+.ex-row:hover .ex-prac.empty::after,
+.ex-prac.empty:focus-visible::after {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .ex-prac.empty::after {
+    opacity: 0.45;
+  }
 }
 
 .ex-prac.queued,
@@ -2577,17 +2609,17 @@ a.button.secondary {
 
 .explorer-head.with-maia,
 .explorer-rows.with-maia .ex-row {
-  grid-template-columns: 58px 50px 40px minmax(44px, auto) 36px 36px minmax(60px, 1fr);
+  grid-template-columns: var(--ex-move-w) var(--ex-eval-w) 40px var(--ex-count-w, 64px) 36px 36px minmax(60px, 1fr);
 }
 
 .explorer-head.with-maia.with-prac,
 .explorer-rows.with-maia.with-prac .ex-row {
-  grid-template-columns: 58px 50px 44px 40px minmax(44px, auto) 36px 36px minmax(60px, 1fr);
+  grid-template-columns: var(--ex-move-w) var(--ex-eval-w) 44px 40px var(--ex-count-w, 64px) 36px 36px minmax(60px, 1fr);
 }
 
 .explorer-head.with-maia.no-games,
 .explorer-rows.with-maia.no-games .ex-row {
-  grid-template-columns: 58px 50px 36px 36px 1fr;
+  grid-template-columns: var(--ex-move-w) var(--ex-eval-w) 36px 36px 1fr;
 }
 
 .explorer-head.with-maia.no-games .ex-sort {
@@ -2701,4 +2733,21 @@ a.button.secondary {
   width: 22em;
   max-width: 100%;
   font-size: 0.8rem;
+}
+
+/* Show sequence's steps (the owner's third notes): one group of small buttons. */
+.train-seq-nav {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.train-seq-nav button {
+  min-width: 40px;
+  padding-inline: 8px;
+}
+
+@media (min-width: 900px) {
+  .comment-dialog {
+    width: min(560px, calc(100vw - 32px));
+  }
 }

@@ -14,7 +14,7 @@ import { commentId, endPreview, preview, stepPreview } from '../app/preview.ts';
 import { beginTraining } from '../app/state.ts';
 import { dataVersion } from '../app/sync.ts';
 import { decidingNow, timeOffset } from '../app/time.ts';
-import { command, endSession, isGraded, leaveForStudy, pace, PACES, pinMissed, playMove, press, queueOf, session, sessionProblem, setPace, setSelfGrade, setSpeech, speech, trainData, undoSuspend, type Pace, type SessionKind, type SessionView, type TrainData } from '../app/train.ts';
+import { command, endSession, seekSequence, isGraded, leaveForStudy, pace, PACES, pinMissed, playMove, press, queueOf, session, sessionProblem, setPace, setSelfGrade, setSpeech, speech, trainData, undoSuspend, type Pace, type SessionKind, type SessionView, type TrainData } from '../app/train.ts';
 import { trainPrefs } from '../app/trainPrefs.ts';
 import type { Line, RepertoireIndex } from '../core/repertoire/index.ts';
 import type { Mode } from '../core/app/fsm.ts';
@@ -44,6 +44,8 @@ export function noteText(note: Note | undefined): string {
       return '';
     case 'newTry':
       return 'New move: find it';
+    case 'sequence':
+      return note.count === 1 ? 'New move: watch it, then play it' : `${note.count} new moves: watch them, then play them`;
     case 'played':
       return 'That’s the move: it comes back soon';
     case 'wrong':
@@ -284,6 +286,53 @@ function Done(props: { s: SessionView; inline?: boolean }) {
   );
 }
 
+/**
+ * Show sequence: steps within the moves shown (← → Home End), and "Play it" (Enter) to replay them
+ * from their start.
+ */
+function SequenceControls(props: { s: SessionView; seq: { from: number; to: number } }) {
+  const { from, to } = props.seq;
+  const at = props.s.path.length;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      // A comment's line on the board takes the arrows first (§5.12).
+      if (e.defaultPrevented || (target && (/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName) || target.closest('dialog')))) return;
+      if (e.key === 'Enter' && !(target && target.tagName === 'BUTTON')) {
+        e.preventDefault();
+        return command('ready');
+      }
+      const ply = e.key === 'ArrowLeft' ? at - 1 : e.key === 'ArrowRight' ? at + 1 : e.key === 'Home' ? from : e.key === 'End' ? to : undefined;
+      if (ply === undefined) return;
+      e.preventDefault();
+      seekSequence(ply);
+    };
+    addEventListener('keydown', onKey);
+    return () => removeEventListener('keydown', onKey);
+  }, [at, from, to]);
+  return (
+    <>
+      <span class="train-seq-nav" role="group" aria-label="Step through the sequence">
+        <button type="button" class="secondary" aria-label="Sequence start" title="Sequence start (Home)" disabled={at <= from} onClick={() => seekSequence(from)}>
+          ⏮
+        </button>
+        <button type="button" class="secondary" aria-label="Back" title="Back (←)" disabled={at <= from} onClick={() => seekSequence(at - 1)}>
+          ◀
+        </button>
+        <button type="button" class="secondary" aria-label="Forward" title="Forward (→)" disabled={at >= to} onClick={() => seekSequence(at + 1)}>
+          ▶
+        </button>
+        <button type="button" class="secondary" aria-label="Sequence end" title="Sequence end (End)" disabled={at >= to} onClick={() => seekSequence(to)}>
+          ⏭
+        </button>
+      </span>
+      <button type="button" onClick={() => command('ready')} title="Play the sequence from its start (Enter)">
+        Play it
+      </button>
+    </>
+  );
+}
+
 function Session(props: { s: SessionView }) {
   const s = props.s;
   const [promotion, setPromotion] = useState<{ orig: Key; dest: Key } | undefined>(undefined);
@@ -408,6 +457,7 @@ function Session(props: { s: SessionView }) {
               Next line
             </button>
           )}
+          {s.sequence && <SequenceControls s={s} seq={s.sequence} />}
           {show && (
             <>
               <button type="button" class="press press-next" onClick={() => press('next')}>

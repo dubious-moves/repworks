@@ -4,8 +4,12 @@ import { signal } from '@preact/signals';
 import { AUTO_PLAYS, LINE_STARTS, type AutoPlay, type LineStart } from '../core/train/trainer.ts';
 
 export interface TrainPrefs {
-  /** New moves: shown with their arrow, or tried first (the arrow after a wrong move or Hint). */
-  newMoves: 'show' | 'try';
+  /**
+   * New moves: shown with their arrow, tried first (the arrow after a wrong move or Hint), or
+   * shown as a sequence of `sequenceLength` new moves, then replayed from its start (Chessable's way).
+   */
+  newMoves: 'show' | 'try' | 'sequence';
+  sequenceLength: number;
   /** At a line's end (a line picked, Learn): wait for "Next line", or go on by itself. */
   lineEnd: 'wait' | 'go';
   /** Where a line starts in the day's queue, and in a line picked or learned. */
@@ -14,7 +18,7 @@ export interface TrainPrefs {
   autoPlay: AutoPlay;
 }
 
-export const DEFAULT_PREFS: TrainPrefs = { newMoves: 'show', lineEnd: 'wait', startQueue: 'first', startLearn: 'auto', autoPlay: 'due' };
+export const DEFAULT_PREFS: TrainPrefs = { newMoves: 'show', sequenceLength: 5, lineEnd: 'wait', startQueue: 'first', startLearn: 'auto', autoPlay: 'due' };
 
 const KEY = 'repworks.trainPrefs';
 
@@ -29,7 +33,8 @@ export function parsePrefs(raw: string | null): TrainPrefs {
   }
   const pick = <T extends string>(value: unknown, allowed: readonly T[], fallback: T): T => (allowed.includes(value as T) ? (value as T) : fallback);
   return {
-    newMoves: pick(v.newMoves, ['show', 'try'], DEFAULT_PREFS.newMoves),
+    newMoves: pick(v.newMoves, ['show', 'try', 'sequence'], DEFAULT_PREFS.newMoves),
+    sequenceLength: Number.isInteger(v.sequenceLength) && (v.sequenceLength as number) >= 1 && (v.sequenceLength as number) <= 50 ? (v.sequenceLength as number) : DEFAULT_PREFS.sequenceLength,
     lineEnd: pick(v.lineEnd, ['wait', 'go'], DEFAULT_PREFS.lineEnd),
     startQueue: pick(v.startQueue, LINE_STARTS, DEFAULT_PREFS.startQueue),
     startLearn: pick(v.startLearn, LINE_STARTS, DEFAULT_PREFS.startLearn),

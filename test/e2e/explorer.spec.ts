@@ -71,6 +71,10 @@ test('the panel: Qchess’s rows, sorted by eval, a row clicked plays its move, 
   await expect(e4).toHaveAttribute('title', 'Average rating: 2101');
   await expect(panel(page).locator('.ex-row.novelty')).toHaveText(/Nf3.*novelty/);
   await expect(panel(page).locator('.ex-total .ex-count')).toHaveText('1,000');
+  // The bars line up whatever the counts' lengths (600, 1,000): the count has one width (Qchess's).
+  const lefts = await panel(page).locator('.ex-bar:not(.ex-novelty)').evaluateAll((bars) => bars.map((b) => Math.round(b.getBoundingClientRect().left)));
+  expect(lefts.length).toBeGreaterThan(2);
+  expect(new Set(lefts).size).toBe(1);
   const asked = fake.requests.filter((r) => r.url.startsWith('https://explorer.lichess.org/lichess'));
   expect(asked).toHaveLength(1);
   expect(asked[0]!.auth).toBe('Bearer lip_e2e');

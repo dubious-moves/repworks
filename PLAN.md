@@ -7,7 +7,7 @@ where the build differed). What remains is live: the spike's re-run (§4.2), the
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
 with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
-for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.27 (the course tree) and §5.18 (alternative moves) wait for the owner's answers, §5.28 for the owner's devices. Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06). Read with `DECISIONS.md`, which this plan updates (its
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is answered (events in the progress log) and comes next, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06). Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -2217,6 +2217,38 @@ one mid-ask removes it from `w` and the grade is Good when right next); replay o
 (add, remove, both devices); Playwright: a wrong move saved as an alternative, then played on a
 later line and taken back for free.
 
+**The owner's answer (2026-10-06, third notes):** events in the progress log, as recommended,
+"as long as it works as expected". Unblocked: built next in the chain.
+
+#### 5.38 The owner's third testing notes (built 2026-10-06)
+
+Taken in a session beside Phase 3's build, so as not to interrupt it.
+- **Explorer: the bars line up** (Qchess's). The games' count was an `auto` column, sized by each
+  row's own grid, so a longer count pushed its bar right. It now has one width for the header and
+  every row, from the longest count shown (a digit about 0.48 rem, a comma half that).
+- **Explorer: Eval further right** on the desktop (Move 62 px, Eval 60 px, from 58 and 50); the
+  phone keeps the old widths, where the row has no room to give.
+- **Practical: a "+" on hover** for a cell not computed (Qchess's), in place of the dashed box;
+  faint and always shown where there is no hover (the phone).
+- **Dialogs wider on the desktop** (600 px from 420; the comment dialog 560 from 460), and **closed
+  by a click on their backdrop**, as by Escape: the dialog gets its `cancel` event, so one that
+  refuses (Maia's while downloading) stays. A press that starts inside the dialog doesn't count.
+- **New moves: "Show a sequence, then let me play it"** (Chessable's way), with **"New moves in a
+  sequence"** (default 5) shown once it is chosen. At a new move the trainer plays the line's next
+  moves up to the n-th new own move, at twice the pace, with no arrows; it stops before an own
+  move asked (a due move would be given away) and at the line's end. The user steps within the
+  sequence (◀ ▶ ⏮ ⏭, or ← → Home End) and presses **"Play it"** (Enter): the board goes back to the
+  sequence's start, each new move is asked with no arrow (a wrong move, then Hint, shows it, as
+  "Let me try first"), and the moves played for the user in it are played as before. The next new
+  move after the sequence starts the next one. Show and grade keeps its own walk (no sequence).
+  The count is of new own moves, not plies: "x moves" read as the moves to learn.
+
+Tests: the trainer (a sequence of two from 1. e4, its ticks at twice the pace, `seek` held within
+it, `ready` back at its start with no arrow, the next sequence after it; a due move ends a
+sequence before it); the settings' parsing and options; the random-session check with sequences
+on; Playwright, desktop and phone: a sequence watched, stepped, played; a dialog closed by its
+backdrop and not by a click inside it; the explorer's bars at one x.
+
 #### 5.14 Phase 1 acceptance test, and exit
 
 **Acceptance test (live, desktop + Android phone)**, after Phase 0's (§4.11) and once §5.15 is
@@ -2735,6 +2767,13 @@ against the real repertoire: the report's counts, the request count, the time.
   wider than the phone).
 
 #### 5.27 The course tree (lichessable §24): the owner's choice first
+
+**Asked again (2026-10-06, the owner's third notes: "What course tree?").** Put plainly to the
+owner: lichessable has a screen that takes a Chessable course, which is a flat list of separate
+variations, and rebuilds it as one move tree you browse column by column. Repworks studies are
+already trees, so the question is only whether a study made of many single-variation chapters
+(as a Chessable export may be) needs a merged view; the recommendation is a small "Study" tab in
+the explorer, or nothing. Waits for the owner's yes or no.
 
 lichessable's course tree exists because a Chessable course is a flat list of variations: it
 rebuilds the tree, position-keyed, and browses it as Miller columns. On this site a study already

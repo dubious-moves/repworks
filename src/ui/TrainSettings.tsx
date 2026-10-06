@@ -1,6 +1,6 @@
 // The training settings dialog (PLAN.md §5.2, §5.16, §5.17): the daily limit of new moves, the
 // retention and the learning step, shared by every device through the data repo's
-// `settings.json`; then this device's: new moves shown or tried first, a line's end, where a line
+// `settings.json`; then this device's: new moves shown, tried first or shown as a sequence, a line's end, where a line
 // starts, auto-play; and time travel, for this tab. Opened by ⚙ on the home screen's training
 // card and on the training screen.
 import { decidingNow } from '../app/time.ts';
@@ -42,6 +42,7 @@ function Dialog() {
   const [prefs, setPrefs] = useState<TrainPrefs>(trainPrefs.peek());
   const set = <K extends keyof TrainPrefs>(key: K, value: TrainPrefs[K]) => setPrefs({ ...prefs, [key]: value });
   const [error, setError] = useState<string | undefined>(undefined);
+  const [seqLength, setSeqLength] = useState(String(prefs.sequenceLength));
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     if (!ref.current!.open) ref.current!.showModal();
@@ -52,9 +53,11 @@ function Dialog() {
     if (!Number.isInteger(values.newPerDay) || values.newPerDay < 0 || values.newPerDay > 1000) return setError('New moves a day: a whole number from 0 to 1000.');
     if (!(values.retention >= 0.7 && values.retention <= 0.99)) return setError('Retention: a number from 0.7 to 0.99.');
     if (!(values.learnStepHours >= 0 && values.learnStepHours <= 48)) return setError('Learning step: from 0 to 48 hours.');
+    const sequenceLength = Number(seqLength);
+    if (prefs.newMoves === 'sequence' && !(Number.isInteger(sequenceLength) && sequenceLength >= 1 && sequenceLength <= 50)) return setError('New moves in a sequence: a whole number from 1 to 50.');
     const done = await saveTrainSettings(values);
     if (!done.ok) return setError(done.error);
-    saveTrainPrefs(prefs);
+    saveTrainPrefs(prefs.newMoves === 'sequence' ? { ...prefs, sequenceLength } : prefs);
     configureSession();
     close();
   };
@@ -84,8 +87,15 @@ function Dialog() {
           <select name="new-moves" value={prefs.newMoves} onChange={(e) => set('newMoves', e.currentTarget.value as TrainPrefs['newMoves'])}>
             <option value="show">Show the move (arrow and name)</option>
             <option value="try">Let me try first</option>
+            <option value="sequence">Show a sequence, then let me play it</option>
           </select>
         </label>
+        {prefs.newMoves === 'sequence' && (
+          <label>
+            New moves in a sequence
+            <input type="number" name="sequence-length" min={1} max={50} step={1} inputMode="numeric" value={seqLength} onInput={(e) => setSeqLength(e.currentTarget.value)} />
+          </label>
+        )}
         <label>
           Auto-play
           <select name="auto-play" value={prefs.autoPlay} onChange={(e) => set('autoPlay', e.currentTarget.value as AutoPlay)}>
