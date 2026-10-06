@@ -697,3 +697,28 @@ Changes made while building Phase 0, each with its reason:
   Phase 1 builds on the parts those tests already cover, and anything the live checks find is
   fixed in the same code either way. Phase 1 goes into daily use only after the acceptance test
   has passed. `PLAN.md` §4.11.
+
+## Revision of 2026-10-06 (Phase 1 planned)
+Phase 1 is planned in depth in `PLAN.md` §5. The technical calls made there that touch these
+decisions, each with its reason (the owner's four questions are in `PLAN.md` §5.13, still open):
+- **D4: a synced `settings.json` at the data repo's root,** for the training settings that change
+  replayed card states (the retention) or a shared count (the daily limit of new moves, which
+  both devices draw from), and the grade thresholds. Merged per field, like `study.json`. Two
+  devices must replay the same events into the same states (`PLAN.md` §4.11, step 6); a per-device
+  retention would break that. Per-device preferences (pace, speech, keys) stay on the device.
+- **D4: the review event gains optional `w` (wrong moves tried) and `h` (hint used).** The day's
+  mistakes are then read from the log on any device and after a reload, with no second store.
+  Phase 0's reader keeps the line and ignores the fields, so its replay is unchanged.
+- **D4: new event kinds `pin`, `unpin` and `drill`** for pinned mistakes, as the outline asked
+  ("pinned mistakes as progress events"). The steps (30 minutes, 4 hours, 24 hours; three clean
+  answers retire a pin) are lichessable's (`DESIGN-pinned-mistakes.md`). Older builds skip the
+  kinds, and compaction keeps them.
+- **D16: retry and drill don't touch FSRS.** The card was graded Again the same day; a second
+  review then would count a retry as recall. mistake-lab guards the same way (`srsRecorded`).
+- **D16: a never-reviewed card is taught, then recalled.** A new line is shown move by move, then
+  walked again from its start with its new moves asked; that answer is the card's first review. A
+  new card met on a review line is taught where it stands. Auto-play never plays a move never
+  answered (lichessable's rule).
+- **D3: conflicting moves in the trainer.** Both own moves are accepted. When the move the line
+  expected is due and the other one was played, the trainer asks the expected one too, in the same
+  position, so a preferred line can't keep its sibling due for ever (the outline's risk).

@@ -4,15 +4,17 @@ Status: plan of 2026-10-05, written in a planning session and updated the same d
 owner's answers to its questions and with the organization they created (§8). The owner approved
 it the same day. Phase 0 is built: §4.1 to §4.11 are on `main` (each part's "As built" notes say
 where the build differed). What remains is live: the spike's re-run (§4.2), the real Qchess and
-Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Read with
-`DECISIONS.md`, which this plan updates (its revision log lists every change and why).
+Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
+alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
+with four questions for the owner (§5.13). Read with `DECISIONS.md`, which this plan updates (its
+revision log lists every change and why).
 
 Contents:
 1. Summary
 2. What was checked, and how
 3. Architecture in one page
 4. Phase 0 in depth
-5. Later phases (outline)
+5. Phase 1 in depth, and later phases (outline)
 6. Phase order and retirement
 7. Risks
 8. The owner's answers, and setup
@@ -923,50 +925,445 @@ daily use, and editing in Qchess doesn't stop (D18), until the acceptance test h
 
 ---
 
-## 5. Later phases (outline)
+## 5. Phase 1 in depth, and later phases (outline)
 
-Each phase lists its scope, what it reuses, its main risks and the checks that would prove it.
+Phase 1 is planned in depth below, the way §4 plans Phase 0. The later phases stay in outline:
+each lists its scope, what it reuses, its main risks and the checks that would prove it.
 
 ### Phase 1: Train and review (SRS)
 
-Scope:
-- **Cards.** One card per repertoire move of the chapter's side: `r|positionKey|uci`. Two
-  chapters reaching one position share its card.
-- **Daily queue**: due cards plus a limit on new ones. Grades follow mistake-lab's repertoire
-  rule (under 3 s Easy, under 15 s Good, slower Hard, wrong or hint Again), adjustable.
-- **New cards.** Every card starts new (D19). They are introduced line by line in chapter
-  order, up to a daily limit of new moves (a setting), so a day's new material is whole lines
-  rather than scattered moves.
-- **The line trainer.** It walks a line through due cards and quizzes those. A move whose card
-  isn't due (or was answered earlier in the session) is played by the trainer at a readable
-  pace, which is what lichessable's auto-play did. Its lessons carry over as spec: pacing (no
-  less than ~450 ms per move), stopping at the first unproven move, never auto-playing a move
-  never answered.
-- **Suspend** a card = "always played for me". This replaces Chessable's key moves. FSRS
-  difficulty and lapses replace "difficult moves".
-- **Conflicting moves** (D3): both repertoire moves are accepted, and training follows the
-  line played. The other move's card stays due, and positions with such conflicts are listed.
-- **Read and Interactive views** of a line (Qchess's training). Clickable lines in comments
-  (q_extension's `clParse`/`clStartFen`, ported, which work out where a line starts from the
-  move numbers). Line jumping.
-- Transposition badges and "copy continuation" in the study view.
-- **Mistakes**: the session's mistake log, retry and drill (lichessable §16–20 without
-  Chessable), and pinned mistakes as progress events.
+Planned on 2026-10-06, while Phase 0's live checks are still to run (§4.11). The parts below are
+in build order. Each lists its tasks, the tests that prove it, and what only a live check can
+show, on which device. Four questions are the owner's (§5.13); the build waits for their answers
+before it relies on them.
+
+**Scope**, from the outline the owner approved:
+- **Cards.** One card per repertoire move of the chapter's side: `r|positionKey|uci` (§4.4).
+  Two chapters reaching one position share its card.
+- **The daily queue**: due cards, plus new cards up to a daily limit of new moves. Every card
+  starts new (D19); new cards come in line by line, in chapter order, so a day's new material
+  is whole lines rather than scattered moves.
+- **The line trainer.** It walks a line, quizzes the due moves and plays the rest itself at a
+  readable pace: lichessable's auto-play, recast (D16). Grades follow mistake-lab's repertoire
+  rule, adjustable.
+- **Suspend** a card = "always played for me" (Chessable's key moves). FSRS difficulty and lapses
+  replace "difficult moves".
+- **Conflicting moves** (D3): both repertoire moves are accepted, and training follows the line
+  played. Positions with such conflicts are listed.
+- **Read and Interactive views** of a line (Qchess's training); **clickable lines** in comments
+  (q_extension's `clParse`/`clStartFen`) and **line jumping**.
+- **Transposition badges** and **copy continuation** in the study view.
+- **Mistakes**: the day's mistake log, retry and drill (lichessable §16–20 without Chessable), and
+  pinned mistakes as progress events.
 - **Show and grade**: two keys, media keys from a ring, optional speech.
 
-Risks:
-- The switch brings thousands of cards at once, all new (D19). The daily limit decides how
-  many weeks the whole repertoire takes to come in; the queue simulation below picks its
-  default.
-- Two cards in one position: the unplayed one could stay due for ever if one line is always
-  preferred. The trainer then routes through that line.
-- Pace and input speed on the phone.
+What it builds on: `src/core/progress` (events, replay, FSRS with retention as a parameter),
+`src/core/progress/cards.ts`, `src/core/chess` (`positionKeyOf`, `standardUci`), the study tree
+(`src/core/study`), the modes (`src/core/app/fsm.ts`), the board (`src/ui/Board.tsx`), the app
+state and sync (`src/app`), and the card states of the debug panel (`src/app/overview.ts`).
 
-Checks:
-- a 90-day replay simulation of queue sizes on the owner's real repertoire, from all-new cards;
-- the trainer's state machine in Node;
-- a Playwright review session;
-- a week of daily use on the phone before Chessable reviewing stops.
+Where the new code goes:
+
+```
+src/core/repertoire/   index.ts (positions, cards, lines), lines.ts (clickable lines in comments)
+src/core/train/        settings.ts, grade.ts, queue.ts, plan.ts, trainer.ts, showGrade.ts, pins.ts
+src/core/progress/     events.ts and replay.ts gain the new fields and kinds (§5.2, §5.8)
+src/app/               train.ts (the session: index, replay, queue, trainer, timers, wake lock)
+src/ui/                Train.tsx, ShowGrade.tsx, Mistakes.tsx, CommentText.tsx, badges in Notation.tsx
+scripts/               queue-sim.ts (§5.5)
+```
+
+#### 5.1 The repertoire index
+
+`buildIndex(studies)` in `core/repertoire/index.ts`, from every readable chapter of every
+repertoire study (D3: reference studies make no cards):
+- Walk each chapter's tree with chessops, keying each position with `positionKeyOf`. A move made
+  by the chapter's side (`Orientation`) is an **own move**, with the card
+  `r|<key before>|<standardUci>`; any other move is an **opponent move**.
+- `positions: Map<PositionKey, { own: Map<uci, Occurrence[]>, opponent: Map<uci, Occurrence[]> }>`,
+  where an occurrence is `{ sid, cid, path, san }`. A position can hold several own moves: those
+  are the repertoire conflicts (D3), listed by `conflicts(index)`.
+- `lines`: every path from a chapter's start to a leaf, in tree order (the main line first, then
+  each variation where it branches, depth first), with its own moves' cards in order. Studies go
+  in the order of the study list, chapters in their study's order.
+- A chapter with illegal moves contributes the part that parses (§4.5); an unreadable chapter
+  contributes nothing and is listed. A card with events but no move in the index any more (the
+  move was deleted) stays in the log, is left out of the queue, and is counted in the debug
+  panel. If the move comes back, so does its history, since the card is keyed by position and
+  move, not by node.
+- Built per chapter and cached by the chapter file's blob SHA (the `parsed` cache §4.11 left
+  for later), so an edit or a sync rebuilds only the chapters that changed.
+
+Tests (`test/unit/core/repertoire`):
+- hand-built chapters: a transposition in two chapters gives one card with two occurrences; a
+  Black chapter's cards are Black's moves; a start FEN with Black to move; castling cards use
+  `e1g1`; two own moves in one position are listed as a conflict; a move that is White's own in
+  a White chapter and the opponent's move in a Black chapter is still one card;
+- lines come in tree order, and every own node lies on at least one line;
+- the public fixtures (`test/fixtures/data-repo`, `test/fixtures/pgn`) index without problems;
+- a generated repertoire of 800 lines indexes in under 100 ms in Node (measured in CI, like the
+  replay benchmark of §4.8).
+
+Live: the index build time on the phone with the owner's real repertoire, read from the debug
+panel (target under 300 ms).
+
+#### 5.2 Grades, training settings, and the review event
+
+**Grades** (`core/train/grade.ts`), mistake-lab's repertoire rule, its thresholds as settings:
+
+| Answer | Grade |
+| --- | --- |
+| right first time, under 3 s | Easy (4) |
+| right first time, under 15 s | Good (3) |
+| right first time, slower | Hard (2) |
+| any wrong move first, or a hint | Again (1) |
+
+- The time runs from the moment the board takes input (the opponent's move has landed) to the
+  move being dropped. A move played into another repertoire move of the same position is right
+  (§5.6).
+- **The first answer after a line is taught counts Good at most** (pending the owner's answer,
+  §5.13 question 2). Right after being shown a move, a quick answer tests short-term memory,
+  and an Easy first grade would put the card 16 days out (FSRS-5's first Easy stability, at
+  retention 0.9). Good gives 3 days, Again 1.
+- Show and grade (§5.10) has no time to measure in the same way: a known card is Good, a failed
+  one Again (also question 2).
+
+**Training settings** (`core/train/settings.ts`). Some must be the same on every device, or two
+devices would replay the same events into different card states, which the acceptance test
+forbids (§4.11 step 6). Those are synced, in a new data-repo file:
+
+```
+settings.json   { "format": 1, "train": { "newPerDay": 20, "retention": 0.9, "easyMs": 3000, "goodMs": 15000 } }
+```
+
+- Merged three-way per field, like `study.json`'s name and kind (§4.7); a field changed on both
+  sides takes ours. A missing file or field means the default. `validate-data` checks it.
+- Changing the retention re-replays every card (as §4.8 planned), so due dates move at once,
+  the same way on every device.
+- The rest is per device, in localStorage: the auto-play pace (fast 450 ms, normal 600 ms,
+  relaxed 900 ms per move; lichessable's floor of ~450 ms), speech on or off, and the
+  show-and-grade keys.
+
+**The review event** gains two optional fields, so that the day's mistakes can be read back from
+the log on any device and after a reload, with nothing else stored:
+
+```json
+{"v":1,"n":4212,"t":"…","k":"review","card":"r|<key>|g1f3","g":1,"ms":5210,"w":["b1c3"],"h":1}
+```
+
+`w` is the wrong moves tried, in standard UCI; `h` is 1 when a hint was shown. Phase 0's reader
+drops unknown fields from the parsed event and keeps the line as written, so builds from before
+this change replay these events unchanged.
+
+Tests: the grade table on its boundaries (2,999 / 3,000 / 14,999 / 15,000 ms), the cap after
+teaching, a wrong move then the right one is Again; `settings.json` parses, rejects bad values
+(a retention outside 0.7–0.99, a negative limit) and merges per field; the new fields round-trip
+through `formatEvent`/`parseLog`, and a Phase 0 parse of the new line gives the same replay.
+
+#### 5.3 The daily queue
+
+`todaysQueue(index, states, settings, day)` in `core/train/queue.ts`. Core has no clock, so the
+app passes in `day = { start, end }`: the device's local midnight and the next one, in ms (as
+§4.8 has it, "due today" is asked with the device's own calendar).
+- **Due**: cards in the index, not suspended, reviewed at least once, with `due < day.end`, the
+  earliest first.
+- **New today**: cards whose first review falls in the day, from every device's log, so the
+  phone and the desktop share one limit. Room for new moves = `newPerDay` minus that.
+- **New lines**: lines in the index's order that still hold a card never reviewed and not
+  suspended. A line is taken while there is room, and a line once taken is taken whole, even past
+  the limit, so the day's new material is whole lines. A new card already taken by an earlier
+  line today (a shared prefix) isn't counted twice.
+- **Scope**: the whole repertoire, or one study (the study list gets a Train button per
+  repertoire study).
+- The home screen shows "Train: 23 due · 18 new".
+
+Tests: with a fake clock and a time zone given as day bounds, a card due at 23:59 local counts
+today and one due at 00:01 doesn't; a card first reviewed yesterday doesn't use today's room; the
+whole-line rule; suspended and orphaned cards are left out; reviews from two devices share the
+limit; the result doesn't depend on the order of the events.
+
+#### 5.4 The line planner
+
+`planSession(index, queue)` in `core/train/plan.ts` chooses the lines to walk:
+- **Review lines**: every due card lies on at least one line (a transposition on several). Going
+  through the lines in the index's order, take each line that holds a due card not yet covered,
+  so consecutive lines share prefixes and the board's positions follow on from each other. A
+  review line ends at its last due card: nothing after it would be asked.
+- **New lines**: today's new lines (§5.3), after the review lines.
+- A plan is data: the lines, each with the cards it asks. The trainer (§5.6) may still change
+  course when a conflict move is played.
+
+Tests: every due card is covered exactly once by the plan's asks; the plan is deterministic; on
+hand-built trees it takes the expected lines; a property test over random repertoires (built
+with `test/support/randomTree.ts`) checks coverage and that no line is taken that asks nothing.
+
+#### 5.5 The queue simulation, and the default limit
+
+`scripts/queue-sim.ts` answers the outline's first risk: how many weeks the repertoire takes to
+come in, and what that costs per day.
+- It reads a data-repo checkout (`REPWORKS_FIXTURES=<path>`), builds the index, and simulates 90
+  days from all-new cards for several daily limits and both retentions, through the real queue,
+  planner and FSRS.
+- A review succeeds with FSRS's own retrievability at that moment; successes are split
+  Easy/Good/Hard by an assumed share (30/60/10, varied to show how much it matters); the first
+  answer after teaching succeeds 90% of the time.
+- It prints, per setting: cards and lines in the repertoire, the day the last new line comes in,
+  reviews a day at days 30, 60 and 90 and the peak, and an estimate of minutes a day (asked moves
+  at 8 s, auto-played moves at the pace, new moves at 20 s). These are assumptions until a week
+  of real use gives measured averages, which the debug panel will show from the log's `ms`.
+- Only aggregate numbers from it enter this repo (PLAN.md); nothing of the repertoire itself.
+
+A first run on synthetic cards (this session, with the repo's FSRS: a fixed number of cards, new
+ones each day up to the limit, recall drawn from retrievability) gives the shape before the real
+run:
+
+| Cards | Retention | New a day | All in by day | Reviews a day, day 30 / 60 / 90 |
+| --- | --- | --- | --- | --- |
+| 2,000 | 0.9 | 20 | 100 | 45 / 67 / 75 |
+| 2,000 | 0.93 | 20 | 100 | 58 / 76 / 87 |
+| 4,000 | 0.9 | 20 | 200 | 45 / 67 / 75 |
+| 4,000 | 0.9 | 30 | 134 | 68 / 101 / 106 |
+| 4,000 | 0.93 | 30 | 134 | 88 / 118 / 135 |
+
+While new cards still come in, reviews a day settle at three to four times the daily limit; at 0.93 they run
+15–20% above 0.9. The real repertoire's card count, which only the real run gives, decides how
+long the intake lasts.
+
+Tests: the script runs on the public fixture data repo in a unit test (small numbers, checked for
+consistency: every card introduced once, reviews never before their due day).
+
+Live: run on the owner's repertoire (desktop, by a Claude session with `REPWORKS_FIXTURES`, or by
+the owner), and its numbers recorded here; then the owner picks the default (§5.13 question 1).
+
+#### 5.6 The trainer
+
+A pure state machine in `core/train/trainer.ts`, driven by the app with the time passed in, so it
+is tested in Node like the modes (§4.11).
+
+States:
+- `opponent`: the line's opponent move is played after the pace delay.
+- `auto`: an own move the session doesn't ask is played after the pace delay.
+- `ask`: the user's move is asked (a due card); the clock for the grade starts.
+- `teach`: a new card is shown (arrow and SAN, "New move"); the user plays it; its comments show
+  after it. No grade yet.
+- `recall`: after a new line has been taught, the same line is walked again from its start and
+  its new moves are asked; that answer is their first review (§5.2: Good at most).
+- `wrong`: the move played isn't in the repertoire here; the board takes it back and asks again.
+  A second wrong move, or Hint, shows the move with an arrow and the user plays it.
+- `lineDone`, then the next line; `sessionDone` with the day's numbers.
+
+Which own moves are asked:
+- a due card not answered yet today is asked;
+- a card reviewed at least once and not due, or suspended, is played for the user (D16);
+- a card never reviewed is never auto-played (lichessable's rule). On a new line it is taught.
+  Met on a review line (a move added in the middle of a known line), it is taught there and
+  counts towards today's new moves.
+
+Conflicting moves (D3), at a position with more than one own move:
+- the line's own move is the expected one, and every other own move there is accepted too;
+- the move played is graded on its own card. If the line's card is due as well, the trainer then
+  says "Your repertoire also plays Nc6 here" and asks that move in the same position, graded on
+  its own. So the move not played can't stay due for ever (the outline's second risk) without
+  breaking "both are accepted";
+- the session then follows the line played when it still has asks ahead, else returns to the
+  planned line.
+
+Opponent moves always come from the line being walked: the repertoire decides which reply to
+meet, never a guess.
+
+Effects returned to the app: play a move on the board, record a review (§5.2's event), show a
+note or an arrow, wait a given time. The app turns them into board calls, `store.record` and
+timers.
+
+Tests (`test/unit/core/train/trainer.test.ts`): a line with nothing due auto-plays to its end and
+asks nothing; a due card is asked and graded by time; a wrong move then the right one records
+Again with `w`; Hint records Again with `h`; a never-reviewed card on a review line is taught; a
+suspended card is played; the conflict rule (the other move accepted, the due one asked after);
+a promotion asks for the piece; teach then recall on a new line gives one review per new card;
+pace delays never under 450 ms; every effect sequence is deterministic for a given input.
+
+#### 5.7 The training screen
+
+- Routes `#/train` and `#/train/<sid>`, as modes in `fsm.ts`.
+- The board first; under it one feedback line ("Your move", "Correct", "Not in your repertoire:
+  try again", "New move: play Nf3"), the line's name (chapter name and the moves so far), and
+  the comments of the node reached, with clickable lines (§5.12).
+- Buttons, one primary action per state (lichessable's UI inventory): Hint; Skip line; Stop;
+  "Always play this for me" (suspend, with undo); Pin (§5.9). Counters: due left, new left.
+- The device's screen stays on during a session (Screen Wake Lock, D7's spec), and is released
+  when the session stops or the app is hidden.
+- Keys: Space for Hint, Escape to stop.
+- The chapter view gains each own move's card state in the move panel (due date, reviews,
+  suspended) and the suspend toggle; the list of positions with conflicting moves sits in the
+  debug panel.
+- Reviews are recorded at once (`store.record`) and pushed by the sync as before, so a session
+  can be stopped, reloaded or continued on the other device: nothing about a session needs saving
+  beyond the log.
+
+Tests: modes and routes in Node. Playwright, desktop and emulated phone, with the fake GitHub
+seeded with a repertoire and progress files dated in the past (Playwright's clock set to a fixed
+day): the home screen's counts; a session that auto-plays, asks a due move, takes a wrong move
+back, accepts the right one; a new line taught and recalled; a move suspended; the review events
+reaching the fake repo with the expected grades and fields; a reload in the middle of a session
+continuing where it was. Repeated under load (`--repeat-each=8 --workers=4`) before pushing.
+
+Live (phone, then desktop): a real day's session with the owner's repertoire. Moving by tap and
+by drag at the pace, reading the feedback, the wake lock, the time a session takes.
+
+#### 5.8 Mistakes: the log, retry, drill and pins
+
+- **The day's mistakes** are the day's reviews graded Again, read from the log (§5.2), so they
+  are the same on both devices and survive a reload. Each shows its position, the move asked, the
+  moves tried and the line it was met on. Route `#/mistakes`.
+- **Retry**: walk each mistake's line from the start, auto-playing up to the failed move whatever
+  is due, and ask it.
+- **Drill**: one card at a time: the position before the opponent's last move, that move played
+  (lichessable's lead-in), then the move asked.
+- Neither touches FSRS: the card was already graded Again today, and a second review the same day
+  would count the retry as recall (mistake-lab guards the same way with `srsRecorded`).
+- **Pins** (lichessable's pinned mistakes, as progress events): `pin` and `unpin` events, and a
+  `drill` event (`{"k":"drill","card":…,"ok":true}`) for each drill answer on a pinned card.
+  Replay derives each pin's streak with lichessable's steps: due 30 minutes after pinning, then 4
+  hours, then 24 hours after each clean answer; a miss sends it back to the first step; three
+  clean answers in a row retire it. "Drill pinned (N)" appears when a pin is due; a pin not due
+  can still be drilled on request, with no credit. Phase 0's builds skip the new kinds, and
+  compaction keeps them (§4.4).
+
+Tests: mistakes read from the log (the right card, moves and line); retry and drill effects
+through the trainer with grading off; pin replay: on time, early (no credit), a miss, three clean
+answers, two devices' drill events interleaved; `drill` events never change a card's FSRS state.
+Playwright: fail a move in a session, see it in the mistakes, drill it, pin it, see the pin come
+due after 30 minutes on Playwright's clock.
+
+Live (phone): a session's mistakes retried and drilled; a pin made on the phone appears on the
+desktop after a sync.
+
+#### 5.9 Show and grade
+
+A mode of the trainer (`core/train/showGrade.ts`) after lichessable's design
+(`DESIGN-show-and-grade.md` §2, §6, §10): the user never moves a piece.
+- Two keys, and every press shows a move. `next` (2): first press plays the user's move on the
+  board with its arrow; second press plays the opponent's reply and grades the card known.
+  `wrong` (4): plays the user's move and marks the card failed; the next press grades it Again.
+- Presses that come while the board is busy are queued (`next` only, three seconds at most, one
+  at a time); `wrong` clears the queue. Key repeats are never presses.
+- Keys: `2`, `4`, and the media keys (previous track, next track) for a Bluetooth ring; `1`
+  repeats the spoken move. Swallowed only while the mode runs, never in a text field.
+- Speech, optional and off by default: the move spoken through the Web Speech API.
+- Not auto-playing is the same as in the trainer; auto-played moves play at the pace.
+
+A web page receives media keys only through the Media Session API, which Chrome on Android routes
+to the page playing media. So the mode listens for the keys as key events and also registers
+Media Session handlers, kept alive by silent audio while the mode runs. Which of the two the
+owner's ring reaches is a live question.
+
+Tests: the two-key table of lichessable's §2 in Node; the queue's rules; key mapping. Playwright:
+a session run with `2` and `4` only, its review events checked.
+
+Live (phone, with the owner's ring): the ring's buttons reach the page (key events or Media
+Session), with the screen on and off; speech on Android.
+
+#### 5.10 Read and Interactive views
+
+Qchess's two training views, started from the chapter view at the move shown ("Read from here",
+"Play from here"):
+- **Read**: the line from the start to the end of the main line below that move, step by step
+  with ← →, with the board, the move and its comments in large text, clickable lines included.
+  No editing controls.
+- **Interactive**: the trainer with grading off, asking every own move of the line; wrong moves
+  are taken back; the line follows the user's move among repertoire alternatives. It records no
+  events.
+
+Tests: the trainer in its interactive setting in Node (asks every own move, records nothing);
+Playwright: read a line through, play a line through with one wrong move.
+
+#### 5.11 Transposition badges and copy continuation
+
+- **Badges** (q_extension's): a move whose resulting position is reached by another path in the
+  same chapter gets `⇄n`; clicking it lists the other move orders, each a link to that node. A
+  smaller mark counts the other repertoire chapters that reach the position, from the index.
+- **Copy continuation** (q_extension's): in the move menu, the moves from the branch's first move
+  (the nearest ancestor-or-self with a sibling) to the end of the line, following first children,
+  as bare moves numbered from the position (`4... c5 5. d4 cxd4`). `linePgn` (§4.11) already
+  numbers a line from the start; this numbers from any move.
+
+Tests: transpositions found within a chapter (hand-built, and q_extension's harness cases ported
+where they apply); the continuation of a main-line move, a variation's move and a nested one;
+numbering from a Black move. Playwright: click a badge and land on the other line; copy a
+continuation.
+
+#### 5.12 Clickable lines and line jumping
+
+- `core/repertoire/lines.ts`: `parseCommentLines(text)`, a port of q_extension's `clParse`
+  (`main-world.js`): every `(N. move …)` or `(N... move …)` in a comment, with each move's place in
+  the text; a group holding anything else is a remark, not a line.
+- `lineStart(line, node, parent)`, the port of `clStartFen`: the line starts at the commented
+  move's position if its first move number and side are that position's, else at the position
+  before the move (the line replaces it). Moves are played with chessops, so as far as they are
+  legal, synchronously: no worker is needed.
+- The comment renderer (`CommentText.tsx`) makes each move clickable. A click previews the
+  position on the board and changes nothing else; ← → step through the line, Escape or a board
+  click goes back.
+- **Line jumping** (q_extension v1.13.1): → on a line's last move enters the first line of that
+  move's comment; ← → run through a comment's lines end to end, skipping lines whose first move
+  is illegal, never into another comment.
+- Used in the chapter view, the Read view and the trainer's comments.
+
+Tests: the two harness comments of q_extension (`test/harness.js`, "clickable lines": a line at
+the same ply and a line before the move) and their edge cases (a remark in parentheses, `0-0`,
+glyphs on a move, a first move that is illegal) in Node; Playwright: preview a line from a
+comment and step back out.
+
+#### 5.13 Questions for the owner (asked 2026-10-06)
+
+Recommendations, with what the build does meanwhile:
+
+1. **The default daily limit of new moves.** It is a setting; the default should come from §5.5
+   run on the real repertoire. That needs the repertoire: either the owner runs `node
+   scripts/queue-sim.ts` with `REPWORKS_FIXTURES` and pastes the table, or a Claude session clones
+   `skAeglund/repworks-data` outside this repo for the run and records only the aggregate numbers
+   here. Recommendation: the second, with 20 a day as the provisional default (synthetic run,
+   §5.5: about 75 reviews a day by day 90 at 0.9).
+2. **The grade rule.** Recommendation: mistake-lab's thresholds as they are (under 3 s Easy,
+   under 15 s Good, slower Hard, a wrong move or a hint Again), with two additions: the first
+   answer after a line is taught counts Good at most; in show and grade, known is Good and failed
+   is Again.
+3. **FSRS retention.** Recommendation: 0.9, FSRS's default and mistake-lab's. 0.93 costs 15–20%
+   more reviews for a few points of recall. It is a synced setting, and changing it later
+   re-replays every card (§5.2).
+4. **What has to be built before Phase 1 goes into daily use** (and Qchess editing stops, D18).
+   Recommendation: daily use once §5.1–§5.8 are built and the Phase 0 acceptance test has passed:
+   cards, the queue, the trainer with teaching, suspend, and the mistakes. Show and grade, the
+   Read and Interactive views, badges, copy continuation and clickable lines follow within Phase
+   1, and lichessable retires (D20) only once show and grade is in use, since the ring session is
+   lichessable's.
+
+#### 5.14 Phase 1 acceptance test, and exit
+
+**Acceptance test (live, desktop + Android phone)**, after Phase 0's (§4.11), on the owner's real
+repertoire imported a last time from Qchess (D18):
+1. Both devices synced. The home screen shows the same "due · new" counts on both.
+2. Desktop: train part of the day's queue: learn one new line, answer one due move wrong, suspend
+   one move, pin the mistake.
+3. Phone, offline: train the rest of the queue; the desktop's new line isn't offered again, and
+   the day's new limit counts the desktop's moves.
+4. Both online, synced. Then on both: the same card states (debug panel, rounded as in §4.8), the
+   same mistakes list, the pin due 30 minutes after it was made, nothing due today.
+5. Phone: a show-and-grade session with the ring the next day.
+
+**Phase 1 exit**: unit, simulation and e2e tests green; the queue simulation run on the real
+repertoire and the default chosen; the acceptance test passed live; a week of daily use on the
+phone before Chessable reviewing stops (the outline's check).
+
+Risks:
+- The switch brings thousands of new cards at once (D19). The daily limit decides how many weeks
+  the repertoire takes to come in; §5.5 shows it before the owner chooses.
+- The ring may reach a web page differently from the extension (§5.9). If neither key events nor
+  Media Session work, show and grade runs on the phone's screen until a fix is found.
+- Pace and input speed on the phone (§5.7, live).
+- Lines differ in length: the first line of a big chapter can bring 30 new moves in one go, past
+  the limit, because lines are taken whole. If that proves too much, a line can be split at its
+  limit instead; the rule lives in one function (§5.3).
 
 ### Phase 2: Explorer, ChessDB and the Practical panel
 
