@@ -143,6 +143,7 @@ test('the settings: the filter changed is what Lichess is asked', async ({ page 
   await expect(rows(page)).toHaveText(['e4', 'd4', 'Nf3', 'c4']);
   await panel(page).getByRole('button', { name: 'Explorer settings' }).click();
   const dialog = page.getByRole('dialog', { name: 'Explorer settings' });
+  await expect(dialog.locator('.explorer-stats')).toContainText('This tab: 1 Lichess requests (0 refused for speed)');
   await dialog.getByRole('button', { name: 'Bullet' }).click();
   await dialog.getByRole('button', { name: '1600' }).click();
   await dialog.getByRole('button', { name: 'Save' }).click();
@@ -151,4 +152,54 @@ test('the settings: the filter changed is what Lichess is asked', async ({ page 
   // The panel fits the screen (the phone's included).
   const wide = await page.evaluate(() => [...document.querySelectorAll('.explorer, .explorer *')].filter((e) => e.getBoundingClientRect().right > document.documentElement.clientWidth + 0.5).map((e) => `${e.tagName}.${e.className} ${Math.round(e.getBoundingClientRect().right)}`).slice(0, 8));
   expect(wide).toEqual([]);
+});
+
+const AFTER_E4 = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq -';
+const AFTER_E5 = 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq -';
+
+test('the Practical column on the chapter’s moves: rows by rounds, green, a click, a long-press, the prepared bars', async ({ page }) => {
+  const fake = await setUp(page);
+  // After 1. e4, Black's move (the chapter is Black's): c5 and e5 picked, b6 (under 2%, no eval) not.
+  fake.games.set(AFTER_E4, [
+    { san: 'c5', white: 250, draws: 150, black: 200 },
+    { san: 'e5', white: 120, draws: 100, black: 80 },
+    { san: 'b6', white: 3, draws: 1, black: 1 },
+  ]);
+  fake.evals.set(AFTER_E4, [
+    ['c5', -25],
+    ['e5', -30],
+  ]);
+  fake.games.set(AFTER_E5, [{ san: 'Nf3', white: 150, draws: 100, black: 50 }]);
+  fake.evals.set(AFTER_E5, [['Nf3', 40]]);
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf`);
+  await expect(rows(page)).toHaveText(['e4', 'd4', 'Nf3', 'c4']);
+  // White's move here: no values, since the chapter is Black's.
+  await expect(panel(page).locator('.ex-row .ex-prac').first()).toHaveText('');
+  await page.locator('.move[data-path="e4"]').click({ position: { x: 6, y: 8 } });
+  await expect(rows(page)).toHaveText(['c5', 'e5', 'b6']);
+  const cell = (san: string) => panel(page).locator('.ex-row', { has: page.locator('.ex-san', { hasText: new RegExp(`^${san}$`) }) }).locator('.ex-prac');
+  await expect(cell('c5')).toHaveText(/^\d+%$/);
+  await expect(cell('e5')).toHaveText(/^\d+%$/);
+  await expect(panel(page).locator('.ex-prac.best')).toHaveCount(1);
+  await expect(cell('c5')).toHaveAttribute('title', /^Practical \d+%/);
+  // b6 wasn't picked: a click computes it (too few games: –), without playing the move.
+  await expect(cell('b6')).toHaveText('');
+  await cell('b6').click();
+  await expect(cell('b6')).toHaveText('–');
+  await expect(page.locator('.move.current')).toHaveText(/e4/);
+  // A tap on a value shows its details under the table.
+  await cell('c5').click();
+  await expect(panel(page).getByRole('status', { name: 'Practical: c5' })).toContainText(/Practical \d+%/);
+  // A right-click (a long-press on the phone) leaves e5 out; again brings it back.
+  await cell('e5').click({ button: 'right' });
+  await expect(cell('e5')).toHaveText('×');
+  await cell('e5').click({ button: 'right' });
+  await expect(cell('e5')).toHaveText(/^\d+%$/);
+  // The Score header switches the bars to the prepared split.
+  await panel(page).getByRole('button', { name: 'Score' }).click();
+  await expect(panel(page).getByRole('button', { name: 'Prepared' })).toBeVisible();
+  await expect(panel(page).locator('.ex-bar.prep')).toHaveCount(2);
+  await expect(panel(page).locator('.ex-bar.prep').first()).toHaveAttribute('title', /^Prepared \d+ \/ \d+ \/ \d+/);
+  // Lichess's data, with the token, for the search too.
+  expect(fake.requests.filter((r) => r.url.includes(encodeURIComponent('4p3/4P3')) && r.url.startsWith('https://explorer.lichess.org/lichess')).length).toBeGreaterThan(0);
 });

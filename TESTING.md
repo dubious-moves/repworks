@@ -68,3 +68,8 @@ couldn't be tested then (the day's limit was used up), so the training items bel
   layout (the panel after the notation, rows readable and tappable). If the login was made before
   this build, the explorer uses the same token: no new login is needed.
 - §5.22: a reload answering from the cache (the panel fills at once on a position seen before).
+- §5.24: the Practical column on the desktop beside q_extension's column (same positions, filter
+  and token; the values within a point at the same depth, the prepared bars likewise); the
+  request counts after ten minutes of use (Explorer settings shows this tab's); on
+  the phone, a search's time and the battery over a session; a long-press on a cell leaving a
+  move out.

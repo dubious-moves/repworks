@@ -2481,6 +2481,36 @@ Live (desktop): q_extension's Practical column and Repworks' side by side on the
 with the same filter and token (the outline's check); the request rate seen over ten minutes;
 (phone) a search's time and the battery over a session.
 
+**As built** (2026-10-06):
+- `core/explorer/rows.ts` (`autoRows`, `bestOf`: q_extension's `peAutoRows` and `peBestOf`, over
+  the table's rows), `core/explorer/details.ts` (its tooltips as lines of text: the value with
+  its mean and engine, games and filter, the main replies with the Practical choice after each,
+  the tail, the switches, the depth and why it stopped; the prepared split against the same
+  games), `src/app/practical.ts` (`peRequest`'s rules: a new position a new `gen`, the old one's
+  queue swept; values kept per position and move for the session; a row left unfinished
+  resumes; a click computes a row; a right-click or long-press leaves a move out for the
+  session; values found under another filter or other options are dropped).
+- The column (`Prac`) sits after Eval on the Lichess (or Local) and Masters tabs, computed on the
+  chapter's side's moves only, and always on Lichess's data (its header says so on Masters). A
+  tap on a value opens its details in a box under the header (the desktop also has them as the
+  cell's title); `d3` is a small marker while a row deepens.
+- The Score header becomes a switch when the column is on: "Prepared" draws the prepared split
+  in the bars (outlined blue, the best green, faded when it rests mostly on the Practical value;
+  rows with no split keep the games' bar, faded), and the details in each bar's title. Saved per
+  device.
+- Explorer settings shows this tab's request counts (q_extension's popup counters: Lichess
+  requests and 429s, ChessDB lookups and analysis requests, local requests, the cache's size,
+  a pause left).
+- Not built: q_extension's ChessDB re-check of a finished row whose positions were sent for
+  analysis (`peRecheck`): analysis is off by default (D9), and with it on a revisit after the
+  session's values are dropped asks again anyway.
+- Tests: `rows.test.ts` (the eval margin and candidates, the share floor, Black to move, the cap
+  of 8, ties to the more played move, an exclusion letting the next in; green at one depth with
+  complete rows always in), `details.test.ts`, and in `explorer.spec.ts` (desktop and phone) the
+  column after 1. e4 in the Black chapter: nothing on White's move, c5 and e5 valued and one
+  green, b6 (not picked) computed by a click without playing it, a value's details on a tap, e5
+  left out by a right-click and brought back, the prepared bars switched on.
+
 #### 5.25 The local explorer (desktop)
 
 - The address (e.g. `http://localhost:9337`) in the settings, tested with `/info` (q_extension's

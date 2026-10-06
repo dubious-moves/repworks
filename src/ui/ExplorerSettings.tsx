@@ -3,7 +3,8 @@
 // q_extension's popup has them, ChessDB analysis (off, D9) and the local explorer's address.
 import { signal } from '@preact/signals';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { DEFAULT_PREFS, prefs, RATINGS, setPrefs, SPEEDS, type ExplorerPrefs } from '../app/explorer.ts';
+import { DEFAULT_PREFS, onWorker, postToWorker, prefs, RATINGS, setPrefs, SPEEDS, type ExplorerPrefs } from '../app/explorer.ts';
+import type { FromWorker } from '../core/explorer/service.ts';
 import { lichessUser, logInWithLichess } from '../app/lichess.ts';
 import { mode } from '../app/mode.ts';
 
@@ -39,6 +40,13 @@ function Dialog() {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     if (!ref.current!.open) ref.current!.showModal();
+  }, []);
+  // This tab's requests so far (q_extension's popup counters).
+  const [stats, setStats] = useState<Extract<FromWorker, { type: 'stats' }> | undefined>(undefined);
+  useEffect(() => {
+    const stop = onWorker((m) => m.type === 'stats' && setStats(m));
+    postToWorker({ type: 'stats' });
+    return stop;
   }, []);
   const toggle = <T,>(list: readonly T[], item: T) => (list.includes(item) ? list.filter((x) => x !== item) : [...list, item]);
   const save = () => {
@@ -120,6 +128,14 @@ function Dialog() {
           Local explorer <span class="muted">(q_extension’s explorerdb serve, e.g. localhost:9337; empty: Lichess)</span>
           <input type="text" name="local" autoComplete="off" spellcheck={false} value={draft.local} onInput={(e) => setDraft({ ...draft, local: e.currentTarget.value.trim() })} />
         </label>
+        {stats && (
+          <p class="muted explorer-stats">
+            This tab: {stats.stats.explorerRequests ?? 0} Lichess requests ({stats.stats.explorer429 ?? 0} refused for speed), {stats.stats.chessdbRequests ?? 0} ChessDB lookups
+            {stats.stats.chessdbAnalyse ? `, ${stats.stats.chessdbAnalyse} analysis requests` : ''}
+            {stats.stats.localRequests ? `, ${stats.stats.localRequests} local` : ''}; cached {stats.cache?.['explorer'] ?? 0} explorer and {stats.cache?.['chessdb'] ?? 0} ChessDB answers
+            {stats.pausedFor > 0 ? `; Lichess paused for ${Math.ceil(stats.pausedFor / 1000)} s` : ''}.
+          </p>
+        )}
         {error && (
           <p class="warn" role="alert">
             {error}
