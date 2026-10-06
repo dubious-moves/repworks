@@ -491,6 +491,17 @@ first and improved later:
   and its comment and glyphs in Qchess's comment dialog, not in tools under the notation
   (asked by the owner, 2026-10-06).
 
+### D22. Studies and training work as Qchess's (Decided by the owner, 2026-10-06)
+After testing Phase 0 on the desktop and the phone, the owner asked for Qchess as the model of
+how studies and training work, as D21 made it the model of the study page:
+- the study list as cards, like `qchess.net/studies`;
+- a study made on the site with no PGN imported, and studies and chapters renamed and deleted
+  where Qchess does it;
+- Qchess's MoveTrainer ↔ Study mode: while a line is trained, switch at any time to the study
+  with that line open and editable.
+`PLAN.md` §5.15 plans it, after §5.12 and before Phase 1's acceptance test. Qchess is read live
+first; its details are copied, then improved later.
+
 ## What carries over (checked against the code)
 
 | From | As code | As spec only | Dropped |
@@ -866,3 +877,15 @@ Technical calls made while building `PLAN.md` §5.10, each with its reason:
   and grade or from the Interactive view.
 - **The Read and Interactive views take a start (`from`) as well as the move naming the line,**
   so stepping back in Read and playing from there stays on the line being read.
+
+## Revision of 2026-10-06 (the owner's testing of Phase 0)
+- **D4's write path, confirmed on the desktop.** The spike ran through on the desktop (`PLAN.md`
+  §4.2): the same error shapes as on the phone, G6b passing with the fix, and `persist()` granted
+  in the desktop browser. Lichess's OAuth and export work from the page (D9).
+- **D18: the real imports work.** A Qchess export and a Lichess study imported as expected on
+  the desktop, comments and arrows included (`PLAN.md` §4.10).
+- **D22 (new): studies and training as Qchess's.** The owner found Phase 0 good on both devices
+  and asked for Qchess's study cards, studies made and managed on the site, and Qchess's switch
+  between training a line and editing it. This adds §5.15 to Phase 1, before its acceptance
+  test. Renaming and the rest already existed in a drawer under the notation, but the owner
+  didn't find them, so they move where Qchess has them.

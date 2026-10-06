@@ -7,11 +7,14 @@ fixes them and updates this file.
 
 ## Phase 0
 
-- §4.2: the remote spike's re-run (desktop).
-- §4.5 (a): a round trip of the owner's own Lichess test study.
-- §4.10: the real Qchess and Lichess imports.
-- §4.11: the study editor, its layout and the long-press menu (phone and desktop), and the
-  sync against the real GitHub.
+Reported by the owner on 2026-10-06: the spike's desktop run (all steps passed, §4.2), the
+Qchess and Lichess imports on the desktop (§4.10), and the study editor on desktop and phone
+("the current version is good"; their requests became §5.15).
+
+- §4.2: the spike from the installed app (S2's second half, and `persist()` there).
+- §4.5 (a): the owner's Lichess test study run through the round-trip suite (its export in the
+  data repo, by `REPWORKS_FIXTURES`), and our output imported back into Lichess and compared.
+- §4.10: the Lichess OAuth flow from the installed app on the phone.
 - §4.11: Phase 0's acceptance test (desktop and Android phone).
 
 ## Phase 1
@@ -31,3 +34,5 @@ fixes them and updates this file.
 - §5.10: the Read and Interactive views on the phone and the desktop, from the chapter view and
   the move menu: reading a long line with comments (the text size, ← →), playing a line by tap
   and drag, and the walk following a variation's move.
+- §5.15: the study cards, a study made and managed without an import, and train ↔ study during
+  a real session (desktop and phone).

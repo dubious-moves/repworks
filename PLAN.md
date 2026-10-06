@@ -116,8 +116,8 @@ Not verified, and where each gets verified:
 - The Qchess export script on the owner's real studies, and their import: Phase 0, §4.10 and
   §4.5 (b).
 - GraphQL commits with a fine-grained token from a browser, and the exact error for a stale
-  head: checked live on the phone on 2026-10-06 (spike, §4.2). Still to run: the spike on the
-  desktop, and from the installed app.
+  head: checked live on the phone and on the desktop on 2026-10-06 (spike, §4.2). Still to run:
+  the spike from the installed app.
 - Lichess's API answering a web page (study export, `/api/token`): checked live from the
   build session's container on 2026-10-05, once lichess.org was reachable. `GET
   /api/study/by/<user>` answers `Access-Control-Allow-Origin: *`, and the preflights of a
@@ -306,8 +306,23 @@ same browser). Everything up to the Lichess steps ran:
   app may differ; the live check stays. Web Locks and BroadcastChannel are there (S3).
 - **P1**: puzzle-explorer-data's `meta.json` reads cross-origin from the site (D12).
 
+The owner's desktop run (2026-10-06, build `0b4d91a`, Brave 154 on Windows, in a browser tab,
+the data repo now private) passed every step:
+- **G1–G17 all passed, G6b included**: the tree read by the commit's SHA lists G6's files, and
+  GitHub's `sha` in that answer is the commit's own SHA, which confirms the fix above.
+- The same answers as on the phone: `STALE_DATA` (G10), `NOT_FOUND` for a missing path (G11), an
+  empty commit made (G12), 422 "Update is not a fast forward" (G14), 401 "Bad credentials"
+  (G12b, G14b). A 304 is free again (G4: 4,992 remaining before it and after it). Each write
+  was readable on the first read (G8 after 718 ms, G13 after 620 ms).
+- **S1: `persist()` was granted** on the desktop (Brave, quota 2 GB), where the phone's tab was
+  refused. S3 and P1 as on the phone.
+- **L1–L4 passed** (PKCE round trip and token exchange, `/api/account`, the owner's studies
+  listed, a study exported with `orientation=true`). These come from the owner's list of results:
+  the JSON file the owner attached ends at P1.
+
 The real error shapes are in `test/support/fakeGithub.ts` and the spike's e2e mock. Still to run:
-the Lichess steps (L1–L4), the installed app (S2's second half), and the desktop. The token needs only what §8 says: access to that
+the installed app (S2's second half, and `persist()` there); L1–L4 from the phone is optional,
+since imports are done on the desktop. The token needs only what §8 says: access to that
 one repo, with Contents read and write; GitHub adds Metadata read by itself. G1's
 `"permissions": {"admin": true, …}` is the owner's role on the repo, not the token's.
 
@@ -851,6 +866,12 @@ Live:
   and arrows against Lichess's own view;
 - phone: the study appears after one sync; the OAuth flow from the installed PWA.
 
+Checked by the owner on 2026-10-06, on the desktop: a Qchess export ("Download study PGN") and a
+Lichess study both imported as expected, comments and arrows included. The owner's Lichess test
+study (§4.5 (a)) was one of the imports. Still to run: OAuth from the installed PWA on the phone;
+the test study's export through the round-trip suite (`REPWORKS_FIXTURES`); and our output
+imported back into Lichess and compared (§4.5, Live).
+
 ### 4.11 Study editor on chessground, and the Phase 0 acceptance test
 
 **Screens.** Phase 0 modes are a small state machine in `core/app/fsm.ts`, tested in Node:
@@ -1043,6 +1064,9 @@ show, on which device. The owner's answers to its questions are in §5.13.
 - **Mistakes**: the day's mistake log, retry and drill (lichessable §16–20 without Chessable), and
   pinned mistakes as progress events.
 - **Show and grade**: two keys, media keys from a ring, optional speech.
+- **Studies as Qchess's** (§5.15, the owner's request after testing Phase 0): the study list as
+  cards, studies made and managed here without an import, and Qchess's switch between training a
+  line and editing it.
 
 What it builds on: `src/core/progress` (events, replay, FSRS with retention as a parameter),
 `src/core/progress/cards.ts`, `src/core/chess` (`positionKeyOf`, `standardUci`), the study tree
@@ -1721,9 +1745,55 @@ Asked on 2026-10-06; the owner answered the same day, then the two follow-ups:
 Still open: running §5.5 on the real repertoire, by the owner or by a Claude session cloning
 `skAeglund/repworks-data` outside this repo (only totals recorded here).
 
+#### 5.15 Studies as Qchess's: the cards, studies made here, train ↔ study
+
+The owner asked for these on 2026-10-06, after testing Phase 0 on the desktop and the phone
+("the current version is good"); D22. They come next after §5.12, before §5.14's acceptance
+test and Phase 2. As with D21, Qchess is read live first on the test account (CLAUDE.md), and its
+behaviour is copied, then improved later. The owner's words:
+
+> - It should be possible to create a study within this site without importing a pgn
+> - It should be possible to edit study name, chapter name and remove study or chapter (etc).
+> - I prefer how train <-> study works in Qchess. The user can review a variation (inside
+>   "MoveTrainer" mode) and at any time switch to "Study mode" where the trained variation is
+>   opened and editable.
+> - Look for Qchess as a base on how the study and train features should work.
+> - I also prefer the Qchess way of visualizing the different studies with cards
+>   (https://qchess.net/studies)
+
+1. **The study cards.** The study list (`#/`) becomes a grid of cards like Qchess's
+   `/studies`: what a card shows and how it opens comes from Qchess, plus what Repworks
+   already knows (repertoire or reference, and the study's due and new counts from the index,
+   §5.1).
+2. **A study made here.** "New study" on the list: a name, its kind, and a first chapter with its
+   side, with no import. It is an ordinary edit (`study.json` and a chapter file, from
+   `newChapter` and `addChapterToStudy`), synced like any other.
+3. **Managing studies and chapters where Qchess has it.** Rename, delete and the rest (reorder,
+   side, kind) already exist for chapters and for the study, but in a drawer under the notation
+   (§4.11), where the owner didn't find them, and a study can't be deleted. They go where
+   Qchess puts them: the card's menu for a study, the chapter list's menu for a chapter.
+   Deleting asks first. Deleting a study removes `study.json` and its chapter files in one
+   change, and §4.7 already restores a study deleted on one device and edited on another.
+4. **Train ↔ study as Qchess's MoveTrainer.** While a line is trained (§5.7, and the Interactive
+   view, §5.10), one control opens the study view on that chapter with the trained line at the
+   current move, editable. From the chapter view, training resumes or starts from the move shown.
+   Qchess decides how the session continues (where it was, or that line again). Repworks also
+   has to decide what an edit made mid-session does to the session plan, since the index and
+   the line can change. That is a technical call for the build session, and §5.6's trainer is
+   pure, so re-planning from the edited tree is the likely answer.
+
+Tests: Node, for a new study, deleting a study and a chapter (the files written), and the merge
+of a study deleted on one side and edited on the other; Playwright, for making a study with no
+import, renaming the study and a chapter, deleting a chapter and then the study, the cards, and
+going from training to the study and back.
+
+Live (desktop and phone): the cards, making and managing a study, and train ↔ study during a
+real session.
+
 #### 5.14 Phase 1 acceptance test, and exit
 
-**Acceptance test (live, desktop + Android phone)**, after Phase 0's (§4.11), on the owner's real
+**Acceptance test (live, desktop + Android phone)**, after Phase 0's (§4.11) and once §5.15 is
+built, on the owner's real
 repertoire imported a last time from Qchess (D18):
 1. Both devices synced. The home screen shows the same "due · new" counts on both.
 2. Desktop: train part of the day's queue: learn one new line, answer one due move wrong, suspend
