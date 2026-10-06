@@ -118,6 +118,9 @@ couldn't be tested then (the day's limit was used up), so the training items bel
   at the same filter (values within a point at the same depth; q_extension's Maia rating is the
   filter's too), a thin position turning purple, the Prac title switching to Maia's values; on the
   phone, a search's time with Maia.
+- §5.35: the analysis board (desktop and phone): a FEN pasted and analysed; "Analyse from here"
+  on a chapter's move, a line played and added back (on the other device after a sync); the
+  board as left after closing the app.
 
 ### The change to q_extension for §5.25 (Repworks sessions can't push there)
 

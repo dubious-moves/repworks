@@ -83,6 +83,60 @@ effect(() => {
   void load(m.sid, m.cid, wanted);
 });
 
+/* ------------------------------------------------------------------ the analysis board (§5.35) */
+
+/** The analysis board's study and chapter id: no study's (ids are 8 characters). */
+export const SCRATCH = 'analysis';
+const SCRATCH_KEY = 'repworks-analysis';
+const SCRATCH_META: StudyMeta = { format: 1, id: SCRATCH, name: 'Analysis board', kind: 'reference', chapters: [] };
+
+/** A chapter for the board from `fen` (the start when none), or the board as last left. */
+function scratchChapter(fen: string | undefined): { chapter: Chapter } | { error: string } {
+  if (!fen) {
+    try {
+      const saved = localStorage.getItem(SCRATCH_KEY);
+      const parsed = saved ? parseChapterFile(saved, SCRATCH) : undefined;
+      if (parsed?.ok) return { chapter: parsed.chapter };
+    } catch {
+      // a new board, then
+    }
+  }
+  const turn = fen?.split(/\s+/)[1] === 'b' ? 'black' : 'white';
+  const made = newChapter(SCRATCH, 'Analysis board', 'Analysis board', turn, fen && fen.trim() !== START_FEN ? fen.trim() : undefined);
+  return made.ok ? { chapter: made.value } : { error: made.error };
+}
+const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+
+let scratchKey = '';
+effect(() => {
+  const m = mode.value;
+  if (m.name !== 'analysis') {
+    scratchKey = '';
+    return;
+  }
+  const key = `${m.fen ?? ''}|${m.from ? `${m.from.sid}/${m.from.cid}` : ''}`;
+  if (key === scratchKey) return;
+  scratchKey = key;
+  openScratch(m.fen);
+});
+
+/** Opens the analysis board from `fen` (the board as last left when none). */
+export function openScratch(fen: string | undefined): boolean {
+  const made = scratchChapter(fen);
+  if ('error' in made) {
+    feedback.value = made.error;
+    return false;
+  }
+  fileText = undefined;
+  study.value = { sid: SCRATCH, cid: SCRATCH, meta: SCRATCH_META, chapters: [] };
+  doc.value = startHistory(made.chapter);
+  problem.value = undefined;
+  feedback.value = undefined;
+  at.value = [];
+  persist(made.chapter);
+  return true;
+}
+
 effect(() => {
   // The address follows the move shown, so a reload comes back to it.
   const path = at.value;
@@ -159,6 +213,15 @@ function persist(next: Chapter, more: ReadonlyMap<string, string | null> = new M
   const s = study.peek();
   if (!s) return;
   const text = chapterFileText(next);
+  // The analysis board's chapter stays on this device (§5.35).
+  if (s.sid === SCRATCH) {
+    try {
+      localStorage.setItem(SCRATCH_KEY, text);
+    } catch {
+      // kept for this page only
+    }
+    return;
+  }
   fileText = text;
   written++;
   const files = new Map<string, string | null>([[chapterPath(s.sid, s.cid), text], ...more]);

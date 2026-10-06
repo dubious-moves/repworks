@@ -18,6 +18,12 @@ test('hashes parse to modes, and modes write back to the same hash', () => {
     ['#/train/Rep0Najd/Ch1Najdf?at=e4,c5', { name: 'train', sid: 'Rep0Najd', cid: 'Ch1Najdf', at: ['e4', 'c5'] }],
     ['#/learn/Rep0Najd/Ch1Najdf', { name: 'learn', sid: 'Rep0Najd', cid: 'Ch1Najdf' }],
     ['#/coverage/Rep0Najd', { name: 'coverage', sid: 'Rep0Najd' }],
+    ['#/analysis', { name: 'analysis' }],
+    ['#/analysis?fen=8%2F8%2F8%2F8%2F8%2F8%2F8%2FK6k%20w%20-%20-%200%201', { name: 'analysis', fen: '8/8/8/8/8/8/8/K6k w - - 0 1' }],
+    [
+      '#/analysis?fen=rnbqkbnr%2Fpppppppp%2F8%2F8%2F4P3%2F8%2FPPPP1PPP%2FRNBQKBNR%20b%20KQkq%20-%200%201&from=Rep0Najd/Ch1Najdf&at=e4',
+      { name: 'analysis', fen: 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1', from: { sid: 'Rep0Najd', cid: 'Ch1Najdf', at: ['e4'] } },
+    ],
     ['#/show', { name: 'show' }],
     ['#/show/Rep0Najd', { name: 'show', sid: 'Rep0Najd' }],
     ['#/mistakes', { name: 'mistakes' }],

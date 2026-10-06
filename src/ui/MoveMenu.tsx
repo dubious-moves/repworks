@@ -4,12 +4,13 @@
 // for the notation.
 import { signal } from '@preact/signals';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { chapter, doc, edit, feedback, goTo, study } from '../app/editor.ts';
+import { chapter, doc, edit, feedback, goTo, SCRATCH, study } from '../app/editor.ts';
+import { makeFen } from 'chessops/fen';
 import { open } from '../app/mode.ts';
 import { LICHESS_COMMENT_LIMIT, sanitizeComment } from '../core/pgn/comment.ts';
 import { GLYPHS, MOVE_GLYPHS, OBSERVATION_GLYPHS, POSITION_GLYPHS } from '../core/pgn/nags.ts';
 import { continuation, deletePath, linePgn, makeMainline, ownComment, promote, setComment, setNags, toggleGlyph, variationStart } from '../core/study/ops.ts';
-import { nodeAt, type Path } from '../core/study/tree.ts';
+import { nodeAt, positionAt, type Path } from '../core/study/tree.ts';
 
 const GLYPH_ROWS: readonly (readonly number[])[] = [
   [3, 1, 5, 6, 2, 4, 146],
@@ -96,7 +97,15 @@ export function MoveMenu() {
   // From the branch's first move to the line's end, numbered from there (§5.11).
   if (isMove) items.push({ label: 'Copy continuation', run: () => void copyLine(m.path, 'continuation') });
   const s = study.value;
-  if (s) {
+  if (s && s.sid !== SCRATCH) {
+    // The analysis board from this move's position, its lines able to come back here (§5.35).
+    items.push({
+      label: 'Analyse from here',
+      run: () => {
+        const pos = positionAt(c, m.path);
+        if (pos) open({ name: 'analysis', fen: makeFen(pos.toSetup()), from: { sid: s.sid, cid: s.cid, at: [...m.path] } });
+      },
+    });
     // Qchess's two training views of the line through this move (§5.10).
     items.push({ label: 'Read from here', run: () => open({ name: 'read', sid: s.sid, cid: s.cid, at: [...m.path] }) });
     items.push({ label: 'Play from here', run: () => open({ name: 'play', sid: s.sid, cid: s.cid, at: [...m.path] }) });

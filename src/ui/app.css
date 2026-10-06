@@ -2686,3 +2686,19 @@ a.button.secondary {
   color: #b392f0;
   font-style: italic;
 }
+
+/* The analysis board's head (PLAN.md §5.35): a FEN box beside its title. */
+.analysis-head .fen-form {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+.analysis-head .fen-form input {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 22em;
+  max-width: 100%;
+  font-size: 0.8rem;
+}

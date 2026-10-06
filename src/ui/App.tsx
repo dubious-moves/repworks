@@ -26,7 +26,7 @@ import { confirmDeleteStudy, openNewStudy, openStudySettings, StudyDialogs } fro
 
 export function App() {
   return (
-    <div class={`shell${mode.value.name === 'chapter' ? ' shell-chapter' : ''}${['train', 'learn', 'practice', 'show', 'read', 'play'].includes(mode.value.name) ? ' shell-train' : ''}`}>
+    <div class={`shell${mode.value.name === 'chapter' || mode.value.name === 'analysis' ? ' shell-chapter' : ''}${['train', 'learn', 'practice', 'show', 'read', 'play'].includes(mode.value.name) ? ' shell-train' : ''}`}>
       <header class="topbar">
         <img class="topbar-icon" src={`${import.meta.env.BASE_URL}icons/icon.svg`} alt="" width={28} height={28} />
         <h1>Repworks</h1>
@@ -68,6 +68,7 @@ function Screen() {
     case 'conflicts':
       return <ConflictsView />;
     case 'chapter':
+    case 'analysis':
       return <ChapterView />;
     case 'train': {
       const m = mode.value;
@@ -111,6 +112,9 @@ function Home() {
         <div class="card-head">
           <h2>Studies</h2>
           <div class="actions">
+            <a class="button secondary" href="#/analysis">
+              Analysis board
+            </a>
             <a class="button secondary" href="#/import">
               Import
             </a>

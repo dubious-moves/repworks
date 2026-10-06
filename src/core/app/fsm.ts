@@ -14,6 +14,8 @@
 //   #/read/<sid>/<cid>[?at=e4,e5][&from=1]  a chapter's line read through, from a move (§5.10)
 //   #/play/<sid>/<cid>[?at=e4,e5][&from=1]  the same line played, every own move asked (§5.10)
 //   #/coverage/<sid>                    a study's coverage against the repertoire, or a reference study's against it (§5.26)
+//   #/analysis[?fen=…][&from=<sid>/<cid>&at=e4,e5]  the analysis board: a scratch chapter, from a
+//                                       FEN or a chapter's move (§5.35)
 // A setup link (#setup?…) is read and removed before any of this (src/app/setup.ts).
 import { isId } from '../study/ids.ts';
 
@@ -42,7 +44,12 @@ export type Mode =
   /** A practice session over mistakes or pins: nothing graded (§5.8). */
   | { name: 'practice'; run: Practice }
   /** Repertoire coverage (§5.26), opened from a study: a reference study's lines against the repertoire. */
-  | { name: 'coverage'; sid: string };
+  | { name: 'coverage'; sid: string }
+  /**
+   * The analysis board (§5.35): a chapter on this device only, from `fen` (the board's last one
+   * when none), opened from a chapter's move (`from`, where its lines go back to) or not.
+   */
+  | { name: 'analysis'; fen?: string; from?: { sid: string; cid: string; at: string[] } };
 
 export type Practice = 'retry' | 'drill' | 'pinned' | 'pins';
 const PRACTICE_HASH: Record<Practice, string> = { retry: '#/mistakes/retry', drill: '#/mistakes/drill', pinned: '#/pinned', pins: '#/pinned/all' };
@@ -111,6 +118,15 @@ export function parseHash(hash: string): Mode {
     return { name: 'list' };
   }
   if (parts[0] === 'coverage' && parts.length === 2 && isId(parts[1])) return { name: 'coverage', sid: parts[1] };
+  if (parts.length === 1 && parts[0] === 'analysis') {
+    const mode: Mode = { name: 'analysis' };
+    const fen = query.split('&').find((q) => q.startsWith('fen='));
+    const f = fen === undefined ? undefined : decode(fen.slice(4));
+    if (f) mode.fen = f;
+    const from = query.split('&').find((q) => q.startsWith('from='))?.slice(5).split('/');
+    if (from?.length === 2 && isId(from[0]) && isId(from[1])) mode.from = { sid: from[0], cid: from[1], at: atOf(query) ?? [] };
+    return mode;
+  }
   if (parts[0] === 'learn' && parts.length === 3 && isId(parts[1]) && isId(parts[2])) return { name: 'learn', sid: parts[1], cid: parts[2] };
   const practice = (Object.keys(PRACTICE_HASH) as Practice[]).find((p) => PRACTICE_HASH[p] === `#/${parts.join('/')}`);
   if (practice) return { name: 'practice', run: practice };
@@ -154,6 +170,13 @@ export function modeHash(mode: Mode): string {
       return PRACTICE_HASH[mode.run];
     case 'coverage':
       return `#/coverage/${mode.sid}`;
+    case 'analysis': {
+      const q = [
+        ...(mode.fen ? [`fen=${encodeURIComponent(mode.fen)}`] : []),
+        ...(mode.from ? [`from=${mode.from.sid}/${mode.from.cid}`, ...(mode.from.at.length ? [`at=${mode.from.at.map(encodeURIComponent).join(',')}`] : [])] : []),
+      ];
+      return `#/analysis${q.length ? `?${q.join('&')}` : ''}`;
+    }
     case 'chapter':
       return `#/study/${mode.sid}${mode.cid ? `/${mode.cid}` : ''}${atQuery(mode.at)}`;
     case 'read':

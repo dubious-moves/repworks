@@ -13,7 +13,8 @@ import { chessgroundDests, chessgroundMove } from 'chessops/compat';
 import { normalizeMove } from 'chessops/chess';
 import type { Key } from '@lichess-org/chessground/types';
 import type { Role } from 'chessops/types';
-import { afterEdits, at, chapter, conflictsHere, doc, edit, feedback, move, play, problem, redoEdit, resolve, side, study, undoEdit } from '../app/editor.ts';
+import { afterEdits, at, chapter, conflictsHere, doc, edit, feedback, move, play, problem, redoEdit, resolve, SCRATCH, side, study, undoEdit } from '../app/editor.ts';
+import { AnalysisHead } from './Analysis.tsx';
 import { open } from '../app/mode.ts';
 import { left, trainingFrom } from '../app/train.ts';
 import { endPreview, enterCommentLines, preview, stepPreview } from '../app/preview.ts';
@@ -135,10 +136,12 @@ export function ChapterView() {
   };
   const waiting = !!left.value;
   const trainTitle = waiting ? 'Back to the training session' : s.meta.kind === 'repertoire' ? 'Train this study' : 'Play the line from this move';
+  // The analysis board (§5.35): the same view over a chapter on this device only.
+  const scratch = s.sid === SCRATCH;
 
   return (
-    <div class={`chapter-view${c && board ? ' has-frame' : ''}${waiting ? ' session-waiting' : ''}`}>
-      <div class="chapter-head">
+    <div class={`chapter-view${c && board ? ' has-frame' : ''}${waiting ? ' session-waiting' : ''}${scratch ? ' scratch' : ''}`}>
+      {scratch ? <AnalysisHead /> : <div class="chapter-head">
         <a href="#/" class="back" onClick={(e) => (e.preventDefault(), open({ name: 'list' }))}>
           ←
         </a>
@@ -170,7 +173,7 @@ export function ChapterView() {
           </div>
         </div>
         <ModeSwitch current="study" onTrain={() => void train()} trainTitle={trainTitle} />
-      </div>
+      </div>}
       {problem.value && (
         <p class="warn" role="alert">
           {problem.value}
@@ -179,7 +182,7 @@ export function ChapterView() {
       {c && board && (
         <div class="cv-frame">
           <div class="cv-grid">
-            <nav class="cv-chapters" aria-label="Chapters">
+            {!scratch && <nav class="cv-chapters" aria-label="Chapters">
               <div class="cv-study">
                 <span>{s.meta.name}</span>
                 <button type="button" class="icon" aria-label="Study settings" title="Study settings" onClick={studySettings}>
@@ -207,7 +210,7 @@ export function ChapterView() {
                   + New chapter
                 </button>
               </div>
-            </nav>
+            </nav>}
             <div class="cv-board" onPointerDown={shownLine ? endPreviewOnBoard : undefined}>
               <Board
                 fen={shownLine?.fen ?? board.fen}
@@ -244,18 +247,20 @@ export function ChapterView() {
             <div class="cv-panel">
               <EnginePanel board={board.pos} />
               <Notation chapter={c} />
-              <div class="actions cv-views">
+              {!scratch && <div class="actions cv-views">
                 <button type="button" class="secondary" onClick={() => open({ name: 'read', sid: s.sid, cid: s.cid, at: [...at.peek()] })}>
                   Read from here
                 </button>
                 <button type="button" class="secondary" onClick={() => open({ name: 'play', sid: s.sid, cid: s.cid, at: [...at.peek()] })}>
                   Play from here
                 </button>
-              </div>
-              <div class="cv-tools">
-                {doc.value && <Conflicts />}
-                <CardPanel />
-              </div>
+              </div>}
+              {!scratch && (
+                <div class="cv-tools">
+                  {doc.value && <Conflicts />}
+                  <CardPanel />
+                </div>
+              )}
               <Explorer chapter={c} path={path} />
               {drawMode && (
                 <div class="brushes" role="radiogroup" aria-label="Colour">

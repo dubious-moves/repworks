@@ -3217,6 +3217,24 @@ the line added to the chapter it came from, nothing synced from the scratch boar
 
 Live: one session on each device.
 
+**As built** (2026-10-06):
+- Route `#/analysis[?fen=…][&from=<sid>/<cid>&at=…]` (`core/app/fsm.ts`). The editor
+  (`app/editor.ts`) opens the board as a chapter of a study that isn't one (`SCRATCH`): from the
+  FEN, or the board as last left (localStorage `repworks-analysis`), else the start, turned to
+  the side to move; its edits go to localStorage, never to the working copies, so nothing syncs.
+- The chapter view in that form (`.scratch`): no chapter list, study settings, training switch,
+  Read/Play or card; its head (`src/ui/Analysis.tsx`) has the title, a FEN box with Set up (the
+  placeholder shows the board's start FEN, so it doubles as a copy of it), New, and **Add to a
+  chapter…**: the line from the start to the move shown, into the chapter it came from (first,
+  checked) or a repertoire chapter reaching the start (the index), by `app/analysis.ts`
+  (`addLine` on that chapter's file, saved and synced), then that chapter opens at the line's
+  end. The engine, Maia and the explorer work as on a study page.
+- Entry points: "Analysis board" on the home screen, "Analyse from here" in a move's menu.
+- Tests: `fsm.test.ts` (the routes) and `test/e2e/analysis.spec.ts` (desktop and phone: moves
+  kept after a reload and nothing synced; no chapter list or training; a FEN set up turning the
+  board; a bad FEN refused; the fake engine on the board; from a chapter's move, 2... e6 3. d4
+  added back and synced as `(2... e6 3. d4)`). The move menu's tests list the new item.
+
 #### 5.36 Threads (cross-origin isolation through the service worker)
 
 Built if its check passes in the container's Chromium; else written up for the owner.
