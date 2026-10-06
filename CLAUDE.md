@@ -5,15 +5,25 @@ decisions, with a revision log; `PLAN.md` §4 is Phase 0 in build order.
 
 ## How we work
 
-- Technical calls are Claude's. Features, anything the owner gives up, cost and naming are the
-  owner's: ask, with a recommendation.
+- Technical calls are Claude's, and so are a feature's details: decide, build, and say what was
+  decided; the owner tests and asks for changes. Ask first, with a recommendation, only where a
+  wrong guess would be wasteful to undo: the shape of the plan, a data format the owner's real
+  data will be written in, anything the owner gives up, cost, and naming.
 - A finding that changes the shape of the plan goes to the owner before anything is built on it.
   When the plan is wrong in a detail, fix `PLAN.md`; a changed decision also goes in
   `DECISIONS.md`'s revision log, with the reason.
 - Say plainly what was checked live (and on which device), what by tests, and what was taken
   from documentation.
-- Push to `main` only when `npm run check`, `npm test` and `npm run e2e` pass. CI deploys `main`
-  to GitHub Pages.
+- Work that is ready goes straight to `main`: commit and push there, not to a feature branch or a
+  pull request, whatever branch the session was started on. Ready means `npm run check`,
+  `npm test` and `npm run e2e` pass; never push to `main` otherwise. CI deploys `main` to GitHub
+  Pages.
+- Working through the plan: when a task or phase is done and pushed, start the next cloud session
+  (`create_session`, claude-code-remote tools) with a prompt naming the next part of `PLAN.md`
+  and anything it needs that isn't in the repo, then end with a short reply: what was built, what
+  the owner can test, and the new session's link. Don't chain when the next step needs the owner
+  (an answer, a live test on their device that gates the work); stop and say exactly what is
+  needed.
 - puzzle-explorer, mistake-lab, q_extension and lichessable are read-only references.
 - Qchess (qchess.net) is read live on the owner's test account, user `Testers`, whose password
   is in the environment variable `QCHESS_PASSWORD` (set in the cloud environment, never in this
