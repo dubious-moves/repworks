@@ -2950,6 +2950,33 @@ and a position changed mid-search answers the new position (the browser's `stop`
 
 Live: (phone) the depth reached in 8 s and the heat over ten minutes.
 
+**As built** (2026-10-06):
+- `src/core/engine/uci.ts` (`parseInfo`: the score turned to White's side, bounds marked, info
+  strings and PV-less lines left out; `parseBestmove`; `pvToSan`, cut at the first illegal
+  move; `formatScore` as Qchess writes it) and `src/core/engine/search.ts` (`createSearch`:
+  the lifecycle above; a request carries the position's legal moves, so a position with fewer
+  moves than lines asked is done with what it has; bound lines aren't shown; a time limit
+  reached counts as done; `bestmove (none)` marks mate or stalemate; `reset` after a restart).
+- `src/platform/stockfish.ts` (the worker from the hashed URLs, the wasm's URL in its hash;
+  mistake-lab's handshake with 10 s timeouts; commands queued until `readyok`) and
+  `src/app/engine.ts` (the device's settings in localStorage `repworks-engine`; the files
+  ensured through `blobs.ts` with progress, then the worker; the lines shown at most every
+  100 ms; the 3 s watchdog after a `stop` and three failures in a row before giving up; hash 32
+  MB, 16 on a narrow screen; stopped while hidden; one tab at a time over a `BroadcastChannel`;
+  the threat as the position with the other side to move, its en passant square cleared, never
+  when either side is in check). The panel (§5.31) is its first user.
+- **`stop` works in the browser too**: in the container's Chromium the built worker answered a
+  `stop` 1.5 s into `go infinite` within a second and searched the next position (the
+  watchdog stays as the fallback mistake-lab's note asks for).
+- Tests: `test/unit/core/engine/uci.test.ts`, `search.test.ts` (over a scripted engine: the
+  first `go`, a new position's `stop` and later `go`, the stopped lines dropped, several
+  positions in a row, no shallower line, bounds, the cache, more lines asked, the time limit,
+  fewer moves than lines, no move, stop and reset), `test/unit/engine/stockfish.test.ts` (the
+  vendored build under Node through the core search: its name, mate in one for each side
+  scored from White's side, mate in two, the hanging queen with three lines best first, a
+  position changed mid-search), and `test/e2e/stockfish.spec.ts` (desktop: the built worker's
+  mate in one, `stop`, the next search).
+
 #### 5.31 The engine panel on the study page (Qchess's engine bar)
 
 - **The bar**, at the top of the panel (on the phone, under the move buttons, above the
