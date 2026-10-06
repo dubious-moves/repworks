@@ -689,3 +689,11 @@ Changes made while building Phase 0, each with its reason:
   (D4's verified limits), and minutes long. The ref stays a conditional REST read, so an idle
   sync is still one free 304. The REST remote, D4's fallback, still reads raw blobs, paced at
   10 a second. PLAN.md §4.9 (as built).
+
+## Revision of 2026-10-06 (Phase 0 built)
+- **D20: Phase 1 starts before Phase 0's live exit.** Decided by the owner, on a recommendation
+  from the build session. Phase 0's code is on `main` with its tests green; what remains is live
+  (the spike's re-run, the real Qchess and Lichess imports, the acceptance test on two devices).
+  Phase 1 builds on the parts those tests already cover, and anything the live checks find is
+  fixed in the same code either way. Phase 1 goes into daily use only after the acceptance test
+  has passed. `PLAN.md` §4.11.

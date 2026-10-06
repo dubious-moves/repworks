@@ -916,6 +916,11 @@ and offline editing with the PWA killed and reopened.
 **Phase 0 exit**: unit, simulation and e2e tests green; the round-trip suite green on the
 owner's real exports; the acceptance test passed live.
 
+Phase 1 starts before this exit (the owner's decision, 2026-10-06): Phase 0's code is on `main`,
+and its live checks (the spike's re-run, the real imports, the acceptance test) run alongside
+Phase 1. Whatever they find is fixed in Phase 0's code as it comes. Phase 1 isn't put into
+daily use, and editing in Qchess doesn't stop (D18), until the acceptance test has passed.
+
 ---
 
 ## 5. Later phases (outline)
