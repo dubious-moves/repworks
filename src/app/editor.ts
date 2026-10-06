@@ -14,7 +14,7 @@ import { freshId } from '../core/study/ids.ts';
 import { header, type Chapter, type StudyMeta } from '../core/study/model.ts';
 import { nearest, step, type Step } from '../core/study/navigate.ts';
 import { deleteChapter } from '../core/study/manage.ts';
-import { addChapterToStudy, addMove, linePgn, newChapter, renameChapter, reorderChapters, setOrientation, type Edit } from '../core/study/ops.ts';
+import { addChapterToStudy, addLine, addMove, linePgn, newChapter, renameChapter, reorderChapters, setOrientation, type Edit } from '../core/study/ops.ts';
 import { parseStudyMeta, reconcileChapterOrder, writeStudyMeta } from '../core/study/studyMeta.ts';
 import type { Path } from '../core/study/tree.ts';
 import { cryptoRandom } from '../platform/browser.ts';
@@ -187,6 +187,23 @@ export function play(san: string): void {
   const d = doc.peek();
   if (!d) return;
   const result = addMove(d.present, at.peek(), san);
+  if (!result.ok) {
+    feedback.value = result.error;
+    return;
+  }
+  feedback.value = undefined;
+  if (result.value.chapter !== d.present) {
+    doc.value = record(d, result.value.chapter);
+    persist(result.value.chapter);
+  }
+  at.value = result.value.path;
+}
+
+/** Plays `sans` from the move shown (an engine's line, §5.31): into the lines there, else as a variation. */
+export function playLine(sans: readonly string[]): void {
+  const d = doc.peek();
+  if (!d) return;
+  const result = addLine(d.present, at.peek(), sans);
   if (!result.ok) {
     feedback.value = result.error;
     return;

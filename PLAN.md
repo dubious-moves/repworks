@@ -3008,6 +3008,43 @@ lines, the panel on the phone (nothing wider than the screen), nothing running i
 Live (desktop and phone): beside Qchess's SF18 on the same positions (the best move the same,
 evals close at the same depth); the arrows' readability; a line added and synced.
 
+**As built** (2026-10-06):
+- `src/ui/Engine.tsx`: the bar (a switch, "SF18", "Depth 18 · 650 kn/s" or the download's
+  progress, Retry after a failure, "+" once a search is done, the threat ⌖, ⚙) at the panel's
+  top on a wide screen and after the move buttons on the phone; one row per line (the eval in
+  Qchess's format, then up to 16 moves numbered from the position, cut with an ellipsis); the
+  eval bar (`EvalBar`: a 9 px column in the gap right of the board on a wide screen, a 6 px
+  strip under it on the phone, White's share growing from White's side); the arrows
+  (`useEngineArrows`, chessground auto shapes; none while a line is previewed or in draw mode).
+  `src/ui/EngineSettings.tsx`: depth, lines, max time, arrows, and the engine files' list.
+  W toggles the threat on the desktop.
+- **A line's move** opens the comment-line preview (`app/preview.ts` gained a `source:
+  'engine'`): the bar reads "Engine: d4 d5", ◀ ▶ step, and **Add** plays the moves shown from
+  the board's move (`playLine` in `app/editor.ts`, core's `addLine`: existing moves followed,
+  the rest a variation), one edit with its undo. The threat's line isn't previewed (its
+  position is not on the board).
+- `core/engine/winning.ts` (Lichess's winning chances and the bar's share; a mate as 2100 less
+  100 a move, at least 1100 centipawns) and `core/engine/shapes.ts` (Lichess's arrows: the best
+  pale blue at 15, the others pale grey at 12 less 50 × half the gap in chances, none at a gap
+  of 0.2 or more; the threat pale red).
+- **The explorer gives up the engine's height**: on a wide screen its default height is half
+  the panel less the engine section's (measured, `--engine-h`), and its largest height leaves it
+  out too, so the notation, the card and the conflicts keep their room and the explorer's
+  height stays constant between moves (§5.23's notes). On the tests' 1280×720 screen that is
+  about 220 px instead of 257.
+- Checked in the container's Chromium with the real engine: depth 20 at 1. e4 c5 2. Nf3 within a
+  few seconds, desktop and emulated phone (screenshots looked at).
+- Tests: `test/unit/core/engine/winning.test.ts` (chances, Qchess's bar at +1, mates, arrows
+  from either side, the threat) and `test/e2e/engine.spec.ts` (desktop and phone, with
+  `test/e2e/engine.ts`'s scripted engine served in Stockfish's place, padded to its size, its
+  commands logged to the test server): off by default; on, the handshake, MultiPV 3 and `go
+  depth 20 movetime 8000`; three lines with evals from White's side, the bar at 52.8% for
+  +0.30, two arrows (the third line three pawns behind); a line's move previewed, stepped and
+  added, then undone; the switch kept after a reload; Black to move scored from White's side;
+  a finished position answered again from the cache with nothing sent; the threat (the start
+  with Black to move, one red arrow, no eval bar); a position changed mid-search: `stop`, then
+  the new `position`; nothing sent in training; nothing wider than the phone.
+
 #### 5.32 Maia in a worker
 
 - `core/maia/encode.ts` (pure), q_extension's encoding on chessops: `tokens(fen)` (64×12, from

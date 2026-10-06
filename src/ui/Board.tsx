@@ -29,6 +29,8 @@ export interface BoardProps {
   brush: Brush;
   onMove(orig: Key, dest: Key): void;
   onShapes(shapes: Shape[]): void;
+  /** Shapes drawn but not the chapter's (the engine's arrows, §5.31). */
+  autoShapes?: readonly { orig: string; dest: string; brush: string; lineWidth?: number }[];
 }
 
 const BRUSHES: readonly string[] = ['green', 'red', 'blue', 'yellow'];
@@ -47,7 +49,10 @@ function config(p: BoardProps): Config {
     movable: { free: false, color: p.dests.size && !p.drawMode ? p.turn : undefined, dests: p.dests, showDests: true },
     draggable: { enabled: !p.drawMode },
     selectable: { enabled: !p.drawMode },
-    drawable: { shapes: toDraw(p.shapes) },
+    drawable: {
+      shapes: toDraw(p.shapes),
+      autoShapes: (p.autoShapes ?? []).map((a) => ({ orig: a.orig as Key, dest: a.dest as Key, brush: a.brush, ...(a.lineWidth ? { modifiers: { lineWidth: a.lineWidth } } : {}) })),
+    },
   };
 }
 

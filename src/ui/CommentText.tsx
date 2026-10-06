@@ -8,6 +8,7 @@ import type { Position } from 'chessops/chess';
 import { parseUci } from 'chessops/util';
 import type { Key } from '@lichess-org/chessground/types';
 import { endPreview, previewOf, previewPosition, showLine, stepPreview, type PreviewOwner } from '../app/preview.ts';
+import { playLine } from '../app/editor.ts';
 import { cursorAt, parseCommentLines, playedLines, type PlayedLine } from '../core/repertoire/lines.ts';
 
 export interface CommentPositions {
@@ -137,10 +138,12 @@ export function PreviewBar(props: { owner: PreviewOwner }) {
   const p = previewOf(props.owner);
   if (!p) return null;
   const line = p.lines[p.cursor.line]!;
+  const engine = p.source === 'engine';
+  const shown = line.sans.slice(0, p.cursor.ply);
   return (
-    <div class="preview-bar" role="group" aria-label="Line from the comment">
+    <div class="preview-bar" role="group" aria-label={engine ? 'Line from the engine' : 'Line from the comment'}>
       <span class="preview-moves">
-        From the comment: <strong>{line.sans.slice(0, p.cursor.ply).join(' ')}</strong>
+        {engine ? 'Engine' : 'From the comment'}: <strong>{shown.join(' ')}</strong>
       </span>
       <span class="preview-buttons">
         <button type="button" aria-label="Previous move in the line" onClick={() => stepPreview(-1)}>
@@ -149,6 +152,11 @@ export function PreviewBar(props: { owner: PreviewOwner }) {
         <button type="button" aria-label="Next move in the line" onClick={() => stepPreview(1)}>
           ▶
         </button>
+        {engine && props.owner === 'chapter' && (
+          <button type="button" title="Add these moves to the chapter, from the board's move" onClick={() => playLine(shown)}>
+            Add
+          </button>
+        )}
         <button type="button" class="secondary" onClick={endPreview}>
           Back
         </button>

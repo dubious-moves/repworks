@@ -97,6 +97,18 @@ couldn't be tested then (the day's limit was used up), so the training items bel
   sense of what is met most, the number of positions asked and the time, and one line added
   to a chapter and seen there (and on the phone after a sync).
 
+## Phase 3
+
+- §5.29: the engines' downloads from the deployed site (desktop and phone): Settings and debug
+  → Engines on this device: Stockfish (7.3 MB) and Maia (59.9 MB, on Wi-Fi) downloaded, the time
+  each took, then both still "stored" after a reload with the network off; Delete.
+- §5.30, §5.31: the engine panel (desktop and phone): the switch on at 1. e4 c5 2. Nf3 and two
+  other positions beside Qchess's SF18 (the same best move, evals within about 0.2 at depth
+  20); the lines, the eval bar and the arrows readable; a line's move previewed, Add putting it
+  in the chapter, and the line on the other device after a sync; the threat (W on the desktop);
+  "+" going deeper; the depth reached in 8 s on the phone, and its heat over ten minutes; the
+  engine stopping when the app is hidden, and in a second tab stopping the first.
+
 ### The change to q_extension for §5.25 (Repworks sessions can't push there)
 
 `explorerdb serve` answers the extension, whose requests carry no page origin; a web page's need

@@ -2085,8 +2085,13 @@ a.button.secondary {
 
 @media (min-width: 900px) {
   .cv-panel .explorer {
-    height: var(--ex-height, 50%);
-    max-height: max(120px, calc(100% - 240px));
+    height: var(--ex-height, calc(50% - var(--engine-h, 0px)));
+    /* The engine's bar and lines (§5.31) come out of its room: --engine-h is their height. */
+    max-height: max(120px, calc(100% - 240px - var(--engine-h, 0px)));
+  }
+
+  .cv-panel .engine {
+    flex: 0 0 auto;
   }
 
   .ex-details {
@@ -2356,4 +2361,213 @@ a.button.secondary {
 
 .coverage-add select {
   max-width: 100%;
+}
+
+/* The engine panel (PLAN.md §5.31), as Qchess's engine bar: at the panel's top on a wide screen,
+   after the move buttons on the phone. One row per line, cut to the row's width. */
+
+.engine {
+  border-bottom: 1px solid rgb(255 255 255 / 10%);
+}
+
+.cv-panel .engine {
+  order: -1;
+}
+
+@media (min-width: 900px) {
+  .cv-panel .engine {
+    order: 0;
+  }
+}
+
+.engine-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 8px;
+}
+
+.engine-bar .spacer {
+  flex: 1;
+}
+
+.engine-name {
+  color: #3fb950;
+  font-weight: 600;
+}
+
+.engine-depth {
+  color: var(--muted);
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.engine-deeper {
+  color: #5c83ca;
+  font-weight: 700;
+}
+
+.engine-threat.on {
+  color: #e05050;
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 22px;
+  flex: none;
+}
+
+.switch input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  margin: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.switch .slider {
+  position: absolute;
+  inset: 0;
+  border-radius: 11px;
+  background: #3a403b;
+  transition: background 0.15s;
+}
+
+.switch .slider::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ddd;
+  transition: transform 0.15s;
+}
+
+.switch input:checked + .slider {
+  background: #2ea043;
+}
+
+.switch input:checked + .slider::after {
+  transform: translateX(18px);
+}
+
+.switch input:focus-visible + .slider {
+  outline: 2px solid #7ec8e3;
+}
+
+.engine-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0 8px 6px;
+}
+
+.engine-line {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.7;
+  font-size: 0.9rem;
+}
+
+.engine-line + .engine-line {
+  border-top: 1px solid rgb(255 255 255 / 8%);
+}
+
+.engine-eval {
+  display: inline-block;
+  min-width: 3.4em;
+  margin-right: 6px;
+  font-weight: 600;
+}
+
+.engine-eval.white {
+  color: #e8e8e8;
+}
+
+.engine-eval.black {
+  color: #ff6b6b;
+}
+
+.engine-eval.even {
+  color: var(--muted);
+}
+
+.engine-line.threat .engine-eval {
+  color: #e05050;
+}
+
+.engine-number {
+  color: var(--muted);
+}
+
+.engine-move {
+  cursor: pointer;
+  border-radius: 3px;
+  padding: 0 1px;
+}
+
+.engine-line.threat .engine-move {
+  cursor: default;
+}
+
+.engine-move:hover,
+.engine-move:focus-visible {
+  text-decoration: underline;
+  outline: none;
+}
+
+.engine-move.current {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+/* The eval bar: in the gap right of the board on a wide screen (Qchess's place), a thin strip
+   under it on the phone. White's share grows from White's side of the board. */
+
+.cv-board {
+  position: relative;
+}
+
+.eval-bar {
+  display: flex;
+  flex-direction: row;
+  height: 6px;
+  margin: 2px 0 0;
+  background: #333;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.eval-bar.flipped {
+  flex-direction: row-reverse;
+}
+
+.eval-white {
+  background: #eee;
+  transition: flex-basis 0.3s;
+}
+
+@media (min-width: 900px) {
+  .eval-bar {
+    position: absolute;
+    top: 0;
+    left: calc(var(--board) + 3px);
+    width: 9px;
+    height: var(--board);
+    margin: 0;
+    flex-direction: column-reverse;
+  }
+
+  .eval-bar.flipped {
+    flex-direction: column;
+  }
 }

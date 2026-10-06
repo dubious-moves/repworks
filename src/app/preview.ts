@@ -16,6 +16,8 @@ export interface Preview {
   key: string;
   lines: PlayedLine[];
   cursor: Cursor;
+  /** An engine's line (§5.31) rather than a comment's: the chapter view can add it. */
+  source?: 'engine';
 }
 
 /** A comment's identity: its node's path key and its text. */
@@ -23,8 +25,8 @@ export const commentId = (nodeKey: string, text: string) => `${nodeKey}#${text}`
 
 export const preview = signal<Preview | undefined>(undefined);
 
-export function showLine(owner: PreviewOwner, key: string, lines: PlayedLine[], cursor: Cursor): void {
-  preview.value = { owner, key, lines, cursor };
+export function showLine(owner: PreviewOwner, key: string, lines: PlayedLine[], cursor: Cursor, source?: 'engine'): void {
+  preview.value = { owner, key, lines, cursor, ...(source ? { source } : {}) };
 }
 
 export function endPreview(): void {

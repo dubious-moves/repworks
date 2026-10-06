@@ -20,6 +20,7 @@ import { TrainCard } from './TrainCard.tsx';
 import { TrainSettingsDialog } from './TrainSettings.tsx';
 import { TimeBanner } from './TimeTravel.tsx';
 import { ExplorerSettingsDialog } from './ExplorerSettings.tsx';
+import { EngineSettingsDialog } from './EngineSettings.tsx';
 import { confirmDeleteStudy, openNewStudy, openStudySettings, StudyDialogs } from './StudyDialogs.tsx';
 
 export function App() {
@@ -49,6 +50,7 @@ export function App() {
       <StudyDialogs />
       <TrainSettingsDialog />
       <ExplorerSettingsDialog />
+      <EngineSettingsDialog />
       <footer class="footer">
         build {__BUILD_ID__}
         {shellVersion.value && <> · shell {shellVersion.value.slice(0, 8)}</>} · <a href={`${import.meta.env.BASE_URL}spike.html`}>remote spike</a>

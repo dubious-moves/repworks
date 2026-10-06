@@ -31,13 +31,27 @@ export interface SiteServer {
   close(): Promise<void>;
 }
 
-export async function serveSite(): Promise<SiteServer> {
+export interface SiteOptions {
+  /** A script served in place of the Stockfish build (a fake engine: test/e2e/engine.ts). */
+  engine?: string;
+}
+
+export async function serveSite(options: SiteOptions = {}): Promise<SiteServer> {
   const requests: string[] = [];
   let workerVersion: string | null = null;
   const server: Server = createServer(async (req, res) => {
     const path = new URL(req.url ?? '/', 'http://localhost').pathname;
     requests.push(path);
     if (!path.startsWith(BASE)) return void res.writeHead(404).end();
+    if (options.engine && /^engines\/stockfish-[^/]*\.js$/.test(path.slice(BASE.length))) {
+      // Padded to the real file's length: the app checks a download's size against the build's.
+      const real = (await readFile(join(DIST, normalize(path.slice(BASE.length))))).length;
+      const body = Buffer.from(options.engine);
+      const pad = real - body.length - 5;
+      if (pad < 0) throw new Error('the fake engine is longer than the real one');
+      res.writeHead(200, { 'content-type': TYPES['.js']!, 'cache-control': 'no-store' });
+      return void res.end(Buffer.concat([body, Buffer.from(`\n/*${' '.repeat(pad)}*/`)]));
+    }
     let file = normalize(path.slice(BASE.length));
     if (file === '.' || file.endsWith('/')) file = join(file, 'index.html');
     if (file.startsWith('..')) return void res.writeHead(403).end();

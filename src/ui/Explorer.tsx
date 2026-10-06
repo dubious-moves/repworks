@@ -303,7 +303,8 @@ const STEP = 24;
 function maxHeight(box: HTMLElement): number {
   const parent = box.parentElement;
   const wide = matchMedia('(min-width: 900px)').matches;
-  const room = wide && parent ? parent.clientHeight - 240 : innerHeight * 0.85;
+  const engine = parent ? parseFloat(getComputedStyle(parent).getPropertyValue('--engine-h')) || 0 : 0;
+  const room = wide && parent ? parent.clientHeight - 240 - engine : innerHeight * 0.85;
   return Math.max(MIN_HEIGHT, Math.round(room));
 }
 

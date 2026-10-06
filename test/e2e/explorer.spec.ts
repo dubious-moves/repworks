@@ -116,7 +116,8 @@ test('the panel keeps its height between positions, and its handle resizes it, k
   await expect(rows(page)).toHaveText(['e4', 'd4', 'Nf3', 'c4']);
   const height = async () => Math.round((await panel(page).boundingBox())!.height);
   const before = await height();
-  expect(before).toBeGreaterThanOrEqual(240);
+  // Half the panel, less the engine's bar (§5.31): about 220 px on this 720 px tall screen.
+  expect(before).toBeGreaterThanOrEqual(200);
   // Moving on: the same height while the next position is asked, and once it has answered.
   await page.getByRole('button', { name: 'Next move' }).click();
   expect(await height()).toBe(before);

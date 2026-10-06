@@ -31,6 +31,8 @@ import { ModeSwitch } from './ModeSwitch.tsx';
 import { openChapterSettings, openNewChapter, openStudySettings } from './StudyDialogs.tsx';
 import { TranspositionList } from './Transpositions.tsx';
 import { Explorer, ExplorerToggle } from './Explorer.tsx';
+import { EnginePanel, EvalBar, useEngineArrows } from './Engine.tsx';
+import { analysePosition, setThreat, threat } from '../app/engine.ts';
 
 const BRUSH_NAMES: Brush[] = ['green', 'red', 'blue', 'yellow'];
 
@@ -85,6 +87,7 @@ export function ChapterView() {
         ArrowDown: () => move('down'),
         Home: () => move('start'),
         End: () => move('end'),
+        w: () => setThreat(!threat.peek()),
       };
       if (ctrl && e.key.toLowerCase() === 'z') (e.shiftKey ? redoEdit : undoEdit)();
       else if (ctrl && e.key.toLowerCase() === 'y') redoEdit();
@@ -97,6 +100,10 @@ export function ChapterView() {
   }, []);
 
   const board = useMemo(() => (c ? boardState(c, path) : undefined), [c, path]);
+  // The engine looks at the board's position (§5.31), and at nothing once the page is left.
+  useEffect(() => analysePosition(board?.pos), [board]);
+  useEffect(() => () => analysePosition(undefined), []);
+  const arrows = useEngineArrows();
 
   // Another chapter opens at the board, wherever the page was scrolled.
   useEffect(() => scrollTo({ top: 0 }), [s?.sid, s?.cid]);
@@ -214,7 +221,9 @@ export function ChapterView() {
                 brush={brush}
                 onMove={onMove}
                 onShapes={(shapes) => edit((ch) => setShapes(ch, at.peek(), shapes))}
+                autoShapes={shownLine || drawMode ? [] : arrows}
               />
+              <EvalBar orientation={side.value} />
               {promotion && (
                 <div class="promotion" role="dialog" aria-label="Promote to">
                   {(['queen', 'rook', 'bishop', 'knight'] as Role[]).map((r) => (
@@ -233,6 +242,7 @@ export function ChapterView() {
               </p>
             </div>
             <div class="cv-panel">
+              <EnginePanel board={board.pos} />
               <Notation chapter={c} />
               <div class="actions cv-views">
                 <button type="button" class="secondary" onClick={() => open({ name: 'read', sid: s.sid, cid: s.cid, at: [...at.peek()] })}>
