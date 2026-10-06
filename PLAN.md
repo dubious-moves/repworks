@@ -559,7 +559,13 @@ Tests (`test/unit/merge`, `test/sim`):
   - As built: a card's `due` is an instant (the last review plus the interval), not
     puzzle-explorer's local-date string, so every device computes the same state whatever its
     time zone; "due today" is asked with the device's own calendar, in the app. The port gives
-    puzzle-explorer's numbers exactly on 509 recorded review steps at retention 0.9 and 0.93.
+    puzzle-explorer's numbers on 509 recorded review steps at retention 0.9 and 0.93: to the
+    last bit on Node 22, where they were recorded. On Node 24 one step's stability differs in
+    the last bit, because `Math.pow` and `Math.exp` may round differently from one JavaScript
+    engine to another, so the test compares real numbers to 1e-12 (scheduled days exactly).
+    The same holds between two browsers: card states agree to within rounding, and due dates
+    agree unless an interval falls within rounding of half a day. The acceptance test
+    compares due dates and rounded numbers, not raw floats.
 
 Tests:
 - Shuffled input gives the same state.
@@ -814,7 +820,8 @@ and offline editing with the PWA killed and reopened.
    - S is kept as far as the phone's move, with a "kept after delete" marker;
    - the variation, the arrow, the glyph and the new chapter are all present;
    - the conflicts view lists two items;
-   - all four reviews are in the log, and replay gives identical card states on both;
+   - all four reviews are in the log, and replay gives the same card states on both (due
+     dates, and stability and difficulty rounded: §4.8);
    - the data repo shows one commit per sync, named by device.
 7. Resolve both conflicts on the phone. After a sync the desktop shows none.
 

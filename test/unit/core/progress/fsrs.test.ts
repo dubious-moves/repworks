@@ -87,15 +87,18 @@ test("the same numbers as puzzle-explorer's lib/fsrs.js, at retention 0.9 and 0.
   const golden = JSON.parse(readFileSync(join(import.meta.dirname, '../../../fixtures/fsrs/golden.json'), 'utf8')) as {
     cases: { retention: number; steps: { t: string; grade: FsrsGrade; state: number; stability: number; difficulty: number; reps: number; lapses: number; elapsedDays: number; scheduledDays: number }[] }[];
   };
+  // The golden numbers were recorded on Node 22. Math.pow and Math.exp may differ in the last
+  // bit between JavaScript engines (Node 24 does at one step of 509), so the real numbers are
+  // compared to 1e-12 of their size; the counts and the scheduled days exactly.
+  const close = (a: number, b: number) => Math.abs(a - b) <= 1e-12 * Math.max(1, Math.abs(b));
   let steps = 0;
   for (const { retention, steps: expected } of golden.cases) {
     let card = newCard();
     for (const step of expected) {
       card = review(card, step.grade, Date.parse(step.t), { ...DEFAULT_PARAMS, retention });
-      assert.deepEqual(
-        [card.state, card.stability, card.difficulty, card.reps, card.lapses, card.elapsedDays, card.scheduledDays],
-        [step.state, step.stability, step.difficulty, step.reps, step.lapses, step.elapsedDays, step.scheduledDays],
-      );
+      const where = `retention ${retention}, step ${steps}`;
+      assert.deepEqual([card.state, card.reps, card.lapses, card.scheduledDays], [step.state, step.reps, step.lapses, step.scheduledDays], where);
+      for (const key of ['stability', 'difficulty', 'elapsedDays'] as const) assert.ok(close(card[key], step[key]), `${where}: ${key} ${card[key]}, recorded ${step[key]}`);
       steps++;
     }
   }
