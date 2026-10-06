@@ -2666,3 +2666,23 @@ a.button.secondary {
 .explorer-head.with-maia .ex-sort select {
   max-width: 4.2em;
 }
+
+/* Maia in the Practical column (§5.34), as q_extension's: a value resting mostly on Maia is
+   purple; Maia's own view purple italics, its best green with a purple underline. */
+.ex-row .ex-prac.maia {
+  color: #b392f0;
+}
+
+.ex-row .ex-prac.maia-view {
+  font-style: italic;
+}
+
+.ex-row .ex-prac.maia.best {
+  color: #3fb950;
+  text-decoration: underline #b392f0;
+}
+
+.explorer-head .ex-prac.maia-view {
+  color: #b392f0;
+  font-style: italic;
+}

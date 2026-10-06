@@ -6,12 +6,14 @@
 import { signal } from '@preact/signals';
 import { fenKey, type RowResult } from '../core/explorer/search.ts';
 import type { FromWorker } from '../core/explorer/service.ts';
-import { onWorker, postToWorker, prefs } from './explorer.ts';
+import { maiaSearchKey, onWorker, postToWorker, prefs } from './explorer.ts';
 
 export type Cell = RowResult & { at?: number };
 
 const KEEP = 3000;
 const results = new Map<string, Cell>(); // `<root>|<san>`
+/** The Maia preview's values (§5.34), keyed alike. */
+const maiaResults = new Map<string, Cell>();
 const queued = new Set<string>();
 /** Moves taken out of the analysis at a position, for this session (q_extension's, per browser session). */
 const excluded = new Set<string>();
@@ -22,11 +24,18 @@ let root: string | null = null;
 export const practicalVersion = signal(0);
 const changed = () => (practicalVersion.value = practicalVersion.peek() + 1);
 
-function remember(key: string, value: Cell) {
-  results.delete(key);
-  results.set(key, value);
-  if (results.size > KEEP) results.delete(results.keys().next().value!);
+function remember(key: string, value: Cell, into = results) {
+  into.delete(key);
+  into.set(key, value);
+  if (into.size > KEEP) into.delete(into.keys().next().value!);
 }
+
+/** Whether the Maia preview runs: Maia ready, in the column, with its preview (§5.34). */
+export const previewOn = (): boolean => !!maiaSearchKey.value && prefs.value.practicalMaia && prefs.value.maiaPreview;
+
+/** Which values the column shows: Lichess's, or the Maia preview's (q_extension's peView). */
+export const practicalView = signal<'lichess' | 'maia'>('lichess');
+export const showsMaia = (): boolean => previewOn() && practicalView.value === 'maia';
 
 // Deepening is worth resuming: a row whose search was cut short by navigating away.
 const unfinished = (r: Cell | undefined) => !!r && r.state === 'value' && r.final === false;
@@ -34,6 +43,8 @@ const needs = (key: string) => !results.has(key) || unfinished(results.get(key))
 
 export interface CellState {
   result?: Cell;
+  /** The Maia preview's value of the row. */
+  maia?: Cell;
   queued: boolean;
   excluded: boolean;
 }
@@ -41,7 +52,8 @@ export interface CellState {
 export function cellOf(fen: string, san: string): CellState {
   const key = `${fenKey(fen)}|${san}`;
   const result = results.get(key);
-  return { ...(result ? { result } : {}), queued: queued.has(key), excluded: excluded.has(key) };
+  const maia = maiaResults.get(key);
+  return { ...(result ? { result } : {}), ...(maia ? { maia } : {}), queued: queued.has(key), excluded: excluded.has(key) };
 }
 
 export function excludedAt(fen: string): Set<string> {
@@ -131,22 +143,31 @@ export function toggleExclude(fen: string, san: string, shares: ReadonlyMap<stri
 let lastConfig = '';
 const configKey = () => {
   const p = prefs.peek();
-  return JSON.stringify([p.speeds, p.ratings, p.recent, p.local, p.riskAversion, p.budget, p.replyThreshold, p.minGames, p.reachFloor, p.maxPly, p.ownMargin, p.ownMaxCandidates, p.prepPriorGames]);
+  return JSON.stringify([p.speeds, p.ratings, p.recent, p.local, p.riskAversion, p.budget, p.replyThreshold, p.minGames, p.reachFloor, p.maxPly, p.ownMargin, p.ownMaxCandidates, p.prepPriorGames, p.practicalMaia, p.maiaPreview, maiaSearchKey.peek()]);
 };
 lastConfig = configKey();
-prefs.subscribe(() => {
+const reconfigured = () => {
   const k = configKey();
   if (k === lastConfig) return;
   lastConfig = k;
   results.clear();
+  maiaResults.clear();
   queued.clear();
   root = null;
   changed();
-});
+};
+prefs.subscribe(reconfigured);
+// Maia ready, gone or at another rating (§5.34): the values found without it, or with another, go.
+maiaSearchKey.subscribe(reconfigured);
 
 onWorker((m: FromWorker) => {
   if (m.type !== 'update') return;
   const key = `${m.root}|${m.san}`;
+  if (m.pass === 'maia') {
+    if (m.result.state !== 'excluded') remember(key, { ...m.result, at: Date.now() }, maiaResults);
+    changed();
+    return;
+  }
   queued.delete(key);
   if (m.result.state === 'excluded') {
     changed();

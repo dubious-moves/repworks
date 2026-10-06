@@ -114,6 +114,10 @@ couldn't be tested then (the day's limit was used up), so the training items bel
   Repworks' to the filter's); Maia's own rows where the games are few; a position's time on the
   phone, and whether Android reloads the page after ten minutes with Maia on (memory); Maia
   still there offline after a reload.
+- §5.34: the Practical column with Maia on (desktop): beside q_extension's column with its Maia on,
+  at the same filter (values within a point at the same depth; q_extension's Maia rating is the
+  filter's too), a thin position turning purple, the Prac title switching to Maia's values; on the
+  phone, a search's time with Maia.
 
 ### The change to q_extension for §5.25 (Repworks sessions can't push there)
 

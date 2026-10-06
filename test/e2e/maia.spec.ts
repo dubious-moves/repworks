@@ -126,3 +126,52 @@ test('the worker in the browser gives onnxruntime-web’s numbers under Node, to
     a.policy.slice(0, 5).forEach((m, j) => expect(Math.abs(m.prob - r.web[j]!.prob)).toBeLessThan(1e-6));
   });
 });
+
+test('Maia in the Practical column: thin positions filled in (purple), and its preview behind the Prac title', async ({ page }) => {
+  test.setTimeout(90_000);
+  await setUp(page);
+  // After 1. e4 (Black's move: the chapter is Black's), few games: c5 and e5 alone, and nothing
+  // deeper. ChessDB knows every position (its first three moves), so the leaves have evals.
+  const { Chess } = await import('chessops/chess');
+  const { parseFen } = await import('chessops/fen');
+  const { makeSan } = await import('chessops/san');
+  const fake = fakeExplorer();
+  fake.games.set(START, [{ san: 'e4', white: 300, draws: 200, black: 100 }]);
+  fake.games.set('rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq -', [
+    { san: 'c5', white: 15, draws: 10, black: 15 },
+    { san: 'e5', white: 12, draws: 8, black: 10 },
+  ]);
+  await serveExplorer(page, fake);
+  await page.route('https://www.chessdb.cn/**', async (route) => {
+    const board = new URL(route.request().url()).searchParams.get('board') ?? '';
+    const pos = Chess.fromSetup(parseFen(board.split(' ').length === 4 ? `${board} 0 1` : board).unwrap()).unwrap();
+    const moves: { uci: string; san: string; score: number }[] = [];
+    for (const [from, tos] of pos.allDests()) for (const to of tos) if (moves.length < 3) moves.push({ uci: '', san: makeSan(pos, { from, to }), score: 20 - 15 * moves.length });
+    await route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*', 'content-type': 'application/json' }, body: JSON.stringify({ status: 'ok', moves }) });
+  });
+  await page.reload();
+  await page.getByRole('switch', { name: 'Maia' }).check();
+  await page.getByRole('dialog', { name: 'Enable Maia' }).getByRole('button', { name: /^Download/ }).click();
+  await expect(page.locator('.explorer-head').getByRole('button', { name: 'Ml' })).toBeVisible({ timeout: 30_000 });
+  await page.locator('.move[data-path="e4"]').click({ position: { x: 6, y: 8 } });
+  const cell = (san: string) => page.locator('.explorer-rows .ex-row', { has: page.locator('.ex-san', { hasText: new RegExp(`^${san}$`) }) }).locator('.ex-prac');
+  await expect(cell('c5')).toHaveText(/^\d+%$/, { timeout: 30_000 });
+  await expect(cell('e5')).toHaveText(/^\d+%$/, { timeout: 30_000 });
+  // Mostly Maia's predictions: purple, and the details say how much.
+  await expect(cell('c5')).toHaveClass(/\bmaia\b/);
+  await expect(cell('c5')).toHaveAttribute('title', /Maia: \d+% of this value \(rating 1100\)/);
+  // The first click on Prac sorts by it; the second shows Maia's preview values.
+  const prac = page.locator('.explorer-head .ex-prac');
+  await prac.click();
+  await expect(page.getByLabel('Sort')).toHaveValue('prac');
+  await expect(prac).toHaveText(/^Prac/);
+  await prac.click();
+  await expect(prac).toHaveText(/^Maia/);
+  await expect(cell('c5')).toHaveClass(/maia-view/);
+  await expect(cell('c5')).toHaveText(/^\d+%$/, { timeout: 30_000 });
+  await expect(cell('c5')).toHaveAttribute('title', /^Maia \d+%[^]*Replies weighted by Maia’s predictions \(rating 1100\)/);
+  await prac.click();
+  await expect(prac).toHaveText(/^Prac/);
+  const right = await page.evaluate(() => Math.max(...[...document.querySelectorAll('.explorer *')].map((e) => e.getBoundingClientRect().right)));
+  expect(right).toBeLessThanOrEqual(page.viewportSize()!.width + 0.5);
+});

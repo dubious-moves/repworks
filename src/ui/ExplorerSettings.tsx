@@ -120,6 +120,14 @@ function Dialog() {
             <input type="checkbox" name="practical" checked={draft.practical} onChange={(e) => setDraft({ ...draft, practical: e.currentTarget.checked })} />
             Your expected score against the filter’s players, on your moves
           </label>
+          <label class="check">
+            <input type="checkbox" name="practicalMaia" checked={draft.practicalMaia} onChange={(e) => setDraft({ ...draft, practicalMaia: e.currentTarget.checked })} />
+            With Maia on: its predictions fill in where there are under 100 games
+          </label>
+          <label class="check">
+            <input type="checkbox" name="maiaPreview" checked={draft.maiaPreview} onChange={(e) => setDraft({ ...draft, maiaPreview: e.currentTarget.checked })} />
+            Maia’s preview beside it (the Prac title switches to it)
+          </label>
           {NUMBERS.filter((n) => !n.advanced).map(numberField)}
           <details>
             <summary>Advanced</summary>

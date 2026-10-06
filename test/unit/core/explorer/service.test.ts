@@ -7,6 +7,7 @@ import { makeFen, parseFen } from 'chessops/fen';
 import { makeSan } from 'chessops/san';
 import { createMemoryCache, type HttpResponse } from '../../../../src/core/explorer/providers.ts';
 import { createExplorerService, type ExplorerConfig, type FromWorker } from '../../../../src/core/explorer/service.ts';
+import type { MaiaMove } from '../../../../src/core/explorer/search.ts';
 
 const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 const CONFIG: ExplorerConfig = { token: 'tok', filter: { speeds: ['blitz'], ratings: [2000] }, local: '', analyse: false, options: { maxPly: 4 }, budget: 60 };
@@ -26,7 +27,7 @@ function legalSans(fen: string, n: number): { san: string; uci: string }[] {
 }
 
 /** A world where every position has two moves with games, and ChessDB knows them. */
-function world(options: { explorer?: (url: string) => HttpResponse | Promise<HttpResponse> } = {}) {
+function world(options: { explorer?: (url: string) => HttpResponse | Promise<HttpResponse>; maia?: (fen: string, elo: number) => Promise<MaiaMove[] | null>; config?: Partial<ExplorerConfig> } = {}) {
   let t = 1_000_000;
   const urls: string[] = [];
   const auth: (string | undefined)[] = [];
@@ -52,8 +53,9 @@ function world(options: { explorer?: (url: string) => HttpResponse | Promise<Htt
       return Promise.resolve();
     },
     post: (m) => posts.push(m),
+    ...(options.maia ? { maia: options.maia } : {}),
   });
-  service.handle({ type: 'config', config: CONFIG });
+  service.handle({ type: 'config', config: { ...CONFIG, ...options.config, options: { ...CONFIG.options, ...options.config?.options } } });
   return { service, urls, auth, posts, tick: (ms: number) => (t += ms) };
 }
 
@@ -201,4 +203,74 @@ test('coverage counts (§5.26): the games alone, at the filter, once and then fr
   await settle();
   const refused = none.posts.find((m) => m.type === 'games' && m.id === 9);
   assert.ok(refused && 'error' in refused && refused.error.login);
+});
+
+/* Maia (§5.34): q_extension's fill-in of thin positions, and its preview beside the search. */
+
+// Every position thin: two moves with 15 games each, under the 50 games a node needs.
+const thin = (url: string) => {
+  const fen = decodeURIComponent((/fen=([^&]+)/.exec(url) ?? [])[1] ?? '');
+  const moves = legalSans(fen, 2).map((m) => ({ uci: m.uci, san: m.san, white: 5, draws: 5, black: 5 }));
+  return json(200, { white: 10, draws: 10, black: 10, moves });
+};
+const fakeMaia = (asked: [string, number][]) => (fen: string, elo: number) => {
+  asked.push([fen, elo]);
+  const [a, b] = legalSans(fen, 2);
+  return Promise.resolve([{ san: a!.san, prob: 0.7 }, { san: b!.san, prob: 0.3 }]);
+};
+const finals = (w: ReturnType<typeof world>, pass?: 'maia') =>
+  new Map(w.posts.filter((m): m is Extract<FromWorker, { type: 'update' }> => m.type === 'update' && m.pass === pass && m.result.final !== false).map((u) => [u.san, u.result]));
+
+test('Maia off: a thin opponent position is a leaf, and Maia is never asked', async () => {
+  const asked: [string, number][] = [];
+  const w = world({ explorer: thin, maia: fakeMaia(asked) });
+  w.service.handle({ type: 'search', gen: 1, rootFen: START, rows: ['e4'], shares: { e4: 1 } });
+  await settle();
+  assert.equal(asked.length, 0);
+  assert.equal(finals(w).get('e4')!.maia ?? 0, 0);
+});
+
+test('Maia on: thin positions filled in with its policy at the configured rating, its share told', async () => {
+  const asked: [string, number][] = [];
+  const w = world({ explorer: thin, maia: fakeMaia(asked), config: { options: { maia: true, maiaElo: 1700 } } });
+  w.service.handle({ type: 'search', gen: 1, rootFen: START, rows: ['e4'], shares: { e4: 1 } });
+  await settle();
+  assert.ok(asked.length > 0);
+  assert.ok(asked.every(([, elo]) => elo === 1700));
+  const r = finals(w).get('e4')!;
+  assert.equal(r.state, 'value');
+  // 30 games a position: Maia weighs in as 20 × (1 − 30/100) = 14 pseudo-games (q_extension's blend).
+  assert.ok(r.maia! > 0.2 && r.maia! < 0.9, `Maia's share: ${r.maia}`);
+  assert.equal(r.maiaElo, 1700);
+  // No preview unless asked for.
+  assert.equal(finals(w, 'maia').size, 0);
+});
+
+test('Maia unreachable: its asks answer null, the search goes on as without it and says so', async () => {
+  const w = world({ explorer: thin, maia: () => Promise.resolve(null), config: { options: { maia: true, maiaElo: 1700 } } });
+  w.service.handle({ type: 'search', gen: 1, rootFen: START, rows: ['e4'], shares: { e4: 1 } });
+  await settle();
+  const r = finals(w).get('e4')!;
+  assert.equal(r.maia ?? 0, 0);
+  assert.equal(r.maiaMissing, true);
+});
+
+test('the preview: the same rows valued with Maia in place of games, asking no explorer of its own', async () => {
+  const plain = world({ config: { options: { maia: true, maiaElo: 1700 } }, maia: fakeMaia([]) });
+  plain.service.handle({ type: 'search', gen: 1, rootFen: START, rows: ['e4', 'Nf3'], shares: { e4: 0.6, Nf3: 0.4 } });
+  await settle();
+  const asked: [string, number][] = [];
+  const w = world({ maia: fakeMaia(asked), config: { maiaPreview: true, options: { maia: true, maiaElo: 1700 } } });
+  w.service.handle({ type: 'search', gen: 1, rootFen: START, rows: ['e4', 'Nf3'], shares: { e4: 0.6, Nf3: 0.4 } });
+  await settle();
+  const preview = finals(w, 'maia');
+  assert.deepEqual([...preview.keys()].sort(), ['Nf3', 'e4']);
+  for (const r of preview.values()) {
+    assert.equal(r.state, 'value');
+    assert.ok(r.maia! > 0.99, 'Maia alone weighs every reply');
+  }
+  // The Lichess values come as before, and the explorer was asked no more than without the preview.
+  assert.equal(finals(w).get('e4')!.state, 'value');
+  assert.equal(explorerUrls(w.urls).length, explorerUrls(plain.urls).length);
+  assert.ok(w.posts.some((m) => m.type === 'update' && m.pass === 'maia' && m.root === 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -'));
 });

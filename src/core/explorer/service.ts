@@ -4,8 +4,10 @@
 // IndexedDB, the clock and postMessage; Node tests drive it with fakes.
 //
 // The search side is q_extension's `src/background.js` (`startRoot`, the port's message handling)
-// at c26242f, by the same owner, under this repo's GPL-3.0-or-later, without Maia (Phase 3) and
-// with the site's token in place of the popup's and Qchess's.
+// at c26242f, by the same owner, under this repo's GPL-3.0-or-later, with the site's token in
+// place of the popup's and Qchess's. Maia (§5.34) is asked through `maia`, which the worker wires
+// to Maia's own worker; with it, thin positions are filled in with its predictions, and its
+// preview (the same rows with Maia in place of games) runs beside the Lichess search.
 import { Chess } from 'chessops/chess';
 import { makeFen, parseFen } from 'chessops/fen';
 import { parseSan } from 'chessops/san';
@@ -13,7 +15,7 @@ import { standardUci } from '../chess/uci.ts';
 import { LICHESS_RATE, OWN_BURST, type LimiterSnapshot, type Now, type Sleep } from './limiter.ts';
 import { createProviders, localAddress, type CompactExplorer, type ExplorerCache, type ExplorerFilter, type Http, type ProviderStats } from './providers.ts';
 import { createPreviewedSearch, type Budget, type RootSearch } from './rounds.ts';
-import { fenKey, type ChessdbAnswer, type PeError, type RowResult, type SearchOptions, type SearchProvider } from './search.ts';
+import { fenKey, type ChessdbAnswer, type MaiaMove, type PeError, type RowResult, type SearchOptions, type SearchProvider } from './search.ts';
 
 export const DEFAULT_BUDGET = 60; // uncached explorer requests per root position
 export const ANALYSE_MAX = 30; // ChessDB analysis requests per root position
@@ -31,6 +33,8 @@ export interface ExplorerConfig {
   options: Partial<SearchOptions>;
   /** Uncached explorer requests per root position. */
   budget: number;
+  /** With `options.maia`: the Maia preview beside the Lichess search (q_extension's peMaiaPreview). */
+  maiaPreview?: boolean;
 }
 
 /** What a lookup asks: a database's games, or ChessDB's moves alone. */
@@ -66,7 +70,8 @@ export type FromWorker =
   | { type: 'games'; id: number; error: LookupError }
   | { type: 'evals'; id: number; evals: ChessdbAnswer }
   | { type: 'evals'; id: number; error: LookupError }
-  | { type: 'update'; gen: number; root: string; san: string; result: RowResult }
+  /** A row's value; `pass: 'maia'` for the Maia preview's (§5.34). */
+  | { type: 'update'; gen: number; root: string; san: string; result: RowResult; pass?: 'maia' }
   /** Lichess asked to slow down: every queued explorer request waits this long. */
   | { type: 'paused'; ms: number }
   | { type: 'stats'; stats: ProviderStats; pausedFor: number; cache: Record<string, number> | null }
@@ -78,6 +83,8 @@ export interface ServiceOptions {
   now: Now;
   sleep: Sleep;
   post(message: FromWorker): void;
+  /** Maia's policy at a position and rating, or null when Maia can't answer (§5.34). */
+  maia?(fen: string, elo: number): Promise<MaiaMove[] | null>;
 }
 
 export interface ExplorerService {
@@ -228,8 +235,15 @@ export function createExplorerService(o: ServiceOptions): ExplorerService {
     const analyseOn = config.analyse;
     const local = !!localAddress(config.local);
     const tokenless = !config.token;
+    // Maia: on when asked for and wired; the preview beside the search when that is on too.
+    const ask = o.maia;
+    const maiaOn = !!config.options.maia && !!ask;
+    const maiaElo = Number(config.options.maiaElo) || 1900;
+    const wantPreview = maiaOn && !!config.maiaPreview;
 
-    function makeProvider(san: string, isAborted: () => boolean, counts: { hits?: number; misses?: number }): SearchProvider {
+    const providerFor = (pass: 'lichess' | 'maia') => (san: string, isAborted: () => boolean, counts: { hits?: number; misses?: number }) => makeProvider(san, isAborted, counts, pass);
+
+    function makeProvider(san: string, isAborted: () => boolean, counts: { hits?: number; misses?: number }, pass: 'lichess' | 'maia'): SearchProvider {
       const isStale = () => rootStale() || isAborted();
       const share = shares[san] || 0.01;
       // Identical requests from different rows share one fetch. If the row that queued it goes
@@ -249,6 +263,8 @@ export function createExplorerService(o: ServiceOptions): ExplorerService {
       };
       const provider: SearchProvider = {
         explorer(fen, info) {
+          // The preview never asks (maiaOnly); this only makes sure it can't spend requests.
+          if (pass === 'maia') return Promise.resolve(null);
           // Within a round, work goes in descending mass: the row's share of games times the
           // node's reach. Round 1 jumps the queue and is never refused.
           const first = !info || info.plies === 1;
@@ -256,7 +272,8 @@ export function createExplorerService(o: ServiceOptions): ExplorerService {
           return retrying(() => providers.explorer(fen, filter, isStale, ctx)).catch(tag(local ? 'The local explorer' : 'Lichess'));
         },
         chessdb(fen) {
-          return retrying(() => providers.chessdb(fen, isStale, 1)).catch(tag('ChessDB'));
+          // The preview's lookups wait behind the Lichess search's.
+          return retrying(() => providers.chessdb(fen, isStale, pass === 'maia' ? 0 : 1)).catch(tag('ChessDB'));
         },
         child: (fen, s) => child(fen, s).fen,
       };
@@ -275,6 +292,7 @@ export function createExplorerService(o: ServiceOptions): ExplorerService {
           );
         };
       }
+      if (maiaOn) provider.maia = (fen: string) => (isStale() ? Promise.resolve(null) : ask!(fen, maiaElo).catch(() => null));
       return provider;
     }
 
@@ -286,9 +304,9 @@ export function createExplorerService(o: ServiceOptions): ExplorerService {
       return (e.source || 'Network') + ' unreachable: ' + (e.message || String(e));
     }
 
-    const post = (san: string, result: RowResult) => {
+    const post = (san: string, result: RowResult, pass?: 'maia') => {
       if (rootStale()) return;
-      o.post({ type: 'update', gen, root: fenKey(rootFen), san, result });
+      o.post({ type: 'update', gen, root: fenKey(rootFen), san, result, ...(pass ? { pass } : {}) });
     };
 
     let search: RootSearch | null = null;
@@ -301,15 +319,24 @@ export function createExplorerService(o: ServiceOptions): ExplorerService {
         }
         // With a local explorer, explorer calls cost nothing and ChessDB is what the search waits
         // on: the explorer is asked everywhere (explorerFree). Decided once per position.
+        // With a local explorer the preview, which would take ChessDB's slots from the real search,
+        // waits until that has settled (q_extension's previewAfter).
         search ??= createPreviewedSearch({
           rootFen,
-          opts: local ? { ...config.options, explorerFree: true, maia: false } : { ...config.options, maia: false },
+          opts: local ? { ...config.options, explorerFree: true, maia: maiaOn } : { ...config.options, maia: maiaOn },
           budget,
-          makeProvider,
+          previewAfter: local,
+          makeProvider: providerFor('lichess'),
           isStale: rootStale,
           onResult: (san, res) => post(san, res),
           onError: (san, e) => post(san, { state: 'error', reason: reasonText(e as PeError), final: true }),
-          preview: null,
+          preview: wantPreview
+            ? {
+                makeProvider: providerFor('maia'),
+                onResult: (san, res) => post(san, res, 'maia'),
+                onError: (san, e) => post(san, { state: 'error', reason: reasonText(e as PeError), final: true }, 'maia'),
+              }
+            : null,
         });
         search.add(sans);
       },

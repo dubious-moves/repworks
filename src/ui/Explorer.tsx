@@ -15,10 +15,10 @@ import { parseUciMove } from '../core/chess/uci.ts';
 import { localAddress } from '../core/explorer/providers.ts';
 import type { ExplorerTab } from '../core/explorer/service.ts';
 import { barLabel, buildTable, evalTone, formatEval, formatShare, SORT_LABELS, type SortMode, type Table, type TableInput, type TableRow } from '../core/explorer/table.ts';
-import { filterLabel, practicalDetails, preparedDetails, type DetailOptions } from '../core/explorer/details.ts';
+import { filterLabel, practicalDetails, preparedDetails, previewDetails, type DetailOptions } from '../core/explorer/details.ts';
 import { autoRows, bestOf } from '../core/explorer/rows.ts';
 import { expectedScore, type RowResult, type Split } from '../core/explorer/search.ts';
-import { cellOf, computeRow, excludedAt, practicalAt, practicalOff, practicalVersion, toggleExclude, type CellState } from '../app/practical.ts';
+import { cellOf, computeRow, excludedAt, practicalAt, practicalOff, practicalVersion, practicalView, previewOn, showsMaia, toggleExclude, type CellState } from '../app/practical.ts';
 import type { Occurrence } from '../core/repertoire/index.ts';
 import type { Chapter } from '../core/study/model.ts';
 import { nodeAt, positionAt, type Path } from '../core/study/tree.ts';
@@ -142,8 +142,11 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
     table = buildTable({ ...input, practical: values });
     cells = cellsOf(table);
   }
+  const viewMaia = prac && showsMaia();
   const values = [...cells.values()].filter((c) => !c.excluded && c.result?.state === 'value').map((c) => c.result!);
   const best = bestOf(values);
+  // Green in Maia's view: the best among its values (q_extension's peRenderMaia).
+  const maiaBest = bestOf([...cells.values()].filter((c) => !c.excluded && c.maia?.state === 'value').map((c) => c.maia!));
   const detail: DetailOptions = { replyThreshold: p.replyThreshold, minGames: p.minGames, filter: filterLabel(p.speeds, p.ratings), analyse: p.analyse };
   // The prepared bars: the Score header's switch, on rows with a prepared split.
   const preparedOn = prac && p.prepared && mine;
@@ -212,13 +215,27 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
       <div class={`explorer-head${games ? '' : ' no-games'}${prac ? ' with-prac' : ''}${maiaOn ? ' with-maia' : ''}`}>
         <span class="ex-move">Move</span>
         {sortBy('eval', 'Eval', 'ex-eval', 'Sort by eval')}
-        {prac &&
-          sortBy(
-            'prac',
-            'Prac',
-            'ex-prac',
-            `Practical: your expected score when each opponent reply is weighted by how often Lichess players (${detail.filter}) play it. Green: the highest among rows searched to the same depth. A small d3: still searching, 3 plies deep so far.${p.tab === 'lichess' ? '' : ' Lichess data, whatever the tab.'} Click to sort by it.`,
-          )}
+        {prac && (
+          <button
+            type="button"
+            class={`ex-prac ex-sortable${p.sort === 'prac' ? ' on' : ''}${viewMaia ? ' maia-view' : ''}`}
+            aria-pressed={p.sort === 'prac'}
+            title={
+              (viewMaia
+                ? `Maia: your expected score when each opponent reply is weighted by Maia’s predictions at the filter’s rating instead of by Lichess games. ChessDB and Maia only, so it goes deeper faster.`
+                : `Practical: your expected score when each opponent reply is weighted by how often Lichess players (${detail.filter}) play it. Green: the highest among rows searched to the same depth. A small d3: still searching, 3 plies deep so far.${p.tab === 'lichess' ? '' : ' Lichess data, whatever the tab.'}${previewOn() ? ' Purple: mostly Maia’s predictions, where there are few games.' : ''}`) +
+              (p.sort !== 'prac' ? ' Click to sort by it.' : previewOn() ? ` Click to show ${viewMaia ? 'the Lichess values' : 'Maia’s values: its predictions in place of Lichess games, much faster'}.` : '')
+            }
+            onClick={() => {
+              // q_extension's rule: the first click sorts; a click on the column already sorted by switches the view.
+              if (p.sort !== 'prac') setPrefs({ sort: 'prac' });
+              else if (previewOn()) practicalView.value = practicalView.peek() === 'maia' ? 'lichess' : 'maia';
+            }}
+          >
+            {viewMaia ? 'Maia' : 'Prac'}
+            {p.sort === 'prac' && <span aria-hidden="true"> ▾</span>}
+          </button>
+        )}
         {games && sortBy('popularity', 'Games', 'ex-games', 'Sort by popularity')}
         {games &&
           (prac ? (
@@ -275,7 +292,8 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
                           san={r.san}
                           cell={cell}
                           mine={mine}
-                          best={res && best.cmp.has(res) ? best.best : null}
+                          viewMaia={viewMaia}
+                          best={viewMaia ? (cell.maia && maiaBest.cmp.has(cell.maia) ? maiaBest.best : null) : res && best.cmp.has(res) ? best.best : null}
                           detail={detail}
                           onCompute={() => computeRow(fen, r.san, shares)}
                           onExclude={() => toggleExclude(fen, r.san, shares)}
@@ -493,6 +511,60 @@ function Row(props: { row: TableRow; games: boolean; others: Occurrence[]; path:
   );
 }
 
+/** A cell in Maia's view (§5.34): the preview's value in purple italics, q_extension's `peRenderMaia`. */
+function MaiaCell(props: { fen: string; san: string; cell: CellState; mine: boolean; best: number | null; detail: DetailOptions; onCompute: () => void; onExclude: () => void }) {
+  const { cell } = props;
+  const m = cell.maia;
+  const r = cell.result;
+  let cls = 'ex-prac maia maia-view';
+  let text = '';
+  let title = '';
+  let depth = '';
+  if (!props.mine) {
+    cls = 'ex-prac';
+    title = 'Practical: computed on your moves only.';
+  } else if (!m) {
+    if (r || cell.queued) {
+      cls += ' queued';
+      text = '·';
+      title = 'Computing…';
+    } else {
+      cls = 'ex-prac empty';
+      title = 'Click to compute the practical score for this move.';
+    }
+  } else if (m.state === 'value') {
+    text = String(Math.round(m.value!)) + (m.final === false ? '' : '%');
+    if (m.final === false) depth = `d${m.depth}`;
+    if (props.best != null && Math.round(m.value!) === props.best) cls += ' best';
+    title = previewDetails(m, r, props.detail).join('\n');
+  } else {
+    if (m.state === 'error') cls = 'ex-prac failed';
+    text = m.state === 'error' ? '?' : '–';
+    title = previewDetails(m, r, props.detail).join('\n');
+  }
+  return (
+    <span
+      class={cls}
+      title={title}
+      data-d={depth || undefined}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (!props.mine || cell.excluded) return;
+        if ((!m && !r && !cell.queued) || m?.state === 'error') return props.onCompute();
+        if (m) details.value = { fen: props.fen, san: props.san, lines: previewDetails(m, r, props.detail) };
+      }}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (props.mine) props.onExclude();
+      }}
+    >
+      {text}
+      {depth && <small class="ex-depth">{depth}</small>}
+    </span>
+  );
+}
+
 /** Asks Maia for Qchess's Ms of the first rows, once its policy is in. */
 function MaiaScores(props: { fen: string; sans: string[] }) {
   const key = props.sans.join(' ');
@@ -531,8 +603,9 @@ function Details(props: { fen: string }) {
   );
 }
 
-function PracCell(props: { fen: string; san: string; cell: CellState; mine: boolean; best: number | null; detail: DetailOptions; onCompute: () => void; onExclude: () => void }) {
+function PracCell(props: { fen: string; san: string; cell: CellState; mine: boolean; viewMaia: boolean; best: number | null; detail: DetailOptions; onCompute: () => void; onExclude: () => void }) {
   const { cell } = props;
+  if (props.viewMaia) return <MaiaCell {...props} />;
   const r: RowResult | undefined = cell.result;
   let text = '';
   let cls = 'ex-prac';
@@ -557,7 +630,9 @@ function PracCell(props: { fen: string; san: string; cell: CellState; mine: bool
     text = String(Math.round(r.value!)) + (r.final === false ? '' : '%');
     if (r.final === false) depth = `d${r.depth}`;
     if (props.best != null && Math.round(r.value!) === props.best) cls += ' best';
-    title = practicalDetails(r, props.detail).join('\n');
+    // Mostly Maia's predictions rather than games: purple (q_extension's qx-maia).
+    if ((r.maia ?? 0) >= 0.5) cls += ' maia';
+    title = practicalDetails(r, props.detail, cell.maia).join('\n');
   } else if (r.state === 'few' || r.state === 'none') {
     text = '–';
     title = practicalDetails(r, props.detail).join('\n');
@@ -577,7 +652,7 @@ function PracCell(props: { fen: string; san: string; cell: CellState; mine: bool
         if (cell.excluded) return;
         if (!r && !cell.queued) return props.onCompute();
         if (r?.state === 'error') return props.onCompute();
-        if (r) details.value = { fen: props.fen, san: props.san, lines: practicalDetails(r, props.detail) };
+        if (r) details.value = { fen: props.fen, san: props.san, lines: practicalDetails(r, props.detail, cell.maia) };
       }}
       onContextMenu={(e) => {
         e.preventDefault();

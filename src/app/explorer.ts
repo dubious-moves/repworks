@@ -42,6 +42,10 @@ export interface ExplorerPrefs {
   local: string;
   /** The panel's height in px, as dragged by its handle; 0 for the layout's default. */
   height: number;
+  /** Maia in the Practical column, once Maia is on (§5.34): thin positions filled in. */
+  practicalMaia: boolean;
+  /** Maia's preview beside the Lichess values (q_extension's peMaiaPreview). */
+  maiaPreview: boolean;
 }
 
 // Qchess's defaults for the filter and the sort; q_extension's for the rest.
@@ -66,6 +70,8 @@ export const DEFAULT_PREFS: ExplorerPrefs = {
   analyse: false,
   local: '',
   height: 0,
+  practicalMaia: true,
+  maiaPreview: true,
 };
 
 const PREFS_KEY = 'repworks-explorer';
@@ -102,7 +108,14 @@ export function sixMonthsAgo(now: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-export function configOf(p: ExplorerPrefs, token: string, now: Date): ExplorerConfig {
+/** Maia for the Practical search (§5.34): its rating, and a port into its worker. */
+export interface MaiaLink {
+  elo: number;
+  connect(): MessagePort;
+}
+
+export function configOf(p: ExplorerPrefs, token: string, now: Date, maiaElo?: number): ExplorerConfig {
+  const maia = maiaElo !== undefined && p.practicalMaia;
   return {
     token,
     filter: { speeds: [...p.speeds], ratings: [...p.ratings], ...(p.recent ? { since: sixMonthsAgo(now) } : {}) },
@@ -119,7 +132,9 @@ export function configOf(p: ExplorerPrefs, token: string, now: Date): ExplorerCo
       ownMaxCandidates: Math.max(1, p.ownMaxCandidates),
       prep: true,
       prepPriorGames: p.prepPriorGames,
+      ...(maia ? { maia: true, maiaElo } : {}),
     },
+    ...(maia ? { maiaPreview: p.maiaPreview } : {}),
   };
 }
 
@@ -136,7 +151,29 @@ function post(m: ToWorker): void {
 }
 
 function postConfig(): void {
-  worker?.postMessage({ type: 'config', config: configOf(prefs.peek(), lichessToken(), new Date()) } satisfies ToWorker);
+  worker?.postMessage({ type: 'config', config: configOf(prefs.peek(), lichessToken(), new Date(), maiaLink?.elo) } satisfies ToWorker);
+}
+
+let maiaLink: MaiaLink | undefined;
+/** What the Practical values were found with: other Maia settings, other values (practical.ts). */
+export const maiaSearchKey = signal('');
+
+/** Maia ready (or not, undefined) for the search: set by app/maia.ts (§5.34). */
+export function linkMaia(link: MaiaLink | undefined): void {
+  const was = maiaLink;
+  maiaLink = link;
+  if (worker && (link?.elo !== was?.elo || !!link !== !!was)) {
+    worker.postMessage({ type: 'maiaPort', port: null });
+    connectMaia();
+    postConfig();
+  }
+  maiaSearchKey.value = link ? `maia ${link.elo}` : '';
+}
+
+function connectMaia(): void {
+  if (!worker || !maiaLink) return;
+  const port = maiaLink.connect();
+  worker.postMessage({ type: 'maiaPort', port }, [port]);
 }
 
 function ensureWorker(): Worker | undefined {
@@ -144,6 +181,7 @@ function ensureWorker(): Worker | undefined {
   if (typeof Worker === 'undefined') return undefined;
   worker = new Worker(new URL('../platform/explorerWorker.ts', import.meta.url), { type: 'module', name: 'explorer' });
   worker.onmessage = (e: MessageEvent<FromWorker>) => receive(e.data);
+  connectMaia();
   postConfig();
   // The bucket as the last page left it, so a reload doesn't start with a full one.
   try {

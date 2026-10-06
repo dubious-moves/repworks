@@ -3176,6 +3176,34 @@ header switch, the details' Maia line.
 Live (desktop): beside q_extension's column with Maia on (values within a point at the same
 depth); (phone) a search's time with Maia.
 
+**As built** (2026-10-06):
+- `core/explorer/service.ts` (q_extension's `startRoot` with Maia): an injected `maia(fen, elo)`;
+  with `options.maia` and Maia wired, `provider.maia` asks it (null once a row is stale, or on any
+  failure, so a node goes on as without Maia and the result says `maiaMissing`); with
+  `maiaPreview`, `createPreviewedSearch`'s preview runs beside, its providers asking no explorer
+  and ChessDB at the lower priority, its updates marked `pass: 'maia'`, after the search has
+  settled with a local explorer (`previewAfter`).
+- The wiring: `app/maia.ts` hands `app/explorer.ts` a link while Maia is ready (its rating, and a
+  `MessageChannel` whose one end goes to Maia's worker, the other to the explorer worker as
+  `maiaPort`); the config then carries `maia`, `maiaElo` and `maiaPreview`. The explorer worker
+  asks over the port with q_extension's 30 s timeout; Maia's worker tells the page it is busy
+  (at most every 10 s), so the idle timer doesn't end it under a search. Values found with
+  other Maia settings, or without Maia, are dropped when Maia comes, goes or changes rating.
+- `app/practical.ts`: the preview's values kept apart; `practicalView` (q_extension's `peView`).
+  The column: a value resting mostly on Maia (half or more) is purple; **the first click on Prac
+  sorts by it, a click when sorted by it switches to Maia's values** (q_extension's rule,
+  kept with the owner's sorting titles): "Maia" in purple italics, the cells in italics, the best
+  green underlined purple, their details q_extension's `pePreviewTooltip`. The details gained
+  q_extension's Maia lines ("Maia: 62% of this value (rating 2150)…", Maia unavailable, the
+  preview's value). Settings: "With Maia on: its predictions fill in…" and "Maia's preview
+  beside it", both on.
+- Tests: `service.test.ts` (Maia off never asked; on: asked at the rating, its share of a thin
+  value; unreachable: `maiaMissing`; the preview's values with Maia alone, its updates marked,
+  no more explorer requests than without it) and `maia.spec.ts` (desktop and phone, the real
+  model, a fake explorer with thin positions and a ChessDB knowing every position: values
+  purple with Maia's share in their details, Prac sorted, then Maia's view and back, nothing
+  wider than the screen).
+
 #### 5.35 The analysis board (a scratch chapter) and "add to a chapter"
 
 - `#/analysis/<fen>`: the study page's view over a chapter kept on the device only (never

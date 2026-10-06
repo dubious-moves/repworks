@@ -59,7 +59,15 @@ async function handle(m: ToMaia, reply: (r: FromMaia) => void): Promise<void> {
   }
   if (m.type === 'port') {
     const port = m.port;
-    port.onmessage = (e) => void handle(e.data, (r) => port.postMessage(r));
+    let told = 0;
+    port.onmessage = (e) => {
+      // At most every 10 s: the page's idle timer only sees its own asks.
+      if (Date.now() - told > 10_000) {
+        told = Date.now();
+        scope.postMessage({ type: 'busy' });
+      }
+      void handle(e.data, (r) => port.postMessage(r));
+    };
     return;
   }
   try {

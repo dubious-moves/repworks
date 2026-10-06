@@ -20,6 +20,8 @@ export type ToMaia =
 
 export type FromMaia =
   | { type: 'status'; status: 'ready' | 'missing' }
+  /** Asked through a port: the page keeps the worker alive while the explorer worker uses it. */
+  | { type: 'busy' }
   | { type: 'failed'; reason: string }
   | { type: 'answer'; id: number; policy: MaiaMove[]; value: number }
   | { type: 'scores'; id: number; scores: Record<string, number> }

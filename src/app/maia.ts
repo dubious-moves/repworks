@@ -7,7 +7,8 @@ import { computed, signal } from '@preact/signals';
 import { maiaEloFor, type MaiaMove } from '../core/maia/encode.ts';
 import type { FromMaia, ToMaia } from '../core/maia/protocol.ts';
 import { ENGINES, ensure, remove } from '../platform/blobs.ts';
-import { prefs as explorerPrefs, setPrefs as setExplorerPrefs } from './explorer.ts';
+import { linkMaia, prefs as explorerPrefs, setPrefs as setExplorerPrefs } from './explorer.ts';
+import { effect } from '@preact/signals';
 
 export interface MaiaPrefs {
   on: boolean;
@@ -110,6 +111,7 @@ function startWorker(): void {
       maiaState.value = { kind: 'failed', reason: m.reason };
       return;
     }
+    if (m.type === 'busy') return touch();
     const w = waiting.get(m.id);
     if (w) {
       waiting.delete(m.id);
@@ -208,6 +210,25 @@ export function requestScores(fen: string, sans: readonly string[]): void {
     if (r.type === 'scores') update(key, (s) => ({ ...s, scores: { ...s.scores, ...r.scores } }));
   });
 }
+
+// The Practical search asks Maia too (§5.34), over a port of its own into this worker, while Maia
+// is ready; the rating goes with it.
+effect(() => {
+  const ready = maiaState.value.kind === 'ready' && maiaPrefs.value.on;
+  const elo = maiaElo.value;
+  linkMaia(
+    ready && worker
+      ? {
+          elo,
+          connect: () => {
+            const channel = new MessageChannel();
+            worker?.postMessage({ type: 'port', port: channel.port1 }, [channel.port1]);
+            return channel.port2;
+          },
+        }
+      : undefined,
+  );
+});
 
 // Maia comes back on with the page when it was left on (its files stored: no dialog then).
 if (maiaPrefs.peek().on) startWorker();

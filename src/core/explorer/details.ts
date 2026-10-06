@@ -1,8 +1,8 @@
 // What a Practical cell and a prepared bar say about themselves (PLAN.md §5.24): q_extension's
 // tooltips (`peTooltip`, `peValueLine`, `peReplyLines`, `peSwitchLines`, `peDepthLine`,
 // `prepTooltip`, `filterLabel` in `src/main-world.js` at c26242f, by the same owner), under this
-// repo's GPL-3.0-or-later. Maia's lines wait for Phase 3. Lines of text: the desktop shows them as
-// a title, the phone in a box under the table.
+// repo's GPL-3.0-or-later, Maia's lines (§5.34) and the preview's (`pePreviewTooltip`) included.
+// Lines of text: the desktop shows them as a title, the phone in a box under the table.
 import { expectedScore, type RowResult, type Side, type Split } from './search.ts';
 
 export interface DetailOptions {
@@ -13,7 +13,11 @@ export interface DetailOptions {
   filter: string;
   /** Whether ChessDB is asked to analyse what it doesn't know (D9). */
   analyse: boolean;
+  /** Maia fills in below this many games (q_extension's maiaUntil, §5.34). */
+  maiaUntil?: number;
 }
+
+export const MAIA_MISSING = 'Maia unavailable: switch Maia on (the engine bar) to fill thin positions in with its predictions.';
 
 export function filterLabel(speeds: readonly string[], ratings: readonly number[]): string {
   const r = [...ratings].sort((a, b) => a - b);
@@ -34,10 +38,10 @@ function valueLine(label: string, r: RowResult): string {
 }
 
 // The main replies, then the tail valued by engine and the share left out.
-function replyLines(r: RowResult, lines: string[], o: DetailOptions) {
+function replyLines(r: RowResult, lines: string[], o: DetailOptions, maiaMark = true) {
   const min = o.replyThreshold / 100;
   for (const x of (r.replies ?? []).filter((x) => x.share >= min).slice(0, 8)) {
-    lines.push(`  ${x.san}  ${Math.round(x.share * 100)}% → ${Math.round(x.v)}%${x.move ? `  (${x.move})` : ''}`);
+    lines.push(`  ${x.san}  ${Math.round(x.share * 100)}% → ${Math.round(x.v)}%${x.move ? `  (${x.move})` : ''}${maiaMark && x.maiaOnly ? '  Maia' : ''}`);
   }
   if ((r.tailShare ?? 0) > 0.0005) lines.push(`  others under ${o.replyThreshold}%: ${((r.tailShare ?? 0) * 100).toFixed(1)}% (engine eval)`);
   if ((r.unexplained ?? 0) > 0.0005) lines.push(`  no engine eval: ${((r.unexplained ?? 0) * 100).toFixed(1)}% (left out)`);
@@ -58,9 +62,9 @@ export function depthLine(r: RowResult): string {
 }
 
 /** A Practical cell's details. */
-export function practicalDetails(r: RowResult, o: DetailOptions): string[] {
+export function practicalDetails(r: RowResult, o: DetailOptions, preview?: RowResult): string[] {
   if (r.state === 'few') {
-    return [`Only ${r.games ?? 0} games here with the current filter (minimum ${o.minGames}).`, ...(r.engine != null ? [`Engine: ${Math.round(r.engine)}%`] : [])];
+    return [`Only ${r.games ?? 0} games here with the current filter (minimum ${o.minGames}).`, ...(r.engine != null ? [`Engine: ${Math.round(r.engine)}%`] : []), ...(r.maiaMissing ? [MAIA_MISSING] : [])];
   }
   if (r.state === 'none') return ['ChessDB has no eval for this position.'];
   if (r.state === 'error') return [r.reason ?? 'Error', 'Click to retry.'];
@@ -68,6 +72,8 @@ export function practicalDetails(r: RowResult, o: DetailOptions): string[] {
   const lines = [valueLine(`Practical ${Math.round(r.value!)}%`, r)];
   lines.push(`${count(r.games ?? 0)} games · Lichess ${o.filter}`);
   replyLines(r, lines, o);
+  if ((r.maia ?? 0) >= 0.005) lines.push(`Maia: ${Math.round(r.maia! * 100)}% of this value (rating ${r.maiaElo}), filling in where there are under ${o.maiaUntil ?? 100} games`);
+  else if (r.maiaMissing) lines.push(MAIA_MISSING);
   if ((r.analysing ?? 0) > 0) {
     const n = r.analysing!;
     lines.push(
@@ -76,7 +82,21 @@ export function practicalDetails(r: RowResult, o: DetailOptions): string[] {
     );
   }
   switchLines(r, lines);
+  if (preview?.state === 'value') lines.push(`Maia preview: ${Math.round(preview.value!)}% at depth ${preview.depth}, with Maia’s predictions in place of games`);
   lines.push(depthLine(r));
+  return lines;
+}
+
+/** A Maia preview cell's details (q_extension's `pePreviewTooltip`); `r` the row's Lichess value. */
+export function previewDetails(m: RowResult, r: RowResult | undefined, o: DetailOptions): string[] {
+  if (m.state === 'error') return [m.reason ?? 'Error', 'Click to retry.'];
+  if (m.state === 'none') return ['ChessDB has no eval for this position.'];
+  if (m.state !== 'value') return [m.maiaMissing ? MAIA_MISSING : 'No value from Maia here.'];
+  const lines = [valueLine(`Maia ${Math.round(m.value!)}%`, m), `Replies weighted by Maia’s predictions (rating ${m.maiaElo}), not by Lichess games.`];
+  replyLines(m, lines, o, false);
+  switchLines(m, lines);
+  lines.push(depthLine(m));
+  lines.push(r?.state === 'value' ? `Lichess: ${Math.round(r.value!)}% at depth ${r.depth}${r.final === false ? ', searching…' : ''}` : r ? 'Lichess: no value' : 'Lichess: computing…');
   return lines;
 }
 
