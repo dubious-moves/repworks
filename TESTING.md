@@ -40,5 +40,9 @@ Qchess and Lichess imports on the desktop (§4.10), and the study editor on desk
 - §5.12: clickable lines in the owner's real comments (Qchess's and Chessable's notation): which
   groups become lines and which stay remarks, where each line starts, line jumping with → at a
   line's end; previews on the phone (tap a move, ◀ ▶ Back, tap the board) and during training.
-- §5.15: the study cards, a study made and managed without an import, and train ↔ study during
-  a real session (desktop and phone).
+- §5.15: the study cards on the real repertoire (the counts, the side tags); a study made with
+  no import, renamed, its chapters renamed, turned, moved and deleted through the ⚙ dialogs, and
+  deleted from its card, then synced to the other device; train ↔ study during a real session
+  (desktop and phone): "Study" from the training screen opens the line at the board's move, an
+  edit there, and "Train" takes the session up again with the edit in it and nothing asked
+  twice. Whether the chapter ⚙ by the phone's chapter menu is easy to find.

@@ -88,3 +88,30 @@ export function interactivePlan(lines: readonly Line[], path: readonly string[],
   const start = from >= line.path.length ? 0 : from;
   return { lines: [{ kind: 'review', line, end: line.path.length, ask: [], teach: [], from: start }] };
 }
+
+/**
+ * A session taken up again after a visit to the study (§5.15): its plan made afresh from the
+ * edited repertoire, less the cards the session already answered, so it carries on rather than
+ * asking them twice. A line left with nothing to ask or teach goes; one that lost its last ask
+ * ends at its last card left (a new line is still walked whole).
+ */
+export function withoutAnswered(plan: SessionPlan, answered: ReadonlySet<string>): SessionPlan {
+  if (answered.size === 0) return plan;
+  const lines: PlannedLine[] = [];
+  for (const p of plan.lines) {
+    const ask = p.ask.filter((c) => !answered.has(c));
+    const teach = p.teach.filter((c) => !answered.has(c));
+    if (ask.length === p.ask.length && teach.length === p.teach.length) {
+      lines.push(p);
+      continue;
+    }
+    if (ask.length + teach.length === 0) continue;
+    const left = new Set<CardId>([...ask, ...teach]);
+    let last = 0;
+    p.line.cards.forEach((card, i) => {
+      if (left.has(card) && p.line.plies[i]! < p.end) last = Math.max(last, p.line.plies[i]! + 1);
+    });
+    lines.push({ ...p, ask, teach, end: p.kind === 'new' ? p.end : last });
+  }
+  return { lines };
+}

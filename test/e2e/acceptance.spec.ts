@@ -8,7 +8,7 @@
 // N = 2. Nf3 (its comment), S = 2... Nc6 and what follows, P = 3. d4, Q = 3... cxd4.
 import { test, expect, devices, type Browser, type Page } from '@playwright/test';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
-import { clickSquare, comment, drawInDrawMode, openMoveMenu } from './board.ts';
+import { clickSquare, comment, drawInDrawMode, newChapter, openMoveMenu } from './board.ts';
 import { serveGithub, world } from './github.ts';
 import { serveSite, type SiteServer } from './server.ts';
 
@@ -102,9 +102,7 @@ test('two devices edit offline, sync, lose nothing, and agree', async ({ browser
   await phone.getByRole('dialog').getByRole('button', { name: 'Good move' }).click();
   await expect(phone.locator('.move.current')).toContainText('cxd4!');
   await phone.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
-  await phone.getByText('Chapter and study').click();
-  await phone.getByLabel('Name', { exact: true }).fill('Phone chapter');
-  await phone.getByRole('button', { name: 'Add chapter' }).click();
+  await newChapter(phone, 'Phone chapter');
   await expect(phone.getByLabel('Chapter', { exact: true }).locator('option:checked')).toHaveText('Phone chapter');
   await recordTwoReviews(phone);
   await phone.reload();

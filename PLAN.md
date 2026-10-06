@@ -946,7 +946,8 @@ and offline editing with the PWA killed and reopened.
   marker goes) or delete it. The conflicts view also lists conflict copies of unmergeable files.
 - **Chapters and the study** (a drawer under the notation): the chapter's side, rename, move up
   or down, delete, add a chapter; the study's name (rewriting every readable chapter's
-  `StudyName`) and kind.
+  `StudyName`) and kind. (Moved by §5.15 into Qchess's places: the ⚙ by the study and by each
+  chapter, and "+ New chapter".)
 - **The debug panel** shows the card states from replaying every device's log plus this
   device's unsent events: reviews, due time, stability and difficulty to four places, for step 6
   of the acceptance test.
@@ -1858,6 +1859,67 @@ going from training to the study and back.
 
 Live (desktop and phone): the cards, making and managing a study, and train ↔ study during a
 real session.
+
+**As built** (2026-10-06):
+- **Read live on Qchess first** (the owner's test account, 1600×900; the pages' scripts read for
+  the handlers): `/studies` is a grid of cards, each a link to its study with a visibility badge
+  (Private), a favourite star, the name, "n chapters · Updated date · size", the colour and type
+  tags, and in its corner a tag button and a delete button; deleting asks `Delete study "X"?
+  This cannot be undone.` (the browser's own question). "+ New Study" opens a dialog (name,
+  visibility; Enter creates) and goes to the new study. On a study page the sidebar has the
+  study's name with a ⚙ (Study Settings: name, visibility, Save/Cancel), Qchess's "Study Mode |
+  Move Trainer" switch, the chapters each with a ⚙ (a right-click opens it too: Chapter
+  Settings: name, "For Color" White/Black, Move Trainer exclusion, colouring, and Delete
+  Chapter, which asks `Delete this chapter?`), drag to reorder, and "+ New" at the foot. Its
+  switch: "Study Mode" during training stops the session and opens the trained chapter at the
+  trained line's last move; "Move Trainer" saves the chapter and starts again at the first line
+  still to learn or due, which is the line that was interrupted, from its start.
+- **The cards** (`src/ui/App.tsx`): Qchess's grid, with the kind where Qchess has the
+  visibility, the name (the card's link: anywhere on the card opens the study), the chapters,
+  the side as Qchess's colour tag (White, Black, Both, from the chapters' `Orientation`), today's
+  "n due · n new" for a repertoire study, and its Train button; ⚙ (study settings) and 🗑 in the
+  corner. Not copied: favourites, tags, the update date and size, which Repworks doesn't keep.
+- **A study made here**: "+ New study" next to Import: name, kind, the first chapter's name and
+  side; Enter creates, and the new chapter opens. `createStudy` in `src/core/study/manage.ts`
+  gives study.json and the chapter file, one change; `src/app/studies.ts` writes it.
+- **Managing**, where Qchess has it, the drawer under the notation gone: the study's ⚙ (by its
+  name at the top of the chapter list on a wide screen, by the title in the head on the phone,
+  and on its card) opens Study settings: name (every chapter's StudyName with it, one change),
+  kind, Save, and "Delete study". A chapter's ⚙ (beside it in the list, or a right-click; on the
+  phone beside the chapter menu, for the open chapter) opens that chapter and its Chapter
+  settings: name and side (saved together, undoable as before), "Move up"/"Move down" (Qchess
+  drags; buttons work on the phone), and "Delete chapter". "+ New chapter" at the list's foot
+  (`+` by the chapter menu on the phone): name and side. Deleting asks first, as Qchess does
+  ("Delete the study “X” and its 2 chapters?"). `deleteStudy` removes every file of the study's
+  folder (study.json, chapters, conflict copies) in one change; the merge restores it, the
+  edited chapters marked, when another device edited it meanwhile (§4.7, tested again from
+  `deleteStudy`'s own change).
+- **Train ↔ study**: the switch "Study | Train" sits in the head of the training screen (every
+  session kind) and of the chapter view. "Study" opens the line's chapter at the move on the
+  board (not at the line's end as Qchess does: that is where the user is, and the rest of the
+  line is under it in the notation), editable, and keeps the session (its kind and the cards it
+  answered, per tab in sessionStorage). "Train" in the chapter view, with a session kept, takes
+  it up again: planned afresh from the repertoire as it now is (after the chapter's pending
+  edits are written), less the cards it already answered (`withoutAnswered` in
+  `core/train/plan.ts`), so the interrupted line comes back from its start, as in Qchess, with
+  the edit in it and nothing asked twice (a move answered wrong, due again a minute later, isn't
+  asked again in the same session). An Interactive view kept this way is played again from the
+  move shown. With no session kept, "Train" trains the study (Qchess's Move Trainer trains the
+  study), and a reference study, which has no cards, is played from the move shown. "Play from
+  here" and "Read from here" stay as they were.
+- Tests: `test/unit/core/study/manage.test.ts` (the files of a new study, a nameless one refused,
+  a study's and a chapter's deletion, the merge of a study deleted here and edited elsewhere),
+  `test/unit/core/train/plan.test.ts` (a plan without the answered cards, shortened and emptied
+  lines, a new line still walked whole), and `test/e2e/studies.spec.ts` on desktop and the
+  emulated phone (the cards; a study made with no import, renamed and made a repertoire, its
+  chapter renamed and turned, a chapter added and deleted, the study deleted from its card after
+  a refusal, each checked in the fake repo; renamed from its card and deleted from the chapter
+  view; a session left for the study at 3. d4, the line extended there by 4. Nxd4 Nf6, and the
+  session taken up again teaching cxd4 then the new Nf6, with one event per card; the switch
+  from the chapter view, and from the Interactive view and back). The editor and acceptance
+  specs now add, rename, turn, move and delete chapters through the dialogs. 96 runs of the new
+  and changed specs and 96 of the training, views and acceptance specs under `--repeat-each`
+  passed before pushing.
 
 #### 5.14 Phase 1 acceptance test, and exit
 

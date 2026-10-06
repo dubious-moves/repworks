@@ -13,7 +13,7 @@ import { open } from '../app/mode.ts';
 import { commentId, endPreview, preview, stepPreview } from '../app/preview.ts';
 import { beginTraining } from '../app/state.ts';
 import { dataVersion } from '../app/sync.ts';
-import { command, endSession, pace, PACES, pinMissed, playMove, press, session, sessionProblem, setPace, setSpeech, speech, undoSuspend, type Pace, type SessionKind, type SessionView } from '../app/train.ts';
+import { command, endSession, leaveForStudy, pace, PACES, pinMissed, playMove, press, session, sessionProblem, setPace, setSpeech, speech, undoSuspend, type Pace, type SessionKind, type SessionView } from '../app/train.ts';
 import { pressOf } from '../core/train/showGrade.ts';
 import { holdMediaKeys } from '../platform/mediaKeys.ts';
 import { canSpeak } from '../platform/speech.ts';
@@ -21,6 +21,7 @@ import type { Note } from '../core/train/trainer.ts';
 import { header } from '../core/study/model.ts';
 import { nodeAt, positionAt, startPosition } from '../core/study/tree.ts';
 import { Board } from './Board.tsx';
+import { ModeSwitch } from './ModeSwitch.tsx';
 import { CommentText, endPreviewOnBoard, PreviewBar, previewBoard } from './CommentText.tsx';
 
 const ASKING = new Set(['ask', 'teach', 'wrong', 'shown']);
@@ -152,6 +153,11 @@ export function TrainScreen(props: { of: SessionKind }) {
           : TITLES[of.kind];
   // The Interactive view goes back to its chapter, at the move on the board.
   const back = () => (of.kind === 'play' ? open({ name: 'chapter', sid: of.sid, cid: of.cid, at: s.path.length ? s.path : of.at }) : open({ name: 'list' }));
+  // Qchess's switch: the line on the board, in its study, editable; "Train" there takes this up again.
+  const toStudy = () => {
+    const there = leaveForStudy();
+    if (there) open(there);
+  };
   return (
     <div class="train">
       <div class="chapter-head">
@@ -161,6 +167,7 @@ export function TrainScreen(props: { of: SessionKind }) {
         <div class="titles">
           <span class="study-title">{title}</span>
         </div>
+        <ModeSwitch current="train" {...(s.line ? { onStudy: toStudy } : {})} />
       </div>
       {s.done ? <Done s={s} /> : <Session s={s} />}
     </div>

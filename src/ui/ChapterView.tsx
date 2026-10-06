@@ -1,7 +1,9 @@
 // The chapter view (PLAN.md §4.11, D21), laid out as Qchess's study page: on a wide screen the
-// chapters on the left, the board, and a panel with the notation, the conflicts at the move
-// shown, the chapter and study drawer, and the move buttons. On the phone: the board, the move
-// buttons, the notation, then the drawer. Play a move to extend a line or branch from it; a
+// chapters on the left (each with its ⚙, the study's ⚙ by its name, "+ New chapter" at the foot:
+// §5.15), the board, and a panel with the notation, the conflicts at the move shown and the move
+// buttons. On the phone: the board, the move buttons, the notation, then the tools; the study's
+// and the chapter's ⚙ and "+" sit in the head, by the chapter menu. The head's switch goes to
+// training as Qchess's Move Trainer does. Play a move to extend a line or branch from it; a
 // move's other edits are in its menu (right-click, long-press or ⋯) and the comment dialog.
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { makeFen } from 'chessops/fen';
@@ -11,33 +13,12 @@ import { chessgroundDests, chessgroundMove } from 'chessops/compat';
 import { normalizeMove } from 'chessops/chess';
 import type { Key } from '@lichess-org/chessground/types';
 import type { Role } from 'chessops/types';
-import {
-  addChapter,
-  at,
-  chapter,
-  conflictsHere,
-  deleteOpenChapter,
-  doc,
-  edit,
-  feedback,
-  move,
-  moveOpenChapter,
-  play,
-  problem,
-  redoEdit,
-  renameOpenChapter,
-  renameOpenStudy,
-  resolve,
-  setSide,
-  setStudyKind,
-  side,
-  study,
-  undoEdit,
-} from '../app/editor.ts';
+import { afterEdits, at, chapter, conflictsHere, doc, edit, feedback, move, play, problem, redoEdit, resolve, side, study, undoEdit } from '../app/editor.ts';
 import { open } from '../app/mode.ts';
+import { left, trainingFrom } from '../app/train.ts';
 import { endPreview, enterCommentLines, preview, stepPreview } from '../app/preview.ts';
 import { isKeptMarker, parseTextConflict, type OpenConflict } from '../core/merge/markers.ts';
-import { header, type Brush, type Chapter } from '../core/study/model.ts';
+import type { Brush, Chapter } from '../core/study/model.ts';
 import { setShapes } from '../core/study/ops.ts';
 import { pathKey } from '../core/study/notation.ts';
 import { nodeAt, positionAt, samePath, type Path } from '../core/study/tree.ts';
@@ -46,6 +27,8 @@ import { CardPanel } from './CardPanel.tsx';
 import { CommentDialog, MoveMenu, openMenu } from './MoveMenu.tsx';
 import { Notation } from './Notation.tsx';
 import { endPreviewOnBoard, PreviewBar, previewBoard } from './CommentText.tsx';
+import { ModeSwitch } from './ModeSwitch.tsx';
+import { openChapterSettings, openNewChapter, openStudySettings } from './StudyDialogs.tsx';
 import { TranspositionList } from './Transpositions.tsx';
 
 const BRUSH_NAMES: Brush[] = ['green', 'red', 'blue', 'yellow'];
@@ -136,22 +119,49 @@ export function ChapterView() {
     setPromotion(undefined);
   };
 
+  const studySettings = () => openStudySettings({ sid: s.sid, name: s.meta.name, kind: s.meta.kind, chapters: s.chapters.length });
+  // Qchess's switch: back to the session left for the study, or training from here.
+  const train = async () => {
+    await afterEdits(async () => undefined);
+    open(trainingFrom({ sid: s.sid, cid: s.cid, at: at.peek(), kind: s.meta.kind }));
+  };
+  const waiting = !!left.value;
+  const trainTitle = waiting ? 'Back to the training session' : s.meta.kind === 'repertoire' ? 'Train this study' : 'Play the line from this move';
+
   return (
-    <div class="chapter-view">
+    <div class={`chapter-view${c && board ? ' has-frame' : ''}${waiting ? ' session-waiting' : ''}`}>
       <div class="chapter-head">
         <a href="#/" class="back" onClick={(e) => (e.preventDefault(), open({ name: 'list' }))}>
           ←
         </a>
         <div class="titles">
-          <span class="study-title">{s.meta.name}</span>
-          <select aria-label="Chapter" value={s.cid} onChange={(e) => open({ name: 'chapter', sid: s.sid, cid: e.currentTarget.value })}>
-            {s.chapters.map((ch) => (
-              <option key={ch.id} value={ch.id}>
-                {ch.name}
-              </option>
-            ))}
-          </select>
+          <span class="study-title">
+            {s.meta.name}
+            <button type="button" class="icon head-tool" aria-label="Study settings" title="Study settings" onClick={studySettings}>
+              ⚙
+            </button>
+          </span>
+          <div class="chapter-pick head-tool">
+            {s.chapters.length > 0 && (
+              <select aria-label="Chapter" value={s.cid} onChange={(e) => open({ name: 'chapter', sid: s.sid, cid: e.currentTarget.value })}>
+                {s.chapters.map((ch) => (
+                  <option key={ch.id} value={ch.id}>
+                    {ch.name}
+                  </option>
+                ))}
+              </select>
+            )}
+            {s.cid && (
+              <button type="button" class="icon" aria-label="Chapter settings" title="Chapter settings" onClick={() => openChapterSettings(s.sid, s.cid)}>
+                ⚙
+              </button>
+            )}
+            <button type="button" class="icon" aria-label="New chapter" title="New chapter" onClick={openNewChapter}>
+              +
+            </button>
+          </div>
         </div>
+        <ModeSwitch current="study" onTrain={() => void train()} trainTitle={trainTitle} />
       </div>
       {problem.value && (
         <p class="warn" role="alert">
@@ -162,10 +172,15 @@ export function ChapterView() {
         <div class="cv-frame">
           <div class="cv-grid">
             <nav class="cv-chapters" aria-label="Chapters">
-              <div class="cv-study">{s.meta.name}</div>
+              <div class="cv-study">
+                <span>{s.meta.name}</span>
+                <button type="button" class="icon" aria-label="Study settings" title="Study settings" onClick={studySettings}>
+                  ⚙
+                </button>
+              </div>
               <ol>
                 {s.chapters.map((ch) => (
-                  <li key={ch.id}>
+                  <li key={ch.id} onContextMenu={(e) => (e.preventDefault(), openChapterSettings(s.sid, ch.id))}>
                     <a
                       href={`#/study/${s.sid}/${ch.id}`}
                       aria-current={ch.id === s.cid ? 'page' : undefined}
@@ -173,9 +188,17 @@ export function ChapterView() {
                     >
                       {ch.name}
                     </a>
+                    <button type="button" class="icon" aria-label={`Settings: ${ch.name}`} title="Chapter settings" onClick={() => openChapterSettings(s.sid, ch.id)}>
+                      ⚙
+                    </button>
                   </li>
                 ))}
               </ol>
+              <div class="cv-new">
+                <button type="button" onClick={openNewChapter}>
+                  + New chapter
+                </button>
+              </div>
             </nav>
             <div class="cv-board" onPointerDown={shownLine ? endPreviewOnBoard : undefined}>
               <Board
@@ -221,7 +244,6 @@ export function ChapterView() {
               <div class="cv-tools">
                 {doc.value && <Conflicts />}
                 <CardPanel />
-                <ChapterDrawer />
               </div>
               {drawMode && (
                 <div class="brushes" role="radiogroup" aria-label="Colour">
@@ -269,7 +291,6 @@ export function ChapterView() {
           </div>
         </div>
       )}
-      {!(c && board) && <ChapterDrawer />}
       {/* Outside the frame, whose size containment would place a fixed menu inside it. */}
       <MoveMenu />
       <TranspositionList />
@@ -351,88 +372,5 @@ function TextConflict(props: { conflict: OpenConflict; ours: string | undefined;
         Use this text
       </button>
     </div>
-  );
-}
-
-function ChapterDrawer() {
-  const s = study.value!;
-  const c = chapter.value;
-  const [chapterName, setChapterName] = useState(c ? (header(c, 'ChapterName') ?? '') : '');
-  const [newName, setNewName] = useState('');
-  const [newSide, setNewSide] = useState<'white' | 'black'>(side.value);
-  const [studyName, setStudyName] = useState(s.meta.name);
-  useEffect(() => setChapterName(c ? (header(c, 'ChapterName') ?? '') : ''), [s.cid, c && header(c, 'ChapterName')]);
-  useEffect(() => setStudyName(s.meta.name), [s.meta.name]);
-  return (
-    <details class="card drawer form">
-      <summary>Chapter and study</summary>
-      {c && doc.value && (
-        <>
-          <fieldset class="choice">
-            <legend>This chapter is for</legend>
-            <label>
-              <input type="radio" name="side" checked={side.value === 'white'} onChange={() => setSide('white')} /> White
-            </label>
-            <label>
-              <input type="radio" name="side" checked={side.value === 'black'} onChange={() => setSide('black')} /> Black
-            </label>
-          </fieldset>
-          <label>
-            Chapter name
-            <input name="chapter-name" value={chapterName} onInput={(e) => setChapterName(e.currentTarget.value)} />
-          </label>
-          <div class="actions">
-            <button type="button" onClick={() => renameOpenChapter(chapterName)}>
-              Rename chapter
-            </button>
-            <button type="button" onClick={() => void moveOpenChapter(-1)}>
-              Move up
-            </button>
-            <button type="button" onClick={() => void moveOpenChapter(1)}>
-              Move down
-            </button>
-            <button type="button" onClick={() => confirm(`Delete the chapter “${chapterName}”?`) && void deleteOpenChapter()}>
-              Delete chapter
-            </button>
-          </div>
-        </>
-      )}
-      <h3>New chapter</h3>
-      <label>
-        Name
-        <input name="new-chapter" value={newName} onInput={(e) => setNewName(e.currentTarget.value)} />
-      </label>
-      <fieldset class="choice">
-        <legend>For</legend>
-        <label>
-          <input type="radio" name="new-side" checked={newSide === 'white'} onChange={() => setNewSide('white')} /> White
-        </label>
-        <label>
-          <input type="radio" name="new-side" checked={newSide === 'black'} onChange={() => setNewSide('black')} /> Black
-        </label>
-      </fieldset>
-      <button type="button" onClick={() => void addChapter(newName, newSide).then(() => setNewName(''))}>
-        Add chapter
-      </button>
-      <h3>Study</h3>
-      <label>
-        Study name
-        <input name="study-name" value={studyName} onInput={(e) => setStudyName(e.currentTarget.value)} />
-      </label>
-      <div class="actions">
-        <button type="button" onClick={() => void renameOpenStudy(studyName)}>
-          Rename study
-        </button>
-      </div>
-      <fieldset class="choice">
-        <legend>Kind</legend>
-        <label>
-          <input type="radio" name="kind" checked={s.meta.kind === 'repertoire'} onChange={() => void setStudyKind('repertoire')} /> Repertoire
-        </label>
-        <label>
-          <input type="radio" name="kind" checked={s.meta.kind === 'reference'} onChange={() => void setStudyKind('reference')} /> Reference
-        </label>
-      </fieldset>
-    </details>
   );
 }

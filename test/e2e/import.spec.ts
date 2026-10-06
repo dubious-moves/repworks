@@ -105,7 +105,7 @@ test('pasted PGN without sides waits for them; the import report lists what chan
   await page.getByLabel('Study name').fill('Pasted');
   await importButton.click();
   await expect(page.locator('.studies')).toContainText('Pasted');
-  await expect(page.locator('.studies')).toContainText('repertoire · 3 chapters');
+  await expect(page.locator('.study-card', { hasText: 'Pasted' })).toContainText(/Repertoire.*3 chapters/);
 });
 
 /** Answers lichess.org: the given studies (public, or private needing the token), OAuth, account. */
@@ -152,7 +152,7 @@ test('a public Lichess study imports from its URL, each chapter as Lichess expor
   await expect(page.getByLabel('Side of Endgame')).toHaveValue('white');
   await page.getByLabel('Reference (read only, never trained)').check();
   await page.getByRole('button', { name: 'Import', exact: true }).click();
-  await expect(page.locator('.studies')).toContainText('reference · 2 chapters');
+  await expect(page.locator('.study-card').filter({ has: page.getByRole('link', { name: 'Rep', exact: true }) })).toContainText(/Reference.*2 chapters/);
   await syncAndWait(page, git, 'Rep');
   const chunks = LICHESS_EXPORT.split('\n\n\n').filter((c) => c.trim()).map((c) => `${c}\n`);
   expect(studiesIn(git).get('Rep')).toEqual({ kind: 'reference', chapters: chunks });

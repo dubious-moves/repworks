@@ -28,7 +28,7 @@ test('a setup link leaves the address bar at once, and the first sync brings the
   await page.goto(setupUrl('desktop'));
   await expect(page).toHaveURL(site.url);
   await expect(page.locator('.studies')).toContainText('Test repertoire');
-  await expect(page.locator('.studies')).toContainText('repertoire · 2 chapters');
+  await expect(page.locator('.study-card', { hasText: 'Test repertoire' })).toContainText(/Repertoire.*2 chapters/);
   await expect(page.locator('.chip')).toHaveText(/^synced/);
   const path = await deviceFile(git);
   expect(git.textsOf().get(path)).toMatch(/^\{ "name": "desktop", "created": "\d{4}-\d\d-\d\dT[\d:.]+Z" \}\n$/);

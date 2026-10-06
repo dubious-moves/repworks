@@ -18,6 +18,8 @@ export interface StudyRow {
   name: string;
   kind: StudyKind;
   chapters: number;
+  /** The sides its chapters are for, as Qchess's colour tag: white, black or both. */
+  side?: 'white' | 'black' | 'both';
 }
 
 /** The local database is open and read. */
@@ -86,12 +88,17 @@ async function reload(): Promise<void> {
 async function readStudies(s: IdbStore): Promise<StudyRow[]> {
   const files = await s.read((path) => {
     const kind = classifyPath(path).kind;
-    return kind === 'study';
+    return kind === 'study' || kind === 'chapter';
   });
   const chapterFiles = new Map<string, string[]>();
-  for (const path of await s.paths()) {
+  const sides = new Map<string, Set<string>>();
+  for (const [path, text] of files) {
     const where = classifyPath(path);
-    if (where.kind === 'chapter') chapterFiles.set(where.sid, [...(chapterFiles.get(where.sid) ?? []), where.cid]);
+    if (where.kind !== 'chapter') continue;
+    chapterFiles.set(where.sid, [...(chapterFiles.get(where.sid) ?? []), where.cid]);
+    const head = text.slice(0, text.indexOf('\n\n') + 1 || undefined);
+    const side = /^\[Orientation "(white|black)"\]$/m.exec(head)?.[1] ?? 'white';
+    sides.set(where.sid, (sides.get(where.sid) ?? new Set()).add(side));
   }
   const rows: StudyRow[] = [];
   for (const [path, text] of files) {
@@ -100,7 +107,10 @@ async function readStudies(s: IdbStore): Promise<StudyRow[]> {
     const meta = parseStudyMeta(text, where.sid);
     if (!meta.ok) continue;
     const chapters = reconcileChapterOrder(meta.value.chapters, chapterFiles.get(where.sid) ?? []).length;
-    rows.push({ id: meta.value.id, name: meta.value.name, kind: meta.value.kind, chapters });
+    const row: StudyRow = { id: meta.value.id, name: meta.value.name, kind: meta.value.kind, chapters };
+    const both = sides.get(where.sid);
+    if (both) row.side = both.size > 1 ? 'both' : (both.values().next().value as 'white' | 'black');
+    rows.push(row);
   }
   return rows.sort((a, b) => a.name.localeCompare(b.name));
 }

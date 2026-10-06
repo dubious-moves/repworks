@@ -18,9 +18,21 @@ export async function clickSquare(page: Page, name: string, orientation: 'white'
   await page.mouse.click(p.x, p.y);
 }
 
-export async function openDrawer(page: Page) {
-  const drawer = page.locator('details.drawer');
-  if (!(await drawer.evaluate((d) => (d as HTMLDetailsElement).open))) await page.getByText('Chapter and study').click();
+/** Makes a chapter in the open study by "+ New chapter" (by the chapter list, or "+" in the head). */
+export async function newChapter(page: Page, name: string, side?: 'white' | 'black') {
+  await page.getByRole('button', { name: 'New chapter' }).click();
+  const dialog = page.getByRole('dialog', { name: 'New chapter' });
+  await dialog.getByLabel('Chapter name').fill(name);
+  if (side) await dialog.getByLabel(side === 'white' ? 'White' : 'Black').check();
+  await dialog.getByRole('button', { name: 'Create chapter' }).click();
+  await dialog.waitFor({ state: 'detached' });
+}
+
+/** Opens the open chapter's settings: its ⚙ in the chapter list on a wide screen, else in the head. */
+export async function chapterSettings(page: Page, name: string) {
+  const inList = page.getByRole('navigation', { name: 'Chapters' }).getByRole('button', { name: `Settings: ${name}` });
+  await (await inList.isVisible() ? inList : page.getByRole('button', { name: 'Chapter settings' })).click();
+  return page.getByRole('dialog', { name: 'Chapter settings' });
 }
 
 /** Draws an arrow (or, from a square to itself, a circle) in draw mode. */

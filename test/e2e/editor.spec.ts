@@ -5,7 +5,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import type { FakeGit } from '../support/fakeGit.ts';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
-import { clickSquare, openDrawer, openMoveMenu, square } from './board.ts';
+import { chapterSettings, clickSquare, newChapter, openMoveMenu, square } from './board.ts';
 import { serveGithub, world } from './github.ts';
 import { serveSite, type SiteServer } from './server.ts';
 
@@ -180,13 +180,10 @@ test('the comment dialog: Escape drops the draft, Ctrl+Enter saves, glyphs clear
   expect(git.textsOf().get(CHAPTER)).toContain('{ Before it all }\n1. e4 c5 { kept } 2. Nf3');
 });
 
-test('chapters: add one, rename it, change its side, and delete it', async ({ page }) => {
+test('chapters: add one, rename it, change its side, move it, and delete it', async ({ page }) => {
   const git = await setUp(page);
   await page.goto(`${site.url}#/study/Rep0Najd/Ch2Alapn`);
-  await openDrawer(page);
-  await page.getByLabel('Name', { exact: true }).fill('Smith-Morra');
-  await page.locator('input[name="new-side"]').first().check();
-  await page.getByRole('button', { name: 'Add chapter' }).click();
+  await newChapter(page, 'Smith-Morra', 'white');
   // A new ID, not the chapter it was added from.
   await expect(page.getByLabel('Chapter', { exact: true })).not.toHaveValue('Ch2Alapn');
   await expect(page.getByLabel('Chapter', { exact: true }).locator('option:checked')).toHaveText('Smith-Morra');
@@ -200,16 +197,33 @@ test('chapters: add one, rename it, change its side, and delete it', async ({ pa
   await expect.poll(() => git.textsOf().get(`studies/Rep0Najd/${cid}.pgn`) ?? '').toContain('1. e4');
   expect(git.textsOf().get(`studies/Rep0Najd/${cid}.pgn`)).toBe('[Event "Test repertoire: Smith-Morra"]\n[Result "*"]\n[StudyName "Test repertoire"]\n[ChapterName "Smith-Morra"]\n[Orientation "white"]\n\n1. e4 *\n');
   expect(JSON.parse(git.textsOf().get('studies/Rep0Najd/study.json')!).chapters).toEqual(['Ch1Najdf', 'Ch2Alapn', cid]);
-  // Rename and side.
-  await openDrawer(page);
-  await page.getByLabel('Chapter name').fill('Morra');
-  await page.getByRole('button', { name: 'Rename chapter' }).click();
-  await page.locator('input[name="side"]').nth(1).check();
+  // Rename and side, saved together; Cancel changes nothing.
+  let dialog = await chapterSettings(page, 'Smith-Morra');
+  await dialog.getByLabel('Chapter name').fill('Not this');
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(page.getByLabel('Chapter', { exact: true }).locator('option:checked')).toHaveText('Smith-Morra');
+  dialog = await chapterSettings(page, 'Smith-Morra');
+  await expect(dialog.getByLabel('Chapter name')).toHaveValue('Smith-Morra');
+  await dialog.getByLabel('Chapter name').fill('Morra');
+  await dialog.getByLabel('Black').check();
+  await dialog.getByRole('button', { name: 'Save' }).click();
   await expect(page.locator('.cg-wrap')).toHaveClass(/orientation-black/);
   await expect(page.getByLabel('Chapter', { exact: true }).locator('option:checked')).toHaveText('Morra');
-  // Delete: back to the study's first chapter.
-  page.once('dialog', (d) => void d.accept());
-  await page.getByRole('button', { name: 'Delete chapter' }).click();
+  // Moved up one place.
+  dialog = await chapterSettings(page, 'Morra');
+  await expect(dialog).toContainText('Chapter 3 of 3');
+  await expect(dialog.getByRole('button', { name: 'Move down' })).toBeDisabled();
+  await dialog.getByRole('button', { name: 'Move up' }).click();
+  await expect(dialog).toContainText('Chapter 2 of 3');
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(page.getByLabel('Chapter', { exact: true }).locator('option')).toHaveText(['Main line', 'Morra', 'Alapin']);
+  // Delete, after asking: back to the study's first chapter.
+  dialog = await chapterSettings(page, 'Morra');
+  page.once('dialog', (d) => {
+    expect(d.message()).toBe('Delete the chapter “Morra”?');
+    void d.accept();
+  });
+  await dialog.getByRole('button', { name: 'Delete chapter' }).click();
   await expect(page.getByLabel('Chapter', { exact: true })).toHaveValue('Ch1Najdf');
   await page.locator('.chip').click();
   await expect.poll(() => git.textsOf().has(`studies/Rep0Najd/${cid}.pgn`)).toBe(false);

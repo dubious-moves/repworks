@@ -4,6 +4,7 @@
 // or continued on the other device with nothing saved beyond the log.
 import { signal } from '@preact/signals';
 import type { Position } from 'chessops/chess';
+import type { Mode } from '../core/app/fsm.ts';
 import { chapterPath, classifyPath } from '../core/data/layout.ts';
 import { parseChapterFile } from '../core/pgn/parse.ts';
 import type { CardId } from '../core/progress/cards.ts';
@@ -12,12 +13,12 @@ import { readProgress } from '../core/progress/files.ts';
 import { DEFAULT_PARAMS } from '../core/progress/fsrs.ts';
 import { Replay, toDeviceEvents, type CardState, type DeviceEvent } from '../core/progress/replay.ts';
 import { combineIndex, indexChapter, type ChapterIndexing, type Line, type RepertoireIndex } from '../core/repertoire/index.ts';
-import { header, type Chapter } from '../core/study/model.ts';
+import { header, type Chapter, type StudyKind } from '../core/study/model.ts';
 import { parseStudyMeta, reconcileChapterOrder } from '../core/study/studyMeta.ts';
 import { lineThrough, startPosition } from '../core/study/tree.ts';
 import { cardLine, drillLines, retryLines, todaysMistakes, type Mistake } from '../core/train/mistakes.ts';
 import { pinsOf, type PinState } from '../core/train/pins.ts';
-import { interactivePlan, planSession, type SessionPlan } from '../core/train/plan.ts';
+import { interactivePlan, planSession, withoutAnswered, type SessionPlan } from '../core/train/plan.ts';
 import { ShowGrade, type Press, type ShowGradeEffect } from '../core/train/showGrade.ts';
 import { todaysQueue, type DailyQueue, type Day } from '../core/train/queue.ts';
 import { SETTINGS_FILE, trainSettings, type TrainSettings } from '../core/train/settings.ts';
@@ -205,6 +206,7 @@ let trainer: Trainer | undefined;
 let shower: ShowGrade | undefined;
 let timer: ReturnType<typeof setTimeout> | undefined;
 let recordEvent: ((event: Parameters<IdbStore['record']>[0]) => Promise<void>) | undefined;
+/** The cards the session asked or taught and that were answered: they are not asked again in it. */
 let answered = new Set<string>();
 
 /** Starts a session: today's queue, the day's mistakes, or the pins. */
@@ -215,7 +217,12 @@ export async function startSession(store: IdbStore, record: (event: Parameters<I
   session.value = undefined;
   sessionProblem.value = undefined;
   recordEvent = record;
-  answered = new Set();
+  // Taken up again from the study (§5.15), or a new session: either way nothing is left waiting.
+  const key = JSON.stringify(of);
+  const resume = resuming === key ? left.peek() : undefined;
+  resuming = undefined;
+  setLeft(undefined);
+  answered = new Set(resume?.answered);
   let data: TrainData;
   try {
     data = await loadTraining(store);
@@ -244,6 +251,7 @@ export async function startSession(store: IdbStore, record: (event: Parameters<I
     const cards = of.all ? pinned : due;
     plan = { lines: drillLines(cards.flatMap((card) => (cardLine(data.index, card) ? [{ card, ...cardLine(data.index, card)! }] : []))) };
   }
+  if (resume && of.kind !== 'play') plan = withoutAnswered(plan, answered);
   // Retry and drill grade nothing: the card was graded Again today (§5.8, D16). The Interactive
   // view asks every own move of its line, whatever its card's state, and follows the line played.
   const grading = of.kind === 'queue' || of.kind === 'show';
@@ -409,6 +417,7 @@ function apply(t: Trainer, effects: readonly ShowGradeEffect[]): void {
         }, e.ms);
         break;
       case 'answer':
+        answered.add(e.card);
         next.answers++;
         if (e.ok) {
           next.right++;
@@ -441,4 +450,81 @@ function apply(t: Trainer, effects: readonly ShowGradeEffect[]): void {
   next.dueLeft = s.plan.lines.flatMap((l) => l.ask).filter((c) => !answered.has(c)).length;
   next.newLeft = s.plan.lines.flatMap((l) => l.teach).filter((c) => !answered.has(c)).length;
   session.value = next;
+}
+
+// ---- train ↔ study (§5.15), as Qchess's switch between Move Trainer and Study mode ----------
+
+/** A session left for the study, to take up again from there. Kept per tab, across reloads. */
+export interface LeftSession {
+  of: SessionKind;
+  answered: string[];
+}
+const LEFT_KEY = 'repworks.leftSession';
+function readLeft(): LeftSession | undefined {
+  try {
+    const raw = sessionStorage.getItem(LEFT_KEY);
+    return raw ? (JSON.parse(raw) as LeftSession) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+export const left = signal<LeftSession | undefined>(readLeft());
+function setLeft(value: LeftSession | undefined): void {
+  if (left.peek() === undefined && value === undefined) return;
+  left.value = value;
+  try {
+    if (value) sessionStorage.setItem(LEFT_KEY, JSON.stringify(value));
+    else sessionStorage.removeItem(LEFT_KEY);
+  } catch {
+    // Kept for this page only.
+  }
+}
+/** The session asked for by the switch: the next start of the same kind takes it up again. */
+let resuming: string | undefined;
+
+/** The screen a session kind runs on. */
+export function sessionMode(of: SessionKind): Mode {
+  switch (of.kind) {
+    case 'queue':
+      return of.scope === undefined ? { name: 'train' } : { name: 'train', sid: of.scope };
+    case 'show':
+      return of.scope === undefined ? { name: 'show' } : { name: 'show', sid: of.scope };
+    case 'retry':
+    case 'drill':
+      return { name: 'practice', run: of.kind };
+    case 'pinned':
+      return { name: 'practice', run: of.all ? 'pins' : 'pinned' };
+    case 'play':
+      return { name: 'play', sid: of.sid, cid: of.cid, at: of.at, ...(of.from === undefined ? {} : { from: of.from }) };
+  }
+}
+
+/**
+ * "Study" on the training screen: the chapter of the line on the board, at the move on the board,
+ * editable. The session is kept, to be taken up again by "Train"; undefined when no line is on
+ * the board yet.
+ */
+export function leaveForStudy(): Mode | undefined {
+  const s = session.peek();
+  const line = s?.line;
+  if (!s || !line) return undefined;
+  setLeft({ of: s.of, answered: [...answered] });
+  return { name: 'chapter', sid: line.sid, cid: line.cid, at: [...s.path] };
+}
+
+/**
+ * "Train" in the chapter view. A session left for the study is taken up again: planned afresh
+ * from the repertoire as it now is, less what it already answered. The Interactive view starts
+ * again from the move shown. With no session left, a repertoire study's training starts (Qchess's
+ * Move Trainer trains the study), and a reference study, which has no cards, is played from the
+ * move shown.
+ */
+export function trainingFrom(here: { sid: string; cid: string; at: readonly string[]; kind: StudyKind }): Mode {
+  const l = left.peek();
+  if (l && l.of.kind !== 'play') {
+    resuming = JSON.stringify(l.of);
+    return sessionMode(l.of);
+  }
+  if (!l && here.kind === 'repertoire') return { name: 'train', sid: here.sid };
+  return { name: 'play', sid: here.sid, cid: here.cid, at: [...here.at] };
 }

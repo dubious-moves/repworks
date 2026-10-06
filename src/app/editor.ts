@@ -11,9 +11,10 @@ import { resolveConflict, type Resolution } from '../core/merge/resolve.ts';
 import { parseChapterFile } from '../core/pgn/parse.ts';
 import { chapterFileText } from '../core/pgn/write.ts';
 import { freshId } from '../core/study/ids.ts';
-import { header, type Chapter, type StudyKind, type StudyMeta } from '../core/study/model.ts';
+import { header, type Chapter, type StudyMeta } from '../core/study/model.ts';
 import { nearest, step, type Step } from '../core/study/navigate.ts';
-import { addChapterToStudy, addMove, linePgn, newChapter, removeChapterFromStudy, renameChapter, renameStudy, reorderChapters, setKind, setOrientation, type Edit } from '../core/study/ops.ts';
+import { deleteChapter } from '../core/study/manage.ts';
+import { addChapterToStudy, addMove, linePgn, newChapter, renameChapter, reorderChapters, setOrientation, type Edit } from '../core/study/ops.ts';
 import { parseStudyMeta, reconcileChapterOrder, writeStudyMeta } from '../core/study/studyMeta.ts';
 import type { Path } from '../core/study/tree.ts';
 import { cryptoRandom } from '../platform/browser.ts';
@@ -251,8 +252,7 @@ export async function addChapter(name: string, side: 'white' | 'black'): Promise
     return undefined;
   }
   const meta = addChapterToStudy({ ...s.meta, chapters: s.chapters.map((c) => c.id) }, cid);
-  written++;
-  await (writing = writing.then(() => saveFiles(new Map([[chapterPath(s.sid, cid), chapterFileText(made.value)], [studyMetaPath(s.sid), writeStudyMeta(meta)]]))));
+  await afterEdits(() => saveFiles(new Map([[chapterPath(s.sid, cid), chapterFileText(made.value)], [studyMetaPath(s.sid), writeStudyMeta(meta)]])));
   dispatch({ type: 'open', mode: { name: 'chapter', sid: s.sid, cid } });
   return cid;
 }
@@ -260,10 +260,9 @@ export async function addChapter(name: string, side: 'white' | 'black'): Promise
 export async function deleteOpenChapter(): Promise<void> {
   const s = study.peek();
   if (!s) return;
-  const meta = removeChapterFromStudy({ ...s.meta, chapters: s.chapters.map((c) => c.id) }, s.cid);
-  written++;
-  await (writing = writing.then(() => saveFiles(new Map([[chapterPath(s.sid, s.cid), null], [studyMetaPath(s.sid), writeStudyMeta(meta)]]))));
-  dispatch({ type: 'missing', chapters: meta.chapters });
+  const change = deleteChapter({ ...s.meta, chapters: s.chapters.map((c) => c.id) }, s.cid);
+  await afterEdits(() => saveFiles(change));
+  dispatch({ type: 'missing', chapters: s.chapters.map((c) => c.id).filter((c) => c !== s.cid) });
 }
 
 export async function moveOpenChapter(by: -1 | 1): Promise<void> {
@@ -276,43 +275,23 @@ export async function moveOpenChapter(by: -1 | 1): Promise<void> {
   [order[i], order[j]] = [order[j]!, order[i]!];
   const meta = reorderChapters({ ...s.meta, chapters: s.chapters.map((c) => c.id) }, order);
   if (!meta.ok) return;
-  written++;
-  await (writing = writing.then(() => saveFiles(new Map([[studyMetaPath(s.sid), writeStudyMeta(meta.value)]]))));
-}
-
-export async function setStudyKind(kind: StudyKind): Promise<void> {
-  const s = study.peek();
-  if (!s) return;
-  written++;
-  await (writing = writing.then(() => saveFiles(new Map([[studyMetaPath(s.sid), writeStudyMeta(setKind(s.meta, kind))]]))));
+  await afterEdits(() => saveFiles(new Map([[studyMetaPath(s.sid), writeStudyMeta(meta.value)]])));
 }
 
 /**
- * Renames the study: study.json and every chapter's StudyName, in one change. A chapter that
- * can't be read keeps its old StudyName, since the app never rewrites such a file.
+ * Runs a change to study files after the open chapter's edits have been written, and marks it as
+ * this tab's own, so a read under way is made again rather than taken for someone else's work. A
+ * change that rewrites the open chapter's file (a study renamed) reads it again afterwards, and
+ * its undo starts over.
  */
-export async function renameOpenStudy(name: string): Promise<void> {
-  const s = study.peek();
-  const store = localStore();
-  if (!s || !store) return;
-  await writing;
-  const files = await store.read((p) => p.startsWith(`studies/${s.sid}/`));
-  const chapters: Chapter[] = [];
-  for (const c of s.chapters) {
-    const parsed = parseChapterFile(files.get(chapterPath(s.sid, c.id)) ?? '', c.id);
-    if (parsed.ok && !parsed.notes.some((n) => n.kind === 'illegal')) chapters.push(parsed.chapter);
-  }
-  const renamed = renameStudy(s.meta, chapters, name);
-  if (!renamed.ok) {
-    feedback.value = renamed.error;
-    return;
-  }
-  const out = new Map<string, string | null>([[studyMetaPath(s.sid), writeStudyMeta(renamed.value.meta)]]);
-  for (const c of renamed.value.chapters) out.set(chapterPath(s.sid, c.id), chapterFileText(c));
-  // The open chapter's history is replaced by the next read: a rename isn't undone from here.
-  fileText = undefined;
+export function afterEdits<T>(fn: () => Promise<T>): Promise<T> {
   written++;
-  await (writing = writing.then(() => saveFiles(out)));
+  const run = writing.then(fn);
+  writing = run.then(
+    () => undefined,
+    (error: unknown) => void (feedback.value = `Not saved: ${error instanceof Error ? error.message : String(error)}`),
+  );
+  return run;
 }
 
 /** The side the open chapter is for, from its Orientation (white when it has none). */

@@ -2,7 +2,8 @@ import { useEffect, useState } from 'preact/hooks';
 import { mode } from '../app/mode.ts';
 import { findConflicts } from '../app/overview.ts';
 import { online, shellVersion, updateReady } from '../app/shell.ts';
-import { device, fatal, localStore, ready, studies } from '../app/state.ts';
+import { device, fatal, localStore, ready, studies, type StudyRow } from '../app/state.ts';
+import { queueOf, trainData } from '../app/train.ts';
 import { dataVersion } from '../app/sync.ts';
 import { ChapterView } from './ChapterView.tsx';
 import { ConflictsView } from './Conflicts.tsx';
@@ -14,6 +15,7 @@ import { MistakesView } from './Mistakes.tsx';
 import { ReadView } from './Read.tsx';
 import { TrainScreen } from './Train.tsx';
 import { TrainCard } from './TrainCard.tsx';
+import { confirmDeleteStudy, openNewStudy, openStudySettings, StudyDialogs } from './StudyDialogs.tsx';
 
 export function App() {
   return (
@@ -38,6 +40,7 @@ export function App() {
       )}
       <SyncBanners />
       <main class="content">{ready.value && (!device.value ? <SetupForm /> : <Screen />)}</main>
+      <StudyDialogs />
       <footer class="footer">
         build {__BUILD_ID__}
         {shellVersion.value && <> · shell {shellVersion.value.slice(0, 8)}</>} · <a href={`${import.meta.env.BASE_URL}spike.html`}>remote spike</a>
@@ -88,31 +91,21 @@ function Home() {
       <section class="card">
         <div class="card-head">
           <h2>Studies</h2>
-          <a class="button" href="#/import">
-            Import
-          </a>
+          <div class="actions">
+            <a class="button secondary" href="#/import">
+              Import
+            </a>
+            <button type="button" onClick={openNewStudy}>
+              + New study
+            </button>
+          </div>
         </div>
         {studies.value.length === 0 ? (
-          <p class="muted">No studies yet: import one.</p>
+          <p class="muted">No studies yet: make one, or import one.</p>
         ) : (
           <ul class="studies">
             {studies.value.map((s) => (
-              <li key={s.id}>
-                <a class="study-name" href={`#/study/${s.id}`}>
-                  {s.name}
-                </a>
-                <span class="muted">
-                  {s.kind} · {s.chapters} chapter{s.chapters === 1 ? '' : 's'}
-                  {s.kind === 'repertoire' && (
-                    <>
-                      {' · '}
-                      <a href={`#/train/${s.id}`} aria-label={`Train ${s.name}`}>
-                        Train
-                      </a>
-                    </>
-                  )}
-                </span>
-              </li>
+              <StudyCard key={s.id} study={s} />
             ))}
           </ul>
         )}
@@ -126,5 +119,52 @@ function Home() {
       </section>
       <Debug />
     </>
+  );
+}
+
+const SIDES = { white: 'White', black: 'Black', both: 'Both' } as const;
+
+/**
+ * A study as a card, after Qchess's /studies (read live, 2026-10-06): the kind where Qchess shows
+ * the visibility, the name, the chapters, and the side as Qchess's colour tag; here also today's
+ * due and new moves. The card opens the study; ⚙ and 🗑 in its corner, as Qchess's tag and delete
+ * buttons, open its settings and delete it.
+ */
+function StudyCard(props: { study: StudyRow }) {
+  const s = props.study;
+  const data = trainData.value;
+  const queue = s.kind === 'repertoire' && data ? queueOf(data, Date.now(), s.id) : undefined;
+  const ref = { sid: s.id, name: s.name, kind: s.kind, chapters: s.chapters };
+  return (
+    <li class="study-card">
+      <div class="study-card-actions">
+        <button type="button" class="icon" aria-label={`Settings of ${s.name}`} title="Study settings" onClick={() => openStudySettings(ref)}>
+          ⚙
+        </button>
+        <button type="button" class="icon" aria-label={`Delete ${s.name}`} title="Delete study" onClick={() => void confirmDeleteStudy(ref)}>
+          🗑
+        </button>
+      </div>
+      <span class={`study-card-badge badge-${s.kind}`}>{s.kind === 'repertoire' ? 'Repertoire' : 'Reference'}</span>
+      <a class="study-card-title" href={`#/study/${s.id}`}>
+        {s.name}
+      </a>
+      <div class="study-card-meta">
+        <span>
+          {s.chapters} chapter{s.chapters === 1 ? '' : 's'}
+        </span>
+        {s.side && <span class={`study-tag tag-${s.side}`}>{SIDES[s.side]}</span>}
+        {queue && (queue.due.length > 0 || queue.newCards.length > 0) && (
+          <span class="study-card-counts">
+            {queue.due.length} due · {queue.newCards.length} new
+          </span>
+        )}
+      </div>
+      {s.kind === 'repertoire' && (
+        <a class="button study-card-train" href={`#/train/${s.id}`} aria-label={`Train ${s.name}`}>
+          Train
+        </a>
+      )}
+    </li>
   );
 }

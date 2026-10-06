@@ -11,7 +11,7 @@ import { newCard, State } from '../../../../src/core/progress/fsrs.ts';
 import type { CardState } from '../../../../src/core/progress/replay.ts';
 import { parseChapterFile } from '../../../../src/core/pgn/parse.ts';
 import { indexStudies, type RepertoireIndex } from '../../../../src/core/repertoire/index.ts';
-import { planSession, type SessionPlan } from '../../../../src/core/train/plan.ts';
+import { planSession, withoutAnswered, type SessionPlan } from '../../../../src/core/train/plan.ts';
 import { knownCardsOf, statusOf, todaysQueue, type DailyQueue, type Day } from '../../../../src/core/train/queue.ts';
 import { DEFAULT_TRAIN } from '../../../../src/core/train/settings.ts';
 import type { Chapter } from '../../../../src/core/study/model.ts';
@@ -170,4 +170,27 @@ test('random repertoires: every due card asked exactly once, on a review line; n
       }
     }
   }
+});
+
+test('a session taken up again leaves out what it answered: shorter lines, emptied ones gone', () => {
+  const ix = index(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 (4. Bxc6) 4... Nf6 5. O-O'), chapter('Chapter2', 'white', '1. d4 d5 2. c4'));
+  const states = new Map<string, CardState>([...ix.cards.keys()].map((c) => [c, dueNow]));
+  const { plan: p } = plan(ix, states, 20);
+  assert.deepEqual(show(p), [
+    'review: e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O | ask 5 teach 0',
+    'review: e4 e5 Nf3 Nc6 Bb5 a6 Bxc6 | ask 1 teach 0',
+    'review: d4 d5 c4 | ask 2 teach 0',
+  ]);
+  // Answered before the visit: the first line's first three asks, and Bxc6; O-O missed and due
+  // again within the minute, which the session doesn't ask twice.
+  const answered = new Set<string>([card('e4'), card('e4 e5 Nf3'), card('e4 e5 Nf3 Nc6 Bb5'), card('e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O'), card('e4 e5 Nf3 Nc6 Bb5 a6 Bxc6')]);
+  assert.deepEqual(show(withoutAnswered(p, answered)), ['review: e4 e5 Nf3 Nc6 Bb5 a6 Ba4 | ask 1 teach 0', 'review: d4 d5 c4 | ask 2 teach 0']);
+  // Nothing answered: the same plan.
+  assert.equal(withoutAnswered(p, new Set()), p);
+});
+
+test('a new line taken up again is still walked whole', () => {
+  const ix = index(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 Nc6 3. Bb5'));
+  const { plan: p } = plan(ix, new Map(), 20);
+  assert.deepEqual(show(withoutAnswered(p, new Set([card('e4')]))), ['new: e4 e5 Nf3 Nc6 Bb5 | ask 0 teach 2']);
 });

@@ -169,19 +169,217 @@ button:disabled {
   border-radius: 6px;
 }
 
+/* The study cards (PLAN.md §5.15), after Qchess's /studies (read live, 2026-10-06): a grid of
+   cards, the badge and the star's place top left, the tag and delete buttons top right. */
+
 .studies {
   list-style: none;
   margin: 0;
   padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
 }
 
-.studies li {
+.study-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 14px 16px;
+  background: rgb(255 255 255 / 4%);
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 8px;
+}
+
+.study-card:hover {
+  border-color: rgb(255 255 255 / 30%);
+}
+
+.study-card-title {
+  color: var(--text);
+  font-size: 1.05rem;
+  font-weight: 600;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  padding-right: 80px;
+}
+
+/* The whole card opens the study; its buttons sit above that link. */
+.study-card-title::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+}
+
+.study-card-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 10%);
+  color: var(--muted);
+}
+
+.study-card-badge.badge-repertoire {
+  background: #22412e;
+  color: #9fd3a8;
+}
+
+.study-card-meta {
   display: flex;
   flex-wrap: wrap;
-  justify-content: space-between;
+  align-items: center;
   gap: 4px 12px;
-  padding: 10px 0;
-  border-bottom: 1px solid rgb(255 255 255 / 8%);
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.study-tag {
+  padding: 1px 8px;
+  border-radius: 10px;
+  border: 1px solid rgb(255 255 255 / 20%);
+}
+
+.study-tag.tag-white {
+  color: #eee;
+}
+
+.study-tag.tag-black {
+  color: #aaa;
+  background: #111;
+}
+
+.study-card-counts {
+  color: #c7d8c9;
+}
+
+.study-card-actions {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 1;
+  display: flex;
+}
+
+.study-card-train {
+  position: relative;
+  z-index: 1;
+  align-self: flex-end;
+  min-height: 36px;
+  margin-top: 2px;
+}
+
+button.icon {
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0 6px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1;
+}
+
+button.icon:hover,
+button.icon:focus-visible {
+  color: var(--text);
+  background: rgb(255 255 255 / 8%);
+}
+
+@media (pointer: coarse) {
+  button.icon {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+button.danger {
+  color: #e57373;
+  border-color: #e5737366;
+}
+
+/* Qchess's "Study Mode | Move Trainer" switch (§5.15), in the head of the chapter view and of
+   the training screen. */
+
+.mode-switch {
+  display: flex;
+  flex: none;
+  margin-left: auto;
+}
+
+.mode-switch button {
+  min-width: 64px;
+  padding: 0 12px;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 0;
+}
+
+.mode-switch button:first-child {
+  border-radius: 6px 0 0 6px;
+}
+
+.mode-switch button:last-child {
+  border-left: 0;
+  border-radius: 0 6px 6px 0;
+}
+
+.mode-switch button[aria-pressed='true'] {
+  background: #2c4a7a;
+  border-color: #5c83ca;
+  color: #fff;
+}
+
+.session-waiting .mode-switch button:last-child {
+  color: #9fd3a8;
+  border-color: #9fd3a8;
+}
+
+/* The study and chapter dialogs (§5.15), in the comment dialog's style. */
+
+.study-dialog {
+  width: min(420px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 20px 22px;
+  color: var(--text);
+  background: #1a1a1a;
+  border: 1px solid #5c83ca;
+  border-radius: 8px;
+}
+
+.study-dialog::backdrop {
+  background: rgb(0 0 0 / 55%);
+}
+
+.study-dialog h2 {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+}
+
+.study-dialog .order {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.study-dialog .order .muted {
+  margin-right: auto;
+}
+
+.study-dialog .dialog-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.study-dialog .spacer {
+  flex: 1;
 }
 
 .debug summary {
@@ -401,6 +599,25 @@ textarea.script {
 .study-title {
   color: var(--muted);
   font-size: 0.85rem;
+}
+
+.study-title .icon {
+  min-width: 28px;
+  min-height: 28px;
+  margin-left: 4px;
+  font-size: 0.85rem;
+}
+
+.chapter-pick {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.chapter-pick select {
+  flex: 1;
+  min-width: 0;
 }
 
 .board {
@@ -1017,13 +1234,14 @@ table.cards td {
     grid-template-areas: 'side board panel';
   }
 
-  .chapter-head select {
+  .has-frame .head-tool {
     display: none;
   }
 
   .cv-chapters {
     grid-area: side;
-    display: block;
+    display: flex;
+    flex-direction: column;
     min-height: 0;
     overflow-y: auto;
     background: var(--surface);
@@ -1031,9 +1249,48 @@ table.cards td {
   }
 
   .cv-study {
-    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+    padding: 4px 4px 4px 12px;
     font-weight: 600;
     border-bottom: 1px solid rgb(255 255 255 / 10%);
+  }
+
+  .cv-chapters ol {
+    flex: 1;
+  }
+
+  .cv-chapters li {
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid rgb(255 255 255 / 6%);
+  }
+
+  .cv-chapters li a {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .cv-chapters li .icon {
+    visibility: hidden;
+  }
+
+  .cv-chapters li:hover .icon,
+  .cv-chapters li .icon:focus-visible,
+  .cv-chapters li:has(a[aria-current='page']) .icon {
+    visibility: visible;
+  }
+
+  .cv-new {
+    padding: 8px;
+    border-top: 1px solid rgb(255 255 255 / 10%);
+  }
+
+  .cv-new button {
+    width: 100%;
+    min-height: 36px;
   }
 
   .cv-chapters ol {
@@ -1049,7 +1306,6 @@ table.cards td {
     padding: 4px 12px;
     color: var(--text);
     text-decoration: none;
-    border-bottom: 1px solid rgb(255 255 255 / 6%);
     border-left: 3px solid transparent;
   }
 

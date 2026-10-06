@@ -913,3 +913,23 @@ Technical calls made while building `PLAN.md` §5.12, each with its reason:
 - **In training, a preview doesn't pause the session;** the board takes no move until it ends.
   Pausing the trainer would need a new command for a rare action.
 
+## Revision of 2026-10-06 (studies as Qchess's)
+Technical calls made while building `PLAN.md` §5.15 (D22), each with its reason:
+- **Qchess was read live first** on the owner's test account (its `/studies` page, a study's
+  sidebar, its dialogs and the Study Mode ↔ Move Trainer handlers), and copied where Repworks has
+  the same things: the cards, the study's and the chapters' ⚙ dialogs, "+ New", the browser's
+  own question before deleting.
+- **The drawer under the notation is gone**, since the owner didn't find it; everything in it
+  is in the dialogs.
+- **"Study" opens the chapter at the move on the board,** not at the trained line's end as
+  Qchess does: that is where the user is, and the rest of the line is in the notation below it.
+- **A session taken up after an edit is planned again from the edited repertoire,** less the
+  cards it already answered. The trainer is pure and a session is rebuilt from the log anyway,
+  so this is "start again" plus one filter; it gives Qchess's behaviour (the interrupted line
+  again, from its start) with the edit included, and never asks a card twice in one session.
+  The kept session lives per tab (sessionStorage), so a reload in the study keeps it.
+- **"Train" with no session kept trains the study** (Qchess's Move Trainer trains the study);
+  a reference study, which has no cards, is played from the move shown.
+- **Reordering chapters is "Move up / Move down" in the chapter's dialog,** not Qchess's drag:
+  it works the same on the phone.
+
