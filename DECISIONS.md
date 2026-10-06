@@ -474,6 +474,20 @@ chapter, but leaves out what the site needs to know about each one: the side it 
 - mistake-lab is retired after Phase 5. Its analyzer keeps running from its repo until the tools
   move (D8).
 
+### D21. The study page is laid out as Qchess's (Decided by the owner, 2026-10-06)
+The owner found the Lichess-style notation (variations inline in brackets, `PLAN.md` §4.11)
+unreadable on a deep repertoire chapter and asked for Qchess's study page instead, replicated
+first and improved later:
+- On a wide screen: the chapters on the left, the board, and a panel on the right with the
+  notation on top and the move buttons at its foot. On the phone: board, move buttons,
+  notation, then the tools.
+- The notation as Qchess lays it out: the main line in rows of two moves under the move number,
+  broken by comments and variations, each on rows of their own; a variation runs inline, and
+  where it forks every continuation goes on its own indented branch line.
+- The explorer (Lichess database, ChessDB, the Practical column: Phase 2 in `PLAN.md`) goes in
+  the panel under the notation, laid out like Qchess's, and can be turned on and off.
+- Comments, including the percentages repgen writes, show as ordinary comments for now.
+
 ## What carries over (checked against the code)
 
 | From | As code | As spec only | Dropped |
@@ -764,3 +778,13 @@ The spike ran through on the phone (`PLAN.md` §4.2):
 - **D4's reads: a tree read by a commit's SHA doesn't give the commit's tree SHA.** The REST write
   path built on that value; it now takes the parent's tree from GitHub itself.
 - **D12: puzzle-explorer-data answers the site cross-origin.**
+
+## Revision of 2026-10-06 (the study page, as Qchess's)
+- **D21 (new): the study page is laid out as Qchess's study page.** The owner's first import
+  showed the Lichess-style notation of §4.11 as a wall of text on a deep chapter. The owner asked
+  for Qchess's layout, replicated first and improved later, and for the explorer of Phase 2 to
+  sit under the notation like Qchess's, toggleable. Qchess's page was read live on the owner's
+  test account (its move list's markup and CSS, on desktop and phone sizes) to copy the rules.
+  One technical call: Qchess shows its untrained lines (the repertoire side's alternatives) in
+  italics; here every own move is trained (D3 lists them as conflicts), so the italics mark only
+  that a branch isn't the first continuation. `PLAN.md` §4.11 (the notation and the layout).

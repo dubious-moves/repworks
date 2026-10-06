@@ -126,8 +126,8 @@ test('two devices edit offline, sync, lose nothing, and agree', async ({ browser
     await page.goto(at('e4,c5,Nf3'));
     await expect(page.locator('.conflict-box')).toContainText('desktop text');
     await expect(page.locator('.conflict-box')).toContainText('phone text');
-    await expect(page.locator('.notation')).toContainText('(3. Bb5+)');
-    await expect(page.locator('.notation')).toContainText('3... cxd4!');
+    await expect(page.locator('.notation .variation', { hasText: /^3\. Bb5\+$/ })).toHaveCount(1);
+    await expect(page.locator('.move[data-path="e4 c5 Nf3 d6 d4 cxd4"]')).toHaveText('cxd4!');
     await expect(page.locator('.move[data-path="e4 c5 Nf3 Nc6 d4 cxd4"]')).toBeVisible();
     await expect(page.getByLabel('Chapter', { exact: true })).toContainText('Phone chapter');
     await page.goto(`${site.url}#/conflicts`);

@@ -64,7 +64,7 @@ test('open a chapter, move through it, and edit it: variation, comment, glyph, a
   await clickSquare(page, 'e7', 'black');
   await clickSquare(page, 'e6', 'black');
   await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 e6');
-  await expect(page.locator('.notation')).toContainText('(2... Nc6 3. d4) (2... e6)');
+  await expect(page.locator('.notation .variation')).toHaveText(['2... Nc6 3. d4', '2... e6']);
 
   // A comment and a glyph on it.
   await page.getByLabel('Comment on this move').fill('The {Taimanov} way');
@@ -108,7 +108,9 @@ test('line actions: promote, make main line, delete from here', async ({ page })
   await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf?at=e4,c5,Nf3,Nc6`);
   await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 Nc6');
   await page.getByRole('button', { name: 'Make main line' }).click();
-  await expect(page.locator('.notation')).toContainText('2... Nc6 (2... d6 3. d4 cxd4) 3. d4');
+  await expect(page.locator('.notation .pair .move[data-path="e4 c5 Nf3 Nc6"]')).toBeVisible();
+  await expect(page.locator('.notation .variation')).toHaveText(['2... d6 3. d4 cxd4']);
+  await expect(page.locator('.notation .pair .move[data-path="e4 c5 Nf3 Nc6 d4"]')).toBeVisible();
   await page.getByRole('button', { name: 'Delete from here' }).click();
   await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3');
   await expect(page.locator('.notation')).not.toContainText('Nc6');
@@ -204,4 +206,21 @@ test('a move lands on the squares pressed after the board has moved down the pag
   await clickSquare(page, 'c5', 'black');
   await clickSquare(page, 'd4', 'black');
   await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 Nc6 d4 cxd4');
+});
+
+test('a wide screen shows the chapters on the left, and the board and panel fit the window', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'the phone keeps one column');
+  await page.setViewportSize({ width: 1400, height: 800 });
+  await setUp(page);
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf`);
+  const chapters = page.getByRole('navigation', { name: 'Chapters' });
+  await expect(chapters.locator('[aria-current="page"]')).toHaveCount(1);
+  for (const sel of ['.cv-board .board', '.cv-panel', '.cv-chapters']) {
+    const box = (await page.locator(sel).boundingBox())!;
+    expect(box.y + box.height, sel).toBeLessThanOrEqual(800);
+    expect(box.x + box.width, sel).toBeLessThanOrEqual(1400);
+  }
+  await chapters.getByRole('link').nth(1).click();
+  await expect(page).toHaveURL(/#\/study\/Rep0Najd\/Ch2Alapn/);
+  await expect(chapters.getByRole('link').nth(1)).toHaveAttribute('aria-current', 'page');
 });

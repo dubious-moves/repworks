@@ -868,9 +868,11 @@ Live:
   phone, a draw-mode button turns a drag into an arrow and a tap into a circle, through
   `setShapes`, since chessground starts drawing only on right-click or Shift.
 
-**Notation.** Lichess-style: the main line, with variations inline, and the current move
-highlighted through a signal so navigation redraws two nodes, not the tree. Keys: ← → ↑ ↓,
-Home, End. Clicking a move goes there.
+**Notation.** As Qchess's study page lays it out (D21, which replaced the first plan of
+Lichess-style variations inline in brackets): the main line in rows of two moves, broken by
+comments and variations on rows of their own; a variation inline, each continuation of a fork on
+its own indented branch. The current move is highlighted through a signal so navigation redraws
+two nodes, not the tree. Keys: ← → ↑ ↓, Home, End. Clicking a move goes there.
 
 **Edits.** Play a move to extend or branch. Per-node menu: delete from here, promote, make main
 line, copy the line as PGN. A comment box (sanitized, with a 4,000-character warning). Glyph
@@ -878,7 +880,8 @@ buttons. Undo/redo for the session.
 
 **Layout** follows mistake-lab's mobile conventions as a spec: board first, a drawer, 44 px
 tap targets, feedback below the board, `touch-action: none` on the board, and no
-`orientation` in the manifest.
+`orientation` in the manifest. On a wide screen it is Qchess's study page (D21): the chapters on
+the left, the board, and a panel with the notation, the tools and the move buttons.
 
 Tests:
 - operations and state machine in Node;
@@ -925,6 +928,25 @@ and offline editing with the PWA killed and reopened.
 - **The debug panel** shows the card states from replaying every device's log plus this
   device's unsent events: reviews, due time, stability and difficulty to four places, for step 6
   of the acceptance test.
+- **The layout as Qchess's** (D21, 2026-10-06, after the owner's first import). The notation's
+  rows come from core (`src/core/study/notation.ts`): pairs of main-line moves with a gap ("…")
+  where a comment or a variation breaks the row, comment rows, and variations whose forks become
+  branches, the first continuation first. A White move is always numbered, a Black move only at
+  the start of a line or a branch (Qchess's rule, not the PGN writer's). The view fills the
+  window from 900 px wide: the board's side is the height left, or what the width leaves after
+  the panel (a CSS size container); the chapter list joins on the left from 1150 px and replaces
+  the chapter menu. The move list scrolls itself, never the page, to keep the current move in
+  view. The phone keeps one column: board, move buttons, notation (at most 55% of the screen),
+  tools. Copied from Qchess's page, read live on the owner's test account at 1900×920 and on a
+  412 px phone viewport: the row grid (40 px, then two equal columns), the variation's shaded
+  block, the branch's left rule and tick, italics for later branches, bolder heads at shallow
+  depth, comment and highlight colours. Not copied: Qchess's engine toggles, FEN box and
+  buttons, which belong to Phase 3 or aren't needed; the explorer comes with Phase 2, under the
+  notation. Tests: `test/unit/core/study/notation.test.ts` (a hand-built deep chapter laid out
+  row by row, a start with Black to move, branch numbering and depth, and every move shown once
+  with the right number on the fixtures and 200 random trees); in Playwright, the editor tests
+  read the new rows, and a wide-screen test checks the chapter list and that board and panel
+  fit the window. Live: not yet seen on the owner's devices.
 - **Not built yet**: the `parsed` cache of chapter models by blob SHA (§4.9). A chapter is parsed
   when it is opened, which is quick at repertoire sizes; the cache comes if the phone shows a
   need.
@@ -1459,6 +1481,9 @@ Scope:
 - **The Practical column, prepared score and risk** from `src/pe/search.js` and `rounds.js`
   in a Web Worker, with `provider.child` on chessops. `provider.analyse`, which calls ChessDB's
   `queue`/`store`, stays off unless explicitly enabled (D9).
+- **Where it sits** (D21): in the study page's panel, under the notation, laid out like
+  Qchess's explorer (tabs per database, a row per move with eval, games and the score bar), and
+  turned on and off with a button by the move buttons.
 - **Local explorer** on the desktop: q_extension's `explorerdb serve` must add
   `Access-Control-Allow-Origin` for the site's origin. That's a small change in q_extension,
   made by the owner's session when no long run depends on the checkout. Chrome asks once for

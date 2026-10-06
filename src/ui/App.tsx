@@ -13,7 +13,7 @@ import { SyncBanners, SyncChip } from './Sync.tsx';
 
 export function App() {
   return (
-    <div class="shell">
+    <div class={`shell${mode.value.name === 'chapter' ? ' shell-chapter' : ''}`}>
       <header class="topbar">
         <img class="topbar-icon" src={`${import.meta.env.BASE_URL}icons/icon.svg`} alt="" width={28} height={28} />
         <h1>Repworks</h1>

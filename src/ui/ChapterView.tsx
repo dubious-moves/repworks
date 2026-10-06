@@ -1,6 +1,8 @@
-// The chapter view (PLAN.md §4.11): board first, feedback under it, then the notation, the
-// panel for the move shown (glyphs, comment, conflicts, line actions), and a drawer for the
-// chapter and the study. Play a move to extend a line or branch from it.
+// The chapter view (PLAN.md §4.11, D21), laid out as Qchess's study page: on a wide screen the
+// chapters on the left, the board, and a panel with the notation, the tools for the move shown
+// (glyphs, comment, conflicts, line actions, the chapter and study drawer) and the move buttons.
+// On the phone: the board, the move buttons, the notation, then the tools. Play a move to extend
+// a line or branch from it.
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { makeFen } from 'chessops/fen';
 import { makeSan, parseSan } from 'chessops/san';
@@ -133,72 +135,92 @@ export function ChapterView() {
         </p>
       )}
       {c && board && (
-        <div class="cv-columns">
-          <div class="cv-left">
-            <Board
-              fen={board.fen}
-              orientation={side.value}
-              turn={board.pos.turn}
-              dests={doc.value ? board.dests : new Map()}
-              lastMove={board.lastMove}
-              check={board.check}
-              shapes={node?.shapes ?? []}
-              drawMode={drawMode}
-              brush={brush}
-              onMove={onMove}
-              onShapes={(shapes) => edit((ch) => setShapes(ch, at.peek(), shapes))}
-            />
-            {promotion && (
-              <div class="promotion" role="dialog" aria-label="Promote to">
-                {(['queen', 'rook', 'bishop', 'knight'] as Role[]).map((r) => (
-                  <button key={r} type="button" onClick={() => promote_(r)}>
-                    {r}
-                  </button>
+        <div class="cv-frame">
+          <div class="cv-grid">
+            <nav class="cv-chapters" aria-label="Chapters">
+              <div class="cv-study">{s.meta.name}</div>
+              <ol>
+                {s.chapters.map((ch) => (
+                  <li key={ch.id}>
+                    <a
+                      href={`#/study/${s.sid}/${ch.id}`}
+                      aria-current={ch.id === s.cid ? 'page' : undefined}
+                      onClick={(e) => (e.preventDefault(), open({ name: 'chapter', sid: s.sid, cid: ch.id }))}
+                    >
+                      {ch.name}
+                    </a>
+                  </li>
                 ))}
-                <button type="button" class="secondary" onClick={() => setPromotion(undefined)}>
-                  cancel
+              </ol>
+            </nav>
+            <div class="cv-board">
+              <Board
+                fen={board.fen}
+                orientation={side.value}
+                turn={board.pos.turn}
+                dests={doc.value ? board.dests : new Map()}
+                lastMove={board.lastMove}
+                check={board.check}
+                shapes={node?.shapes ?? []}
+                drawMode={drawMode}
+                brush={brush}
+                onMove={onMove}
+                onShapes={(shapes) => edit((ch) => setShapes(ch, at.peek(), shapes))}
+              />
+              {promotion && (
+                <div class="promotion" role="dialog" aria-label="Promote to">
+                  {(['queen', 'rook', 'bishop', 'knight'] as Role[]).map((r) => (
+                    <button key={r} type="button" onClick={() => promote_(r)}>
+                      {r}
+                    </button>
+                  ))}
+                  <button type="button" class="secondary" onClick={() => setPromotion(undefined)}>
+                    cancel
+                  </button>
+                </div>
+              )}
+              <p class="feedback" role="status">
+                {feedback.value ?? ''}
+              </p>
+            </div>
+            <div class="cv-panel">
+              <Notation chapter={c} />
+              <div class="cv-tools">
+                {node && doc.value && <NodePanel chapter={c} path={path} />}
+                <ChapterDrawer />
+              </div>
+              {drawMode && (
+                <div class="brushes" role="radiogroup" aria-label="Colour">
+                  {BRUSH_NAMES.map((b) => (
+                    <button key={b} type="button" role="radio" aria-checked={brush === b} aria-label={b} class={`brush brush-${b}${brush === b ? ' on' : ''}`} onClick={() => setBrush(b)} />
+                  ))}
+                  <span class="muted">Drag for an arrow, tap for a circle; again to remove.</span>
+                </div>
+              )}
+              <div class="controls">
+                <button type="button" aria-label="Start" onClick={() => move('start')}>
+                  ⏮
+                </button>
+                <button type="button" aria-label="Previous move" onClick={() => move('prev')}>
+                  ◀
+                </button>
+                <button type="button" aria-label="Next move" onClick={() => move('next')}>
+                  ▶
+                </button>
+                <button type="button" aria-label="End of the line" onClick={() => move('end')}>
+                  ⏭
+                </button>
+                <button type="button" aria-label="Undo" disabled={!doc.value?.past.length} onClick={undoEdit}>
+                  ↶
+                </button>
+                <button type="button" aria-label="Redo" disabled={!doc.value?.future.length} onClick={redoEdit}>
+                  ↷
+                </button>
+                <button type="button" aria-pressed={drawMode} aria-label="Draw mode" class={drawMode ? 'on' : ''} onClick={() => setDrawMode(!drawMode)}>
+                  ✎
                 </button>
               </div>
-            )}
-            <div class="controls">
-              <button type="button" aria-label="Start" onClick={() => move('start')}>
-                ⏮
-              </button>
-              <button type="button" aria-label="Previous move" onClick={() => move('prev')}>
-                ◀
-              </button>
-              <button type="button" aria-label="Next move" onClick={() => move('next')}>
-                ▶
-              </button>
-              <button type="button" aria-label="End of the line" onClick={() => move('end')}>
-                ⏭
-              </button>
-              <button type="button" aria-label="Undo" disabled={!doc.value?.past.length} onClick={undoEdit}>
-                ↶
-              </button>
-              <button type="button" aria-label="Redo" disabled={!doc.value?.future.length} onClick={redoEdit}>
-                ↷
-              </button>
-              <button type="button" aria-pressed={drawMode} aria-label="Draw mode" class={drawMode ? 'on' : ''} onClick={() => setDrawMode(!drawMode)}>
-                ✎
-              </button>
             </div>
-            {drawMode && (
-              <div class="brushes" role="radiogroup" aria-label="Colour">
-                {BRUSH_NAMES.map((b) => (
-                  <button key={b} type="button" role="radio" aria-checked={brush === b} aria-label={b} class={`brush brush-${b}${brush === b ? ' on' : ''}`} onClick={() => setBrush(b)} />
-                ))}
-                <span class="muted">Drag for an arrow, tap for a circle; again to remove.</span>
-              </div>
-            )}
-            <p class="feedback" role="status">
-              {feedback.value ?? ''}
-            </p>
-          </div>
-          <div class="cv-right">
-            <Notation chapter={c} />
-            {node && doc.value && <NodePanel chapter={c} path={path} />}
-            <ChapterDrawer />
           </div>
         </div>
       )}
