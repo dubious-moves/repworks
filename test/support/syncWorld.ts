@@ -5,8 +5,10 @@ import { join, relative, sep } from 'node:path';
 import { parseChapterFile } from '../../src/core/pgn/parse.ts';
 import { chapterFileText } from '../../src/core/pgn/write.ts';
 import type { Chapter } from '../../src/core/study/model.ts';
-import type { Remote } from '../../src/core/sync/ports.ts';
+import type { KnownEvent } from '../../src/core/progress/events.ts';
+import type { LocalEvent, LocalStore, Remote } from '../../src/core/sync/ports.ts';
 import { sync, type SyncOutcome } from '../../src/core/sync/step.ts';
+import { IdbStore } from '../../src/platform/idbStore.ts';
 import { graphqlRemote } from '../../src/platform/githubGraphql.ts';
 import { restRemote } from '../../src/platform/githubRest.ts';
 import { FakeGit } from './fakeGit.ts';
@@ -20,7 +22,7 @@ export type Kind = 'direct' | 'rest' | 'graphql';
 export const KINDS: readonly Kind[] = ['direct', 'rest', 'graphql'];
 
 export const REPO = 'owner/repworks-data';
-export const TOKEN = 'test-token-not-a-real-one';
+export const TOKEN = 'test_token_for_the_fake_github_only';
 
 const FIXTURE = new URL('../fixtures/data-repo/', import.meta.url).pathname;
 
@@ -43,6 +45,17 @@ export interface Dev {
   store: MemoryStore;
   remote: Remote;
   sync(push?: boolean): Promise<SyncOutcome>;
+}
+
+export interface SimDev {
+  name: string;
+  id: string;
+  store: LocalStore;
+  sync(push?: boolean): Promise<SyncOutcome>;
+  view(): Promise<Map<string, string>>;
+  edit(path: string, text: string | null): Promise<void>;
+  record(t: string, k: KnownEvent['k'], card: string, g?: 1 | 2 | 3 | 4): Promise<LocalEvent>;
+  leftovers(): Promise<{ overlay: number; pending: number; events: number }>;
 }
 
 export class World {
@@ -72,6 +85,43 @@ export class World {
     const random = mulberry32(seed);
     const newId = () => `Copy${String(++this.ids).padStart(4, '0')}`;
     return { name, store, remote, sync: (push = true) => sync({ remote, store, clock: this.clock, newId, random }, { push }) };
+  }
+
+  /** A device whose store is in memory or in IndexedDB (fake-indexeddb in Node), driven through async helpers. */
+  async simDevice(storeKind: 'memory' | 'idb', id: string, name: string, seed = 1): Promise<SimDev> {
+    const remote = this.remote();
+    const random = mulberry32(seed);
+    const newId = () => `Copy${String(++this.ids).padStart(4, '0')}`;
+    const run = (store: LocalStore) => (push = true) => sync({ remote, store, clock: this.clock, newId, random }, { push });
+    if (storeKind === 'memory') {
+      const store = new MemoryStore({ id, name });
+      return {
+        name,
+        id,
+        store,
+        sync: run(store),
+        view: async () => store.view(),
+        edit: async (path, text) => store.edit(path, text),
+        record: async (t, k, card, g = 3) => store.record(t, k, card, g),
+        leftovers: async () => ({ overlay: store.overlay.size, pending: store.pending.length, events: store.events.length }),
+      };
+    }
+    const store = await IdbStore.open(undefined, `repworks-test-${id}-${seed}-${++this.ids}`);
+    await store.setUp({ repo: REPO, branch: 'main', token: TOKEN, write: 'graphql' }, { id, name, created: new Date(this.clock.t).toISOString() });
+    return {
+      name,
+      id,
+      store,
+      sync: run(store),
+      view: () => store.read(),
+      edit: (path, text) => store.edit(path, text),
+      record: (t, k, card, g = 3) => store.record((k === 'review' ? { t, k, card, g } : { t, k, card }) as Parameters<IdbStore['record']>[0]),
+      leftovers: async () => {
+        const state = await store.state();
+        const waiting = await store.waiting();
+        return { overlay: waiting.files, pending: state.pending.length, events: waiting.events };
+      },
+    };
   }
 
   /** Another writer's commit straight onto the branch. */

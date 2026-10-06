@@ -24,6 +24,8 @@ export interface GithubConfig {
 
 export interface RequestInfo {
   method: string;
+  /** A content-creating request (GitHub allows 500 an hour): REST POST/PATCH, a GraphQL mutation. */
+  write: boolean;
   /** The path without the host and query, the repo replaced by {repo}. */
   route: string;
   status: number | 'network';
@@ -50,6 +52,8 @@ export async function call(
   const doFetch = config.fetch ?? fetch;
   const started = Date.now();
   const route = path.split('?')[0]!.replace(`/repos/${config.repo}/`, '/repos/{repo}/');
+  const query = (options.body as { query?: unknown } | undefined)?.query;
+  const write = method !== 'GET' && !(route === '/graphql' && typeof query === 'string' && !query.trimStart().startsWith('mutation'));
   const headers: Record<string, string> = {
     Accept: options.accept ?? 'application/vnd.github+json',
     Authorization: `Bearer ${config.token}`,
@@ -70,11 +74,11 @@ export async function call(
     // Decoded by hand to keep a byte-order mark, so a blob's text hashes back to its SHA.
     text = new TextDecoder('utf-8', { ignoreBOM: true }).decode(await response.arrayBuffer());
   } catch (error) {
-    config.onRequest?.({ method, route, status: 'network', ms: Date.now() - started });
+    config.onRequest?.({ method, write, route, status: 'network', ms: Date.now() - started });
     throw new RemoteError('network', `no answer from GitHub (${(error as Error)?.name ?? 'error'}: ${(error as Error)?.message ?? String(error)})`);
   }
   const remaining = response.headers.get('x-ratelimit-remaining');
-  const info: RequestInfo = { method, route, status: response.status, ms: Date.now() - started };
+  const info: RequestInfo = { method, write, route, status: response.status, ms: Date.now() - started };
   if (remaining !== null) info.rateRemaining = Number(remaining);
   const resource = response.headers.get('x-ratelimit-resource');
   if (resource !== null) info.rateResource = resource;

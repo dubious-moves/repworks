@@ -88,6 +88,11 @@ export async function sync(ports: SyncPorts, options: SyncOptions): Promise<Sync
   return { ...report, kind: 'synced' };
 }
 
+/** The outcome of a sync that failed before the step ran (resolving the branch, say). */
+export function failedSync(error: unknown): SyncOutcome {
+  return { pulled: false, pushed: false, adopted: 0, conflicts: [], ownFilesChanged: [], ...failure(error) };
+}
+
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 type Failure = DistributiveOmit<Exclude<SyncOutcome, { kind: 'synced' }>, keyof SyncReport>;
 

@@ -112,7 +112,8 @@ Not verified, and where each gets verified:
 - The Qchess export script on the owner's real studies, and their import: Phase 0, §4.10 and
   §4.5 (b).
 - GraphQL commits with a fine-grained token from a browser, and the exact error for a stale
-  head: Phase 0 spike, §4.2.
+  head: Phase 0 spike, §4.2 (the owner's first run stopped at the empty data repo; the re-run
+  covers it).
 - Lichess's API answering a web page (study export, `/api/token`): checked live from the
   build session's container on 2026-10-05, once lichess.org was reachable. `GET
   /api/study/by/<user>` answers `Access-Control-Allow-Origin: *`, and the preflights of a
@@ -250,6 +251,19 @@ with the real fine-grained token against the real data repo. It records:
 
 Exit: the write path is chosen (GraphQL if 2 behaves, else REST), and the real error shapes
 are copied into the fake remote used by `test/sim`.
+
+The owner's first run (2026-10-05, desktop, Brave on Windows, build `e92b3d2`):
+- G1 (the repo, the token's permissions, `ETag` and the rate-limit headers readable from the
+  page; core and GraphQL limits 5,000) and G1c (`X-GitHub-Api-Version` allowed by CORS) passed.
+- G2–G4 and G17 got 409 "Git Repository is empty.": the data repo had been created without a
+  README. G5 then failed, because the spike carried on.
+- G1 reported the data repo as **public**; it has to be private (§3, §8).
+
+Since then the spike stops on an empty repo and says what to do. It also gained G6b (the tree
+read by its commit's SHA, as the app reads it) and G7b (blobs read through GraphQL, as the app
+reads them). The rest waits for the owner's re-run: the GraphQL and REST writes, Lichess, the
+phone and the installed PWA. Until then the adapters' error shapes follow GitHub's
+documentation and community reports (`test/support/fakeGithub.ts` says which).
 
 ### 4.3 Position key
 
@@ -563,19 +577,22 @@ acceptance test (§4.11) checks that both devices compute the same card states.
 **Ports.**
 
 ```ts
-interface Remote {
-  head(etag?): Promise<{ commit: string; tree: string; etag: string } | 'not-modified'>;
-  tree(sha): Promise<Map<string, string>>;      // path → blob sha (recursive)
-  blob(sha): Promise<string>;                   // raw
-  commit(expectedHead, message, add: Map<string, string>, remove: string[]):
-    Promise<{ ok: true; commit: string } | { ok: false; reason: 'stale' | 'auth' | 'rate' | 'network' }>;
+interface Remote {                                   // as built: src/core/sync/ports.ts
+  head(etag?): Promise<{ commit: string; etag: string } | 'not-modified'>;
+  files(commit): Promise<{ commit: string; tree: string; files: Map<string, string> }>; // path → blob sha
+  blobs(shas): Promise<Map<string, string>>;         // sha → text
+  commit({ parent: { commit, tree }, message, add: Map<path, text>, remove: path[] }):
+    Promise<{ ok: true; commit: string; tree: string } | { ok: false; reason: 'stale' }>;
   commitsSince(head, base): Promise<{ sha: string; message: string }[]>;   // for lost acknowledgements
 }
+// Other failures throw RemoteError: auth (401), rate (403/429, with GitHub's wait), network (no
+// answer: a commit's outcome is unknown), server (5xx: unknown too), setup (404; 409, an empty
+// repo; 403 without a rate limit).
 ```
 
-Two implementations: `github-graphql.ts` (writes through `createCommitOnBranch`, reads
-through REST) and `github-rest.ts` (everything through REST). Both are tested through the
-same suite against the fake.
+Two implementations, `src/platform/githubGraphql.ts` (commits through `createCommitOnBranch`,
+blobs through GraphQL in batches) and `src/platform/githubRest.ts` (everything through REST).
+Both are tested through the same suite against the fake.
 
 **Local store** (IndexedDB `repworks`):
 - `meta`: device ID and name, base commit and tree, schema version.
@@ -639,6 +656,51 @@ commits, and a branch head checked against `expectedHead`; error shapes copied f
 
 Live: the acceptance test (§4.11); the request counts of a day's normal use, read from the
 debug panel, against the limits above.
+
+**As built** (where the build settled details the plan left open, or changed them):
+- **Pull, then push.** A pull whose head moved merges the working view (base plus working
+  copies) with the head three-way and makes the head the new base at once; whatever of ours the
+  head lacks stays as working copies. The push commits those, and the device's new events, on
+  the base. Stale → pull again and retry after 1, 2, 4, 8 s (with jitter), at most 5 commits.
+  This is steps 1-5 above, with the merge kept locally between the two halves.
+- **Reads.** The tree is read by the commit's SHA, one request fewer than commit then tree
+  (through the commit if GitHub ever refuses that; spike G6b checks it). Blobs come through
+  GraphQL, 100 to a request, each checked against its SHA, with REST for any that doesn't
+  match. A first clone of 1,000 files would otherwise be 1,000 REST requests, over GitHub's 900
+  points a minute. The REST remote paces blob reads at 10 a second.
+- **Local store** (`src/platform/idbStore.ts`). `files` holds the working copies laid over the
+  base, each with the edit counter's value when written. A sync finishes in one transaction
+  that writes only if nothing was edited since it computed its result; otherwise it computes
+  again. So an edit made during a sync is merged onto the result (the snapshot as base), never
+  lost. The same transaction deletes blobs that neither the base nor a pending commit refers
+  to. `parsed` (chapter models cached by SHA) comes with the editor (§4.11).
+- **Pending commits** are recorded before they are sent, with their snapshot and their files,
+  and kept until found on the branch (adopted) or unable to land (the branch moved past their
+  parent).
+- **A lagging replica.** A head read that returns an earlier base is read again after 1 s and
+  2 s before it is believed, so a device never steps back to before its own last commit.
+- **The data format.** The app writes nothing to a repo whose `repworks.json` declares a format
+  other than 1, or can't be read. The first sync adds `repworks.json` if the repo lacks it, and
+  the device's `devices/<dev>.json`.
+- **This device's progress file changed by someone else**: every line of every side is kept
+  (a union by `n`), and the sync reports it.
+- **Commit messages**: `phone: 2 study files, 14 events`, then `repworks-sync: <device>:<seq>`.
+  Conflict markers name the devices from the headlines of the commits since the base.
+- **When to sync** (`src/core/sync/schedule.ts`): as above. Also: hiding the app pushes at
+  once; a refused token stops syncing until setup or a sync asked for by hand; the network
+  coming back clears any wait.
+- **Setup**: the link also takes `&name=` (the device's name; else phone or desktop from the
+  browser) and `&write=rest` (REST commits). The setup screen has a form for the same, and
+  Settings shows the setup link of the next device as a QR code, on request, since it holds the
+  token. A public data repo is warned about at setup and on every start.
+- **Tests**: the step's suite (17 cases) runs three times: through the plain fake, and through
+  the REST and GraphQL adapters over a fake GitHub (`test/support/fakeGithub.ts`). 420 random
+  histories of 2-3 devices through the fake converge, plus 50 through the adapters and 30
+  through the IndexedDB store, which runs in Node on `fake-indexeddb`. Between them they hold
+  about 2,000 edits made during a sync, 50 commits that landed with their answer lost (each
+  adopted, none merged twice), 500 dropped connections and 220 rate limits. In the browser
+  (Playwright, desktop and phone): setup from a link, the first sync, a pushed review, a pull,
+  a refused token and the REST path, against the same fake GitHub.
 
 ### 4.10 Import
 

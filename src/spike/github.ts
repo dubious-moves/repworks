@@ -159,7 +159,11 @@ export async function runGithubChecks(token: string, repo: string, log: Log): Pr
   let head = '';
   await step('G2', `Create the throwaway branch ${branch}`, async () => {
     const base = await refSha(token, repo, defaultBranch);
-    if (!base.sha) return { ok: false, detail: { status: base.h.status, body: excerpt(base.h.text) } };
+    if (base.h.status === 409) {
+      // Nothing else can run: GitHub can't make a branch in an empty repo.
+      throw new Error(`the data repo is empty (409: ${excerpt(base.h.text, 120)}). Add a README on GitHub (Add file → Create new file), then run the spike again.`);
+    }
+    if (!base.sha) throw new Error(`the default branch ${defaultBranch} wasn't readable (${base.h.status}: ${excerpt(base.h.text, 120)})`);
     const h = await http(token, 'POST', `/repos/${repo}/git/refs`, { body: { ref: `refs/heads/${branch}`, sha: base.sha } });
     head = base.sha;
     return { ok: h.status === 201, ms: h.ms, detail: { status: h.status, base: base.sha, body: h.status === 201 ? undefined : excerpt(h.text) } };
@@ -206,11 +210,29 @@ export async function runGithubChecks(token: string, repo: string, log: Log): Pr
       readme = entries.find((e) => e.type === 'blob');
       return { ok: h.status === 200, ms: h.ms, detail: { status: h.status, entries: entries.length, truncated: (h.json as { truncated?: boolean } | undefined)?.truncated, firstBlob: readme?.path, headers: visible(h) } };
     });
+    await step('G6b', "GET the recursive tree by the commit's SHA (how the app reads it, one request fewer)", async () => {
+      const h = await http(token, 'GET', `/repos/${repo}/git/trees/${head}?recursive=1`);
+      const sha = (h.json as { sha?: string } | undefined)?.sha;
+      return { ok: h.status === 200 && sha === tree, ms: h.ms, detail: { status: h.status, treeShaMatches: sha === tree, body: h.status === 200 ? undefined : excerpt(h.text) } };
+    });
     await step('G7', 'GET a blob raw (Accept: application/vnd.github.raw+json) and check its SHA here', async () => {
       if (!readme) return { ok: false, detail: { note: 'no blob in the tree' } };
       const h = await http(token, 'GET', `/repos/${repo}/git/blobs/${readme.sha}`, { headers: { Accept: 'application/vnd.github.raw+json' } });
       const computed = await gitBlobSha(h.text);
       return { ok: h.status === 200 && computed === readme.sha, ms: h.ms, detail: { status: h.status, path: readme.path, bytes: h.text.length, shaMatches: computed === readme.sha, headers: visible(h) } };
+    });
+
+    await step('G7b', 'GraphQL: blobs read by SHA in one query (how the app fetches many files)', async () => {
+      if (!readme) return { ok: false, detail: { note: 'no blob in the tree' } };
+      const h = await http(token, 'POST', '/graphql', {
+        body: {
+          query: `query ($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { b0: object(oid: "${readme.sha}") { ... on Blob { text isTruncated isBinary byteSize } } } }`,
+          variables: { owner: repo.split('/')[0], name: repo.split('/')[1] },
+        },
+      });
+      const blob = (h.json as { data?: { repository?: { b0?: { text?: string; isTruncated?: boolean; isBinary?: boolean; byteSize?: number } } } } | undefined)?.data?.repository?.b0;
+      const shaMatches = typeof blob?.text === 'string' && (await gitBlobSha(blob.text)) === readme.sha;
+      return { ok: h.status === 200 && shaMatches, ms: h.ms, detail: { status: h.status, shaMatches, isTruncated: blob?.isTruncated, isBinary: blob?.isBinary, byteSize: blob?.byteSize, headers: visible(h), errors: (h.json as { errors?: unknown } | undefined)?.errors } };
     });
 
     // G8-G12: GraphQL createCommitOnBranch.

@@ -86,3 +86,152 @@ body {
 a {
   color: #9fd3a8;
 }
+
+h2 {
+  font-size: 1.05rem;
+  margin: 0 0 8px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.warn {
+  color: var(--warn);
+}
+
+.error {
+  color: #e08a7a;
+}
+
+.card {
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.chip {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid rgb(255 255 255 / 25%);
+  border-radius: 18px;
+  background: transparent;
+  color: var(--accent-text);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.chip-warn {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+.banner-warn {
+  border-left: 4px solid var(--warn);
+}
+
+.banner > button:last-child {
+  margin-left: auto;
+}
+
+button {
+  min-height: 44px;
+  padding: 0 16px;
+  font: inherit;
+  border-radius: 6px;
+  border: 1px solid rgb(255 255 255 / 20%);
+  background: var(--accent);
+  color: var(--accent-text);
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.6;
+}
+
+.setup label {
+  display: block;
+  margin: 10px 0;
+}
+
+.setup input {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 4px;
+  padding: 0 10px;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 6px;
+}
+
+.studies {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.studies li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgb(255 255 255 / 8%);
+}
+
+.debug summary {
+  cursor: pointer;
+  min-height: 32px;
+}
+
+.debug dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 12px 0;
+}
+
+.debug dt {
+  color: var(--muted);
+}
+
+.debug dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.routes {
+  font-size: 0.8rem;
+  padding-left: 18px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.qr {
+  width: min(280px, 100%);
+  background: #fff;
+  padding: 8px;
+  border-radius: 6px;
+}
+
+.qr svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+@media (max-width: 420px) {
+  .debug dl {
+    grid-template-columns: 1fr;
+  }
+}

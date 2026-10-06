@@ -27,7 +27,9 @@ class FakeGitHub {
   refs = new Map<string, string>();
   requests: string[] = [];
 
-  constructor() {
+  /** `empty`: a repo created without a README, as the owner's first one was. */
+  constructor(empty = false) {
+    if (empty) return;
     const readme = '# repworks-data\n';
     this.blobs.set(blobSha(readme), readme);
     const tree = this.putTree(new Map([['README.md', blobSha(readme)]]));
@@ -61,6 +63,14 @@ class FakeGitHub {
     const base = `/repos/${REPO}`;
     const p = url.pathname;
 
+    if (p === '/graphql' && !(body as { query: string }).query.includes('createCommitOnBranch')) {
+      const repository: Record<string, unknown> = {};
+      for (const m of (body as { query: string }).query.matchAll(/(b\d+): object\(oid: "([0-9a-f]{40})"\)/g)) {
+        const text = this.blobs.get(m[2]!);
+        repository[m[1]!] = text === undefined ? null : { text, isTruncated: false, isBinary: false, byteSize: Buffer.byteLength(text) };
+      }
+      return json(200, { data: { repository } }, { 'x-ratelimit-resource': 'graphql' });
+    }
     if (p === '/graphql') {
       const input = (body as { variables: { input: Record<string, unknown> } }).variables.input as {
         branch: { branchName: string };
@@ -89,6 +99,7 @@ class FakeGitHub {
     let m: RegExpExecArray | null;
     if ((m = new RegExp(`^${base}/git/ref/heads/(.+)$`).exec(p)) && method === 'GET') {
       const sha = this.refs.get(m[1]!);
+      if (this.refs.size === 0) return json(409, { message: 'Git Repository is empty.', documentation_url: 'https://docs.github.com/rest/git/refs#get-a-reference', status: '409' });
       if (!sha) return json(404, { message: 'Not Found' });
       const etag = `"${sha1(sha)}"`;
       if (request.headers()['if-none-match'] === etag) return route.fulfill({ status: 304, headers: { ...CORS, etag, 'x-ratelimit-remaining': '4990' } });
@@ -121,8 +132,10 @@ class FakeGitHub {
       return json(201, { sha: this.putCommit(body!['tree'] as string, body!['parents'] as string[], body!['message'] as string) });
     }
     if ((m = new RegExp(`^${base}/git/trees/([0-9a-f]+)$`).exec(p))) {
-      const t = this.trees.get(m[1]!);
-      return t ? json(200, { sha: m[1], truncated: false, tree: [...t].map(([path, sha]) => ({ path, type: 'blob', mode: '100644', sha })) }) : json(404, { message: 'Not Found' });
+      // A commit is taken for its tree, as git resolves a tree-ish.
+      const sha = this.trees.has(m[1]!) ? m[1]! : this.commits.get(m[1]!)?.tree;
+      const t = sha === undefined ? undefined : this.trees.get(sha);
+      return t ? json(200, { sha, truncated: false, tree: [...t].map(([path, sha]) => ({ path, type: 'blob', mode: '100644', sha })) }) : json(404, { message: 'Not Found' });
     }
     if (p === `${base}/git/trees` && method === 'POST') {
       const entries = new Map(this.trees.get(body!['base_tree'] as string)!);
@@ -222,11 +235,22 @@ test('the spike runs every check against mocks, and its report holds no token', 
   expect(report).not.toContain(LICHESS_TOKEN);
   const parsed = JSON.parse(report) as { steps: { id: string; ok: boolean; detail: Record<string, unknown> }[] };
   const byId = new Map(parsed.steps.map((s) => [s.id, s]));
-  for (const id of ['S0', 'G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8', 'G8b', 'G9', 'G10', 'G12b', 'G13', 'G14', 'G14b', 'G15', 'G16', 'G17', 'L1', 'L2', 'L3', 'L4', 'S3', 'P1']) {
+  for (const id of ['S0', 'G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G6b', 'G7', 'G7b', 'G8', 'G8b', 'G9', 'G10', 'G12b', 'G13', 'G14', 'G14b', 'G15', 'G16', 'G17', 'L1', 'L2', 'L3', 'L4', 'S3', 'P1']) {
     expect(byId.get(id)?.ok, `step ${id}: ${JSON.stringify(byId.get(id))}`).toBe(true);
   }
   // Chrome refuses persist() to a throwaway profile; the live run reports the real answer.
   expect(byId.get('S1')?.detail).toHaveProperty('persistGranted');
   expect(String(byId.get('G10')!.detail['fullBody'])).toContain('STALE_DATA');
   expect(String(byId.get('G14')!.detail['fullBody'])).toContain('not a fast forward');
+});
+
+test('on an empty data repo the spike stops at once and says what to do', async ({ page }) => {
+  const github = new FakeGitHub(true);
+  await page.route('https://api.github.com/**', (route) => github.handle(route));
+  await page.goto(`${site.url}spike.html#setup?repo=${encodeURIComponent(REPO)}&token=${TOKEN}`);
+  await page.getByRole('button', { name: 'Run the GitHub checks' }).click();
+  await expect(page.locator('#log')).toContainText('the data repo is empty');
+  await expect(page.locator('#log')).toContainText('Add a README on GitHub');
+  await expect(page.locator('#log')).not.toContainText('GET the ref');
+  expect(github.requests.filter((r) => r.startsWith('POST'))).toEqual([]);
 });

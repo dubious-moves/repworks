@@ -682,3 +682,10 @@ Changes made while building Phase 0, each with its reason:
 - **`prototypes/` removed.** Phase 0 replaced each part with tested code: the position key
   (§4.3), the Lichess-dialect writer (§4.5) and the merge (§4.7). It is in the history at
   `469d081`.
+- **D4 reads: blobs through GraphQL, in batches.** D4 has every read go through REST (ref,
+  tree, raw blobs). As built, the GraphQL remote reads blobs 100 to a request, each checked
+  against its SHA, and the tree is read by the commit's SHA. Reason: a device's first sync of
+  a data repo with 1,000 files would be 1,000 REST requests, over GitHub's 900 points a minute
+  (D4's verified limits), and minutes long. The ref stays a conditional REST read, so an idle
+  sync is still one free 304. The REST remote, D4's fallback, still reads raw blobs, paced at
+  10 a second. PLAN.md §4.9 (as built).

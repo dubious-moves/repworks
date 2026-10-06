@@ -12,6 +12,8 @@ export interface FakeGithubOptions {
   branch: string;
   token: string;
   visibility?: 'private' | 'public';
+  /** Whether a commit SHA is taken where a tree is asked for (git's tree-ish); true by default. */
+  treesByCommit?: boolean;
 }
 
 export interface Logged {
@@ -136,7 +138,7 @@ export class FakeGithub {
     }
     if (method === 'GET' && path.startsWith(`${repo}/git/trees/`)) {
       const sha = path.slice(`${repo}/git/trees/`.length);
-      const tree = this.git.trees.has(sha) ? sha : this.git.commits.get(sha)?.tree;
+      const tree = this.git.trees.has(sha) ? sha : this.options.treesByCommit === false ? undefined : this.git.commits.get(sha)?.tree;
       if (!tree) return notFound();
       const files = this.git.trees.get(tree)!;
       const entries = [...files].sort(([a], [b]) => (a < b ? -1 : 1)).map(([p, s]) => ({ path: p, mode: '100644', type: 'blob', sha: s, size: new TextEncoder().encode(this.git.blobs.get(s)!).length, url: `https://api.github.com${repo}/git/blobs/${s}` }));
@@ -144,6 +146,11 @@ export class FakeGithub {
       const dirs = new Set([...files.keys()].flatMap((p) => p.split('/').slice(0, -1).map((_, i, parts) => parts.slice(0, i + 1).join('/'))));
       const trees = [...dirs].map((d) => ({ path: d, mode: '040000', type: 'tree', sha: '0'.repeat(40), url: '' }));
       return this.response(200, { sha: tree, url: `https://api.github.com${repo}/git/trees/${tree}`, tree: [...trees, ...entries], truncated: false });
+    }
+    if (method === 'GET' && path.startsWith(`${repo}/git/commits/`)) {
+      const c = this.git.commits.get(path.slice(`${repo}/git/commits/`.length));
+      if (!c) return notFound();
+      return this.response(200, { sha: c.sha, tree: { sha: c.tree, url: '' }, message: c.message, parents: c.parent ? [{ sha: c.parent }] : [] });
     }
     if (method === 'GET' && path.startsWith(`${repo}/git/blobs/`)) {
       const sha = path.slice(`${repo}/git/blobs/`.length);

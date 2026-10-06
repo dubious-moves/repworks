@@ -22,7 +22,17 @@ export function restRemote(config: GithubConfig): Remote {
   }
 
   async function files(commit: string): Promise<RemoteTree> {
-    const answer = await call(config, 'GET', `${repo}/git/trees/${commit}?recursive=1`);
+    let answer;
+    try {
+      answer = await call(config, 'GET', `${repo}/git/trees/${commit}?recursive=1`);
+    } catch (error) {
+      // If GitHub ever stops taking a commit for a tree: the commit's tree, then that tree.
+      if (!(error instanceof RemoteError) || (error.status !== 404 && error.status !== 422)) throw error;
+      const c = await call(config, 'GET', `${repo}/git/commits/${commit}`);
+      const tree = (c.json as { tree?: { sha?: unknown } } | undefined)?.tree?.sha;
+      if (typeof tree !== 'string') throw new RemoteError('server', `no tree in GitHub's answer for commit ${commit}`);
+      answer = await call(config, 'GET', `${repo}/git/trees/${tree}?recursive=1`);
+    }
     const j = answer.json as { sha?: unknown; truncated?: unknown; tree?: { path?: unknown; type?: unknown; sha?: unknown }[] } | undefined;
     if (typeof j?.sha !== 'string' || !Array.isArray(j.tree)) throw new RemoteError('server', `no tree in GitHub's answer for ${commit}`);
     if (j.truncated === true) throw new RemoteError('server', 'the data repo has more files than GitHub lists in one tree');
