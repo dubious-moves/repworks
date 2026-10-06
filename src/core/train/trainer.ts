@@ -127,6 +127,11 @@ export interface TrainerSetup {
   /** Show and grade (§5.9): the user never moves; `show` plays the move, `tell` grades it. */
   selfGrade?: boolean;
   /**
+   * A line picked from the list (§5.16): an own move the plan neither asks nor teaches, and that
+   * would be played for the user, is asked too, with no grade (unless suspended).
+   */
+  practice?: boolean;
+  /**
    * Interactive view (§5.10): an own move that another of the index's lines plays after the
    * board's moves is right, and the walk follows that line to its end.
    */
@@ -194,7 +199,9 @@ export class Trainer {
   private ply = 0;
   private pending: Pending | undefined;
   /** Show and grade: a move played and waiting for its grade. */
-  private waiting: { card: CardId; mode: 'ask' | 'teach'; san: string; since: number } | undefined;
+  private waiting: { card: CardId; mode: 'ask' | 'teach'; san: string; since: number; failed: boolean } | undefined;
+  /** Show and grade, on from the setup and switched during the session (§5.16). */
+  private selfGrading: boolean;
   private waitId = 0;
   private walked = 0;
   private readonly counts = { reviews: 0, good: 0, taught: 0, suspended: 0 };
@@ -209,6 +216,17 @@ export class Trainer {
       for (const c of l.teach) this.toTeach.add(c);
     }
     this.known = knownCardsOf(setup.index);
+    this.selfGrading = setup.selfGrade ?? false;
+  }
+
+  /** Show and grade on or off from the next move asked (§5.16). */
+  setSelfGrade(on: boolean): void {
+    this.selfGrading = on;
+  }
+
+  /** Show and grade: a move is shown and waits for its verdict (`tell`). */
+  get awaitingGrade(): boolean {
+    return this.waiting !== undefined;
   }
 
   /** A new pace, from the next move played for the user. */
@@ -296,7 +314,7 @@ export class Trainer {
     if (this.toAsk.has(card) || this.setup.askAll || (fresh && this.known.has(card))) return 'ask';
     // A move never answered is never played for the user (lichessable's rule).
     if (this.toTeach.has(card) || fresh) return 'teach';
-    return 'auto';
+    return this.setup.practice ? 'ask' : 'auto';
   }
 
   private learning(card: CardId) {
@@ -488,11 +506,16 @@ export class Trainer {
     out.push({ type: 'note', note: { kind: 'shown', san: p.san } });
   }
 
+  /** Whether an answer on the card is graded: with `practice`, only the plan's asks and known moves never answered. */
+  private graded(card: CardId) {
+    return this.record && (!this.setup.practice || this.toAsk.has(card) || (statusOf(this.state(card)) === 'fresh' && this.known.has(card)));
+  }
+
   private review(card: CardId, p: Pending, now: number, out: TrainerEffect[]): Grade {
     const g = grade({ wrong: p.wrong.length, hint: p.hint });
     this.answered.add(card);
     out.push({ type: 'answer', card, ok: g === 3 });
-    if (this.record) {
+    if (this.graded(card)) {
       const event: TrainerRecord = { k: 'review', card, g, ms: Math.max(0, now - p.since) };
       if (p.wrong.length) event.w = [...p.wrong];
       if (p.hint) event.h = 1;
@@ -524,10 +547,11 @@ export class Trainer {
   /** Show and grade: the move asked is played, and the grade waits for `tell`. */
   private showMove(out: TrainerEffect[]) {
     const p = this.pending;
-    if (!this.setup.selfGrade || !p) return;
+    if (!this.selfGrading || !p) return;
     this.pending = undefined;
     this.answered.add(p.card);
-    this.waiting = { card: p.card, mode: p.mode, san: p.san, since: p.since };
+    // A move already tried wrong, or hinted, before the keys took over is failed whatever is told.
+    this.waiting = { card: p.card, mode: p.mode, san: p.san, since: p.since, failed: p.mode === 'ask' && (p.wrong.length > 0 || p.hint) };
     out.push({ type: 'arrow', uci: p.uci });
     this.ply++;
     out.push({ type: 'play', uci: p.uci, san: p.san, path: this.path(), by: 'user' });
@@ -548,9 +572,9 @@ export class Trainer {
       }
       out.push({ type: 'note', note: { kind: 'taught', san: w.san } });
     } else {
-      const g = selfGrade(knew);
+      const g = selfGrade(knew && !w.failed);
       out.push({ type: 'answer', card: w.card, ok: g === 3 });
-      if (this.record) {
+      if (this.graded(w.card)) {
         out.push({ type: 'record', event: { k: 'review', card: w.card, g, ms: Math.max(0, now - w.since) } });
         this.counts.reviews++;
         if (g === 3) this.counts.good++;

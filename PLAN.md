@@ -1068,6 +1068,9 @@ show, on which device. The owner's answers to its questions are in §5.13.
 - **Studies as Qchess's** (§5.15, the owner's request after testing Phase 0): the study list as
   cards, studies made and managed here without an import, and Qchess's switch between training a
   line and editing it.
+- **The owner's first testing round** (§5.16): the training screen's line list (any line
+  trained, due or not, as in Qchess's Move Trainer), the daily limit changed from the site, show
+  and grade switched mid-session, and fixes to the notation.
 
 What it builds on: `src/core/progress` (events, replay, FSRS with retention as a parameter),
 `src/core/progress/cards.ts`, `src/core/chess` (`positionKeyOf`, `standardUci`), the study tree
@@ -1920,6 +1923,83 @@ real session.
   specs now add, rename, turn, move and delete chapters through the dialogs. 96 runs of the new
   and changed specs and 96 of the training, views and acceptance specs under `--repeat-each`
   passed before pushing.
+
+#### 5.16 The owner's first Phase 1 testing round
+
+The owner tested the build of 2026-10-06 (`95b0b76`) on the desktop and the phone and reported
+(the same day): the study cards, making and managing studies (synced to the phone), the chapter
+⚙ on the phone, the transposition badges and clickable lines work. Training couldn't be tested:
+the day's limit of new moves was used up, "Train again" did nothing, and nothing changed it. The
+requests, in the owner's words where they set a detail:
+
+1. "Study" on the training screen did nothing (with nothing on the board).
+2. No way to change or turn off the daily limit; "Train again" did nothing.
+3. "The training page should not only be about the due reviews. Like in Qchess, the user should
+   be able to browse all variations and learn or repeat variations even if they're not due",
+   and from training, the study at the exact position (the line's end is acceptable).
+4. Clicking a move in the study: its hitbox can extend to the right of the move.
+5. Show and grade: a button to switch to it during a normal review, and "1" to enter it.
+6. The transposition badge could stand out more.
+7. Clickable lines: not green; a bold blue font, the brackets included.
+
+Qchess's Move Trainer was read live first (its study page's script, on the test account): the
+sidebar lists each chapter with "Learn k/n" (lines learned of all) while it has unlearned lines,
+or "Review n"; a chapter opens to "Line 1…n", each with a state dot, "Due now" / "Due in n
+days" and a tooltip of its moves; a click on any line trains it at once. A line trained in
+review mode while not due is not saved (`saveLineProgressAfterTraining` returns `not-due`), and
+a learned line trained again in learn mode changes nothing.
+
+**As built** (2026-10-06):
+- **The line list** (`src/core/train/browse.ts`, `src/ui/LineList.tsx`): on the training screen
+  of the whole repertoire, of a study, of a picked line and of a chapter's learning, beside the
+  board on a wide screen (≥1150 px), folded under the session on a narrower one (opened by "Show
+  lines", and opened by itself when there is nothing to train). Each chapter: "n due" (lines with
+  a due move), "Learn k/n" while it has new lines (else "n/n"), and its lines when opened (the
+  line on the board's chapter opens by itself): "Line n", a dot (new, due, learning, learned),
+  the line's own moves from where it leaves the line before it (Qchess shows these only in a
+  tooltip; the whole line is the tooltip here), and "New · 3", "Due now", "Due 14:00" or "Due in
+  3 days". With the whole repertoire, chapters are grouped under their study's name.
+- **A line picked from the list** (`#/train/<sid>/<cid>?at=…`, the line's moves): walked whole.
+  Its due moves (and a known chapter's moves never answered) are asked and graded as in the
+  queue; its moves never answered are taught, whatever the daily limit says (the limit paces
+  the queue; a line the owner picks is learned); every other own move is asked with no grade
+  and no event (the trainer's `practice`), as Qchess saves nothing for a line trained before
+  it is due. Suspended moves are still played for the user. The end offers "Next line" (the
+  list's next), "Again" and "Today's queue". `pickedPlan`, and the trainer's `practice` option.
+- **Learn on a chapter** (`#/learn/<sid>/<cid>`): the chapter's lines with moves never answered,
+  in order, each walked whole, past the limit (`learnPlan`). A known chapter has nothing to
+  learn: its lines show as due.
+- **Nothing to train** now says why (no move due until when; the day's new moves learned, with
+  the limit) and offers "Learn the next line" (the list's first line with new moves, picked as
+  above), "Daily limit…", Mistakes and Home, with the list open beside it. "Train again" stays
+  only after a session that trained something.
+- **Training settings** (`src/ui/TrainSettings.tsx`, `src/app/trainSettings.ts`): ⚙ on the home
+  screen's training card and in the training screen's head opens New moves a day (0 turns new
+  moves off), Retention and the learning step, written to `settings.json` (§5.2; only the fields
+  changed, so the per-field merge keeps a change made on the other device). A `settings.json`
+  that can't be read is not rewritten. The home card says when the day's new moves are learned.
+- **"Study"** on the training screen always works: with a line on the board, its chapter at the
+  move on the board (as before: the exact position); with none, the picked line's or learned
+  chapter's chapter, the study trained, or the repertoire's first chapter.
+- **Show and grade, switched mid-session**: "Show and grade (1)" on the training screen, and the
+  key `1`, switch any session to the two keys at the move asked, the same trainer going on (its
+  `setSelfGrade`); "Play the moves" switches back (not while a shown move waits for its
+  verdict). A move already tried wrong, or hinted, before the switch is graded Again whatever is
+  told. `#/show` still starts a session that way.
+- **The notation**: a main-line move's whole cell takes the click, the space to its right
+  included; `⇄n` is a gold pill and `+k` a slate one; a comment's line is bold blue, brackets
+  included (`.comment-line`), each move still its own link.
+- Tests: `test/unit/core/train/browse.test.ts` (line states, numbers and forks; a picked line's
+  grades, teaches, practice with nothing recorded and a suspended move played; Learn past the
+  limit; show and grade switched on after a wrong move), `test/unit/core/app/fsm.test.ts` (the
+  two routes), and `test/e2e/lines.spec.ts` on desktop and the emulated phone (the list, a
+  line picked: c5 graded and Nc6 taught, then practised with a wrong move and nothing recorded;
+  the limit set to 0 from the home card and written to `settings.json`, a value out of range
+  refused, nothing to train, "Learn the next line", "Study" with nothing on the board; "1"
+  mid-session after a wrong move, Again recorded, and back to moves). Two existing specs now
+  click a move's text rather than its middle, which the larger `+1` pill covers.
+- Not checked live: the testing data repo (`REPWORKS_TESTING_DATA`) wasn't reachable from the
+  build container (CLAUDE.md), so everything above was checked against the fake GitHub only.
 
 #### 5.14 Phase 1 acceptance test, and exit
 

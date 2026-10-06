@@ -13,7 +13,8 @@ import { open } from '../app/mode.ts';
 import { commentId, endPreview, preview, stepPreview } from '../app/preview.ts';
 import { beginTraining } from '../app/state.ts';
 import { dataVersion } from '../app/sync.ts';
-import { command, endSession, leaveForStudy, pace, PACES, pinMissed, playMove, press, session, sessionProblem, setPace, setSpeech, speech, undoSuspend, type Pace, type SessionKind, type SessionView } from '../app/train.ts';
+import { command, endSession, isGraded, leaveForStudy, pace, PACES, pinMissed, playMove, press, queueOf, session, sessionProblem, setPace, setSelfGrade, setSpeech, speech, trainData, undoSuspend, type Pace, type SessionKind, type SessionView, type TrainData } from '../app/train.ts';
+import type { Mode } from '../core/app/fsm.ts';
 import { pressOf } from '../core/train/showGrade.ts';
 import { holdMediaKeys } from '../platform/mediaKeys.ts';
 import { canSpeak } from '../platform/speech.ts';
@@ -23,6 +24,8 @@ import { nodeAt, positionAt, startPosition } from '../core/study/tree.ts';
 import { Board } from './Board.tsx';
 import { ModeSwitch } from './ModeSwitch.tsx';
 import { CommentText, endPreviewOnBoard, PreviewBar, previewBoard } from './CommentText.tsx';
+import { firstNewLine, LineList, nextLine } from './LineList.tsx';
+import { openTrainSettings } from './TrainSettings.tsx';
 
 const ASKING = new Set(['ask', 'teach', 'wrong', 'shown']);
 
@@ -111,7 +114,7 @@ export function TrainScreen(props: { of: SessionKind }) {
     if (empty) void beginTraining(props.of);
   }, [version]);
 
-  const showing = running && s.of.kind === 'show';
+  const showing = running && s.selfGrade;
   useEffect(() => {
     if (!running) return;
     const onKey = (e: KeyboardEvent) => {
@@ -125,6 +128,8 @@ export function TrainScreen(props: { of: SessionKind }) {
       }
       if (e.key === 'Escape') command('stop');
       else if (showing && !e.repeat && pressOf(e.key)) press(pressOf(e.key)!);
+      // "1" switches a session to show and grade, as in Chessable (§5.16).
+      else if (!showing && !e.repeat && e.key === '1') setSelfGrade(true);
       else if (!showing && e.key === ' ' && !(target && target.tagName === 'BUTTON')) command('hint');
       else return;
       e.preventDefault();
@@ -143,9 +148,17 @@ export function TrainScreen(props: { of: SessionKind }) {
   if (sessionProblem.value) return <p class="warn">{sessionProblem.value}</p>;
   if (!s) return <p class="muted">Reading the repertoire…</p>;
   const of = s.of;
+  const chapterName = (sid: string, cid: string) => {
+    const c = s.data.chapters.get(`${sid}/${cid}`);
+    return c ? (header(c, 'ChapterName') ?? cid) : cid;
+  };
   const title =
     of.kind === 'queue'
       ? `Training · ${s.scope ? (s.data.studyNames.get(s.scope) ?? s.scope) : 'Whole repertoire'}`
+      : of.kind === 'line'
+        ? `Line · ${chapterName(of.sid, of.cid)}`
+        : of.kind === 'learn'
+          ? `Learn · ${chapterName(of.sid, of.cid)}`
       : of.kind === 'play'
         ? `Play · ${s.chapter ? (header(s.chapter, 'ChapterName') ?? of.cid) : of.cid}`
         : of.kind === 'pinned' && of.all
@@ -154,10 +167,13 @@ export function TrainScreen(props: { of: SessionKind }) {
   // The Interactive view goes back to its chapter, at the move on the board.
   const back = () => (of.kind === 'play' ? open({ name: 'chapter', sid: of.sid, cid: of.cid, at: s.path.length ? s.path : of.at }) : open({ name: 'list' }));
   // Qchess's switch: the line on the board, in its study, editable; "Train" there takes this up again.
+  // With no line on the board, the study the screen is about (§5.16).
   const toStudy = () => {
-    const there = leaveForStudy();
+    const there = leaveForStudy() ?? studyOf(s);
     if (there) open(there);
   };
+  const data = trainData.value ?? s.data;
+  const listed = of.kind === 'queue' || of.kind === 'show' || of.kind === 'line' || of.kind === 'learn';
   return (
     <div class="train">
       <div class="chapter-head">
@@ -167,9 +183,15 @@ export function TrainScreen(props: { of: SessionKind }) {
         <div class="titles">
           <span class="study-title">{title}</span>
         </div>
-        <ModeSwitch current="train" {...(s.line ? { onStudy: toStudy } : {})} />
+        <button type="button" class="icon" aria-label="Training settings" title="Training settings" onClick={openTrainSettings}>
+          ⚙
+        </button>
+        <ModeSwitch current="train" {...(s.line || studyOf(s) ? { onStudy: toStudy } : {})} />
       </div>
-      {s.done ? <Done s={s} /> : <Session s={s} />}
+      <div class={`train-body${listed ? ' with-list' : ''}`}>
+        {listed && <Lines s={s} data={data} />}
+        <div class="train-main">{s.done ? <Done s={s} /> : <Session s={s} />}</div>
+      </div>
     </div>
   );
 }
@@ -199,10 +221,12 @@ function Done(props: { s: SessionView }) {
     );
   }
   // Show and grade records its grades; retry, drill and the pins never do.
-  const practice = of.kind !== 'queue' && of.kind !== 'show';
+  const practice = !isGraded(of);
+  if (!practice && plan.lines.length === 0) return <NothingToTrain s={props.s} />;
+  const after = of.kind === 'line' ? nextLine(trainData.value ?? props.s.data, props.s.scope, { sid: of.sid, cid: of.cid, path: of.at }) : undefined;
   return (
     <section class="card train-done" aria-label="Session done">
-      <h2>{plan.lines.length === 0 ? (practice ? 'Nothing to practise now' : 'Nothing to train now') : 'Session done'}</h2>
+      <h2>{plan.lines.length === 0 ? 'Nothing to practise now' : of.kind === 'line' ? 'Line done' : 'Session done'}</h2>
       {practice && plan.lines.length > 0 && (
         <p>
           {props.s.answers} move{props.s.answers === 1 ? '' : 's'}, {props.s.right} right first time. Nothing graded: these moves keep their schedule.
@@ -215,9 +239,19 @@ function Done(props: { s: SessionView }) {
         </p>
       )}
       <div class="actions">
-        <button type="button" onClick={() => void beginTraining(of)}>
-          {practice ? 'Again' : 'Train again'}
+        {after && (
+          <button type="button" onClick={() => open({ name: 'train', sid: after.line.sid, cid: after.line.cid, at: [...after.line.path] })}>
+            Next line
+          </button>
+        )}
+        <button type="button" class={after ? 'secondary' : undefined} onClick={() => void beginTraining(of)}>
+          {practice || of.kind === 'line' ? 'Again' : 'Train again'}
         </button>
+        {(of.kind === 'line' || of.kind === 'learn') && (
+          <button type="button" class="secondary" onClick={() => open({ name: 'train', sid: of.sid })}>
+            Today's queue
+          </button>
+        )}
         {!practice && (
           <button type="button" class="secondary" onClick={() => open({ name: 'mistakes' })}>
             Mistakes
@@ -234,7 +268,7 @@ function Done(props: { s: SessionView }) {
 function Session(props: { s: SessionView }) {
   const s = props.s;
   const [promotion, setPromotion] = useState<{ orig: Key; dest: Key } | undefined>(undefined);
-  const show = s.of.kind === 'show';
+  const show = s.selfGrade;
   const asking = ASKING.has(s.phase) && !show;
   const pos = s.position;
   const board = useMemo(() => {
@@ -320,7 +354,7 @@ function Session(props: { s: SessionView }) {
             <>
               {s.right} of {s.answers} right first time
             </>
-          ) : s.of.kind === 'queue' || s.of.kind === 'show' ? (
+          ) : isGraded(s.of) ? (
             <>
               <span>{s.dueLeft} due</span> · <span>{s.newLeft} new</span> · line {s.number} of {s.total}
             </>
@@ -368,7 +402,7 @@ function Session(props: { s: SessionView }) {
               Pin this mistake
             </button>
           )}
-          {asking && s.of.kind === 'queue' && (
+          {asking && isGraded(s.of) && (
             <button type="button" class="secondary" onClick={() => command('suspend')}>
               Always play this for me
             </button>
@@ -378,7 +412,16 @@ function Session(props: { s: SessionView }) {
               Undo: ask {s.suspended.san} again
             </button>
           )}
-          {s.of.kind !== 'play' && (
+          {show ? (
+            <button type="button" class="secondary" disabled={s.phase === 'shown'} onClick={() => setSelfGrade(false)} title="Back to playing the moves on the board">
+              Play the moves
+            </button>
+          ) : (
+            <button type="button" class="secondary" onClick={() => setSelfGrade(true)} title="Show each move and grade it yourself, by 2 and 4">
+              Show and grade <span class="muted">(1)</span>
+            </button>
+          )}
+          {s.of.kind !== 'play' && s.of.kind !== 'line' && (
             <button type="button" class="secondary" onClick={() => command('skipLine')}>
               Skip line
             </button>
@@ -407,3 +450,80 @@ function Session(props: { s: SessionView }) {
   );
 }
 
+
+/** The study a screen with no line on the board opens on "Study": its chapter, or its study. */
+function studyOf(s: SessionView): Mode | undefined {
+  const of = s.of;
+  if (of.kind === 'line' || of.kind === 'learn' || of.kind === 'play') return { name: 'chapter', sid: of.sid, cid: of.cid };
+  if (s.scope) return { name: 'chapter', sid: s.scope };
+  const first = s.data.index.lines[0];
+  return first ? { name: 'chapter', sid: first.sid, cid: first.cid } : undefined;
+}
+
+/** The line list beside the board (a wide screen) or under it, folded, on the phone (§5.16). */
+function Lines(props: { s: SessionView; data: TrainData }) {
+  const { s, data } = props;
+  const wide = typeof matchMedia === 'function' && matchMedia('(min-width: 1150px)').matches;
+  const nothing = !!s.done && s.plan.lines.length === 0;
+  const [shown, setShown] = useState(wide || nothing);
+  useEffect(() => {
+    if (nothing) setShown(true);
+  }, [nothing]);
+  const active = s.line ? { sid: s.line.sid, cid: s.line.cid, path: s.line.path } : undefined;
+  return (
+    <aside class={`train-list${shown ? ' shown' : ''}`} aria-label="Lines to train">
+      <button type="button" class="train-list-head" aria-expanded={shown} onClick={() => setShown(!shown)}>
+        <span>{s.scope ? (data.studyNames.get(s.scope) ?? s.scope) : 'All lines'}</span>
+        <span class="muted">{shown ? 'Hide' : 'Show'} lines</span>
+      </button>
+      {shown && <LineList data={data} {...(s.scope === undefined ? {} : { scope: s.scope })} {...(active ? { active } : {})} />}
+    </aside>
+  );
+}
+
+/** Nothing due and no room for new moves: say why, and what can still be done (§5.16). */
+function NothingToTrain(props: { s: SessionView }) {
+  const s = props.s;
+  const data = trainData.value ?? s.data;
+  const queue = queueOf(data, Date.now(), s.scope);
+  const next = firstNewLine(data, s.scope);
+  const clock = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return (
+    <section class="card train-done" aria-label="Session done">
+      <h2>Nothing to train now</h2>
+      <p>
+        No moves are due
+        {queue.later.length > 0 && (
+          <>
+            {' '}
+            until {clock(queue.later[0]!.due)} ({queue.later.length} then)
+          </>
+        )}
+        .
+        {next && queue.room === 0 && (
+          <>
+            {' '}
+            Today's {data.settings.newPerDay} new moves are learned ({queue.taughtToday} taught today).
+          </>
+        )}{' '}
+        Any line can still be trained from the list: due moves are graded, new ones taught, and the rest asked without changing their schedule.
+      </p>
+      <div class="actions">
+        {next && (
+          <button type="button" onClick={() => open({ name: 'train', sid: next.line.sid, cid: next.line.cid, at: [...next.line.path] })}>
+            Learn the next line
+          </button>
+        )}
+        <button type="button" class="secondary" onClick={openTrainSettings}>
+          Daily limit…
+        </button>
+        <button type="button" class="secondary" onClick={() => open({ name: 'mistakes' })}>
+          Mistakes
+        </button>
+        <button type="button" class="secondary" onClick={() => open({ name: 'list' })}>
+          Home
+        </button>
+      </div>
+    </section>
+  );
+}

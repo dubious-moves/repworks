@@ -17,18 +17,26 @@ export interface CommentPositions {
   before: Position | undefined;
 }
 
-type Segment = { text: string } | { text: string; line: number; move: number };
+type Piece = { text: string } | { text: string; line: number; move: number };
+/** Plain text, or a line group: its text from `(` to `)`, with its moves clickable. */
+type Segment = { text: string } | { group: Piece[] };
 
 function segments(text: string): Segment[] {
   const out: Segment[] = [];
   let at = 0;
-  parseCommentLines(text).forEach((line, i) =>
+  parseCommentLines(text).forEach((line, i) => {
+    if (line.from > at) out.push({ text: text.slice(at, line.from) });
+    const group: Piece[] = [];
+    let g = line.from;
     line.moves.forEach((m, j) => {
-      if (m.from > at) out.push({ text: text.slice(at, m.from) });
-      out.push({ text: text.slice(m.from, m.to), line: i, move: j });
-      at = m.to;
-    }),
-  );
+      if (m.from > g) group.push({ text: text.slice(g, m.from) });
+      group.push({ text: text.slice(m.from, m.to), line: i, move: j });
+      g = m.to;
+    });
+    if (g < line.to) group.push({ text: text.slice(g, line.to) });
+    out.push({ group });
+    at = line.to;
+  });
   if (at < text.length) out.push({ text: text.slice(at) });
   return out;
 }
@@ -46,7 +54,7 @@ export function CommentText(props: {
   const parts = useMemo(() => segments(props.text), [props.text]);
   const shown = previewOf(props.owner);
   const mine = shown?.key === props.id ? shown.cursor : undefined;
-  if (!parts.some((p) => 'line' in p)) return <>{props.text}</>;
+  if (!parts.some((p) => 'group' in p)) return <>{props.text}</>;
   const open = (line: number, move: number) => (e: Event) => {
     e.stopPropagation();
     const at = props.positions();
@@ -58,19 +66,27 @@ export function CommentText(props: {
     props.onOpen?.();
     showLine(props.owner, props.id, lines, cursor);
   };
+  const piece = (p: Piece, i: number) =>
+    'line' in p ? (
+      <span
+        key={i}
+        class={`line-move${mine && mine.line === p.line && mine.ply === p.move + 1 ? ' current' : ''}`}
+        role="button"
+        tabIndex={0}
+        onClick={open(p.line, p.move)}
+        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), open(p.line, p.move)(e))}
+      >
+        {p.text}
+      </span>
+    ) : (
+      <span key={i}>{p.text}</span>
+    );
   return (
     <>
       {parts.map((p, i) =>
-        'line' in p ? (
-          <span
-            key={i}
-            class={`line-move${mine && mine.line === p.line && mine.ply === p.move + 1 ? ' current' : ''}`}
-            role="button"
-            tabIndex={0}
-            onClick={open(p.line, p.move)}
-            onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), open(p.line, p.move)(e))}
-          >
-            {p.text}
+        'group' in p ? (
+          <span key={i} class="comment-line">
+            {p.group.map(piece)}
           </span>
         ) : (
           <span key={i}>{p.text}</span>

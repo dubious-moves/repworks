@@ -5,6 +5,8 @@
 //   #/conflicts                         every open conflict
 //   #/study/<sid>[/<cid>][?at=e4,e5]    a chapter, at a move
 //   #/train[/<sid>]                     training: the whole repertoire, or one study (§5.7)
+//   #/train/<sid>/<cid>?at=e4,e5        one line picked from the training list (§5.16)
+//   #/learn/<sid>/<cid>                 a chapter's new lines, past the daily limit (§5.16)
 //   #/show[/<sid>]                      show and grade, by two keys (§5.9)
 //   #/mistakes                          the day's mistakes and the pins (§5.8)
 //   #/mistakes/retry, #/mistakes/drill  the day's mistakes retried, or drilled
@@ -20,8 +22,13 @@ export type Mode =
   | { name: 'conflicts' }
   /** A study's chapter; without `cid`, its first. `at` is a move path, [] the start. */
   | { name: 'chapter'; sid: string; cid?: string; at?: string[] }
-  /** A training session: the whole repertoire, or one study's lines. */
-  | { name: 'train'; sid?: string }
+  /**
+   * A training session: the whole repertoire, or one study's lines; with `cid` and `at`, the one
+   * line of that chapter whose moves are `at`, picked from the list (§5.16).
+   */
+  | { name: 'train'; sid?: string; cid?: string; at?: string[] }
+  /** A chapter's lines still holding new moves, learned past the daily limit (§5.16). */
+  | { name: 'learn'; sid: string; cid: string }
   /** Show and grade (§5.9): the same queue, run with two keys. */
   | { name: 'show'; sid?: string }
   | { name: 'mistakes' }
@@ -91,13 +98,16 @@ export function parseHash(hash: string): Mode {
   if (parts.length === 1 && parts[0] === 'import') return { name: 'import' };
   if (parts.length === 1 && parts[0] === 'conflicts') return { name: 'conflicts' };
   if (parts.length === 1 && parts[0] === 'mistakes') return { name: 'mistakes' };
-  // #/train, #/show, and either with a study.
+  // #/train, #/show, and either with a study; #/train with a picked line.
   for (const name of ['train', 'show'] as const) {
     if (parts[0] !== name) continue;
     if (parts.length === 1) return { name };
     if (parts.length === 2 && isId(parts[1])) return { name, sid: parts[1] };
+    const at = atOf(query);
+    if (name === 'train' && parts.length === 3 && isId(parts[1]) && isId(parts[2]) && at?.length) return { name, sid: parts[1], cid: parts[2], at };
     return { name: 'list' };
   }
+  if (parts[0] === 'learn' && parts.length === 3 && isId(parts[1]) && isId(parts[2])) return { name: 'learn', sid: parts[1], cid: parts[2] };
   const practice = (Object.keys(PRACTICE_HASH) as Practice[]).find((p) => PRACTICE_HASH[p] === `#/${parts.join('/')}`);
   if (practice) return { name: 'practice', run: practice };
   const at = atOf(query);
@@ -128,7 +138,10 @@ export function modeHash(mode: Mode): string {
     case 'conflicts':
       return '#/conflicts';
     case 'train':
+      if (mode.sid && mode.cid && mode.at?.length) return `#/train/${mode.sid}/${mode.cid}${atQuery(mode.at)}`;
       return mode.sid ? `#/train/${mode.sid}` : '#/train';
+    case 'learn':
+      return `#/learn/${mode.sid}/${mode.cid}`;
     case 'show':
       return mode.sid ? `#/show/${mode.sid}` : '#/show';
     case 'mistakes':

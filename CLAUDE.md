@@ -36,6 +36,13 @@ decisions, with a revision log; `PLAN.md` §4 is Phase 0 in build order.
   `/api/auth/me`, then remove `[id^=tour]` and `.study-modal-overlay.active` on a study page
   before clicking.
 
+- A testing data repo, only for Claude sessions' live checks, is named in the environment
+  variable `REPWORKS_TESTING_DATA` (owner/repo) with a fine-grained token in
+  `REPWORKS_TESTING_PAT` (never in this repo). On 2026-10-06 it couldn't be reached from the cloud
+  container: `api.github.com` goes through the session's GitHub proxy, which refuses a repo the
+  Claude GitHub App can't access (`add_repo` was refused). Live checks against it need the owner
+  to give the Claude GitHub App access to that repo first.
+
 ## Commands
 
 ```sh

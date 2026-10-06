@@ -13,7 +13,8 @@ import type { CardState } from '../progress/replay.ts';
 import type { Line, RepertoireIndex } from '../repertoire/index.ts';
 import { knownCardsOf, statusOf, type DailyQueue } from './queue.ts';
 
-export type PlannedKind = 'review' | 'new' | 'known';
+/** `pick`: a line picked from the training screen's list (§5.16). */
+export type PlannedKind = 'review' | 'new' | 'known' | 'pick';
 
 export interface PlannedLine {
   kind: PlannedKind;

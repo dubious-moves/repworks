@@ -89,7 +89,8 @@ export class ShowGrade {
   press(press: Press, now: number): ShowGradeEffect[] {
     if (press === 'repeat') return this.said !== undefined ? [{ type: 'say', text: spokenMove(this.said) }] : [];
     const phase = this.trainer.view.phase;
-    if (phase === 'ask' || phase === 'teach') {
+    // A move asked, taught, tried wrong, or shown by a hint before the keys took over (§5.16).
+    if (phase === 'ask' || phase === 'teach' || phase === 'wrong' || (phase === 'shown' && !this.trainer.awaitingGrade)) {
       this.failed = press === 'wrong';
       return this.after(this.trainer.send({ type: 'show' }), now);
     }

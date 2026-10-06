@@ -1,6 +1,7 @@
 // The home screen's training card (PLAN.md §5.3, §5.7): "Train: 23 due · 18 new", the moves
 // whose learning step ends later today, and the known pool still to review.
 import { mistakesOf, pinnedOf, queueOf, trainData } from '../app/train.ts';
+import { openTrainSettings } from './TrainSettings.tsx';
 
 const clock = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -24,8 +25,16 @@ export function TrainCard() {
           <a class="button secondary" href="#/show">
             Show and grade
           </a>
+          <button type="button" class="icon" aria-label="Training settings" title="Training settings" onClick={openTrainSettings}>
+            ⚙
+          </button>
         </div>
       </div>
+      {queue.room === 0 && queue.newLines.length === 0 && queue.taughtToday > 0 && (
+        <p class="muted">
+          Today's {data.settings.newPerDay} new moves are learned. More: pick a line in the training list, or raise the limit (⚙).
+        </p>
+      )}
       {queue.later.length > 0 && (
         <p class="muted">
           {queue.later.length} more today from {clock(queue.later[0]!.due)}

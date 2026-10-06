@@ -15,11 +15,12 @@ import { MistakesView } from './Mistakes.tsx';
 import { ReadView } from './Read.tsx';
 import { TrainScreen } from './Train.tsx';
 import { TrainCard } from './TrainCard.tsx';
+import { TrainSettingsDialog } from './TrainSettings.tsx';
 import { confirmDeleteStudy, openNewStudy, openStudySettings, StudyDialogs } from './StudyDialogs.tsx';
 
 export function App() {
   return (
-    <div class={`shell${mode.value.name === 'chapter' ? ' shell-chapter' : ''}${['train', 'practice', 'show', 'read', 'play'].includes(mode.value.name) ? ' shell-train' : ''}`}>
+    <div class={`shell${mode.value.name === 'chapter' ? ' shell-chapter' : ''}${['train', 'learn', 'practice', 'show', 'read', 'play'].includes(mode.value.name) ? ' shell-train' : ''}`}>
       <header class="topbar">
         <img class="topbar-icon" src={`${import.meta.env.BASE_URL}icons/icon.svg`} alt="" width={28} height={28} />
         <h1>Repworks</h1>
@@ -41,6 +42,7 @@ export function App() {
       <SyncBanners />
       <main class="content">{ready.value && (!device.value ? <SetupForm /> : <Screen />)}</main>
       <StudyDialogs />
+      <TrainSettingsDialog />
       <footer class="footer">
         build {__BUILD_ID__}
         {shellVersion.value && <> · shell {shellVersion.value.slice(0, 8)}</>} · <a href={`${import.meta.env.BASE_URL}spike.html`}>remote spike</a>
@@ -57,8 +59,13 @@ function Screen() {
       return <ConflictsView />;
     case 'chapter':
       return <ChapterView />;
-    case 'train':
-      return <TrainScreen of={mode.value.sid ? { kind: 'queue', scope: mode.value.sid } : { kind: 'queue' }} />;
+    case 'train': {
+      const m = mode.value;
+      if (m.sid && m.cid && m.at?.length) return <TrainScreen of={{ kind: 'line', sid: m.sid, cid: m.cid, at: m.at }} />;
+      return <TrainScreen of={m.sid ? { kind: 'queue', scope: m.sid } : { kind: 'queue' }} />;
+    }
+    case 'learn':
+      return <TrainScreen of={{ kind: 'learn', sid: mode.value.sid, cid: mode.value.cid }} />;
     case 'show':
       return <TrainScreen of={mode.value.sid ? { kind: 'show', scope: mode.value.sid } : { kind: 'show' }} />;
     case 'mistakes':

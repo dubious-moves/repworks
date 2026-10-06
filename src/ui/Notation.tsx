@@ -123,8 +123,9 @@ function CellView(props: { cell: Cell }) {
   const c = props.cell;
   if (c === 'none') return <span class="cell" />;
   if (c === 'gap') return <span class="cell gap">…</span>;
+  // The whole cell takes the click, not just the move's text: the space to its right included.
   return (
-    <span class="cell">
+    <span class="cell cell-move" onClick={(e) => e.target === e.currentTarget && goTo(c.path)} onContextMenu={(e) => e.target === e.currentTarget && menuAt(c.path)(e)}>
       <Move move={c} class="main" />
     </span>
   );

@@ -18,6 +18,7 @@ import { parseStudyMeta, reconcileChapterOrder } from '../core/study/studyMeta.t
 import { lineThrough, startPosition } from '../core/study/tree.ts';
 import { cardLine, drillLines, retryLines, todaysMistakes, type Mistake } from '../core/train/mistakes.ts';
 import { pinsOf, type PinState } from '../core/train/pins.ts';
+import { findLine, learnPlan, pickedPlan } from '../core/train/browse.ts';
 import { interactivePlan, planSession, withoutAnswered, type SessionPlan } from '../core/train/plan.ts';
 import { ShowGrade, type Press, type ShowGradeEffect } from '../core/train/showGrade.ts';
 import { todaysQueue, type DailyQueue, type Day } from '../core/train/queue.ts';
@@ -163,12 +164,18 @@ export type SessionKind =
   | { kind: 'retry' }
   | { kind: 'drill' }
   | { kind: 'pinned'; all: boolean }
+  /** A line picked from the list (§5.16): every own move asked; due ones graded, new ones taught. */
+  | { kind: 'line'; sid: string; cid: string; at: string[] }
+  /** A chapter's lines with new moves, learned past the daily limit (§5.16). */
+  | { kind: 'learn'; sid: string; cid: string }
   /** The Interactive view (§5.10): a chapter's line through a move, every own move asked, nothing recorded. */
   | { kind: 'play'; sid: string; cid: string; at: string[]; from?: number };
 
 export interface SessionView {
   of: SessionKind;
   scope?: string;
+  /** Show and grade (§5.9): on for #/show, and toggled during any session (§5.16). */
+  selfGrade: boolean;
   data: TrainData;
   plan: SessionPlan;
   /** The line on the board, and the chapter it is in. */
@@ -244,6 +251,14 @@ export async function startSession(store: IdbStore, record: (event: Parameters<I
     // The chapter may be a reference study's, which the training data leaves out.
     data = { ...data, chapters: new Map(data.chapters).set(`${of.sid}/${of.cid}`, played.chapter) };
   } else if (of.kind === 'queue' || of.kind === 'show') plan = planSession(data.index, queueOf(data, now, scope), data.states);
+  else if (of.kind === 'line') {
+    const line = findLine(data.index, of.sid, of.cid, of.at);
+    if (!line) {
+      sessionProblem.value = 'That line isn’t in the repertoire any more: pick another from the list.';
+      return;
+    }
+    plan = pickedPlan(data.index, data.states, data.settings, dayOf(now), line);
+  } else if (of.kind === 'learn') plan = learnPlan(data.index, data.states, of.sid, of.cid);
   else if (of.kind === 'retry') plan = { lines: retryLines(mistakesOf(data, now)) };
   else if (of.kind === 'drill') plan = { lines: drillLines(mistakesOf(data, now)) };
   else {
@@ -254,13 +269,14 @@ export async function startSession(store: IdbStore, record: (event: Parameters<I
   if (resume && of.kind !== 'play') plan = withoutAnswered(plan, answered);
   // Retry and drill grade nothing: the card was graded Again today (§5.8, D16). The Interactive
   // view asks every own move of its line, whatever its card's state, and follows the line played.
-  const grading = of.kind === 'queue' || of.kind === 'show';
+  const grading = isGraded(of);
   const interactive = of.kind === 'play';
   const t = new Trainer({
     record: grading,
     askOnly: !grading && !interactive,
     askAll: interactive,
     follow: interactive,
+    practice: of.kind === 'line',
     selfGrade: of.kind === 'show',
     index,
     plan,
@@ -273,10 +289,34 @@ export async function startSession(store: IdbStore, record: (event: Parameters<I
   });
   trainer = t;
   shower = of.kind === 'show' ? new ShowGrade(t, speech.peek() ? { speech: true } : {}) : undefined;
-  const view: SessionView = { of, data, plan, side: 'white', path: [], phase: 'ready', number: 0, total: plan.lines.length, dueLeft: 0, newLeft: 0, answers: 0, right: 0, tick: 0 };
-  if (scope !== undefined) view.scope = scope;
+  const view: SessionView = { of, selfGrade: of.kind === 'show', data, plan, side: 'white', path: [], phase: 'ready', number: 0, total: plan.lines.length, dueLeft: 0, newLeft: 0, answers: 0, right: 0, tick: 0 };
+  const listed = scope ?? (of.kind === 'line' || of.kind === 'learn' ? of.sid : undefined);
+  if (listed !== undefined) view.scope = listed;
   session.value = view;
   send({ type: 'start', now });
+}
+
+/** Sessions whose answers are graded and recorded: the queue's, and lines picked from the list. */
+export function isGraded(of: SessionKind): boolean {
+  return of.kind === 'queue' || of.kind === 'show' || of.kind === 'line' || of.kind === 'learn';
+}
+
+/**
+ * Show and grade on or off in the middle of a session (§5.16), as Chessable allows: the same
+ * trainer, now driven by the two keys, or by moves again. Not while a move shown waits for its grade.
+ */
+export function setSelfGrade(on: boolean): void {
+  const t = trainer;
+  const s = session.peek();
+  if (!t || !s || s.done || s.selfGrade === on || t.awaitingGrade) return;
+  t.setSelfGrade(on);
+  shower = on ? new ShowGrade(t, speech.peek() ? { speech: true } : {}) : undefined;
+  session.value = { ...s, selfGrade: on, tick: s.tick + 1 };
+}
+
+/** Whether the board waits for a show-and-grade verdict (the toggle waits for it). */
+export function awaitingGrade(): boolean {
+  return trainer?.awaitingGrade ?? false;
 }
 
 /** The Interactive view's chapter, its own index (it may be a reference study's) and plan. */
@@ -422,7 +462,7 @@ function apply(t: Trainer, effects: readonly ShowGradeEffect[]): void {
         if (e.ok) {
           next.right++;
           delete next.missed;
-        } else if (s.of.kind === 'queue' && !s.data.pins.get(e.card)?.pinned) next.missed = e.card;
+        } else if (isGraded(s.of) && !s.data.pins.get(e.card)?.pinned) next.missed = e.card;
         // A drill answer on a pinned card is recorded for the pin's steps; nothing else is.
         if ((s.of.kind === 'drill' || s.of.kind === 'pinned') && s.data.pins.get(e.card)?.pinned) {
           void recordEvent?.({ t: new Date().toISOString(), k: 'drill', card: e.card, ok: e.ok });
@@ -496,6 +536,10 @@ export function sessionMode(of: SessionKind): Mode {
       return { name: 'practice', run: of.all ? 'pins' : 'pinned' };
     case 'play':
       return { name: 'play', sid: of.sid, cid: of.cid, at: of.at, ...(of.from === undefined ? {} : { from: of.from }) };
+    case 'line':
+      return { name: 'train', sid: of.sid, cid: of.cid, at: of.at };
+    case 'learn':
+      return { name: 'learn', sid: of.sid, cid: of.cid };
   }
 }
 

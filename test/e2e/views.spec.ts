@@ -33,7 +33,7 @@ const ownProgress = (git: FakeGit) => [...git.textsOf().keys()].filter((p) => p.
 test('read: a line stepped through with its comments, then back to the chapter at the move', async ({ page, isMobile }) => {
   await setUp(page);
   await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf`);
-  await page.locator('.move[data-path="e4"]').click();
+  await page.locator('.move[data-path="e4"]').click({ position: { x: 6, y: 8 } }); // the move, not its +1
   await page.getByRole('button', { name: 'Read from here' }).click();
   await expect(page).toHaveURL(/#\/read\/Rep0Najd\/Ch1Najdf\?at=e4$/);
   await expect(page.locator('.study-title')).toHaveText('Read · Main line');

@@ -753,6 +753,13 @@ textarea.script {
   min-height: 28px;
 }
 
+.notation .cell-move {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
 .notation .index {
   color: rgb(185 179 179);
   padding-right: 8px;
@@ -1375,6 +1382,214 @@ table.cards td {
   }
 }
 
+/* The line list (PLAN.md §5.16), after Qchess's Move Trainer sidebar: beside the board on a wide
+   screen, folded under the session on a narrower one. */
+
+.train-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.train-list {
+  order: 1;
+  background: var(--surface);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.train-list-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 12px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  font-weight: 600;
+  text-align: left;
+}
+
+.train-list.shown .train-list-head {
+  border-bottom: 1px solid rgb(255 255 255 / 8%);
+}
+
+.line-list {
+  max-height: 60dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 0;
+}
+
+.line-list-empty {
+  padding: 8px 12px;
+}
+
+.line-list-study {
+  padding: 8px 12px 2px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.line-list-chapter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-right: 8px;
+}
+
+.line-list-chapter.active {
+  background: rgb(49 154 40 / 14%);
+}
+
+.line-list-toggle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 4px 0 10px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  text-align: left;
+}
+
+.line-list-toggle .caret {
+  font-size: 0.65rem;
+  color: var(--muted);
+  transition: transform 0.15s;
+}
+
+.line-list-chapter.open .caret {
+  transform: rotate(90deg);
+}
+
+.line-list-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.line-list-due {
+  color: #e05050;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.line-list-learn,
+.line-list-count {
+  flex: none;
+  min-height: 26px;
+  padding: 0 8px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.line-list-count {
+  color: var(--muted);
+}
+
+.line-list-lines {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 4px;
+}
+
+.line-list-line {
+  display: grid;
+  grid-template-columns: 10px auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 10px 0 26px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  font-size: 0.85rem;
+  text-align: left;
+}
+
+.line-list-line:hover,
+.line-list-line:focus-visible {
+  background: rgb(45 81 113 / 60%);
+}
+
+.line-list-line.current {
+  background: #22412e;
+}
+
+.line-list-number {
+  white-space: nowrap;
+}
+
+.line-list-moves {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.line-list-label {
+  font-size: 0.72rem;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.line-list-label.tone-due {
+  color: #e05050;
+}
+
+.line-list-label.tone-new {
+  color: #7ec8e3;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #555;
+}
+
+.dot-due {
+  background: #e05050;
+}
+
+.dot-new {
+  background: transparent;
+  border: 1px solid #7ec8e3;
+}
+
+.dot-learning {
+  background: #c99a3e;
+}
+
+.dot-learned {
+  background: #319a28;
+}
+
+@media (min-width: 1150px) {
+  .train-body.with-list {
+    display: grid;
+    grid-template-columns: 280px minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .train-body.with-list .train-list {
+    order: 0;
+  }
+
+  .train-body.with-list .line-list {
+    max-height: calc(100dvh - 190px);
+  }
+}
+
 /* Mistakes and pins (PLAN.md §5.8). */
 
 .mistake-list {
@@ -1477,25 +1692,37 @@ a.button.secondary {
 /* Transposition badges (PLAN.md §5.11): small marks after a move, and the list they open. */
 
 .badges {
-  margin-left: 3px;
-  font-size: 0.75em;
+  margin-left: 4px;
+  font-size: 0.78em;
   cursor: pointer;
   white-space: nowrap;
 }
 
+/* Pills, so a transposition stands out from the moves around it (asked by the owner). */
+.badges .badge,
+.badges .xref {
+  display: inline-block;
+  padding: 0 5px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-style: normal;
+  line-height: 1.45;
+}
+
 .badges .badge {
-  color: #7ec8e3;
+  background: #c99a3e;
+  color: #1a1407;
 }
 
 .badges .xref {
   margin-left: 2px;
-  color: var(--muted);
-  font-size: 0.9em;
+  background: #3b4a5c;
+  color: #dbe6f3;
 }
 
 .move.current .badges .badge,
 .move.current .badges .xref {
-  color: inherit;
+  box-shadow: 0 0 0 1px #fff;
 }
 
 .transpositions {
@@ -1515,9 +1742,15 @@ a.button.secondary {
 
 /* Clickable lines in comments (PLAN.md §5.12). */
 
+/* A line in a comment: bold blue, its brackets included (the owner's choice, 2026-10-06). */
+.comment-line {
+  color: #6fb3ff;
+  font-weight: 700;
+  font-style: normal;
+}
+
 .line-move {
   cursor: pointer;
-  color: #9fd59a;
   border-radius: 3px;
   padding: 0 1px;
 }

@@ -19,6 +19,18 @@ Qchess and Lichess imports on the desktop (§4.10), and the study editor on desk
 
 ## Phase 1
 
+Reported by the owner on 2026-10-06 (build `95b0b76`): the study cards, making and managing a
+study (synced to the phone), the chapter ⚙ on the phone, the transposition badges and the
+clickable lines work (§5.11, §5.12, §5.15 in part). Their requests became §5.16; training itself
+couldn't be tested then (the day's limit was used up), so the training items below still stand.
+
+- §5.16: the line list on desktop and phone (a chapter opened, a line picked, due or not: its due
+  moves graded, its new moves taught, the rest asked with nothing recorded; "Learn" on a
+  chapter; "Next line"); the daily limit changed from ⚙ and the same on the other device after a
+  sync; the "Nothing to train" screen; "Study" from it and from a line; "1" and the button
+  switching a review to show and grade and back; the move's wider hitbox, the badge pills and
+  the bold blue lines in the notation.
+
 - §5.1: the index build time on the phone, with the real repertoire.
 - §5.5: the queue simulation on the real repertoire, to choose the default daily limit (needs
   the data repo, by `REPWORKS_FIXTURES`).

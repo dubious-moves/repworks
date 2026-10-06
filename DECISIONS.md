@@ -933,3 +933,24 @@ Technical calls made while building `PLAN.md` §5.15 (D22), each with its reason
 - **Reordering chapters is "Move up / Move down" in the chapter's dialog,** not Qchess's drag:
   it works the same on the phone.
 
+
+## Revision of 2026-10-06 (the owner's first testing of Phase 1)
+The owner's requests and the technical calls made building them (`PLAN.md` §5.16), each with its
+reason:
+- **D22 extended: training lists every line, as Qchess's Move Trainer.** The owner asked to
+  browse all variations and learn or repeat any of them, due or not. Read live on Qchess first.
+- **D16: a line picked from the list asks every own move, and grades only what is due.** Its new
+  moves are taught and its due moves graded as in the queue; the rest are asked with no event,
+  as Qchess saves nothing for a line trained before it is due. Practising ahead must not move a
+  schedule, or a line repeated for fun would push its moves weeks out.
+- **D19: the daily limit paces the queue, not the owner.** A picked line, "Learn" on a chapter
+  and "Learn the next line" teach past it; the limit itself is now set from the site (0 turns
+  new moves off), written to `settings.json`, only the fields changed, so the per-field merge
+  keeps the other device's change.
+- **D16: show and grade is switched in the middle of a session** (a button, and `1`, as asked),
+  on the same trainer; a move tried wrong or hinted before the switch stays failed, so the keys
+  can't turn a miss into Good.
+- **"Study" with nothing on the board opens the study the screen is about,** rather than doing
+  nothing.
+- **D21: the notation's details as the owner asked:** a main-line move's cell takes the whole
+  click, transposition badges are pills, and a comment's lines are bold blue with their brackets.

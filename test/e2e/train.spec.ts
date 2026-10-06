@@ -142,7 +142,7 @@ test('the chapter view shows the move’s card and toggles its suspend; the debu
   await expect(page.locator('.repertoire-conflicts li')).toHaveText(['Test repertoire: e4 c5 Nf3 → d6, Nc6']);
 
   await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf`);
-  await page.locator('.move[data-path="e4 c5"]').click();
+  await page.locator('.move[data-path="e4 c5"]').click({ position: { x: 6, y: 8 } }); // the move, not its +1
   const panel = page.getByRole('region', { name: 'Training card' });
   await expect(panel).toContainText('Due');
   await expect(panel).toContainText('2 reviews');
