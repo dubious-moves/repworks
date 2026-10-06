@@ -1,5 +1,7 @@
 // The card of the move shown (PLAN.md §5.7): for an own move of a repertoire chapter, where its
-// card stands (new, learning, due, reviewed) and the suspend toggle, "Always play this for me".
+// card stands (new, learning, due, reviewed) and the suspend toggle, "Always play this for me";
+// and the alternatives saved for its position (§5.18), each removed by its ✕. They are saved in
+// training, after a wrong move.
 import { decidingNow } from '../app/time.ts';
 import { parseSan } from 'chessops/san';
 import { isNormal } from 'chessops/types';
@@ -9,6 +11,9 @@ import { dayOf, trainData } from '../app/train.ts';
 import { positionKeyOf } from '../core/chess/positionKey.ts';
 import { standardUci } from '../core/chess/uci.ts';
 import { repertoireCard } from '../core/progress/cards.ts';
+import { parseUciMove } from '../core/chess/uci.ts';
+import { makeSan } from 'chessops/san';
+import { alternativesAt } from '../core/train/alternatives.ts';
 import { dueAt, statusOf } from '../core/train/queue.ts';
 import { positionAt } from '../core/study/tree.ts';
 
@@ -29,7 +34,12 @@ export function CardPanel() {
   if (!before || before.turn !== side.value) return null;
   const move = parseSan(before, path[path.length - 1]!);
   if (!move || !isNormal(move)) return null;
-  const card = repertoireCard(positionKeyOf(before), standardUci(before, move));
+  const key = positionKeyOf(before);
+  const card = repertoireCard(key, standardUci(before, move));
+  const alts = alternativesAt(data.alternatives, key).flatMap((uci) => {
+    const m = parseUciMove(before, uci);
+    return m ? [{ uci, san: makeSan(before, m) }] : [];
+  });
   const state = data.states.get(card);
   const status = statusOf(state);
   const due = dueAt(state, data.settings);
@@ -47,6 +57,25 @@ export function CardPanel() {
       <button type="button" class="secondary" aria-pressed={suspended} onClick={toggle}>
         {suspended ? 'Ask me this move again' : 'Always play this for me'}
       </button>
+      {alts.length > 0 && (
+        <p class="card-alts">
+          <span class="muted">Alternatives here:</span>{' '}
+          {alts.map((a) => (
+            <span key={a.uci} class="card-alt">
+              {a.san}
+              <button
+                type="button"
+                class="icon"
+                aria-label={`Remove ${a.san} from the alternatives`}
+                title={`Remove ${a.san}: it counts as a wrong move again`}
+                onClick={() => void recordEvent({ t: new Date().toISOString(), k: 'alt', card: repertoireCard(key, a.uci), on: false })}
+              >
+                ✕
+              </button>
+            </span>
+          ))}
+        </p>
+      )}
     </section>
   );
 }

@@ -1087,7 +1087,9 @@ account. The technical calls, each with its reason:
 ## Revision of 2026-10-06 (the owner's third testing notes)
 `PLAN.md` §5.38, built in a session beside Phase 3's. The calls, each with its reason:
 - **§5.18's storage is answered: events in the progress log** (the owner: "fine as long as it
-  works as expected"). §5.18 is built next.
+  works as expected"), and built: `k:"alt"` with the move in `card` (`r|<positionKey>|<uci>`)
+  and `on`, the last event of a move deciding. The move in `card`, rather than separate `key`
+  and `uci` fields, keeps every known event's shape (replay groups by `card`).
 - **New moves gain a third way, "Show a sequence"** (Chessable's), per device like the other two,
   with its length (default 5) counting new own moves, so that "x moves" means the moves to learn
   whatever the opponent's replies between them. A sequence stops before a due move, which it

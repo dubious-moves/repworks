@@ -53,8 +53,18 @@ export interface DrillEvent extends Base {
   card: string;
   ok: boolean;
 }
-export type KnownEvent = ReviewEvent | SuspendEvent | UnsuspendEvent | ForgetEvent | TaughtEvent | PinEvent | UnpinEvent | DrillEvent;
-export const KNOWN_KINDS = ['review', 'suspend', 'unsuspend', 'forget', 'taught', 'pin', 'unpin', 'drill'] as const;
+/**
+ * An alternative move (§5.18, Chessable's): `card` names the move and its position, as a
+ * repertoire card does; `on` saves it, `false` removes it. Played where the repertoire's own
+ * move is asked, it is taken back for free. It never touches a card's schedule.
+ */
+export interface AltEvent extends Base {
+  k: 'alt';
+  card: string;
+  on: boolean;
+}
+export type KnownEvent = ReviewEvent | SuspendEvent | UnsuspendEvent | ForgetEvent | TaughtEvent | PinEvent | UnpinEvent | DrillEvent | AltEvent;
+export const KNOWN_KINDS = ['review', 'suspend', 'unsuspend', 'forget', 'taught', 'pin', 'unpin', 'drill', 'alt'] as const;
 
 /** A line as read. `event` is set for the kinds this code knows; `raw` is always the line itself. */
 export interface LogLine {
@@ -139,6 +149,12 @@ function knownEvent(o: Record<string, unknown>): KnownEvent | string {
       if (typeof ok !== 'boolean') return 'ok must be true or false';
       return { ...base, k: 'drill', ok };
     }
+    case 'alt': {
+      const on = o['on'];
+      if (typeof on !== 'boolean') return 'on must be true or false';
+      if (!/^r\|[^|]+\|[a-h][1-8][a-h][1-8][qrbn]?$/.test(card)) return 'card must be a move: r|<position>|<uci>';
+      return { ...base, k: 'alt', on };
+    }
     default:
       return { ...base, k: 'forget' };
   }
@@ -154,6 +170,7 @@ export function formatEvent(event: KnownEvent): string {
     if (event.h !== undefined) o['h'] = event.h;
   }
   if (event.k === 'drill') o['ok'] = event.ok;
+  if (event.k === 'alt') o['on'] = event.on;
   return JSON.stringify(o);
 }
 

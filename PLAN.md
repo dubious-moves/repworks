@@ -7,7 +7,7 @@ where the build differed). What remains is live: the spike's re-run (§4.2), the
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
 with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
-for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is answered (events in the progress log) and comes next, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06). Read with `DECISIONS.md`, which this plan updates (its
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06). Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -2218,7 +2218,25 @@ one mid-ask removes it from `w` and the grade is Good when right next); replay o
 later line and taken back for free.
 
 **The owner's answer (2026-10-06, third notes):** events in the progress log, as recommended,
-"as long as it works as expected". Unblocked: built next in the chain.
+"as long as it works as expected".
+
+**As built (2026-10-06):**
+- The event is `{"v":1,"n":…,"t":…,"k":"alt","card":"r|<positionKey>|<uci>","on":true}` (`on:false`
+  removes it): the move and its position in a `card` field, as every known event has, rather than
+  the `key` and `uci` sketched above, so replay groups it with the other events of that move and
+  an older reader skips it as a kind it doesn't know. The last event of a move decides
+  (`core/train/alternatives.ts`). It never touches a schedule, and a move only ever saved as an
+  alternative isn't counted as "no longer in the repertoire".
+- Training: an alternative played where an own move is asked is taken back with "e5: a good
+  alternative, but your repertoire plays something else: try again", for free, however often.
+  After a wrong move, **"Save e5 as alternative"** saves it and takes it out of the ask's wrong
+  moves (shown by a second wrong move, the arrow goes and the ask goes on with the first);
+  **"Undo"** puts it back, until the next move. Saved in every kind of session, graded or not.
+- The study: the card panel of an own move lists **"Alternatives here: e5 ✕"** for its position,
+  each removed by its ✕. Adding one from the study isn't built: the training screen's button is
+  the one way in, where the wrong move is in hand.
+- Not built: an import of Chessable's own alternatives from a course export (to check against an
+  export in the data repo first).
 
 #### 5.38 The owner's third testing notes (built 2026-10-06)
 

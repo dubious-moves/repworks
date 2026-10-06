@@ -58,6 +58,10 @@ export function noteText(note: Note | undefined): string {
       return note.found ? `New move found: ${note.san}` : `New move learned: ${note.san}`;
     case 'alsoPlays':
       return 'Also in your repertoire. It has another move here too: find it';
+    case 'alternative':
+      return `${note.san}: a good alternative, but your repertoire plays something else: try again`;
+    case 'altSaved':
+      return `${note.san} saved as an alternative: try again`;
     case 'suspended':
       return `${note.san} will always be played for you`;
   }
@@ -476,6 +480,16 @@ function Session(props: { s: SessionView }) {
           {(s.phase === 'ask' || s.phase === 'wrong') && !show && (
             <button type="button" onClick={() => command('hint')}>
               Hint
+            </button>
+          )}
+          {s.wrongMove && !show && (
+            <button type="button" class="secondary" onClick={() => command('saveAlt')} title={`${s.wrongMove} is good too: never counted as wrong here again`}>
+              Save {s.wrongMove} as alternative
+            </button>
+          )}
+          {s.savedAlt && (
+            <button type="button" class="secondary" onClick={() => command('unsaveAlt')}>
+              Undo: {s.savedAlt} isn’t an alternative
             </button>
           )}
           {s.missed && (

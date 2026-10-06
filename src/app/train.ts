@@ -18,6 +18,7 @@ import { parseStudyMeta, reconcileChapterOrder } from '../core/study/studyMeta.t
 import { lineThrough, startPosition } from '../core/study/tree.ts';
 import { cardLine, drillLines, retryLines, todaysMistakes, type Mistake } from '../core/train/mistakes.ts';
 import { pinsOf, type PinState } from '../core/train/pins.ts';
+import { alternativesOf } from '../core/train/alternatives.ts';
 import { findLine, learnPlan, pickedPlan } from '../core/train/browse.ts';
 import { interactivePlan, planSession, withoutAnswered, type SessionPlan } from '../core/train/plan.ts';
 import { ShowGrade, type Press, type ShowGradeEffect } from '../core/train/showGrade.ts';
@@ -50,6 +51,8 @@ export interface TrainData {
   eventsOf(card: string): readonly DeviceEvent[];
   /** Pinned mistakes, pinned or retired, by card. */
   pins: Map<string, PinState>;
+  /** Moves saved as alternatives (§5.18). */
+  alternatives: Set<CardId>;
 }
 
 /** Each chapter file's parse and index part, kept while its text is the same (§5.1). */
@@ -101,7 +104,7 @@ export async function loadTraining(store: IdbStore): Promise<TrainData> {
   const device = await store.device();
   if (device) replay.add(toDeviceEvents(device.id, parseLog((await store.unsentEvents()).map((e) => e.raw).join('\n')).lines));
   const eventsOf = (card: string) => replay.eventsOf(card);
-  return { index, states: replay.states, settings, chapters, studyNames, indexMs, eventsOf, pins: pinsOf(replay.states.keys(), eventsOf) };
+  return { index, states: replay.states, settings, chapters, studyNames, indexMs, eventsOf, pins: pinsOf(replay.states.keys(), eventsOf), alternatives: alternativesOf(replay.states.keys(), eventsOf) };
 }
 
 /** The training data of the working view, read again whenever it changes (home, chapter view, debug). */
@@ -196,6 +199,9 @@ export interface SessionView {
   upcoming?: Line;
   /** Show sequence, while shown: the plies it spans. */
   sequence?: { from: number; to: number };
+  /** After a wrong move, the move "Save as alternative" saves; an alternative just saved (§5.18). */
+  wrongMove?: string;
+  savedAlt?: string;
   /** The planned asks and teaches not answered yet. */
   dueLeft: number;
   newLeft: number;
@@ -293,6 +299,7 @@ export async function startSession(store: IdbStore, record: (event: Parameters<I
       return c ? startPosition(c) : undefined;
     },
     paceMs: PACES[pace.peek()],
+    alternatives: data.alternatives,
     ...optionsFor(of, trainPrefs.peek()),
   });
   trainer = t;
@@ -376,7 +383,7 @@ function stopTimer() {
 }
 
 /** A command from the screen, with the time now. */
-export function command(type: 'hint' | 'suspend' | 'skipLine' | 'stop' | 'next' | 'ready'): void {
+export function command(type: 'hint' | 'suspend' | 'skipLine' | 'stop' | 'next' | 'ready' | 'saveAlt' | 'unsaveAlt'): void {
   send({ type, now: Date.now() });
 }
 /** Show sequence: the board at a ply of the sequence shown. */
@@ -482,9 +489,13 @@ function apply(t: Trainer, effects: readonly ShowGradeEffect[]): void {
         break;
       case 'record': {
         const ev = e.event;
+        const now = new Date().toISOString();
+        if (ev.k === 'alt') {
+          void recordEvent?.({ t: now, ...ev });
+          break;
+        }
         answered.add(ev.card);
         if (ev.k === 'suspend') suspendedCard = ev.card;
-        const now = new Date().toISOString();
         void recordEvent?.(ev.k === 'review' ? { t: now, ...ev } : { t: now, k: ev.k, card: ev.card });
         break;
       }
@@ -531,6 +542,10 @@ function apply(t: Trainer, effects: readonly ShowGradeEffect[]): void {
   else delete next.upcoming;
   if (v.sequence) next.sequence = v.sequence;
   else delete next.sequence;
+  if (v.wrongMove) next.wrongMove = v.wrongMove.san;
+  else delete next.wrongMove;
+  if (v.savedAlt) next.savedAlt = v.savedAlt.san;
+  else delete next.savedAlt;
   next.dueLeft = s.plan.lines.flatMap((l) => l.ask).filter((c) => !answered.has(c)).length;
   next.newLeft = s.plan.lines.flatMap((l) => l.teach).filter((c) => !answered.has(c)).length;
   session.value = next;

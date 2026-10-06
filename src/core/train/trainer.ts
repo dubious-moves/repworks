@@ -20,6 +20,11 @@
 //   where the line's own move is asked or taught, so the line followed is always the planned one,
 //   except with `follow` (the Interactive view, §5.10): a move that starts another line of the
 //   chapter from the board's moves is right, and the walk goes on along that line.
+// - Alternative moves (§5.18, Chessable's): a move saved as an alternative for the position,
+//   played where an own move is asked, is taken back and doesn't count (not a wrong move: no
+//   Again, no arrow). After a wrong move, `saveAlt` saves the last one as an alternative and
+//   takes it out of the ask's wrong moves, as if never played; `unsaveAlt` undoes that until the
+//   next move. Saving is the owner's choice about the position, recorded even with grading off.
 // - Show sequence (`sequence`, Chessable's way with new moves): at a new move, the line's next
 //   moves up to the n-th new own move (or a due one) are played for the user to watch, at twice
 //   the pace; the user steps within them (`seek`) and, when ready, replays them from their start,
@@ -106,12 +111,17 @@ export type Note =
   | { kind: 'taught'; san: string; found?: boolean }
   /** A conflict move was accepted; the repertoire has another move here, asked now. */
   | { kind: 'alsoPlays' }
+  /** An alternative saved for the position was played: taken back, for free (§5.18). */
+  | { kind: 'alternative'; san: string }
+  /** The last wrong move was saved as an alternative (§5.18). */
+  | { kind: 'altSaved'; san: string }
   | { kind: 'suspended'; san: string };
 
 export type TrainerRecord =
   | { k: 'review'; card: CardId; g: Grade; ms: number; w?: string[]; h?: 1 }
   | { k: 'taught'; card: CardId }
-  | { k: 'suspend'; card: CardId };
+  | { k: 'suspend'; card: CardId }
+  | { k: 'alt'; card: CardId; on: boolean };
 
 export interface Summary {
   /** Lines walked (to their end or stopped in). */
@@ -159,6 +169,9 @@ export type TrainerCommand =
   | { type: 'ready'; now: number }
   /** "Always play this for me" on the move asked or taught. */
   | { type: 'suspend'; now: number }
+  /** After a wrong move: save it as an alternative for the position (§5.18); and its undo. */
+  | { type: 'saveAlt'; now: number }
+  | { type: 'unsaveAlt'; now: number }
   | { type: 'skipLine'; now: number }
   | { type: 'stop'; now: number };
 
@@ -192,6 +205,8 @@ export interface TrainerSetup {
   autoPlay?: AutoPlay;
   /** New moves are asked before they are shown (§5.17): the arrow comes after a wrong move or Hint. */
   tryNew?: boolean;
+  /** Moves saved as alternatives (§5.18), as repertoire card IDs; the trainer keeps its own copy. */
+  alternatives?: Iterable<CardId>;
   /** Show sequence: a new move starts a sequence of this many new own moves, shown then replayed. */
   sequence?: number;
   /** Where a line starts (§5.17). Unset: where the board already is when the line shares its moves, else at its start. */
@@ -226,6 +241,10 @@ interface Pending {
   since: number;
   /** Asked after a conflict move was accepted: the conflict move no longer counts as right. */
   also: boolean;
+  /** The last wrong move, while it can be saved as an alternative (§5.18). */
+  lastWrong?: { uci: string; san: string };
+  /** The move just saved as an alternative, while it can be undone. */
+  saved?: { uci: string; san: string; shown: boolean };
 }
 
 export interface TrainerView {
@@ -241,6 +260,10 @@ export interface TrainerView {
   shown?: { uci: string; san: string };
   /** At a line's end: the line that comes next, if any. */
   upcoming?: PlannedLine;
+  /** After a wrong move: the move that "Save as alternative" would save (§5.18). */
+  wrongMove?: { uci: string; san: string };
+  /** An alternative just saved, while "Undo" can take it back. */
+  savedAlt?: { uci: string; san: string };
   /** Show sequence, while shown: the plies it spans (the board's path between `from` and `to`). */
   sequence?: { from: number; to: number };
   summary: Summary;
@@ -286,6 +309,7 @@ export class Trainer {
   private waitId = 0;
   private walked = 0;
   private readonly counts = { reviews: 0, good: 0, taught: 0, suspended: 0 };
+  private readonly alternatives: Set<CardId>;
 
   constructor(setup: TrainerSetup) {
     this.setup = setup;
@@ -300,6 +324,7 @@ export class Trainer {
     }
     this.known = knownCardsOf(setup.index);
     this.selfGrading = setup.selfGrade ?? false;
+    this.alternatives = new Set(setup.alternatives ?? []);
   }
 
   /** New options, from the next move met (§5.17's settings changed during a session). */
@@ -337,6 +362,8 @@ export class Trainer {
     if (this.phase === 'lineDone' && this.upcoming) v.upcoming = this.lines[this.upcoming.at]!;
     if (this.seq && !this.seq.replay) v.sequence = { from: this.seq.from, to: this.seq.to };
     const p = this.pending;
+    if (p?.lastWrong) v.wrongMove = { ...p.lastWrong };
+    if (p?.saved) v.savedAlt = { uci: p.saved.uci, san: p.saved.san };
     if (p?.shown) v.shown = { uci: p.uci, san: p.san };
     else if (this.waiting) v.shown = { uci: '', san: this.waiting.san };
     return v;
@@ -377,6 +404,12 @@ export class Trainer {
         break;
       case 'suspend':
         this.suspend(command.now, out);
+        break;
+      case 'saveAlt':
+        this.saveAlt(out);
+        break;
+      case 'unsaveAlt':
+        this.unsaveAlt(out);
         break;
       case 'skipLine':
         if (this.phase === 'ready') break;
@@ -654,6 +687,8 @@ export class Trainer {
     // Not a legal move (or a promotion without its piece): no answer yet.
     if (!move) return void out.push({ type: 'takeback', path: this.path() });
     const played = standardUci(before, move);
+    // Any move made ends the undo of a save (§5.18).
+    delete p.saved;
     if (played === p.uci) return this.accept(p, now, out);
     if (this.setup.follow && this.followLine(before, move)) return this.accept(this.pending!, now, out);
     if (p.mode === 'teach' && p.shown && !this.options.tryNew) {
@@ -674,7 +709,15 @@ export class Trainer {
       this.phase = 'ask';
       return;
     }
+    if (this.alternatives.has(repertoireCard(key, played))) {
+      // An alternative (§5.18): free, however often it is played in this ask.
+      delete p.lastWrong;
+      out.push({ type: 'takeback', path: this.path() });
+      out.push({ type: 'note', note: { kind: 'alternative', san: makeSan(before, move) } });
+      return;
+    }
     if (!p.wrong.includes(played)) p.wrong.push(played);
+    p.lastWrong = { uci: played, san: makeSan(before, move) };
     out.push({ type: 'takeback', path: this.path() });
     if (p.shown || p.wrong.length >= 2) this.show(p, out);
     else {
@@ -811,6 +854,46 @@ export class Trainer {
     this.advance(now, out);
     // The press plays the opponent's reply at once; what follows comes at the pace.
     if (this.phase === 'opponent' || this.phase === 'auto') this.tick(now, out);
+  }
+
+  /** Saves the last wrong move as an alternative: it no longer counts against the ask. */
+  private saveAlt(out: TrainerEffect[]) {
+    const p = this.pending;
+    const w = p?.lastWrong;
+    if (!p || !w) return;
+    const card = repertoireCard(positionKeyOf(this.plies[this.ply]!.before), w.uci);
+    this.alternatives.add(card);
+    p.wrong = p.wrong.filter((m) => m !== w.uci);
+    delete p.lastWrong;
+    p.saved = { ...w, shown: p.shown };
+    out.push({ type: 'record', event: { k: 'alt', card, on: true } });
+    // Shown by that move alone (a second wrong move): asked again as if it was never played.
+    if (p.shown && !p.hint && p.wrong.length < 2) {
+      p.shown = false;
+      out.push({ type: 'arrow' });
+    }
+    if (!p.shown) this.phase = p.wrong.length > 0 ? 'wrong' : 'ask';
+    out.push({ type: 'note', note: { kind: 'altSaved', san: w.san } });
+  }
+
+  /** Undoes the save: the move is a wrong move of this ask again, as it was. */
+  private unsaveAlt(out: TrainerEffect[]) {
+    const p = this.pending;
+    const saved = p?.saved;
+    if (!p || !saved) return;
+    const card = repertoireCard(positionKeyOf(this.plies[this.ply]!.before), saved.uci);
+    this.alternatives.delete(card);
+    out.push({ type: 'record', event: { k: 'alt', card, on: false } });
+    if (!p.wrong.includes(saved.uci)) p.wrong.push(saved.uci);
+    p.lastWrong = { uci: saved.uci, san: saved.san };
+    delete p.saved;
+    if (saved.shown || p.wrong.length >= 2) {
+      if (!p.shown) this.show(p, out);
+      else this.phase = 'shown';
+    } else {
+      this.phase = 'wrong';
+      out.push({ type: 'note', note: { kind: 'wrong' } });
+    }
   }
 
   private hint(out: TrainerEffect[]) {

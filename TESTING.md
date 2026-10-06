@@ -76,6 +76,10 @@ couldn't be tested then (the day's limit was used up), so the training items bel
   built) or all moves, whether twice the pace is right for watching, and whether Chessable shows
   the whole variation instead.
 
+- §5.18: alternative moves (desktop and phone): a wrong move saved as an alternative from the
+  training screen, taken back for free when played again on another line or another day (and on
+  the other device after a sync), listed in the study's card panel and removed there.
+
 ## Phase 2
 
 - §5.23: the explorer panel with the owner's Lichess login, on desktop and phone: on 1. e4 c5

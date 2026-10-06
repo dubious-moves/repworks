@@ -147,7 +147,8 @@ export function todaysQueue(index: RepertoireIndex, states: ReadonlyMap<string, 
   }
 
   const orphaned: CardId[] = [];
-  for (const card of states.keys()) if (card.startsWith('r|') && !index.cards.has(card as CardId)) orphaned.push(card as CardId);
+  // Reviewed or taught: a move only ever saved as an alternative (§5.18) was never trained.
+  for (const [card, s] of states) if (card.startsWith('r|') && !index.cards.has(card as CardId) && (s.reviews > 0 || s.taught !== undefined)) orphaned.push(card as CardId);
   orphaned.sort();
 
   const queue: DailyQueue = { due, later, taughtToday, room, newLines, newCards, knownLines, knownCards, orphaned };

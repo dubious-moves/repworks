@@ -62,9 +62,11 @@ export function foldCard(events: readonly DeviceEvent[], params: FsrsParams = DE
         state.taught ??= t;
         break;
       // Pins and drills (§5.8) never change a card's schedule: core/train/pins.ts reads them.
+      // Nor do alternatives (§5.18): core/train/alternatives.ts reads them.
       case 'pin':
       case 'unpin':
       case 'drill':
+      case 'alt':
         break;
     }
   }

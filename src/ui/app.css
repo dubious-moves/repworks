@@ -2751,3 +2751,22 @@ a.button.secondary {
     width: min(560px, calc(100vw - 32px));
   }
 }
+
+/* Alternatives saved for a position (PLAN.md §5.18), in the card panel: each with its ✕. */
+.card-alts {
+  margin: 8px 0 0;
+}
+
+.card-alt {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-right: 8px;
+  font-weight: 600;
+}
+
+.card-alt button.icon {
+  min-height: 0;
+  padding: 0 4px;
+  font-size: 0.75rem;
+}
