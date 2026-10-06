@@ -13,6 +13,7 @@
 //   #/pinned, #/pinned/all              the pins due, or every pin, drilled
 //   #/read/<sid>/<cid>[?at=e4,e5][&from=1]  a chapter's line read through, from a move (§5.10)
 //   #/play/<sid>/<cid>[?at=e4,e5][&from=1]  the same line played, every own move asked (§5.10)
+//   #/coverage/<sid>                    a study's coverage against the repertoire, or a reference study's against it (§5.26)
 // A setup link (#setup?…) is read and removed before any of this (src/app/setup.ts).
 import { isId } from '../study/ids.ts';
 
@@ -39,7 +40,9 @@ export type Mode =
    */
   | { name: 'read' | 'play'; sid: string; cid: string; at: string[]; from?: number }
   /** A practice session over mistakes or pins: nothing graded (§5.8). */
-  | { name: 'practice'; run: Practice };
+  | { name: 'practice'; run: Practice }
+  /** Repertoire coverage (§5.26), opened from a study: a reference study's lines against the repertoire. */
+  | { name: 'coverage'; sid: string };
 
 export type Practice = 'retry' | 'drill' | 'pinned' | 'pins';
 const PRACTICE_HASH: Record<Practice, string> = { retry: '#/mistakes/retry', drill: '#/mistakes/drill', pinned: '#/pinned', pins: '#/pinned/all' };
@@ -107,6 +110,7 @@ export function parseHash(hash: string): Mode {
     if (name === 'train' && parts.length === 3 && isId(parts[1]) && isId(parts[2]) && at?.length) return { name, sid: parts[1], cid: parts[2], at };
     return { name: 'list' };
   }
+  if (parts[0] === 'coverage' && parts.length === 2 && isId(parts[1])) return { name: 'coverage', sid: parts[1] };
   if (parts[0] === 'learn' && parts.length === 3 && isId(parts[1]) && isId(parts[2])) return { name: 'learn', sid: parts[1], cid: parts[2] };
   const practice = (Object.keys(PRACTICE_HASH) as Practice[]).find((p) => PRACTICE_HASH[p] === `#/${parts.join('/')}`);
   if (practice) return { name: 'practice', run: practice };
@@ -148,6 +152,8 @@ export function modeHash(mode: Mode): string {
       return '#/mistakes';
     case 'practice':
       return PRACTICE_HASH[mode.run];
+    case 'coverage':
+      return `#/coverage/${mode.sid}`;
     case 'chapter':
       return `#/study/${mode.sid}${mode.cid ? `/${mode.cid}` : ''}${atQuery(mode.at)}`;
     case 'read':

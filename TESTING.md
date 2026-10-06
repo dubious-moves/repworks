@@ -91,6 +91,12 @@ couldn't be tested then (the day's limit was used up), so the training items bel
   the index, then the Lichess tab named Local answering with no login, and the Practical
   column computing faster (no Lichess budget).
 
+- §5.26: a coverage report (desktop) of a real course (a reference study imported from the
+  owner's Chessable export) against the real repertoire, from the course's ⚙ → Coverage…: the
+  counts (present, missing, alternatives), whether the ranking's order matches the owner's
+  sense of what is met most, the number of positions asked and the time, and one line added
+  to a chapter and seen there (and on the phone after a sync).
+
 ### The change to q_extension for §5.25 (Repworks sessions can't push there)
 
 `explorerdb serve` answers the extension, whose requests carry no page origin; a web page's need

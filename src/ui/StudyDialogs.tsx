@@ -198,6 +198,12 @@ function StudySettings(props: { study: StudyRef }) {
         <input type="text" name="study-name" maxLength={100} value={name} onInput={(e) => setName(e.currentTarget.value)} />
       </label>
       <KindChoice value={kind} onChange={setKind} />
+      <p>
+        <button type="button" class="secondary" onClick={() => (close(), open({ name: 'coverage', sid: s.sid }))}>
+          Coverage…
+        </button>{' '}
+        <span class="muted">{s.kind === 'reference' ? 'which of its lines your repertoire doesn’t have' : 'the lines of a reference study this one doesn’t have'}</span>
+      </p>
       {error && (
         <p class="warn" role="alert">
           {error}

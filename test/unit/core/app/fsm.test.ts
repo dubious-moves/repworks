@@ -17,6 +17,7 @@ test('hashes parse to modes, and modes write back to the same hash', () => {
     ['#/train/Rep0Najd', { name: 'train', sid: 'Rep0Najd' }],
     ['#/train/Rep0Najd/Ch1Najdf?at=e4,c5', { name: 'train', sid: 'Rep0Najd', cid: 'Ch1Najdf', at: ['e4', 'c5'] }],
     ['#/learn/Rep0Najd/Ch1Najdf', { name: 'learn', sid: 'Rep0Najd', cid: 'Ch1Najdf' }],
+    ['#/coverage/Rep0Najd', { name: 'coverage', sid: 'Rep0Najd' }],
     ['#/show', { name: 'show' }],
     ['#/show/Rep0Najd', { name: 'show', sid: 'Rep0Najd' }],
     ['#/mistakes', { name: 'mistakes' }],
@@ -40,7 +41,7 @@ test('hashes parse to modes, and modes write back to the same hash', () => {
   }
   assert.equal(modeHash({ name: 'chapter', sid: 'Rep0Najd', cid: 'Ch1Najdf', at: [] }), '#/study/Rep0Najd/Ch1Najdf');
   // Anything else is the list: unknown pages, malformed IDs, a path with a stray character.
-  for (const hash of ['#/mistakes/other', '#/pinned/x', '#/train/short', '#/train/Rep0Najd/x', '#/train/Rep0Najd/Ch1Najdf', '#/learn/Rep0Najd', '#/nope', '#/study/short', '#/study/Rep0Najd/bad', '#/study/Rep0Najd/Ch1Najdf/x', '#/read/Rep0Najd', '#/play/Rep0Najd/bad']) assert.deepEqual(parseHash(hash), { name: 'list' }, hash);
+  for (const hash of ['#/mistakes/other', '#/pinned/x', '#/train/short', '#/train/Rep0Najd/x', '#/train/Rep0Najd/Ch1Najdf', '#/learn/Rep0Najd', '#/coverage', '#/coverage/bad', '#/nope', '#/study/short', '#/study/Rep0Najd/bad', '#/study/Rep0Najd/Ch1Najdf/x', '#/read/Rep0Najd', '#/play/Rep0Najd/bad']) assert.deepEqual(parseHash(hash), { name: 'list' }, hash);
   assert.deepEqual(parseHash('#/study/Rep0Najd/Ch1Najdf?at=e4,<script>'), { name: 'chapter', sid: 'Rep0Najd', cid: 'Ch1Najdf' });
 });
 

@@ -2682,6 +2682,57 @@ repertoire and a reference study, a line added to a chapter.
 Live (desktop): a real course (a reference study imported from the owner's Chessable export)
 against the real repertoire: the report's counts, the request count, the time.
 
+**As built** (2026-10-06):
+- **Read first**: lichessable's `DESIGN-repertoire-coverage.md` and its section 21 in
+  `content/lichessable.js` (`indexRepertoire`, `firstDivergence`, `rootPlyOf`, `riskPlies`,
+  `rankGaps`, `sortGaps`), whose rules are ported as they are: the four divergences plus
+  "unreachable", the divergence move counted in P only for an unmet option, the floor of 50
+  games ending the product (marked ~), and `score = P_cond × exp(−d/16)`.
+- `src/core/explorer/coverage.ts` (pure): `repertoireTree` (every move the chosen repertoire
+  chapters play at each position, own and opponent moves alike, and where each position is
+  reached), `courseLines` (a chapter's root-to-leaf lines, as far as legal), `firstDivergence`,
+  `coverage` (the report: lines, present, the gaps grouped by divergence position and move,
+  lines of chapters for the other side counted, unreadable chapters listed, the root ply),
+  `positionsToRank` (the distinct positions the ranking needs), `rank` and `sortGaps` (by score,
+  depth or kind). A position not answered (not asked yet, or refused) leaves its gap unranked
+  rather than truncated, so a report with no login shows "P —", never a fake 100%.
+- The repertoire is compared **by side**: the chapters of the chosen side (default: the side
+  most of the course's chapters are for), of every repertoire study or one. Comparing against
+  both sides' chapters would let a Black chapter's White moves "cover" a White course.
+- **The explorer's answers** come through the explorer worker (a `counts` message: the Lichess
+  tab's games at the panel's filter, or the local explorer's, at priority 500, under the panel's
+  1000 and over the search's), so the same limiter, cache and token apply; answers are kept for
+  the session, so the report run again (after an add) asks nothing.
+- **Where**: "Coverage…" in a study's settings opens `#/coverage/<sid>`: from a reference study,
+  its lines against the whole repertoire; from a repertoire study, the first reference study
+  against it; both changeable (the course, the repertoire or one study, the side). The report:
+  "3 lines · 0 present · 2 missing in 2 places · 1 where you play another move", the other-side
+  warning, the ranking's progress ("Asking Lichess… 2/3 positions") or the login it needs, then
+  one row per gap: its kind, the moves to it numbered with the divergence move bold (a link
+  opening the course there), its lines, P from the root, P of all games, the ply and the score;
+  the alternatives folded apart (a choice, not a gap). Sort and D are on the report.
+- **Adding**: each gap with a repertoire chapter reaching its position offers "Add the line" (or
+  "the 3 lines"), into the first such chapter or one chosen: every line behind the gap is copied
+  from the divergence on (`addLine` in `core/study/ops.ts`), one change, synced. The added list
+  above the gaps keeps "Open" and "Undo" (the chapter put back, unless it changed since), since
+  the gap itself leaves the report once covered. Alternatives and unreachable lines have no Add.
+- **Not built: "Gaps"** (the repertoire's own unanswered opponent moves against the explorer
+  alone): every position of the repertoire with the opponent to move would need an explorer
+  request, hundreds for a real repertoire against a bucket of about 20 a minute, so the walk
+  doesn't make it cheap (§5.26's condition). The core functions don't stand in its way.
+- Tests: `test/unit/core/explorer/coverage.test.ts` (each divergence; a line present under
+  another chapter and by a transposition; a course line by another move order reported at its
+  first move; unreachable; another side counted; grouping and the root ply; the ranking's P,
+  P from the root, the floor, the depth discount and the sorts on a hand-worked example; no
+  answers leaving gaps unranked; a gap's lines added and then present),
+  `service.test.ts` (the `counts` message: games only, the filter, the cache, no login),
+  `fsm.test.ts` (the route), and `test/e2e/coverage.spec.ts` on desktop and the emulated phone
+  (a reference study beside the fixture repertoire: the summary, the gaps ranked with a fake
+  explorer and their figures, three requests with the token, the alternative; 2. Nc3 added to the
+  Main line, the report updated, the chapter synced, nothing asked again, then undone; without a
+  login the gaps unranked with the login offered, a gap opening the course at it, and nothing
+  wider than the phone).
+
 #### 5.27 The course tree (lichessable §24): the owner's choice first
 
 lichessable's course tree exists because a Chessable course is a flat list of variations: it

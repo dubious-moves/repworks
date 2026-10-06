@@ -2283,3 +2283,77 @@ a.button.secondary {
   flex: 1;
   min-width: 0;
 }
+
+/* Repertoire coverage (PLAN.md §5.26). */
+.coverage-choices,
+.coverage-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.coverage-choices label,
+.coverage-tools label {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.coverage-choices select {
+  max-width: 100%;
+}
+
+.coverage-summary {
+  font-size: 1.05rem;
+}
+
+.coverage-gaps {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+}
+
+.coverage-gap {
+  border-top: 1px solid rgb(255 255 255 / 8%);
+  padding: 8px 0;
+}
+
+.coverage-gap-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.coverage-sev {
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 10%);
+}
+
+.coverage-sev.sev-hole,
+.coverage-sev.sev-ends {
+  background: #7a2e25;
+}
+
+.coverage-sev.sev-unmet {
+  background: #6b5a1d;
+}
+
+.coverage-figures {
+  margin: 2px 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.coverage-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.coverage-add select {
+  max-width: 100%;
+}

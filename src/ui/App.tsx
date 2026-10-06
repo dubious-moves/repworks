@@ -8,6 +8,7 @@ import { queueOf, trainData } from '../app/train.ts';
 import { dataVersion } from '../app/sync.ts';
 import { ChapterView } from './ChapterView.tsx';
 import { ConflictsView } from './Conflicts.tsx';
+import { CoverageView } from './Coverage.tsx';
 import { Debug } from './Debug.tsx';
 import { ImportScreen } from './Import.tsx';
 import { SetupForm } from './Setup.tsx';
@@ -85,6 +86,8 @@ function Screen() {
       const run = mode.value.run;
       return <TrainScreen of={run === 'retry' || run === 'drill' ? { kind: run } : { kind: 'pinned', all: run === 'pins' }} />;
     }
+    case 'coverage':
+      return <CoverageView sid={mode.value.sid} />;
     case 'list':
       return <Home />;
   }

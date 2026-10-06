@@ -32,6 +32,17 @@ export function addMove(chapter: Chapter, path: Path, san: string): Edit<{ chapt
   return next ? done({ chapter: next, path: at }) : notFound(path);
 }
 
+/** Plays `sans` one after another from `path`, following moves already there; the path reached. */
+export function addLine(chapter: Chapter, path: Path, sans: readonly string[]): Edit<{ chapter: Chapter; path: Path }> {
+  let out = { chapter, path };
+  for (const san of sans) {
+    const step = addMove(out.chapter, out.path, san);
+    if (!step.ok) return step;
+    out = step.value;
+  }
+  return done(out);
+}
+
 /** Deletes the move at `path` and everything after it. */
 export function deletePath(chapter: Chapter, path: Path): Edit {
   if (path.length === 0) return fail('the start of a chapter cannot be deleted');

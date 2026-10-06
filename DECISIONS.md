@@ -1031,3 +1031,24 @@ its reason:
   answers made at the real time; due moves, the learning step, the queue, the line list and the
   pins use the shifted time.
 
+## Revision of 2026-10-06 (the local explorer's test, and repertoire coverage)
+`PLAN.md` §5.25 and §5.26 are built. The calls, each with its reason:
+- **The local explorer is tested from the page** (Explorer settings' Test), so Chrome's
+  local-network prompt comes when the owner asks for it, not in the middle of a search. The
+  `explorerdb serve` change stays q_extension's: a patch in TESTING.md, checked on a copy.
+- **Coverage compares a course with the repertoire's chapters of one side** (chosen, defaulting
+  to the course's), not the whole index: a Black chapter's White moves would otherwise cover a
+  White course's positions.
+- **lichessable's section 21 rules are kept as they are** (four divergences and unreachable, P
+  over the opponent's moves, the 50-game floor, the gentle depth discount with D = 16), with one
+  change: a position the explorer didn't answer leaves the gap unranked instead of truncated, so
+  a report without a login never shows a probability it doesn't have.
+- **Coverage's explorer requests go through the explorer worker** at a priority between the
+  panel's and the Practical search's, with the panel's filter, so one limiter governs the
+  token's bucket (D9).
+- **Adding copies every line behind a gap from its divergence into one repertoire chapter that
+  reaches the position,** as one change with an undo on the report; alternatives (a choice, not
+  a gap) and unreachable lines are never added.
+- **"Gaps" without a reference study is not built:** it would need an explorer request for every
+  position of the repertoire where the opponent moves.
+

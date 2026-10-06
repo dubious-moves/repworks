@@ -44,6 +44,11 @@ export type ToWorker =
   /** A lookup no longer wanted: its queued requests are dropped. */
   | { type: 'drop'; id: number }
   /**
+   * Repertoire coverage (§5.26): the Lichess tab's games at a position (the panel's filter, or the
+   * local explorer), answered as `games`, below the panel's priority and above the search's.
+   */
+  | { type: 'counts'; id: number; fen: string }
+  /**
    * The Practical rows of a root position. A higher `gen` is a new root: the old one's queued
    * requests go at once. `shares` (the rows' shares of the games) order the requests.
    */
@@ -187,6 +192,22 @@ export function createExplorerService(o: ServiceOptions): ExplorerService {
       .finally(() => (pending.delete('evals'), settle()));
   }
 
+  function counts(id: number, fen: string) {
+    live.add(id);
+    const isStale = () => dropped.has(id);
+    const source = localAddress(config.local) ? 'The local explorer' : 'Lichess';
+    providers
+      .explorer(fen, { ...config.filter, db: 'lichess' }, isStale, { priority: 500 })
+      .then(
+        (games) => !isStale() && o.post({ type: 'games', id, games }),
+        (e: PeError) => !isStale() && !e?.cancelled && o.post({ type: 'games', id, error: reasonOf(e, source) }),
+      )
+      .finally(() => {
+        live.delete(id);
+        dropped.delete(id);
+      });
+  }
+
   function drop(id: number) {
     if (!live.has(id)) return;
     dropped.add(id);
@@ -328,6 +349,8 @@ export function createExplorerService(o: ServiceOptions): ExplorerService {
           return lookup(msg.id, msg.tab, msg.fen);
         case 'drop':
           return drop(msg.id);
+        case 'counts':
+          return counts(msg.id, msg.fen);
         case 'search':
           return searchRows(msg);
         case 'stats':

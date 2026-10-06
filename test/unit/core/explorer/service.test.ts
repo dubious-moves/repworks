@@ -181,3 +181,24 @@ test('a row taken out while it runs is reported as excluded', async () => {
   w.service.handle({ type: 'search', gen: 1, rootFen: START, rows: [], remove: ['e4'], shares: {} });
   assert.ok(w.posts.some((m) => m.type === 'update' && m.san === 'e4' && m.result.state === 'excluded'));
 });
+
+test('coverage counts (§5.26): the games alone, at the filter, once and then from the cache; with no login, the reason', async () => {
+  const w = world();
+  w.service.handle({ type: 'counts', id: 7, fen: START });
+  await settle();
+  const games = w.posts.find((m) => m.type === 'games' && m.id === 7);
+  assert.ok(games && 'games' in games && games.games.total === 1650);
+  assert.deepEqual(w.urls.map((u) => u.split('?')[0]), ['https://explorer.lichess.org/lichess'], 'no ChessDB request');
+  assert.match(w.urls[0]!, /speeds=blitz&ratings=2000/);
+  w.service.handle({ type: 'counts', id: 8, fen: START });
+  await settle();
+  assert.equal(w.urls.length, 1);
+  assert.ok(w.posts.some((m) => m.type === 'games' && m.id === 8));
+
+  const none = world();
+  none.service.handle({ type: 'config', config: { ...CONFIG, token: '' } });
+  none.service.handle({ type: 'counts', id: 9, fen: START });
+  await settle();
+  const refused = none.posts.find((m) => m.type === 'games' && m.id === 9);
+  assert.ok(refused && 'error' in refused && refused.error.login);
+});
