@@ -20,6 +20,7 @@
     "@lichess-org/chessground": "10.4.2",
     "@preact/signals": "2.11.3",
     "chessops": "0.15.1",
+    "onnxruntime-web": "1.30.0",
     "preact": "10.29.8",
     "uqr": "0.1.3"
   },

@@ -7,6 +7,12 @@
 //   Repworks alone (D17), but nothing here may wipe a cache it doesn't own;
 // - a response is cloned before it is handed back, never after.
 //
+// The engines and the model (engines/, PLAN.md §5.29) are listed apart in __ENGINES__: never
+// precached, they are kept in `repworks-engines` once the app has downloaded them (it puts them
+// there itself, with progress: src/platform/blobs.ts), and served from it cache first. Their
+// names carry a hash of their content, so a stored file never goes stale; on activation the
+// entries this version doesn't name are deleted.
+//
 // Strategy: the shell is served cache first, current version first, then the version before it,
 // which stays until the next update so a page still running it keeps its files. Everything else
 // goes to the network untouched; data from GitHub, Lichess and the rest is cached by the app in
@@ -20,9 +26,11 @@
 declare const self: ServiceWorkerGlobalScope;
 declare const __PRECACHE__: readonly { url: string; rev: string | null }[];
 declare const __VERSION__: string;
+declare const __ENGINES__: readonly string[];
 
 const SHELL_PREFIX = 'repworks-shell-';
 const SHELL = SHELL_PREFIX + __VERSION__;
+const ENGINES = 'repworks-engines';
 const KEEP_SHELLS = 2;
 const ATTEMPTS = 3;
 
@@ -37,6 +45,7 @@ self.addEventListener('activate', (event) => {
       const older = shells.filter((k) => k !== SHELL);
       const keep = new Set([SHELL, ...older.slice(-(KEEP_SHELLS - 1))]);
       await Promise.all(shells.filter((k) => !keep.has(k)).map((k) => caches.delete(k)));
+      await pruneEngines();
       await self.clients.claim();
     })(),
   );
@@ -83,10 +92,24 @@ async function precache(): Promise<void> {
   }
 }
 
+/** Deletes the stored engines this version doesn't name (an engine replaced by a deploy). */
+async function pruneEngines(): Promise<void> {
+  if (!(await caches.has(ENGINES))) return;
+  const cache = await caches.open(ENGINES);
+  const named = new Set(__ENGINES__.map((u) => new URL(u, self.registration.scope).pathname));
+  for (const request of await cache.keys()) {
+    if (!named.has(new URL(request.url).pathname)) await cache.delete(request);
+  }
+}
+
 async function respond(request: Request, url: URL, scope: URL): Promise<Response> {
   // The query and hash don't select a different file: routes live in the hash, and the
   // OAuth callback arrives as a query on the page itself.
   let path = url.pathname;
+  if (path.startsWith(`${scope.pathname}engines/`)) {
+    const stored = (await caches.has(ENGINES)) ? await (await caches.open(ENGINES)).match(path) : undefined;
+    return stored ?? fetch(request);
+  }
   if (request.mode === 'navigate' && path === scope.pathname) path += 'index.html';
   const current = await caches.open(SHELL);
   const hit = (await current.match(path)) ?? (await matchOlderShell(path));

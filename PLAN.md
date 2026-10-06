@@ -2899,6 +2899,28 @@ CDN (any request off the site's origin, Lichess, ChessDB and GitHub fails the te
 
 Live (desktop and phone): the first download's time; offline after a reload.
 
+**As built** (2026-10-06):
+- `vendor/stockfish/` (npm `stockfish@18.0.0`'s two files, its `Copying.txt` and `AUTHORS`, a
+  README with the sha256) and `vendor/maia/` (the model and a README crediting CSSLab);
+  `onnxruntime-web` 1.30.0 pinned in `package.json`.
+- `vite.config.ts`: the `engines` plugin emits the four files (Stockfish's js and wasm, the
+  model, onnxruntime-web's `ort-wasm-simd-threaded.wasm`) as `engines/<name>.<sha256:10>.<ext>`
+  and exposes their URLs and sizes as `virtual:repworks-engines` (in dev, Vite's `/@fs/` path).
+  The service worker's build lists them in `__ENGINES__`, out of `__PRECACHE__`.
+- `src/sw/sw.ts`: `engines/` is served from `repworks-engines` when stored, else from the
+  network untouched; on activation the entries this version doesn't name are deleted. The app
+  stores the files itself (`src/platform/blobs.ts`: `stored`, `storedBytes`, `ensure` with
+  progress counted against the build's sizes, a file stored only once it arrived whole,
+  `remove`), so one module owns the downloads.
+- The debug panel lists both groups (Stockfish 18, 7.3 MB; Maia 3, 59.9 MB), stored or not,
+  with Download and Delete (`src/ui/Engines.tsx`); §5.31 and §5.32 download through the same
+  module when the engine or Maia is first switched on.
+- Tests: `test/e2e/engines.spec.ts` (desktop and phone): no engine file requested or precached
+  with the shell; Stockfish downloaded from the debug panel, stored under its hashed names,
+  and answered from the cache with the site gone; Maia downloaded, a deploy deleting a stored
+  engine it doesn't name and keeping Maia's, Delete; no request off the site and the faked
+  services.
+
 #### 5.30 Stockfish in a worker
 
 - `core/engine/uci.ts` (pure): an `info` line to `{depth, seldepth, multipv, score (cp or mate,

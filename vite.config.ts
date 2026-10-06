@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { execSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import { defineConfig, transformWithOxc, type Plugin } from 'vite';
 
 // The site is served at https://dubious-moves.github.io/repworks/ (D17).
@@ -29,8 +29,55 @@ export default defineConfig({
     port: 4173,
     strictPort: true,
   },
-  plugins: [serviceWorker()],
+  plugins: [engines(), serviceWorker()],
 });
+
+/**
+ * The engines and the model (PLAN.md §5.29): vendored files and onnxruntime-web's wasm, emitted
+ * under engines/ with a hash of their content in the name, and listed by the virtual module
+ * `virtual:repworks-engines` (their URLs and sizes). They stay out of the shell's precache: the
+ * app downloads them when first used, into a cache of their own (src/platform/blobs.ts). In dev
+ * they are served from where they lie.
+ */
+const ENGINE_FILES: Record<string, string> = {
+  stockfishJs: 'vendor/stockfish/stockfish-18-lite-single.js',
+  stockfishWasm: 'vendor/stockfish/stockfish-18-lite-single.wasm',
+  maiaModel: 'vendor/maia/maia3_simplified.onnx',
+  ortWasm: 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm',
+};
+const ENGINES_DIR = 'engines/';
+const ENGINES_ID = 'virtual:repworks-engines';
+
+function engines(): Plugin {
+  let serve = false;
+  return {
+    name: 'repworks:engines',
+    configResolved(config) {
+      serve = config.command === 'serve';
+    },
+    resolveId(id) {
+      return id === ENGINES_ID ? '\0' + ENGINES_ID : undefined;
+    },
+    load(id) {
+      if (id !== '\0' + ENGINES_ID) return undefined;
+      const out: Record<string, { url: string; bytes: number }> = {};
+      for (const [key, file] of Object.entries(ENGINE_FILES)) {
+        const source = readFileSync(file);
+        let url: string;
+        if (serve) url = `${BASE}@fs${resolve(file)}`;
+        else {
+          const name = basename(file);
+          const dot = name.indexOf('.');
+          const fileName = `${ENGINES_DIR}${name.slice(0, dot)}.${sha256(source).slice(0, 10)}${name.slice(dot)}`;
+          this.emitFile({ type: 'asset', fileName, source });
+          url = BASE + fileName;
+        }
+        out[key] = { url, bytes: source.length };
+      }
+      return `export const ENGINES = ${JSON.stringify(out)};\n`;
+    },
+  };
+}
 
 /** The commit the site was built from: GitHub's in CI, else git's, with `+` for local changes. */
 function buildId(): string {
@@ -65,8 +112,15 @@ function serviceWorker(): Plugin {
       for (const file of listFiles('public')) files.set(file, readFileSync(join('public', file)));
 
       const precache: { url: string; rev: string | null }[] = [];
+      const engineFiles: string[] = [];
       const version = createHash('sha256');
       for (const file of [...files.keys()].sort()) {
+        // Content-hashed and large: cached when first used, never precached (§5.29).
+        if (file.startsWith(ENGINES_DIR)) {
+          engineFiles.push(`./${file}`);
+          version.update(`${file}\n`);
+          continue;
+        }
         const rev = file.startsWith('assets/') ? null : sha256(files.get(file)!).slice(0, 16);
         precache.push({ url: `./${file}`, rev });
         version.update(`${file}\0${rev ?? ''}\n`);
@@ -77,6 +131,7 @@ function serviceWorker(): Plugin {
       const { code } = await transformWithOxc(source, 'src/sw/sw.ts', { target: 'es2022' });
       const header =
         `const __PRECACHE__ = ${JSON.stringify(precache)};\n` +
+        `const __ENGINES__ = ${JSON.stringify(engineFiles)};\n` +
         `const __VERSION__ = ${JSON.stringify(version.digest('hex').slice(0, 16))};\n`;
       this.emitFile({ type: 'asset', fileName: 'sw.js', source: header + code });
     },

@@ -16,6 +16,9 @@ const TYPES: Record<string, string> = {
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
   '.map': 'application/json',
+  '.wasm': 'application/wasm',
+  '.mjs': 'text/javascript; charset=utf-8',
+  '.onnx': 'application/octet-stream',
 };
 
 export interface SiteServer {

@@ -11,6 +11,7 @@ import { formatTime } from './Sync.tsx';
 import { trainData } from '../app/train.ts';
 import { conflicts } from '../core/repertoire/index.ts';
 import { TimeControl } from './TimeTravel.tsx';
+import { EngineFiles } from './Engines.tsx';
 
 /** The repertoire index (§5.1, §5.7): its size and build time, positions with more than one own move, chapters left out. */
 function Repertoire() {
@@ -120,6 +121,7 @@ export function Debug() {
         </button>
       </div>
       <Repertoire />
+      <EngineFiles />
       <h3>Card states (replay of every device's log)</h3>
       {cards.length === 0 ? (
         <p class="muted">No reviews yet.</p>
