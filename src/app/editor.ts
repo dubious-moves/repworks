@@ -60,6 +60,12 @@ const chapterKey = computed(() => {
 });
 
 let openedKey = '';
+/**
+ * The move asked for when the chapter was opened, until a read shows it: a sync finishing while
+ * the first read is under way starts a newer read, which abandons the first, and without this
+ * the chapter would open at its start instead of at the address's move.
+ */
+let wanted: string[] | undefined;
 
 effect(() => {
   const key = chapterKey.value;
@@ -71,9 +77,9 @@ effect(() => {
   const m = mode.peek();
   if (m.name !== 'chapter') return;
   // Opened (or opened again): at the address's move. Read again after a change: where it was.
-  const opened = key !== openedKey;
+  if (key !== openedKey) wanted = m.at ?? [];
   openedKey = key;
-  void load(m.sid, m.cid, opened ? (m.at ?? []) : undefined);
+  void load(m.sid, m.cid, wanted);
 });
 
 effect(() => {
@@ -128,6 +134,7 @@ async function load(sid: string, cid: string | undefined, wantAt: string[] | und
   const sameChapter = study.peek()?.sid === sid && study.peek()?.cid === cid;
   const same = sameChapter && text === fileText && doc.peek() !== undefined;
   study.value = { sid, cid, meta: meta.value, chapters };
+  wanted = undefined;
   if (same) {
     if (wantAt) at.value = nearest(doc.peek()!.present, wantAt);
     return;
