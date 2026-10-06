@@ -28,3 +28,6 @@ fixes them and updates this file.
 - §5.9: show and grade on the phone with the owner's ring: whether its buttons arrive as key
   events or through the Media Session API (and whether the silent loop keeps that routing), with
   the screen on and off; speech on Android.
+- §5.10: the Read and Interactive views on the phone and the desktop, from the chapter view and
+  the move menu: reading a long line with comments (the text size, ← →), playing a line by tap
+  and drag, and the walk following a variation's move.

@@ -12,12 +12,12 @@ import { newCard, State } from '../../../../src/core/progress/fsrs.ts';
 import type { CardState } from '../../../../src/core/progress/replay.ts';
 import { parseChapterFile } from '../../../../src/core/pgn/parse.ts';
 import { indexStudies, type Line, type RepertoireIndex } from '../../../../src/core/repertoire/index.ts';
-import { planSession, type PlannedLine, type SessionPlan } from '../../../../src/core/train/plan.ts';
+import { interactivePlan, planSession, type PlannedLine, type SessionPlan } from '../../../../src/core/train/plan.ts';
 import { statusOf, todaysQueue, type Day } from '../../../../src/core/train/queue.ts';
 import { DEFAULT_TRAIN } from '../../../../src/core/train/settings.ts';
 import { MIN_PACE_MS, Trainer, type TrainerCommand, type TrainerEffect, type TrainerRecord, type TrainerView } from '../../../../src/core/train/trainer.ts';
 import type { Chapter } from '../../../../src/core/study/model.ts';
-import { startPosition } from '../../../../src/core/study/tree.ts';
+import { lineThrough, startPosition } from '../../../../src/core/study/tree.ts';
 import { mulberry32 } from '../../../support/random.ts';
 import { randomChapter } from '../../../support/randomTree.ts';
 import { DAY } from '../../../support/reviewHistory.ts';
@@ -64,7 +64,7 @@ const startOf = (w: World) => (line: Line) => {
   return c ? startPosition(c) : undefined;
 };
 const planOf = (w: World, states: Map<string, CardState>, newPerDay = 0) => planSession(w.ix, todaysQueue(w.ix, states, { ...DEFAULT_TRAIN, newPerDay }, day), states);
-const trainer = (w: World, plan: SessionPlan, states: Map<string, CardState>, extra: { record?: boolean; askAll?: boolean; paceMs?: number } = {}) =>
+const trainer = (w: World, plan: SessionPlan, states: Map<string, CardState>, extra: { record?: boolean; askAll?: boolean; follow?: boolean; paceMs?: number } = {}) =>
   new Trainer({ index: w.ix, plan, states, startOf: startOf(w), paceMs: extra.paceMs ?? 600, ...extra });
 
 /** Who answers an ask or a teach: a command, or undefined to stop the session. */
@@ -305,6 +305,49 @@ test('with recording off nothing is graded or taught on record; askAll asks ever
   assert.deepEqual(records, []);
   assert.deepEqual(plays(effects), ['user:e4', 'opponent:e5', 'user:Nf3', 'opponent:Nc6', 'user:Bb5']);
   assert.deepEqual(views.map((v) => v.phase), ['ask', 'ask', 'wrong', 'ask']);
+});
+
+test('Interactive view: every own move asked, nothing recorded, and the walk follows the line the user chooses', () => {
+  const c = chapter('Chapter1', 'black', '1. e4 c5 2. Nf3 d6 (2... Nc6 3. d4) 3. d4 cxd4');
+  const w = world(c);
+  const plan = interactivePlan(w.ix.lines, lineThrough(c, [])!, 0)!;
+  assert.deepEqual(plan.lines[0]!.line.path, ['e4', 'c5', 'Nf3', 'd6', 'd4', 'cxd4']);
+  // Played with no card states at all: nothing is suspended, known or due.
+  const t = trainer(w, plan, new Map(), { record: false, askAll: true, follow: true });
+  const { records, effects } = run(t, (view, n) => {
+    if (n === 0) return { type: 'move', uci: 'd7d5', now: 0 };
+    // 2... Nc6 is the other line's move: right, and the walk goes on along it.
+    if (n === 2) return { type: 'move', uci: 'b8c6', now: 0 };
+    return right(view, n);
+  });
+  assert.deepEqual(records, []);
+  assert.deepEqual(plays(effects), ['opponent:e4', 'user:c5', 'opponent:Nf3', 'user:Nc6', 'opponent:d4']);
+  assert.deepEqual(
+    effects.flatMap((e) => (e.type === 'answer' ? [e.ok] : [])),
+    [false, true],
+  );
+  assert.ok(!effects.some((e) => e.type === 'note' && e.note.kind === 'alsoPlays'));
+
+  // Without `follow`, the same move is the conflict rule's: accepted, then the line's move asked.
+  const strict = trainer(w, interactivePlan(w.ix.lines, lineThrough(c, [])!, 0)!, new Map(), { record: false, askAll: true });
+  const second = run(strict, (view, n) => (n === 1 ? { type: 'move', uci: 'b8c6', now: 0 } : right(view, n)));
+  assert.ok(second.effects.some((e) => e.type === 'note' && e.note.kind === 'alsoPlays'));
+  assert.deepEqual(plays(second.effects), ['opponent:e4', 'user:c5', 'opponent:Nf3', 'user:d6', 'opponent:d4', 'user:cxd4']);
+});
+
+test('Interactive view: walked from the move shown, or from the start at the line\'s end', () => {
+  const c = chapter('Chapter1', 'black', '1. e4 c5 2. Nf3 d6 (2... Nc6 3. d4) 3. d4 cxd4');
+  const w = world(c);
+  const from = (path: string[]) => {
+    const plan = interactivePlan(w.ix.lines, lineThrough(c, path)!, path.length)!;
+    return plays(run(trainer(w, plan, new Map(), { record: false, askAll: true, follow: true }), right).effects);
+  };
+  assert.deepEqual(from(['e4', 'c5', 'Nf3']), ['user:d6', 'opponent:d4', 'user:cxd4']);
+  assert.deepEqual(from(['e4', 'c5', 'Nf3', 'Nc6']), ['opponent:d4']);
+  assert.deepEqual(from(['e4', 'c5', 'Nf3', 'Nc6', 'd4']), ['opponent:e4', 'user:c5', 'opponent:Nf3', 'user:Nc6', 'opponent:d4']);
+  assert.equal(interactivePlan(w.ix.lines, ['e4', 'c5', 'Nf3'], 0), undefined);
+  assert.deepEqual(lineThrough(c, ['e4', 'c5', 'Nf3', 'Nc6']), ['e4', 'c5', 'Nf3', 'Nc6', 'd4']);
+  assert.equal(lineThrough(c, ['e4', 'e5']), undefined);
 });
 
 test('random repertoires: every planned ask graded once, every teach taught once, the same effects twice', () => {

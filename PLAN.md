@@ -1628,6 +1628,45 @@ Qchess's two training views, started from the chapter view at the move shown ("R
 Tests: the trainer in its interactive setting in Node (asks every own move, records nothing);
 Playwright: read a line through, play a line through with one wrong move.
 
+**As built** (2026-10-06):
+- Routes `#/read/<sid>/<cid>?at=…` and `#/play/<sid>/<cid>?at=…`, modes `read` and `play` in
+  `fsm.ts`. `at` names the line (the move's path, then the main line below it: `lineThrough` in
+  `core/study/tree.ts`); an optional `&from=n` starts the view after the line's first n moves
+  (default: at the move), so Read's "Play from here" after stepping back stays on the same line
+  rather than the main line below the earlier move. The address doesn't follow Read's steps: a
+  reload comes back to the move it was opened at.
+- Opened from the chapter view by "Read from here" and "Play from here" under the notation (phone
+  and desktop) and from the move menu. Both read the chapter from the working copy, so they work
+  on reference studies too.
+- **Read** (`src/ui/Read.tsx`): the board with the study's arrows and circles, the move numbered
+  as in a book with its glyphs and "n / m", the comments in large text, the line's moves as
+  buttons, ⏮ ◀ ▶ ⏭ and ← → Home End; Escape or "Edit" goes back to the chapter at the move
+  shown, "Play from here" plays the same line from it. Clickable lines in its comments come with
+  §5.12.
+- **Interactive**: the training screen with a session kind `play`. The trainer gains `follow`:
+  a move the user plays that another line of the chapter plays after the board's moves is right,
+  and the walk continues along that line (`followLine`); without it the conflict rule (§5.6)
+  applies. The session builds an index of that chapter alone, runs with no card states (so
+  suspended and known moves are asked as well), `askAll`, `record: false`, and starts at the
+  move (`interactivePlan` in `core/train/plan.ts`; from the start when opened at the line's
+  last move). It records no events at all, pins and drills included. Hint and Stop as in
+  training, no Skip line; the end offers "Play again", "Read the line" and "Back to the
+  chapter" (at the line's last move); ← goes back to the chapter at the move on the board.
+- The drill event (§5.8) is now recorded only in the drill and pin sessions, by name: the old
+  test (every session but the queue and retry) would also have credited a pin from show and
+  grade, and from the Interactive view.
+- Tests: `test/unit/core/train/trainer.test.ts` (every own move asked with nothing recorded, a
+  wrong move, the other line's move followed, the conflict rule without `follow`; the walk from a
+  move, from a variation's move, and from the start at a line's end), `test/unit/core/app/
+  fsm.test.ts` (the routes), and `test/e2e/views.spec.ts` on desktop and the emulated phone: a
+  line read through (keys on desktop, buttons on the phone), its comment, a move picked from the
+  list, back to the chapter at it, a variation's line; a line played with a wrong move, the
+  suspended 2... d6 asked, 2... Nc6 followed to 3. d4, and nothing in the fake repo; Play from
+  the move menu with a hint, then "Read the line". 128 runs of the training and views specs
+  under `--repeat-each=8 --workers=4` passed before pushing; the first load runs caught Read's
+  Escape leaving at the move before a quick step (the key handler now reads the latest step
+  through a ref).
+
 #### 5.11 Transposition badges and copy continuation
 
 - **Badges** (q_extension's): a move whose resulting position is reached by another path in the

@@ -184,6 +184,14 @@ export function ChapterView() {
             </div>
             <div class="cv-panel">
               <Notation chapter={c} />
+              <div class="actions cv-views">
+                <button type="button" class="secondary" onClick={() => open({ name: 'read', sid: s.sid, cid: s.cid, at: [...at.peek()] })}>
+                  Read from here
+                </button>
+                <button type="button" class="secondary" onClick={() => open({ name: 'play', sid: s.sid, cid: s.cid, at: [...at.peek()] })}>
+                  Play from here
+                </button>
+              </div>
               <div class="cv-tools">
                 {doc.value && <Conflicts />}
                 <CardPanel />

@@ -1165,3 +1165,55 @@ a.button.secondary {
   background: transparent;
   color: var(--text);
 }
+
+/* The Read view (PLAN.md §5.10): the move and its comments in large text. */
+
+.cv-views {
+  margin: 6px 0;
+}
+
+.read-controls {
+  justify-content: center;
+}
+
+.read-move {
+  font-size: 1.6rem;
+  font-weight: 600;
+  margin: 8px 0;
+}
+
+.read-move .glyphs {
+  margin-left: 2px;
+}
+
+.read-count {
+  font-size: 0.9rem;
+  font-weight: 400;
+}
+
+.read-comments {
+  font-size: 1.2rem;
+  line-height: 1.5;
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 4px 12px;
+  max-height: 40dvh;
+  overflow-y: auto;
+}
+
+.read-line {
+  line-height: 2;
+}
+
+.read-step {
+  background: transparent;
+  color: var(--text);
+  padding: 2px 4px;
+  min-height: 0;
+  font-weight: 400;
+}
+
+.read-step.current {
+  background: var(--accent);
+  color: var(--accent-text);
+}

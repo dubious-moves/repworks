@@ -58,6 +58,18 @@ export function mainline(chapter: Chapter): Path[] {
 }
 
 /**
+ * The line through the move at `path` (PLAN.md §5.10): its moves, then the main line below it
+ * (first children) to its end. Undefined if the path isn't in the chapter.
+ */
+export function lineThrough(chapter: Chapter, path: Path): string[] | undefined {
+  const node = nodeAt(chapter, path);
+  if (!node) return undefined;
+  const out = [...path];
+  for (let next = node.children[0]; next; next = next.children[0]) out.push(next.san);
+  return out;
+}
+
+/**
  * Problems that make a chapter unwritable as a study: a move that isn't legal, SAN that isn't
  * chessops's own, or two siblings with the same move. An empty list means valid.
  */

@@ -852,3 +852,17 @@ Technical calls made while building `PLAN.md` §5.6–§5.7, each with its reaso
 - **D16: a wrong press on a move already shown grades it Again at once.** The plan had the next
   press do it; one press is what the owner means, and the two-key table keeps `next`, `next` for
   Good and anything with a `wrong` for Again.
+
+## Revision of 2026-10-06 (the Read and Interactive views)
+Technical calls made while building `PLAN.md` §5.10, each with its reason:
+- **D16: the Interactive view asks every own move, suspended and known ones included,** and
+  records nothing: it is practice of a line as written, apart from the schedule. It runs the
+  trainer with no card states rather than a second walker.
+- **D3: in the Interactive view the walk follows the user's move among the chapter's lines.**
+  Training keeps the conflict rule (the line's move is asked after the other); the view has no
+  schedule to protect, so the move played picks the line, as the plan asked.
+- **D4: a drill event is recorded only by the drill and pin sessions.** Before, any session but
+  the queue and retry recorded one for a pinned card, which would have credited a pin from show
+  and grade or from the Interactive view.
+- **The Read and Interactive views take a start (`from`) as well as the move naming the line,**
+  so stepping back in Read and playing from there stays on the line being read.

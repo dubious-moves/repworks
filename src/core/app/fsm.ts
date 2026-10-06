@@ -9,6 +9,8 @@
 //   #/mistakes                          the day's mistakes and the pins (§5.8)
 //   #/mistakes/retry, #/mistakes/drill  the day's mistakes retried, or drilled
 //   #/pinned, #/pinned/all              the pins due, or every pin, drilled
+//   #/read/<sid>/<cid>[?at=e4,e5][&from=1]  a chapter's line read through, from a move (§5.10)
+//   #/play/<sid>/<cid>[?at=e4,e5][&from=1]  the same line played, every own move asked (§5.10)
 // A setup link (#setup?…) is read and removed before any of this (src/app/setup.ts).
 import { isId } from '../study/ids.ts';
 
@@ -23,6 +25,12 @@ export type Mode =
   /** Show and grade (§5.9): the same queue, run with two keys. */
   | { name: 'show'; sid?: string }
   | { name: 'mistakes' }
+  /**
+   * A chapter's line through the move `at` (to the end of the main line below it), read move by
+   * move or played with every own move asked (§5.10), from its first `from` moves (`at`'s
+   * length when not given). Nothing is graded.
+   */
+  | { name: 'read' | 'play'; sid: string; cid: string; at: string[]; from?: number }
   /** A practice session over mistakes or pins: nothing graded (§5.8). */
   | { name: 'practice'; run: Practice };
 
@@ -66,6 +74,17 @@ const decode = (part: string): string | undefined => {
   }
 };
 
+/** The move path of a query's `at=`, when it is one. */
+function atOf(query: string): string[] | undefined {
+  const at = query.split('&').find((p) => p.startsWith('at='))?.slice(3);
+  if (at === undefined) return undefined;
+  const path = at === '' ? [] : at.split(',').map(decode);
+  return path.every((san) => san !== undefined && SAN.test(san)) ? (path as string[]) : undefined;
+}
+
+// encoded: a query reads a bare + as a space (exd8=Q+).
+const atQuery = (at: readonly string[] | undefined) => (at && at.length ? `?at=${at.map(encodeURIComponent).join(',')}` : '');
+
 export function parseHash(hash: string): Mode {
   const [rawPath = '', query = ''] = hash.replace(/^#\/?/, '').split('?');
   const parts = rawPath.split('/').filter(Boolean);
@@ -81,17 +100,20 @@ export function parseHash(hash: string): Mode {
   }
   const practice = (Object.keys(PRACTICE_HASH) as Practice[]).find((p) => PRACTICE_HASH[p] === `#/${parts.join('/')}`);
   if (practice) return { name: 'practice', run: practice };
+  const at = atOf(query);
   if (parts[0] === 'study' && isId(parts[1]) && parts.length <= 3) {
     const mode: Mode = { name: 'chapter', sid: parts[1] };
     if (parts.length === 3) {
       if (!isId(parts[2])) return { name: 'list' };
       mode.cid = parts[2];
     }
-    const at = query.split('&').find((p) => p.startsWith('at='))?.slice(3);
-    if (at !== undefined) {
-      const path = at === '' ? [] : at.split(',').map(decode);
-      if (path.every((san) => san !== undefined && SAN.test(san))) mode.at = path as string[];
-    }
+    if (at) mode.at = at;
+    return mode;
+  }
+  if ((parts[0] === 'read' || parts[0] === 'play') && parts.length === 3 && isId(parts[1]) && isId(parts[2])) {
+    const mode: Mode = { name: parts[0], sid: parts[1], cid: parts[2], at: at ?? [] };
+    const from = /(?:^|&)from=(\d{1,4})(?:&|$)/.exec(query)?.[1];
+    if (from !== undefined && Number(from) !== mode.at.length) mode.from = Number(from);
     return mode;
   }
   return { name: 'list' };
@@ -113,10 +135,13 @@ export function modeHash(mode: Mode): string {
       return '#/mistakes';
     case 'practice':
       return PRACTICE_HASH[mode.run];
-    case 'chapter': {
-      const base = `#/study/${mode.sid}${mode.cid ? `/${mode.cid}` : ''}`;
-      // encoded: a query reads a bare + as a space (exd8=Q+).
-      return mode.at && mode.at.length ? `${base}?at=${mode.at.map(encodeURIComponent).join(',')}` : base;
+    case 'chapter':
+      return `#/study/${mode.sid}${mode.cid ? `/${mode.cid}` : ''}${atQuery(mode.at)}`;
+    case 'read':
+    case 'play': {
+      const query = atQuery(mode.at);
+      const from = mode.from === undefined || mode.from === mode.at.length ? '' : `${query ? '&' : '?'}from=${mode.from}`;
+      return `#/${mode.name}/${mode.sid}/${mode.cid}${query}${from}`;
     }
   }
 }

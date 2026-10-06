@@ -13,10 +13,12 @@
 // - Conflicting moves (D3): every own move of the position is accepted, and the one played is
 //   graded on its own card if it is due. The line's own move is then asked in the same position,
 //   on its own card, so a sibling can't stay due for ever. The trainer only lets the user move
-//   where the line's own move is asked or taught, so the line followed is always the planned one.
+//   where the line's own move is asked or taught, so the line followed is always the planned one,
+//   except with `follow` (the Interactive view, §5.10): a move that starts another line of the
+//   chapter from the board's moves is right, and the walk goes on along that line.
 import type { Position } from 'chessops/chess';
-import { parseSan } from 'chessops/san';
-import { isNormal } from 'chessops/types';
+import { makeSan, parseSan } from 'chessops/san';
+import { isNormal, type NormalMove } from 'chessops/types';
 import { positionKeyOf } from '../chess/positionKey.ts';
 import { parseUciMove, standardUci } from '../chess/uci.ts';
 import { repertoireCard, type CardId } from '../progress/cards.ts';
@@ -124,6 +126,11 @@ export interface TrainerSetup {
   askOnly?: boolean;
   /** Show and grade (§5.9): the user never moves; `show` plays the move, `tell` grades it. */
   selfGrade?: boolean;
+  /**
+   * Interactive view (§5.10): an own move that another of the index's lines plays after the
+   * board's moves is right, and the walk follows that line to its end.
+   */
+  follow?: boolean;
 }
 
 interface Ply {
@@ -169,6 +176,8 @@ export class Trainer {
   private readonly setup: TrainerSetup;
   private pace: number;
   private readonly record: boolean;
+  /** The plan's lines; with `follow`, the line walked is replaced by the one the user chose. */
+  private readonly lines: PlannedLine[];
   private readonly toAsk = new Set<CardId>();
   private readonly toTeach = new Set<CardId>();
   private readonly known: Set<CardId>;
@@ -194,6 +203,7 @@ export class Trainer {
     this.setup = setup;
     this.pace = Math.max(MIN_PACE_MS, setup.paceMs);
     this.record = setup.record ?? true;
+    this.lines = [...setup.plan.lines];
     for (const l of setup.plan.lines) {
       for (const c of l.ask) this.toAsk.add(c);
       for (const c of l.teach) this.toTeach.add(c);
@@ -207,11 +217,11 @@ export class Trainer {
   }
 
   get view(): TrainerView {
-    const line = this.setup.plan.lines[this.at];
+    const line = this.lines[this.at];
     const v: TrainerView = {
       phase: this.phase,
       number: this.at + 1,
-      total: this.setup.plan.lines.length,
+      total: this.lines.length,
       path: line ? line.line.path.slice(0, this.ply) : [],
       summary: this.summary(),
     };
@@ -309,7 +319,7 @@ export class Trainer {
   }
 
   private nextLine(now: number, out: TrainerEffect[]) {
-    const lines = this.setup.plan.lines;
+    const lines = this.lines;
     const board = this.at >= 0 ? lines[this.at]! : undefined;
     const boardPath = board ? board.line.path.slice(0, this.ply) : [];
     for (this.at++; this.at < lines.length; this.at++) {
@@ -362,7 +372,7 @@ export class Trainer {
   }
 
   private path(upTo = this.ply) {
-    return this.setup.plan.lines[this.at]!.line.path.slice(0, upTo);
+    return this.lines[this.at]!.line.path.slice(0, upTo);
   }
 
   /** From the board's position: the next move, an ask, or the line's end. */
@@ -409,7 +419,7 @@ export class Trainer {
     const p = this.pending;
     if (!p) {
       // Not the user's turn: the board goes back.
-      if (this.phase !== 'ready' && this.at < this.setup.plan.lines.length) out.push({ type: 'takeback', path: this.path() });
+      if (this.phase !== 'ready' && this.at < this.lines.length) out.push({ type: 'takeback', path: this.path() });
       return;
     }
     const before = this.plies[this.ply]!.before;
@@ -418,6 +428,7 @@ export class Trainer {
     if (!move) return void out.push({ type: 'takeback', path: this.path() });
     const played = standardUci(before, move);
     if (played === p.uci) return this.accept(p, now, out);
+    if (this.setup.follow && this.followLine(before, move)) return this.accept(this.pending!, now, out);
     if (p.mode === 'teach') {
       out.push({ type: 'takeback', path: this.path() });
       out.push({ type: 'note', note: { kind: 'newMove', san: p.san } });
@@ -443,6 +454,31 @@ export class Trainer {
       this.phase = 'wrong';
       out.push({ type: 'note', note: { kind: 'wrong' } });
     }
+  }
+
+  /**
+   * With `follow`: switches to the first of the index's lines in this chapter that plays `move`
+   * after the board's moves, and makes it the move asked. False when no line does.
+   */
+  private followLine(before: Position, move: NormalMove): boolean {
+    const p = this.pending!;
+    const current = this.lines[this.at]!;
+    const board = current.line.path.slice(0, this.ply);
+    const san = makeSan(before, move);
+    const line = this.setup.index.lines.find(
+      (l) => l.sid === current.line.sid && l.cid === current.line.cid && l.path[this.ply] === san && board.every((m, i) => l.path[i] === m),
+    );
+    if (!line) return false;
+    const planned: PlannedLine = { ...current, line, end: line.path.length };
+    const built = this.build(planned);
+    const ply = built?.plies[this.ply];
+    if (!built || !ply?.card) return false;
+    this.lines[this.at] = planned;
+    this.plies = built.plies;
+    this.positions = built.positions;
+    this.end = built.plies.length;
+    this.pending = { ...p, card: ply.card, uci: ply.uci, san: ply.san };
+    return true;
   }
 
   private show(p: Pending, out: TrainerEffect[]) {

@@ -11,12 +11,13 @@ import { ImportScreen } from './Import.tsx';
 import { SetupForm } from './Setup.tsx';
 import { SyncBanners, SyncChip } from './Sync.tsx';
 import { MistakesView } from './Mistakes.tsx';
+import { ReadView } from './Read.tsx';
 import { TrainScreen } from './Train.tsx';
 import { TrainCard } from './TrainCard.tsx';
 
 export function App() {
   return (
-    <div class={`shell${mode.value.name === 'chapter' ? ' shell-chapter' : ''}${mode.value.name === 'train' || mode.value.name === 'practice' || mode.value.name === 'show' ? ' shell-train' : ''}`}>
+    <div class={`shell${mode.value.name === 'chapter' ? ' shell-chapter' : ''}${['train', 'practice', 'show', 'read', 'play'].includes(mode.value.name) ? ' shell-train' : ''}`}>
       <header class="topbar">
         <img class="topbar-icon" src={`${import.meta.env.BASE_URL}icons/icon.svg`} alt="" width={28} height={28} />
         <h1>Repworks</h1>
@@ -59,6 +60,12 @@ function Screen() {
       return <TrainScreen of={mode.value.sid ? { kind: 'show', scope: mode.value.sid } : { kind: 'show' }} />;
     case 'mistakes':
       return <MistakesView />;
+    case 'read':
+      return <ReadView sid={mode.value.sid} cid={mode.value.cid} at={mode.value.at} {...(mode.value.from === undefined ? {} : { from: mode.value.from })} />;
+    case 'play': {
+      const m = mode.value;
+      return <TrainScreen of={{ kind: 'play', sid: m.sid, cid: m.cid, at: m.at, ...(m.from === undefined ? {} : { from: m.from }) }} />;
+    }
     case 'practice': {
       const run = mode.value.run;
       return <TrainScreen of={run === 'retry' || run === 'drill' ? { kind: run } : { kind: 'pinned', all: run === 'pins' }} />;

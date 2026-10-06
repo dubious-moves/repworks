@@ -14,10 +14,10 @@ import { Replay, toDeviceEvents, type CardState, type DeviceEvent } from '../cor
 import { combineIndex, indexChapter, type ChapterIndexing, type Line, type RepertoireIndex } from '../core/repertoire/index.ts';
 import { header, type Chapter } from '../core/study/model.ts';
 import { parseStudyMeta, reconcileChapterOrder } from '../core/study/studyMeta.ts';
-import { startPosition } from '../core/study/tree.ts';
+import { lineThrough, startPosition } from '../core/study/tree.ts';
 import { cardLine, drillLines, retryLines, todaysMistakes, type Mistake } from '../core/train/mistakes.ts';
 import { pinsOf, type PinState } from '../core/train/pins.ts';
-import { planSession, type SessionPlan } from '../core/train/plan.ts';
+import { interactivePlan, planSession, type SessionPlan } from '../core/train/plan.ts';
 import { ShowGrade, type Press, type ShowGradeEffect } from '../core/train/showGrade.ts';
 import { todaysQueue, type DailyQueue, type Day } from '../core/train/queue.ts';
 import { SETTINGS_FILE, trainSettings, type TrainSettings } from '../core/train/settings.ts';
@@ -156,7 +156,14 @@ export function setPace(p: Pace): void {
  * What a session walks: today's queue (everything, or one study), or the day's mistakes, retried
  * from their lines' start or drilled from the lead-in, or the pinned mistakes (due, or all).
  */
-export type SessionKind = { kind: 'queue'; scope?: string } | { kind: 'show'; scope?: string } | { kind: 'retry' } | { kind: 'drill' } | { kind: 'pinned'; all: boolean };
+export type SessionKind =
+  | { kind: 'queue'; scope?: string }
+  | { kind: 'show'; scope?: string }
+  | { kind: 'retry' }
+  | { kind: 'drill' }
+  | { kind: 'pinned'; all: boolean }
+  /** The Interactive view (§5.10): a chapter's line through a move, every own move asked, nothing recorded. */
+  | { kind: 'play'; sid: string; cid: string; at: string[]; from?: number };
 
 export interface SessionView {
   of: SessionKind;
@@ -219,7 +226,17 @@ export async function startSession(store: IdbStore, record: (event: Parameters<I
   const now = Date.now();
   const scope = of.kind === 'queue' || of.kind === 'show' ? of.scope : undefined;
   let plan: SessionPlan;
-  if (of.kind === 'queue' || of.kind === 'show') plan = planSession(data.index, queueOf(data, now, scope), data.states);
+  let index = data.index;
+  if (of.kind === 'play') {
+    const played = await playPlan(store, of);
+    if (typeof played === 'string') {
+      sessionProblem.value = played;
+      return;
+    }
+    ({ plan, index } = played);
+    // The chapter may be a reference study's, which the training data leaves out.
+    data = { ...data, chapters: new Map(data.chapters).set(`${of.sid}/${of.cid}`, played.chapter) };
+  } else if (of.kind === 'queue' || of.kind === 'show') plan = planSession(data.index, queueOf(data, now, scope), data.states);
   else if (of.kind === 'retry') plan = { lines: retryLines(mistakesOf(data, now)) };
   else if (of.kind === 'drill') plan = { lines: drillLines(mistakesOf(data, now)) };
   else {
@@ -227,15 +244,19 @@ export async function startSession(store: IdbStore, record: (event: Parameters<I
     const cards = of.all ? pinned : due;
     plan = { lines: drillLines(cards.flatMap((card) => (cardLine(data.index, card) ? [{ card, ...cardLine(data.index, card)! }] : []))) };
   }
-  // Retry and drill grade nothing: the card was graded Again today (§5.8, D16).
+  // Retry and drill grade nothing: the card was graded Again today (§5.8, D16). The Interactive
+  // view asks every own move of its line, whatever its card's state, and follows the line played.
   const grading = of.kind === 'queue' || of.kind === 'show';
+  const interactive = of.kind === 'play';
   const t = new Trainer({
     record: grading,
-    askOnly: !grading,
+    askOnly: !grading && !interactive,
+    askAll: interactive,
+    follow: interactive,
     selfGrade: of.kind === 'show',
-    index: data.index,
+    index,
     plan,
-    states: data.states,
+    states: interactive ? new Map() : data.states,
     startOf: (line) => {
       const c = data.chapters.get(`${line.sid}/${line.cid}`);
       return c ? startPosition(c) : undefined;
@@ -248,6 +269,22 @@ export async function startSession(store: IdbStore, record: (event: Parameters<I
   if (scope !== undefined) view.scope = scope;
   session.value = view;
   send({ type: 'start', now });
+}
+
+/** The Interactive view's chapter, its own index (it may be a reference study's) and plan. */
+async function playPlan(store: IdbStore, of: Extract<SessionKind, { kind: 'play' }>): Promise<{ plan: SessionPlan; index: RepertoireIndex; chapter: Chapter } | string> {
+  const path = chapterPath(of.sid, of.cid);
+  const text = (await store.read((p) => p === path)).get(path);
+  if (text === undefined) return 'That chapter isn’t on this device.';
+  const parsed = parseChapterFile(text, of.cid);
+  if (!parsed.ok) return `This chapter can't be read: ${parsed.reason}.`;
+  const part = indexChapter(of.sid, parsed.chapter);
+  if (!part.ok) return `This chapter can't be played: ${part.reason}.`;
+  const index = combineIndex([part]);
+  const line = lineThrough(parsed.chapter, of.at);
+  const plan = line && interactivePlan(index.lines, line, Math.min(of.from ?? of.at.length, line.length));
+  if (!plan) return 'That move isn’t in the chapter any more.';
+  return { plan, index, chapter: parsed.chapter };
 }
 
 function stopTimer() {
@@ -378,7 +415,7 @@ function apply(t: Trainer, effects: readonly ShowGradeEffect[]): void {
           delete next.missed;
         } else if (s.of.kind === 'queue' && !s.data.pins.get(e.card)?.pinned) next.missed = e.card;
         // A drill answer on a pinned card is recorded for the pin's steps; nothing else is.
-        if (s.of.kind !== 'queue' && s.of.kind !== 'retry' && s.data.pins.get(e.card)?.pinned) {
+        if ((s.of.kind === 'drill' || s.of.kind === 'pinned') && s.data.pins.get(e.card)?.pinned) {
           void recordEvent?.({ t: new Date().toISOString(), k: 'drill', card: e.card, ok: e.ok });
         }
         break;
@@ -396,7 +433,8 @@ function apply(t: Trainer, effects: readonly ShowGradeEffect[]): void {
   }
   const v = t.view;
   next.phase = v.phase;
-  next.path = v.path;
+  // At the session's end the board's last moves stay, for "back to the chapter" at them.
+  if (v.phase !== 'sessionDone') next.path = v.path;
   if (v.position) next.position = v.position;
   next.number = v.number;
   next.total = v.total;

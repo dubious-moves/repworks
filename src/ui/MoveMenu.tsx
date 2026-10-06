@@ -4,7 +4,8 @@
 // for the notation.
 import { signal } from '@preact/signals';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { chapter, doc, edit, feedback, goTo } from '../app/editor.ts';
+import { chapter, doc, edit, feedback, goTo, study } from '../app/editor.ts';
+import { open } from '../app/mode.ts';
 import { LICHESS_COMMENT_LIMIT, sanitizeComment } from '../core/pgn/comment.ts';
 import { GLYPHS, MOVE_GLYPHS, OBSERVATION_GLYPHS, POSITION_GLYPHS } from '../core/pgn/nags.ts';
 import { deletePath, linePgn, makeMainline, ownComment, promote, setComment, setNags, toggleGlyph, variationStart } from '../core/study/ops.ts';
@@ -92,6 +93,12 @@ export function MoveMenu() {
   if (editable && variationStart(c, m.path)) items.push({ label: 'Make main line', class: 'promote', run: () => edit((ch) => makeMainline(ch, m.path)) });
   if (editable && isMove) items.push({ label: 'Delete from here', class: 'delete', run: () => edit((ch) => deletePath(ch, m.path), m.path.slice(0, -1)) });
   if (isMove) items.push({ label: 'Copy line as PGN', run: () => void copyLine(m.path) });
+  const s = study.value;
+  if (s) {
+    // Qchess's two training views of the line through this move (§5.10).
+    items.push({ label: 'Read from here', run: () => open({ name: 'read', sid: s.sid, cid: s.cid, at: [...m.path] }) });
+    items.push({ label: 'Play from here', run: () => open({ name: 'play', sid: s.sid, cid: s.cid, at: [...m.path] }) });
+  }
 
   const onKey = (e: KeyboardEvent) => {
     const buttons = [...(ref.current?.querySelectorAll('button') ?? [])];

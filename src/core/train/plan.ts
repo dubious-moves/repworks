@@ -76,3 +76,15 @@ export function planSession(index: RepertoireIndex, queue: DailyQueue, states: R
   }
   return { lines: out };
 }
+
+/**
+ * The Interactive view's plan (§5.10): the line of `lines` that is `path` (a chapter's line through
+ * a move, `lineThrough`), walked from its first `from` moves; from its start when `from` is its
+ * end, so a line opened at its last move is played through. Undefined when no line is `path`.
+ */
+export function interactivePlan(lines: readonly Line[], path: readonly string[], from: number): SessionPlan | undefined {
+  const line = lines.find((l) => l.path.length === path.length && l.path.every((san, i) => san === path[i]));
+  if (!line) return undefined;
+  const start = from >= line.path.length ? 0 : from;
+  return { lines: [{ kind: 'review', line, end: line.path.length, ask: [], teach: [], from: start }] };
+}

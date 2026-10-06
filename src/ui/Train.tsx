@@ -132,16 +132,21 @@ export function TrainScreen(props: { of: SessionKind }) {
 
   if (sessionProblem.value) return <p class="warn">{sessionProblem.value}</p>;
   if (!s) return <p class="muted">Reading the repertoire…</p>;
+  const of = s.of;
   const title =
-    s.of.kind === 'queue'
+    of.kind === 'queue'
       ? `Training · ${s.scope ? (s.data.studyNames.get(s.scope) ?? s.scope) : 'Whole repertoire'}`
-      : s.of.kind === 'pinned' && s.of.all
-        ? 'Drill all pins'
-        : TITLES[s.of.kind];
+      : of.kind === 'play'
+        ? `Play · ${s.chapter ? (header(s.chapter, 'ChapterName') ?? of.cid) : of.cid}`
+        : of.kind === 'pinned' && of.all
+          ? 'Drill all pins'
+          : TITLES[of.kind];
+  // The Interactive view goes back to its chapter, at the move on the board.
+  const back = () => (of.kind === 'play' ? open({ name: 'chapter', sid: of.sid, cid: of.cid, at: s.path.length ? s.path : of.at }) : open({ name: 'list' }));
   return (
     <div class="train">
       <div class="chapter-head">
-        <a href="#/" class="back" onClick={(e) => (e.preventDefault(), open({ name: 'list' }))}>
+        <a href="#/" class="back" onClick={(e) => (e.preventDefault(), back())}>
           ←
         </a>
         <div class="titles">
@@ -156,6 +161,27 @@ export function TrainScreen(props: { of: SessionKind }) {
 function Done(props: { s: SessionView }) {
   const { done, plan, of } = props.s;
   if (!done) return null;
+  if (of.kind === 'play') {
+    return (
+      <section class="card train-done" aria-label="Session done">
+        <h2>Line played</h2>
+        <p>
+          {props.s.answers} move{props.s.answers === 1 ? '' : 's'}, {props.s.right} right first time. Nothing recorded: training keeps its schedule.
+        </p>
+        <div class="actions">
+          <button type="button" onClick={() => void beginTraining(of)}>
+            Play again
+          </button>
+          <button type="button" class="secondary" onClick={() => open({ name: 'read', sid: of.sid, cid: of.cid, at: of.at, ...(of.from === undefined ? {} : { from: of.from }) })}>
+            Read the line
+          </button>
+          <button type="button" class="secondary" onClick={() => open({ name: 'chapter', sid: of.sid, cid: of.cid, at: props.s.path.length ? props.s.path : of.at })}>
+            Back to the chapter
+          </button>
+        </div>
+      </section>
+    );
+  }
   // Show and grade records its grades; retry, drill and the pins never do.
   const practice = of.kind !== 'queue' && of.kind !== 'show';
   return (
@@ -268,7 +294,11 @@ function Session(props: { s: SessionView }) {
       </div>
       <div class="train-panel">
         <p class="train-counters" aria-label="Left today">
-          {s.of.kind === 'queue' || s.of.kind === 'show' ? (
+          {s.of.kind === 'play' ? (
+            <>
+              {s.right} of {s.answers} right first time
+            </>
+          ) : s.of.kind === 'queue' || s.of.kind === 'show' ? (
             <>
               <span>{s.dueLeft} due</span> · <span>{s.newLeft} new</span> · line {s.number} of {s.total}
             </>
@@ -324,9 +354,11 @@ function Session(props: { s: SessionView }) {
               Undo: ask {s.suspended.san} again
             </button>
           )}
-          <button type="button" class="secondary" onClick={() => command('skipLine')}>
-            Skip line
-          </button>
+          {s.of.kind !== 'play' && (
+            <button type="button" class="secondary" onClick={() => command('skipLine')}>
+              Skip line
+            </button>
+          )}
           <button type="button" class="secondary" onClick={() => command('stop')}>
             Stop
           </button>

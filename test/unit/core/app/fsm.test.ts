@@ -26,6 +26,11 @@ test('hashes parse to modes, and modes write back to the same hash', () => {
     ['#/study/Rep0Najd/Ch1Najdf', { name: 'chapter', sid: 'Rep0Najd', cid: 'Ch1Najdf' }],
     ['#/study/Rep0Najd/Ch1Najdf?at=e4,c5,Nf3', { name: 'chapter', sid: 'Rep0Najd', cid: 'Ch1Najdf', at: ['e4', 'c5', 'Nf3'] }],
     ['#/study/Rep0Najd/Ch1Najdf?at=O-O,exd8%3DQ%2B', { name: 'chapter', sid: 'Rep0Najd', cid: 'Ch1Najdf', at: ['O-O', 'exd8=Q+'] }],
+    ['#/read/Rep0Najd/Ch1Najdf', { name: 'read', sid: 'Rep0Najd', cid: 'Ch1Najdf', at: [] }],
+    ['#/read/Rep0Najd/Ch1Najdf?at=e4,c5', { name: 'read', sid: 'Rep0Najd', cid: 'Ch1Najdf', at: ['e4', 'c5'] }],
+    ['#/play/Rep0Najd/Ch1Najdf?at=e4', { name: 'play', sid: 'Rep0Najd', cid: 'Ch1Najdf', at: ['e4'] }],
+    ['#/play/Rep0Najd/Ch1Najdf?at=e4,c5&from=1', { name: 'play', sid: 'Rep0Najd', cid: 'Ch1Najdf', at: ['e4', 'c5'], from: 1 }],
+    ['#/read/Rep0Najd/Ch1Najdf?from=0', { name: 'read', sid: 'Rep0Najd', cid: 'Ch1Najdf', at: [] }],
   ];
   for (const [hash, mode] of cases) {
     assert.deepEqual(parseHash(hash), mode, hash);
@@ -33,7 +38,7 @@ test('hashes parse to modes, and modes write back to the same hash', () => {
   }
   assert.equal(modeHash({ name: 'chapter', sid: 'Rep0Najd', cid: 'Ch1Najdf', at: [] }), '#/study/Rep0Najd/Ch1Najdf');
   // Anything else is the list: unknown pages, malformed IDs, a path with a stray character.
-  for (const hash of ['#/mistakes/other', '#/pinned/x', '#/train/short', '#/train/Rep0Najd/x', '#/nope', '#/study/short', '#/study/Rep0Najd/bad', '#/study/Rep0Najd/Ch1Najdf/x']) assert.deepEqual(parseHash(hash), { name: 'list' }, hash);
+  for (const hash of ['#/mistakes/other', '#/pinned/x', '#/train/short', '#/train/Rep0Najd/x', '#/nope', '#/study/short', '#/study/Rep0Najd/bad', '#/study/Rep0Najd/Ch1Najdf/x', '#/read/Rep0Najd', '#/play/Rep0Najd/bad']) assert.deepEqual(parseHash(hash), { name: 'list' }, hash);
   assert.deepEqual(parseHash('#/study/Rep0Najd/Ch1Najdf?at=e4,<script>'), { name: 'chapter', sid: 'Rep0Najd', cid: 'Ch1Najdf' });
 });
 
