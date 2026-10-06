@@ -11,7 +11,7 @@ import type { Api } from '@lichess-org/chessground/api';
 import type { Config } from '@lichess-org/chessground/config';
 import type { DrawShape } from '@lichess-org/chessground/draw';
 import type { Key } from '@lichess-org/chessground/types';
-import { useEffect, useRef } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef } from 'preact/hooks';
 import type { SquareName } from 'chessops/types';
 import type { Brush, Shape } from '../core/study/model.ts';
 import { toggleShape } from '../core/study/ops.ts';
@@ -135,7 +135,9 @@ export function Board(p: BoardProps) {
     };
   }, []);
 
-  useEffect(() => {
+  // In the same commit as the rest of the view, so the board never shows a position the
+  // notation has already left.
+  useLayoutEffect(() => {
     api.current?.set(config(p));
   });
 

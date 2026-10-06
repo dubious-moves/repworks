@@ -866,7 +866,8 @@ and offline editing with the PWA killed and reopened.
 - **Edits** are core's operations; each new chapter is written at once as the device's working
   copy, in order. When a sync or another tab changes the open chapter's file, it is read again,
   the move shown is kept where it still exists, and undo starts over (it would otherwise undo
-  someone else's work). A chapter whose file can't be read, or holds illegal moves an edit would
+  someone else's work). A read that an edit overtook is made again, or the edit would look like
+  someone else's change and be lost (the Playwright tests found this under load). A chapter whose file can't be read, or holds illegal moves an edit would
   cut, is shown without editing. A promotion asks for the piece.
 - **Conflicts** are resolved where they stand (`src/core/merge/resolve.ts`): for clashing text,
   either side, both, or a text written by hand; for a line kept after a delete, keep it (the

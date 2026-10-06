@@ -50,6 +50,8 @@ export const chapter = computed(() => doc.value?.present);
 /** The chapter file as last read or written here: a different text means someone else changed it. */
 let fileText: string | undefined;
 let loading = 0;
+/** Raised by every write from here: a read that began before one is stale. */
+let written = 0;
 let writing: Promise<void> = Promise.resolve();
 
 const chapterKey = computed(() => {
@@ -90,10 +92,13 @@ async function load(sid: string, cid: string | undefined, wantAt: string[] | und
   const store = localStore();
   if (!store) return;
   const ticket = ++loading;
-  // An edit being written would read back as someone else's change.
+  // An edit being written would read back as someone else's change; so would one made while
+  // this read is under way, so then the read is made again.
   await writing;
+  const before = written;
   const files = await store.read((p) => p.startsWith(`studies/${sid}/`));
   if (ticket !== loading) return;
+  if (written !== before) return load(sid, cid, wantAt);
   const metaText = files.get(studyMetaPath(sid));
   const meta = metaText === undefined ? undefined : parseStudyMeta(metaText, sid);
   if (!meta?.ok) {
@@ -147,6 +152,7 @@ function persist(next: Chapter, more: ReadonlyMap<string, string | null> = new M
   if (!s) return;
   const text = chapterFileText(next);
   fileText = text;
+  written++;
   const files = new Map<string, string | null>([[chapterPath(s.sid, s.cid), text], ...more]);
   writing = writing.then(() => saveFiles(files)).catch((error: unknown) => void (feedback.value = `Not saved: ${error instanceof Error ? error.message : String(error)}`));
 }
@@ -238,6 +244,7 @@ export async function addChapter(name: string, side: 'white' | 'black'): Promise
     return undefined;
   }
   const meta = addChapterToStudy({ ...s.meta, chapters: s.chapters.map((c) => c.id) }, cid);
+  written++;
   await (writing = writing.then(() => saveFiles(new Map([[chapterPath(s.sid, cid), chapterFileText(made.value)], [studyMetaPath(s.sid), writeStudyMeta(meta)]]))));
   dispatch({ type: 'open', mode: { name: 'chapter', sid: s.sid, cid } });
   return cid;
@@ -247,6 +254,7 @@ export async function deleteOpenChapter(): Promise<void> {
   const s = study.peek();
   if (!s) return;
   const meta = removeChapterFromStudy({ ...s.meta, chapters: s.chapters.map((c) => c.id) }, s.cid);
+  written++;
   await (writing = writing.then(() => saveFiles(new Map([[chapterPath(s.sid, s.cid), null], [studyMetaPath(s.sid), writeStudyMeta(meta)]]))));
   dispatch({ type: 'missing', chapters: meta.chapters });
 }
@@ -261,12 +269,14 @@ export async function moveOpenChapter(by: -1 | 1): Promise<void> {
   [order[i], order[j]] = [order[j]!, order[i]!];
   const meta = reorderChapters({ ...s.meta, chapters: s.chapters.map((c) => c.id) }, order);
   if (!meta.ok) return;
+  written++;
   await (writing = writing.then(() => saveFiles(new Map([[studyMetaPath(s.sid), writeStudyMeta(meta.value)]]))));
 }
 
 export async function setStudyKind(kind: StudyKind): Promise<void> {
   const s = study.peek();
   if (!s) return;
+  written++;
   await (writing = writing.then(() => saveFiles(new Map([[studyMetaPath(s.sid), writeStudyMeta(setKind(s.meta, kind))]]))));
 }
 
@@ -294,6 +304,7 @@ export async function renameOpenStudy(name: string): Promise<void> {
   for (const c of renamed.value.chapters) out.set(chapterPath(s.sid, c.id), chapterFileText(c));
   // The open chapter's history is replaced by the next read: a rename isn't undone from here.
   fileText = undefined;
+  written++;
   await (writing = writing.then(() => saveFiles(out)));
 }
 

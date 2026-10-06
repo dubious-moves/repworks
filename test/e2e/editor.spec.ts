@@ -60,6 +60,7 @@ test('open a chapter, move through it, and edit it: variation, comment, glyph, a
 
   // A new variation: 2... e6 instead of 2... d6, played on the board.
   await page.locator('.move[data-path="e4 c5 Nf3"]').click();
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3');
   await clickSquare(page, 'e7', 'black');
   await clickSquare(page, 'e6', 'black');
   await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 e6');

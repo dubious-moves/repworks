@@ -73,6 +73,7 @@ test('two devices edit offline, sync, lose nothing, and agree', async ({ browser
   // 3. Desktop: a variation (3. Bb5+ instead of 3. d4), N's comment rewritten, S deleted, an
   //    arrow on P, two test reviews.
   await desktop.goto(at('e4,c5,Nf3,d6'));
+  await expect(desktop.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 d6');
   await clickSquare(desktop, 'f1', 'black');
   await clickSquare(desktop, 'b5', 'black');
   await expect(desktop.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 d6 Bb5+');
@@ -81,6 +82,7 @@ test('two devices edit offline, sync, lose nothing, and agree', async ({ browser
   await desktop.locator('.move[data-path="e4 c5 Nf3 Nc6"]').click();
   await desktop.getByRole('button', { name: 'Delete from here' }).click();
   await desktop.locator('.move[data-path="e4 c5 Nf3 d6 d4"]').click();
+  await expect(desktop.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 d6 d4');
   await drawInDrawMode(desktop, 'f8', 'b4', 'black', 'blue');
   await recordTwoReviews(desktop);
 
@@ -89,6 +91,7 @@ test('two devices edit offline, sync, lose nothing, and agree', async ({ browser
   await phone.goto(at('e4,c5,Nf3'));
   await comment(phone, 'phone text');
   await phone.locator('.move[data-path="e4 c5 Nf3 Nc6 d4"]').click();
+  await expect(phone.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 Nc6 d4');
   await clickSquare(phone, 'c5', 'black');
   await clickSquare(phone, 'd4', 'black');
   await expect(phone.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 Nc6 d4 cxd4');

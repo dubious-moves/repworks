@@ -113,6 +113,8 @@ test('a device that starts offline says offline, keeps its studies, and syncs wh
   await serveGithub(page, github);
   await page.goto(setupUrl('desktop'));
   await expect(page.locator('.studies')).toContainText('Test repertoire');
+  // The first sync pulls (the studies show), then pushes this device's file: wait for both.
+  await expect(page.locator('.chip')).toHaveText(/^synced/);
   await context.setOffline(true);
   await page.reload();
   await expect(page.locator('.chip')).toHaveText('offline');
