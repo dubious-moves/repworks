@@ -3085,6 +3085,38 @@ with progress, the worker's top five on three fixture positions equal to Node's 
 Live: (phone) the download on Wi-Fi, a position's time, the memory (the page not reloaded by
 Android after ten minutes with Maia on).
 
+**As built** (2026-10-06, with §5.33 in one push: the switch and the columns are how the worker
+is reached):
+- `src/core/maia/encode.ts` (`maiaTokens`, `moveIndex`, `legalMoves` in standard UCI, castling
+  through `standardUci`; `policyFrom` on a chessops position; `expectedScore`; `maiaEloFor`,
+  with this site's 400 group read as Lichess's 0), `src/core/maia/batch.ts`
+  (`createMaiaBatch`: q_extension's queue, answering the policy and the value together, memo
+  by position key and rating) and `src/core/maia/protocol.ts` (the worker's messages).
+- `src/platform/maiaWorker.ts`: onnxruntime-web 1.30.0's **non-bundled** build
+  (`ort.wasm.min.mjs`, aliased in `vite.config.ts`), its wasm and its 24 KB glue
+  (`ort-wasm-simd-threaded.mjs`, a fourth engine file) from the engines' cache through
+  `env.wasm.wasmPaths`: the default build points at its wasm with `new URL(…, import.meta.url)`,
+  which the build copied into `assets/` (14 MB the shell would have precached). Batches run
+  through the batch queue; `scores` gives Qchess's Ms (checkmate 100%, a drawn end 50%, else one
+  less the score of the side then to move). The worker build gets the engines plugin too.
+- `src/app/maia.ts`: settings in localStorage `repworks-maia` (on, the rating: 0 for the
+  explorer's filter's); the worker started by the switch (and at start when left on), ended
+  when switched off or after 90 s unused and started again by the next ask; "missing" opens
+  `MaiaDialog.tsx` (Qchess's text, credit to the CSSLab, the size, a Wi-Fi note on a narrow
+  screen, the progress), Download stores the three files through `blobs.ts`; the policy and
+  the scores kept per position and rating for the session.
+- Checked: **in the container's Chromium the worker's top five on three fixture positions equal
+  onnxruntime-web's under Node to 1e-6** (the same wasm), and the explorer's Ml values at the
+  start (1100) are the fixture's.
+- Tests: `test/unit/core/maia/encode.test.ts` (tokens and the turned board, indices, castling
+  and promotions, the policy over set logits from either side and from a batch's row, the
+  expected score, the filter's rating), `batch.test.ts` (a turn's requests in one run up to the
+  batch size, the memo and in-flight sharing, a failed run), `test/unit/engine/maia.test.ts`
+  (the model's names; the 50 fixture positions: q_extension's order where clear, within 0.01,
+  the score within 0.01, and onnxruntime-web's own values to 1e-6; the largest difference
+  0.0043), `test/fixtures/maia/reference.json` from `scripts/maia-reference.mjs`, and
+  `test/e2e/maia.spec.ts` (below).
+
 #### 5.33 Maia in the explorer panel (Qchess's Ml and Ms)
 
 - A **Maia switch** in the engine bar, as Qchess's "Maia3"; on, the explorer gains two columns
@@ -3103,6 +3135,24 @@ added row, the sort, nothing wider than the phone, Maia off in training.
 
 Live (desktop): Ml and Ms beside Qchess's Maia3 at the same rating on three positions (the same
 top four, likelihoods and scores within a point: both run onnxruntime-web).
+
+**As built** (2026-10-06):
+- The **Maia3** switch is first in the engine bar (Qchess's place); on, it opens the explorer.
+  The rating is in the engine's settings ("As the explorer's filter (2150)", or 600–2600).
+- `core/explorer/table.ts`: a row's `maia` (likelihood) and `maiaOnly` (Maia's top-four move
+  the games and ChessDB lack, after the novelties, by likelihood), and the `maia` order (by
+  likelihood, the rest by games); without Maia the order falls back to popularity, as Qchess's.
+- `src/ui/Explorer.tsx`: Ml and Ms after the counts (Qchess puts them before the bars), Ml in
+  blue as `9.5%`/`31%` (Qchess's `fmtProb`), Ms in gold for the first four rows, `…` while asked;
+  Maia's rows purple with "Maia" in the bar's place; Ml's title sorts. The policy is asked
+  120 ms after a position is shown. On a screen 480 px wide or less, with Maia on, the games'
+  count gives way to the two columns (the share stays), and the Score/Prepared switch with it.
+- Tests: `table.test.ts` (Maia's rows, likelihoods and order, and none without Maia) and
+  `test/e2e/maia.spec.ts` on desktop and the emulated phone, with the real model: the dialog
+  (its size and credit), Cancel leaving Maia off with nothing downloaded, Download, the columns,
+  e4 and d4 from the games with Nf3 and c4 as Maia's rows, Ml as the fixture's, Ms filled, the
+  Ml sort, nothing wider than the screen, Maia back after a reload with no download and no
+  dialog, off again; and (desktop) the worker's numbers to 1e-6.
 
 #### 5.34 Maia in the Practical column (q_extension's fill-in and preview)
 

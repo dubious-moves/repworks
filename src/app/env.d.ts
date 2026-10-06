@@ -12,5 +12,6 @@ declare module 'virtual:repworks-engines' {
     stockfishWasm: EngineFile;
     maiaModel: EngineFile;
     ortWasm: EngineFile;
+    ortMjs: EngineFile;
   };
 }

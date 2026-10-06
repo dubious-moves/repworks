@@ -2,10 +2,11 @@
 // stored or not, their size, a download with progress and a delete.
 import { useEffect, useState } from 'preact/hooks';
 import { ENGINES, ensure, remove, stored, type EngineFile, type Progress } from '../platform/blobs.ts';
+import { deleteMaia, maiaPrefs } from '../app/maia.ts';
 
 const GROUPS: { name: string; files: EngineFile[] }[] = [
   { name: 'Stockfish 18', files: [ENGINES.stockfishJs, ENGINES.stockfishWasm] },
-  { name: 'Maia 3', files: [ENGINES.maiaModel, ENGINES.ortWasm] },
+  { name: 'Maia 3', files: [ENGINES.maiaModel, ENGINES.ortWasm, ENGINES.ortMjs] },
 ];
 
 export const megabytes = (bytes: number): string => `${(bytes / 1e6).toFixed(1)} MB`;
@@ -37,7 +38,7 @@ function Group(props: { name: string; files: EngineFile[] }) {
         </button>
       )}
       {has && (
-        <button type="button" class="secondary" onClick={() => void remove(props.files).then(check)}>
+        <button type="button" class="secondary" onClick={() => void (props.files.includes(ENGINES.maiaModel) && maiaPrefs.peek().on ? deleteMaia() : remove(props.files)).then(check)}>
           Delete
         </button>
       )}

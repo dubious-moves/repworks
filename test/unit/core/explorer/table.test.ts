@@ -97,3 +97,20 @@ test('check marks don’t split a move between the two sources', () => {
   assert.equal(t.rows.length, 1);
   assert.deepEqual(t.rows[0]!.eval, { cp: 40 });
 });
+
+test('Maia (§5.33): its likelihoods on the rows, its top moves the table lacks as rows, its order', () => {
+  // Maia's top four: Nf6, d5, c5 (no games, no eval) and e5 (a ChessDB novelty already).
+  const maia = { probs: new Map([['Nf6', 0.5], ['d5', 0.2], ['c5', 0.12], ['e5', 0.08], ['f5', 0.01]]), top: ['Nf6', 'd5', 'c5', 'e5'] };
+  const t = buildTable({ turn: 'b', games, evals, sort: 'popularity', side: 'w', maia });
+  // The games' rows, ChessDB's novelties, then Maia's own row.
+  assert.deepEqual(sans(t), ['Nf6', 'd5', 'f5', 'e5', 'g5', 'c5']);
+  const c5 = t.rows.find((r) => r.san === 'c5')!;
+  assert.deepEqual([c5.maiaOnly, c5.novelty, c5.games, c5.maia], [true, false, 0, 0.12]);
+  assert.deepEqual(t.rows.map((r) => r.maia), [0.5, 0.2, 0.01, 0.08, undefined, 0.12]);
+  // Maia's order: by likelihood, the moves it doesn't list last by games.
+  assert.deepEqual(sans(buildTable({ turn: 'b', games, evals, sort: 'maia', side: 'w', maia })), ['Nf6', 'd5', 'c5', 'e5', 'f5', 'g5']);
+  // An eval order puts Maia's row, with no eval, last.
+  assert.equal(sans(buildTable({ turn: 'b', games, evals, sort: 'eval', side: 'w', maia })).at(-1), 'c5');
+  // Without Maia, no Maia order: as given, nothing added.
+  assert.deepEqual(sans(buildTable({ turn: 'b', games, evals, sort: 'popularity', side: 'w' })), ['Nf6', 'd5', 'f5', 'e5', 'g5']);
+});

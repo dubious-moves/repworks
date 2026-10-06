@@ -29,7 +29,15 @@ export default defineConfig({
     port: 4173,
     strictPort: true,
   },
+  resolve: {
+    // onnxruntime-web's build that loads its wasm and glue from `env.wasm.wasmPaths` (§5.32): the
+    // default one points at its wasm with `new URL(…, import.meta.url)`, which the build would
+    // copy into assets/ and the shell would precache.
+    alias: { 'onnxruntime-web/wasm': resolve('node_modules/onnxruntime-web/dist/ort.wasm.min.mjs') },
+  },
   plugins: [engines(), serviceWorker()],
+  // Maia's worker reads the engines' URLs too (§5.32).
+  worker: { format: 'es', plugins: () => [engines()] },
 });
 
 /**
@@ -44,6 +52,7 @@ const ENGINE_FILES: Record<string, string> = {
   stockfishWasm: 'vendor/stockfish/stockfish-18-lite-single.wasm',
   maiaModel: 'vendor/maia/maia3_simplified.onnx',
   ortWasm: 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm',
+  ortMjs: 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.mjs',
 };
 const ENGINES_DIR = 'engines/';
 const ENGINES_ID = 'virtual:repworks-engines';

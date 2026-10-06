@@ -4,14 +4,15 @@
 import type { CompactExplorer } from './providers.ts';
 import { moveKey, type ChessdbAnswer, type Side } from './search.ts';
 
-/** Qchess's sort menu, Maia's order left out until Phase 3, and the Practical column's order. */
-export type SortMode = 'popularity' | 'eval' | 'prac' | 'score' | 'white-eval' | 'black-eval' | 'mine-eval' | 'only-rep';
+/** Qchess's sort menu (Maia's order with Maia on, §5.33), and the Practical column's order. */
+export type SortMode = 'popularity' | 'eval' | 'prac' | 'score' | 'maia' | 'white-eval' | 'black-eval' | 'mine-eval' | 'only-rep';
 
 export const SORT_LABELS: Record<SortMode, string> = {
   popularity: 'Sort by popularity',
   eval: 'Sort by eval',
   prac: 'Sort by practical',
   score: 'Sort by score',
+  maia: 'Sort by Maia',
   'white-eval': 'White moves by eval, black by popularity',
   'black-eval': 'Black moves by eval, white by popularity',
   'mine-eval': 'Your moves by eval, opp’s by popularity',
@@ -45,6 +46,10 @@ export interface TableRow {
   covered: boolean;
   /** Repertoire chapters playing it here (the index: transpositions included). */
   repertoire: number;
+  /** Maia's likelihood of the move, 0 to 1, when Maia is on and has it in its top moves (§5.33). */
+  maia?: number;
+  /** A move of Maia's top four that neither the games nor ChessDB have (Qchess's Maia rows). */
+  maiaOnly?: boolean;
 }
 
 export interface Table {
@@ -68,6 +73,8 @@ export interface TableInput {
   repertoire?: ReadonlyMap<string, number>;
   /** The Practical column's values by SAN, for the `prac` order (the side to move's expected score). */
   practical?: ReadonlyMap<string, number>;
+  /** Maia's likelihoods by SAN (Qchess shows its top 20), and its top four, added as rows when missing. */
+  maia?: { probs: ReadonlyMap<string, number>; top: readonly string[] };
 }
 
 /** An eval in pawns from White's side, as Qchess writes it: `+0.18`, `0.00`, `-1.20`; mates `#3` / `-#3`. */
@@ -147,6 +154,20 @@ export function buildTable(input: TableInput): Table {
     rows.push({ san: m.san, games: 0, share: 0, white: 0, draws: 0, black: 0, novelty: true, ...base(m.san) });
   }
 
+  // Maia's top four moves that neither has (Qchess's `injectMaiaRows`), and its likelihoods.
+  if (input.maia) {
+    for (const san of input.maia.top) {
+      if (seen.has(moveKey(san))) continue;
+      seen.add(moveKey(san));
+      rows.push({ san, games: 0, share: 0, white: 0, draws: 0, black: 0, novelty: false, maiaOnly: true, ...base(san) });
+    }
+    const probs = new Map([...input.maia.probs].map(([san, p]) => [moveKey(san), p] as const));
+    for (const r of rows) {
+      const p = probs.get(moveKey(r.san));
+      if (p !== undefined) r.maia = p;
+    }
+  }
+
   // The best eval for the side to move first; a move with no eval last (Qchess: treated as the worst).
   const byEval = (a: TableRow, b: TableRow) => {
     const va = a.eval ? (turn === 'w' ? a.eval.cp : -a.eval.cp) : -Infinity;
@@ -165,16 +186,22 @@ export function buildTable(input: TableInput): Table {
     out = [...out].sort((a, b) => value(b) - value(a) || byEval(a, b));
     return total ? { rows: out, total } : { rows: out };
   }
+  if (input.sort === 'maia' && input.maia) {
+    // Qchess's Ml order: the most likely first; moves Maia doesn't list after them, by games.
+    out = [...out].sort((a, b) => (b.maia ?? -1) - (a.maia ?? -1) || byGames(a, b));
+    return total ? { rows: out, total } : { rows: out };
+  }
   if (input.sort === 'only-rep') out = rows.filter((r) => r.covered || r.repertoire > 0);
   if (evalSort) {
     out = [...out].sort(byEval);
   } else {
     // Games first by the order chosen; novelties after them, by eval (Qchess sorts them in only
     // with an eval order).
-    const played = out.filter((r) => !r.novelty);
+    const played = out.filter((r) => !r.novelty && !r.maiaOnly);
     const novel = out.filter((r) => r.novelty).sort(byEval);
+    const maiaOnly = out.filter((r) => r.maiaOnly).sort((a, b) => (b.maia ?? 0) - (a.maia ?? 0));
     played.sort(input.sort === 'score' ? (a, b) => moverScore(b, turn) - moverScore(a, turn) || byGames(a, b) : byGames);
-    out = [...played, ...novel];
+    out = [...played, ...novel, ...maiaOnly];
   }
   return total ? { rows: out, total } : { rows: out };
 }

@@ -24,6 +24,7 @@ import type { Chapter } from '../core/study/model.ts';
 import { nodeAt, positionAt, type Path } from '../core/study/tree.ts';
 import { play, side as chapterSide, study } from '../app/editor.ts';
 import { lookAt, lookup, pausedUntil, prefs, retryLookup, setPrefs } from '../app/explorer.ts';
+import { maiaElo, maiaKey, maiaPrefs, maiaSeen, maiaState, requestPolicy, requestScores } from '../app/maia.ts';
 import { logInWithLichess } from '../app/lichess.ts';
 import { trainData } from '../app/train.ts';
 import { openExplorerSettings } from './ExplorerSettings.tsx';
@@ -46,12 +47,20 @@ const TABS: { tab: ExplorerTab; label: string }[] = [
 
 const fmtCount = (n: number) => n.toLocaleString('en-US');
 
+/** Qchess's Maia: likelihoods for its top 20 moves; its top four added as rows, scored (Ms). */
+const MAIA_SHOWN = 20;
+const MAIA_ROWS = 4;
+
+/** Qchess's `fmtProb`: one decimal under 10%. */
+export const formatProb = (p: number): string => (p * 100 < 9.95 ? `${(p * 100).toFixed(1)}%` : `${Math.round(p * 100)}%`);
+
 /** The last position's rows, shown faded while the next position is asked. */
 interface Shown {
   fen: string;
   table: Table;
   games: boolean;
   prac: boolean;
+  maia: boolean;
 }
 
 export function Explorer(props: { chapter: Chapter; path: Path }) {
@@ -63,6 +72,14 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
   const filter = `${p.speeds.join()}|${p.ratings.join()}|${p.recent}|${p.local}`;
   useEffect(() => lookAt(p.on ? fen : undefined), [fen, p.on, p.tab, filter]);
   useEffect(() => () => lookAt(undefined), []);
+  // Maia's policy here (§5.33), once Maia is ready, a moment after the position is shown.
+  const maiaOn = p.on && maiaPrefs.value.on && maiaState.value.kind === 'ready';
+  const elo = maiaElo.value;
+  useEffect(() => {
+    if (!maiaOn || !fen) return;
+    const t = setTimeout(() => requestPolicy(fen), 120);
+    return () => clearTimeout(t);
+  }, [fen, maiaOn, elo]);
 
   const s = study.value;
   const data = trainData.value;
@@ -102,6 +119,11 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
     covered,
     repertoire: new Map([...repertoire].map(([san, o]) => [san, o.length])),
   };
+  // Maia's likelihoods (Qchess shows its top 20) and its top four, once it has answered.
+  const seen = maiaOn ? maiaSeen.value.get(maiaKey(fen, elo)) : undefined;
+  if (seen?.policy) input.maia = { probs: new Map(seen.policy.slice(0, MAIA_SHOWN).map((m) => [m.san, m.prob] as const)), top: seen.policy.slice(0, MAIA_ROWS).map((m) => m.san) };
+  // Maia's order without Maia: Qchess falls back to popularity.
+  if (p.sort === 'maia' && !maiaOn) input.sort = 'popularity';
   let table = buildTable(input);
   // Without a Lichess login there are no games: ChessDB's moves alone, under the login's note.
   const games = !l?.gamesError?.login;
@@ -135,7 +157,7 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
 
   // While this position is asked, the last one's rows stay, faded and inert, so nothing jumps.
   const asking = !l || (waitingGames && !paused);
-  if (!asking && table.rows.length) shown.current = { fen, table, games, prac };
+  if (!asking && table.rows.length) shown.current = { fen, table, games, prac, maia: maiaOn };
   const stale = asking && shown.current && shown.current.fen !== fen ? shown.current : undefined;
 
   const message = (() => {
@@ -187,7 +209,7 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
         </button>
       </div>
       {prac && <PracticalDriver fen={fen} mine={mine} rows={table.rows} turn={turn} shares={shares} excludedKey={[...excludedAt(fen)].join()} />}
-      <div class={`explorer-head${games ? '' : ' no-games'}${prac ? ' with-prac' : ''}`}>
+      <div class={`explorer-head${games ? '' : ' no-games'}${prac ? ' with-prac' : ''}${maiaOn ? ' with-maia' : ''}`}>
         <span class="ex-move">Move</span>
         {sortBy('eval', 'Eval', 'ex-eval', 'Sort by eval')}
         {prac &&
@@ -211,10 +233,16 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
           ) : (
             sortBy('score', 'Score', 'ex-score', 'Sort by score')
           ))}
+        {maiaOn && sortBy('maia', 'Ml', 'ex-ml', `Maia likelihood: how likely a ${elo} player is to choose the move. Click to sort by it.`)}
+        {maiaOn && (
+          <span class="ex-ms" title={`Maia score: the expected score of the side to move after the move, as Maia (${elo}) sees it; for the first ${MAIA_ROWS} rows.`}>
+            Ms
+          </span>
+        )}
         <label class="ex-sort" title="Sort order">
           <span aria-hidden="true">⇅</span>
           <select aria-label="Sort" value={p.sort} onChange={(e) => setPrefs({ sort: e.currentTarget.value as SortMode })}>
-            {(Object.keys(SORT_LABELS) as SortMode[]).map((k) => (
+            {(Object.keys(SORT_LABELS) as SortMode[]).filter((k) => k !== 'maia' || maiaOn).map((k) => (
               <option key={k} value={k}>
                 {SORT_LABELS[k]}
               </option>
@@ -226,8 +254,9 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
       <Details fen={fen} />
       {stale && <StaleRows shown={stale} />}
       {!stale && table.rows.length > 0 && (
-        <div class={`explorer-rows${games ? '' : ' no-games'}${prac ? ' with-prac' : ''}`} role="list">
-          {table.rows.map((r) => {
+        <div class={`explorer-rows${games ? '' : ' no-games'}${prac ? ' with-prac' : ''}${maiaOn ? ' with-maia' : ''}`} role="list">
+          {maiaOn && seen?.policy && <MaiaScores fen={fen} sans={table.rows.slice(0, MAIA_ROWS).map((r) => r.san)} />}
+          {table.rows.map((r, i) => {
             const cell = cells.get(r.san)!;
             const res = cell.result;
             const usable = preparedOn && !cell.excluded && res?.state === 'value' && res.prep ? res : undefined;
@@ -256,6 +285,7 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
                   : {})}
                 {...(usable ? { prepared: { split: usable.prep!, muted: (usable.prior ?? 0) >= 0.5, best: bestPrep != null && best.cmp.has(usable) && Math.round(expectedScore(usable.prep, turn)! * 100) === bestPrep, title: preparedDetails(usable, turn, detail).join('\n') } } : {})}
                 faded={preparedOn && !usable && !r.novelty}
+                {...(maiaOn ? { maia: { elo, ms: i < MAIA_ROWS ? (seen?.scores[r.san] ?? (seen?.asked.has(r.san) ? 'asking' : undefined)) : undefined, turn } } : {})}
               />
             );
           })}
@@ -266,6 +296,8 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
               {prac && <span class="ex-prac" />}
               <span class="ex-share">100%</span>
               <span class="ex-count">{fmtCount(table.total.games)}</span>
+              {maiaOn && <span class="ex-ml" />}
+              {maiaOn && <span class="ex-ms" />}
               <Bar white={table.total.white} draws={table.total.draws} black={table.total.black} />
             </div>
           )}
@@ -277,9 +309,9 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
 
 /** The last position's rows, faded and inert, while this one is asked. */
 function StaleRows(props: { shown: Shown }) {
-  const { table, games, prac } = props.shown;
+  const { table, games, prac, maia } = props.shown;
   return (
-    <div class={`explorer-rows stale${games ? '' : ' no-games'}${prac ? ' with-prac' : ''}`} aria-hidden="true" inert>
+    <div class={`explorer-rows stale${games ? '' : ' no-games'}${prac ? ' with-prac' : ''}${maia ? ' with-maia' : ''}`} aria-hidden="true" inert>
       {table.rows.map((r) => (
         <div key={r.san} class={`ex-row${r.covered ? ' covered' : ''}${r.novelty ? ' novelty' : ''}`}>
           <span class="ex-move">
@@ -288,8 +320,10 @@ function StaleRows(props: { shown: Shown }) {
           <span class={`ex-eval${r.eval ? ` ${evalTone(r.eval)}` : ''}`}>{r.eval ? formatEval(r.eval) : ''}</span>
           {prac && <span class="ex-prac" />}
           {games && <span class="ex-share">{r.novelty ? '' : formatShare(r.share)}</span>}
-          {games && <span class="ex-count">{r.novelty ? '' : fmtCount(r.games)}</span>}
-          {games && (r.novelty ? <span class="ex-bar ex-novelty">novelty</span> : <Bar white={r.white} draws={r.draws} black={r.black} />)}
+          {games && <span class="ex-count">{r.novelty || r.maiaOnly ? '' : fmtCount(r.games)}</span>}
+          {maia && <span class="ex-ml">{r.maia !== undefined ? formatProb(r.maia) : ''}</span>}
+          {maia && <span class="ex-ms" />}
+          {games && (r.novelty || r.maiaOnly ? <span class="ex-bar ex-novelty">{r.maiaOnly ? 'Maia' : 'novelty'}</span> : <Bar white={r.white} draws={r.draws} black={r.black} />)}
         </div>
       ))}
     </div>
@@ -386,12 +420,30 @@ interface Prepared {
   title: string;
 }
 
-function Row(props: { row: TableRow; games: boolean; others: Occurrence[]; path: Path; practical?: preact.JSX.Element; prepared?: Prepared; faded?: boolean }) {
+interface MaiaCells {
+  elo: number;
+  /** Qchess's Ms: the mover's expected score, or 'asking'. */
+  ms: number | 'asking' | undefined;
+  turn: 'w' | 'b';
+}
+
+function Row(props: { row: TableRow; games: boolean; others: Occurrence[]; path: Path; practical?: preact.JSX.Element; prepared?: Prepared; faded?: boolean; maia?: MaiaCells }) {
   const r = props.row;
-  const title = r.novelty ? 'Engine suggested move (novelty)' : r.rating ? `Average rating: ${Math.round(r.rating)}` : undefined;
+  const title = r.novelty ? 'Engine suggested move (novelty)' : r.maiaOnly ? 'Maia suggested move' : r.rating ? `Average rating: ${Math.round(r.rating)}` : undefined;
+  const m = props.maia;
+  const maiaCells = m && (
+    <>
+      <span class="ex-ml" title={r.maia !== undefined ? `Maia predicts a ${m.elo} player chooses this move ${formatProb(r.maia)} of the time` : undefined}>
+        {r.maia !== undefined ? formatProb(r.maia) : ''}
+      </span>
+      <span class="ex-ms" title={typeof m.ms === 'number' ? `Maia's expected score for ${m.turn === 'w' ? 'White' : 'Black'} after ${r.san}` : undefined}>
+        {typeof m.ms === 'number' ? `${Math.round(m.ms * 100)}%` : m.ms === 'asking' ? '…' : ''}
+      </span>
+    </>
+  );
   return (
     <div
-      class={`ex-row${r.covered ? ' covered' : ''}${r.novelty ? ' novelty' : ''}`}
+      class={`ex-row${r.covered ? ' covered' : ''}${r.novelty ? ' novelty' : ''}${r.maiaOnly ? ' maia-only' : ''}`}
       role="listitem"
       title={title}
       tabIndex={0}
@@ -415,12 +467,16 @@ function Row(props: { row: TableRow; games: boolean; others: Occurrence[]; path:
           </button>
         )}
       </span>
-      <span class={`ex-eval${r.eval ? ` ${evalTone(r.eval)}` : ''}`}>{r.eval ? formatEval(r.eval) : r.novelty ? '' : '?'}</span>
+      <span class={`ex-eval${r.eval ? ` ${evalTone(r.eval)}` : ''}`}>{r.eval ? formatEval(r.eval) : r.novelty || r.maiaOnly ? '' : '?'}</span>
       {props.practical}
-      {props.games && <span class="ex-share">{r.novelty ? '' : formatShare(r.share)}</span>}
-      {props.games && <span class="ex-count">{r.novelty ? '' : fmtCount(r.games)}</span>}
+      {props.games && <span class="ex-share">{r.novelty || r.maiaOnly ? '' : formatShare(r.share)}</span>}
+      {props.games && <span class="ex-count">{r.novelty || r.maiaOnly ? '' : fmtCount(r.games)}</span>}
+      {maiaCells}
+      {!props.games && r.maiaOnly && <span class="ex-bar ex-novelty ex-maia">Maia</span>}
       {props.games &&
-        (r.novelty ? (
+        (r.maiaOnly ? (
+          <span class="ex-bar ex-novelty ex-maia">Maia</span>
+        ) : r.novelty ? (
           <span class="ex-bar ex-novelty">novelty</span>
         ) : props.prepared ? (
           <Bar
@@ -435,6 +491,13 @@ function Row(props: { row: TableRow; games: boolean; others: Occurrence[]; path:
         ))}
     </div>
   );
+}
+
+/** Asks Maia for Qchess's Ms of the first rows, once its policy is in. */
+function MaiaScores(props: { fen: string; sans: string[] }) {
+  const key = props.sans.join(' ');
+  useEffect(() => requestScores(props.fen, props.sans), [props.fen, key]);
+  return null;
 }
 
 /** Asks the worker for the rows the column computes without a click, as the table changes. */

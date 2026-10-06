@@ -5,6 +5,9 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { DEFAULT_ENGINE_PREFS, DEPTHS, enginePrefs, MOVETIMES, updateEnginePrefs, type EnginePrefs } from '../app/engine.ts';
 import { mode } from '../app/mode.ts';
 import { EngineFiles } from './Engines.tsx';
+import { maiaEloFor } from '../core/maia/encode.ts';
+import { maiaPrefs, setMaiaPrefs } from '../app/maia.ts';
+import { prefs as explorerPrefs } from '../app/explorer.ts';
 
 const shown = signal(false);
 export const openEngineSettings = () => (shown.value = true);
@@ -33,6 +36,8 @@ function Choice<T extends number>(props: { label: string; values: readonly T[]; 
 
 function Dialog() {
   const [draft, setDraft] = useState<EnginePrefs>(() => ({ ...enginePrefs.peek() }));
+  const [rating, setRating] = useState(maiaPrefs.peek().rating);
+  const filterElo = maiaEloFor(explorerPrefs.peek().ratings);
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     if (!ref.current!.open) ref.current!.showModal();
@@ -40,6 +45,7 @@ function Dialog() {
   const save = () => {
     const { on: _on, ...rest } = draft;
     updateEnginePrefs(rest);
+    setMaiaPrefs({ rating });
     close();
   };
   return (
@@ -52,6 +58,17 @@ function Dialog() {
         <Choice label="Max time" values={MOVETIMES} value={draft.movetime as (typeof MOVETIMES)[number]} format={(s) => `${s} s`} onPick={(movetime) => setDraft({ ...draft, movetime })} />
         <label class="check">
           <input type="checkbox" checked={draft.arrows} onChange={(e) => setDraft({ ...draft, arrows: e.currentTarget.checked })} /> Arrows on the board
+        </label>
+        <label>
+          Maia’s rating
+          <select value={rating} onChange={(e) => setRating(Number(e.currentTarget.value))}>
+            <option value={0}>As the explorer’s filter ({filterElo})</option>
+            {Array.from({ length: 21 }, (_, i) => 600 + i * 100).map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
         </label>
         <EngineFiles />
         <div class="dialog-buttons">

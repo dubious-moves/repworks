@@ -2571,3 +2571,98 @@ a.button.secondary {
     flex-direction: column;
   }
 }
+
+/* Maia in the explorer (PLAN.md §5.33), as Qchess's: Ml (likelihood, blue) and Ms (score, gold)
+   before the bars; Maia's own moves purple. */
+
+.explorer-head.with-maia,
+.explorer-rows.with-maia .ex-row {
+  grid-template-columns: 58px 50px 40px minmax(44px, auto) 36px 36px minmax(60px, 1fr);
+}
+
+.explorer-head.with-maia.with-prac,
+.explorer-rows.with-maia.with-prac .ex-row {
+  grid-template-columns: 58px 50px 44px 40px minmax(44px, auto) 36px 36px minmax(60px, 1fr);
+}
+
+.explorer-head.with-maia.no-games,
+.explorer-rows.with-maia.no-games .ex-row {
+  grid-template-columns: 58px 50px 36px 36px 1fr;
+}
+
+.explorer-head.with-maia.no-games .ex-sort {
+  grid-column: 5;
+}
+
+.ex-ml,
+.ex-ms {
+  text-align: right;
+  font-size: 0.72rem;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.ex-row .ex-ml {
+  color: #8fb4e8;
+}
+
+.ex-row .ex-ms {
+  color: #e8c98f;
+}
+
+.explorer-head .ex-ml.ex-sortable,
+.explorer-head .ex-ms {
+  text-align: right;
+}
+
+.ex-row.maia-only .ex-move {
+  color: #b392f0;
+}
+
+.ex-bar.ex-maia {
+  color: #b392f0;
+}
+
+/* The phone: with Maia's two columns, the games' count gives way (its share stays). */
+@media (max-width: 480px) {
+  .explorer-head.with-maia,
+  .explorer-rows.with-maia .ex-row {
+    grid-template-columns: 54px 46px 36px 34px 34px minmax(40px, 1fr);
+    column-gap: 4px;
+  }
+
+  .explorer-head.with-maia.with-prac,
+  .explorer-rows.with-maia.with-prac .ex-row {
+    grid-template-columns: 54px 46px 40px 36px 34px 34px minmax(40px, 1fr);
+    column-gap: 4px;
+  }
+
+  .explorer-rows.with-maia:not(.no-games) .ex-count,
+  .explorer-head.with-maia:not(.no-games) .ex-score {
+    display: none;
+  }
+}
+
+.maia-switch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #8fb4e8;
+}
+
+.maia-progress {
+  height: 10px;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.maia-progress > div {
+  height: 100%;
+  background: #5c83ca;
+}
+
+.explorer-head.with-maia .ex-sort select {
+  max-width: 4.2em;
+}

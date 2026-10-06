@@ -108,6 +108,12 @@ couldn't be tested then (the day's limit was used up), so the training items bel
   in the chapter, and the line on the other device after a sync; the threat (W on the desktop);
   "+" going deeper; the depth reached in 8 s on the phone, and its heat over ten minutes; the
   engine stopping when the app is hidden, and in a second tab stopping the first.
+- §5.32, §5.33: Maia (desktop, then the phone on Wi-Fi): the switch, the dialog and its download,
+  then Ml and Ms in the explorer beside Qchess's Maia3 at the same rating on three positions
+  (the same top four, likelihoods and scores within a point; Qchess's rating defaults to 2600,
+  Repworks' to the filter's); Maia's own rows where the games are few; a position's time on the
+  phone, and whether Android reloads the page after ten minutes with Maia on (memory); Maia
+  still there offline after a reload.
 
 ### The change to q_extension for §5.25 (Repworks sessions can't push there)
 

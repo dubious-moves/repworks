@@ -65,7 +65,8 @@ test('Maia is downloaded, and a deploy keeps the engines it still names', async 
   await expect(maia).toContainText('59.9 MB · not stored');
   await maia.getByRole('button', { name: 'Download' }).click();
   await expect(maia).toHaveAttribute('data-stored', 'yes', { timeout: 20_000 });
-  expect(await storedEngines(page)).toEqual([expect.stringMatching(/^maia3_simplified\.[0-9a-f]{10}\.onnx$/), expect.stringMatching(/^ort-wasm-simd-threaded\.[0-9a-f]{10}\.wasm$/)]);
+  expect(await storedEngines(page)).toHaveLength(3);
+  expect(await storedEngines(page)).toEqual(expect.arrayContaining([expect.stringMatching(/^maia3_simplified\.[0-9a-f]{10}\.onnx$/), expect.stringMatching(/^ort-wasm-simd-threaded\.[0-9a-f]{10}\.mjs$/), expect.stringMatching(/^ort-wasm-simd-threaded\.[0-9a-f]{10}\.wasm$/)]));
 
   // An engine an older version stored, which this one doesn't name.
   await page.evaluate(async () => (await caches.open('repworks-engines')).put(new URL('engines/stockfish-17.0000000000.wasm', location.href).href, new Response('old')));
@@ -78,7 +79,8 @@ test('Maia is downloaded, and a deploy keeps the engines it still names', async 
     const worker = navigator.serviceWorker.controller!;
     if (worker.state !== 'activated') await new Promise((resolve) => worker.addEventListener('statechange', () => worker.state === 'activated' && resolve(null)));
   });
-  expect(await storedEngines(page)).toEqual([expect.stringMatching(/^maia3_simplified\./), expect.stringMatching(/^ort-wasm-simd-threaded\./)]);
+  expect(await storedEngines(page)).toHaveLength(3);
+  expect(await storedEngines(page)).not.toContain('stockfish-17.0000000000.wasm');
 
   // Deleted from the debug panel.
   await page.locator('.engine-files', { hasText: 'Maia 3' }).getByRole('button', { name: 'Delete' }).click();

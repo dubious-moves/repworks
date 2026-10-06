@@ -16,6 +16,7 @@ import { makeSanAndPlay } from 'chessops/san';
 import { parseUciMove } from '../core/chess/uci.ts';
 import type { PlayedLine } from '../core/repertoire/lines.ts';
 import { openEngineSettings } from './EngineSettings.tsx';
+import { maiaPrefs, maiaState, setMaiaOn } from '../app/maia.ts';
 
 /** Moves shown in a row (the row is cut to its width on a narrow screen). */
 const SHOWN_MOVES = 16;
@@ -83,6 +84,7 @@ export function EnginePanel(props: { board: Position | undefined }) {
   return (
     <section class="engine" aria-label="Engine" ref={box}>
       <div class="engine-bar">
+        <MaiaSwitch />
         <label class="switch" title="Stockfish on or off">
           <input type="checkbox" role="switch" aria-label="Engine" checked={on} onChange={(e) => updateEnginePrefs({ on: e.currentTarget.checked })} />
           <span class="slider" />
@@ -117,6 +119,24 @@ export function EnginePanel(props: { board: Position | undefined }) {
         </ol>
       )}
     </section>
+  );
+}
+
+/** Qchess's "Maia3" switch, beside the engine's: Maia's columns in the explorer (§5.33). */
+function MaiaSwitch() {
+  const on = maiaPrefs.value.on;
+  const s = maiaState.value;
+  const note = !on ? '' : s.kind === 'loading' ? '…' : s.kind === 'downloading' ? ` ${Math.floor((100 * s.received) / s.total)}%` : s.kind === 'failed' ? ' !' : '';
+  return (
+    <span class="maia-switch" title={s.kind === 'failed' ? s.reason : 'Maia: human move predictions in the explorer'}>
+      <label class="switch">
+        <input type="checkbox" role="switch" aria-label="Maia" checked={on} onChange={(e) => setMaiaOn(e.currentTarget.checked)} />
+        <span class="slider" />
+      </label>
+      <span class="maia-name">
+        Maia3{note}
+      </span>
+    </span>
   );
 }
 
