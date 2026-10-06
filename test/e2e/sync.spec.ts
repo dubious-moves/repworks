@@ -138,3 +138,22 @@ test('the REST write path (write=rest in the link) pushes too', async ({ page })
   expect(github.log.filter((l) => l.method === 'PATCH').length).toBe(2);
   expect(github.log.filter((l) => l.path === '/graphql').length).toBe(0);
 });
+
+test('a device that starts offline says offline, keeps its studies, and syncs when the network returns', async ({ page, context }) => {
+  const { git, github } = world();
+  await serveGithub(page, github);
+  await page.goto(setupUrl('desktop'));
+  await expect(page.locator('.studies')).toContainText('Test repertoire');
+  await context.setOffline(true);
+  await page.reload();
+  await expect(page.locator('.chip')).toHaveText('offline');
+  await expect(page.locator('.studies')).toContainText('Test repertoire');
+  await page.getByText('Settings and debug').click();
+  await page.getByRole('button', { name: 'Record a test review' }).click();
+  await expect(page.locator('.chip')).toHaveText('offline · 1 change waiting');
+  const id = (await deviceFile(git)).slice('devices/'.length, -'.json'.length);
+  await context.setOffline(false);
+  const day = new Date().toISOString().slice(0, 10);
+  await page.getByRole('button', { name: 'Sync now' }).click();
+  await expect.poll(() => git.textsOf().get(`progress/${id}/${day}.jsonl`) ?? '').toContain('"card":"r|test|e2e4"');
+});

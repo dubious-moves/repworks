@@ -58,6 +58,7 @@ export class SyncController {
       this.update({ phase: 'setup' });
       return;
     }
+    if (syncStatus.value.phase === 'setup') this.update(navigator.onLine ? { phase: 'idle', message: undefined } : { phase: 'offline', message: 'no network' });
     if (!this.started) {
       this.started = true;
       document.addEventListener('visibilitychange', () => this.trigger(document.visibilityState === 'visible' ? 'visible' : 'hidden'));

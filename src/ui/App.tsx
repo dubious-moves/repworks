@@ -10,8 +10,7 @@ export function App() {
       <header class="topbar">
         <img class="topbar-icon" src={`${import.meta.env.BASE_URL}icons/icon.svg`} alt="" width={28} height={28} />
         <h1>Repworks</h1>
-        {!online.value && <span class="status status-offline">offline</span>}
-        {device.value && <SyncChip />}
+        {device.value ? <SyncChip /> : !online.value && <span class="status status-offline">offline</span>}
       </header>
       {updateReady.value && (
         <div class="banner" role="status">
