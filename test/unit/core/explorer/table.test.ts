@@ -70,6 +70,16 @@ test('sorts: eval for the side to move (no eval last), score, and the mixed orde
   assert.deepEqual(sans(buildTable({ turn: 'b', games, evals, sort: 'only-rep', side: 'b', covered: new Set(['f5']), repertoire: new Map([['e5', 1]]) })), ['f5', 'e5']);
 });
 
+test('the Practical order: values highest first, then the rest by eval', () => {
+  const practical = new Map([
+    ['f5', 61],
+    ['d5', 48],
+  ]);
+  assert.deepEqual(sans(buildTable({ turn: 'b', games, evals, sort: 'prac', side: 'b', practical })), ['f5', 'd5', 'Nf6', 'e5', 'g5']);
+  // No values yet: by eval.
+  assert.deepEqual(sans(buildTable({ turn: 'b', games, evals, sort: 'prac', side: 'b' })), ['Nf6', 'd5', 'e5', 'g5', 'f5']);
+});
+
 test('ChessDB’s tab: its moves alone, by eval, with no Σ; White to move keeps the sign', () => {
   const white: ChessdbAnswer = { status: 'ok', moves: [{ uci: 'e2e4', san: 'e4', score: 20 }, { uci: 'd2d4', san: 'd4', score: 25 }, { uci: 'g1f3', san: 'Nf3', score: 18 }] };
   const t = buildTable({ turn: 'w', evals: white, sort: 'popularity', side: 'w' });

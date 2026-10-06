@@ -3,15 +3,18 @@
 // the move's share and count of games and its results as a bar, ChessDB's other moves as novelty
 // rows, and Σ. A click on a row plays the move. A move the chapter plays here is on a lighter
 // band; a move other repertoire chapters play here carries their count, which lists them.
+// As Qchess's, the panel keeps its height between positions (§5.23, the owner's notes): a handle
+// on its top edge drags it, saved per device, and the last position's rows stay, faded, until the
+// next answer.
 import { signal } from '@preact/signals';
-import { useEffect, useMemo } from 'preact/hooks';
+import { useEffect, useMemo, useRef } from 'preact/hooks';
 import { makeFen } from 'chessops/fen';
 import { makeSan } from 'chessops/san';
 import { positionKeyOf } from '../core/chess/positionKey.ts';
 import { parseUciMove } from '../core/chess/uci.ts';
 import { localAddress } from '../core/explorer/providers.ts';
 import type { ExplorerTab } from '../core/explorer/service.ts';
-import { barLabel, buildTable, evalTone, formatEval, formatShare, SORT_LABELS, type SortMode, type TableRow } from '../core/explorer/table.ts';
+import { barLabel, buildTable, evalTone, formatEval, formatShare, SORT_LABELS, type SortMode, type Table, type TableInput, type TableRow } from '../core/explorer/table.ts';
 import { filterLabel, practicalDetails, preparedDetails, type DetailOptions } from '../core/explorer/details.ts';
 import { autoRows, bestOf } from '../core/explorer/rows.ts';
 import { expectedScore, type RowResult, type Split } from '../core/explorer/search.ts';
@@ -39,13 +42,22 @@ export function ExplorerToggle() {
 const TABS: { tab: ExplorerTab; label: string }[] = [
   { tab: 'lichess', label: 'Lichess' },
   { tab: 'masters', label: 'Masters' },
-  { tab: 'chessdb', label: 'ChessDB' },
 ];
 
 const fmtCount = (n: number) => n.toLocaleString('en-US');
 
+/** The last position's rows, shown faded while the next position is asked. */
+interface Shown {
+  fen: string;
+  table: Table;
+  games: boolean;
+  prac: boolean;
+}
+
 export function Explorer(props: { chapter: Chapter; path: Path }) {
   const p = prefs.value;
+  const box = useRef<HTMLElement>(null);
+  const shown = useRef<Shown | undefined>(undefined);
   const pos = useMemo(() => positionAt(props.chapter, props.path), [props.chapter, props.path]);
   const fen = pos ? makeFen(pos.toSetup()) : undefined;
   const filter = `${p.speeds.join()}|${p.ratings.join()}|${p.recent}|${p.local}`;
@@ -81,16 +93,18 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
   const covered = new Set(node?.children.map((c) => c.san) ?? []);
   const l = lookup.value?.fen === fen && lookup.value.tab === p.tab ? lookup.value : undefined;
   const side = chapterSide.value === 'black' ? 'b' : 'w';
-  const table = buildTable({
+  const input: TableInput = {
     turn: pos.turn === 'white' ? 'w' : 'b',
-    ...(p.tab !== 'chessdb' && l?.games ? { games: l.games } : {}),
+    ...(l?.games ? { games: l.games } : {}),
     ...(l?.evals ? { evals: l.evals } : {}),
     sort: p.sort,
     side,
     covered,
     repertoire: new Map([...repertoire].map(([san, o]) => [san, o.length])),
-  });
-  const games = p.tab !== 'chessdb';
+  };
+  let table = buildTable(input);
+  // Without a Lichess login there are no games: ChessDB's moves alone, under the login's note.
+  const games = !l?.gamesError?.login;
   const waitingGames = games && !l?.games && !l?.gamesError;
   const turn = pos.turn === 'white' ? 'w' : 'b';
   // The Practical column: on the games tabs, computed on the chapter's side's moves only.
@@ -98,7 +112,14 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
   const mine = turn === side;
   const shares = new Map(table.rows.filter((r) => !r.novelty).map((r) => [r.san, r.share] as const));
   practicalVersion.value; // redraw as values come
-  const cells = new Map<string, CellState>(table.rows.map((r) => [r.san, cellOf(fen, r.san)] as const));
+  const cellsOf = (t: Table) => new Map<string, CellState>(t.rows.map((r) => [r.san, cellOf(fen, r.san)] as const));
+  let cells = cellsOf(table);
+  if (p.sort === 'prac') {
+    const values = new Map<string, number>();
+    for (const [san, c] of cells) if (prac && mine && !c.excluded && c.result?.state === 'value') values.set(san, c.result.value!);
+    table = buildTable({ ...input, practical: values });
+    cells = cellsOf(table);
+  }
   const values = [...cells.values()].filter((c) => !c.excluded && c.result?.state === 'value').map((c) => c.result!);
   const best = bestOf(values);
   const detail: DetailOptions = { replyThreshold: p.replyThreshold, minGames: p.minGames, filter: filterLabel(p.speeds, p.ratings), analyse: p.analyse };
@@ -112,8 +133,13 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
   const paused = pausedUntil.value > Date.now();
   const lichessLabel = localAddress(p.local) ? 'Local' : 'Lichess';
 
+  // While this position is asked, the last one's rows stay, faded and inert, so nothing jumps.
+  const asking = !l || (waitingGames && !paused);
+  if (!asking && table.rows.length) shown.current = { fen, table, games, prac };
+  const stale = asking && shown.current && shown.current.fen !== fen ? shown.current : undefined;
+
   const message = (() => {
-    if (games && l?.gamesError?.login) {
+    if (l?.gamesError?.login) {
       return (
         <div class="explorer-note" role="status">
           <p>{l.gamesError.message}</p>
@@ -135,13 +161,21 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
       );
     }
     if (waitingGames && paused) return <p class="explorer-note muted">Lichess asked to slow down: waiting up to a minute.</p>;
-    if (!l || waitingGames || (!games && !l.evals)) return <p class="explorer-note muted">Asking…</p>;
+    if (!l || waitingGames) return stale ? null : <p class="explorer-note muted">Asking…</p>;
     if (!table.rows.length) return <p class="explorer-note muted">{games ? 'No games here.' : 'ChessDB doesn’t know this position.'}</p>;
     return null;
   })();
 
+  const sortBy = (mode: SortMode, label: string, cls: string, title: string) => (
+    <button type="button" class={`${cls} ex-sortable${p.sort === mode ? ' on' : ''}`} aria-pressed={p.sort === mode} title={title} onClick={() => setPrefs({ sort: mode })}>
+      {label}
+      {p.sort === mode && <span aria-hidden="true"> ▾</span>}
+    </button>
+  );
+
   return (
-    <section class="explorer" aria-label="Explorer">
+    <section class="explorer" aria-label="Explorer" ref={box} style={p.height ? { '--ex-height': `${p.height}px` } : undefined}>
+      <Grip box={box} />
       <div class="explorer-tabs" role="tablist">
         {TABS.map((t) => (
           <button key={t.tab} type="button" role="tab" aria-selected={p.tab === t.tab} class={p.tab === t.tab ? 'on' : ''} onClick={() => setPrefs({ tab: t.tab })}>
@@ -155,13 +189,15 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
       {prac && <PracticalDriver fen={fen} mine={mine} rows={table.rows} turn={turn} shares={shares} excludedKey={[...excludedAt(fen)].join()} />}
       <div class={`explorer-head${games ? '' : ' no-games'}${prac ? ' with-prac' : ''}`}>
         <span class="ex-move">Move</span>
-        <span class="ex-eval">Eval</span>
-        {prac && (
-          <span class="ex-prac" title={`Practical: your expected score when each opponent reply is weighted by how often Lichess players (${detail.filter}) play it. Green: the highest among rows searched to the same depth. A small d3: still searching, 3 plies deep so far.${p.tab === 'lichess' ? '' : ' Lichess data, whatever the tab.'}`}>
-            Prac
-          </span>
-        )}
-        {games && <span class="ex-games">Games</span>}
+        {sortBy('eval', 'Eval', 'ex-eval', 'Sort by eval')}
+        {prac &&
+          sortBy(
+            'prac',
+            'Prac',
+            'ex-prac',
+            `Practical: your expected score when each opponent reply is weighted by how often Lichess players (${detail.filter}) play it. Green: the highest among rows searched to the same depth. A small d3: still searching, 3 plies deep so far.${p.tab === 'lichess' ? '' : ' Lichess data, whatever the tab.'} Click to sort by it.`,
+          )}
+        {games && sortBy('popularity', 'Games', 'ex-games', 'Sort by popularity')}
         {games &&
           (prac ? (
             <button
@@ -173,7 +209,7 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
               {p.prepared ? 'Prepared' : 'Score'}
             </button>
           ) : (
-            <span class="ex-score">Score</span>
+            sortBy('score', 'Score', 'ex-score', 'Sort by score')
           ))}
         <label class="ex-sort" title="Sort order">
           <span aria-hidden="true">⇅</span>
@@ -188,7 +224,8 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
       </div>
       {message}
       <Details fen={fen} />
-      {table.rows.length > 0 && (
+      {stale && <StaleRows shown={stale} />}
+      {!stale && table.rows.length > 0 && (
         <div class={`explorer-rows${games ? '' : ' no-games'}${prac ? ' with-prac' : ''}`} role="list">
           {table.rows.map((r) => {
             const cell = cells.get(r.san)!;
@@ -235,6 +272,90 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
         </div>
       )}
     </section>
+  );
+}
+
+/** The last position's rows, faded and inert, while this one is asked. */
+function StaleRows(props: { shown: Shown }) {
+  const { table, games, prac } = props.shown;
+  return (
+    <div class={`explorer-rows stale${games ? '' : ' no-games'}${prac ? ' with-prac' : ''}`} aria-hidden="true" inert>
+      {table.rows.map((r) => (
+        <div key={r.san} class={`ex-row${r.covered ? ' covered' : ''}${r.novelty ? ' novelty' : ''}`}>
+          <span class="ex-move">
+            <span class="ex-san">{r.san}</span>
+          </span>
+          <span class={`ex-eval${r.eval ? ` ${evalTone(r.eval)}` : ''}`}>{r.eval ? formatEval(r.eval) : ''}</span>
+          {prac && <span class="ex-prac" />}
+          {games && <span class="ex-share">{r.novelty ? '' : formatShare(r.share)}</span>}
+          {games && <span class="ex-count">{r.novelty ? '' : fmtCount(r.games)}</span>}
+          {games && (r.novelty ? <span class="ex-bar ex-novelty">novelty</span> : <Bar white={r.white} draws={r.draws} black={r.black} />)}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const MIN_HEIGHT = 120;
+const STEP = 24;
+
+/** The largest height the panel may take: room left for the notation and the move buttons. */
+function maxHeight(box: HTMLElement): number {
+  const parent = box.parentElement;
+  const wide = matchMedia('(min-width: 900px)').matches;
+  const room = wide && parent ? parent.clientHeight - 240 : innerHeight * 0.85;
+  return Math.max(MIN_HEIGHT, Math.round(room));
+}
+
+/** Qchess's resize handle on the panel's top edge: drag (or arrow keys) for the height; double-click resets it. */
+function Grip(props: { box: { current: HTMLElement | null } }) {
+  const set = (h: number) => {
+    const box = props.box.current;
+    if (!box) return;
+    setPrefs({ height: Math.round(Math.min(maxHeight(box), Math.max(MIN_HEIGHT, h))) });
+  };
+  return (
+    <div
+      class="explorer-grip"
+      role="separator"
+      aria-orientation="horizontal"
+      aria-label="Explorer height"
+      title="Drag to resize the explorer; double-click for the default"
+      tabIndex={0}
+      onPointerDown={(e) => {
+        const box = props.box.current;
+        if (!box || e.button !== 0) return;
+        e.preventDefault();
+        const grip = e.currentTarget;
+        grip.setPointerCapture(e.pointerId);
+        grip.classList.add('dragging');
+        const y0 = e.clientY;
+        const h0 = box.getBoundingClientRect().height;
+        const max = maxHeight(box);
+        let h = h0;
+        const move = (m: PointerEvent) => {
+          h = Math.min(max, Math.max(MIN_HEIGHT, h0 + y0 - m.clientY));
+          box.style.setProperty('--ex-height', `${h}px`);
+        };
+        const up = () => {
+          grip.removeEventListener('pointermove', move);
+          grip.removeEventListener('pointerup', up);
+          grip.removeEventListener('pointercancel', up);
+          grip.classList.remove('dragging');
+          if (h !== h0) setPrefs({ height: Math.round(h) });
+        };
+        grip.addEventListener('pointermove', move);
+        grip.addEventListener('pointerup', up);
+        grip.addEventListener('pointercancel', up);
+      }}
+      onDblClick={() => setPrefs({ height: 0 })}
+      onKeyDown={(e) => {
+        const box = props.box.current;
+        if (!box || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+        e.preventDefault();
+        set(box.getBoundingClientRect().height + (e.key === 'ArrowUp' ? STEP : -STEP));
+      }}
+    />
   );
 }
 

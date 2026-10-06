@@ -72,10 +72,14 @@ couldn't be tested then (the day's limit was used up), so the training items bel
 
 - §5.23: the explorer panel with the owner's Lichess login, on desktop and phone: on 1. e4 c5
   2. Nf3 the Lichess tab beside Qchess's Lichess tab with the same filter (moves, shares, counts,
-  bars) and the Eval column beside Qchess's; Masters and ChessDB; a row tapped playing its move;
+  bars) and the Eval column beside Qchess's; Masters; a row tapped playing its move;
   the ⛁ button turning the panel off and on (and remembered); the settings' filter; the phone's
   layout (the panel after the notation, rows readable and tappable). If the login was made before
   this build, the explorer uses the same token: no new login is needed.
+- §5.23, the owner's notes of 2026-10-06: the panel keeping one height while stepping through
+  moves (desktop and phone); dragging its top edge's handle (mouse, and a finger on the phone),
+  the height kept after a reload, a double-click back to the default; Eval, Prac and Games
+  sorting on a click on their titles; no ChessDB tab.
 - §5.22: a reload answering from the cache (the panel fills at once on a position seen before).
 - §5.24: the Practical column on the desktop beside q_extension's column (same positions, filter
   and token; the values within a point at the same depth, the prepared bars likewise); the

@@ -4,12 +4,13 @@
 import type { CompactExplorer } from './providers.ts';
 import { moveKey, type ChessdbAnswer, type Side } from './search.ts';
 
-/** Qchess's sort menu, Maia's order left out until Phase 3. */
-export type SortMode = 'popularity' | 'eval' | 'score' | 'white-eval' | 'black-eval' | 'mine-eval' | 'only-rep';
+/** Qchess's sort menu, Maia's order left out until Phase 3, and the Practical column's order. */
+export type SortMode = 'popularity' | 'eval' | 'prac' | 'score' | 'white-eval' | 'black-eval' | 'mine-eval' | 'only-rep';
 
 export const SORT_LABELS: Record<SortMode, string> = {
   popularity: 'Sort by popularity',
   eval: 'Sort by eval',
+  prac: 'Sort by practical',
   score: 'Sort by score',
   'white-eval': 'White moves by eval, black by popularity',
   'black-eval': 'Black moves by eval, white by popularity',
@@ -65,6 +66,8 @@ export interface TableInput {
   covered?: ReadonlySet<string>;
   /** Repertoire chapters playing each move here, by SAN. */
   repertoire?: ReadonlyMap<string, number>;
+  /** The Practical column's values by SAN, for the `prac` order (the side to move's expected score). */
+  practical?: ReadonlyMap<string, number>;
 }
 
 /** An eval in pawns from White's side, as Qchess writes it: `+0.18`, `0.00`, `-1.20`; mates `#3` / `-#3`. */
@@ -155,6 +158,13 @@ export function buildTable(input: TableInput): Table {
   const evalSort =
     input.sort === 'eval' || (input.sort === 'white-eval' && turn === 'w') || (input.sort === 'black-eval' && turn === 'b') || (input.sort === 'mine-eval' && turn === mineSide);
   let out = rows;
+  if (input.sort === 'prac') {
+    // The Practical values first, highest first; the moves without one after them, by eval.
+    const prac = new Map([...(input.practical ?? [])].map(([san, v]) => [moveKey(san), v] as const));
+    const value = (r: TableRow) => prac.get(moveKey(r.san)) ?? -Infinity;
+    out = [...out].sort((a, b) => value(b) - value(a) || byEval(a, b));
+    return total ? { rows: out, total } : { rows: out };
+  }
   if (input.sort === 'only-rep') out = rows.filter((r) => r.covered || r.repertoire > 0);
   if (evalSort) {
     out = [...out].sort(byEval);

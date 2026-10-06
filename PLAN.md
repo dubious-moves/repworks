@@ -2503,7 +2503,8 @@ counts and bars equal for the same filter); the phone's layout and scrolling; th
   chapter view's panel; on a wide screen it takes up to half the panel and scrolls, on the phone
   it follows the notation. The database button (`⛁`) is first in the move-button bar, which now
   keeps its nine buttons on one row at every width.
-- Tabs: Lichess (named Local when a local explorer is set), Masters, ChessDB; ⚙ opens the
+- Tabs: Lichess (named Local when a local explorer is set), Masters, ChessDB (removed since, by
+  the owner's notes below); ⚙ opens the
   explorer's settings (`ExplorerSettings.tsx`: the Lichess login, Qchess's time controls and
   rating buttons, the past 6 months, and §5.24's Practical options and §5.25's address, already
   there). The sort is a `<select>` in the header (Qchess's menu items), saved per device; the
@@ -2530,6 +2531,23 @@ counts and bars equal for the same filter); the phone's layout and scrolling; th
   panel wider than the phone).
 - Not checked live: the real explorer needs a Lichess token, which this container doesn't have;
   ChessDB was reached from the container (§2). Both wait for the owner (TESTING.md).
+
+**The owner's testing notes** (2026-10-06), built the same day:
+- **A constant size, as Qchess's**: Qchess's `#opening-tree` is `flex: 0 0 auto` at a set height
+  (50% of its column by default) with a resize handle on its top edge, its rows scrolling inside
+  (read live, desktop 1600×900). Repworks' panel had taken its content's height, shrinking to
+  "Asking…" on each move and to what the notation left. Now: a fixed height, half the panel on a
+  wide screen (at most the panel less 240 px, for the notation and the buttons) and 360 px on the
+  phone; the last position's rows stay, faded and inert, until the next answer.
+- **Adjustable**: a handle on the panel's top edge (drag, a finger on the phone, ↑/↓ keys;
+  double-click for the default), the height saved per device (`height` in the explorer prefs).
+- **Sorting by the column titles**: Eval (by eval), Prac (a new order, `prac`: the Practical
+  values highest first, then by eval), Games (by popularity), and Score when the Practical
+  column is off (by score; with it on, Score stays the prepared switch). The menu stays, and
+  shows the order chosen either way.
+- **No ChessDB tab**: its evals are already the games tabs' Eval column and novelty rows. A
+  device that had it chosen opens on Lichess. Without a Lichess login, ChessDB's moves show under
+  the login's note (what the ChessDB tab was for there).
 
 #### 5.24 The Practical column and the prepared score
 

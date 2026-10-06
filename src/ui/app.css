@@ -1801,9 +1801,73 @@ a.button.secondary {
 .explorer {
   font-size: 0.85rem;
   border-top: 1px solid rgb(255 255 255 / 10%);
-  min-height: 0;
   display: flex;
   flex-direction: column;
+  /* A constant height, as Qchess's (§5.23): its handle sets --ex-height; the rows scroll inside. */
+  flex: 0 0 auto;
+  height: var(--ex-height, 360px);
+  min-height: 120px;
+  max-height: 85dvh;
+  overflow: hidden;
+}
+
+/* Qchess's resize handle: a thin bar with two grip lines on the panel's top edge. */
+.explorer-grip {
+  flex: 0 0 auto;
+  height: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: ns-resize;
+  touch-action: none;
+  background: rgb(92 131 202 / 15%);
+}
+
+.explorer-grip::before {
+  content: '';
+  width: 60px;
+  height: 2px;
+  background: #999;
+  border-radius: 2px;
+  box-shadow: 0 3px 0 #999;
+  transform: translateY(-1.5px);
+}
+
+.explorer-grip:hover,
+.explorer-grip:focus-visible,
+.explorer-grip.dragging {
+  background: rgb(92 131 202 / 35%);
+  outline: none;
+}
+
+.explorer-rows.stale {
+  opacity: 0.45;
+}
+
+.explorer-head .ex-sortable {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.explorer-head .ex-sortable:hover,
+.explorer-head .ex-sortable.on {
+  color: var(--text);
+}
+
+.explorer-head .ex-eval.ex-sortable,
+.explorer-head .ex-prac.ex-sortable {
+  text-align: right;
+}
+
+.explorer-head .ex-games.ex-sortable,
+.explorer-head .ex-score.ex-sortable {
+  text-align: left;
 }
 
 .explorer-tabs {
@@ -2021,9 +2085,8 @@ a.button.secondary {
 
 @media (min-width: 900px) {
   .cv-panel .explorer {
-    flex: 0 1 auto;
-    max-height: 48%;
-    overflow: hidden;
+    height: var(--ex-height, 50%);
+    max-height: max(120px, calc(100% - 240px));
   }
 
   .ex-details {

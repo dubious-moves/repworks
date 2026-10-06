@@ -79,6 +79,13 @@ test('the panel: Qchess’s rows, sorted by eval, a row clicked plays its move, 
   // Sorted by popularity instead: c4 among the games, the novelty after them.
   await panel(page).getByRole('combobox', { name: 'Sort' }).selectOption('popularity');
   await expect(rows(page)).toHaveText(['e4', 'd4', 'c4', 'Nf3']);
+  // The column titles sort too, and the menu follows.
+  await panel(page).getByRole('button', { name: 'Eval', exact: true }).click();
+  await expect(rows(page)).toHaveText(['e4', 'd4', 'Nf3', 'c4']);
+  await expect(panel(page).getByRole('combobox', { name: 'Sort' })).toHaveValue('eval');
+  await panel(page).getByRole('button', { name: 'Games', exact: true }).click();
+  await expect(rows(page)).toHaveText(['e4', 'd4', 'c4', 'Nf3']);
+  await expect(panel(page).getByRole('combobox', { name: 'Sort' })).toHaveValue('popularity');
 
   // A click on d4 plays it, as a variation of the chapter.
   await panel(page).locator('.ex-row', { hasText: 'd4' }).first().click();
@@ -93,16 +100,50 @@ test('the panel: Qchess’s rows, sorted by eval, a row clicked plays its move, 
   await expect(page.getByRole('button', { name: 'Explorer', exact: true })).toHaveAttribute('aria-pressed', 'false');
 });
 
-test('tabs: Masters asks Lichess’s masters with no filter; ChessDB shows its moves alone', async ({ page }) => {
+test('tabs: Lichess and Masters, which asks Lichess’s masters with no filter; no ChessDB tab', async ({ page }) => {
   const fake = await setUp(page);
   await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf`);
   await expect(rows(page)).toHaveText(['e4', 'd4', 'Nf3', 'c4']);
+  await expect(panel(page).getByRole('tab')).toHaveText(['Lichess', 'Masters']);
   await panel(page).getByRole('tab', { name: 'Masters' }).click();
   await expect.poll(() => fake.requests.some((r) => r.url.startsWith('https://explorer.lichess.org/masters?fen='))).toBe(true);
   expect(fake.requests.find((r) => r.url.includes('/masters'))!.url).not.toContain('speeds=');
-  await panel(page).getByRole('tab', { name: 'ChessDB' }).click();
-  await expect(rows(page)).toHaveText(['e4', 'd4', 'Nf3']);
-  await expect(panel(page).locator('.ex-count')).toHaveCount(0);
+});
+
+test('the panel keeps its height between positions, and its handle resizes it, kept after a reload', async ({ page }) => {
+  await setUp(page);
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf`);
+  await expect(rows(page)).toHaveText(['e4', 'd4', 'Nf3', 'c4']);
+  const height = async () => Math.round((await panel(page).boundingBox())!.height);
+  const before = await height();
+  expect(before).toBeGreaterThanOrEqual(240);
+  // Moving on: the same height while the next position is asked, and once it has answered.
+  await page.getByRole('button', { name: 'Next move' }).click();
+  expect(await height()).toBe(before);
+  await page.getByRole('button', { name: 'Next move' }).click();
+  await expect(rows(page)).toHaveText(['Nf3', 'c3']);
+  expect(await height()).toBe(before);
+  // Dragged down by 60 px: 60 px shorter (up makes it taller, as far as the notation leaves room).
+  const grip = panel(page).getByRole('separator', { name: 'Explorer height' });
+  await grip.scrollIntoViewIfNeeded();
+  const g = (await grip.boundingBox())!;
+  const x = g.x + g.width / 2;
+  const y = g.y + g.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x, y + 30, { steps: 3 });
+  await page.mouse.move(x, y + 60, { steps: 3 });
+  await page.mouse.up();
+  await expect.poll(height).toBe(before - 60);
+  await page.reload();
+  await expect(rows(page)).not.toHaveCount(0);
+  expect(await height()).toBe(before - 60);
+  // The arrow keys too; a double-click goes back to the default.
+  await grip.focus();
+  await page.keyboard.press('ArrowUp');
+  await expect.poll(height).toBe(before - 36);
+  await grip.dblclick();
+  await expect(panel(page)).not.toHaveAttribute('style', /--ex-height/);
 });
 
 test('a move other repertoire chapters play is marked, and its list opens the other chapter there', async ({ page }) => {
@@ -120,14 +161,14 @@ test('a move other repertoire chapters play is marked, and its list opens the ot
   await expect(page.locator('.move.current')).toHaveText(/c3/);
 });
 
-test('no Lichess login: the games tab says so and offers it; ChessDB still answers', async ({ page }) => {
+test('no Lichess login: the games tab says so and offers it, with ChessDB’s moves under it', async ({ page }) => {
   const fake = await setUp(page, { login: false });
   await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf`);
   await expect(panel(page).getByText(/needs a Lichess login/)).toBeVisible();
   await expect(panel(page).getByRole('button', { name: 'Log in with Lichess' })).toBeVisible();
   expect(fake.requests.filter((r) => r.url.startsWith('https://explorer.lichess.org'))).toHaveLength(0);
-  await panel(page).getByRole('tab', { name: 'ChessDB' }).click();
   await expect(rows(page)).toHaveText(['e4', 'd4', 'Nf3']);
+  await expect(panel(page).locator('.ex-count')).toHaveCount(0);
 });
 
 test('Lichess asks to slow down: the panel says it waits', async ({ page }) => {

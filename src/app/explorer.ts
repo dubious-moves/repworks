@@ -40,6 +40,8 @@ export interface ExplorerPrefs {
   analyse: boolean;
   /** A local explorer's address (§5.25), or ''. */
   local: string;
+  /** The panel's height in px, as dragged by its handle; 0 for the layout's default. */
+  height: number;
 }
 
 // Qchess's defaults for the filter and the sort; q_extension's for the rest.
@@ -63,6 +65,7 @@ export const DEFAULT_PREFS: ExplorerPrefs = {
   prepPriorGames: 50,
   analyse: false,
   local: '',
+  height: 0,
 };
 
 const PREFS_KEY = 'repworks-explorer';
@@ -72,6 +75,8 @@ function loadPrefs(): ExplorerPrefs {
   try {
     const raw = localStorage.getItem(PREFS_KEY);
     const saved = raw ? (JSON.parse(raw) as Partial<ExplorerPrefs>) : {};
+    // ChessDB's own tab is gone: its evals are the games tabs' Eval column and novelties.
+    if ((saved.tab as string | undefined) === 'chessdb') delete saved.tab;
     return { ...DEFAULT_PREFS, ...saved };
   } catch {
     return { ...DEFAULT_PREFS };
