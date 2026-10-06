@@ -1587,6 +1587,33 @@ a session run with `2` and `4` only, its review events checked.
 Live (phone, with the owner's ring): the ring's buttons reach the page (key events or Media
 Session), with the screen on and off; speech on Android.
 
+**As built** (2026-10-06):
+- The trainer gained `selfGrade`, with two commands: `show` (the move asked is played, with its
+  arrow, and its grade waits) and `tell(knew)` (the card is graded `selfGrade(knew)`, or a new
+  move is recorded taught, and the opponent's reply is played with the press; what follows comes
+  at the pace). Everything else — which moves are asked, auto-play, the plan — is the trainer's.
+- `src/core/train/showGrade.ts`: `ShowGrade` turns presses into those commands. `next` shows the
+  move, then grades it known; `wrong` shows it and marks it failed, and marks a move already
+  shown failed there and then; the next press grades Again. A new move takes two presses and is
+  never graded. A press while the board is playing waits for it: `next` only, one at a time, and
+  dropped after three seconds; `wrong` clears what was waiting. `pressOf(key)` maps `2` and
+  `MediaTrackNext` to `next`, `4` and `MediaTrackPrevious` to `wrong`, `1` to `repeat`; a held
+  key is one press (the screen drops `repeat` events). `spokenMove(san)` reads a move aloud
+  ("knight takes e5, check"), for the Web Speech API.
+- `src/platform/speech.ts` (speech, off by default, per device) and `src/platform/mediaKeys.ts`
+  (Media Session handlers kept alive by a second of silence on loop, built in code as a WAV blob:
+  a zero-length clip on loop crashed the browser under the repeated e2e runs). Pause and play are
+  handled as nothing, so the ring can't stop the loop and with it the routing.
+- The screen is the training screen in another mode (`#/show`, `#/show/<sid>`; "Show and grade"
+  on the home card), with two large buttons for the keys, "Say again" when speech is on, and the
+  speech toggle. The board takes no moves. A separate `ShowGrade.tsx` wasn't needed: the board,
+  the feedback line, the counters and the session's end are the same.
+- Tests: `test/unit/core/train/showGrade.test.ts` (the two-key table, a new move, the queue's
+  three seconds and `wrong` clearing it, the key mapping, speech and the spoken moves) and
+  `test/e2e/train.spec.ts` (a session run with `2` and `4` only: a move missed and graded Again
+  with no `w`, three new moves taught, and the four events in the fake repo). 80 runs of the
+  training specs under `--repeat-each=8 --workers=4` passed before pushing.
+
 #### 5.10 Read and Interactive views
 
 Qchess's two training views, started from the chapter view at the move shown ("Read from here",

@@ -17,9 +17,14 @@ export function TrainCard() {
         <h2>
           Train: <span class="train-due">{queue.due.length} due</span> · <span class="train-new">{queue.newCards.length} new</span>
         </h2>
-        <a class="button" href="#/train">
-          Train
-        </a>
+        <div class="actions">
+          <a class="button" href="#/train">
+            Train
+          </a>
+          <a class="button secondary" href="#/show">
+            Show and grade
+          </a>
+        </div>
       </div>
       {queue.later.length > 0 && (
         <p class="muted">

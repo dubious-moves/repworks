@@ -12,7 +12,10 @@ import type { Role, SquareName } from 'chessops/types';
 import { open } from '../app/mode.ts';
 import { beginTraining } from '../app/state.ts';
 import { dataVersion } from '../app/sync.ts';
-import { command, endSession, pace, PACES, pinMissed, playMove, session, sessionProblem, setPace, undoSuspend, type Pace, type SessionKind, type SessionView } from '../app/train.ts';
+import { command, endSession, pace, PACES, pinMissed, playMove, press, session, sessionProblem, setPace, setSpeech, speech, undoSuspend, type Pace, type SessionKind, type SessionView } from '../app/train.ts';
+import { pressOf } from '../core/train/showGrade.ts';
+import { holdMediaKeys } from '../platform/mediaKeys.ts';
+import { canSpeak } from '../platform/speech.ts';
 import type { Note } from '../core/train/trainer.ts';
 import { header } from '../core/study/model.ts';
 import { nodeAt, startPosition } from '../core/study/tree.ts';
@@ -85,7 +88,7 @@ function useWakeLock(active: boolean) {
   }, [active]);
 }
 
-const TITLES = { retry: 'Retry mistakes', drill: 'Drill mistakes', pinned: 'Drill pinned' } as const;
+const TITLES = { retry: 'Retry mistakes', drill: 'Drill mistakes', pinned: 'Drill pinned', show: 'Show and grade' } as const;
 
 export function TrainScreen(props: { of: SessionKind }) {
   const key = JSON.stringify(props.of);
@@ -103,24 +106,38 @@ export function TrainScreen(props: { of: SessionKind }) {
     if (empty) void beginTraining(props.of);
   }, [version]);
 
+  const showing = running && s.of.kind === 'show';
   useEffect(() => {
     if (!running) return;
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
-      if (target && /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(target.tagName) && e.key === ' ') return;
-      if (e.key === ' ') command('hint');
-      else if (e.key === 'Escape') command('stop');
+      // Never swallowed in a text field, and a held key is one press.
+      if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+      if (e.key === 'Escape') command('stop');
+      else if (showing && !e.repeat && pressOf(e.key)) press(pressOf(e.key)!);
+      else if (!showing && e.key === ' ' && !(target && target.tagName === 'BUTTON')) command('hint');
       else return;
       e.preventDefault();
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [running]);
+  }, [running, showing]);
+
+  // The ring's buttons, when they arrive as media keys rather than key events (§5.9).
+  useEffect(() => {
+    if (!showing) return;
+    const keys = holdMediaKeys({ onNext: () => press('next'), onPrevious: () => press('wrong') });
+    return () => keys.stop();
+  }, [showing]);
 
   if (sessionProblem.value) return <p class="warn">{sessionProblem.value}</p>;
   if (!s) return <p class="muted">Reading the repertoire…</p>;
   const title =
-    s.of.kind === 'queue' ? `Training · ${s.scope ? (s.data.studyNames.get(s.scope) ?? s.scope) : 'Whole repertoire'}` : s.of.kind === 'pinned' && s.of.all ? 'Drill all pins' : TITLES[s.of.kind];
+    s.of.kind === 'queue'
+      ? `Training · ${s.scope ? (s.data.studyNames.get(s.scope) ?? s.scope) : 'Whole repertoire'}`
+      : s.of.kind === 'pinned' && s.of.all
+        ? 'Drill all pins'
+        : TITLES[s.of.kind];
   return (
     <div class="train">
       <div class="chapter-head">
@@ -139,7 +156,8 @@ export function TrainScreen(props: { of: SessionKind }) {
 function Done(props: { s: SessionView }) {
   const { done, plan, of } = props.s;
   if (!done) return null;
-  const practice = of.kind !== 'queue';
+  // Show and grade records its grades; retry, drill and the pins never do.
+  const practice = of.kind !== 'queue' && of.kind !== 'show';
   return (
     <section class="card train-done" aria-label="Session done">
       <h2>{plan.lines.length === 0 ? (practice ? 'Nothing to practise now' : 'Nothing to train now') : 'Session done'}</h2>
@@ -174,7 +192,8 @@ function Done(props: { s: SessionView }) {
 function Session(props: { s: SessionView }) {
   const s = props.s;
   const [promotion, setPromotion] = useState<{ orig: Key; dest: Key } | undefined>(undefined);
-  const asking = ASKING.has(s.phase);
+  const show = s.of.kind === 'show';
+  const asking = ASKING.has(s.phase) && !show;
   const pos = s.position;
   const board = useMemo(() => {
     if (!pos) return undefined;
@@ -249,7 +268,7 @@ function Session(props: { s: SessionView }) {
       </div>
       <div class="train-panel">
         <p class="train-counters" aria-label="Left today">
-          {s.of.kind === 'queue' ? (
+          {s.of.kind === 'queue' || s.of.kind === 'show' ? (
             <>
               <span>{s.dueLeft} due</span> · <span>{s.newLeft} new</span> · line {s.number} of {s.total}
             </>
@@ -270,7 +289,22 @@ function Session(props: { s: SessionView }) {
           </div>
         )}
         <div class="actions train-actions">
-          {(s.phase === 'ask' || s.phase === 'wrong') && (
+          {show && (
+            <>
+              <button type="button" class="press press-next" onClick={() => press('next')}>
+                {s.phase === 'shown' ? 'Knew it' : 'Show'} <span class="muted">(2)</span>
+              </button>
+              <button type="button" class="press press-wrong" onClick={() => press('wrong')}>
+                Missed it <span class="muted">(4)</span>
+              </button>
+              {speech.value && (
+                <button type="button" class="secondary" onClick={() => press('repeat')}>
+                  Say again <span class="muted">(1)</span>
+                </button>
+              )}
+            </>
+          )}
+          {(s.phase === 'ask' || s.phase === 'wrong') && !show && (
             <button type="button" onClick={() => command('hint')}>
               Hint
             </button>
@@ -297,6 +331,11 @@ function Session(props: { s: SessionView }) {
             Stop
           </button>
         </div>
+        {show && canSpeak() && (
+          <label class="train-speech">
+            <input type="checkbox" checked={speech.value} onChange={(e) => setSpeech(e.currentTarget.checked)} /> Speak each move
+          </label>
+        )}
         <label class="train-pace">
           Pace{' '}
           <select value={pace.value} onChange={(e) => setPace(e.currentTarget.value as Pace)}>

@@ -15,6 +15,8 @@ test('hashes parse to modes, and modes write back to the same hash', () => {
     ['#/conflicts', { name: 'conflicts' }],
     ['#/train', { name: 'train' }],
     ['#/train/Rep0Najd', { name: 'train', sid: 'Rep0Najd' }],
+    ['#/show', { name: 'show' }],
+    ['#/show/Rep0Najd', { name: 'show', sid: 'Rep0Najd' }],
     ['#/mistakes', { name: 'mistakes' }],
     ['#/mistakes/retry', { name: 'practice', run: 'retry' }],
     ['#/mistakes/drill', { name: 'practice', run: 'drill' }],

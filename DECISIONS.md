@@ -841,3 +841,14 @@ Technical calls made while building `PLAN.md` §5.6–§5.7, each with its reaso
 - **D4: a mistake's line is a line through the card's first occurrence.** The review event names
   the card, not the line it was met on, and cards are per position (D3); any line through the
   move leads to it.
+
+## Revision of 2026-10-06 (show and grade)
+- **D16: show and grade is a mode of the trainer, not a second one.** `selfGrade` adds two
+  commands (`show`, `tell`); the plan, auto-play and the learning step are shared, so a session
+  can be run either way on the same queue. Its screen is the training screen in another mode.
+- **D7: the media keys need a sound playing.** Chrome on Android routes them only to a page
+  playing media, so the mode loops a second of silence built in code. A zero-length clip looped
+  crashed the browser under the repeated e2e runs, which is why the clip has real samples.
+- **D16: a wrong press on a move already shown grades it Again at once.** The plan had the next
+  press do it; one press is what the owner means, and the two-key table keeps `next`, `next` for
+  Good and anything with a `wrong` for Again.

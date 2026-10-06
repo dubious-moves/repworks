@@ -23,7 +23,7 @@ import { repertoireCard, type CardId } from '../progress/cards.ts';
 import type { Grade } from '../progress/events.ts';
 import type { CardState } from '../progress/replay.ts';
 import type { Line, RepertoireIndex } from '../repertoire/index.ts';
-import { grade } from './grade.ts';
+import { grade, selfGrade } from './grade.ts';
 import type { PlannedLine, SessionPlan } from './plan.ts';
 import { knownCardsOf, statusOf } from './queue.ts';
 
@@ -99,6 +99,10 @@ export type TrainerCommand =
   /** A move made on the board, in UCI (either castling spelling). */
   | { type: 'move'; uci: string; now: number }
   | { type: 'hint'; now: number }
+  /** Show and grade: play the move asked, without grading it yet. */
+  | { type: 'show' }
+  /** Show and grade: the move was known or not; the card is graded and the line goes on. */
+  | { type: 'tell'; knew: boolean; now: number }
   /** "Always play this for me" on the move asked or taught. */
   | { type: 'suspend'; now: number }
   | { type: 'skipLine'; now: number }
@@ -118,6 +122,8 @@ export interface TrainerSetup {
   askAll?: boolean;
   /** Ask only the plan's asks and play everything else, new or not (retry and drill, §5.8). */
   askOnly?: boolean;
+  /** Show and grade (§5.9): the user never moves; `show` plays the move, `tell` grades it. */
+  selfGrade?: boolean;
 }
 
 interface Ply {
@@ -178,6 +184,8 @@ export class Trainer {
   private end = 0;
   private ply = 0;
   private pending: Pending | undefined;
+  /** Show and grade: a move played and waiting for its grade. */
+  private waiting: { card: CardId; mode: 'ask' | 'teach'; san: string; since: number } | undefined;
   private waitId = 0;
   private walked = 0;
   private readonly counts = { reviews: 0, good: 0, taught: 0, suspended: 0 };
@@ -212,6 +220,7 @@ export class Trainer {
     if (position) v.position = position;
     const p = this.pending;
     if (p && (p.mode === 'teach' || p.shown)) v.shown = { uci: p.uci, san: p.san };
+    else if (this.waiting) v.shown = { uci: '', san: this.waiting.san };
     return v;
   }
 
@@ -231,6 +240,12 @@ export class Trainer {
       case 'hint':
         this.hint(out);
         break;
+      case 'show':
+        this.showMove(out);
+        break;
+      case 'tell':
+        this.tell(command.knew, command.now, out);
+        break;
       case 'suspend':
         this.suspend(command.now, out);
         break;
@@ -238,12 +253,14 @@ export class Trainer {
         if (this.phase === 'ready') break;
         this.waitId++;
         this.pending = undefined;
+        this.waiting = undefined;
         out.push({ type: 'arrow' });
         this.nextLine(command.now, out);
         break;
       case 'stop':
         this.waitId++;
         this.pending = undefined;
+        this.waiting = undefined;
         this.finish(out);
         break;
     }
@@ -351,6 +368,7 @@ export class Trainer {
   /** From the board's position: the next move, an ask, or the line's end. */
   private advance(now: number, out: TrainerEffect[]) {
     this.pending = undefined;
+    this.waiting = undefined;
     if (this.ply >= this.end) {
       this.phase = 'lineDone';
       out.push({ type: 'lineDone' });
@@ -465,6 +483,47 @@ export class Trainer {
     this.ply++;
     out.push({ type: 'play', uci: p.uci, san: p.san, path: this.path(), by: 'user' });
     this.advance(now, out);
+  }
+
+  /** Show and grade: the move asked is played, and the grade waits for `tell`. */
+  private showMove(out: TrainerEffect[]) {
+    const p = this.pending;
+    if (!this.setup.selfGrade || !p) return;
+    this.pending = undefined;
+    this.answered.add(p.card);
+    this.waiting = { card: p.card, mode: p.mode, san: p.san, since: p.since };
+    out.push({ type: 'arrow', uci: p.uci });
+    this.ply++;
+    out.push({ type: 'play', uci: p.uci, san: p.san, path: this.path(), by: 'user' });
+    this.phase = 'shown';
+    out.push({ type: 'note', note: { kind: 'shown', san: p.san } });
+  }
+
+  /** Show and grade: the card is graded (a taught move is taught), then the line goes on. */
+  private tell(knew: boolean, now: number, out: TrainerEffect[]) {
+    const w = this.waiting;
+    if (!w) return;
+    this.waiting = undefined;
+    if (w.mode === 'teach') {
+      this.taughtNow.add(w.card);
+      if (this.record) {
+        out.push({ type: 'record', event: { k: 'taught', card: w.card } });
+        this.counts.taught++;
+      }
+      out.push({ type: 'note', note: { kind: 'taught', san: w.san } });
+    } else {
+      const g = selfGrade(knew);
+      out.push({ type: 'answer', card: w.card, ok: g === 3 });
+      if (this.record) {
+        out.push({ type: 'record', event: { k: 'review', card: w.card, g, ms: Math.max(0, now - w.since) } });
+        this.counts.reviews++;
+        if (g === 3) this.counts.good++;
+      }
+      out.push({ type: 'note', note: { kind: g === 3 ? 'correct' : 'played' } });
+    }
+    this.advance(now, out);
+    // The press plays the opponent's reply at once; what follows comes at the pace.
+    if (this.phase === 'opponent' || this.phase === 'auto') this.tick(now, out);
   }
 
   private hint(out: TrainerEffect[]) {

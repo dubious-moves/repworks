@@ -1141,3 +1141,27 @@ table.cards td {
   margin: 0;
   align-items: center;
 }
+
+/* Show and grade (PLAN.md §5.9): two big keys, reachable with a thumb. */
+
+.press {
+  flex: 1 1 40%;
+  min-height: 64px;
+  font-size: 1.05rem;
+}
+
+.press-next {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.train-speech {
+  display: block;
+  color: var(--muted);
+  margin-top: 8px;
+}
+
+a.button.secondary {
+  background: transparent;
+  color: var(--text);
+}

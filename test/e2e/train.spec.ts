@@ -202,3 +202,40 @@ test('mistakes: fail a move, pin it, see it, retry and drill it with nothing gra
   await page.goto(`${site.url}#/mistakes`);
   await expect(page.getByRole('region', { name: 'Pinned' }).locator('li')).toContainText('1 of 3 clean');
 });
+
+test('show and grade: a session run with 2 and 4 only, its review events checked', async ({ page }) => {
+  const git = await setUp(page);
+  await expect(page.locator('.train-card h2')).toHaveText('Train: 1 due · 3 new');
+  await page.getByRole('link', { name: 'Show and grade' }).click();
+  await expect(page).toHaveURL(/#\/show$/);
+  await expect(page.locator('.study-title')).toHaveText('Show and grade');
+
+  // 1. e4 is played for the user; 1... c5 is due. 4 shows it and marks it missed, the next press
+  // grades it Again and plays on. The board never takes a move.
+  await expect(feedback(page)).toHaveText('Your move');
+  await page.keyboard.press('4');
+  await expect(feedback(page)).toHaveText('Play c5');
+  await expect(page.getByRole('button', { name: 'Knew it (2)' })).toBeVisible();
+  await page.keyboard.press('2');
+  await expect(feedback(page)).toHaveText('That’s the move: it comes back soon');
+
+  // The new moves are shown and learned by two presses each, with no grade.
+  for (const expected of ['New move: play cxd4', 'New move: play Nc6', 'New move: play Nf6']) {
+    await expect(feedback(page)).toHaveText(expected);
+    await page.keyboard.press('2');
+    await page.keyboard.press('2');
+  }
+  await expect(page.getByRole('region', { name: 'Session done' })).toContainText('1 move reviewed, 0 right first time · 3 new');
+
+  await page.locator('.chip').click();
+  await expect.poll(() => pushed(git).length).toBe(4);
+  const events = pushed(git);
+  expect(events.map((e) => [e['k'], e['card']])).toEqual([
+    ['review', C5],
+    ['taught', CXD4],
+    ['taught', NC6],
+    ['taught', NF6],
+  ]);
+  expect(events[0]).toMatchObject({ g: 1 });
+  expect(events[0]!['w']).toBeUndefined();
+});

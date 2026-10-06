@@ -16,7 +16,7 @@ import { TrainCard } from './TrainCard.tsx';
 
 export function App() {
   return (
-    <div class={`shell${mode.value.name === 'chapter' ? ' shell-chapter' : ''}${mode.value.name === 'train' || mode.value.name === 'practice' ? ' shell-train' : ''}`}>
+    <div class={`shell${mode.value.name === 'chapter' ? ' shell-chapter' : ''}${mode.value.name === 'train' || mode.value.name === 'practice' || mode.value.name === 'show' ? ' shell-train' : ''}`}>
       <header class="topbar">
         <img class="topbar-icon" src={`${import.meta.env.BASE_URL}icons/icon.svg`} alt="" width={28} height={28} />
         <h1>Repworks</h1>
@@ -55,6 +55,8 @@ function Screen() {
       return <ChapterView />;
     case 'train':
       return <TrainScreen of={mode.value.sid ? { kind: 'queue', scope: mode.value.sid } : { kind: 'queue' }} />;
+    case 'show':
+      return <TrainScreen of={mode.value.sid ? { kind: 'show', scope: mode.value.sid } : { kind: 'show' }} />;
     case 'mistakes':
       return <MistakesView />;
     case 'practice': {

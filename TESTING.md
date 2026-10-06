@@ -25,3 +25,6 @@ fixes them and updates this file.
   build time is in the debug panel (§5.1's target: under 300 ms on the phone).
 - §5.8: a session's mistakes retried and drilled on the phone; a pin made on the phone appears
   on the desktop after a sync, and comes due 30 minutes after it was made.
+- §5.9: show and grade on the phone with the owner's ring: whether its buttons arrive as key
+  events or through the Media Session API (and whether the silent loop keeps that routing), with
+  the screen on and off; speech on Android.

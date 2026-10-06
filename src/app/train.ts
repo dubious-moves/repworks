@@ -18,10 +18,12 @@ import { startPosition } from '../core/study/tree.ts';
 import { cardLine, drillLines, retryLines, todaysMistakes, type Mistake } from '../core/train/mistakes.ts';
 import { pinsOf, type PinState } from '../core/train/pins.ts';
 import { planSession, type SessionPlan } from '../core/train/plan.ts';
+import { ShowGrade, type Press, type ShowGradeEffect } from '../core/train/showGrade.ts';
 import { todaysQueue, type DailyQueue, type Day } from '../core/train/queue.ts';
 import { SETTINGS_FILE, trainSettings, type TrainSettings } from '../core/train/settings.ts';
 import { Trainer, type Note, type Summary, type TrainerCommand, type TrainerEffect } from '../core/train/trainer.ts';
 import type { IdbStore } from '../platform/idbStore.ts';
+import { say, stopSpeaking } from '../platform/speech.ts';
 
 /** The device's day: from its last local midnight to the next. */
 export function dayOf(now: number): Day {
@@ -154,7 +156,7 @@ export function setPace(p: Pace): void {
  * What a session walks: today's queue (everything, or one study), or the day's mistakes, retried
  * from their lines' start or drilled from the lead-in, or the pinned mistakes (due, or all).
  */
-export type SessionKind = { kind: 'queue'; scope?: string } | { kind: 'retry' } | { kind: 'drill' } | { kind: 'pinned'; all: boolean };
+export type SessionKind = { kind: 'queue'; scope?: string } | { kind: 'show'; scope?: string } | { kind: 'retry' } | { kind: 'drill' } | { kind: 'pinned'; all: boolean };
 
 export interface SessionView {
   of: SessionKind;
@@ -193,6 +195,7 @@ export const session = signal<SessionView | undefined>(undefined);
 export const sessionProblem = signal<string | undefined>(undefined);
 
 let trainer: Trainer | undefined;
+let shower: ShowGrade | undefined;
 let timer: ReturnType<typeof setTimeout> | undefined;
 let recordEvent: ((event: Parameters<IdbStore['record']>[0]) => Promise<void>) | undefined;
 let answered = new Set<string>();
@@ -201,6 +204,7 @@ let answered = new Set<string>();
 export async function startSession(store: IdbStore, record: (event: Parameters<IdbStore['record']>[0]) => Promise<void>, of: SessionKind): Promise<void> {
   stopTimer();
   trainer = undefined;
+  shower = undefined;
   session.value = undefined;
   sessionProblem.value = undefined;
   recordEvent = record;
@@ -213,9 +217,9 @@ export async function startSession(store: IdbStore, record: (event: Parameters<I
     return;
   }
   const now = Date.now();
-  const scope = of.kind === 'queue' ? of.scope : undefined;
+  const scope = of.kind === 'queue' || of.kind === 'show' ? of.scope : undefined;
   let plan: SessionPlan;
-  if (of.kind === 'queue') plan = planSession(data.index, queueOf(data, now, scope), data.states);
+  if (of.kind === 'queue' || of.kind === 'show') plan = planSession(data.index, queueOf(data, now, scope), data.states);
   else if (of.kind === 'retry') plan = { lines: retryLines(mistakesOf(data, now)) };
   else if (of.kind === 'drill') plan = { lines: drillLines(mistakesOf(data, now)) };
   else {
@@ -224,10 +228,11 @@ export async function startSession(store: IdbStore, record: (event: Parameters<I
     plan = { lines: drillLines(cards.flatMap((card) => (cardLine(data.index, card) ? [{ card, ...cardLine(data.index, card)! }] : []))) };
   }
   // Retry and drill grade nothing: the card was graded Again today (§5.8, D16).
-  const grading = of.kind === 'queue';
+  const grading = of.kind === 'queue' || of.kind === 'show';
   const t = new Trainer({
     record: grading,
     askOnly: !grading,
+    selfGrade: of.kind === 'show',
     index: data.index,
     plan,
     states: data.states,
@@ -238,6 +243,7 @@ export async function startSession(store: IdbStore, record: (event: Parameters<I
     paceMs: PACES[pace.peek()],
   });
   trainer = t;
+  shower = of.kind === 'show' ? new ShowGrade(t, speech.peek() ? { speech: true } : {}) : undefined;
   const view: SessionView = { of, data, plan, side: 'white', path: [], phase: 'ready', number: 0, total: plan.lines.length, dueLeft: 0, newLeft: 0, answers: 0, right: 0, tick: 0 };
   if (scope !== undefined) view.scope = scope;
   session.value = view;
@@ -279,16 +285,49 @@ export function pinMissed(): void {
 export function endSession(): void {
   stopTimer();
   trainer = undefined;
+  shower = undefined;
+  stopSpeaking();
   session.value = undefined;
 }
 
 function send(c: TrainerCommand): void {
   const t = trainer;
   if (!t) return;
+  if (shower && (c.type === 'tick' || c.type === 'stop' || c.type === 'skipLine')) {
+    apply(t, c.type === 'tick' ? shower.tick(c.id, c.now) : shower.send(c));
+    return;
+  }
   apply(t, t.send(c));
 }
 
-function apply(t: Trainer, effects: TrainerEffect[]): void {
+/** A press of the show-and-grade keys (§5.9). */
+export function press(p: Press): void {
+  const t = trainer;
+  if (!t || !shower) return;
+  apply(t, shower.press(p, Date.now()));
+}
+
+/** Speech, per device: off by default (§5.2). */
+const SPEECH_KEY = 'repworks.speech';
+const readFlag = (key: string) => {
+  try {
+    return localStorage.getItem(key) === 'on';
+  } catch {
+    return false;
+  }
+};
+export const speech = signal(readFlag(SPEECH_KEY));
+export function setSpeech(on: boolean): void {
+  speech.value = on;
+  if (!on) stopSpeaking();
+  try {
+    localStorage.setItem(SPEECH_KEY, on ? 'on' : 'off');
+  } catch {
+    // Kept for this page only.
+  }
+}
+
+function apply(t: Trainer, effects: readonly ShowGradeEffect[]): void {
   const s = session.peek();
   if (!s || effects.length === 0) return;
   const next: SessionView = { ...s, tick: s.tick + 1 };
@@ -346,6 +385,9 @@ function apply(t: Trainer, effects: TrainerEffect[]): void {
       case 'done':
         stopTimer();
         next.done = e.summary;
+        break;
+      case 'say':
+        if (speech.peek()) say(e.text);
         break;
       case 'takeback':
       case 'lineDone':
