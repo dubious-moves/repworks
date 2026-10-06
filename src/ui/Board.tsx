@@ -96,6 +96,10 @@ export function Board(p: BoardProps) {
       return at ? board.getKeyAtDomPos(at) : undefined;
     };
     const start = (e: Mouch) => {
+      // chessground keeps the board's place on screen until a scroll or resize event, which
+      // arrives a frame late, and never hears of a banner opening above the board. Measured
+      // again on each press, a press always lands on the square under it.
+      board.state.dom.bounds.clear();
       drawing = 'button' in e && (e.button === 2 || e.shiftKey);
       if (!props.current.drawMode) return;
       e.preventDefault();

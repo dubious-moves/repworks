@@ -39,11 +39,16 @@ async function comment(page: Page, text: string) {
   await page.getByRole('button', { name: 'Save comment' }).click();
 }
 
+/**
+ * Two reviews, waited for in the debug panel's card table (each device starts with none): a
+ * reload before the second one's write lands would lose it, and the step's count with it.
+ */
 async function recordTwoReviews(page: Page) {
   await page.goto(`${site.url}#/`);
   await page.getByText('Settings and debug').click();
   await page.getByRole('button', { name: 'Record a test review' }).click();
   await page.getByRole('button', { name: 'Record a test review' }).click();
+  await expect(page.locator('table.cards tr', { hasText: 'r|test|e2e4' }).locator('td').nth(1)).toHaveText('2');
 }
 
 async function syncNow(page: Page) {

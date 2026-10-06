@@ -188,3 +188,20 @@ test('an unreadable chapter is shown without editing, and never rewritten', asyn
   await expect(page.getByRole('alert')).toContainText("This chapter can't be read, so the app never rewrites it");
   await expect(page.locator('cg-board')).toHaveCount(0);
 });
+
+test('a move lands on the squares pressed after the board has moved down the page', async ({ page }) => {
+  await setUp(page);
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf?at=e4,c5,Nf3,Nc6,d4`);
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 Nc6 d4');
+  // A press on an empty square makes chessground note where the board is.
+  await clickSquare(page, 'h4', 'black');
+  // Something opens above the board (a banner, say): no scroll, no resize of the board.
+  await page.evaluate(() => {
+    const block = document.createElement('div');
+    block.style.height = '60px';
+    document.querySelector('main.content')!.prepend(block);
+  });
+  await clickSquare(page, 'c5', 'black');
+  await clickSquare(page, 'd4', 'black');
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 Nc6 d4 cxd4');
+});
