@@ -88,3 +88,14 @@ test('an update keeps foreign caches and one older shell, and offers a reload', 
     'repworks-shell-bbbbbbbbbbbbbbbb',
   ]);
 });
+
+test('the remote spike is one tap from the app, set up or not (the installed PWA opens the app)', async ({ page }) => {
+  const site = await serveSite();
+  try {
+    await page.goto(site.url);
+    await page.getByRole('link', { name: 'remote spike' }).click();
+    await expect(page).toHaveURL(`${site.url}spike.html`);
+  } finally {
+    await site.close();
+  }
+});

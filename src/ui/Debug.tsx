@@ -69,9 +69,6 @@ export function Debug() {
       </div>
       <OtherDeviceCode />
       <SetupForm title="Change the token" />
-      <p class="muted">
-        <a href={`${import.meta.env.BASE_URL}spike.html`}>Remote spike</a> (temporary test page)
-      </p>
     </details>
   );
 }

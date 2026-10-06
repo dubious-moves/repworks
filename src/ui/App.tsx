@@ -29,7 +29,7 @@ export function App() {
       <main class="content">{ready.value && (device.value ? <Home /> : <SetupForm />)}</main>
       <footer class="footer">
         build {__BUILD_ID__}
-        {shellVersion.value && <> · shell {shellVersion.value.slice(0, 8)}</>}
+        {shellVersion.value && <> · shell {shellVersion.value.slice(0, 8)}</>} · <a href={`${import.meta.env.BASE_URL}spike.html`}>remote spike</a>
       </footer>
     </div>
   );
