@@ -1399,6 +1399,41 @@ suspended card is played; the conflict rule (the other move accepted, the due on
 a promotion asks for the piece; teaching records one `taught` event per new card and no review;
 pace delays never under 450 ms; every effect sequence is deterministic for a given input.
 
+**As built** (2026-10-06):
+- `src/core/train/trainer.ts`: `new Trainer({ index, plan, states, startOf, paceMs, record?,
+  askAll? })` and `send(command) → effects`. Commands: `start`, `tick` (a timer's id), `move`
+  (UCI, either castling spelling), `hint`, `suspend`, `skipLine`, `stop`, each with the time.
+  Effects: `line` (a line starts, at the position after `path`), `play` (by the opponent, for
+  the user, or the user's move confirmed), `takeback`, `arrow`, `note` (the feedback line's
+  meaning, worded by the UI), `record` (`review`, `taught` or `suspend`), `wait` (with an id; a
+  tick with an older id is ignored, so a skipped line's timer can't play into the next),
+  `lineDone`, `done` (the session's numbers). `view` gives the phase, the line, the board's path
+  and position, and the move shown.
+- Which own moves are asked is decided where the move is met, from the plan's asks and teaches
+  and the states: a move answered (asked, taught or suspended) earlier in the session is played
+  for the user; a move never answered is still taught or asked if a skipped line left it, so
+  auto-play never plays it. A planned line whose asks and teaches were all answered on earlier
+  lines (a conflict move answered out of turn) is passed over.
+- A line that shares its first moves with the board starts there, up to its first ask or teach,
+  rather than replaying them: the planner orders lines so that this is most of each line.
+- The pace is clamped to 450 ms; the pause at a line's end is two paces.
+- Conflicting moves: the other own move is accepted and graded on its own card when that card
+  is asked today (due, or known and never answered), else accepted with no record. The note then
+  says the repertoire has another move here, without naming it (naming it would be a hint), and
+  the line's move is asked on its own card; the other move played again then counts as wrong.
+  "The session then follows the line played" never arises: the user moves only where the line's
+  own move is asked, and the other move's later asks come on their own planned lines.
+- A promotion without its piece is not an answer (the board asks for the piece); a wrong piece
+  is a wrong move.
+- A suspend is recorded even with recording off (it is the owner's choice about the card, not a
+  grade), and the move is played for the user.
+- `record: false` and `askAll` are there for the Interactive view, retry and drill (§5.8, §5.10).
+- Tests: `test/unit/core/train/trainer.test.ts`: each case of the list above, castling as king
+  takes rook, a stale tick, skip and stop, recording off with every move asked, and 120 random
+  repertoires answered at random (right, hint, any legal move): every planned ask graded once,
+  every teach taught once, nothing reviewed or taught twice, no wait under 450 ms, and the same
+  effects twice.
+
 #### 5.7 The training screen
 
 - Routes `#/train` and `#/train/<sid>`, as modes in `fsm.ts`.
