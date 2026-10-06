@@ -35,14 +35,17 @@ import {
   undoEdit,
 } from '../app/editor.ts';
 import { open } from '../app/mode.ts';
+import { endPreview, enterCommentLines, preview, stepPreview } from '../app/preview.ts';
 import { isKeptMarker, parseTextConflict, type OpenConflict } from '../core/merge/markers.ts';
 import { header, type Brush, type Chapter } from '../core/study/model.ts';
 import { setShapes } from '../core/study/ops.ts';
+import { pathKey } from '../core/study/notation.ts';
 import { nodeAt, positionAt, samePath, type Path } from '../core/study/tree.ts';
 import { Board } from './Board.tsx';
 import { CardPanel } from './CardPanel.tsx';
 import { CommentDialog, MoveMenu, openMenu } from './MoveMenu.tsx';
 import { Notation } from './Notation.tsx';
+import { endPreviewOnBoard, PreviewBar, previewBoard } from './CommentText.tsx';
 import { TranspositionList } from './Transpositions.tsx';
 
 const BRUSH_NAMES: Brush[] = ['green', 'red', 'blue', 'yellow'];
@@ -58,6 +61,18 @@ function boardState(c: Chapter, path: Path) {
   return { pos, fen: makeFen(pos.toSetup()), dests: chessgroundDests(pos) as Map<Key, Key[]>, lastMove, check: pos.isCheck() };
 }
 
+/**
+ * Line jumping (§5.12): → on the last move of a line enters the first line written in its
+ * comments. False when the move has a continuation or no line to enter.
+ */
+function jumpIntoComment(): boolean {
+  const c = chapter.peek();
+  const path = at.peek();
+  const node = c && nodeAt(c, path);
+  if (!c || !node || node.children.length) return false;
+  return enterCommentLines('chapter', pathKey(path), node.comments, positionAt(c, path), path.length ? positionAt(c, path.slice(0, -1)) : undefined);
+}
+
 export function ChapterView() {
   const s = study.value;
   const c = chapter.value;
@@ -71,9 +86,17 @@ export function ChapterView() {
       const target = e.target as HTMLElement | null;
       if (target && (/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName) || target.closest('dialog'))) return;
       const ctrl = e.ctrlKey || e.metaKey;
+      // A line from a comment on the board takes ← → and Escape (§5.12).
+      if (preview.peek()?.owner === 'chapter' && !ctrl) {
+        const step: Record<string, () => void> = { ArrowLeft: () => stepPreview(-1), ArrowRight: () => stepPreview(1), Escape: endPreview };
+        if (step[e.key]) {
+          e.preventDefault();
+          return step[e.key]!();
+        }
+      }
       const keys: Record<string, () => void> = {
         ArrowLeft: () => move('prev'),
-        ArrowRight: () => move('next'),
+        ArrowRight: () => void (jumpIntoComment() || move('next')),
         ArrowUp: () => move('up'),
         ArrowDown: () => move('down'),
         Home: () => move('start'),
@@ -96,6 +119,7 @@ export function ChapterView() {
 
   if (!s) return <p class="muted">{problem.value ?? 'Opening…'}</p>;
   const node = c ? nodeAt(c, path) : undefined;
+  const shownLine = previewBoard('chapter');
 
   const onMove = (orig: Key, dest: Key) => {
     if (!board) return;
@@ -153,15 +177,15 @@ export function ChapterView() {
                 ))}
               </ol>
             </nav>
-            <div class="cv-board">
+            <div class="cv-board" onPointerDown={shownLine ? endPreviewOnBoard : undefined}>
               <Board
-                fen={board.fen}
+                fen={shownLine?.fen ?? board.fen}
                 orientation={side.value}
-                turn={board.pos.turn}
-                dests={doc.value ? board.dests : new Map()}
-                lastMove={board.lastMove}
-                check={board.check}
-                shapes={node?.shapes ?? []}
+                turn={shownLine?.turn ?? board.pos.turn}
+                dests={doc.value && !shownLine ? board.dests : new Map()}
+                lastMove={shownLine ? shownLine.lastMove : board.lastMove}
+                check={shownLine?.check ?? board.check}
+                shapes={shownLine ? [] : (node?.shapes ?? [])}
                 drawMode={drawMode}
                 brush={brush}
                 onMove={onMove}
@@ -179,6 +203,7 @@ export function ChapterView() {
                   </button>
                 </div>
               )}
+              <PreviewBar owner="chapter" />
               <p class="feedback" role="status">
                 {feedback.value ?? ''}
               </p>

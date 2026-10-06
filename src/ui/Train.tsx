@@ -10,6 +10,7 @@ import { makeUci, parseSquare, parseUci } from 'chessops/util';
 import type { Key } from '@lichess-org/chessground/types';
 import type { Role, SquareName } from 'chessops/types';
 import { open } from '../app/mode.ts';
+import { commentId, endPreview, preview, stepPreview } from '../app/preview.ts';
 import { beginTraining } from '../app/state.ts';
 import { dataVersion } from '../app/sync.ts';
 import { command, endSession, pace, PACES, pinMissed, playMove, press, session, sessionProblem, setPace, setSpeech, speech, undoSuspend, type Pace, type SessionKind, type SessionView } from '../app/train.ts';
@@ -18,8 +19,9 @@ import { holdMediaKeys } from '../platform/mediaKeys.ts';
 import { canSpeak } from '../platform/speech.ts';
 import type { Note } from '../core/train/trainer.ts';
 import { header } from '../core/study/model.ts';
-import { nodeAt, startPosition } from '../core/study/tree.ts';
+import { nodeAt, positionAt, startPosition } from '../core/study/tree.ts';
 import { Board } from './Board.tsx';
+import { CommentText, endPreviewOnBoard, PreviewBar, previewBoard } from './CommentText.tsx';
 
 const ASKING = new Set(['ask', 'teach', 'wrong', 'shown']);
 
@@ -98,6 +100,8 @@ export function TrainScreen(props: { of: SessionKind }) {
   }, [key]);
   const s = session.value;
   const running = !!s && !s.done;
+  // The session's end, or another session, ends a preview of a comment's line.
+  useEffect(() => endPreview, [key, running]);
   useWakeLock(running);
   // Nothing to train yet, and new data arrives (a sync just after setup): look again.
   const version = dataVersion.value;
@@ -113,6 +117,11 @@ export function TrainScreen(props: { of: SessionKind }) {
       const target = e.target as HTMLElement | null;
       // Never swallowed in a text field, and a held key is one press.
       if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+      // A line from a comment on the board takes ← → and Escape first (§5.12).
+      if (preview.peek()?.owner === 'train' && (e.key === 'Escape' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        e.preventDefault();
+        return e.key === 'Escape' ? endPreview() : stepPreview(e.key === 'ArrowLeft' ? -1 : 1);
+      }
       if (e.key === 'Escape') command('stop');
       else if (showing && !e.repeat && pressOf(e.key)) press(pressOf(e.key)!);
       else if (!showing && e.key === ' ' && !(target && target.tagName === 'BUTTON')) command('hint');
@@ -248,7 +257,8 @@ function Session(props: { s: SessionView }) {
     setPromotion(undefined);
   };
 
-  const arrow = s.arrow ? parseUci(s.arrow) : undefined;
+  const shownLine = previewBoard('train');
+  const arrow = s.arrow && !shownLine ? parseUci(s.arrow) : undefined;
   const sq = (n: number) => `${'abcdefgh'[n & 7]}${(n >> 3) + 1}` as SquareName;
   const shapes = arrow && 'from' in arrow ? [{ brush: 'green' as const, orig: sq(arrow.from), dest: sq(arrow.to) }] : [];
   const node = s.chapter ? nodeAt(s.chapter, s.path) : undefined;
@@ -257,18 +267,22 @@ function Session(props: { s: SessionView }) {
   const start = s.chapter ? startPosition(s.chapter) : undefined;
   const moves = start ? numbered(start, s.path) : s.path.join(' ');
   const chapterName = s.chapter ? (header(s.chapter, 'ChapterName') ?? s.chapter.id) : '';
+  const commentPositions = () => {
+    const after = s.chapter && positionAt(s.chapter, s.path);
+    return after ? { after, before: s.path.length ? positionAt(s.chapter!, s.path.slice(0, -1)) : undefined } : undefined;
+  };
 
   return (
     <div class="train-grid">
-      <div class="train-board">
+      <div class="train-board" onPointerDown={shownLine ? endPreviewOnBoard : undefined}>
         {board && (
           <Board
-            fen={board.fen}
+            fen={shownLine?.fen ?? board.fen}
             orientation={s.side}
-            turn={pos!.turn}
-            dests={asking ? board.dests : new Map()}
-            lastMove={board.lastMove}
-            check={board.check}
+            turn={shownLine?.turn ?? pos!.turn}
+            dests={asking && !shownLine ? board.dests : new Map()}
+            lastMove={shownLine ? shownLine.lastMove : board.lastMove}
+            check={shownLine?.check ?? board.check}
             shapes={shapes}
             drawMode={false}
             brush="green"
@@ -288,6 +302,7 @@ function Session(props: { s: SessionView }) {
             </button>
           </div>
         )}
+        <PreviewBar owner="train" />
         <p class={`feedback train-feedback note-${s.note?.kind ?? 'none'}`} role="status">
           {noteText(s.note)}
         </p>
@@ -314,7 +329,9 @@ function Session(props: { s: SessionView }) {
         {comments.length > 0 && (
           <div class="train-comments">
             {comments.map((c, i) => (
-              <p key={i}>{c}</p>
+              <p key={i}>
+                <CommentText text={c} owner="train" id={commentId(s.path.join(' '), c)} positions={commentPositions} />
+              </p>
             ))}
           </div>
         )}

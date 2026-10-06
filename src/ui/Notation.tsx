@@ -4,13 +4,15 @@
 // Right-click (long-press on the phone) opens a move's menu; on a comment, its move's.
 import { effect, signal, type Signal } from '@preact/signals';
 import { useContext, useEffect, useMemo, useRef } from 'preact/hooks';
-import { at, goTo, study } from '../app/editor.ts';
+import { at, chapter, goTo, study } from '../app/editor.ts';
+import { commentId } from '../app/preview.ts';
 import { trainData } from '../app/train.ts';
 import { hasMarker } from '../core/merge/markers.ts';
 import type { Chapter } from '../core/study/model.ts';
 import { notation, pathKey, type Cell, type Inline, type Line, type Move as MoveData } from '../core/study/notation.ts';
-import type { Path } from '../core/study/tree.ts';
+import { positionAt, type Path } from '../core/study/tree.ts';
 import { transpositions } from '../core/study/transpositions.ts';
+import { CommentText } from './CommentText.tsx';
 import { openMenu } from './MoveMenu.tsx';
 import { Badges, badgesOf, openTranspositions } from './Transpositions.tsx';
 
@@ -96,12 +98,23 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 const badgeTitle = (orders: number, chapters: number) =>
   [orders ? `${plural(orders, 'other move order', 'other move orders')} here` : '', chapters ? `reached in ${plural(chapters, 'other chapter', 'other chapters')}` : ''].filter(Boolean).join('; ');
 
+/** The positions a comment's lines start from (§5.12): after the commented move, and before it. */
+function positionsOf(path: Path) {
+  const c = chapter.peek();
+  const after = c && positionAt(c, path);
+  return c && after ? { after, before: path.length ? positionAt(c, path.slice(0, -1)) : undefined } : undefined;
+}
+
 function Comment(props: { text: string; path: Path; row?: boolean }) {
   const conflict = hasMarker(props.text);
   const Tag = props.row ? 'div' : 'span';
   return (
     <Tag class={`comment${props.row ? ' comment-row' : ''}${conflict ? ' conflict' : ''}`} onClick={() => goTo(props.path)} onContextMenu={menuAt(props.path)}>
-      {conflict ? '⚠ conflict: open the move to resolve it' : props.text}
+      {conflict ? (
+        '⚠ conflict: open the move to resolve it'
+      ) : (
+        <CommentText text={props.text} owner="chapter" id={commentId(pathKey(props.path), props.text)} positions={() => positionsOf(props.path)} onOpen={() => goTo(props.path)} />
+      )}
     </Tag>
   );
 }

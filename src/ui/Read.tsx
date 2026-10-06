@@ -8,6 +8,7 @@ import { parseSan } from 'chessops/san';
 import { chessgroundMove } from 'chessops/compat';
 import type { Key } from '@lichess-org/chessground/types';
 import { open } from '../app/mode.ts';
+import { commentId, endPreview, enterCommentLines, preview, stepPreview } from '../app/preview.ts';
 import { localStore } from '../app/state.ts';
 import { dataVersion } from '../app/sync.ts';
 import { chapterPath } from '../core/data/layout.ts';
@@ -15,7 +16,9 @@ import { glyphSymbol } from '../core/pgn/nags.ts';
 import { parseChapterFile } from '../core/pgn/parse.ts';
 import { header, type Chapter } from '../core/study/model.ts';
 import { lineThrough, nodeAt, positionAt, startPosition } from '../core/study/tree.ts';
+import { pathKey } from '../core/study/notation.ts';
 import { Board } from './Board.tsx';
+import { CommentText, endPreviewOnBoard, PreviewBar, previewBoard } from './CommentText.tsx';
 
 type Loaded = { chapter: Chapter; line: string[] } | { problem: string };
 
@@ -67,20 +70,29 @@ export function ReadView(props: { sid: string; cid: string; at: string[]; from?:
 
   // The keys read the latest step through a ref: an effect re-registered after each render would
   // let a quick Escape leave at the move before.
-  const latest = useRef({ last, toChapter });
-  latest.current = { last, toChapter };
+  // Line jumping (§5.12): → on the line's last move enters the first line of its comments.
+  const jump = () => {
+    const node = ok && nodeAt(ok.chapter, path);
+    return !!node && enterCommentLines('read', pathKey(path), [...node.startingComments, ...node.comments], positionAt(ok.chapter, path), path.length ? positionAt(ok.chapter, path.slice(0, -1)) : undefined);
+  };
+  const latest = useRef({ last, toChapter, jump, shown });
+  latest.current = { last, toChapter, jump, shown };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
-      const { last: end, toChapter: leave } = latest.current;
-      const keys: Record<string, () => void> = {
-        ArrowLeft: () => setPly((p) => Math.max(0, Math.min(p, end) - 1)),
-        ArrowRight: () => setPly((p) => Math.min(end, p + 1)),
-        Home: () => setPly(0),
-        End: () => setPly(end),
-        Escape: leave,
-      };
+      const { last: end, toChapter: leave, jump: enter, shown: at } = latest.current;
+      // A line from a comment on the board takes ← → and Escape first.
+      const previewing = preview.peek()?.owner === 'read';
+      const keys: Record<string, () => void> = previewing
+        ? { ArrowLeft: () => stepPreview(-1), ArrowRight: () => stepPreview(1), Escape: endPreview }
+        : {
+            ArrowLeft: () => setPly((p) => Math.max(0, Math.min(p, end) - 1)),
+            ArrowRight: () => void (at === end ? enter() : setPly((p) => Math.min(end, p + 1))),
+            Home: () => setPly(0),
+            End: () => setPly(end),
+            Escape: leave,
+          };
       const run = keys[e.key];
       if (!run) return;
       e.preventDefault();
@@ -110,6 +122,12 @@ export function ReadView(props: { sid: string; cid: string; at: string[]; from?:
   const comments = node ? [...node.startingComments, ...node.comments] : [];
   const glyphs = node && path.length ? node.nags.map(glyphSymbol).join('') : '';
   const side = header(ok.chapter, 'Orientation') === 'black' ? 'black' : 'white';
+  const shownLine = previewBoard('read');
+  const go = (n: number) => {
+    endPreview();
+    setPly(n);
+  };
+  const positions = () => ({ after: positionAt(ok.chapter, path)!, before: path.length ? positionAt(ok.chapter, path.slice(0, -1)) : undefined });
 
   return (
     <div class="train read">
@@ -122,33 +140,34 @@ export function ReadView(props: { sid: string; cid: string; at: string[]; from?:
         </div>
       </div>
       <div class="train-grid">
-        <div class="train-board">
+        <div class="train-board" onPointerDown={shownLine ? endPreviewOnBoard : undefined}>
           {board && (
             <Board
-              fen={board.fen}
+              fen={shownLine?.fen ?? board.fen}
               orientation={side}
-              turn={board.pos.turn}
+              turn={shownLine?.turn ?? board.pos.turn}
               dests={new Map()}
-              lastMove={board.lastMove}
-              check={board.pos.isCheck()}
-              shapes={node?.shapes ?? []}
+              lastMove={shownLine ? shownLine.lastMove : board.lastMove}
+              check={shownLine?.check ?? board.pos.isCheck()}
+              shapes={shownLine ? [] : (node?.shapes ?? [])}
               drawMode={false}
               brush="green"
               onMove={() => undefined}
               onShapes={() => undefined}
             />
           )}
+          <PreviewBar owner="read" />
           <div class="controls read-controls">
-            <button type="button" aria-label="Start" disabled={shown === 0} onClick={() => setPly(0)}>
+            <button type="button" aria-label="Start" disabled={shown === 0} onClick={() => go(0)}>
               ⏮
             </button>
-            <button type="button" aria-label="Previous move" disabled={shown === 0} onClick={() => setPly(shown - 1)}>
+            <button type="button" aria-label="Previous move" disabled={shown === 0} onClick={() => go(shown - 1)}>
               ◀
             </button>
-            <button type="button" aria-label="Next move" disabled={shown === last} onClick={() => setPly(shown + 1)}>
+            <button type="button" aria-label="Next move" disabled={shown === last} onClick={() => go(shown + 1)}>
               ▶
             </button>
-            <button type="button" aria-label="End of the line" disabled={shown === last} onClick={() => setPly(last)}>
+            <button type="button" aria-label="End of the line" disabled={shown === last} onClick={() => go(last)}>
               ⏭
             </button>
           </div>
@@ -163,12 +182,20 @@ export function ReadView(props: { sid: string; cid: string; at: string[]; from?:
             </span>
           </p>
           <div class="read-comments" aria-label="Comments">
-            {comments.length ? comments.map((c, i) => <p key={i}>{c}</p>) : <p class="muted">No comment.</p>}
+            {comments.length ? (
+              comments.map((c, i) => (
+                <p key={i}>
+                  <CommentText text={c} owner="read" id={commentId(pathKey(path), c)} positions={positions} />
+                </p>
+              ))
+            ) : (
+              <p class="muted">No comment.</p>
+            )}
           </div>
           <p class="read-line" aria-label="The line">
             {names.map((name, i) => (
               <span key={i}>
-                <button type="button" class={`read-step${i + 1 === shown ? ' current' : ''}`} aria-current={i + 1 === shown ? 'true' : undefined} onClick={() => setPly(i + 1)}>
+                <button type="button" class={`read-step${i + 1 === shown ? ' current' : ''}`} aria-current={i + 1 === shown ? 'true' : undefined} onClick={() => go(i + 1)}>
                   {/* A Black move after a White one goes without its number, as in a book. */}
                   {name.includes('...') && i > 0 ? ok.line[i] : name}
                 </button>{' '}

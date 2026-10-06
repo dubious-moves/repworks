@@ -1256,3 +1256,45 @@ a.button.secondary {
   color: var(--muted);
   font-size: 0.75rem;
 }
+
+/* Clickable lines in comments (PLAN.md §5.12). */
+
+.line-move {
+  cursor: pointer;
+  color: #9fd59a;
+  border-radius: 3px;
+  padding: 0 1px;
+}
+
+.line-move:hover,
+.line-move:focus-visible {
+  text-decoration: underline;
+  outline: none;
+}
+
+.line-move.current {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.preview-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  margin: 8px 0 4px;
+  padding: 6px 10px;
+  background: var(--surface);
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+}
+
+.preview-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.preview-buttons button {
+  min-width: 44px;
+}

@@ -6,7 +6,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import type { FakeGit } from '../support/fakeGit.ts';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
-import { clickSquare } from './board.ts';
+import { clickSquare, comment } from './board.ts';
 import { serveGithub, world } from './github.ts';
 import { serveSite, type SiteServer } from './server.ts';
 
@@ -180,4 +180,88 @@ test('copy continuation: from the variation’s first move to the end of its lin
   await page.getByRole('button', { name: 'Move menu' }).click();
   await page.getByRole('menuitem', { name: 'Copy continuation' }).click();
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('2... d6 3. d4 cxd4');
+});
+
+test('clickable lines: preview a comment’s line, step through its lines, and back out', async ({ page, isMobile }) => {
+  await setUp(page);
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf?at=e4,c5,Nf3,d6`);
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 d6');
+  // A line replacing 2... d6, a remark, and a line after it.
+  await comment(page, 'Or (2... e6 3. d4) (see below), then (3. d4 cxd4 4. Nxd4)');
+  const written = page.locator('.notation .comment', { hasText: 'see below' });
+  await expect(written.locator('.line-move')).toHaveText(['e6', 'd4', 'd4', 'cxd4', 'Nxd4']);
+
+  const bar = page.getByRole('group', { name: 'Line from the comment' });
+  const next = async () => (isMobile ? bar.getByRole('button', { name: 'Next move in the line' }).click() : page.keyboard.press('ArrowRight'));
+  const prev = async () => (isMobile ? bar.getByRole('button', { name: 'Previous move in the line' }).click() : page.keyboard.press('ArrowLeft'));
+  await written.locator('.line-move', { hasText: 'e6' }).click();
+  await expect(bar).toContainText('From the comment: e6');
+  await expect(written.locator('.line-move.current')).toHaveText('e6');
+  // The move shown in the notation stays the commented one; the board shows the line.
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 d6');
+  await expect(page.locator('cg-board square.last-move')).toHaveCount(2);
+  await next();
+  await expect(bar).toContainText('From the comment: e6 d4');
+  // On from the line's end into the next line, skipping the remark.
+  await next();
+  await expect(bar).toContainText('From the comment: d4');
+  await expect(written.locator('.line-move.current')).toHaveText('d4');
+  await next();
+  await next();
+  await expect(bar).toContainText('From the comment: d4 cxd4 Nxd4');
+  await next();
+  await expect(bar).toContainText('From the comment: d4 cxd4 Nxd4');
+  await prev();
+  await prev();
+  await prev();
+  await expect(bar).toContainText('From the comment: e6 d4');
+  if (isMobile) await bar.getByRole('button', { name: 'Back' }).click();
+  else await page.keyboard.press('Escape');
+  await expect(bar).toHaveCount(0);
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 d6');
+
+  // A click on the board goes back too.
+  await written.locator('.line-move', { hasText: 'Nxd4' }).click();
+  await expect(bar).toContainText('From the comment: d4 cxd4 Nxd4');
+  await clickSquare(page, 'a4', 'black');
+  await expect(bar).toHaveCount(0);
+});
+
+test('line jumping: → on a line’s last move enters its comment’s line, in the chapter view and the Read view', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'arrow keys: the desktop');
+  await setUp(page);
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf?at=e4,c5,Nf3,d6,d4,cxd4`);
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 d6 d4 cxd4');
+  await comment(page, 'Then (4. Nxd4 Nf6 5. Nc3)');
+  await page.keyboard.press('ArrowLeft');
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 d6 d4');
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 d6 d4 cxd4');
+  const bar = page.getByRole('group', { name: 'Line from the comment' });
+  await expect(bar).toHaveCount(0);
+  await page.keyboard.press('ArrowRight');
+  await expect(bar).toContainText('From the comment: Nxd4');
+  await page.keyboard.press('ArrowRight');
+  await expect(bar).toContainText('From the comment: Nxd4 Nf6');
+  // Back before the line's first move leaves it.
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('ArrowLeft');
+  await expect(bar).toHaveCount(0);
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 d6 d4 cxd4');
+
+  // The Read view: the line's end, then into the comment; Escape leaves the line, then the view.
+  await page.getByRole('button', { name: 'Read from here' }).click();
+  await expect(page.locator('.read-move')).toContainText('3... cxd4');
+  await expect(page.locator('.read-comments .line-move')).toHaveText(['Nxd4', 'Nf6', 'Nc3']);
+  await page.keyboard.press('ArrowRight');
+  await expect(bar).toContainText('From the comment: Nxd4');
+  await expect(page.locator('.read-comments .line-move.current')).toHaveText('Nxd4');
+  await page.keyboard.press('Escape');
+  await expect(bar).toHaveCount(0);
+  await expect(page).toHaveURL(/#\/read\//);
+  await page.locator('.read-comments .line-move', { hasText: 'Nc3' }).click();
+  await expect(bar).toContainText('From the comment: Nxd4 Nf6 Nc3');
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await expect(page).toHaveURL(/#\/study\/Rep0Najd\/Ch1Najdf\?at=e4,c5,Nf3,d6,d4,cxd4$/);
 });

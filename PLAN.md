@@ -1757,6 +1757,46 @@ the same ply and a line before the move) and their edge cases (a remark in paren
 glyphs on a move, a first move that is illegal) in Node; Playwright: preview a line from a
 comment and step back out.
 
+**As built** (2026-10-06):
+- **q_extension's source wasn't available.** This container had only this repo, so `clParse`,
+  `clStartFen` and the harness's two "clickable lines" cases were rebuilt from this section's
+  description and the comment grammar the repo's own PGN fixtures show (`qchess-sample.pgn`'s
+  `{(7. Bc4 Qa5)}` on 6... Nbd7, and its remark in parentheses). What was implemented instead:
+  - `src/core/repertoire/lines.ts`: `parseCommentLines(text)` takes every innermost `( … )`
+    group that starts with a move number (`7.`, `7...` or `7…`, with or without a space) and
+    holds only SAN moves, move numbers and glyphs (`!?`, `$14`, a move's own `!` or `+`);
+    anything else makes the group a remark. `0-0`/`0-0-0` read as castling. Each move keeps its
+    place in the text, glyphs left out.
+  - `lineStart(line, after, before)`: the commented move's position when the line's first number
+    and side are its own, else the position before the move; and when the first move is legal
+    only in the other of the two, the other (a guess at how loose numbering is handled, as in
+    a FEN-headed chapter). A comment before the first move starts at the chapter's start.
+  - `playLine` plays as far as the moves are legal; a line whose first move is illegal shows
+    nothing and is skipped.
+  A later session with q_extension at hand should port its harness cases into
+  `test/unit/core/repertoire/lines.test.ts` and compare.
+- **The preview** (`src/app/preview.ts`, `src/ui/CommentText.tsx`): a click on a move of a line
+  shows that position on the board (no other change: the move shown in the notation stays the
+  commented one, no edit, no arrows of the study), with the moves so far and ◀ ▶ Back in a bar
+  under the board for the phone. ← → step, Escape, Back, a press on the board, another move shown
+  or another screen end it. One preview at a time, owned by the chapter view, Read or training.
+- **Line jumping**: ← → run through one comment's lines end to end, skipping lines with no legal
+  move, never into another comment; ← before the first move leaves the preview. → on a line's
+  last move (a move with no continuation in the chapter view; the line's end in Read) enters
+  the first line of that move's comments.
+- Used in the chapter view's notation (comments in conflict stay a warning), the Read view's
+  comments, and the training screen's comments (which stay hidden while a move is asked). In
+  training, the session goes on underneath a preview; the board takes no move until it ends.
+- Tests: `test/unit/core/repertoire/lines.test.ts` (a line at the same ply, a line before the
+  move, the text places, glyphs and `0-0`, remarks, an illegal first move, the other-position
+  fallback, a root comment in a set-up position, the cursor end to end and out, the Qchess
+  sample) and `test/e2e/views.spec.ts` (a comment written with a line replacing 2... d6, a
+  remark and a line after it: previewed, stepped across lines with keys on desktop and the bar
+  on the phone, left by Escape/Back and by a board click; line jumping by → in the chapter view
+  and the Read view, desktop). The training screen's comments use the same component and were
+  not driven by e2e. 304 runs of the views, training and editor specs under `--repeat-each=8
+  --workers=4` passed before pushing.
+
 #### 5.13 The owner's answers
 
 Asked on 2026-10-06; the owner answered the same day, then the two follow-ups:

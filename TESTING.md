@@ -37,5 +37,8 @@ Qchess and Lichess imports on the desktop (§4.10), and the study editor on desk
 - §5.11: the transposition badges on the real repertoire (how many moves carry `⇄` or `+k`,
   whether the marks crowd the notation on the phone, the time the chapter view takes to open a
   big chapter); copy continuation pasted where the owner uses it.
+- §5.12: clickable lines in the owner's real comments (Qchess's and Chessable's notation): which
+  groups become lines and which stay remarks, where each line starts, line jumping with → at a
+  line's end; previews on the phone (tap a move, ◀ ▶ Back, tap the board) and during training.
 - §5.15: the study cards, a study made and managed without an import, and train ↔ study during
   a real session (desktop and phone).

@@ -900,3 +900,16 @@ Technical calls made while building `PLAN.md` §5.11, each with its reason:
   chapters' from the index (as last saved), which is enough for a count.
 - **Copy continuation on a main line with no fork above the move copies from the start,** the
   plan's rule read literally (no ancestor with a sibling: the branch is the whole line).
+
+## Revision of 2026-10-06 (clickable lines and line jumping)
+Technical calls made while building `PLAN.md` §5.12, each with its reason:
+- **q_extension's `clParse`/`clStartFen` were rebuilt from the plan, not ported:** its source
+  wasn't in the build container. The rules are the plan's, plus one fallback (a first move legal
+  only from the other position starts there), recorded in §5.12 so a session with the source can
+  check them against it.
+- **A line preview changes nothing but the board** (the notation keeps the commented move, and
+  the study's arrows are hidden): it is a look, not a navigation, so leaving it returns exactly
+  where the user was.
+- **In training, a preview doesn't pause the session;** the board takes no move until it ends.
+  Pausing the trainer would need a new command for a rare action.
+
