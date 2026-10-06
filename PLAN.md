@@ -1527,6 +1527,41 @@ due after 30 minutes on Playwright's clock.
 Live (phone): a session's mistakes retried and drilled; a pin made on the phone appears on the
 desktop after a sync.
 
+**As built** (2026-10-06):
+- Events: `pin`, `unpin` and `drill` (`ok` true or false) in `src/core/progress/events.ts`; replay
+  folds them into nothing, so a card's FSRS state never sees them.
+- `src/core/train/pins.ts`: `pinOf(events)` and `pinsOf(cards, eventsOf)`, with the steps above. A
+  pin made while the card is already pinned changes nothing; a pin after a retire or an unpin
+  starts again. A miss resets the streak whenever it comes, early or not.
+- `src/core/train/mistakes.ts`: `todaysMistakes(index, eventsOf, day)`: the day's Again reviews
+  from every device, one per card (its latest), each with the moves tried, the hint, and a line
+  through the card's first occurrence in the index (cards are per position, so the log doesn't
+  name the line it was met on); `retryLines` and `drillLines` make the plans. A planned line may
+  now start further on (`from`), for drill's lead-in.
+- The trainer gained `askOnly` (ask the plan's asks and play everything else, new moves included,
+  for retry and drill) and an `answer` effect (a move asked, right first time or not), given with
+  recording on or off.
+- The app (`src/app/train.ts`): a session is today's queue, the day's mistakes retried or
+  drilled, or the pins (due, or all). Retry and drill record no reviews; a drill answer on a
+  pinned card records a `drill` event, so a pin drilled early from "Drill all" gets no credit,
+  by replay. Routes `#/mistakes`, `#/mistakes/retry`, `#/mistakes/drill`, `#/pinned`,
+  `#/pinned/all`.
+- `src/ui/Mistakes.tsx`: today's mistakes (chapter, the moves up to the move, the moves tried in
+  SAN, the hint), with Retry, Drill, Pin or Unpin, and a link to the move in its study; the pins
+  with their next drill and clean answers so far, "Drill pinned (N)" when some are due, and "Drill
+  all". The training screen offers "Pin this mistake" after a move answered wrong, until the next
+  line or a right answer; the session's end links to the mistakes; the home card shows the day's
+  mistakes, the pins, and "Drill pinned (N)".
+- A screen with nothing to train starts again when new data arrives, so a session opened while
+  the first sync is still landing doesn't stay empty.
+- Tests: `test/unit/core/train/mistakes.test.ts` (the events' round trip and refusal; pins and
+  drills leave FSRS states as they were; the pin steps on time, early, after a miss, retired and
+  pinned again, unpinned; two devices' drills in any order; the day's mistakes; retry and drill
+  through the trainer with nothing recorded, the drill starting at its lead-in) and
+  `test/e2e/train.spec.ts` (fail 1... c5, pin it, see it in the mistakes with "tried e5", retry it,
+  the pin due 30 minutes later on Playwright's clock, drilled, and the events `review`, `pin`,
+  `drill` in the fake repo, then "1 of 3 clean").
+
 #### 5.9 Show and grade
 
 A mode of the trainer (`core/train/showGrade.ts`) after lichessable's design

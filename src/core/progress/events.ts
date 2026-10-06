@@ -38,8 +38,23 @@ export interface TaughtEvent extends Base {
   k: 'taught';
   card: string;
 }
-export type KnownEvent = ReviewEvent | SuspendEvent | UnsuspendEvent | ForgetEvent | TaughtEvent;
-export const KNOWN_KINDS = ['review', 'suspend', 'unsuspend', 'forget', 'taught'] as const;
+/** A mistake pinned for drilling (§5.8); pins never touch a card's FSRS state. */
+export interface PinEvent extends Base {
+  k: 'pin';
+  card: string;
+}
+export interface UnpinEvent extends Base {
+  k: 'unpin';
+  card: string;
+}
+/** A drill answer on a pinned card: `ok` when right first time. */
+export interface DrillEvent extends Base {
+  k: 'drill';
+  card: string;
+  ok: boolean;
+}
+export type KnownEvent = ReviewEvent | SuspendEvent | UnsuspendEvent | ForgetEvent | TaughtEvent | PinEvent | UnpinEvent | DrillEvent;
+export const KNOWN_KINDS = ['review', 'suspend', 'unsuspend', 'forget', 'taught', 'pin', 'unpin', 'drill'] as const;
 
 /** A line as read. `event` is set for the kinds this code knows; `raw` is always the line itself. */
 export interface LogLine {
@@ -115,6 +130,15 @@ function knownEvent(o: Record<string, unknown>): KnownEvent | string {
       return { ...base, k: 'unsuspend' };
     case 'taught':
       return { ...base, k: 'taught' };
+    case 'pin':
+      return { ...base, k: 'pin' };
+    case 'unpin':
+      return { ...base, k: 'unpin' };
+    case 'drill': {
+      const ok = o['ok'];
+      if (typeof ok !== 'boolean') return 'ok must be true or false';
+      return { ...base, k: 'drill', ok };
+    }
     default:
       return { ...base, k: 'forget' };
   }
@@ -129,6 +153,7 @@ export function formatEvent(event: KnownEvent): string {
     if (event.w !== undefined) o['w'] = event.w;
     if (event.h !== undefined) o['h'] = event.h;
   }
+  if (event.k === 'drill') o['ok'] = event.ok;
   return JSON.stringify(o);
 }
 

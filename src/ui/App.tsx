@@ -10,12 +10,13 @@ import { Debug } from './Debug.tsx';
 import { ImportScreen } from './Import.tsx';
 import { SetupForm } from './Setup.tsx';
 import { SyncBanners, SyncChip } from './Sync.tsx';
+import { MistakesView } from './Mistakes.tsx';
 import { TrainScreen } from './Train.tsx';
 import { TrainCard } from './TrainCard.tsx';
 
 export function App() {
   return (
-    <div class={`shell${mode.value.name === 'chapter' ? ' shell-chapter' : ''}${mode.value.name === 'train' ? ' shell-train' : ''}`}>
+    <div class={`shell${mode.value.name === 'chapter' ? ' shell-chapter' : ''}${mode.value.name === 'train' || mode.value.name === 'practice' ? ' shell-train' : ''}`}>
       <header class="topbar">
         <img class="topbar-icon" src={`${import.meta.env.BASE_URL}icons/icon.svg`} alt="" width={28} height={28} />
         <h1>Repworks</h1>
@@ -53,7 +54,13 @@ function Screen() {
     case 'chapter':
       return <ChapterView />;
     case 'train':
-      return <TrainScreen {...(mode.value.sid ? { sid: mode.value.sid } : {})} />;
+      return <TrainScreen of={mode.value.sid ? { kind: 'queue', scope: mode.value.sid } : { kind: 'queue' }} />;
+    case 'mistakes':
+      return <MistakesView />;
+    case 'practice': {
+      const run = mode.value.run;
+      return <TrainScreen of={run === 'retry' || run === 'drill' ? { kind: run } : { kind: 'pinned', all: run === 'pins' }} />;
+    }
     case 'list':
       return <Home />;
   }

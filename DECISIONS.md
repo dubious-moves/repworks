@@ -833,3 +833,11 @@ Technical calls made while building `PLAN.md` §5.6–§5.7, each with its reaso
   often names the reply; they show while a move is taught and after it is played.
 - **D4: a suspend made during training is recorded even when grading is off** (Interactive
   view, retry, drill): it is the owner's choice about the card, not a grade.
+- **D16: retry and drill ask only the mistake, and play everything else for the user,** new
+  moves included: they practise one move, and teaching on the way would spend the daily limit
+  outside the queue.
+- **D4: a drill of the day's mistakes records `drill` events for the pinned ones,** as a drill of
+  the pins does: a pin's steps count every drill answer, wherever it was drilled from.
+- **D4: a mistake's line is a line through the card's first occurrence.** The review event names
+  the card, not the line it was met on, and cards are per position (D3); any line through the
+  move leads to it.

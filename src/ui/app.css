@@ -1118,3 +1118,26 @@ table.cards td {
     width: 100%;
   }
 }
+
+/* Mistakes and pins (PLAN.md §5.8). */
+
+.mistake-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.mistake-list li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgb(255 255 255 / 8%);
+}
+
+.mistake-list .actions {
+  margin: 0;
+  align-items: center;
+}

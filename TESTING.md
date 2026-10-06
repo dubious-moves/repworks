@@ -23,3 +23,5 @@ fixes them and updates this file.
   tap and by drag at the pace, the feedback line, the screen staying on (wake lock), the time a
   session takes; the home screen's counts the same on both devices after a sync. The index
   build time is in the debug panel (§5.1's target: under 300 ms on the phone).
+- §5.8: a session's mistakes retried and drilled on the phone; a pin made on the phone appears
+  on the desktop after a sync, and comes due 30 minutes after it was made.

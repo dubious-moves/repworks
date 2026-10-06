@@ -5,6 +5,9 @@
 //   #/conflicts                         every open conflict
 //   #/study/<sid>[/<cid>][?at=e4,e5]    a chapter, at a move
 //   #/train[/<sid>]                     training: the whole repertoire, or one study (§5.7)
+//   #/mistakes                          the day's mistakes and the pins (§5.8)
+//   #/mistakes/retry, #/mistakes/drill  the day's mistakes retried, or drilled
+//   #/pinned, #/pinned/all              the pins due, or every pin, drilled
 // A setup link (#setup?…) is read and removed before any of this (src/app/setup.ts).
 import { isId } from '../study/ids.ts';
 
@@ -15,7 +18,13 @@ export type Mode =
   /** A study's chapter; without `cid`, its first. `at` is a move path, [] the start. */
   | { name: 'chapter'; sid: string; cid?: string; at?: string[] }
   /** A training session: the whole repertoire, or one study's lines. */
-  | { name: 'train'; sid?: string };
+  | { name: 'train'; sid?: string }
+  | { name: 'mistakes' }
+  /** A practice session over mistakes or pins: nothing graded (§5.8). */
+  | { name: 'practice'; run: Practice };
+
+export type Practice = 'retry' | 'drill' | 'pinned' | 'pins';
+const PRACTICE_HASH: Record<Practice, string> = { retry: '#/mistakes/retry', drill: '#/mistakes/drill', pinned: '#/pinned', pins: '#/pinned/all' };
 
 export type ModeEvent =
   | { type: 'open'; mode: Mode }
@@ -60,6 +69,9 @@ export function parseHash(hash: string): Mode {
   if (parts.length === 1 && parts[0] === 'import') return { name: 'import' };
   if (parts.length === 1 && parts[0] === 'conflicts') return { name: 'conflicts' };
   if (parts[0] === 'train' && parts.length === 1) return { name: 'train' };
+  if (parts[0] === 'mistakes' && parts.length === 1) return { name: 'mistakes' };
+  const practice = (Object.keys(PRACTICE_HASH) as Practice[]).find((p) => PRACTICE_HASH[p] === `#/${parts.join('/')}`);
+  if (practice) return { name: 'practice', run: practice };
   if (parts[0] === 'train' && parts.length === 2 && isId(parts[1])) return { name: 'train', sid: parts[1] };
   if (parts[0] === 'study' && isId(parts[1]) && parts.length <= 3) {
     const mode: Mode = { name: 'chapter', sid: parts[1] };
@@ -87,6 +99,10 @@ export function modeHash(mode: Mode): string {
       return '#/conflicts';
     case 'train':
       return mode.sid ? `#/train/${mode.sid}` : '#/train';
+    case 'mistakes':
+      return '#/mistakes';
+    case 'practice':
+      return PRACTICE_HASH[mode.run];
     case 'chapter': {
       const base = `#/study/${mode.sid}${mode.cid ? `/${mode.cid}` : ''}`;
       // encoded: a query reads a bare + as a space (exd8=Q+).

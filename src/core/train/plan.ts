@@ -24,6 +24,8 @@ export interface PlannedLine {
   ask: CardId[];
   /** Cards never answered, shown here and then played (§5.6). */
   teach: CardId[];
+  /** Where the walk starts, as a number of moves already on the board (drill's lead-in, §5.8). */
+  from?: number;
 }
 
 export interface SessionPlan {

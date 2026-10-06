@@ -159,3 +159,46 @@ test('the chapter view shows the move’s card and toggles its suspend; the debu
   await page.locator('.chip').click();
   await expect.poll(() => pushed(git).map((e) => e['k'])).toEqual(['unsuspend', 'suspend']);
 });
+
+test('mistakes: fail a move, pin it, see it, retry and drill it with nothing graded; the pin comes due after 30 minutes', async ({ page }) => {
+  const git = await setUp(page);
+  await expect(page.locator('.train-card h2')).toHaveText('Train: 1 due · 3 new');
+  await page.goto(`${site.url}#/train`);
+  await expect(feedback(page)).toHaveText('Your move');
+  await play(page, 'e7', 'e5');
+  await expect(feedback(page)).toHaveText('Not in your repertoire: try again');
+  await play(page, 'c7', 'c5');
+  await page.getByRole('button', { name: 'Pin this mistake' }).click();
+  await expect(page.getByRole('button', { name: 'Pin this mistake' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Stop' }).click();
+  await page.getByRole('button', { name: 'Mistakes' }).click();
+
+  const today = page.getByRole('region', { name: "Today's mistakes" });
+  await expect(today.locator('li')).toHaveCount(1);
+  await expect(today.locator('li')).toContainText('Main line 1. e4 c5');
+  await expect(today.locator('li')).toContainText('tried e5');
+  await expect(today.getByRole('button', { name: 'Unpin' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Pinned' }).locator('li')).toContainText('0 of 3 clean');
+
+  // Retry: from the line's start, 1. e4 played, 1... c5 asked.
+  await today.getByRole('link', { name: 'Retry' }).click();
+  await expect(page.locator('.study-title')).toHaveText('Retry mistakes');
+  await expect(feedback(page)).toHaveText('Your move');
+  await play(page, 'c7', 'c5');
+  await expect(page.getByRole('region', { name: 'Session done' })).toContainText('1 move, 1 right first time');
+
+  // The pin comes due 30 minutes after it was made, and its drill is recorded.
+  await page.clock.fastForward('00:31:00');
+  await page.goto(`${site.url}#/`);
+  await page.getByRole('link', { name: 'Drill pinned (1)' }).click();
+  await expect(page.locator('.study-title')).toHaveText('Drill pinned');
+  await expect(feedback(page)).toHaveText('Your move');
+  await play(page, 'c7', 'c5');
+  await expect(page.getByRole('region', { name: 'Session done' })).toContainText('1 move, 1 right first time');
+
+  await page.locator('.chip').click();
+  await expect.poll(() => pushed(git).map((e) => e['k'])).toEqual(['review', 'pin', 'drill']);
+  expect(pushed(git)[2]).toMatchObject({ card: C5, ok: true });
+  await page.goto(`${site.url}#/mistakes`);
+  await expect(page.getByRole('region', { name: 'Pinned' }).locator('li')).toContainText('1 of 3 clean');
+});

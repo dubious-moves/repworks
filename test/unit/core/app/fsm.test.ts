@@ -15,6 +15,11 @@ test('hashes parse to modes, and modes write back to the same hash', () => {
     ['#/conflicts', { name: 'conflicts' }],
     ['#/train', { name: 'train' }],
     ['#/train/Rep0Najd', { name: 'train', sid: 'Rep0Najd' }],
+    ['#/mistakes', { name: 'mistakes' }],
+    ['#/mistakes/retry', { name: 'practice', run: 'retry' }],
+    ['#/mistakes/drill', { name: 'practice', run: 'drill' }],
+    ['#/pinned', { name: 'practice', run: 'pinned' }],
+    ['#/pinned/all', { name: 'practice', run: 'pins' }],
     ['#/study/Rep0Najd', { name: 'chapter', sid: 'Rep0Najd' }],
     ['#/study/Rep0Najd/Ch1Najdf', { name: 'chapter', sid: 'Rep0Najd', cid: 'Ch1Najdf' }],
     ['#/study/Rep0Najd/Ch1Najdf?at=e4,c5,Nf3', { name: 'chapter', sid: 'Rep0Najd', cid: 'Ch1Najdf', at: ['e4', 'c5', 'Nf3'] }],
@@ -26,7 +31,7 @@ test('hashes parse to modes, and modes write back to the same hash', () => {
   }
   assert.equal(modeHash({ name: 'chapter', sid: 'Rep0Najd', cid: 'Ch1Najdf', at: [] }), '#/study/Rep0Najd/Ch1Najdf');
   // Anything else is the list: unknown pages, malformed IDs, a path with a stray character.
-  for (const hash of ['#/train/short', '#/train/Rep0Najd/x', '#/nope', '#/study/short', '#/study/Rep0Najd/bad', '#/study/Rep0Najd/Ch1Najdf/x']) assert.deepEqual(parseHash(hash), { name: 'list' }, hash);
+  for (const hash of ['#/mistakes/other', '#/pinned/x', '#/train/short', '#/train/Rep0Najd/x', '#/nope', '#/study/short', '#/study/Rep0Najd/bad', '#/study/Rep0Najd/Ch1Najdf/x']) assert.deepEqual(parseHash(hash), { name: 'list' }, hash);
   assert.deepEqual(parseHash('#/study/Rep0Najd/Ch1Najdf?at=e4,<script>'), { name: 'chapter', sid: 'Rep0Najd', cid: 'Ch1Najdf' });
 });
 

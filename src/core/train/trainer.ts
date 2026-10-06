@@ -86,6 +86,8 @@ export type TrainerEffect =
   | { type: 'arrow'; uci?: string }
   | { type: 'note'; note: Note }
   | { type: 'record'; event: TrainerRecord }
+  /** A move asked was answered: right first time or not. Given with recording on or off. */
+  | { type: 'answer'; card: CardId; ok: boolean }
   /** Send `{ type: 'tick', id }` after `ms`; a tick with another id is ignored. */
   | { type: 'wait'; ms: number; id: number }
   | { type: 'lineDone' }
@@ -114,6 +116,8 @@ export interface TrainerSetup {
   record?: boolean;
   /** Ask every own move not answered yet in the session, due or not (Interactive view). */
   askAll?: boolean;
+  /** Ask only the plan's asks and play everything else, new or not (retry and drill, §5.8). */
+  askOnly?: boolean;
 }
 
 interface Ply {
@@ -259,6 +263,7 @@ export class Trainer {
   }
 
   private kindOf(card: CardId): Kind {
+    if (this.setup.askOnly) return !this.answered.has(card) && this.toAsk.has(card) ? 'ask' : 'auto';
     if (this.answered.has(card) || this.suspended(card)) return 'auto';
     const fresh = statusOf(this.state(card)) === 'fresh';
     if (this.toAsk.has(card) || this.setup.askAll || (fresh && this.known.has(card))) return 'ask';
@@ -298,7 +303,8 @@ export class Trainer {
       this.positions = built.positions;
       this.end = Math.min(planned.end, built.plies.length);
       // Start where the board already is when the line shares its moves, up to its first ask or
-      // teach: the positions follow on from each other (§5.4).
+      // teach: the positions follow on from each other (§5.4). A planned start (drill's lead-in)
+      // comes first when it is further on.
       let ply = 0;
       if (board && board.line.sid === planned.line.sid && board.line.cid === planned.line.cid) {
         while (ply < boardPath.length && ply < this.end && boardPath[ply] === planned.line.path[ply]) {
@@ -307,9 +313,9 @@ export class Trainer {
           ply++;
         }
       }
-      this.ply = ply;
+      this.ply = Math.max(ply, Math.min(planned.from ?? 0, this.end));
       this.walked++;
-      out.push({ type: 'line', line: planned.line, number: this.at + 1, total: lines.length, kind: planned.kind, path: planned.line.path.slice(0, ply) });
+      out.push({ type: 'line', line: planned.line, number: this.at + 1, total: lines.length, kind: planned.kind, path: planned.line.path.slice(0, this.ply) });
       this.advance(now, out);
       return;
     }
@@ -431,6 +437,7 @@ export class Trainer {
   private review(card: CardId, p: Pending, now: number, out: TrainerEffect[]): Grade {
     const g = grade({ wrong: p.wrong.length, hint: p.hint });
     this.answered.add(card);
+    out.push({ type: 'answer', card, ok: g === 3 });
     if (this.record) {
       const event: TrainerRecord = { k: 'review', card, g, ms: Math.max(0, now - p.since) };
       if (p.wrong.length) event.w = [...p.wrong];

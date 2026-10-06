@@ -11,7 +11,7 @@ import { IdbStore, type DeviceRecord, type RemoteSettings } from '../platform/id
 import { finishLichessLogin } from './lichess.ts';
 import { applySetup, publicRepoWarning, takeSetupFromAddress, type Notice } from './setup.ts';
 import { dataVersion, SyncController } from './sync.ts';
-import { refreshTrainData, startSession } from './train.ts';
+import { refreshTrainData, startSession, type SessionKind } from './train.ts';
 
 export interface StudyRow {
   id: string;
@@ -140,9 +140,9 @@ export async function recordEvent(event: Parameters<IdbStore['record']>[0]): Pro
   await controller?.changed();
 }
 
-/** Starts a training session (§5.7) over today's queue: everything, or one study. */
-export async function beginTraining(scope?: string): Promise<void> {
-  if (store) await startSession(store, recordEvent, scope);
+/** Starts a session (§5.7, §5.8): today's queue (everything, or one study), mistakes or pins. */
+export async function beginTraining(of: SessionKind): Promise<void> {
+  if (store) await startSession(store, recordEvent, of);
 }
 
 export function syncNow(): void {

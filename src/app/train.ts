@@ -10,11 +10,13 @@ import type { CardId } from '../core/progress/cards.ts';
 import { parseLog } from '../core/progress/events.ts';
 import { readProgress } from '../core/progress/files.ts';
 import { DEFAULT_PARAMS } from '../core/progress/fsrs.ts';
-import { Replay, toDeviceEvents, type CardState } from '../core/progress/replay.ts';
+import { Replay, toDeviceEvents, type CardState, type DeviceEvent } from '../core/progress/replay.ts';
 import { combineIndex, indexChapter, type ChapterIndexing, type Line, type RepertoireIndex } from '../core/repertoire/index.ts';
 import { header, type Chapter } from '../core/study/model.ts';
 import { parseStudyMeta, reconcileChapterOrder } from '../core/study/studyMeta.ts';
 import { startPosition } from '../core/study/tree.ts';
+import { cardLine, drillLines, retryLines, todaysMistakes, type Mistake } from '../core/train/mistakes.ts';
+import { pinsOf, type PinState } from '../core/train/pins.ts';
 import { planSession, type SessionPlan } from '../core/train/plan.ts';
 import { todaysQueue, type DailyQueue, type Day } from '../core/train/queue.ts';
 import { SETTINGS_FILE, trainSettings, type TrainSettings } from '../core/train/settings.ts';
@@ -38,13 +40,14 @@ export interface TrainData {
   studyNames: Map<string, string>;
   /** How long the index took to build, in ms (§5.1's live check reads it in the debug panel). */
   indexMs: number;
+  /** Every event of a card, in replay order (mistakes and pins read them, §5.8). */
+  eventsOf(card: string): readonly DeviceEvent[];
+  /** Pinned mistakes, pinned or retired, by card. */
+  pins: Map<string, PinState>;
 }
 
 /** Each chapter file's parse and index part, kept while its text is the same (§5.1). */
 const parts = new Map<string, { text: string; chapter?: Chapter; part: ChapterIndexing }>();
-
-/** The last index build's time, for the debug panel. */
-export const indexBuildMs = signal<number | undefined>(undefined);
 
 export async function loadTraining(store: IdbStore): Promise<TrainData> {
   const files = await store.read((p) => p.startsWith('studies/') || p.startsWith('progress/') || p === SETTINGS_FILE);
@@ -86,13 +89,13 @@ export async function loadTraining(store: IdbStore): Promise<TrainData> {
   for (const path of parts.keys()) if (!seen.has(path)) parts.delete(path);
   const index = combineIndex(indexing);
   const indexMs = performance.now() - began;
-  indexBuildMs.value = indexMs;
 
   const replay = new Replay({ ...DEFAULT_PARAMS, retention: settings.retention });
   replay.add(readProgress(files).events);
   const device = await store.device();
   if (device) replay.add(toDeviceEvents(device.id, parseLog((await store.unsentEvents()).map((e) => e.raw).join('\n')).lines));
-  return { index, states: replay.states, settings, chapters, studyNames, indexMs };
+  const eventsOf = (card: string) => replay.eventsOf(card);
+  return { index, states: replay.states, settings, chapters, studyNames, indexMs, eventsOf, pins: pinsOf(replay.states.keys(), eventsOf) };
 }
 
 /** The training data of the working view, read again whenever it changes (home, chapter view, debug). */
@@ -106,6 +109,16 @@ export async function refreshTrainData(store: IdbStore): Promise<void> {
   } catch {
     // The home card and the move panel go without; a session says why.
   }
+}
+
+export function mistakesOf(data: TrainData, now: number): Mistake[] {
+  return todaysMistakes(data.index, data.eventsOf, dayOf(now));
+}
+
+/** Pinned cards still in the repertoire, and those due now. */
+export function pinnedOf(data: TrainData, now: number): { pinned: CardId[]; due: CardId[] } {
+  const pinned = [...data.pins].filter(([card, p]) => p.pinned && data.index.cards.has(card as CardId)).map(([card]) => card as CardId);
+  return { pinned, due: pinned.filter((c) => data.pins.get(c)!.due <= now) };
 }
 
 export function queueOf(data: TrainData, now: number, scope?: string): DailyQueue {
@@ -137,7 +150,14 @@ export function setPace(p: Pace): void {
   }
 }
 
+/**
+ * What a session walks: today's queue (everything, or one study), or the day's mistakes, retried
+ * from their lines' start or drilled from the lead-in, or the pinned mistakes (due, or all).
+ */
+export type SessionKind = { kind: 'queue'; scope?: string } | { kind: 'retry' } | { kind: 'drill' } | { kind: 'pinned'; all: boolean };
+
 export interface SessionView {
+  of: SessionKind;
   scope?: string;
   data: TrainData;
   plan: SessionPlan;
@@ -158,6 +178,11 @@ export interface SessionView {
   newLeft: number;
   /** The last card suspended, for its undo. */
   suspended?: { card: CardId; san: string };
+  /** The last move answered wrong, which can be pinned (§5.8). */
+  missed?: CardId;
+  /** Moves asked and answered, and how many right first time (retry and drill record no reviews). */
+  answers: number;
+  right: number;
   done?: Summary;
   /** Bumped on every effect, so the board is set again even when its position is the same. */
   tick: number;
@@ -172,8 +197,8 @@ let timer: ReturnType<typeof setTimeout> | undefined;
 let recordEvent: ((event: Parameters<IdbStore['record']>[0]) => Promise<void>) | undefined;
 let answered = new Set<string>();
 
-/** Starts a session over today's queue, for the whole repertoire or one study. */
-export async function startSession(store: IdbStore, record: (event: Parameters<IdbStore['record']>[0]) => Promise<void>, scope?: string): Promise<void> {
+/** Starts a session: today's queue, the day's mistakes, or the pins. */
+export async function startSession(store: IdbStore, record: (event: Parameters<IdbStore['record']>[0]) => Promise<void>, of: SessionKind): Promise<void> {
   stopTimer();
   trainer = undefined;
   session.value = undefined;
@@ -188,8 +213,21 @@ export async function startSession(store: IdbStore, record: (event: Parameters<I
     return;
   }
   const now = Date.now();
-  const plan = planSession(data.index, queueOf(data, now, scope), data.states);
+  const scope = of.kind === 'queue' ? of.scope : undefined;
+  let plan: SessionPlan;
+  if (of.kind === 'queue') plan = planSession(data.index, queueOf(data, now, scope), data.states);
+  else if (of.kind === 'retry') plan = { lines: retryLines(mistakesOf(data, now)) };
+  else if (of.kind === 'drill') plan = { lines: drillLines(mistakesOf(data, now)) };
+  else {
+    const { pinned, due } = pinnedOf(data, now);
+    const cards = of.all ? pinned : due;
+    plan = { lines: drillLines(cards.flatMap((card) => (cardLine(data.index, card) ? [{ card, ...cardLine(data.index, card)! }] : []))) };
+  }
+  // Retry and drill grade nothing: the card was graded Again today (§5.8, D16).
+  const grading = of.kind === 'queue';
   const t = new Trainer({
+    record: grading,
+    askOnly: !grading,
     index: data.index,
     plan,
     states: data.states,
@@ -200,7 +238,7 @@ export async function startSession(store: IdbStore, record: (event: Parameters<I
     paceMs: PACES[pace.peek()],
   });
   trainer = t;
-  const view: SessionView = { data, plan, side: 'white', path: [], phase: 'ready', number: 0, total: plan.lines.length, dueLeft: 0, newLeft: 0, tick: 0 };
+  const view: SessionView = { of, data, plan, side: 'white', path: [], phase: 'ready', number: 0, total: plan.lines.length, dueLeft: 0, newLeft: 0, answers: 0, right: 0, tick: 0 };
   if (scope !== undefined) view.scope = scope;
   session.value = view;
   send({ type: 'start', now });
@@ -225,6 +263,15 @@ export function undoSuspend(): void {
   if (!s?.suspended) return;
   void recordEvent?.({ t: new Date().toISOString(), k: 'unsuspend', card: s.suspended.card });
   const { suspended: _, ...rest } = s;
+  session.value = { ...rest, tick: s.tick + 1 };
+}
+
+/** Pins the last move answered wrong; it comes due for a drill 30 minutes later. */
+export function pinMissed(): void {
+  const s = session.peek();
+  if (!s?.missed) return;
+  void recordEvent?.({ t: new Date().toISOString(), k: 'pin', card: s.missed });
+  const { missed: _, ...rest } = s;
   session.value = { ...rest, tick: s.tick + 1 };
 }
 
@@ -255,6 +302,7 @@ function apply(t: Trainer, effects: TrainerEffect[]): void {
         next.side = c && header(c, 'Orientation') === 'black' ? 'black' : 'white';
         delete next.arrow;
         delete next.suspended;
+        delete next.missed;
         break;
       }
       case 'play':
@@ -283,6 +331,17 @@ function apply(t: Trainer, effects: TrainerEffect[]): void {
           timer = undefined;
           send({ type: 'tick', id: e.id, now: Date.now() });
         }, e.ms);
+        break;
+      case 'answer':
+        next.answers++;
+        if (e.ok) {
+          next.right++;
+          delete next.missed;
+        } else if (s.of.kind === 'queue' && !s.data.pins.get(e.card)?.pinned) next.missed = e.card;
+        // A drill answer on a pinned card is recorded for the pin's steps; nothing else is.
+        if (s.of.kind !== 'queue' && s.of.kind !== 'retry' && s.data.pins.get(e.card)?.pinned) {
+          void recordEvent?.({ t: new Date().toISOString(), k: 'drill', card: e.card, ok: e.ok });
+        }
         break;
       case 'done':
         stopTimer();

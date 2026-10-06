@@ -11,7 +11,8 @@ import type { Key } from '@lichess-org/chessground/types';
 import type { Role, SquareName } from 'chessops/types';
 import { open } from '../app/mode.ts';
 import { beginTraining } from '../app/state.ts';
-import { command, endSession, pace, PACES, playMove, session, sessionProblem, setPace, undoSuspend, type Pace, type SessionView } from '../app/train.ts';
+import { dataVersion } from '../app/sync.ts';
+import { command, endSession, pace, PACES, pinMissed, playMove, session, sessionProblem, setPace, undoSuspend, type Pace, type SessionKind, type SessionView } from '../app/train.ts';
 import type { Note } from '../core/train/trainer.ts';
 import { header } from '../core/study/model.ts';
 import { nodeAt, startPosition } from '../core/study/tree.ts';
@@ -44,7 +45,7 @@ export function noteText(note: Note | undefined): string {
 }
 
 /** The moves so far, numbered from the chapter's start (`1. e4 c5 2. Nf3`). */
-function numbered(start: Position, path: readonly string[]): string {
+export function numbered(start: Position, path: readonly string[]): string {
   let n = start.fullmoves;
   let turn = start.turn;
   const out: string[] = [];
@@ -84,14 +85,23 @@ function useWakeLock(active: boolean) {
   }, [active]);
 }
 
-export function TrainScreen(props: { sid?: string }) {
+const TITLES = { retry: 'Retry mistakes', drill: 'Drill mistakes', pinned: 'Drill pinned' } as const;
+
+export function TrainScreen(props: { of: SessionKind }) {
+  const key = JSON.stringify(props.of);
   useEffect(() => {
-    void beginTraining(props.sid);
+    void beginTraining(props.of);
     return endSession;
-  }, [props.sid]);
+  }, [key]);
   const s = session.value;
   const running = !!s && !s.done;
   useWakeLock(running);
+  // Nothing to train yet, and new data arrives (a sync just after setup): look again.
+  const version = dataVersion.value;
+  const empty = !!s?.done && s.plan.lines.length === 0;
+  useEffect(() => {
+    if (empty) void beginTraining(props.of);
+  }, [version]);
 
   useEffect(() => {
     if (!running) return;
@@ -109,7 +119,8 @@ export function TrainScreen(props: { sid?: string }) {
 
   if (sessionProblem.value) return <p class="warn">{sessionProblem.value}</p>;
   if (!s) return <p class="muted">Reading the repertoire…</p>;
-  const scopeName = s.scope ? (s.data.studyNames.get(s.scope) ?? s.scope) : 'Whole repertoire';
+  const title =
+    s.of.kind === 'queue' ? `Training · ${s.scope ? (s.data.studyNames.get(s.scope) ?? s.scope) : 'Whole repertoire'}` : s.of.kind === 'pinned' && s.of.all ? 'Drill all pins' : TITLES[s.of.kind];
   return (
     <div class="train">
       <div class="chapter-head">
@@ -117,7 +128,7 @@ export function TrainScreen(props: { sid?: string }) {
           ←
         </a>
         <div class="titles">
-          <span class="study-title">Training · {scopeName}</span>
+          <span class="study-title">{title}</span>
         </div>
       </div>
       {s.done ? <Done s={s} /> : <Session s={s} />}
@@ -126,21 +137,32 @@ export function TrainScreen(props: { sid?: string }) {
 }
 
 function Done(props: { s: SessionView }) {
-  const { done, plan } = props.s;
+  const { done, plan, of } = props.s;
   if (!done) return null;
+  const practice = of.kind !== 'queue';
   return (
     <section class="card train-done" aria-label="Session done">
-      <h2>{plan.lines.length === 0 ? 'Nothing to train now' : 'Session done'}</h2>
-      {plan.lines.length > 0 && (
+      <h2>{plan.lines.length === 0 ? (practice ? 'Nothing to practise now' : 'Nothing to train now') : 'Session done'}</h2>
+      {practice && plan.lines.length > 0 && (
+        <p>
+          {props.s.answers} move{props.s.answers === 1 ? '' : 's'}, {props.s.right} right first time. Nothing graded: these moves keep their schedule.
+        </p>
+      )}
+      {!practice && plan.lines.length > 0 && (
         <p>
           {done.lines} line{done.lines === 1 ? '' : 's'} · {done.reviews} move{done.reviews === 1 ? '' : 's'} reviewed, {done.good} right first time · {done.taught} new
           {done.suspended > 0 && <> · {done.suspended} always played for you</>}
         </p>
       )}
       <div class="actions">
-        <button type="button" onClick={() => void beginTraining(props.s.scope)}>
-          Train again
+        <button type="button" onClick={() => void beginTraining(of)}>
+          {practice ? 'Again' : 'Train again'}
         </button>
+        {!practice && (
+          <button type="button" class="secondary" onClick={() => open({ name: 'mistakes' })}>
+            Mistakes
+          </button>
+        )}
         <button type="button" class="secondary" onClick={() => open({ name: 'list' })}>
           Home
         </button>
@@ -227,7 +249,15 @@ function Session(props: { s: SessionView }) {
       </div>
       <div class="train-panel">
         <p class="train-counters" aria-label="Left today">
-          <span>{s.dueLeft} due</span> · <span>{s.newLeft} new</span> · line {s.number} of {s.total}
+          {s.of.kind === 'queue' ? (
+            <>
+              <span>{s.dueLeft} due</span> · <span>{s.newLeft} new</span> · line {s.number} of {s.total}
+            </>
+          ) : (
+            <>
+              {s.number} of {s.total} · {s.right} of {s.answers} right
+            </>
+          )}
         </p>
         <p class="train-line">
           <strong>{chapterName}</strong> <span class="muted">{moves}</span>
@@ -245,7 +275,12 @@ function Session(props: { s: SessionView }) {
               Hint
             </button>
           )}
-          {asking && (
+          {s.missed && (
+            <button type="button" onClick={pinMissed}>
+              Pin this mistake
+            </button>
+          )}
+          {asking && s.of.kind === 'queue' && (
             <button type="button" class="secondary" onClick={() => command('suspend')}>
               Always play this for me
             </button>
