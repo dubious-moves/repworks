@@ -159,8 +159,11 @@ test('transposition badges: a new move order shows ⇄1 both ways and leads to t
   // The +1 on 1... c5 opens the Alapin at its 1... c5.
   await page.locator('.move[data-path="e4 c5"] .badges').click();
   await expect(list.getByRole('menuitem')).toHaveText(['Test repertoire · Alapin: 1. e4 c5']);
-  if (!isMobile) await page.keyboard.press('Enter');
-  else await list.getByRole('menuitem').click();
+  if (!isMobile) {
+    // The list takes the focus once it is placed, an effect after its items render.
+    await expect(list.getByRole('menuitem')).toBeFocused();
+    await page.keyboard.press('Enter');
+  } else await list.getByRole('menuitem').click();
   await expect(page).toHaveURL(/#\/study\/Rep0Najd\/Ch2Alapn\?at=e4,c5$/);
   await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5');
 });
