@@ -1766,6 +1766,13 @@ a.button.secondary {
   color: var(--accent-text);
 }
 
+/* A move of a line that can't be played from there: struck through, as q_extension does. */
+.line-move.bad {
+  cursor: default;
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
 .preview-bar {
   display: flex;
   flex-wrap: wrap;

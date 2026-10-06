@@ -1,11 +1,12 @@
-// Transposition badges and copy continuation (PLAN.md §5.11). q_extension's harness wasn't
-// available to this session, so its cases aren't ported; these are hand-built.
+// Transposition badges and copy continuation (PLAN.md §5.11). Hand-built cases, then
+// q_extension's harness study (`test/harness.js` at c26242f, dumped from its live test study),
+// ported in §5.20.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseChapterFile } from '../../../../src/core/pgn/parse.ts';
 import { indexStudies } from '../../../../src/core/repertoire/index.ts';
 import type { Chapter } from '../../../../src/core/study/model.ts';
-import { continuation, linePgn } from '../../../../src/core/study/ops.ts';
+import { addMove, continuation, linePgn } from '../../../../src/core/study/ops.ts';
 import { otherOrders, transpositions } from '../../../../src/core/study/transpositions.ts';
 import { positionKeyOf } from '../../../../src/core/chess/positionKey.ts';
 import { positionAt } from '../../../../src/core/study/tree.ts';
@@ -30,6 +31,38 @@ test('transpositions: the other move orders to a position, within the chapter', 
   assert.deepEqual(otherOrders(t, ['nowhere']), []);
   // Every position listed is reached at least twice.
   for (const paths of t.paths.values()) assert.ok(paths.length > 1);
+});
+
+test('q_extension’s harness study: 3 transposing positions, 8 marked moves', () => {
+  // The 19 move paths of the live test study, as the harness rebuilds them; a path's prefixes are
+  // the study's other paths. The last transposes nowhere.
+  const lines = [
+    'Nf3 d5 c4 d4 g3 c5 b4 cxb4',
+    'Nf3 d5 c4 d4 b4 c5 g3 cxb4',
+    'Nf3 d5 b4 c5 c4 d4 g3 cxb4',
+    'Nf3 d5 b4 c5 c4 d4 d3',
+    'Nf3 d5 c4 e6',
+  ];
+  let c = chapter('');
+  for (const line of lines) {
+    const sans = line.split(' ');
+    sans.forEach((san, i) => {
+      const e = addMove(c, sans.slice(0, i), san);
+      assert.ok(e.ok);
+      c = e.value.chapter;
+    });
+  }
+  const t = transpositions(c);
+  assert.equal(t.paths.size, 3);
+  assert.equal([...t.paths.values()].flat().length, 8);
+  const groups = [...t.paths.values()].map((paths) => paths.map((p) => p.join(' ')));
+  assert.deepEqual(groups, [
+    ['Nf3 d5 c4 d4 g3 c5 b4', 'Nf3 d5 c4 d4 b4 c5 g3', 'Nf3 d5 b4 c5 c4 d4 g3'],
+    ['Nf3 d5 c4 d4 g3 c5 b4 cxb4', 'Nf3 d5 c4 d4 b4 c5 g3 cxb4', 'Nf3 d5 b4 c5 c4 d4 g3 cxb4'],
+    ['Nf3 d5 c4 d4 b4 c5', 'Nf3 d5 b4 c5 c4 d4'],
+  ]);
+  // The harness's untouched move: 7. d3 reaches no other path's position.
+  assert.deepEqual(otherOrders(t, 'Nf3 d5 b4 c5 c4 d4 d3'.split(' ')), []);
 });
 
 test('transpositions ignore move counters, and keep an en passant square only when the capture is legal', () => {

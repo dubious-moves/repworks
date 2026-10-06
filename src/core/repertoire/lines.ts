@@ -1,12 +1,15 @@
-// Clickable lines in comments (PLAN.md §5.12), after q_extension's `clParse` and `clStartFen`,
-// rebuilt from the plan's description (q_extension's source wasn't at hand when this was built):
+// Clickable lines in comments (PLAN.md §5.12), after q_extension's `clParse` and `clStartFen`
+// (`src/main-world.js` at c26242f), first rebuilt from the plan's description, then checked against
+// that source (Phase 2, §5.20):
 // - A line is a group in parentheses that starts with a move number, `(7. Bc4 Qa5)` or
 //   `(6... Nbd7 7. Bc4)`, and holds only moves, move numbers and glyphs. A group holding anything
-//   else is a remark, `(with braces typed as parens)`, and stays text.
+//   else is a remark, `(with braces typed as parens)`, and stays text. Glyphs standing alone
+//   (`!?`, `$14`) are allowed here; q_extension would read such a group as a remark.
 // - A line starts at the commented move's position when its first move number and side are that
-//   position's; else at the position before the move, as an alternative to it. When the first
-//   move is legal only in the other of the two, it starts there. Moves are played with chessops,
-//   as far as they are legal.
+//   position's, or at the position before the move (it replaces the move) when they are that
+//   one's. The two differ by a ply, so at most one fits; a line that fits neither stays text, as
+//   in q_extension. Moves are played with chessops, as far as they are legal; the rest are shown
+//   struck through.
 // - Line jumping (q_extension v1.13.1): a cursor runs through a comment's lines end to end,
 //   skipping lines whose first move is illegal; stepping back before the first line leaves.
 import type { Position } from 'chessops/chess';
@@ -73,21 +76,22 @@ export function parseCommentLines(text: string): CommentLine[] {
 }
 
 const fits = (line: CommentLine, pos: Position) => pos.fullmoves === line.number && pos.turn === line.turn;
-const legalFirst = (line: CommentLine, pos: Position) => parseSan(pos, line.moves[0]!.san) !== undefined;
 
 /**
  * Where a line starts: `after` is the commented move's position (the chapter's start for a
  * comment before the first move), `before` the position before it (none at the start).
+ * Undefined when the line's first number and side fit neither: it is then text.
  */
-export function lineStart(line: CommentLine, after: Position, before: Position | undefined): Position {
-  const chosen = fits(line, after) || !before ? after : before;
-  const other = chosen === after ? before : after;
-  if (other && !legalFirst(line, chosen) && legalFirst(line, other)) return other.clone();
-  return chosen.clone();
+export function lineStart(line: CommentLine, after: Position, before: Position | undefined): Position | undefined {
+  if (fits(line, after)) return after.clone();
+  if (before && fits(line, before)) return before.clone();
+  return undefined;
 }
 
 export interface PlayedLine {
   line: CommentLine;
+  /** Whether the line has a start; one that fits neither position is text, with no moves. */
+  placed: boolean;
   /** positions[0] is the start; positions[i] follows the line's first i moves. */
   positions: Position[];
   /** The legal moves played, as UCI (for the board's last move) and canonical SAN. */
@@ -95,10 +99,11 @@ export interface PlayedLine {
   sans: string[];
 }
 
-/** A line played from its start, as far as its moves are legal. */
-export function playLine(line: CommentLine, start: Position): PlayedLine {
+/** A line played from its start, as far as its moves are legal; none played with no start. */
+export function playLine(line: CommentLine, start: Position | undefined): PlayedLine {
+  if (!start) return { line, placed: false, positions: [], ucis: [], sans: [] };
   const pos = start.clone();
-  const out: PlayedLine = { line, positions: [pos.clone()], ucis: [], sans: [] };
+  const out: PlayedLine = { line, placed: true, positions: [pos.clone()], ucis: [], sans: [] };
   for (const m of line.moves) {
     const move = parseSan(pos, m.san);
     if (!move) break;

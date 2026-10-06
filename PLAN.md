@@ -6,7 +6,8 @@ it the same day. Phase 0 is built: §4.1 to §4.11 are on `main` (each part's "A
 where the build differed). What remains is live: the spike's re-run (§4.2), the real Qchess and
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
-with the owner's answers (§5.13). Read with `DECISIONS.md`, which this plan updates (its
+with the owner's answers (§5.13); it is built through §5.16, its acceptance test (§5.14) waiting
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06). Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -1037,8 +1038,9 @@ daily use, and editing in Qchess doesn't stop (D18), until the acceptance test h
 
 ## 5. Phase 1 in depth, and later phases (outline)
 
-Phase 1 is planned in depth below, the way §4 plans Phase 0. The later phases stay in outline:
-each lists its scope, what it reuses, its main risks and the checks that would prove it.
+Phase 1 is planned in depth below, the way §4 plans Phase 0, and Phase 2 after it (§5.20–§5.28).
+The later phases stay in outline: each lists its scope, what it reuses, its main risks and the
+checks that would prove it.
 
 ### Phase 1: Train and review (SRS)
 
@@ -1728,8 +1730,8 @@ continuation.
   `continuation(chapter, path)` in `core/study/ops.ts`, sharing its numbering with `linePgn`.
   On a main line with no fork above the move, it is the whole line from the start.
 - q_extension wasn't checked out in this session's container, so its harness cases weren't
-  ported; the tests are hand-built from this section's description. A later session with
-  q_extension at hand can port them.
+  ported; the tests are hand-built from this section's description. Ported in §5.20: the same
+  3 positions and 8 moves.
 - Tests: `test/unit/core/study/transpositions.test.ts` (move orders both ways, a three-move
   order, clocks ignored, the en passant rule both ways, the continuation of a main-line move, a
   move after a fork, a variation's move and a nested one, from a set-up position with Black to
@@ -1778,7 +1780,9 @@ comment and step back out.
   - `playLine` plays as far as the moves are legal; a line whose first move is illegal shows
     nothing and is skipped.
   A later session with q_extension at hand should port its harness cases into
-  `test/unit/core/repertoire/lines.test.ts` and compare.
+  `test/unit/core/repertoire/lines.test.ts` and compare. Done in §5.20, which brought the rules
+  in line with q_extension's: a line is placed by its number alone, and one fitting neither
+  position stays text.
 - **The preview** (`src/app/preview.ts`, `src/ui/CommentText.tsx`): a click on a move of a line
   shows that position on the board (no other change: the move shown in the notation stays the
   commented one, no edit, no arrows of the study), with the moves so far and ◀ ▶ Back in a bar
@@ -2031,32 +2035,340 @@ Risks:
 
 ### Phase 2: Explorer, ChessDB and the Practical panel
 
-Scope:
-- **Lichess explorer** with `src/pe`'s limiter (copied with a provenance header) and an
-  IndexedDB cache. Repertoire badges on the move rows.
-- **ChessDB evals** (`queryall`; CORS checked live).
-- **The Practical column, prepared score and risk** from `src/pe/search.js` and `rounds.js`
-  in a Web Worker, with `provider.child` on chessops. `provider.analyse`, which calls ChessDB's
-  `queue`/`store`, stays off unless explicitly enabled (D9).
-- **Where it sits** (D21): in the study page's panel, under the notation, laid out like
-  Qchess's explorer (tabs per database, a row per move with eval, games and the score bar), and
-  turned on and off with a button by the move buttons.
-- **Local explorer** on the desktop: q_extension's `explorerdb serve` must add
-  `Access-Control-Allow-Origin` for the site's origin. That's a small change in q_extension,
-  made by the owner's session when no long run depends on the checkout. Chrome asks once for
-  `loopback-network`.
-- **Repertoire coverage** and the **course tree** (lichessable §21, §24), comparing a reference
-  study with a repertoire.
+Planned on 2026-10-06, after Phase 1's build (§5.16) and while its live checks wait for the owner
+(TESTING.md). The parts below are in build order; each lists its tasks, the tests that prove it,
+and what only a live check can show, on which device. Numbering goes on from Phase 1's.
+
+**Scope**, from the outline the owner approved:
+- **Lichess explorer** with `src/pe`'s limiter and an IndexedDB cache; repertoire marks on the
+  move rows.
+- **ChessDB evals** (`queryall`).
+- **The Practical column, prepared score and risk**, from `src/pe/search.js` and `rounds.js`, in a
+  Web Worker, with `provider.child` on chessops. `provider.analyse` (ChessDB's `queue`/`store`)
+  stays off unless switched on (D9).
+- **Where it sits** (D21): in the study page's panel under the notation, laid out as Qchess's
+  explorer, turned on and off by a button by the move buttons.
+- **The local explorer** on the desktop (`explorerdb serve`, q_extension).
+- **Repertoire coverage** and the **course tree** (lichessable §21, §24).
+
+**Sources, read for this plan** (2026-10-06):
+- q_extension at `c26242f` (cloned outside this repo): `src/pe/search.js` (637 lines), `rounds.js`
+  (296), `providers.js` (588), `cache.js` (110); `src/background.js` (the service worker that runs
+  the search: providers, budget, token, Maia over the port); `src/main-world.js`'s Practical part
+  (row picking, the cell, the tooltip, the prepared bars) and its `clParse`/`clStartFen`;
+  `test/pe.js` (1,572 lines, 17 sections) and `test/harness.js`'s "clickable lines" and
+  same-chapter detection cases; its CLAUDE.md (the explorer panel's page contract) and README.
+- Qchess's explorer, read live on the test account (desktop 1600×900 and phone 390×844, headless)
+  and in the study page's source: `displayStatistics`, `createNoveltyElement`, the sort menu, the
+  Lichess settings panel. What it is:
+  - The panel sits under the notation (`#opening-tree`), its toggle (`#toggle-tree`, a database
+    icon) leftmost in the move-button bar. On the phone: the move buttons, the notation, then the
+    explorer.
+  - Tabs, one per database (Elite, CORR, 2024+, TT, Lichess; the chosen one highlighted), and for
+    Lichess a ⚙ opening its filter: player, time controls (Bullet, Blitz, Rapid, Classical;
+    default the last three), average ratings (400 … 2500; default 1600–2500), "Only stats from
+    past 6 months".
+  - A header row: Move, Eval, Games (share and count), Score, and a "⇅ Sort" menu: popularity,
+    eval (the default), score, White's moves by eval and Black's by popularity, the reverse,
+    "Your moves by eval, opp's by popularity", and "Only show repertoire moves".
+  - A row per move, 20 px high: the SAN; the eval in pawns from White's side to two decimals
+    (green above 0, red below, grey at 0; ChessDB's where it knows the position); the share of
+    games; the count; a bar of three parts (white, grey, black) with the percentage written in a
+    part of 15% or more. A row's title gives the average ratings. A click plays the move.
+  - A move the chapter already has at that position is drawn on a lighter band
+    (`chapter-covered`); in its repertoire mode the row also carries chips naming the chapters.
+  - Moves ChessDB knows and the games don't are "novelty" rows (orange name, "novelty" in place
+    of the bar), sorted in with the rest when sorting by eval.
+  - A last row, Σ, sums the games and their results.
+  - Without a Lichess login, the Lichess tab says "Lichess account required … No permissions are
+    granted, we only verify you have a Lichess account" and offers to connect: the explorer wants
+    a token of any scope. Checked from this container: `explorer.lichess.org/lichess` and
+    `/masters` answer 401 without a token, and their preflight allows `Authorization` from any
+    origin.
+  - Elite also lists top games under the rows; not part of this phase.
+- lichessable's `DESIGN-repertoire-coverage.md` and `DESIGN-course-tree.md` (§1–§3, §12–§17's
+  headings and conclusions).
+
+**What carries over, and what doesn't:**
+- Qchess's own databases (Elite, CORR, 2024+, TT) are its server's, behind its login: not used.
+  Repworks' tabs are **Lichess** (the filter's games), **Masters** (Lichess's masters database,
+  the nearest to Elite), **ChessDB** (its moves and evals, no games) and, where one is set,
+  **Local** (`explorerdb serve`).
+- The Practical column always runs on the Lichess filter's data (or the local explorer's), as in
+  q_extension, whatever tab is shown; its header says so on other tabs.
+- Maia (q_extension's thin-position fill-in and preview) waits for Phase 3, which brings the
+  model. The port keeps `provider.maia` and the preview search, tested, and switched off.
+- The player filter (Lichess's `/player` endpoint) and the top games: not in this phase.
+
+Where the new code goes:
+
+```
+src/core/explorer/   search.ts, rounds.ts, limiter.ts, providers.ts (ports of src/pe),
+                     table.ts (the panel's rows), rows.ts (which rows Practical computes),
+                     coverage.ts, filter.ts
+src/platform/        explorerCache.ts (IndexedDB), explorerWorker.ts (the worker), explorerHttp.ts
+src/app/             explorer.ts (signals, the worker's client, the panel's state)
+src/ui/              Explorer.tsx, ExplorerSettings.tsx, Coverage.tsx
+```
+
+#### 5.20 q_extension's harness cases (clickable lines, transpositions)
+
+§5.11 and §5.12 were built without q_extension's source; with it at hand:
+- Port the "clickable lines in training comments" cases of `test/harness.js` into
+  `test/unit/core/repertoire/lines.test.ts`, on the same line and comments with real positions.
+- Port its same-chapter detection case (the live test study's 19 paths: 3 transposing positions,
+  8 marked moves, one move untouched) into `transpositions.test.ts`.
+- Compare `lines.ts` with `clParse`/`clStartFen` and fix what differs.
+
+**As built** (2026-10-06):
+- `clStartFen` places a line by its number and side alone: the commented move's position, or the
+  position before it, else nothing, and **a line that fits neither stays text**. §5.12's guess (a
+  line goes to whichever position its first move is legal in) is gone; `lineStart` returns
+  undefined and `PlayedLine.placed` says whether a line has a start. The comment renderer plays a
+  comment's lines once (only for a comment with a group) to know this.
+- q_extension strikes a line's moves through from the first illegal one, and a click on one does
+  nothing; here a click on such a move used to show the last legal one. Now as q_extension
+  (`.line-move.bad`).
+- Kept as a deliberate difference: glyphs standing alone in a group (`!?`, `$14`) don't make it a
+  remark here, as they do in q_extension; Lichess's dialect can carry `$n` in a comment typed so.
+- Transpositions: the harness's study gives the same 3 positions and 8 moves with the site's key
+  (D10), so nothing differed.
+- Tests: `lines.test.ts` (q_extension's harness case: the remark and the line fitting nowhere left
+  as text; the same-ply line replacing 3... c5 and its position; the before-the-move line from
+  5. a3; moves struck from `Qxh7` on; on the last move, → through three lines skipping the
+  illegal one and stopping at the end, ← back and out, a click into the second line running back
+  into the first; and a line placed by its number where its first move is illegal),
+  `transpositions.test.ts` (the 19 paths, built move by move: the three groups and the untouched
+  `7. d3`).
+
+#### 5.21 The Practical search in core (a port of `src/pe`)
+
+`src/core/explorer/`, each file with a provenance header naming q_extension, the file and
+`c26242f`, under the repo's GPL-3.0-or-later:
+- `search.ts` from `search.js`: `evaluateRow`, `PE_DEFAULTS`, `winFromCp`, `riskMean`, `leafSplit`,
+  the counts and splits, unchanged in behaviour. TypeScript types for the provider, the node and
+  the result; erasable syntax only.
+- `rounds.ts` from `rounds.js`: `createRootSearch` and `createPreviewedSearch` (the second unused
+  until Maia, Phase 3).
+- `limiter.ts` from `providers.js`: `createRateLimiter` (the token bucket, one in flight, the 429
+  pause, snapshot and restore) and `createLimiter` (n in flight, priorities). The clock and
+  `sleep` are inputs (core reads no clock).
+- `providers.ts` from `providers.js` (`createProviders`): the explorer and ChessDB clients over an
+  `Http` port (`(url, init) → { status, ok, json(), headers }`), a cache port (`get(store, key,
+  ttl)`, `put`), the clock, `sleep` and the token. TTLs, the budget, the retries, the
+  in-flight sharing, `analyse` and the local explorer as in q_extension. The explorer's URL takes
+  the database (`lichess` or `masters`; Masters takes no speed or rating filter).
+- `fenKey` is q_extension's (the first four FEN fields, as given); the FENs the site sends come
+  from chessops's `makeFen`, so en passant is already the legal rule (D10).
+
+Tests: `test/pe.js` ported to `test/unit/core/explorer/*.test.ts` with `node:test`, case for case
+(the worked example, perspective, mates, tails, deepening, rounds, the preview, Maia, fewer
+requests, risk aversion, the prepared score's five sections, the rate limiter), and
+`test/explorerdb.js`'s cases for `providers.js`'s local path. A one-off differential check, kept
+out of the repo: the port and the original, side by side on the same random positions and fake
+providers, give equal results (recorded in "as built").
+
+Live: none (pure code).
+
+#### 5.22 The explorer worker and its cache
+
+- `src/platform/explorerCache.ts`: q_extension's `cache.js` on IndexedDB, database
+  `repworks-explorer` (stores `explorer`, `chessdb`), apart from the study store, so it can be
+  cleared alone. A memory LRU in front. A broken IndexedDB degrades to memory only.
+- `src/platform/explorerWorker.ts`, a module worker: it owns every explorer and ChessDB request of
+  its tab (the panel's and the search's), so one limiter governs the token's bucket. Messages in:
+  `token` (the Lichess token, or none), `settings` (the filter, the Practical options, the local
+  explorer's address, analysis on or off), `lookup {id, db, fen}` (the panel: the database's
+  moves and ChessDB's evals for a position, at the top priority), `search {gen, rootFen, rows,
+  remove}` (q_extension's `startRoot`: a new `gen` sweeps the old root's queue), `stats`. Out:
+  `lookup` answers, `update {gen, root, san, result}` per row, `stats`. `provider.child` plays SAN
+  with chessops; ChessDB's spelling of castling (`e1g1`) comes from `standardUci` (§4.3).
+- Rate: q_extension's measured bucket (about 23, refilling about 18.5 to 19 a minute); the site's
+  token is its own, so a burst of 20 (q_extension's `OWN_BURST`) and 16 a minute. The bucket is
+  saved to `sessionStorage` through the page (a worker has none), so a reload doesn't start full.
+- Budget per root position 60, as q_extension's default; analysis requests at most 30 per root
+  position, and only when switched on.
+- `src/app/explorer.ts`: starts the worker on first use, passes the token from the Lichess login
+  (§4.10), and answers the panel and the column.
+
+Tests (Node, the worker's message handling over a fake `Http`, a fake clock and a memory cache):
+a lookup answered once and then from the cache; a 429 pausing every queued request for 60 s and
+emptying the bucket; a new root sweeping the old root's queued requests; no token: the Lichess
+lookup refused with a clear reason, ChessDB still answering; Masters asked without the filter.
+`explorerCache` against fake-indexeddb (expiry on read, the LRU).
+
+Live (desktop, then phone): the panel's first answers with the owner's Lichess login; a reload
+answering from the cache; the request counts after ten minutes of browsing (the debug panel).
+
+#### 5.23 The explorer panel (D21)
+
+`src/ui/Explorer.tsx` under the notation in the chapter view's panel (on the phone, after the
+notation):
+- **Toggle**: a database button first in the move-button bar, as Qchess's; on or off per device
+  (localStorage), on by default. Off, nothing is asked.
+- **Tabs**: Lichess, Masters, ChessDB, and Local when an address is set; the chosen one per
+  device. A ⚙ by the tabs opens the settings (§5.24's dialog): the Lichess filter (speeds;
+  average ratings; past 6 months only), as Qchess's panel.
+- **The table** (`core/explorer/table.ts`, pure: the database's moves and ChessDB's evals in, rows
+  out): Qchess's header and rows, a Σ row, novelty rows (ChessDB's moves the games don't have;
+  shown on the Lichess and Masters tabs), the eval in pawns from White's side, coloured as
+  Qchess's; sorted by the menu's choice (Qchess's options, Maia's left out until Phase 3), saved
+  per device, "Your moves by eval, opp's by popularity" taking the side from the chapter's
+  orientation.
+- **Rows**: a click plays the move, as a move on the board does (it extends the line or goes to
+  the move the chapter has). A move the chapter has at this position is on Qchess's lighter band;
+  a move of the repertoire here (from the index, §5.1: any repertoire chapter, transpositions
+  included) carries a mark with its count of chapters, whose list opens as the transposition
+  list does (§5.11) and leads to each chapter at that move. "Only show repertoire moves" is in
+  the sort menu, as in Qchess.
+- **Asking**: after 280 ms on a position (Qchess's debounce), the shown tab's lookup only; a
+  position left before its answer drops its queued request. The ChessDB tab and the Eval column
+  ask `queryall` alone.
+- **No login**: the Lichess and Masters tabs say a Lichess login is needed, as Qchess's does, and
+  offer the login (§4.10), coming back to this chapter.
+- **Errors**: the reason in the panel (no token, 401, 429 with the pause left, network), and a
+  retry.
+
+Tests: `table.test.ts` (rows from a fixture answer: shares, Σ, the bar's parts and their labels at
+15%, novelties, each sort, the eval colours from White's side with Black to move, the repertoire
+mark and the chapter's band); Playwright with a fake explorer and ChessDB (routes in the e2e
+server): the panel toggled and remembered; the tabs; a row clicked adding the move; the
+repertoire mark's list opening the other chapter; no login; a 429 shown with its pause; the
+phone's layout (the panel after the notation, nothing wider than the screen).
+
+Live (desktop and phone): the panel beside Qchess's on the same positions (moves, shares,
+counts and bars equal for the same filter); the phone's layout and scrolling; the toggle.
+
+#### 5.24 The Practical column and the prepared score
+
+- **The column** (`Prac`), after Eval, on the Lichess, Masters and Local tabs, computed on the
+  chapter's side's moves only (q_extension's "your moves"): the rows q_extension picks
+  (`peAutoRows`, in `core/explorer/rows.ts`: up to 3 moves within 5 win% of ChessDB's best, then
+  moves played in 2% of games or more, 8 at most), a click on an empty cell computing that row,
+  and a right-click (long-press on the phone) leaving a move out at that position for the
+  session, as q_extension does (its search stops, its share of the budget goes to the others).
+- **Cells** as q_extension's: `54%`, a small `d3` while deepening, green on the best among rows at
+  one depth (`peBestOf`), `–` with too few games or no eval, `?` on an error (click to retry),
+  `×` when left out. The details (q_extension's tooltip: the value, mean and engine, the games
+  and filter, the main replies with their values and the Practical choice after each, the
+  switches, the depth and why it stopped) are the cell's title on the desktop and, on a tap, a
+  box under the table on the phone.
+- **Rows' values are kept per position** for the session (q_extension's `pe.results`): coming
+  back is instant, and a row left before it finished resumes.
+- **The prepared score**: a click on the Score header switches the bars between the games'
+  results and the prepared split (q_extension's `prepPaint`): outlined, the best in green, faded
+  when it rests mostly on the Practical value, and the details in the title.
+- **Settings** (`ExplorerSettings.tsx`, per device): the Lichess filter; Practical on or off; risk
+  aversion (0.05); the request budget per position (60); under Advanced q_extension's options
+  (reply threshold 3%, minimum games 50, reach floor 2%, depth limit 6, own margin 5, own
+  candidates 3, prepared prior 50 games); "Ask ChessDB to analyse unknown positions" (off, D9);
+  the local explorer's address with a Test button (§5.25); the request counts (q_extension's
+  popup stats).
+
+Tests: `rows.test.ts` (q_extension's row picking: eval margin, ties broken by games, the share
+floor, exclusions, the cap); the worker's search messages (a root's rows answered by depth, a
+row excluded mid-round, a new root sweeping the old); Playwright with fake data whose values are
+worked out by hand (the worked example's 65.3%): the column filled by rounds, the green, a click
+computing a row, a long-press excluding one, the prepared bars switched.
+
+Live (desktop): q_extension's Practical column and Repworks' side by side on the same positions
+with the same filter and token (the outline's check); the request rate seen over ten minutes;
+(phone) a search's time and the battery over a session.
+
+#### 5.25 The local explorer (desktop)
+
+- The address (e.g. `http://localhost:9337`) in the settings, tested with `/info` (q_extension's
+  `localInfo`). Set, the Lichess tab becomes Local's games, asked with no token, no limiter and
+  no budget, and the search treats the explorer as free (`explorerFree`), as q_extension does.
+- Chrome asks once for `loopback-network` (Local Network Access, §2).
+- `explorerdb serve` must answer the site's origin: `Access-Control-Allow-Origin:
+  https://dubious-moves.github.io` on its answers, and 204 to `OPTIONS`. That change is
+  q_extension's (`tools/explorerdb/server.mjs`), which a Repworks session can't push to; the
+  patch is written out in TESTING.md for the owner or a session with q_extension attached.
+
+Tests: the provider's local path (§5.21's ported cases) and a Playwright run against a fake local
+server on another port (the address tested, the tab answered without a token).
+
+Live (desktop, owner): the patched `explorerdb serve` answering the site, after Chrome's prompt.
+
+#### 5.26 Repertoire coverage (lichessable §21)
+
+What lichessable's design asks, on studies instead of Chessable courses: which lines of a
+reference study (a course) the repertoire doesn't have, ranked by how likely they are to be met.
+- `core/explorer/coverage.ts` (pure): each line of the reference study (each chapter's every
+  root-to-leaf path) walked against the repertoire's index (§5.1, position-keyed, so
+  transpositions and copies under other names count) to its first divergence: a **hole** (the
+  repertoire has no move of its own there), **line ends** (an opponent's move where the
+  repertoire has nothing after it), an **alternative** (a different own move: a choice, not a
+  gap), an **unmet option** (an opponent's move the repertoire doesn't branch on), or present. A
+  study for the other side is flagged, as lichessable does.
+- **Ranking**: `P` is the product of the opponent's moves' shares from the course's root to the
+  divergence (explorer answers, through the worker and its cache, with the panel's filter), shown
+  conditional on reaching the course's root and unconditionally; a position under 50 games ends
+  the product, marked truncated; `score = P × exp(−d / 16)` with `d` the divergence ply (a
+  setting). A line whose start the repertoire never reaches can't be ranked and says so.
+- **Where**: "Coverage…" in a reference study's settings, or a repertoire's: choose the other
+  study (and the side); the report lists the gaps grouped by their divergence (five lines behind
+  one unanswered move are one thing to fix), each opening the chapter at the divergence.
+- **Adding**: a gap's line copied into a chosen repertoire chapter of the same side, from the
+  divergence (an ordinary edit, undoable, synced).
+- The repertoire's own gaps (opponent moves with no answer, ranked the same way against the
+  explorer alone) are lichessable's "general form"; built here as "Gaps" with no reference study,
+  if the walk makes it cheap.
+
+Tests: `coverage.test.ts` (each of the four divergences, a transposition counted as present, a
+copy under another chapter, a study for the other side, the ranking with a fake explorer: P, the
+floor, the depth discount, the conditional figure); Playwright: a report on the fixture
+repertoire and a reference study, a line added to a chapter.
+
+Live (desktop): a real course (a reference study imported from the owner's Chessable export)
+against the real repertoire: the report's counts, the request count, the time.
+
+#### 5.27 The course tree (lichessable §24): the owner's choice first
+
+lichessable's course tree exists because a Chessable course is a flat list of variations: it
+rebuilds the tree, position-keyed, and browses it as Miller columns. On this site a study already
+is a tree and opens as one (D21), and the explorer panel (§5.23) already shows, at any position,
+the moves the repertoire plays there with their chapters. What is left of §24's value is a
+study whose chapters are single variations (as a Chessable export may be): the moves of all its
+chapters at a position, merged.
+
+Proposed (to the owner, before it is built): a **"Study" tab in the explorer panel**: the moves
+the open study plays at the board's position, across all its chapters and their transpositions,
+each with its chapters (one click to open), its count of lines, and the explorer's columns beside
+it. Not built: the Miller columns, the folding of forced runs, the Lichess scan of a column.
+Recommended, because it answers §24's question ("standing here, what did the author cover")
+inside the page the owner already uses, for a fraction of the code. This part waits for the
+owner's answer; the parts before it don't depend on it.
+
+#### 5.28 Phase 2 acceptance test, and exit
+
+**Acceptance test (live, desktop + Android phone)**, on the owner's repertoire and Lichess login:
+1. Desktop: the explorer on 1. e4 c5 2. Nf3 shows the same moves, shares and bars as Qchess's
+   Lichess tab with the same filter; the Eval column as Qchess's (ChessDB).
+2. Desktop: the Practical column's values on three positions match q_extension's column (same
+   filter, same depth) within a point; the prepared bars likewise.
+3. Phone: the panel on and off; the rows readable; a row tapped plays the move; a Practical cell's
+   details on a tap.
+4. Desktop: the local explorer (if patched) answers the Local tab.
+5. A coverage report of one course against the repertoire, and one line added from it.
+
+**Phase 2 exit**: unit and e2e tests green; the acceptance test passed live; a week of use with
+q_extension's column kept as the reference.
 
 Risks:
 - The explorer bucket (~23, refilling ~19 a minute) is per token, possibly per account
-  (q_extension couldn't tell which). Every device using the token shares it, and so may
-  mistake-lab, lichessable and Qchess on the same account.
-- Worker CPU on the phone.
-- Two copies of `src/pe` drifting apart.
+  (q_extension couldn't tell which). Every device using the token shares it, and so may Qchess's
+  Lichess connection, q_extension and lichessable on the same account. Each tab has its own
+  worker and bucket; two tabs searching at once can draw a 429, which pauses that tab a minute.
+- Two copies of `src/pe` drifting apart: the port names its source commit, and the differential
+  check can be re-run against a newer q_extension.
+- Worker CPU and battery on the phone (the search mostly waits on the network; to be measured).
+- The explorer under attack again (Qchess's message mentions a DDoS): errors are shown, never
+  cached.
 
 Checks:
-- q_extension's `test/pe.js` checks ported to `node --test`;
+- `test/pe.js` ported to `node --test`, and the differential check;
 - on the desktop, values for the same positions match q_extension's column side by side.
 
 ### Phase 3: Analysis with Stockfish and Maia
@@ -2154,7 +2466,8 @@ Side tasks, outside this repo:
 - **Chessable courses**: the owner's own export script (D14). Its PGN imports like any other
   file; bought courses become reference studies, in the private data repo only. It doesn't
   depend on lichessable, so retiring lichessable sets it no deadline.
-- **`explorerdb serve` CORS**, in q_extension, at the start of Phase 2.
+- **`explorerdb serve` CORS**, in q_extension, for Phase 2's local explorer (§5.25; the patch is
+  in TESTING.md).
 
 Phase 4 stays after Phases 2 and 3: the storm will be daily use eventually, but the owner
 doesn't need it early (§8). Nothing in Phases 2 and 3 depends on it, so it can still move up.

@@ -1,6 +1,7 @@
-// Clickable lines in comments and line jumping (PLAN.md §5.12). q_extension's harness wasn't
-// available to this session; its two "clickable lines" cases (a line at the same ply, a line
-// before the move) and their edge cases are rebuilt here from the plan.
+// Clickable lines in comments and line jumping (PLAN.md §5.12). The cases were first rebuilt from
+// the plan; q_extension's own harness cases (`test/harness.js` at c26242f, "clickable lines in
+// training comments") are ported below on the same line and comments, with real positions where
+// the harness had stand-in FENs (§5.20).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -72,10 +73,68 @@ test('a first move that is illegal: no move to show, and the lines skip it', () 
   assert.deepEqual(cursorAt(lines, 2, 1), { line: 2, ply: 1 });
 });
 
-test('a first move legal only from the other position starts there', () => {
-  // Numbered as White's move 2 after 2. Nf3 (so "before"), but only legal after it.
-  const c = chapter('1. e4 c5 2. Nf3 { (2. d6 3. d4) }');
-  assert.deepEqual(linesAt(c, ['e4', 'c5', 'Nf3'])[0]!.sans, ['d6', 'd4']);
+test('a line is placed by its number and side alone; one that fits neither position is text', () => {
+  // (2. d6 3. d4) is numbered for the position before 2. Nf3, so it starts there, where d6 isn't
+  // legal: q_extension's clStartFen never looks at the moves. (5. e5) fits neither: text.
+  const c = chapter('1. e4 c5 2. Nf3 { (2. d6 3. d4) and (5. e5) }');
+  const lines = linesAt(c, ['e4', 'c5', 'Nf3']);
+  assert.deepEqual(lines.map((l) => [l.placed, l.sans]), [[true, []], [false, []]]);
+  assert.equal(firstCursor(lines), undefined);
+  const q = chapter('1. e4 c5 2. Nf3 { (2. d4 cxd4) }');
+  assert.deepEqual(linesAt(q, ['e4', 'c5', 'Nf3'])[0]!.sans, ['d4', 'cxd4']);
+});
+
+// q_extension's harness: the test study's line as its training walks it, with the comments of the
+// live study plus the harness's own (a remark, a line that fits nowhere, illegal moves).
+test('q_extension’s harness: the clickable lines of its training line', () => {
+  const c = chapter(
+    '1. Nf3 d5 { A remark (see the other chapter) and (4. e4 e5) that fits nowhere } 2. c4 d4 3. g3 c5 { Test of clickable line at the same ply: (3... Nc6 4. Bg2 e5 5. d3) } ' +
+      '4. b4 cxb4 5. a3 { Test of clickable line before the move: (5... b6 6. Bg2 Bb7 7. axb4) } bxa3 { Illegal on: (6. Bg2 Qxh7 7. Nc3) } ' +
+      '6. Bg2 { Either (6... Qa5 7. O-O), (6... Qxh7) or (6... Nc6 7. Qa4) }',
+  );
+  const line = ['Nf3', 'd5', 'c4', 'd4', 'g3', 'c5', 'b4', 'cxb4', 'a3', 'bxa3', 'Bg2'];
+  const at = (n: number) => linesAt(c, line.slice(0, n + 1));
+  const fenAfter = (l: ReturnType<typeof at>[number], ply: number) => makeFen(l.positions[ply]!.toSetup());
+  // A remark in parentheses and a line that fits neither position stay plain.
+  assert.deepEqual(parseCommentLines(nodeAt(c, line.slice(0, 2))!.comments[0]!).length, 1);
+  assert.deepEqual(at(1).map((l) => l.placed), [false]);
+  // Same ply: the line replaces the commented move (starts before 3... c5).
+  const [same] = at(5);
+  assert.deepEqual(same!.sans, ['Nc6', 'Bg2', 'e5', 'd3']);
+  assert.equal(fenAfter(same!, 4), 'r1bqkbnr/ppp2ppp/2n5/4p3/2Pp4/3P1NP1/PP2PPBP/RNBQK2R b KQkq - 0 5');
+  assert.deepEqual(same!.ucis.at(-1), 'd2d3');
+  // Before the move: the line continues from the commented position.
+  const [before] = at(8);
+  assert.deepEqual(before!.sans, ['b6', 'Bg2', 'Bb7', 'axb4']);
+  assert.equal(before!.positions[1]!.turn, 'white');
+  assert.equal(before!.positions[1]!.fullmoves, 6);
+  // Moves from the first illegal one on are not played (struck through in the comment).
+  const [illegal] = at(9);
+  assert.deepEqual([illegal!.placed, illegal!.sans], [true, ['Bg2']]);
+  // On the last move: three lines, the middle one illegal from its first move. → runs on through
+  // them, past the one that can't be played, and stays at the end; ← retraces it and leaves.
+  const last = at(10);
+  assert.deepEqual(last.map((l) => l.sans), [['Qa5', 'O-O'], [], ['Nc6', 'Qa4']]);
+  const walk = [firstCursor(last)!];
+  for (let i = 0; i < 4; i++) walk.push(stepCursor(last, walk.at(-1)!, 1)!);
+  assert.deepEqual(walk, [
+    { line: 0, ply: 1 },
+    { line: 0, ply: 2 },
+    { line: 2, ply: 1 },
+    { line: 2, ply: 2 },
+    { line: 2, ply: 2 },
+  ]);
+  const back = [walk[3]!];
+  for (let i = 0; i < 3; i++) back.push(stepCursor(last, back.at(-1)!, -1)!);
+  assert.deepEqual(back, [
+    { line: 2, ply: 2 },
+    { line: 2, ply: 1 },
+    { line: 0, ply: 2 },
+    { line: 0, ply: 1 },
+  ]);
+  assert.equal(stepCursor(last, { line: 0, ply: 1 }, -1), undefined);
+  // A click into the second line also runs back into the first.
+  assert.deepEqual(stepCursor(last, cursorAt(last, 2, 0)!, -1), { line: 0, ply: 2 });
 });
 
 test('a comment before the first move starts at the chapter’s start, a set-up position too', () => {
@@ -84,7 +143,7 @@ test('a comment before the first move starts at the chapter’s start, a set-up 
   const lines = playedLines(c.root.comments[0]!, startPosition(c)!, undefined);
   assert.deepEqual(lines[0]!.sans, ['e5', 'Nf3']);
   const line = parseCommentLines('(1... e5)')[0]!;
-  assert.equal(makeFen(lineStart(line, startPosition(c)!, undefined).toSetup()), fen);
+  assert.equal(makeFen(lineStart(line, startPosition(c)!, undefined)!.toSetup()), fen);
 });
 
 test('line jumping: end to end through a comment’s lines, and out before the first', () => {

@@ -954,3 +954,33 @@ reason:
   nothing.
 - **D21: the notation's details as the owner asked:** a main-line move's cell takes the whole
   click, transposition badges are pills, and a comment's lines are bold blue with their brackets.
+
+## Revision of 2026-10-06 (Phase 2 planned)
+Phase 2 is planned in depth in `PLAN.md` §5.20–§5.28, from q_extension's source (`c26242f`),
+Qchess's explorer read live on the test account, and lichessable's coverage and course-tree
+designs. The technical calls, each with its reason:
+- **D21: the explorer's tabs are Lichess, Masters, ChessDB and (where set) Local.** Qchess's own
+  databases (Elite, CORR, 2024+, TT) are its server's, behind its login. Masters is Lichess's
+  nearest to Elite; ChessDB alone shows its moves and evals where there are no games.
+- **D13: the Practical column runs on the Lichess filter's data, whatever tab is shown,** as in
+  q_extension; Maia's fill-in and preview are ported and stay off until Phase 3 brings the model.
+- **D9: one module worker per tab owns every explorer and ChessDB request** (the panel's and the
+  search's), so one limiter governs the token's bucket; burst 20 and 16 a minute (q_extension's
+  own-token figures), the bucket kept in `sessionStorage` across reloads.
+- **D5: the explorer cache is its own IndexedDB database, `repworks-explorer`,** with
+  q_extension's TTLs (explorer 30 days, ChessDB 7, unknown positions 1), so it can be cleared
+  without touching the studies.
+- **`src/pe` is ported to TypeScript in `src/core/explorer`,** behaviour unchanged, with a
+  provenance header naming the source commit; `test/pe.js` is ported case for case, and a
+  differential check runs the port and the original on the same random inputs. The clock, `sleep`
+  and HTTP are inputs, so core stays pure.
+- **Clickable lines (§5.12) now follow q_extension's `clStartFen` exactly:** a line is placed by
+  its number and side alone, one fitting neither position stays text, and the moves from the
+  first illegal one are struck through. §5.12's fallback (whichever position the first move is
+  legal in) was a guess made without the source. Kept as a difference: glyphs standing alone in
+  a group don't make it a remark.
+- **The local explorer's CORS change is q_extension's,** which Repworks sessions can't push to; the
+  patch is written out for the owner (TESTING.md).
+- **For the owner (`PLAN.md` §5.27): the course tree as a "Study" tab of the explorer panel**
+  rather than lichessable's Miller columns, since a study here is already a tree. Not built until
+  the owner answers.

@@ -8,7 +8,7 @@ import type { Position } from 'chessops/chess';
 import { parseUci } from 'chessops/util';
 import type { Key } from '@lichess-org/chessground/types';
 import { endPreview, previewOf, previewPosition, showLine, stepPreview, type PreviewOwner } from '../app/preview.ts';
-import { cursorAt, parseCommentLines, playedLines } from '../core/repertoire/lines.ts';
+import { cursorAt, parseCommentLines, playedLines, type PlayedLine } from '../core/repertoire/lines.ts';
 
 export interface CommentPositions {
   /** The commented move's position (the start, for a comment before the first move). */
@@ -21,10 +21,15 @@ type Piece = { text: string } | { text: string; line: number; move: number };
 /** Plain text, or a line group: its text from `(` to `)`, with its moves clickable. */
 type Segment = { text: string } | { group: Piece[] };
 
-function segments(text: string): Segment[] {
+/**
+ * The comment cut into text and lines. With the lines played (`played`), a line that fits neither
+ * position stays text, as in q_extension; without them every group is drawn as a line.
+ */
+function segments(text: string, played: readonly PlayedLine[] | undefined): Segment[] {
   const out: Segment[] = [];
   let at = 0;
   parseCommentLines(text).forEach((line, i) => {
+    if (played && !played[i]?.placed) return;
     if (line.from > at) out.push({ text: text.slice(at, line.from) });
     const group: Piece[] = [];
     let g = line.from;
@@ -51,7 +56,14 @@ export function CommentText(props: {
   /** Before the preview starts (the chapter view shows the commented move first). */
   onOpen?: () => void;
 }) {
-  const parts = useMemo(() => segments(props.text), [props.text]);
+  // Played once per comment, so a line that fits neither position is text and the moves past
+  // the legal ones are struck through (q_extension's rules). Only for a comment with a group.
+  const played = useMemo(() => {
+    if (!/\(\s*\d/.test(props.text) || !parseCommentLines(props.text).length) return undefined;
+    const at = props.positions();
+    return at ? playedLines(props.text, at.after, at.before) : undefined;
+  }, [props.text, props.id]);
+  const parts = useMemo(() => segments(props.text, played), [props.text, played]);
   const shown = previewOf(props.owner);
   const mine = shown?.key === props.id ? shown.cursor : undefined;
   if (!parts.some((p) => 'group' in p)) return <>{props.text}</>;
@@ -60,14 +72,23 @@ export function CommentText(props: {
     const at = props.positions();
     if (!at) return;
     const lines = playedLines(props.text, at.after, at.before);
+    // A move past the legal ones does nothing (q_extension).
+    if (move >= (lines[line]?.ucis.length ?? 0)) return;
     const cursor = cursorAt(lines, line, move);
-    // A line whose first move isn't legal here has nothing to show.
     if (!cursor) return;
     props.onOpen?.();
     showLine(props.owner, props.id, lines, cursor);
   };
-  const piece = (p: Piece, i: number) =>
-    'line' in p ? (
+  const piece = (p: Piece, i: number) => {
+    if (!('line' in p)) return <span key={i}>{p.text}</span>;
+    if (played && p.move >= (played[p.line]?.ucis.length ?? 0)) {
+      return (
+        <span key={i} class="line-move bad" title="Not a legal move here">
+          {p.text}
+        </span>
+      );
+    }
+    return (
       <span
         key={i}
         class={`line-move${mine && mine.line === p.line && mine.ply === p.move + 1 ? ' current' : ''}`}
@@ -78,9 +99,8 @@ export function CommentText(props: {
       >
         {p.text}
       </span>
-    ) : (
-      <span key={i}>{p.text}</span>
     );
+  };
   return (
     <>
       {parts.map((p, i) =>
