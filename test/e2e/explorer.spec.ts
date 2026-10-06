@@ -3,7 +3,7 @@
 // Alapin: 1. e4 c5 2. c3 Nf6, both Black's).
 import { test, expect, type Page } from '@playwright/test';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
-import { fakeExplorer, lichessLogin, serveExplorer, type FakeExplorer } from './explorer.ts';
+import { fakeExplorer, lichessLogin, serveExplorer, serveLocalExplorer, type FakeExplorer } from './explorer.ts';
 import { serveGithub, world } from './github.ts';
 import { serveSite, type SiteServer } from './server.ts';
 
@@ -202,4 +202,39 @@ test('the Practical column on the chapter’s moves: rows by rounds, green, a cl
   await expect(panel(page).locator('.ex-bar.prep').first()).toHaveAttribute('title', /^Prepared \d+ \/ \d+ \/ \d+/);
   // Lichess's data, with the token, for the search too.
   expect(fake.requests.filter((r) => r.url.includes(encodeURIComponent('4p3/4P3')) && r.url.startsWith('https://explorer.lichess.org/lichess')).length).toBeGreaterThan(0);
+});
+
+test('the local explorer: its address tested, then the Lichess tab answered by it with no login; Masters stays Lichess’s', async ({ page }) => {
+  const fake = await setUp(page, { login: false });
+  const local = await serveLocalExplorer(fake, new URL(site.url).origin);
+  try {
+    await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf`);
+    await expect(panel(page).getByText(/needs a Lichess login/)).toBeVisible();
+    await panel(page).getByRole('button', { name: 'Explorer settings' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Explorer settings' });
+    // Nothing there first: the test says so.
+    await dialog.locator('input[name="local"]').fill('127.0.0.1:1');
+    await dialog.getByRole('button', { name: 'Test' }).click();
+    await expect(dialog.getByRole('alert')).toContainText('nothing answers at http://127.0.0.1:1');
+    await dialog.locator('input[name="local"]').fill(local.address);
+    await dialog.getByRole('button', { name: 'Test' }).click();
+    await expect(dialog.locator('.local-tested')).toContainText('Answers: lichess_db_standard_rated_2026-09.pgn.zst (made 2026-10-01) · its games: blitz, rapid; ratings 1800, 2000 · 12,345 positions, 67,890 games');
+    await dialog.getByRole('button', { name: 'Save' }).click();
+    await expect(dialog).toHaveCount(0);
+
+    // The games tab is the local explorer's, asked with no token.
+    await expect(panel(page).getByRole('tab', { name: 'Local' })).toBeVisible();
+    await expect(rows(page)).toHaveText(['e4', 'd4', 'Nf3', 'c4']);
+    const asked = fake.requests.filter((r) => r.url.startsWith('local /lichess'));
+    expect(asked.length).toBeGreaterThan(0);
+    expect(asked.every((r) => r.auth === undefined)).toBe(true);
+    expect(asked[0]!.url).toContain('speeds=blitz,rapid,classical');
+    expect(fake.requests.filter((r) => r.url.startsWith('https://explorer.lichess.org'))).toHaveLength(0);
+
+    // Masters is Lichess's: it still needs the login.
+    await panel(page).getByRole('tab', { name: 'Masters' }).click();
+    await expect(panel(page).getByText(/needs a Lichess login/)).toBeVisible();
+  } finally {
+    await local.close();
+  }
 });

@@ -2209,3 +2209,14 @@ a.button.secondary {
   display: block;
   margin: 6px 0;
 }
+
+/* §5.25: the local explorer's address and its Test button. */
+.local-explorer {
+  display: flex;
+  gap: 8px;
+}
+
+.local-explorer input {
+  flex: 1;
+  min-width: 0;
+}

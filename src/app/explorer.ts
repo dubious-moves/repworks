@@ -3,7 +3,7 @@
 // use; its answers are kept for the session, so going back to a position is instant.
 import { signal } from '@preact/signals';
 import type { LimiterSnapshot } from '../core/explorer/limiter.ts';
-import type { CompactExplorer } from '../core/explorer/providers.ts';
+import { localInfo, type CompactExplorer } from '../core/explorer/providers.ts';
 import { fenKey, type ChessdbAnswer } from '../core/explorer/search.ts';
 import type { ExplorerConfig, ExplorerTab, FromWorker, LookupError, ToWorker } from '../core/explorer/service.ts';
 import type { SortMode } from '../core/explorer/table.ts';
@@ -271,5 +271,28 @@ function receive(m: FromWorker) {
         // not kept
       }
       return;
+  }
+}
+
+/* ------------------------------------------------------------- the local explorer (§5.25) */
+
+/**
+ * The settings' Test button: what the local explorer at `address` serves (q_extension's popup's
+ * test, its /info), asked from the page. Chrome asks once for the local network the first time.
+ */
+export async function testLocalExplorer(address: string): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
+  try {
+    const info = await localInfo((url, init) => fetch(url, init), address);
+    const f = (info.filter ?? {}) as { speeds?: string[]; ratings?: number[] };
+    const n = (x: unknown) => (typeof x === 'number' ? x.toLocaleString('en-US') : undefined);
+    const parts = [`Answers: ${String(info['source'] ?? info.id)}`];
+    if (typeof info['created'] === 'string') parts[0] += ` (made ${info['created'].slice(0, 10)})`;
+    if (f.speeds?.length || f.ratings?.length) parts.push(`its games: ${(f.speeds ?? []).join(', ') || 'any speed'}; ratings ${(f.ratings ?? []).join(', ') || 'any'}`);
+    const sizes = [n(info['positions']) && `${n(info['positions'])} positions`, n(info['games']) && `${n(info['games'])} games`].filter(Boolean);
+    if (sizes.length) parts.push(sizes.join(', '));
+    return { ok: true, text: `${parts.join(' · ')}. Its filter is fixed: the time controls and ratings above don’t change its answers.` };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: `${message}. Is explorerdb serve running, and does it allow this site (the change to q_extension is in Repworks’ TESTING.md)?` };
   }
 }

@@ -3,7 +3,7 @@
 // q_extension's popup has them, ChessDB analysis (off, D9) and the local explorer's address.
 import { signal } from '@preact/signals';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { DEFAULT_PREFS, onWorker, postToWorker, prefs, RATINGS, setPrefs, SPEEDS, type ExplorerPrefs } from '../app/explorer.ts';
+import { DEFAULT_PREFS, onWorker, postToWorker, prefs, RATINGS, setPrefs, SPEEDS, testLocalExplorer, type ExplorerPrefs } from '../app/explorer.ts';
 import type { FromWorker } from '../core/explorer/service.ts';
 import { lichessUser, logInWithLichess } from '../app/lichess.ts';
 import { mode } from '../app/mode.ts';
@@ -37,6 +37,12 @@ function Dialog() {
   const [draft, setDraft] = useState<ExplorerPrefs>(() => ({ ...prefs.peek() }));
   const [numbers, setNumbers] = useState<Record<NumberKey, string>>(() => Object.fromEntries(NUMBERS.map((n) => [n.key, String(prefs.peek()[n.key])])) as Record<NumberKey, string>);
   const [error, setError] = useState<string | undefined>(undefined);
+  const [tested, setTested] = useState<{ ok: boolean; text: string } | undefined>(undefined);
+  const test = async () => {
+    setTested({ ok: true, text: 'Asking…' });
+    const r = await testLocalExplorer(draft.local);
+    setTested(r.ok ? { ok: true, text: r.text } : { ok: false, text: r.error });
+  };
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     if (!ref.current!.open) ref.current!.showModal();
@@ -126,8 +132,27 @@ function Dialog() {
         </fieldset>
         <label>
           Local explorer <span class="muted">(q_extension’s explorerdb serve, e.g. localhost:9337; empty: Lichess)</span>
-          <input type="text" name="local" autoComplete="off" spellcheck={false} value={draft.local} onInput={(e) => setDraft({ ...draft, local: e.currentTarget.value.trim() })} />
+          <span class="local-explorer">
+            <input
+              type="text"
+              name="local"
+              placeholder="localhost:9337"
+              autoComplete="off"
+              spellcheck={false}
+              value={draft.local}
+              onInput={(e) => (setDraft({ ...draft, local: e.currentTarget.value.trim() }), setTested(undefined))}
+            />
+            <button type="button" class="secondary" disabled={!draft.local} onClick={() => void test()}>
+              Test
+            </button>
+          </span>
         </label>
+        {tested && (
+          <p class={tested.ok ? 'muted local-tested' : 'warn local-tested'} role={tested.ok ? 'status' : 'alert'}>
+            {tested.text}
+          </p>
+        )}
+        {draft.local && <p class="muted">Set, the Lichess tab shows its games (named Local), asked with no login, no rate limit and no request budget; Masters stays Lichess’s.</p>}
         {stats && (
           <p class="muted explorer-stats">
             This tab: {stats.stats.explorerRequests ?? 0} Lichess requests ({stats.stats.explorer429 ?? 0} refused for speed), {stats.stats.chessdbRequests ?? 0} ChessDB lookups

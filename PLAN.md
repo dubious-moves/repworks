@@ -2613,6 +2613,24 @@ server on another port (the address tested, the tab answered without a token).
 
 Live (desktop, owner): the patched `explorerdb serve` answering the site, after Chrome's prompt.
 
+**As built** (2026-10-06):
+- What §5.21–§5.24 had already built: the address in Explorer settings (per device), the
+  provider's local path (no token, no limiter, no budget, `explorerFree` for the search, Masters
+  still Lichess's), the tab named Local, and `localInfo`. Added here: **Test** beside the
+  address (`testLocalExplorer` in `src/app/explorer.ts`, from the page, so Chrome's prompt comes
+  with it), which shows what the index is (source, date, its fixed filter, positions and
+  games) or why nothing answers; and a line saying what the address changes.
+- **The q_extension change** is written out in TESTING.md as a patch against `c26242f`, checked
+  on a copy (it applies, q_extension's `test/explorerdb.js` passes, and the patched server sends
+  `Access-Control-Allow-Origin` only to the allowed origin and answers a preflight 204). Requests
+  from the site are plain GETs with no custom header, so no preflight is needed by CORS itself;
+  the 204 is for Chrome's Private Network Access, which may send one.
+- Tests: `test/e2e/explorer.spec.ts` (desktop and phone) against a stand-in `explorerdb serve` on
+  another port, a real HTTP server with the patched CORS (`serveLocalExplorer`): with no Lichess
+  login, a dead address's Test failing, the real one's showing its index, then the tab named
+  Local answering with no Authorization and no request to Lichess, and Masters still asking for
+  the login.
+
 #### 5.26 Repertoire coverage (lichessable §21)
 
 What lichessable's design asks, on studies instead of Chessable courses: which lines of a

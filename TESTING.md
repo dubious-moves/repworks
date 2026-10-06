@@ -82,3 +82,76 @@ couldn't be tested then (the day's limit was used up), so the training items bel
   request counts after ten minutes of use (Explorer settings shows this tab's); on
   the phone, a search's time and the battery over a session; a long-press on a cell leaving a
   move out.
+- §5.25: the local explorer on the desktop, once `explorerdb serve` has the change below: the
+  address in Explorer settings, Test (Chrome asks once for the local network: allow it) showing
+  the index, then the Lichess tab named Local answering with no login, and the Practical
+  column computing faster (no Lichess budget).
+
+### The change to q_extension for §5.25 (Repworks sessions can't push there)
+
+`explorerdb serve` answers the extension, whose requests carry no page origin; a web page's need
+CORS. This patch against q_extension `c26242f` makes the answers carry
+`Access-Control-Allow-Origin` for `https://dubious-moves.github.io` (and any origin added through
+`createServer`'s `o.origins`) and answers a preflight with 204 (with
+`Access-Control-Allow-Private-Network`, for Chrome's older Private Network Access checks). Other
+origins get the answers as before, without the header, so the browser keeps them from the page.
+Checked by a Repworks session on a copy of q_extension: it applies with `git apply`,
+q_extension's `node test/explorerdb.js` passes with it, and the patched server answered `/info`
+and a preflight with the headers for that origin and without them for another. Apply it in
+q_extension (or give it to a session with q_extension attached), then run
+`node tools/explorerdb.mjs serve <index> --port 9337` and use `localhost:9337` in Repworks.
+
+```diff
+--- a/tools/explorerdb/server.mjs
++++ b/tools/explorerdb/server.mjs
+@@ -13,11 +13,19 @@
+  * (/info has the index's), and the popup's Test button shows it.
+  *
+  * Listens on 127.0.0.1 unless told otherwise, and answers GET only.
++ *
++ * Repworks (https://dubious-moves.github.io/repworks/) asks it from a web page, which needs
++ * CORS: an answer to an allowed origin carries Access-Control-Allow-Origin, and a preflight
++ * (OPTIONS, which Chrome's Private Network Access may send) is answered 204. The extension's
++ * own requests carry no page origin and need none of this.
+  */
+ 
+ import http from 'node:http';
+ import { explorerAnswer } from './store.mjs';
+ 
++// The web pages allowed to read its answers; `o.origins` adds more (e.g. a local build).
++export var ORIGINS = ['https://dubious-moves.github.io'];
++
+ // What /info says. `id` changes with every import, so caches can tell indexes apart.
+ export function indexInfo(db) {
+   var m = db.meta;
+@@ -75,7 +83,19 @@
+   var log = o.log || function () {};
+   var seen = new Set();
+   var served = 0;
++  var origins = ORIGINS.concat(o.origins || []);
+   return http.createServer(function (req, res) {
++    var origin = req.headers.origin;
++    var cors = origin && origins.indexOf(origin) >= 0 ? { 'Access-Control-Allow-Origin': origin, 'Vary': 'Origin' } : {};
++    if (req.method === 'OPTIONS' && cors['Access-Control-Allow-Origin']) {
++      res.writeHead(204, Object.assign({
++        'Access-Control-Allow-Methods': 'GET',
++        'Access-Control-Allow-Private-Network': 'true',
++        'Access-Control-Max-Age': '600'
++      }, cors));
++      res.end();
++      return;
++    }
+     var r;
+     if (req.method !== 'GET') r = { status: 405, body: { error: 'GET only' } };
+     else {
+@@ -85,7 +105,7 @@
+     }
+     served++;
+     if (o.onServed) o.onServed(served);
+-    res.writeHead(r.status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
++    res.writeHead(r.status, Object.assign({ 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }, cors));
+     res.end(JSON.stringify(r.body));
+   });
+ }
+```
+
