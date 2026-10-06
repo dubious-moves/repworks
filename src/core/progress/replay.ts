@@ -22,6 +22,8 @@ export interface CardState {
   reviews: number;
   firstReview?: number;
   lastGrade?: FsrsGrade;
+  /** When the move was first taught (§5.2); a card taught and never reviewed is in learning. */
+  taught?: number;
 }
 
 export const order = (a: DeviceEvent, b: DeviceEvent) => a.t - b.t || (a.device < b.device ? -1 : a.device > b.device ? 1 : 0) || a.n - b.n;
@@ -54,6 +56,10 @@ export function foldCard(events: readonly DeviceEvent[], params: FsrsParams = DE
       case 'forget':
         state.card = newCard();
         delete state.lastGrade;
+        delete state.taught;
+        break;
+      case 'taught':
+        state.taught ??= t;
         break;
     }
   }

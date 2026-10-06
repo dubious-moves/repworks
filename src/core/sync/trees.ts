@@ -2,6 +2,7 @@
 // copies laid over a base, the three-way merge of two trees, and the rebase of working copies
 // onto a new base. Contents come through a `text` function over blobs the caller has loaded;
 // each function says which blobs it will read, so the caller loads only those.
+import { mergeSettings, SETTINGS_FILE } from '../train/settings.ts';
 import { classifyPath, DATA_FORMAT, devicePath, FORMAT_FILE, progressDayPath, utcDay } from '../data/layout.ts';
 import { mergeAuthoredFiles, type FileConflict, type FileMergeContext } from '../merge/files.ts';
 import { writeLog } from '../progress/events.ts';
@@ -58,6 +59,8 @@ export function mergeNeeds(sides: Sides, device: string): { studies: Set<string>
       continue;
     }
     if (o === t || t === b || o === b) continue;
+    // The training settings changed on both sides merge per field (§5.2): read all three.
+    if (path === SETTINGS_FILE) for (const sha of [b, o, t]) if (sha !== undefined) shas.add(sha);
     const sid = studyOf(path);
     if (sid !== undefined) studies.add(sid);
   }
@@ -87,6 +90,7 @@ function shaOf(content: string, text: Text, candidates: readonly (string | undef
  * Three-way merge of two trees:
  * - a file changed on one side only takes that side;
  * - a study changed on both sides merges through mergeAuthoredFiles (§4.7);
+ * - the training settings changed on both sides merge per field (§5.2);
  * - any other file changed on both sides takes theirs;
  * - other devices' progress files are theirs, always;
  * - this device's progress files are ours; if someone else changed one, every line of every
@@ -116,6 +120,15 @@ export function mergeTrees(sides: Sides, text: Text, ctx: FileMergeContext): Tre
       files.set(path, sha);
       texts.set(sha, union);
       ownFilesChanged.push(path);
+    } else if (path === SETTINGS_FILE && o !== undefined && t !== undefined && o !== t && t !== b && o !== b) {
+      // Changed on both sides: per field, ours on a clash; theirs if either won't parse.
+      const merged = mergeSettings(b === undefined ? undefined : text(b), text(o), text(t));
+      if (merged === undefined) files.set(path, t);
+      else {
+        const sha = shaOf(merged, text, [t, o, b]);
+        files.set(path, sha);
+        texts.set(sha, merged);
+      }
     } else {
       const v = o === t || t === b ? o : o === b ? t : t;
       if (v !== undefined) files.set(path, v);

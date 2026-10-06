@@ -21,6 +21,7 @@ export const devicePath = (dev: string) => `devices/${dev}.json`;
 
 export type DataPath =
   | { kind: 'format' }
+  | { kind: 'settings' }
   | { kind: 'study'; sid: string }
   | { kind: 'chapter'; sid: string; cid: string }
   | { kind: 'conflict-copy'; sid: string; cid: string; dev: string }
@@ -34,6 +35,7 @@ const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 
 export function classifyPath(path: string): DataPath {
   if (path === FORMAT_FILE) return { kind: 'format' };
+  if (path === 'settings.json') return { kind: 'settings' };
   const parts = path.split('/');
   const [top, a, b] = parts;
   if (parts.length === 3 && top === 'studies' && isId(a) && b !== undefined) {

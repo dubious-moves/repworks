@@ -16,6 +16,10 @@ export interface ReviewEvent extends Base {
   g: Grade;
   /** Time to answer, in milliseconds. */
   ms?: number;
+  /** The wrong moves tried first, in standard UCI (PLAN.md §5.2). */
+  w?: string[];
+  /** 1 when a hint was shown. */
+  h?: 1;
 }
 export interface SuspendEvent extends Base {
   k: 'suspend';
@@ -29,8 +33,13 @@ export interface ForgetEvent extends Base {
   k: 'forget';
   card: string;
 }
-export type KnownEvent = ReviewEvent | SuspendEvent | UnsuspendEvent | ForgetEvent;
-export const KNOWN_KINDS = ['review', 'suspend', 'unsuspend', 'forget'] as const;
+/** A new move shown and played (§5.2): its learning step starts, and the daily limit counts it. */
+export interface TaughtEvent extends Base {
+  k: 'taught';
+  card: string;
+}
+export type KnownEvent = ReviewEvent | SuspendEvent | UnsuspendEvent | ForgetEvent | TaughtEvent;
+export const KNOWN_KINDS = ['review', 'suspend', 'unsuspend', 'forget', 'taught'] as const;
 
 /** A line as read. `event` is set for the kinds this code knows; `raw` is always the line itself. */
 export interface LogLine {
@@ -90,14 +99,22 @@ function knownEvent(o: Record<string, unknown>): KnownEvent | string {
       if (g !== 1 && g !== 2 && g !== 3 && g !== 4) return 'g must be a grade from 1 to 4';
       const ms = o['ms'];
       if (ms !== undefined && (typeof ms !== 'number' || !(ms >= 0))) return 'ms must be a non-negative number';
+      const w = o['w'];
+      if (w !== undefined && (!Array.isArray(w) || !w.every((m) => typeof m === 'string' && /^[a-h][1-8][a-h][1-8][qrbn]?$/.test(m)))) return 'w must be a list of moves in UCI';
+      const h = o['h'];
+      if (h !== undefined && h !== 1) return 'h must be 1 when present';
       const event: ReviewEvent = { ...base, k: 'review', g };
       if (ms !== undefined) event.ms = ms as number;
+      if (w !== undefined) event.w = w as string[];
+      if (h !== undefined) event.h = 1;
       return event;
     }
     case 'suspend':
       return { ...base, k: 'suspend' };
     case 'unsuspend':
       return { ...base, k: 'unsuspend' };
+    case 'taught':
+      return { ...base, k: 'taught' };
     default:
       return { ...base, k: 'forget' };
   }
@@ -109,6 +126,8 @@ export function formatEvent(event: KnownEvent): string {
   if (event.k === 'review') {
     o['g'] = event.g;
     if (event.ms !== undefined) o['ms'] = event.ms;
+    if (event.w !== undefined) o['w'] = event.w;
+    if (event.h !== undefined) o['h'] = event.h;
   }
   return JSON.stringify(o);
 }

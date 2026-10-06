@@ -17,6 +17,7 @@ import { chapterFileText } from '../pgn/write.ts';
 import { header, type Chapter, type StudyMeta } from '../study/model.ts';
 import { parseStudyMeta, writeStudyMeta } from '../study/studyMeta.ts';
 import { renameChapter } from '../study/ops.ts';
+import { mergeSettings, SETTINGS_FILE } from '../train/settings.ts';
 import { insertAfterNeighbours, mergeChapter, type MergeLabels } from './chapter.ts';
 import { keptMarker } from './markers.ts';
 
@@ -53,7 +54,12 @@ export function mergeAuthoredFiles(base: Files, ours: Files, theirs: Files, ctx:
     }
   }
   for (const path of others) {
-    const v = pick(base.get(path), ours.get(path), theirs.get(path)) ?? theirs.get(path);
+    const [b, o, t] = [base.get(path), ours.get(path), theirs.get(path)];
+    let v = pick(b, o, t);
+    // Both changed the training settings: per field (§5.2). Anything else changed on both sides,
+    // or settings that won't parse: theirs.
+    if (v === null && path === SETTINGS_FILE && o !== undefined && t !== undefined) v = mergeSettings(b, o, t) ?? t;
+    v ??= t;
     if (v !== undefined) files.set(path, v);
   }
   for (const sid of [...studies].sort()) mergeStudy(sid, base, ours, theirs, ctx, files, conflicts);

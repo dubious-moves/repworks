@@ -911,7 +911,10 @@ and offline editing with the PWA killed and reopened.
   copy, in order. When a sync or another tab changes the open chapter's file, it is read again,
   the move shown is kept where it still exists, and undo starts over (it would otherwise undo
   someone else's work). A read that an edit overtook is made again, or the edit would look like
-  someone else's change and be lost (the Playwright tests found this under load). A chapter whose file can't be read, or holds illegal moves an edit would
+  someone else's change and be lost (the Playwright tests found this under load). Likewise the move
+  asked for in the address stays pending until a read shows it: a sync finishing while a chapter
+  opened started a newer read, which opened the chapter at its start (found on 2026-10-06, in two
+  of three full e2e runs). A chapter whose file can't be read, or holds illegal moves an edit would
   cut, is shown without editing. A promotion asks for the piece.
 - **Conflicts** are resolved where they stand (`src/core/merge/resolve.ts`): for clashing text,
   either side, both, or a text written by hand; for a line kept after a delete, keep it (the
@@ -1128,6 +1131,16 @@ Tests: the grade table (right, wrong then right, a hint, a conflict move); time 
 grade; `settings.json` parses, rejects bad values
 (a retention outside 0.7–0.99, a negative limit) and merges per field; the new fields round-trip
 through `formatEvent`/`parseLog`, and a Phase 0 parse of the new line gives the same replay.
+
+**As built** (2026-10-06):
+- `src/core/train/grade.ts`: `grade({ wrong, hint })` and `selfGrade(knew)`.
+- `src/core/train/settings.ts`: `settings.json` read strictly (out-of-range values are refused, and
+  a bad or missing file gives the defaults), written in one stable form, fields this code doesn't
+  know kept in place, and merged per field both in the file merge (§4.7) and in the sync's tree
+  merge, which reads all three versions when both sides changed it. `validate-data` checks it.
+- Events: the review's `w` (UCI moves) and `h` (1) are checked on reading; `taught` folds into the
+  card's `taught` time (the first one; `forget` clears it).
+- Tests: `test/unit/core/train/settings.test.ts`.
 
 #### 5.3 The daily queue
 

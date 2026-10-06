@@ -5,6 +5,7 @@ import { parseStudyMeta } from '../study/studyMeta.ts';
 import { parseLog } from '../progress/events.ts';
 import { parseChapterFile } from '../pgn/parse.ts';
 import { chapterFileText } from '../pgn/write.ts';
+import { parseSettings } from '../train/settings.ts';
 import { classifyPath, DATA_FORMAT, FORMAT_FILE, utcDay, utcMonth } from './layout.ts';
 
 export interface Issue {
@@ -79,6 +80,11 @@ export function validateDataRepo(files: ReadonlyMap<string, string>, options: Va
     switch (where.kind) {
       case 'format':
         break;
+      case 'settings': {
+        const parsed = parseSettings(text);
+        if (!parsed.ok) for (const message of parsed.errors) error(path, message);
+        break;
+      }
       case 'study': {
         const parsed = parseStudyMeta(text, where.sid);
         if (!parsed.ok) for (const message of parsed.errors) error(path, message);
