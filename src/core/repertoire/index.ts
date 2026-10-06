@@ -46,6 +46,8 @@ export interface Line {
   path: readonly string[];
   /** The own moves' cards along the line, in order (a card met twice is listed twice). */
   cards: readonly CardId[];
+  /** Where each card's move is on the line: its index in `path`. */
+  plies: readonly number[];
 }
 
 export interface ChapterIndex {
@@ -88,7 +90,7 @@ export function indexChapter(sid: string, chapter: Chapter): ChapterIndexing {
   const moves: IndexedMove[] = [];
   const lines: Line[] = [];
 
-  const walk = (node: RootNode | MoveNode, pos: Position, path: string[], cards: CardId[]) => {
+  const walk = (node: RootNode | MoveNode, pos: Position, path: string[], cards: CardId[], plies: number[]) => {
     let walked = 0;
     for (const child of node.children) {
       const move = parseSan(pos, child.san);
@@ -100,20 +102,22 @@ export function indexChapter(sid: string, chapter: Chapter): ChapterIndexing {
       const childPath = [...path, child.san];
       const indexed: IndexedMove = { key, uci, at: { sid, cid, path: childPath, san: child.san } };
       let childCards = cards;
+      let childPlies = plies;
       if (pos.turn === side) {
         indexed.card = repertoireCard(key, uci);
         childCards = [...cards, indexed.card];
+        childPlies = [...plies, path.length];
       }
       moves.push(indexed);
       const after = pos.clone();
       after.play(move);
       walked++;
-      walk(child, after, childPath, childCards);
+      walk(child, after, childPath, childCards, childPlies);
     }
     // A line ends where the walk stops: at a leaf, or before moves that were left out.
-    if (path.length > 0 && walked === 0) lines.push({ sid, cid, known, path, cards });
+    if (path.length > 0 && walked === 0) lines.push({ sid, cid, known, path, cards, plies });
   };
-  walk(chapter.root, start, [], []);
+  walk(chapter.root, start, [], [], []);
   return { ok: true, index: { sid, cid, side, known, moves, lines } };
 }
 

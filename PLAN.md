@@ -1167,8 +1167,9 @@ through `formatEvent`/`parseLog`, and a Phase 0 parse of the new line gives the 
 #### 5.3 The daily queue
 
 `todaysQueue(index, states, settings, day)` in `core/train/queue.ts`. Core has no clock, so the
-app passes in `day = { start, end }`: the device's local midnight and the next one, in ms (as
-§4.8 has it, "due today" is asked with the device's own calendar).
+app passes in `day = { start, end, now }`: the device's local midnight and the next one, in ms (as
+§4.8 has it, "due today" is asked with the device's own calendar), and the time now, which the
+learning step is measured against.
 - **Due**: cards in the index, not suspended, reviewed at least once, with `due < day.end`; and
   cards taught but not yet reviewed whose learning step has passed (§5.2). The earliest first.
 - **New today**: cards taught in the day, from every device's log, so the phone and the desktop
@@ -1194,9 +1195,37 @@ card comes due after its step; the whole-line rule; known chapters' lines go to 
 use the limit, and are never taught first; suspended and orphaned cards are left out; reviews from two devices share the
 limit; the result doesn't depend on the order of the events.
 
+**As built** (2026-10-06):
+- `src/core/train/queue.ts`: `todaysQueue(index, states, settings, day, { scope })` gives `due`
+  (reviewed cards due before the day's end, and taught cards whose step has passed by `now`, the
+  earliest first), `later` (taught cards whose step ends later today, for "3 more at 14:20"),
+  `taughtToday` and `room`, `newLines` and `newCards`, `knownLines` and `knownCards`, and
+  `orphaned` (cards with events whose move is gone). The home screen's "23 due · 18 new" is
+  `due.length` and `newCards.length`.
+- A card's status comes from its replayed state (`statusOf`): reviewed if it has a due time,
+  learning if taught and not reviewed since, else never answered. A `forget` makes a card new
+  again, as before.
+- **A card met on a known chapter's line is known wherever else it is met** (`knownCardsOf`):
+  the owner learned the move in that position, and cards are per position (D3). So a new line
+  that shares a known chapter's prefix teaches only the moves after it, and a line whose only
+  unanswered moves are known isn't a new line.
+- A known move's wrong first answer is a review graded Again; the move is shown, as any wrong
+  answer shows it, but no `taught` event is recorded, so the daily limit, which counts `taught`
+  events, never counts a known move. §5.6 keeps to this.
+- The limit and `taughtToday` count every device and every study; a study scope narrows the
+  due cards (those played in that study) and the lines only.
+- `Line` gained `plies` (each card's index in the line's path) in the index (§5.1), for the
+  planner.
+- `src/core/repertoire/files.ts`: `studiesFromFiles(files)` gives the studies of a data repo's
+  files in the study list's order (by name, as the app lists them), chapters in their study's
+  order, and the files it couldn't read; the simulation uses it, and the app can (§5.7).
+- Tests: `test/unit/core/train/queue.test.ts` (each case above, with the day in a time zone two
+  hours ahead of UTC, two devices' events shuffled and added in batches, a forgotten card, and a
+  study scope) and `test/unit/core/repertoire/files.test.ts`.
+
 #### 5.4 The line planner
 
-`planSession(index, queue)` in `core/train/plan.ts` chooses the lines to walk:
+`planSession(index, queue, states)` in `core/train/plan.ts` chooses the lines to walk:
 - **Review lines**: every due card lies on at least one line (a transposition on several). Going
   through the lines in the index's order, take each line that holds a due card not yet covered,
   so consecutive lines share prefixes and the board's positions follow on from each other. A
@@ -1209,6 +1238,25 @@ limit; the result doesn't depend on the order of the events.
 Tests: every due card is covered exactly once by the plan's asks; the plan is deterministic; on
 hand-built trees it takes the expected lines; a property test over random repertoires (built
 with `test/support/randomTree.ts`) checks coverage and that no line is taken that asks nothing.
+
+**As built** (2026-10-06):
+- `src/core/train/plan.ts`: a plan is a list of `{ kind, line, end, ask, teach }`: `kind` is
+  `review`, `new` or `known`; the walk is `line.path.slice(0, end)`; `ask` holds the cards graded
+  there, `teach` the cards shown first. It takes the states too, to tell a move never answered
+  from one played for the user.
+- On any line, a card never answered is taught where it is first met, or asked if it is known
+  (§5.3); each card is asked or taught once in a plan. So a move added in the middle of a
+  reviewed line is taught on the review line that passes it (§5.6), and a new line whose moves
+  were all met earlier is dropped.
+- Review lines and known lines end at their last ask; new lines are walked to their leaf.
+- Suspended cards and cards still in their learning step are played for the user: never asked
+  or taught.
+- Tests: `test/unit/core/train/plan.test.ts`: hand-built cases (lines in order, each ending at
+  its last due card; a transposition asked once; a move never answered taught on a review line
+  and not again; reviews, then new lines, then the known pool; an empty plan) and 150 random
+  repertoires with random states (every due card asked once on a review line, every new card
+  taught, nothing asked or taught twice, every ask on the walked part, no line asking nothing,
+  review and known lines ending at an ask, the same plan twice).
 
 #### 5.5 The queue simulation, and the default limit
 
@@ -1248,6 +1296,40 @@ consistency: every card introduced once, reviews never before their due day).
 
 Live: run on the owner's repertoire (desktop, by a Claude session with `REPWORKS_FIXTURES`, or by
 the owner), and its numbers recorded here; then the owner picks the default (§5.13 question 1).
+
+**As built** (2026-10-06):
+- `scripts/simulate-queue.ts` (the simulation, a library) and `scripts/queue-sim.ts` (its command
+  line: `node scripts/queue-sim.ts [<checkout>] [--days 90] [--known asis|all|none]`, the checkout
+  defaulting to `$REPWORKS_FIXTURES`). `--known all` simulates every chapter as marked known, for
+  the case where most of the repertoire was learned in Chessable or Qchess; `asis` reads the
+  chapters' own marks.
+- Each simulated day has a morning session (the due cards, the day's new lines, the known pool up
+  to its pace) and an evening one (the moves taught that morning, once their step has passed).
+  Recall is drawn from FSRS's retrievability at the moment of the review, with the retention's
+  own replay; a first answer after the step is right 90% of the time, a known move's at the rate
+  in the row. Times: 8 s an asked move, 20 s a new move, 600 ms a move played at the pace.
+- It prints the repertoire's size and one row per setting: daily limits 10, 20, 30, 40 at
+  retentions 0.9 and 0.93, and, when chapters are marked known, the known pool at 100 and 300
+  moves a day and all in a week, with first answers right 70% and 90% of the time. Each row: the
+  day the last new move and the last known move came in, moves asked (and minutes) at days 30,
+  60 and 90, and the peak.
+- A run on a generated repertoire (the index benchmark's: 836 lines, 2,535 cards; this session,
+  through the real queue and planner), as the shape to expect before the real run:
+
+  | New a day | Retention | Known chapters | All in by day | Asked a day (minutes), day 30 / 60 / 90 | Peak asked (day) |
+  | --- | --- | --- | --- | --- | --- |
+  | 20 | 0.9 | none | not by 90 (545 left) | 82 (27) / 103 (29) / 126 (35) | 132 (89) |
+  | 30 | 0.9 | none | 80 | 129 (40) / 157 (43) / 81 (17) | 182 (74) |
+  | 20 | 0.93 | none | not by 90 (545 left) | 107 (31) / 138 (35) / 151 (38) | 154 (63) |
+  | 20 | 0.9 | 3 in 4 (1,942 cards), 300 a day | new 26, known 7 | 83 (20) / 85 (20) / 16 (4) | 743 (6) |
+
+  Asked moves include each day's first reviews after the learning step. A known pool taken at
+  300 a day brings a wave about three days later, when its first Good answers come due together:
+  743 moves on day 6 here. A slower pace flattens it.
+- Tests: `test/unit/scripts/queueSim.test.ts`: the command line on the public fixture (with and
+  without `--known all`), and the library on 12 random repertoires with known chapters: every
+  card taught or first answered exactly once, no review before the queue offers it, everything in
+  by day 60, and the same result twice.
 
 #### 5.6 The trainer
 

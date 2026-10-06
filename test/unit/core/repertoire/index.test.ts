@@ -102,6 +102,14 @@ test('lines come in tree order, and every own move lies on a line', () => {
   );
   for (const m of result.index.moves) assert.ok(onSomeLine(result.index.lines, m.at.path), m.at.san);
   assert.deepEqual(result.index.lines[1]!.cards.length, 3);
+  // Each card's ply on its line: White's moves, at even plies.
+  assert.deepEqual(result.index.lines.map((l) => l.plies), [[0, 2, 4], [0, 2, 4], [0, 2], [0, 2]]);
+  for (const line of result.index.lines) {
+    line.plies.forEach((ply, i) => {
+      const m = result.index.moves.find((x) => x.at.path.join(' ') === line.path.slice(0, ply + 1).join(' '))!;
+      assert.equal(m.card, line.cards[i]);
+    });
+  }
 });
 
 test('a chapter marked known says so on its lines', () => {

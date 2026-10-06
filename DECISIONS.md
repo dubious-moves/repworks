@@ -788,3 +788,16 @@ The spike ran through on the phone (`PLAN.md` §4.2):
   One technical call: Qchess shows its untrained lines (the repertoire side's alternatives) in
   italics; here every own move is trained (D3 lists them as conflicts), so the italics mark only
   that a branch isn't the first continuation. `PLAN.md` §4.11 (the notation and the layout).
+
+## Revision of 2026-10-06 (the daily queue, the planner, the simulation)
+Technical calls made while building `PLAN.md` §5.3–§5.5, each with its reason:
+- **D19's intake: a move met on a known chapter's line is known wherever it is met.** Cards are
+  per position and move (D3), and the owner learned that move in that position, so a new line
+  sharing a known chapter's prefix teaches only what comes after it, and never spends the limit
+  on a known move.
+- **A known move's wrong first answer records a review (Again) and no `taught` event.** The daily
+  limit counts `taught` events, and the owner's answer was that known lines never use it. The
+  move is still shown, as after any wrong answer.
+- **The queue takes the time now as well as the day's bounds.** A reviewed card is due for the
+  whole of its due day, but a learning step ends at its own time: without `now`, a move taught at
+  10:00 would be asked again at once rather than from 14:00.
