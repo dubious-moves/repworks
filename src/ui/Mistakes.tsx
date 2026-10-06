@@ -1,6 +1,7 @@
 // The day's mistakes and the pins (PLAN.md §5.8): each mistake with its line, the move asked and
 // the moves tried; Retry and Drill over all of them; Pin per mistake. The pins below, each with
 // its next drill and its clean answers so far; "Drill pinned" when some are due.
+import { decidingNow } from '../app/time.ts';
 import { makeSan } from 'chessops/san';
 import { open } from '../app/mode.ts';
 import { recordEvent } from '../app/state.ts';
@@ -42,8 +43,9 @@ function PinButton(props: { data: TrainData; card: CardId }) {
 export function MistakesView() {
   const data = trainData.value;
   if (!data) return <p class="muted">Reading the repertoire…</p>;
-  const now = Date.now();
-  const mistakes = mistakesOf(data, now);
+  // The day's mistakes as recorded; the pins due at the time travelled to (§5.17).
+  const now = decidingNow();
+  const mistakes = mistakesOf(data, Date.now());
   const { pinned, due } = pinnedOf(data, now);
   return (
     <div class="mistakes">

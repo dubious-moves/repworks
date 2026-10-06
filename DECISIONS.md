@@ -1003,3 +1003,31 @@ its reason:
   needs syncing.
 - **Open for the owner (§5.18): where alternative moves are stored.** Recommended: events in the
   progress log, keyed by position, leaving the studies' PGN untouched.
+
+## Revision of 2026-10-06 (the second testing notes built)
+`PLAN.md` §5.17 is built. The calls, each with its reason:
+- **D16: four auto-play modes**, after lichessable's two features: `off`, `session` (lichessable's
+  auto-play: a move answered right this session is played), `due` (the trainer as it was:
+  answered this session, or not due in the queue) and `difficult` (lichessable's "difficult
+  moves only": as `due`, but a difficult move is always asked). **`due` stays the default**
+  until the owner says otherwise, as §5.17 asked. Chessable's review asks whole due variations,
+  so lichessable has no "not due" rule; `due` is Repworks' own, from D16.
+- **What the plan needs is decided apart from the mode**: a due move, a known move never
+  answered and a move never answered are graded or taught whatever the mode says, so no mode
+  can skip a due move or auto-play one never learned; every other move asked is practice, with
+  no event, and a card is graded once a session.
+- **Difficult = two lapses, or FSRS difficulty 7 or more** (D16's "difficult moves are FSRS
+  difficulty and lapses"), or answered wrong in the session. A threshold, to be tuned from use.
+- **A line starting "at its first new or due move" jumps there with one move of lead-in** (the
+  opponent's move is seen), or starts where the board already is when that is further; before,
+  a line not sharing the board was played from the chapter's start at the pace, which is now
+  the `auto` choice. Defaults: the queue `first` (review is fast), a line picked or learned
+  `auto` (the owner asked for the moves to get there).
+- **The session ends at the last line's end at once, its view kept on that line,** so the board
+  stays and the summary takes the buttons' place; before, two paces later with the board gone.
+- **Learn holds at each line's end by default** ("At a line's end: wait"), since the owner asked
+  for going on to be an option; the queue goes on by itself as before.
+- **The day's mistakes are read at the real day under time travel,** since they are records of
+  answers made at the real time; due moves, the learning step, the queue, the line list and the
+  pins use the shifted time.
+

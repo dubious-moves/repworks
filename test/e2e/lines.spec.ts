@@ -12,6 +12,9 @@ import { clickSquare } from './board.ts';
 import { serveGithub, world } from './github.ts';
 import { serveSite, type SiteServer } from './server.ts';
 
+/** The trainer asks for a move: the feedback line says nothing for it (§5.17), so the phase tells. */
+const asked = (page: Page) => expect(page.locator('.train-grid')).toHaveAttribute('data-phase', 'ask');
+
 let site: SiteServer;
 test.beforeAll(async () => {
   site = await serveSite();
@@ -62,7 +65,7 @@ const shot = async (page: Page, name: string) => {
 test('the line list: a line picked and trained, then practised again with nothing recorded', async ({ page }) => {
   const git = await setUp(page);
   await page.goto(`${site.url}#/train/Rep0Najd`);
-  await expect(feedback(page)).toHaveText('Your move');
+  await asked(page);
   const list = await lines(page);
   await expect(list.locator('.line-list-chapter')).toHaveCount(2);
   await expect(list.locator('.line-list-chapter').first()).toContainText('Main line');
@@ -84,9 +87,8 @@ test('the line list: a line picked and trained, then practised again with nothin
   await rows.nth(1).click();
   await expect(page).toHaveURL(/#\/train\/Rep0Najd\/Ch1Najdf\?at=e4,c5,Nf3,Nc6,d4$/);
   await expect(page.locator('.study-title')).toHaveText('Line · Main line');
-  await expect(feedback(page)).toHaveText('Your move');
+  await asked(page);
   await play(page, 'c7', 'c5');
-  await expect(feedback(page)).toHaveText(/Correct|New move: play Nc6/);
   await expect(feedback(page)).toHaveText('New move: play Nc6');
   await play(page, 'b8', 'c6');
   const done = page.getByRole('region', { name: 'Session done' });
@@ -101,11 +103,11 @@ test('the line list: a line picked and trained, then practised again with nothin
   // Again: nothing on it is due now, and every move is asked anyway, a wrong one included, with
   // nothing recorded.
   await done.getByRole('button', { name: 'Again' }).click();
-  await expect(feedback(page)).toHaveText('Your move');
+  await asked(page);
   await play(page, 'e7', 'e5');
   await expect(feedback(page)).toHaveText('Not in your repertoire: try again');
   await play(page, 'c7', 'c5');
-  await expect(feedback(page)).toHaveText('Your move');
+  await asked(page);
   await play(page, 'b8', 'c6');
   await expect(done).toContainText('Line done');
   await page.locator('.chip').click();
@@ -137,7 +139,7 @@ test('the daily limit: changed from the site, nothing left, the next line learne
 
   // The due move, then nothing: the screen says why and offers the next line and the study.
   await page.getByRole('link', { name: 'Train', exact: true }).first().click();
-  await expect(feedback(page)).toHaveText('Your move');
+  await asked(page);
   await play(page, 'c7', 'c5');
   const done = page.getByRole('region', { name: 'Session done' });
   await expect(done).toContainText('Session done');
@@ -147,10 +149,10 @@ test('the daily limit: changed from the site, nothing left, the next line learne
   await shot(page, 'nothing');
   await done.getByRole('button', { name: 'Learn the next line' }).click();
   await expect(page).toHaveURL(/#\/train\/Rep0Najd\/Ch1Najdf\?at=e4,c5,Nf3,d6,d4,cxd4$/);
-  // 1... c5, just reviewed, is practised (asked, not graded); 2... d6 is suspended and played.
-  await expect(feedback(page)).toHaveText('Your move');
-  await play(page, 'c7', 'c5');
+  // A line picked starts auto-played (§5.17): 1... c5, just reviewed, and 2... d6, suspended, are
+  // played up to the new move.
   await expect(feedback(page)).toHaveText('New move: play cxd4');
+  await expect(page.locator('.train-line')).toContainText('1. e4 c5 2. Nf3 d6 3. d4');
   await page.getByRole('button', { name: 'Stop' }).click();
 
   // "Study" with no line on the board still opens the study.
@@ -163,7 +165,7 @@ test('the daily limit: changed from the site, nothing left, the next line learne
 test('show and grade switched on by 1 in the middle of a session, and off again', async ({ page }) => {
   const git = await setUp(page);
   await page.goto(`${site.url}#/train`);
-  await expect(feedback(page)).toHaveText('Your move');
+  await asked(page);
   // A wrong move first, then the keys: the move is failed whatever is told.
   await play(page, 'e7', 'e5');
   await expect(feedback(page)).toHaveText('Not in your repertoire: try again');

@@ -1,3 +1,4 @@
+import { decidingNow } from '../app/time.ts';
 import { useEffect, useState } from 'preact/hooks';
 import { mode } from '../app/mode.ts';
 import { findConflicts } from '../app/overview.ts';
@@ -16,6 +17,7 @@ import { ReadView } from './Read.tsx';
 import { TrainScreen } from './Train.tsx';
 import { TrainCard } from './TrainCard.tsx';
 import { TrainSettingsDialog } from './TrainSettings.tsx';
+import { TimeBanner } from './TimeTravel.tsx';
 import { ExplorerSettingsDialog } from './ExplorerSettings.tsx';
 import { confirmDeleteStudy, openNewStudy, openStudySettings, StudyDialogs } from './StudyDialogs.tsx';
 
@@ -41,6 +43,7 @@ export function App() {
         </div>
       )}
       <SyncBanners />
+      <TimeBanner />
       <main class="content">{ready.value && (!device.value ? <SetupForm /> : <Screen />)}</main>
       <StudyDialogs />
       <TrainSettingsDialog />
@@ -142,7 +145,7 @@ const SIDES = { white: 'White', black: 'Black', both: 'Both' } as const;
 function StudyCard(props: { study: StudyRow }) {
   const s = props.study;
   const data = trainData.value;
-  const queue = s.kind === 'repertoire' && data ? queueOf(data, Date.now(), s.id) : undefined;
+  const queue = s.kind === 'repertoire' && data ? queueOf(data, decidingNow(), s.id) : undefined;
   const ref = { sid: s.id, name: s.name, kind: s.kind, chapters: s.chapters };
   return (
     <li class="study-card">

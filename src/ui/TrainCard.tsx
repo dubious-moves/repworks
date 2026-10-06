@@ -1,5 +1,6 @@
 // The home screen's training card (PLAN.md §5.3, §5.7): "Train: 23 due · 18 new", the moves
 // whose learning step ends later today, and the known pool still to review.
+import { decidingNow } from '../app/time.ts';
 import { mistakesOf, pinnedOf, queueOf, trainData } from '../app/train.ts';
 import { openTrainSettings } from './TrainSettings.tsx';
 
@@ -8,9 +9,10 @@ const clock = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: '2-dig
 export function TrainCard() {
   const data = trainData.value;
   if (!data || data.index.cards.size === 0) return null;
-  const now = Date.now();
+  // Due moves and pins at the time travelled to (§5.17); the day's mistakes as recorded.
+  const now = decidingNow();
   const queue = queueOf(data, now);
-  const mistakes = mistakesOf(data, now).length;
+  const mistakes = mistakesOf(data, Date.now()).length;
   const pins = pinnedOf(data, now);
   return (
     <section class="card train-card" aria-label="Training">

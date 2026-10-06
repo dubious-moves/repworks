@@ -1,5 +1,6 @@
 // The card of the move shown (PLAN.md §5.7): for an own move of a repertoire chapter, where its
 // card stands (new, learning, due, reviewed) and the suspend toggle, "Always play this for me".
+import { decidingNow } from '../app/time.ts';
 import { parseSan } from 'chessops/san';
 import { isNormal } from 'chessops/types';
 import { at, chapter, side, study } from '../app/editor.ts';
@@ -12,7 +13,7 @@ import { dueAt, statusOf } from '../core/train/queue.ts';
 import { positionAt } from '../core/study/tree.ts';
 
 const when = (ms: number) => {
-  const today = dayOf(Date.now());
+  const today = dayOf(decidingNow());
   const time = new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   if (ms < today.start) return 'overdue';
   if (ms < today.end) return `today${ms > today.now ? ` from ${time}` : ''}`;

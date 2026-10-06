@@ -11,6 +11,9 @@ import { clickSquare } from './board.ts';
 import { serveGithub, world } from './github.ts';
 import { serveSite, type SiteServer } from './server.ts';
 
+/** The trainer asks for a move: the feedback line says nothing for it (§5.17), so the phase tells. */
+const asked = (page: Page) => expect(page.locator('.train-grid')).toHaveAttribute('data-phase', 'ask');
+
 let site: SiteServer;
 test.beforeAll(async () => {
   site = await serveSite();
@@ -58,7 +61,7 @@ test('train: the counts, a due move asked, a wrong move taken back, new lines ta
   await expect(page.locator('.cg-wrap')).toHaveClass(/orientation-black/);
 
   // 1. e4 is played for the user; 1... c5 is due and asked. A wrong move goes back.
-  await expect(feedback(page)).toHaveText('Your move');
+  await asked(page);
   await expect(page.locator('.train-line')).toContainText('1. e4');
   await expect(page.locator('.train-counters')).toContainText('1 due · 3 new');
   await play(page, 'e7', 'e5');
@@ -108,10 +111,13 @@ test('train: the counts, a due move asked, a wrong move taken back, new lines ta
   await page.reload();
   await expect(page.locator('.train-card h2')).toHaveText('Train: 2 due · 0 new');
   await page.locator('.train-card').getByRole('link', { name: 'Train' }).click();
-  await expect(feedback(page)).toHaveText('Your move');
+  await asked(page);
   await expect(page.locator('.train-line')).toContainText('1. e4 c5 2. Nf3 d6 3. d4');
   await play(page, 'c5', 'd4');
-  await expect(feedback(page)).toHaveText(/Correct|Your move/);
+  // Right first time: the feedback line stays quiet (§5.17), and the Alapin's Nf6 is asked next.
+  await expect(page.locator('.train-line')).toContainText('2. c3');
+  await asked(page);
+  await expect(feedback(page)).toHaveText('');
 });
 
 test('train one study from the study list and Escape stops', async ({ page, isMobile }) => {
@@ -119,7 +125,7 @@ test('train one study from the study list and Escape stops', async ({ page, isMo
   await page.getByRole('link', { name: 'Train Test repertoire' }).click();
   await expect(page).toHaveURL(/#\/train\/Rep0Najd$/);
   await expect(page.locator('.study-title')).toHaveText('Training · Test repertoire');
-  await expect(feedback(page)).toHaveText('Your move');
+  await asked(page);
   if (!isMobile) {
     // Space for Hint.
     await page.keyboard.press(' ');
@@ -132,7 +138,7 @@ test('train one study from the study list and Escape stops', async ({ page, isMo
   }
   await expect(page.getByRole('region', { name: 'Session done' })).toContainText('0 moves reviewed');
   await page.getByRole('button', { name: 'Train again' }).click();
-  await expect(feedback(page)).toHaveText('Your move');
+  await asked(page);
 });
 
 test('the chapter view shows the move’s card and toggles its suspend; the debug panel lists conflicting moves', async ({ page }) => {
@@ -164,7 +170,7 @@ test('mistakes: fail a move, pin it, see it, retry and drill it with nothing gra
   const git = await setUp(page);
   await expect(page.locator('.train-card h2')).toHaveText('Train: 1 due · 3 new');
   await page.goto(`${site.url}#/train`);
-  await expect(feedback(page)).toHaveText('Your move');
+  await asked(page);
   await play(page, 'e7', 'e5');
   await expect(feedback(page)).toHaveText('Not in your repertoire: try again');
   await play(page, 'c7', 'c5');
@@ -183,7 +189,7 @@ test('mistakes: fail a move, pin it, see it, retry and drill it with nothing gra
   // Retry: from the line's start, 1. e4 played, 1... c5 asked.
   await today.getByRole('link', { name: 'Retry' }).click();
   await expect(page.locator('.study-title')).toHaveText('Retry mistakes');
-  await expect(feedback(page)).toHaveText('Your move');
+  await asked(page);
   await play(page, 'c7', 'c5');
   await expect(page.getByRole('region', { name: 'Session done' })).toContainText('1 move, 1 right first time');
 
@@ -192,7 +198,7 @@ test('mistakes: fail a move, pin it, see it, retry and drill it with nothing gra
   await page.goto(`${site.url}#/`);
   await page.getByRole('link', { name: 'Drill pinned (1)' }).click();
   await expect(page.locator('.study-title')).toHaveText('Drill pinned');
-  await expect(feedback(page)).toHaveText('Your move');
+  await asked(page);
   await play(page, 'c7', 'c5');
   await expect(page.getByRole('region', { name: 'Session done' })).toContainText('1 move, 1 right first time');
 
@@ -212,7 +218,7 @@ test('show and grade: a session run with 2 and 4 only, its review events checked
 
   // 1. e4 is played for the user; 1... c5 is due. 4 shows it and marks it missed, the next press
   // grades it Again and plays on. The board never takes a move.
-  await expect(feedback(page)).toHaveText('Your move');
+  await asked(page);
   await page.keyboard.press('4');
   await expect(feedback(page)).toHaveText('Play c5');
   await expect(page.getByRole('button', { name: 'Knew it (2)' })).toBeVisible();

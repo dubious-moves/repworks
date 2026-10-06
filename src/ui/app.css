@@ -2181,3 +2181,31 @@ a.button.secondary {
   right: 0;
   min-height: 28px;
 }
+
+/* §5.17: a line's or a session's end under the board kept on its last position; the next line
+   named while it waits or goes on; the time travel banner and control. */
+
+.train-done-inline h2 {
+  font-size: 1.1rem;
+  margin: 8px 0 4px;
+}
+
+.train-going {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0;
+}
+
+.train-feedback.note-next {
+  color: var(--text);
+}
+
+.banner-time {
+  border-left: 4px solid #4a8fd8;
+}
+
+.time-control label {
+  display: block;
+  margin: 6px 0;
+}

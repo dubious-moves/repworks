@@ -81,7 +81,7 @@ export class ShowGrade {
   }
 
   /** Stop, skip a line, and the rest of the trainer's own commands. */
-  send(command: { type: 'skipLine' | 'stop'; now: number }): ShowGradeEffect[] {
+  send(command: { type: 'skipLine' | 'stop' | 'next'; now: number }): ShowGradeEffect[] {
     this.queued = undefined;
     return this.after(this.trainer.send(command), command.now);
   }
@@ -98,6 +98,8 @@ export class ShowGrade {
       if (press === 'wrong') this.failed = true;
       return this.after(this.trainer.send({ type: 'tell', knew: !this.failed, now }), now);
     }
+    // A line's end held for "Next line" (§5.17): `next` goes on, so the ring alone can.
+    if (phase === 'lineDone' && press === 'next' && this.trainer.view.upcoming) return this.after(this.trainer.send({ type: 'next', now }), now);
     // The board is playing: a `next` waits for it, a `wrong` clears what was waiting.
     this.queued = press === 'next' ? now : undefined;
     return [];

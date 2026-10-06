@@ -23,9 +23,11 @@ import { interactivePlan, planSession, withoutAnswered, type SessionPlan } from 
 import { ShowGrade, type Press, type ShowGradeEffect } from '../core/train/showGrade.ts';
 import { todaysQueue, type DailyQueue, type Day } from '../core/train/queue.ts';
 import { SETTINGS_FILE, trainSettings, type TrainSettings } from '../core/train/settings.ts';
-import { Trainer, type Note, type Summary, type TrainerCommand, type TrainerEffect } from '../core/train/trainer.ts';
+import { Trainer, type Note, type Summary, type TrainerCommand, type TrainerEffect, type TrainerOptions } from '../core/train/trainer.ts';
 import type { IdbStore } from '../platform/idbStore.ts';
 import { say, stopSpeaking } from '../platform/speech.ts';
+import { decidingNow } from './time.ts';
+import { trainPrefs, type TrainPrefs } from './trainPrefs.ts';
 
 /** The device's day: from its last local midnight to the next. */
 export function dayOf(now: number): Day {
@@ -190,6 +192,8 @@ export interface SessionView {
   phase: string;
   number: number;
   total: number;
+  /** At a line's end: the line that comes next in the session (§5.17). */
+  upcoming?: Line;
   /** The planned asks and teaches not answered yet. */
   dueLeft: number;
   newLeft: number;
@@ -237,7 +241,8 @@ export async function startSession(store: IdbStore, record: (event: Parameters<I
     sessionProblem.value = `The repertoire couldn't be read: ${error instanceof Error ? error.message : String(error)}`;
     return;
   }
-  const now = Date.now();
+  // What is due is decided at the time travelled to (§5.17); the day's mistakes are the real day's records.
+  const now = decidingNow();
   const scope = of.kind === 'queue' || of.kind === 'show' ? of.scope : undefined;
   let plan: SessionPlan;
   let index = data.index;
@@ -259,8 +264,8 @@ export async function startSession(store: IdbStore, record: (event: Parameters<I
     }
     plan = pickedPlan(data.index, data.states, data.settings, dayOf(now), line);
   } else if (of.kind === 'learn') plan = learnPlan(data.index, data.states, of.sid, of.cid);
-  else if (of.kind === 'retry') plan = { lines: retryLines(mistakesOf(data, now)) };
-  else if (of.kind === 'drill') plan = { lines: drillLines(mistakesOf(data, now)) };
+  else if (of.kind === 'retry') plan = { lines: retryLines(mistakesOf(data, Date.now())) };
+  else if (of.kind === 'drill') plan = { lines: drillLines(mistakesOf(data, Date.now())) };
   else {
     const { pinned, due } = pinnedOf(data, now);
     const cards = of.all ? pinned : due;
@@ -286,6 +291,7 @@ export async function startSession(store: IdbStore, record: (event: Parameters<I
       return c ? startPosition(c) : undefined;
     },
     paceMs: PACES[pace.peek()],
+    ...optionsFor(of, trainPrefs.peek()),
   });
   trainer = t;
   shower = of.kind === 'show' ? new ShowGrade(t, speech.peek() ? { speech: true } : {}) : undefined;
@@ -294,6 +300,33 @@ export async function startSession(store: IdbStore, record: (event: Parameters<I
   if (listed !== undefined) view.scope = listed;
   session.value = view;
   send({ type: 'start', now });
+}
+
+/**
+ * The per-device settings a session runs with (§5.17): the queue's and show and grade's lines start
+ * as `startQueue` says and go on by themselves; a line picked or learned starts as `startLearn`
+ * says, and Learn's lines wait at their end or go on after four paces. Retry, drill, the pins and
+ * the Interactive view keep their own walk.
+ */
+export function optionsFor(of: SessionKind, prefs: TrainPrefs): TrainerOptions {
+  const common: TrainerOptions = { autoPlay: prefs.autoPlay, tryNew: prefs.newMoves === 'try' };
+  switch (of.kind) {
+    case 'queue':
+    case 'show':
+      return { ...common, lineStart: prefs.startQueue };
+    case 'line':
+      return { ...common, lineStart: prefs.startLearn };
+    case 'learn':
+      return { ...common, lineStart: prefs.startLearn, holdLineEnd: prefs.lineEnd === 'wait', lineEndPaces: 4 };
+    default:
+      return {};
+  }
+}
+
+/** The settings changed during a session: from the next move met. */
+export function configureSession(): void {
+  const s = session.peek();
+  if (trainer && s) trainer.configure(optionsFor(s.of, trainPrefs.peek()));
 }
 
 /** Sessions whose answers are graded and recorded: the queue's, and lines picked from the list. */
@@ -341,7 +374,7 @@ function stopTimer() {
 }
 
 /** A command from the screen, with the time now. */
-export function command(type: 'hint' | 'suspend' | 'skipLine' | 'stop'): void {
+export function command(type: 'hint' | 'suspend' | 'skipLine' | 'stop' | 'next'): void {
   send({ type, now: Date.now() });
 }
 export function playMove(uci: string): void {
@@ -378,7 +411,7 @@ export function endSession(): void {
 function send(c: TrainerCommand): void {
   const t = trainer;
   if (!t) return;
-  if (shower && (c.type === 'tick' || c.type === 'stop' || c.type === 'skipLine')) {
+  if (shower && (c.type === 'tick' || c.type === 'stop' || c.type === 'skipLine' || c.type === 'next')) {
     apply(t, c.type === 'tick' ? shower.tick(c.id, c.now) : shower.send(c));
     return;
   }
@@ -482,11 +515,14 @@ function apply(t: Trainer, effects: readonly ShowGradeEffect[]): void {
   }
   const v = t.view;
   next.phase = v.phase;
-  // At the session's end the board's last moves stay, for "back to the chapter" at them.
-  if (v.phase !== 'sessionDone') next.path = v.path;
+  // At the session's end the trainer's view stays on the last line's moves, so the board and "back
+  // to the chapter" stay at them (§5.17).
+  next.path = v.path;
   if (v.position) next.position = v.position;
   next.number = v.number;
   next.total = v.total;
+  if (v.upcoming) next.upcoming = v.upcoming.line;
+  else delete next.upcoming;
   next.dueLeft = s.plan.lines.flatMap((l) => l.ask).filter((c) => !answered.has(c)).length;
   next.newLeft = s.plan.lines.flatMap((l) => l.teach).filter((c) => !answered.has(c)).length;
   session.value = next;

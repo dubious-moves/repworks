@@ -15,7 +15,7 @@ import { indexStudies, type Line, type RepertoireIndex } from '../../../../src/c
 import { interactivePlan, planSession, type PlannedLine, type SessionPlan } from '../../../../src/core/train/plan.ts';
 import { statusOf, todaysQueue, type Day } from '../../../../src/core/train/queue.ts';
 import { DEFAULT_TRAIN } from '../../../../src/core/train/settings.ts';
-import { MIN_PACE_MS, Trainer, type TrainerCommand, type TrainerEffect, type TrainerRecord, type TrainerView } from '../../../../src/core/train/trainer.ts';
+import { AUTO_PLAYS, LINE_STARTS, MIN_PACE_MS, Trainer, type TrainerCommand, type TrainerEffect, type TrainerOptions, type TrainerRecord, type TrainerView } from '../../../../src/core/train/trainer.ts';
 import type { Chapter } from '../../../../src/core/study/model.ts';
 import { lineThrough, startPosition } from '../../../../src/core/study/tree.ts';
 import { mulberry32 } from '../../../support/random.ts';
@@ -64,7 +64,7 @@ const startOf = (w: World) => (line: Line) => {
   return c ? startPosition(c) : undefined;
 };
 const planOf = (w: World, states: Map<string, CardState>, newPerDay = 0) => planSession(w.ix, todaysQueue(w.ix, states, { ...DEFAULT_TRAIN, newPerDay }, day), states);
-const trainer = (w: World, plan: SessionPlan, states: Map<string, CardState>, extra: { record?: boolean; askAll?: boolean; follow?: boolean; paceMs?: number } = {}) =>
+const trainer = (w: World, plan: SessionPlan, states: Map<string, CardState>, extra: { record?: boolean; askAll?: boolean; follow?: boolean; practice?: boolean; paceMs?: number } & TrainerOptions = {}) =>
   new Trainer({ index: w.ix, plan, states, startOf: startOf(w), paceMs: extra.paceMs ?? 600, ...extra });
 
 /** Who answers an ask or a teach: a command, or undefined to stop the session. */
@@ -88,6 +88,11 @@ function run(t: Trainer, answer: Answerer, now = day.now) {
       const c = answer(t.view, asked++);
       if (!c) send({ type: 'stop', now });
       else send({ ...c, now } as TrainerCommand);
+      continue;
+    }
+    // A line's end held for "Next line" (§5.17).
+    if (phase === 'lineDone' && !pendingWait) {
+      send({ type: 'next', now });
       continue;
     }
     assert.ok(pendingWait, `waiting in ${phase} with no timer`);
@@ -410,4 +415,234 @@ test('the planned line kinds come through to the line effect', () => {
   const out = t.send({ type: 'start', now: 0 });
   assert.deepEqual(out[0], { type: 'line', line, number: 1, total: 1, kind: 'new', path: [] });
   assert.equal(t.view.phase, 'teach');
+});
+
+// ---- §5.17: the owner's second testing notes ------------------------------------------------
+
+/** Plays a wrong move (one not in the line) the first time each of `sans` is asked, else the line's move. */
+const wrongFirstOn = (...sans: string[]): Answerer => {
+  const missed = new Set<string>();
+  return (view, n) => {
+    const san = view.line!.line.path[view.path.length]!;
+    if (sans.includes(san) && !missed.has(san) && view.phase !== 'shown') {
+      missed.add(san);
+      return { type: 'move', uci: view.position!.turn === 'white' ? 'h2h3' : 'h7h6', now: 0 };
+    }
+    return right(view, n);
+  };
+};
+const notes = (effects: TrainerEffect[]) => effects.flatMap((e) => (e.type === 'note' ? [e.note] : []));
+
+{
+  // Two lines sharing 1. e4 e5 2. Nf3 Nc6, every own move due: e4 answered right on the first line,
+  // Nf3 answered wrong; the second line meets both again.
+  const w = world(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 Nc6 3. Bb5 (3. Bc4 Bc5 4. c3) *'));
+  const states = () => new Map<string, CardState>([...w.ix.cards.keys()].map((c) => [c, dueNow]));
+  const second = (effects: TrainerEffect[]) => plays(effects.slice(effects.findIndex((e, i) => i > 0 && e.type === 'line')));
+  const cases: [string, string[]][] = [
+    // Every own move asked again (ungraded), so the line starts at the chapter's start.
+    ['off', ['user:e4', 'opponent:e5', 'user:Nf3', 'opponent:Nc6', 'user:Bc4', 'opponent:Bc5', 'user:c3']],
+    // The move answered right is played; the one answered wrong is asked again.
+    ['session', ['user:Nf3', 'opponent:Nc6', 'user:Bc4', 'opponent:Bc5', 'user:c3']],
+    // Both answered: the line starts where the board is, at its first due move.
+    ['due', ['user:Bc4', 'opponent:Bc5', 'user:c3']],
+    // The move answered wrong is difficult: asked again; the one answered right is played.
+    ['difficult', ['user:Nf3', 'opponent:Nc6', 'user:Bc4', 'opponent:Bc5', 'user:c3']],
+  ];
+  for (const [mode, expectedPlays] of cases) {
+    test(`auto-play ${mode}: a move answered right and one answered wrong, met again on the next line`, () => {
+      const s = states();
+      const { effects, records } = run(trainer(w, planOf(w, s), s, { autoPlay: mode as TrainerOptions['autoPlay'] }), wrongFirstOn('Nf3'));
+      assert.deepEqual(second(effects), expectedPlays);
+      // Each card graded once: e4 Good, Nf3 Again, Bb5, Bc4 and c3 Good; the second asks are practice.
+      const graded = records.filter((r) => r.k === 'review');
+      assert.equal(graded.length, 5);
+      assert.deepEqual(new Set(graded.map((r) => r.card)).size, 5);
+      assert.deepEqual(graded.map((r) => (r.k === 'review' ? r.g : 0)), [3, 1, 3, 3, 3]);
+    });
+  }
+}
+
+test('auto-play difficult: a move with lapses is asked even when not due; an easy one is played', () => {
+  const w = world(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 Nc6 3. Bb5'));
+  const hard: CardState = { ...notDue, card: { ...notDue.card, lapses: 2 } };
+  const states = new Map<string, CardState>([
+    [card('e4'), notDue],
+    [card('e4 e5 Nf3'), hard],
+    [card('e4 e5 Nf3 Nc6 Bb5'), dueNow],
+  ]);
+  const plan = planOf(w, states);
+  const easy = run(trainer(w, plan, states, { autoPlay: 'due' }), right);
+  assert.deepEqual(plays(easy.effects), ['auto:e4', 'opponent:e5', 'auto:Nf3', 'opponent:Nc6', 'user:Bb5']);
+  const { effects, records } = run(trainer(w, plan, states, { autoPlay: 'difficult' }), right);
+  assert.deepEqual(plays(effects), ['auto:e4', 'opponent:e5', 'user:Nf3', 'opponent:Nc6', 'user:Bb5']);
+  // Nf3 is practice: only Bb5 is graded.
+  assert.deepEqual(records.map((r) => r.card), [card('e4 e5 Nf3 Nc6 Bb5')]);
+});
+
+test('auto-play session: a move taught is asked when met again; one found unaided is played', () => {
+  // A new line taught, then a second sharing its start: Nf3 taught with its arrow, e4 found first try.
+  const w = world(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 Nc6 3. Bb5 (3. Bc4) *'));
+  const plan = planOf(w, new Map(), 20);
+  let tries = 0;
+  const answerer: Answerer = (view, n) => {
+    const san = view.line!.line.path[view.path.length]!;
+    // Nf3 is first asked with no arrow: a wrong move shows nothing yet, Hint shows it.
+    if (san === 'Nf3' && tries++ === 0) return { type: 'hint', now: 0 };
+    return right(view, n);
+  };
+  const { effects, records } = run(trainer(w, plan, new Map(), { autoPlay: 'session', tryNew: true }), answerer);
+  const after = plays(effects.slice(effects.findIndex((e, i) => i > 0 && e.type === 'line')));
+  assert.deepEqual(after, ['user:Nf3', 'opponent:Nc6', 'user:Bc4']);
+  assert.deepEqual(records.map((r) => r.k), ['taught', 'taught', 'taught', 'taught']);
+  const taughtNotes = notes(effects).filter((n) => n.kind === 'taught');
+  assert.deepEqual(taughtNotes.map((n) => (n.kind === 'taught' ? `${n.san}${n.found ? ' found' : ''}` : '')), ['e4 found', 'Nf3', 'Bb5 found', 'Bc4 found']);
+});
+
+test('try first: a new move is asked with no arrow; a wrong move then Hint show it; one taught, no review', () => {
+  const w = world(chapter('Chapter1', 'white', '1. e4 e5'));
+  const plan = planOf(w, new Map(), 20);
+  const t = trainer(w, plan, new Map(), { tryNew: true });
+  const first = t.send({ type: 'start', now: 0 });
+  assert.equal(t.view.phase, 'ask');
+  assert.equal(t.view.shown, undefined);
+  assert.ok(!first.some((e) => e.type === 'arrow' && e.uci));
+  assert.deepEqual(notes(first), [{ kind: 'newTry' }]);
+  const wrong = t.send({ type: 'move', uci: 'd2d4', now: 1 });
+  assert.deepEqual(notes(wrong), [{ kind: 'wrong' }]);
+  assert.ok(!wrong.some((e) => e.type === 'arrow' && e.uci));
+  const hint = t.send({ type: 'hint', now: 2 });
+  assert.deepEqual(hint.find((e) => e.type === 'arrow'), { type: 'arrow', uci: 'e2e4' });
+  assert.deepEqual(t.view.shown, { uci: 'e2e4', san: 'e4' });
+  const done = t.send({ type: 'move', uci: 'e2e4', now: 3 });
+  assert.deepEqual(done.flatMap((e) => (e.type === 'record' ? [e.event] : [])), [{ k: 'taught', card: card('e4') }]);
+  assert.deepEqual(notes(done)[0], { kind: 'taught', san: 'e4' });
+});
+
+{
+  // 1. e4 and 2. Nf3 not due, 3. Bb5 and 4. Ba4 due.
+  const w = world(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4'));
+  const states = new Map<string, CardState>([
+    [card('e4'), notDue],
+    [card('e4 e5 Nf3'), notDue],
+    [card('e4 e5 Nf3 Nc6 Bb5'), dueNow],
+    [card('e4 e5 Nf3 Nc6 Bb5 a6 Ba4'), dueNow],
+  ]);
+  const cases: [string, string[], string[]][] = [
+    // One move before the first due one, so the opponent's move is seen.
+    ['first', ['e4', 'e5', 'Nf3'], ['opponent:Nc6', 'user:Bb5', 'opponent:a6', 'user:Ba4']],
+    ['auto', [], ['auto:e4', 'opponent:e5', 'auto:Nf3', 'opponent:Nc6', 'user:Bb5', 'opponent:a6', 'user:Ba4']],
+    ['ask', [], ['user:e4', 'opponent:e5', 'user:Nf3', 'opponent:Nc6', 'user:Bb5', 'opponent:a6', 'user:Ba4']],
+  ];
+  for (const [start, path, expectedPlays] of cases) {
+    test(`a line starts ${start === 'first' ? 'at its first due move' : start === 'auto' ? 'auto-played from the start' : 'from the start, asked'}`, () => {
+      const { effects, records } = run(trainer(w, planOf(w, states), states, { lineStart: start as TrainerOptions['lineStart'] }), right);
+      assert.deepEqual(effects.find((e) => e.type === 'line')?.type === 'line' && (effects.find((e) => e.type === 'line') as { path: string[] }).path, path);
+      assert.deepEqual(plays(effects), expectedPlays);
+      // Only the due moves are graded; the moves asked before them are practice.
+      assert.deepEqual(records.map((r) => r.card), [card('e4 e5 Nf3 Nc6 Bb5'), card('e4 e5 Nf3 Nc6 Bb5 a6 Ba4')]);
+    });
+  }
+
+  test('a line started auto-played goes back to the chapter\'s start even when the board shares its moves', () => {
+    const w2 = world(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 Nc6 3. Bb5 (3. Bc4) *'));
+    const s = new Map<string, CardState>([...w2.ix.cards.keys()].map((c) => [c, dueNow]));
+    const { effects } = run(trainer(w2, planOf(w2, s), s, { lineStart: 'auto' }), right);
+    const lines = effects.filter((e) => e.type === 'line');
+    assert.equal(lines.length, 2);
+    assert.deepEqual((lines[1] as { path: string[] }).path, []);
+    assert.deepEqual(plays(effects.slice(effects.indexOf(lines[1]!))), ['auto:e4', 'opponent:e5', 'auto:Nf3', 'opponent:Nc6', 'user:Bc4']);
+  });
+}
+
+test('a line\'s end held: no timer, the next line named, and `next` goes on; the last line ends the session at once', () => {
+  const w = world(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 (2. Nc3) *'));
+  const plan = planOf(w, new Map(), 20);
+  assert.equal(plan.lines.length, 2);
+  const t = trainer(w, plan, new Map(), { holdLineEnd: true });
+  let out = t.send({ type: 'start', now: 0 });
+  /** Ticks the timers and plays the moves taught until the phase is not one of those. */
+  const drive = () => {
+    for (let guard = 0; guard < 20; guard++) {
+      const wait = out.find((e) => e.type === 'wait');
+      if (t.view.phase === 'teach') out = t.send({ type: 'move', uci: expected(t.view), now: 1 });
+      else if (wait?.type === 'wait') out = t.send({ type: 'tick', id: wait.id, now: 1 });
+      else return;
+    }
+  };
+  drive();
+  assert.equal(t.view.phase, 'lineDone');
+  assert.ok(!out.some((e) => e.type === 'wait'));
+  assert.equal(t.view.upcoming, plan.lines[1]);
+  assert.deepEqual(t.send({ type: 'tick', id: 99, now: 5 }), []);
+  out = t.send({ type: 'next', now: 6 });
+  assert.equal(out[0]!.type, 'line');
+  assert.equal(t.view.phase, 'teach');
+  out = t.send({ type: 'move', uci: 'b1c3', now: 7 });
+  assert.deepEqual(out.slice(-2).map((e) => e.type), ['lineDone', 'done']);
+  assert.ok(!out.some((e) => e.type === 'wait'));
+  assert.equal(t.view.phase, 'sessionDone');
+  // The board stays on the last line's end.
+  assert.deepEqual(t.view.path, ['e4', 'e5', 'Nc3']);
+});
+
+test('a line\'s end goes on after the paces asked', () => {
+  const w = world(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 (2. Nc3) *'));
+  const { effects } = run(trainer(w, planOf(w, new Map(), 20), new Map(), { lineEndPaces: 4 }), right);
+  const i = effects.findIndex((e) => e.type === 'lineDone');
+  assert.deepEqual(effects[i + 1], { type: 'wait', ms: 2400, id: (effects[i + 1] as { id: number }).id });
+});
+
+test('random repertoires under every auto-play mode and line start: every planned ask graded once, every teach taught once', () => {
+  for (let seed = 1; seed <= 120; seed++) {
+    const random = mulberry32(seed * 7919);
+    const chapters = Array.from({ length: 1 + Math.floor(random() * 3) }, (_, i) => {
+      const c = randomChapter(random, `Rand000${i}`, { maxDepth: 9, maxChildren: 3 });
+      if (random() < 0.3) c.headers.push(['RepworksKnown', 'true']);
+      return c;
+    });
+    const w: World = { ix: indexStudies([{ sid: 'Study001', kind: 'repertoire', chapters }]), chapters: new Map(chapters.map((c) => [c.id, c])) };
+    const states = new Map<string, CardState>();
+    for (const c of w.ix.cards.keys()) {
+      const r = random();
+      if (r < 0.3) continue;
+      const s = r < 0.4 ? { ...learning } : reviewed(start + Math.floor((random() * 6 - 3) * DAY));
+      if (random() < 0.15) s.card = { ...s.card, lapses: 2 };
+      if (random() < 0.05) s.suspended = true;
+      states.set(c, s);
+    }
+    const plan = planOf(w, states, Math.floor(random() * 12));
+    const options: TrainerOptions & { practice?: boolean } = {
+      autoPlay: AUTO_PLAYS[seed % 4]!,
+      lineStart: LINE_STARTS[Math.floor(seed / 4) % 3]!,
+      tryNew: random() < 0.5,
+      holdLineEnd: random() < 0.5,
+      practice: random() < 0.3,
+    };
+    const answers = Array.from({ length: 500 }, () => random());
+    const answerer: Answerer = (view, n) => {
+      const r = answers[n % answers.length]!;
+      if (view.phase === 'teach' || view.phase === 'shown' || r < 0.7) return right(view, n);
+      if (r < 0.8) return { type: 'hint', now: 0 };
+      const pos = view.position!;
+      const all = [...pos.allDests()].flatMap(([from, tos]) => [...tos].map((to) => ({ from, to })));
+      const m = all[Math.floor(r * 1000) % all.length]!;
+      const promo = pos.board.getRole(m.from) === 'pawn' && (m.to >> 3 === 7 || m.to >> 3 === 0) ? 'q' : '';
+      const sq = (x: number) => `${'abcdefgh'[x & 7]}${(x >> 3) + 1}`;
+      return { type: 'move', uci: `${sq(m.from)}${sq(m.to)}${promo}`, now: 0 };
+    };
+    const a = run(trainer(w, plan, states, options), answerer);
+    const b = run(trainer(w, plan, states, options), answerer);
+    const what = `seed ${seed} ${JSON.stringify(options)}`;
+    assert.deepEqual(a.effects, b.effects, `${what}: deterministic`);
+    const reviewed_ = a.records.filter((e) => e.k === 'review').map((e) => e.card);
+    const taught = a.records.filter((e) => e.k === 'taught').map((e) => e.card);
+    assert.equal(new Set(reviewed_).size, reviewed_.length, `${what}: a card reviewed twice`);
+    assert.equal(new Set(taught).size, taught.length, `${what}: a card taught twice`);
+    for (const c of plan.lines.flatMap((l) => l.ask)) assert.ok(reviewed_.includes(c), `${what}: ask ${c} not graded`);
+    for (const c of plan.lines.flatMap((l) => l.teach)) assert.ok(taught.includes(c), `${what}: teach ${c} not taught`);
+    // Nothing is graded that the plan doesn't ask (a picked line's and auto-play off's asks are practice).
+    for (const c of reviewed_) assert.ok(plan.lines.some((l) => l.ask.includes(c)) || statusOf(states.get(c)) === 'fresh' || [...w.ix.positions.values()].some((p) => p.own.size > 1), `${what}: ${c} graded though not asked`);
+    for (const e of a.effects) if (e.type === 'wait') assert.ok(e.ms >= MIN_PACE_MS, what);
+  }
 });

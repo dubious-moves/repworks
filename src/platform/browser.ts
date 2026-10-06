@@ -6,6 +6,11 @@ export const browserClock: Clock = {
   sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
 };
 
+/** The clock shifted ahead by `offset()` ms (time travel, PLAN.md §5.17); sleeps are real. */
+export function shiftedClock(offset: () => number): Clock {
+  return { now: () => Date.now() + offset(), sleep: browserClock.sleep };
+}
+
 /** [0, 1) from the platform's cryptographic source. */
 export function cryptoRandom(): number {
   const word = new Uint32Array(1);

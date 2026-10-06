@@ -10,6 +10,10 @@
 //   back and the move asked again; a second, or Hint, shows it with an arrow. A taught move
 //   records `taught`, never a review. A known move answered wrong records Again and no `taught`:
 //   the daily limit counts `taught` events, and known moves never use it (§5.3).
+// - Auto-play (§5.17, lichessable's modes): an own move the plan doesn't need graded or taught is
+//   played for the user or asked without a grade, by the `autoPlay` mode (`plays`). Suspended
+//   moves are always played. Where a line starts (`lineStart`) decides the moves before its first
+//   move the plan needs: skipped, played at the pace, or asked.
 // - Conflicting moves (D3): every own move of the position is accepted, and the one played is
 //   graded on its own card if it is due. The line's own move is then asked in the same position,
 //   on its own card, so a sibling can't stay due for ever. The trainer only lets the user move
@@ -31,6 +35,36 @@ import { knownCardsOf, statusOf } from './queue.ts';
 
 /** The quickest pace: lichessable's floor, so a move can still be followed (§5.2). */
 export const MIN_PACE_MS = 450;
+
+/**
+ * Which own moves the plan doesn't need are played for the user (§5.17, after lichessable's
+ * auto-play and its "difficult moves only"):
+ * - `off`: none; every one is asked, with no grade.
+ * - `session`: moves answered right first time earlier in the session (lichessable's auto-play);
+ *   a move answered wrong is asked again, ungraded.
+ * - `due` (the default, the trainer as it was): moves answered earlier in the session, right or
+ *   wrong, and in the queue moves reviewed and not due. A line picked or learned asks the latter.
+ * - `difficult`: as `due`, except that a difficult move (answered wrong in the session, or with
+ *   lapses or a high FSRS difficulty) is asked whenever it is met.
+ */
+export type AutoPlay = 'off' | 'session' | 'due' | 'difficult';
+export const AUTO_PLAYS: readonly AutoPlay[] = ['off', 'session', 'due', 'difficult'];
+
+/**
+ * Where a line starts (§5.17), for the moves before its first move the plan grades or teaches:
+ * - `first`: there (one move before, so the opponent's move is seen), or where the board already
+ *   is when the line shares its moves;
+ * - `auto`: at the chapter's start, those moves played at the pace, own moves included;
+ * - `ask`: at the chapter's start, every own move asked (ungraded unless due).
+ */
+export type LineStart = 'first' | 'auto' | 'ask';
+export const LINE_STARTS: readonly LineStart[] = ['first', 'auto', 'ask'];
+
+/** A card is difficult (§5.17's `difficult` mode) after two lapses, or with FSRS difficulty from 7. */
+export function isDifficult(state: CardState | undefined): boolean {
+  if (!state || state.card.due === undefined) return false;
+  return state.card.lapses >= 2 || state.card.difficulty >= 7;
+}
 
 export type Phase =
   | 'ready'
@@ -56,8 +90,10 @@ export type Note =
   | { kind: 'wrong' }
   | { kind: 'shown'; san: string }
   | { kind: 'newMove'; san: string }
-  /** A taught move played. */
-  | { kind: 'taught'; san: string }
+  /** A new move asked before it is shown (`tryNew`). */
+  | { kind: 'newTry' }
+  /** A taught move played; `found` when it was found with no arrow, wrong move or hint. */
+  | { kind: 'taught'; san: string; found?: boolean }
   /** A conflict move was accepted; the repertoire has another move here, asked now. */
   | { kind: 'alsoPlays' }
   | { kind: 'suspended'; san: string };
@@ -101,6 +137,8 @@ export type TrainerCommand =
   /** A move made on the board, in UCI (either castling spelling). */
   | { type: 'move'; uci: string; now: number }
   | { type: 'hint'; now: number }
+  /** At a line's end held by `holdLineEnd`: the next line. */
+  | { type: 'next'; now: number }
   /** Show and grade: play the move asked, without grading it yet. */
   | { type: 'show' }
   /** Show and grade: the move was known or not; the card is graded and the line goes on. */
@@ -136,7 +174,20 @@ export interface TrainerSetup {
    * board's moves is right, and the walk follows that line to its end.
    */
   follow?: boolean;
+  /** Which own moves the plan doesn't need are played for the user (§5.17); default `due`. */
+  autoPlay?: AutoPlay;
+  /** New moves are asked before they are shown (§5.17): the arrow comes after a wrong move or Hint. */
+  tryNew?: boolean;
+  /** Where a line starts (§5.17). Unset: where the board already is when the line shares its moves, else at its start. */
+  lineStart?: LineStart;
+  /** At a line's end, wait for `next` rather than going on (§5.17). */
+  holdLineEnd?: boolean;
+  /** The pause at a line's end before the next, in paces (default 2). */
+  lineEndPaces?: number;
 }
+
+/** The options a running session can change (the training settings, §5.17). */
+export type TrainerOptions = Pick<TrainerSetup, 'autoPlay' | 'tryNew' | 'lineStart' | 'holdLineEnd' | 'lineEndPaces'>;
 
 interface Ply {
   san: string;
@@ -172,6 +223,8 @@ export interface TrainerView {
   position?: Position;
   /** The move asked or taught, once shown (teach, shown). */
   shown?: { uci: string; san: string };
+  /** At a line's end: the line that comes next, if any. */
+  upcoming?: PlannedLine;
   summary: Summary;
 }
 
@@ -179,6 +232,7 @@ type Kind = 'ask' | 'teach' | 'auto';
 
 export class Trainer {
   private readonly setup: TrainerSetup;
+  private options: TrainerOptions;
   private pace: number;
   private readonly record: boolean;
   /** The plan's lines; with `follow`, the line walked is replaced by the one the user chose. */
@@ -190,6 +244,9 @@ export class Trainer {
   private readonly answered = new Set<CardId>();
   private readonly taughtNow = new Set<CardId>();
   private readonly suspendedNow = new Set<CardId>();
+  /** Cards answered right first time in this session, and answered wrong (§5.17's modes). */
+  private readonly right = new Set<CardId>();
+  private readonly missedNow = new Set<CardId>();
   private phase: Phase = 'ready';
   private at = -1;
   private plies: Ply[] = [];
@@ -197,9 +254,13 @@ export class Trainer {
   private positions: Position[] = [];
   private end = 0;
   private ply = 0;
+  /** Where the line's first move the plan needs is: the moves before it are its prefix. */
+  private prefix = 0;
+  /** At a line's end: the next line found, and its moves. */
+  private upcoming: { at: number; plies: Ply[]; positions: Position[] } | undefined;
   private pending: Pending | undefined;
   /** Show and grade: a move played and waiting for its grade. */
-  private waiting: { card: CardId; mode: 'ask' | 'teach'; san: string; since: number; failed: boolean } | undefined;
+  private waiting: { card: CardId; mode: 'ask' | 'teach'; san: string; since: number; failed: boolean; graded: boolean } | undefined;
   /** Show and grade, on from the setup and switched during the session (§5.16). */
   private selfGrading: boolean;
   private waitId = 0;
@@ -208,6 +269,8 @@ export class Trainer {
 
   constructor(setup: TrainerSetup) {
     this.setup = setup;
+    const { autoPlay, tryNew, lineStart, holdLineEnd, lineEndPaces } = setup;
+    this.options = { autoPlay, tryNew, lineStart, holdLineEnd, lineEndPaces };
     this.pace = Math.max(MIN_PACE_MS, setup.paceMs);
     this.record = setup.record ?? true;
     this.lines = [...setup.plan.lines];
@@ -217,6 +280,11 @@ export class Trainer {
     }
     this.known = knownCardsOf(setup.index);
     this.selfGrading = setup.selfGrade ?? false;
+  }
+
+  /** New options, from the next move met (§5.17's settings changed during a session). */
+  configure(options: TrainerOptions): void {
+    this.options = { ...this.options, ...options };
   }
 
   /** Show and grade on or off from the next move asked (§5.16). */
@@ -246,8 +314,9 @@ export class Trainer {
     if (line) v.line = line;
     const position = this.positions[this.ply];
     if (position) v.position = position;
+    if (this.phase === 'lineDone' && this.upcoming) v.upcoming = this.lines[this.upcoming.at]!;
     const p = this.pending;
-    if (p && (p.mode === 'teach' || p.shown)) v.shown = { uci: p.uci, san: p.san };
+    if (p?.shown) v.shown = { uci: p.uci, san: p.san };
     else if (this.waiting) v.shown = { uci: '', san: this.waiting.san };
     return v;
   }
@@ -267,6 +336,11 @@ export class Trainer {
         break;
       case 'hint':
         this.hint(out);
+        break;
+      case 'next':
+        if (this.phase !== 'lineDone') break;
+        this.waitId++;
+        this.nextLine(command.now, out);
         break;
       case 'show':
         this.showMove(out);
@@ -307,14 +381,38 @@ export class Trainer {
     return this.suspendedNow.has(card) || this.state(card)?.suspended === true;
   }
 
-  private kindOf(card: CardId): Kind {
-    if (this.setup.askOnly) return !this.answered.has(card) && this.toAsk.has(card) ? 'ask' : 'auto';
-    if (this.answered.has(card) || this.suspended(card)) return 'auto';
+  /** What the plan needs of a card: graded (`ask`) or taught, once a session; else nothing. */
+  private needs(card: CardId): Kind | undefined {
+    if (this.answered.has(card) || this.suspended(card)) return undefined;
     const fresh = statusOf(this.state(card)) === 'fresh';
     if (this.toAsk.has(card) || this.setup.askAll || (fresh && this.known.has(card))) return 'ask';
     // A move never answered is never played for the user (lichessable's rule).
     if (this.toTeach.has(card) || fresh) return 'teach';
-    return this.setup.practice ? 'ask' : 'auto';
+    return undefined;
+  }
+
+  /** Whether an own move the plan doesn't need is played for the user, by the auto-play mode. */
+  private plays(card: CardId): boolean {
+    const mode = this.options.autoPlay ?? 'due';
+    const hard = mode === 'difficult' && (this.missedNow.has(card) || isDifficult(this.state(card)));
+    if (this.answered.has(card)) {
+      if (mode === 'off') return false;
+      if (mode === 'session') return this.right.has(card);
+      return !hard;
+    }
+    // A move not answered yet: played in the queue when it isn't due, never in a line picked or learned.
+    if (mode === 'off' || mode === 'session' || this.setup.practice) return false;
+    return !hard;
+  }
+
+  /** How an own move is met: asked, taught or played; `prefix` for a move before the line's first need. */
+  private kindOf(card: CardId, prefix = false): Kind {
+    if (this.setup.askOnly) return !this.answered.has(card) && this.toAsk.has(card) ? 'ask' : 'auto';
+    if (this.suspended(card)) return 'auto';
+    const need = this.needs(card);
+    if (need) return need;
+    if (prefix) return this.options.lineStart === 'ask' && !(this.answered.has(card) && this.plays(card)) ? 'ask' : 'auto';
+    return this.plays(card) ? 'auto' : 'ask';
   }
 
   private learning(card: CardId) {
@@ -333,38 +431,58 @@ export class Trainer {
   /** Whether a planned line still has something to ask or teach on its walked part. */
   private needed(planned: PlannedLine, plies: readonly Ply[]): boolean {
     if (planned.ask.length + planned.teach.length === 0) return true;
-    return plies.some((p, i) => i < planned.end && p.card !== undefined && this.kindOf(p.card) !== 'auto');
+    return plies.some((p, i) => i < planned.end && p.card !== undefined && (this.setup.askOnly ? this.kindOf(p.card) !== 'auto' : this.needs(p.card) !== undefined));
+  }
+
+  /** The next planned line after the current one with something to walk, and its moves. */
+  private findNext(): { at: number; plies: Ply[]; positions: Position[] } | undefined {
+    for (let at = this.at + 1; at < this.lines.length; at++) {
+      const built = this.build(this.lines[at]!);
+      if (built && this.needed(this.lines[at]!, built.plies)) return { at, ...built };
+    }
+    return undefined;
+  }
+
+  /** The ply of the line's first move the plan needs, or else of its first own move asked; its end if none. */
+  private prefixEnd(plies: readonly Ply[], end: number): number {
+    for (let i = 0; i < end; i++) if (plies[i]!.card && this.needs(plies[i]!.card!)) return i;
+    for (let i = 0; i < end; i++) if (plies[i]!.card && this.kindOf(plies[i]!.card!) !== 'auto') return i;
+    return end;
   }
 
   private nextLine(now: number, out: TrainerEffect[]) {
+    const found = this.upcoming ?? this.findNext();
+    this.upcoming = undefined;
+    // The last line's end is the session's: the board stays on it (§5.17).
+    if (!found) return this.finish(out);
     const lines = this.lines;
-    const board = this.at >= 0 ? lines[this.at]! : undefined;
+    const board = this.at >= 0 ? lines[this.at] : undefined;
     const boardPath = board ? board.line.path.slice(0, this.ply) : [];
-    for (this.at++; this.at < lines.length; this.at++) {
-      const planned = lines[this.at]!;
-      const built = this.build(planned);
-      if (!built || !this.needed(planned, built.plies)) continue;
-      this.plies = built.plies;
-      this.positions = built.positions;
-      this.end = Math.min(planned.end, built.plies.length);
-      // Start where the board already is when the line shares its moves, up to its first ask or
-      // teach: the positions follow on from each other (§5.4). A planned start (drill's lead-in)
-      // comes first when it is further on.
-      let ply = 0;
-      if (board && board.line.sid === planned.line.sid && board.line.cid === planned.line.cid) {
-        while (ply < boardPath.length && ply < this.end && boardPath[ply] === planned.line.path[ply]) {
-          const card = this.plies[ply]!.card;
-          if (card && this.kindOf(card) !== 'auto') break;
-          ply++;
-        }
+    this.at = found.at;
+    const planned = lines[this.at]!;
+    this.plies = found.plies;
+    this.positions = found.positions;
+    this.end = Math.min(planned.end, found.plies.length);
+    const start = this.options.lineStart;
+    this.prefix = start === undefined ? 0 : this.prefixEnd(this.plies, this.end);
+    // Where the board already is when the line shares its moves, up to its first ask or teach: the
+    // positions follow on from each other (§5.4).
+    let shared = 0;
+    if (board && board.line.sid === planned.line.sid && board.line.cid === planned.line.cid) {
+      while (shared < boardPath.length && shared < this.end && boardPath[shared] === planned.line.path[shared]) {
+        const card = this.plies[shared]!.card;
+        if (card && this.kindOf(card, shared < this.prefix) !== 'auto') break;
+        shared++;
       }
-      this.ply = Math.max(ply, Math.min(planned.from ?? 0, this.end));
-      this.walked++;
-      out.push({ type: 'line', line: planned.line, number: this.at + 1, total: lines.length, kind: planned.kind, path: planned.line.path.slice(0, this.ply) });
-      this.advance(now, out);
-      return;
     }
-    this.finish(out);
+    // §5.17: at the first move needed (one move before it, for the opponent's), from the start
+    // played, or from the start asked. A planned start (drill's lead-in) comes first when further on.
+    let ply = start === undefined ? shared : start === 'first' ? Math.max(Math.min(shared, this.prefix), this.prefix - 1, 0) : 0;
+    ply = Math.max(ply, Math.min(planned.from ?? 0, this.end));
+    this.ply = ply;
+    this.walked++;
+    out.push({ type: 'line', line: planned.line, number: this.at + 1, total: lines.length, kind: planned.kind, path: planned.line.path.slice(0, this.ply) });
+    this.advance(now, out);
   }
 
   /** The line's moves as positions and UCI, as far as they are legal. */
@@ -400,7 +518,9 @@ export class Trainer {
     if (this.ply >= this.end) {
       this.phase = 'lineDone';
       out.push({ type: 'lineDone' });
-      this.wait(this.pace * 2, out);
+      this.upcoming = this.findNext();
+      if (!this.upcoming) return this.finish(out);
+      if (!this.options.holdLineEnd) this.wait(this.pace * (this.options.lineEndPaces ?? 2), out);
       return;
     }
     const p = this.plies[this.ply]!;
@@ -409,19 +529,21 @@ export class Trainer {
       this.wait(this.pace, out);
       return;
     }
-    const kind = this.kindOf(p.card);
+    const kind = this.kindOf(p.card, this.ply < this.prefix);
     if (kind === 'auto') {
       this.phase = 'auto';
       if (this.learning(p.card)) out.push({ type: 'arrow', uci: p.uci });
       this.wait(this.pace, out);
       return;
     }
-    this.pending = { mode: kind, card: p.card, uci: p.uci, san: p.san, wrong: [], hint: false, shown: kind === 'teach', since: now, also: false };
-    this.phase = kind;
-    if (kind === 'teach') {
+    // With `tryNew` a new move is asked like a due one, and shown only after a wrong move or Hint.
+    const shown = kind === 'teach' && !this.options.tryNew;
+    this.pending = { mode: kind, card: p.card, uci: p.uci, san: p.san, wrong: [], hint: false, shown, since: now, also: false };
+    this.phase = shown ? 'teach' : 'ask';
+    if (shown) {
       out.push({ type: 'arrow', uci: p.uci });
       out.push({ type: 'note', note: { kind: 'newMove', san: p.san } });
-    } else out.push({ type: 'note', note: { kind: 'yourMove' } });
+    } else out.push({ type: 'note', note: kind === 'teach' ? { kind: 'newTry' } : { kind: 'yourMove' } });
   }
 
   private tick(now: number, out: TrainerEffect[]) {
@@ -447,7 +569,7 @@ export class Trainer {
     const played = standardUci(before, move);
     if (played === p.uci) return this.accept(p, now, out);
     if (this.setup.follow && this.followLine(before, move)) return this.accept(this.pending!, now, out);
-    if (p.mode === 'teach') {
+    if (p.mode === 'teach' && p.shown && !this.options.tryNew) {
       out.push({ type: 'takeback', path: this.path() });
       out.push({ type: 'note', note: { kind: 'newMove', san: p.san } });
       return;
@@ -506,16 +628,30 @@ export class Trainer {
     out.push({ type: 'note', note: { kind: 'shown', san: p.san } });
   }
 
-  /** Whether an answer on the card is graded: with `practice`, only the plan's asks and known moves never answered. */
+  /**
+   * Whether an answer on the card is graded: only the plan's asks and known moves never answered,
+   * and once a session. Any other move asked (a line picked, or auto-play off) is practice.
+   */
   private graded(card: CardId) {
-    return this.record && (!this.setup.practice || this.toAsk.has(card) || (statusOf(this.state(card)) === 'fresh' && this.known.has(card)));
+    return this.record && !this.answered.has(card) && (this.toAsk.has(card) || (statusOf(this.state(card)) === 'fresh' && this.known.has(card)));
+  }
+
+  /** A move asked was answered: right first time or not, for auto-play's `session` and `difficult`. */
+  private answer(card: CardId, ok: boolean, out: TrainerEffect[]) {
+    this.answered.add(card);
+    if (ok) this.right.add(card);
+    else {
+      this.right.delete(card);
+      this.missedNow.add(card);
+    }
+    out.push({ type: 'answer', card, ok });
   }
 
   private review(card: CardId, p: Pending, now: number, out: TrainerEffect[]): Grade {
     const g = grade({ wrong: p.wrong.length, hint: p.hint });
-    this.answered.add(card);
-    out.push({ type: 'answer', card, ok: g === 3 });
-    if (this.graded(card)) {
+    const graded = this.graded(card);
+    this.answer(card, g === 3, out);
+    if (graded) {
       const event: TrainerRecord = { k: 'review', card, g, ms: Math.max(0, now - p.since) };
       if (p.wrong.length) event.w = [...p.wrong];
       if (p.hint) event.h = 1;
@@ -534,7 +670,10 @@ export class Trainer {
         out.push({ type: 'record', event: { k: 'taught', card: p.card } });
         this.counts.taught++;
       }
-      out.push({ type: 'note', note: { kind: 'taught', san: p.san } });
+      // Found unaided, it counts as answered right for auto-play's `session` mode.
+      const found = !p.shown && p.wrong.length === 0 && !p.hint;
+      if (found) this.right.add(p.card);
+      out.push({ type: 'note', note: found ? { kind: 'taught', san: p.san, found } : { kind: 'taught', san: p.san } });
     } else {
       const g = this.review(p.card, p, now, out);
       out.push({ type: 'note', note: { kind: g === 3 ? 'correct' : 'played' } });
@@ -549,9 +688,10 @@ export class Trainer {
     const p = this.pending;
     if (!this.selfGrading || !p) return;
     this.pending = undefined;
+    const graded = this.graded(p.card);
     this.answered.add(p.card);
     // A move already tried wrong, or hinted, before the keys took over is failed whatever is told.
-    this.waiting = { card: p.card, mode: p.mode, san: p.san, since: p.since, failed: p.mode === 'ask' && (p.wrong.length > 0 || p.hint) };
+    this.waiting = { card: p.card, mode: p.mode, san: p.san, since: p.since, failed: p.mode === 'ask' && (p.wrong.length > 0 || p.hint), graded };
     out.push({ type: 'arrow', uci: p.uci });
     this.ply++;
     out.push({ type: 'play', uci: p.uci, san: p.san, path: this.path(), by: 'user' });
@@ -573,8 +713,8 @@ export class Trainer {
       out.push({ type: 'note', note: { kind: 'taught', san: w.san } });
     } else {
       const g = selfGrade(knew && !w.failed);
-      out.push({ type: 'answer', card: w.card, ok: g === 3 });
-      if (this.graded(w.card)) {
+      this.answer(w.card, g === 3, out);
+      if (w.graded) {
         out.push({ type: 'record', event: { k: 'review', card: w.card, g, ms: Math.max(0, now - w.since) } });
         this.counts.reviews++;
         if (g === 3) this.counts.good++;
@@ -588,7 +728,7 @@ export class Trainer {
 
   private hint(out: TrainerEffect[]) {
     const p = this.pending;
-    if (!p || p.mode !== 'ask' || p.shown) return;
+    if (!p || p.shown) return;
     p.hint = true;
     this.show(p, out);
   }

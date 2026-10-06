@@ -13,7 +13,10 @@ import { open } from '../app/mode.ts';
 import { commentId, endPreview, preview, stepPreview } from '../app/preview.ts';
 import { beginTraining } from '../app/state.ts';
 import { dataVersion } from '../app/sync.ts';
+import { decidingNow, timeOffset } from '../app/time.ts';
 import { command, endSession, isGraded, leaveForStudy, pace, PACES, pinMissed, playMove, press, queueOf, session, sessionProblem, setPace, setSelfGrade, setSpeech, speech, trainData, undoSuspend, type Pace, type SessionKind, type SessionView, type TrainData } from '../app/train.ts';
+import { trainPrefs } from '../app/trainPrefs.ts';
+import type { Line, RepertoireIndex } from '../core/repertoire/index.ts';
 import type { Mode } from '../core/app/fsm.ts';
 import { pressOf } from '../core/train/showGrade.ts';
 import { holdMediaKeys } from '../platform/mediaKeys.ts';
@@ -29,13 +32,18 @@ import { openTrainSettings } from './TrainSettings.tsx';
 
 const ASKING = new Set(['ask', 'teach', 'wrong', 'shown']);
 
+/**
+ * What the feedback line says (§5.7): only what asks something of the user (§5.17). "Your move"
+ * and "Correct" say nothing: the board shows both.
+ */
 export function noteText(note: Note | undefined): string {
   if (!note) return '';
   switch (note.kind) {
     case 'yourMove':
-      return 'Your move';
     case 'correct':
-      return 'Correct';
+      return '';
+    case 'newTry':
+      return 'New move: find it';
     case 'played':
       return 'That’s the move: it comes back soon';
     case 'wrong':
@@ -45,7 +53,7 @@ export function noteText(note: Note | undefined): string {
     case 'newMove':
       return `New move: play ${note.san}`;
     case 'taught':
-      return `New move learned: ${note.san}`;
+      return note.found ? `New move found: ${note.san}` : `New move learned: ${note.san}`;
     case 'alsoPlays':
       return 'Also in your repertoire. It has another move here too: find it';
     case 'suspended':
@@ -110,9 +118,11 @@ export function TrainScreen(props: { of: SessionKind }) {
   // Nothing to train yet, and new data arrives (a sync just after setup): look again.
   const version = dataVersion.value;
   const empty = !!s?.done && s.plan.lines.length === 0;
+  // …or the time travelled to changes (§5.17).
+  const offset = timeOffset.value;
   useEffect(() => {
     if (empty) void beginTraining(props.of);
-  }, [version]);
+  }, [version, offset]);
 
   const showing = running && s.selfGrade;
   // Read when a key arrives, not when the listener was added: the listener is replaced in an effect,
@@ -195,18 +205,21 @@ export function TrainScreen(props: { of: SessionKind }) {
       </div>
       <div class={`train-body${listed ? ' with-list' : ''}`}>
         {listed && <Lines s={s} data={data} />}
-        <div class="train-main">{s.done ? <Done s={s} /> : <Session s={s} />}</div>
+        {/* A line's or a session's end keeps the board on its last position (§5.17). */}
+        <div class="train-main">{s.done && !(s.position && s.plan.lines.length > 0) ? <Done s={s} /> : <Session s={s} />}</div>
       </div>
     </div>
   );
 }
 
-function Done(props: { s: SessionView }) {
+/** The session's end: on a card, or under the board kept at the last position (`inline`). */
+function Done(props: { s: SessionView; inline?: boolean }) {
   const { done, plan, of } = props.s;
+  const cls = props.inline ? 'train-done train-done-inline' : 'card train-done';
   if (!done) return null;
   if (of.kind === 'play') {
     return (
-      <section class="card train-done" aria-label="Session done">
+      <section class={cls} aria-label="Session done">
         <h2>Line played</h2>
         <p>
           {props.s.answers} move{props.s.answers === 1 ? '' : 's'}, {props.s.right} right first time. Nothing recorded: training keeps its schedule.
@@ -230,7 +243,7 @@ function Done(props: { s: SessionView }) {
   if (!practice && plan.lines.length === 0) return <NothingToTrain s={props.s} />;
   const after = of.kind === 'line' ? nextLine(trainData.value ?? props.s.data, props.s.scope, { sid: of.sid, cid: of.cid, path: of.at }) : undefined;
   return (
-    <section class="card train-done" aria-label="Session done">
+    <section class={cls} aria-label="Session done">
       <h2>{plan.lines.length === 0 ? 'Nothing to practise now' : of.kind === 'line' ? 'Line done' : 'Session done'}</h2>
       {practice && plan.lines.length > 0 && (
         <p>
@@ -243,6 +256,7 @@ function Done(props: { s: SessionView }) {
           {done.suspended > 0 && <> · {done.suspended} always played for you</>}
         </p>
       )}
+      {after && trainPrefs.value.lineEnd === 'go' && <GoingOn line={after.line} number={after.number} data={trainData.value ?? props.s.data} from={props.s.line} />}
       <div class="actions">
         {after && (
           <button type="button" onClick={() => open({ name: 'train', sid: after.line.sid, cid: after.line.cid, at: [...after.line.path] })}>
@@ -318,8 +332,12 @@ function Session(props: { s: SessionView }) {
     return after ? { after, before: s.path.length ? positionAt(s.chapter!, s.path.slice(0, -1)) : undefined } : undefined;
   };
 
+  // Learn's line ends (§5.17): the next line named, and "Next line" when it waits for it.
+  const holding = !s.done && s.phase === 'lineDone' && s.upcoming !== undefined && s.of.kind === 'learn';
+  const waits = holding && trainPrefs.value.lineEnd === 'wait';
+  const upcoming = s.upcoming && `Line ${lineNumber(s.data.index, s.upcoming)}${s.line && s.upcoming.cid !== s.line.cid ? ` · ${chapterNameOf(s, s.upcoming)}` : ''}`;
   return (
-    <div class="train-grid">
+    <div class="train-grid" data-phase={s.done ? 'done' : s.phase}>
       <div class="train-board" onPointerDown={shownLine ? endPreviewOnBoard : undefined}>
         {board && (
           <Board
@@ -349,8 +367,9 @@ function Session(props: { s: SessionView }) {
           </div>
         )}
         <PreviewBar owner="train" />
-        <p class={`feedback train-feedback note-${s.note?.kind ?? 'none'}`} role="status">
-          {noteText(s.note)}
+        {/* One line, always its height, so the board never moves (§5.17). */}
+        <p class={`feedback train-feedback note-${holding ? 'next' : (s.note?.kind ?? 'none')}`} role="status">
+          {s.done ? '' : holding ? `Line done · Next: ${upcoming}` : noteText(s.note)}
         </p>
       </div>
       <div class="train-panel">
@@ -381,7 +400,14 @@ function Session(props: { s: SessionView }) {
             ))}
           </div>
         )}
+        {s.done && <Done s={s} inline />}
+        {!s.done && (
         <div class="actions train-actions">
+          {waits && (
+            <button type="button" onClick={() => command('next')}>
+              Next line
+            </button>
+          )}
           {show && (
             <>
               <button type="button" class="press press-next" onClick={() => press('next')}>
@@ -435,6 +461,7 @@ function Session(props: { s: SessionView }) {
             Stop
           </button>
         </div>
+        )}
         {show && canSpeak() && (
           <label class="train-speech">
             <input type="checkbox" checked={speech.value} onChange={(e) => setSpeech(e.currentTarget.checked)} /> Speak each move
@@ -455,6 +482,57 @@ function Session(props: { s: SessionView }) {
   );
 }
 
+
+/** A line's number in its chapter, as the line list numbers it (Qchess's "Line 14"). */
+function lineNumber(index: RepertoireIndex, line: Line): number {
+  let n = 0;
+  for (const l of index.lines) {
+    if (l.sid !== line.sid || l.cid !== line.cid) continue;
+    n++;
+    if (l === line) return n;
+  }
+  return n;
+}
+
+function chapterNameOf(s: SessionView, line: Line): string {
+  const c = s.data.chapters.get(`${line.sid}/${line.cid}`);
+  return c ? (header(c, 'ChapterName') ?? line.cid) : line.cid;
+}
+
+/**
+ * At a picked line's end with "go on" (§5.17): the next line of the list opens after four paces,
+ * "Next: Line 7 · Stop" meanwhile; Stop or Escape stays here.
+ */
+function GoingOn(props: { line: Line; number: number; data: TrainData; from: Line | undefined }) {
+  const [stopped, setStopped] = useState(false);
+  const { line } = props;
+  useEffect(() => {
+    if (stopped) return;
+    const go = setTimeout(() => open({ name: 'train', sid: line.sid, cid: line.cid, at: [...line.path] }), 4 * PACES[pace.peek()]);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      setStopped(true);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      clearTimeout(go);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [stopped, line]);
+  if (stopped) return null;
+  const c = props.data.chapters.get(`${line.sid}/${line.cid}`);
+  const other = props.from && (props.from.sid !== line.sid || props.from.cid !== line.cid);
+  return (
+    <p class="train-going" role="status">
+      Next: Line {props.number}
+      {other && c ? ` · ${header(c, 'ChapterName') ?? line.cid}` : ''}{' '}
+      <button type="button" class="secondary" onClick={() => setStopped(true)}>
+        Stop
+      </button>
+    </p>
+  );
+}
 
 /** The study a screen with no line on the board opens on "Study": its chapter, or its study. */
 function studyOf(s: SessionView): Mode | undefined {
@@ -490,7 +568,7 @@ function Lines(props: { s: SessionView; data: TrainData }) {
 function NothingToTrain(props: { s: SessionView }) {
   const s = props.s;
   const data = trainData.value ?? s.data;
-  const queue = queueOf(data, Date.now(), s.scope);
+  const queue = queueOf(data, decidingNow(), s.scope);
   const next = firstNewLine(data, s.scope);
   const clock = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   return (

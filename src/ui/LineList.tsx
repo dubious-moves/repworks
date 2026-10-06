@@ -2,6 +2,7 @@
 // live, 2026-10-06): each chapter with "Learn k/n" while it has new lines, opening to its lines,
 // "Line n" with a state dot and "Due now" / "Due in 3 days"; a line clicked is trained at once,
 // due or not. Here each line also shows its own moves, from where it leaves the line before it.
+import { decidingNow } from '../app/time.ts';
 import { signal } from '@preact/signals';
 import { useEffect, useMemo } from 'preact/hooks';
 import type { Position } from 'chessops/chess';
@@ -53,8 +54,7 @@ export function LineList(props: {
   active?: { sid: string; cid: string; path: readonly string[] };
 }) {
   const { data, scope, active } = props;
-  const now = Date.now();
-  const day = dayOf(now);
+  const day = dayOf(decidingNow());
   const groups = useMemo(() => chapterRows(data.index, data.states, data.settings, day, scope), [data, scope, day.start]);
   const activeKey = active && `${active.sid}/${active.cid}`;
   useEffect(() => {
@@ -139,13 +139,13 @@ function ChapterBlock(props: { group: ChapterRows; data: TrainData; open: boolea
 
 /** The next line after `path` in the list's order (its chapter's, then the next chapter's). */
 export function nextLine(data: TrainData, scope: string | undefined, at: { sid: string; cid: string; path: readonly string[] }): LineRow | undefined {
-  const rows = chapterRows(data.index, data.states, data.settings, dayOf(Date.now()), scope).flatMap((g) => g.lines);
+  const rows = chapterRows(data.index, data.states, data.settings, dayOf(decidingNow()), scope).flatMap((g) => g.lines);
   const i = rows.findIndex((r) => r.line.sid === at.sid && r.line.cid === at.cid && r.line.path.length === at.path.length && r.line.path.every((m, j) => m === at.path[j]));
   return i >= 0 ? rows[i + 1] : undefined;
 }
 
 /** The first line of the list with new moves: "Learn the next line". */
 export function firstNewLine(data: TrainData, scope: string | undefined): LineRow | undefined {
-  for (const g of chapterRows(data.index, data.states, data.settings, dayOf(Date.now()), scope)) for (const r of g.lines) if (r.state === 'new') return r;
+  for (const g of chapterRows(data.index, data.states, data.settings, dayOf(decidingNow()), scope)) for (const r of g.lines) if (r.state === 'new') return r;
   return undefined;
 }

@@ -10,6 +10,9 @@ import { clickSquare, comment } from './board.ts';
 import { serveGithub, world } from './github.ts';
 import { serveSite, type SiteServer } from './server.ts';
 
+/** The trainer asks for a move: the feedback line says nothing for it (§5.17), so the phase tells. */
+const asked = (page: Page) => expect(page.locator('.train-grid')).toHaveAttribute('data-phase', 'ask');
+
 let site: SiteServer;
 test.beforeAll(async () => {
   site = await serveSite();
@@ -83,13 +86,13 @@ test('play: every own move asked, a wrong move taken back, the other line follow
   };
 
   // 1. e4 by the opponent; 1... c5 asked even though it isn't due. A wrong move goes back.
-  await expect(feedback).toHaveText('Your move');
+  await asked(page);
   await play('e7', 'e5');
   await expect(feedback).toHaveText('Not in your repertoire: try again');
   await play('c7', 'c5');
   // 2... d6 is suspended in the training data, and asked here all the same. 2... Nc6 is the
   // other line's move: right, and the walk follows it to 3. d4.
-  await expect(feedback).toHaveText('Your move');
+  await asked(page);
   await expect(page.locator('.train-line')).toContainText('1. e4 c5 2. Nf3');
   await play('b8', 'c6');
   await expect(page.getByRole('region', { name: 'Session done' })).toContainText('2 moves, 1 right first time');
@@ -115,12 +118,12 @@ test('play from the move menu, from the move shown; read the line from the end',
   await page.getByRole('menuitem', { name: 'Play from here' }).click();
   await expect(page).toHaveURL(/#\/play\/Rep0Najd\/Ch1Najdf\?at=e4,c5,Nf3$/);
   const feedback = page.locator('.train-feedback');
-  await expect(feedback).toHaveText('Your move');
+  await asked(page);
   await page.getByRole('button', { name: 'Hint' }).click();
   await expect(feedback).toHaveText('Play d6');
   await clickSquare(page, 'd7', 'black');
   await clickSquare(page, 'd6', 'black');
-  await expect(feedback).toHaveText('Your move');
+  await asked(page);
   await clickSquare(page, 'c5', 'black');
   await clickSquare(page, 'd4', 'black');
   await expect(page.getByRole('region', { name: 'Session done' })).toContainText('2 moves, 1 right first time');

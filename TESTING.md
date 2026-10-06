@@ -59,6 +59,15 @@ couldn't be tested then (the day's limit was used up), so the training items bel
   edit there, and "Train" takes the session up again with the edit in it and nothing asked
   twice. Whether the chapter ⚙ by the phone's chapter menu is easy to find.
 
+- §5.17: the second testing notes, built (desktop and phone): the new settings' defaults in a real
+  session (auto-play `due`, the queue's lines starting at the first due move, a picked line and
+  Learn auto-played from the start, Learn waiting at each line's end); whether the quieter
+  feedback line is enough; "Let me try first" for new moves; "Go on to the next line" on a picked
+  line and in Learn; the four auto-play modes against what lichessable does (and whether
+  `session` should be the default); time travel's banner, +4 hours bringing the day's taught
+  moves due, and "Back to now". Difficult moves are two lapses or FSRS difficulty 7: say if the
+  `difficult` mode asks too much or too little.
+
 ## Phase 2
 
 - §5.23: the explorer panel with the owner's Lichess login, on desktop and phone: on 1. e4 c5

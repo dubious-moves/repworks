@@ -1,12 +1,27 @@
-// The training settings dialog (PLAN.md §5.2, §5.16): the daily limit of new moves, the
+// The training settings dialog (PLAN.md §5.2, §5.16, §5.17): the daily limit of new moves, the
 // retention and the learning step, shared by every device through the data repo's
-// `settings.json`. Opened by ⚙ on the home screen's training card and on the training screen.
+// `settings.json`; then this device's: new moves shown or tried first, a line's end, where a line
+// starts, auto-play; and time travel, for this tab. Opened by ⚙ on the home screen's training
+// card and on the training screen.
+import { decidingNow } from '../app/time.ts';
 import { signal } from '@preact/signals';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { mode } from '../app/mode.ts';
 import { queueOf, trainData } from '../app/train.ts';
 import { saveTrainSettings } from '../app/trainSettings.ts';
+import { configureSession } from '../app/train.ts';
+import { saveTrainPrefs, trainPrefs, type TrainPrefs } from '../app/trainPrefs.ts';
 import { DEFAULT_TRAIN } from '../core/train/settings.ts';
+import type { AutoPlay, LineStart } from '../core/train/trainer.ts';
+import { TimeControl } from './TimeTravel.tsx';
+
+const STARTS: Record<LineStart, string> = { first: 'At its first new or due move', auto: 'From the start, played', ask: 'From the start, asked' };
+const AUTO: Record<AutoPlay, string> = {
+  due: 'Moves not due, and moves answered this session',
+  session: 'Moves answered right this session',
+  difficult: 'As above, but difficult moves are always asked',
+  off: 'Off: every move is asked',
+};
 
 const shown = signal(false);
 export const openTrainSettings = () => (shown.value = true);
@@ -24,12 +39,14 @@ function Dialog() {
   const [newPerDay, setNewPerDay] = useState(String(now.newPerDay));
   const [retention, setRetention] = useState(String(now.retention));
   const [step, setStep] = useState(String(now.learnStepHours));
+  const [prefs, setPrefs] = useState<TrainPrefs>(trainPrefs.peek());
+  const set = <K extends keyof TrainPrefs>(key: K, value: TrainPrefs[K]) => setPrefs({ ...prefs, [key]: value });
   const [error, setError] = useState<string | undefined>(undefined);
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     if (!ref.current!.open) ref.current!.showModal();
   }, []);
-  const taught = data ? queueOf(data, Date.now()).taughtToday : 0;
+  const taught = data ? queueOf(data, decidingNow()).taughtToday : 0;
   const save = async () => {
     const values = { newPerDay: Number(newPerDay), retention: Number(retention), learnStepHours: Number(step) };
     if (!Number.isInteger(values.newPerDay) || values.newPerDay < 0 || values.newPerDay > 1000) return setError('New moves a day: a whole number from 0 to 1000.');
@@ -37,6 +54,8 @@ function Dialog() {
     if (!(values.learnStepHours >= 0 && values.learnStepHours <= 48)) return setError('Learning step: from 0 to 48 hours.');
     const done = await saveTrainSettings(values);
     if (!done.ok) return setError(done.error);
+    saveTrainPrefs(prefs);
+    configureSession();
     close();
   };
   return (
@@ -59,6 +78,53 @@ function Dialog() {
           First review after a new move <span class="muted">(hours)</span>
           <input type="number" name="learn-step" min={0} max={48} step={0.5} inputMode="decimal" value={step} onInput={(e) => setStep(e.currentTarget.value)} />
         </label>
+        <h3>This device</h3>
+        <label>
+          New moves
+          <select name="new-moves" value={prefs.newMoves} onChange={(e) => set('newMoves', e.currentTarget.value as TrainPrefs['newMoves'])}>
+            <option value="show">Show the move (arrow and name)</option>
+            <option value="try">Let me try first</option>
+          </select>
+        </label>
+        <label>
+          Auto-play
+          <select name="auto-play" value={prefs.autoPlay} onChange={(e) => set('autoPlay', e.currentTarget.value as AutoPlay)}>
+            {(Object.keys(AUTO) as AutoPlay[]).map((k) => (
+              <option key={k} value={k}>
+                {AUTO[k]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p class="muted">Moves played for you; the others are asked, graded only when due. Moves set to “always play this for me” are always played.</p>
+        <label>
+          A line starts, in the day's queue
+          <select name="start-queue" value={prefs.startQueue} onChange={(e) => set('startQueue', e.currentTarget.value as LineStart)}>
+            {(Object.keys(STARTS) as LineStart[]).map((k) => (
+              <option key={k} value={k}>
+                {STARTS[k]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          A line starts, when learning or picked
+          <select name="start-learn" value={prefs.startLearn} onChange={(e) => set('startLearn', e.currentTarget.value as LineStart)}>
+            {(Object.keys(STARTS) as LineStart[]).map((k) => (
+              <option key={k} value={k}>
+                {STARTS[k]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          At a line's end
+          <select name="line-end" value={prefs.lineEnd} onChange={(e) => set('lineEnd', e.currentTarget.value as TrainPrefs['lineEnd'])}>
+            <option value="wait">Wait for “Next line”</option>
+            <option value="go">Go on to the next line</option>
+          </select>
+        </label>
+        <TimeControl />
         {error && (
           <p class="warn" role="alert">
             {error}

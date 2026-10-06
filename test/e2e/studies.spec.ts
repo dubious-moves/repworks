@@ -11,6 +11,9 @@ import { chapterSettings, clickSquare, newChapter } from './board.ts';
 import { serveGithub, world } from './github.ts';
 import { serveSite, type SiteServer } from './server.ts';
 
+/** The trainer asks for a move: the feedback line says nothing for it (§5.17), so the phase tells. */
+const asked = (page: Page) => expect(page.locator('.train-grid')).toHaveAttribute('data-phase', 'ask');
+
 let site: SiteServer;
 test.beforeAll(async () => {
   site = await serveSite();
@@ -165,7 +168,7 @@ test('train ↔ study: the line on the board opened editable, edited, and the se
   const git = await setUp(page);
   await page.locator('.train-card').getByRole('link', { name: 'Train' }).click();
   const feedback = page.locator('.train-feedback');
-  await expect(feedback).toHaveText('Your move');
+  await asked(page);
   await clickSquare(page, 'c7', 'black');
   await clickSquare(page, 'c5', 'black');
   await expect(feedback).toHaveText('New move: play cxd4');
@@ -214,17 +217,17 @@ test('train ↔ study from the chapter view: a repertoire study trains, the Inte
   await expect(sw.getByRole('button', { name: 'Train' })).toHaveAttribute('title', 'Train this study');
   await sw.getByRole('button', { name: 'Train' }).click();
   await expect(page).toHaveURL(/#\/train\/Rep0Najd$/);
-  await expect(page.locator('.train-feedback')).toHaveText('Your move');
+  await asked(page);
 
   // Play from here, to the study at the board's move, and Train: played again from that move.
   await page.goto(`${site.url}#/play/Rep0Najd/Ch2Alapn?at=e4`);
-  await expect(page.locator('.train-feedback')).toHaveText('Your move');
+  await asked(page);
   await page.getByRole('group', { name: 'Study or train' }).getByRole('button', { name: 'Study' }).click();
   await expect(page).toHaveURL(/#\/study\/Rep0Najd\/Ch2Alapn\?at=e4$/);
   await expect(sw.getByRole('button', { name: 'Train' })).toHaveAttribute('title', 'Back to the training session');
   await page.locator('.move[data-path="e4 c5 c3"]').click();
   await sw.getByRole('button', { name: 'Train' }).click();
   await expect(page).toHaveURL(/#\/play\/Rep0Najd\/Ch2Alapn\?at=e4,c5,c3$/);
-  await expect(page.locator('.train-feedback')).toHaveText('Your move');
+  await asked(page);
   await expect(page.locator('.train-line')).toContainText('1. e4 c5 2. c3');
 });

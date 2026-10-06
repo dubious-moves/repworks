@@ -10,6 +10,7 @@ import { OtherDeviceCode, SetupForm } from './Setup.tsx';
 import { formatTime } from './Sync.tsx';
 import { trainData } from '../app/train.ts';
 import { conflicts } from '../core/repertoire/index.ts';
+import { TimeControl } from './TimeTravel.tsx';
 
 /** The repertoire index (§5.1, §5.7): its size and build time, positions with more than one own move, chapters left out. */
 function Repertoire() {
@@ -19,6 +20,8 @@ function Repertoire() {
   const list = conflicts(index);
   return (
     <>
+      <h3>Time travel</h3>
+      <TimeControl />
       <h3>Repertoire</h3>
       <p class="repertoire-stats">
         {index.cards.size} cards · {index.lines.length} lines · {index.positions.size} positions · index built in {Math.round(data.indexMs)} ms

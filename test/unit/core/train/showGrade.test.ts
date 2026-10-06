@@ -190,3 +190,24 @@ test('moves are spoken as they are read aloud', () => {
   ];
   for (const [san, said] of cases) assert.equal(spokenMove(san), said, san);
 });
+
+test('a line\'s end held for "Next line" (§5.17): the next press goes on', () => {
+  const two = chapter('1. e4 e5 2. Nf3 (2. Nc3) *');
+  const ix2 = indexStudies([{ sid: 'Study001', kind: 'repertoire', chapters: [two] }]);
+  const states = new Map<string, CardState>([...ix2.cards.keys()].map((c) => [c, dueNow]));
+  const plan = planSession(ix2, todaysQueue(ix2, states, DEFAULT_TRAIN, day), states);
+  const trainer = new Trainer({ index: ix2, plan, states, startOf: () => startPosition(two), paceMs: 600, selfGrade: true, holdLineEnd: true });
+  const sg = new ShowGrade(trainer);
+  let now = day.now;
+  let out = sg.start(now);
+  // Runs the waits and presses `next` at every ask, until the first line's end.
+  for (let guard = 0; guard < 20 && trainer.view.phase !== 'lineDone'; guard++) {
+    const wait = out.find((e) => e.type === 'wait');
+    out = wait?.type === 'wait' && !['ask', 'shown'].includes(trainer.view.phase) ? sg.tick(wait.id, (now += 600)) : sg.press('next', (now += 1000));
+  }
+  assert.equal(trainer.view.phase, 'lineDone');
+  assert.equal(trainer.view.number, 1);
+  out = sg.press('next', (now += 1000));
+  assert.equal(out[0]?.type, 'line');
+  assert.equal(trainer.view.number, 2);
+});

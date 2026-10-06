@@ -6,7 +6,7 @@ it the same day. Phase 0 is built: §4.1 to §4.11 are on `main` (each part's "A
 where the build differed). What remains is live: the spike's re-run (§4.2), the real Qchess and
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
-with the owner's answers (§5.13); it is built through §5.16, its acceptance test (§5.14) waiting
+with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
 for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06). Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
@@ -2095,6 +2095,92 @@ bringing a just-taught move due, its review event carrying the real time, and th
 Live (owner, phone and desktop): the new settings' defaults in a real session; whether the
 quieter feedback line is enough; auto-play's modes against what the owner knows from
 lichessable.
+
+**As built** (2026-10-06):
+- **Read first**: lichessable's `DESIGN-autoplay.md` (§1–§12) and `DESIGN-difficult-moves.md`
+  (§1–§5), cloned read-only at its `main`. lichessable has two things a Repworks mode can be:
+  auto-play proper (a move answered right this session is played the next time a line passes
+  its position; the first meeting is always by hand; a failed move never auto-plays; the line,
+  not the record, chooses the move) and "difficult moves only" (an easy move is played though
+  the session never saw it, a difficult one is asked even when proven). Chessable's own "not due"
+  doesn't exist there: its review session asks whole due variations.
+- **Auto-play** (`AutoPlay` in `core/train/trainer.ts`, a `Trainer` option, changeable mid-session
+  by `configure`). The rule is in two functions now: `needs(card)` (the plan grades or teaches
+  it: due today, known and never answered, or never answered at all; mode-independent, so a
+  move never answered is still never played) and `plays(card)` (for every other own move, by the
+  mode). Suspended moves are always played.
+
+  | Mode | Answered right this session | Answered wrong this session | Not answered, not needed |
+  | --- | --- | --- | --- |
+  | `off` | asked | asked | asked |
+  | `session` (lichessable's auto-play) | played | asked | asked |
+  | `due` (default: the trainer as it was) | played | played | queue: played; a line picked: asked |
+  | `difficult` (lichessable's "difficult moves only") | played unless difficult | asked | queue: played unless difficult; a line picked: asked |
+
+  "Asked" for a move the plan doesn't need is practice: no event. A card is graded once a
+  session (`graded` now also checks it wasn't answered, which before was never reached). A move
+  taught with its arrow isn't "answered right"; one found with no arrow, wrong move or hint is
+  (`session` then plays it). **Difficult** (`isDifficult`): a reviewed card with two lapses or
+  more, or FSRS difficulty from 7 (an Again pushes a card there; Goods bring it down slowly).
+  The default is `due`, today's behaviour, until the owner says otherwise.
+- **Learn without the arrow** (`tryNew`): a new move is asked (phase `ask`, note `newTry`, "New
+  move: find it", no arrow, comments hidden as for any ask); a first wrong move is taken back,
+  a second or Hint shows the arrow; either way one `taught`, no review. The note after it says
+  "New move found: Nf3" when found unaided.
+- **Where a line starts** (`lineStart`): the line's **prefix** is its moves before the first move
+  the plan needs (or, on a line with none, before the first own move the mode asks). `first`:
+  the walk starts at the prefix's end, one move before it so the opponent's move is seen, or
+  where the board already is when that is further on; `auto`: at the chapter's start, the prefix
+  played at the pace, own moves included (even when the board already shares the line's
+  moves); `ask`: at the chapter's start, every own move of the prefix asked as practice unless
+  the mode plays it as answered this session. After the prefix, the mode decides. Unset (retry,
+  drill, the pins, the Interactive view): the walk as before. Defaults: `first` for the queue
+  and show and grade, `auto` for a line picked and Learn.
+- **A line's end**: the board stays. The trainer now ends the session at the last line's end
+  at once (no pause before `done`), its view still on that line, so the training screen keeps
+  the board at the last position with the comments of its last move, and the session's numbers
+  and buttons take the action buttons' place (`Done` inline). Only a session that walked nothing
+  (or was stopped before its first line) shows the card. The board's `data-phase` attribute
+  names the phase, for tests and styling.
+- **Auto-advance** (per device: wait / go on): Learn's lines **hold** at each end (`holdLineEnd`;
+  "Line done · Next: Line 2" and "Next line"; the trainer's `next` command, and in show and
+  grade the `next` press, go on) or go on after four paces (`lineEndPaces`), with Stop and
+  Escape ending the session. A line picked, set to go on, opens the list's next line four paces
+  after its end, "Next: Line 2 · Stop" meanwhile; Stop or Escape stays. The queue goes on after
+  two paces, as before.
+- **Quieter feedback**: "Your move" and "Correct" show nothing (the trainer still emits them; the
+  UI words them as empty), and the line keeps its height. Speech never said them.
+- **The settings**: the training settings dialog gains "This device": New moves (show / try
+  first), Auto-play (the four modes), A line starts in the day's queue, A line starts when
+  learning or picked, At a line's end; saved with the dialog to localStorage
+  (`repworks.trainPrefs`, `src/app/trainPrefs.ts`, each field checked on reading) and applied
+  to a running session at once.
+- **Time travel** (`src/app/time.ts`, `shiftedClock` in `src/platform/browser.ts`): Now, +1 hour,
+  +4 hours, +1 day, +1 week or a number of hours, in the training settings and the debug panel,
+  per tab (sessionStorage), with a banner on every screen ("Time +1 day · Back to now", the help
+  in its title). `decidingNow()` replaces the real clock where the app decides: the queue and
+  the day's bounds (home card, study cards, the session's plan, "Nothing to train"), the line
+  list's states and "Due …", the card panel, the pins due (home card, Mistakes, "Drill pinned").
+  The day's mistakes are read at the real day (they are records), so a mistake made while
+  shifted is listed. Events keep the real time (`new Date()` in `apply`); the sync's clock is the
+  real one. A screen with nothing to train looks again when the offset changes.
+- Tests: `trainer.test.ts` (each mode on two lines sharing a move answered right and one answered
+  wrong; `difficult` asking a lapsed move not due; `session` asking a move taught with its arrow
+  and playing one found; try first; each line start, and `auto` going back to the start; the
+  held end, `next`, and the session ending at once; the pause in paces; 120 random repertoires
+  under every mode, line start, try first, hold and practice: every planned ask graded once,
+  every teach taught once, nothing graded twice, no wait under the floor), `showGrade.test.ts`
+  (`next` at a held end), `test/unit/app/timeTravel.test.ts` (the shifted clock, the banner's
+  words, a move taught now due at +4 hours with the day's limit the real day's, its review at
+  the real time scheduled from it; the stored settings; each session kind's options), and
+  `test/e2e/autoplay.spec.ts` on desktop and the emulated phone (a picked line's end with the
+  board kept, "Next: Line 2", the next line opening by itself and starting from 1. e4, Escape
+  staying, and "Your move"/"Correct" never shown; a new move tried first with no arrow, then due
+  at +4 hours, its review at the real time, "Back to now"; Learn holding with "Next line"). The
+  existing specs wait on `data-phase` where they waited on "Your move"; two of them now follow
+  the new defaults (a picked line starting auto-played, the board kept at the end). 360 runs of
+  the training, line, studies, views and §5.17 specs under `--repeat-each=8 --workers=4` passed
+  before pushing.
 
 #### 5.18 Alternative moves (Chessable's), planned for later
 
