@@ -7,7 +7,7 @@ where the build differed). What remains is live: the spike's re-run (§4.2), the
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
 with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
-for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.27 (the course tree) and §5.18 (alternative moves) wait for the owner's answers, §5.28 for the owner's devices. Read with `DECISIONS.md`, which this plan updates (its
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.27 (the course tree) and §5.18 (alternative moves) wait for the owner's answers, §5.28 for the owner's devices. Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06). Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -1038,7 +1038,8 @@ daily use, and editing in Qchess doesn't stop (D18), until the acceptance test h
 
 ## 5. Phase 1 in depth, and later phases (outline)
 
-Phase 1 is planned in depth below, the way §4 plans Phase 0, and Phase 2 after it (§5.20–§5.28).
+Phase 1 is planned in depth below, the way §4 plans Phase 0, then Phase 2 (§5.20–§5.28) and Phase 3
+(§5.29–§5.37).
 The later phases stay in outline: each lists its scope, what it reuses, its main risks and the
 checks that would prove it.
 
@@ -2782,25 +2783,322 @@ Checks:
 
 ### Phase 3: Analysis with Stockfish and Maia
 
-Scope:
-- **Stockfish 18** lite single-threaded first (mistake-lab's 7.3 MB build, no isolation
-  needed). Threads later if wanted: the service worker can add COOP/COEP itself, and Lichess
-  login already uses redirects.
-- **Maia 3**: the GPL-3 model vendored with attribution, and onnxruntime-web vendored, not from
-  a CDN. The encoding is ported from mistake-lab and checked against q_extension's
-  `tools/repgen/maia.mjs`.
-- **The analysis board**: MultiPV arrows, eval bar, Maia and database overlays. "Add as
-  variation" into a study, which is trivial now that the site owns the studies.
+Planned on 2026-10-06, after Phase 2's build (through §5.26) and while its live checks wait for
+the owner (TESTING.md). The parts below are in build order; each lists its tasks, the tests that
+prove it, and what only a live check can show, on which device. Numbering goes on from Phase 2's.
+
+**Scope**, from the outline the owner approved:
+- **Stockfish 18**, the lite single-threaded build first (mistake-lab's 7.3 MB build, no
+  isolation needed); threads later if wanted (§5.36).
+- **Maia 3**: the GPL-3 model vendored with attribution (D11), and onnxruntime-web vendored, not
+  from a CDN. The encoding ported and checked against q_extension's `tools/repgen/maia.mjs`.
+- **The analysis board**: MultiPV arrows, an eval bar, Maia and database overlays, and "add as
+  variation" into a study.
+
+**Sources, read for this plan** (2026-10-06):
+- mistake-lab (`skAeglund/mistake-lab`, `main` cloned outside this repo): `docs/architecture-
+  reference.md` first (its engine, eval bar, eval cache, analysis mode, Maia init phases and
+  overlays), then `index.html`'s `initStockfish`, `handleSfCrash`, `sfAnalyzeAdaptive`,
+  `startAnalysisSearch`, the eval worker, and the Maia section (`prefetchMaia`, `compileMaia`,
+  `maiaMirrorFEN`, `maiaEncodeBoard`, `maiaPolicyTopMoves`); `engine/` and `maia/`.
+- q_extension at `c26242f`: `tools/repgen/maia.mjs` (the encoding, the policy, the batching
+  queue, the pinned model and its sha256), `src/background.js`'s Maia over the port and the
+  preview search, `src/main-world.js`'s Maia view of the Practical column (`peMaiaElo`, the
+  `Prac`/`Maia` header switch, the purple cells), its CLAUDE.md's notes on Qchess's Maia.
+- Qchess, read live on the test account (desktop 1600×900, phone 412×915, headless) and in its
+  source: the study page's engine bar (`#engine`: the engine switch, "SF18 Small", "Depth: 20"
+  with the nodes per second while it computes, "+" to go deeper, the threat button (W), the
+  settings ⚙), the PV lines under it (`#pv1_display`…: the eval from White's side in pawns, then
+  the moves in SAN), the eval bar on the board's right edge (Lichess's win% formula), the engine
+  settings (Depth 20/30/40, Lines 1–5, Threads 1/3/7, Max time 5/8/30 s), its search lifecycle
+  (one `go` at a time: a new position sends `stop`, waits for `bestmove`, then starts; info lines
+  of a stopped search are ignored; the shown depth never goes down; evals cached per FEN; one
+  tab at a time runs the engine); `/Frontend/engineLoader.js` (SF18 full, lite and a basic
+  build, chosen by what the device can run); and `/Frontend/maia/maia-integration.js` with
+  `maia-worker.js`: a "Maia3" switch beside the engine's, a one-time "Download (44 MB)" dialog
+  with progress, the model kept in IndexedDB, a rating (600–2600, default 2600), and in the
+  explorer two columns before the bars, **Ml** (Maia's likelihood of the move at that rating) and
+  **Ms** (Maia's expected score for the side to move after it, from the model's value head on
+  the position after the move), Maia's top four moves the table lacks added as rows, and a sort
+  by Ml. Qchess runs cross-origin isolated (`crossOriginIsolated` is true there), hence its
+  threads; Maia is off in its Move Trainer.
+
+**Checked for this plan** (scratch code outside the repo, 2026-10-06):
+- mistake-lab's `stockfish-18-lite-single.{js,wasm}` are byte-identical to npm `stockfish@18.0.0`
+  (sha256 `2278005…` and `a8fbc05…`). The build runs under Node (it has a command-line mode), and
+  there **`stop` ends a search** (`go infinite`, `stop` after 2 s: `bestmove` at once, and the next
+  search runs). mistake-lab never sends `stop` ("WASM crashes"), Qchess does; the browser worker
+  is checked in §5.30. npm also has `stockfish@19.0.0`, whose lite single build is 1.8 MB with
+  another small net; 18 stays (proven in mistake-lab on the owner's phone), 19 noted as a
+  possible swap.
+- **One Maia model everywhere**: mistake-lab's `maia3_simplified.onnx`, q_extension's pin
+  (CSSLab `a6e52f5`) and Qchess's newer pin (`0013cc8`) are the same file (sha256 `405bf76c…`,
+  45,683,686 bytes). Its weights are float16 (168 of 210 initializers), cast to float32 in the
+  graph (opset 17, 1,359 nodes).
+- mistake-lab's move table (`all_moves_maia3.json`) is q_extension's `moveIndex` formula, all
+  4,352 entries, so no table needs shipping.
+- **onnxruntime-web 1.30.0 under Node** runs the model (session 1.2 s; 140 ms a position, single
+  thread, this container) with q_extension's encoding. Against q_extension's own runner
+  (onnxruntime-node 1.30.0) on 50 fixed positions: the same top five in the same order, the
+  probabilities within **0.0043**; the logits differ by up to 0.09 between runtimes, and by 0.08
+  between web's own optimization levels, while node's levels agree exactly. So the outline's
+  "to 1e-4" can't hold across runtimes (fp16 weights, different kernels); the check becomes
+  exact equality of the encoding and the policy, and the runtimes within 0.01 (§5.32).
+- onnxruntime-web's wasm (`ort-wasm-simd-threaded.wasm`) is 14.2 MB: Maia costs about 60 MB to
+  download, Stockfish 7.3 MB.
+
+**Decisions** (technical calls, each with its reason; in DECISIONS.md's revision log):
+- **Engines and the model are downloaded when first used, not precached.** The service worker
+  precaches the shell anew on every deploy; 60 MB with it would be downloaded again each time.
+  They go in a cache of their own, by content-hashed name, kept across deploys.
+- **Maia asks first** (Qchess's one-time dialog, with the size and progress), Stockfish doesn't
+  (7.3 MB, said while it loads).
+- **The study page is the analysis board** (Lichess's study, Qchess's study page): the engine
+  panel sits there. A PV is a clickable line (§5.12's preview): stepping through it on the board
+  edits nothing, and "Add" puts it in the chapter as a variation. A scratch board for positions
+  in no study comes after (§5.35).
+- **Maia in the explorer as Qchess's** (D21): Ml and Ms columns, Maia's moves as rows, a sort by
+  Ml. Its rating follows the Lichess filter by default (q_extension's `maiaEloFor`: the players
+  whose games stand beside it), or a fixed rating.
+- **Never during training**: neither engine runs in training, Read or Play (Qchess turns Maia
+  off in its Move Trainer; an eval would give the answer away).
+
+Where the new code goes:
+
+```
+vendor/stockfish/    stockfish-18-lite-single.{js,wasm} (npm stockfish@18.0.0), Copying.txt, README.md
+vendor/maia/         maia3_simplified.onnx (CSSLab a6e52f5), README.md (attribution, GPL-3)
+src/core/engine/     uci.ts (info lines, scores, PVs in SAN), search.ts (the search lifecycle),
+                     winning.ts (win%, the eval bar), shapes.ts (the arrows)
+src/core/maia/       encode.ts (tokens, move index, policy, value), batch.ts (q_extension's queue)
+src/platform/        stockfish.ts (the worker and its watchdog), maiaWorker.ts (onnxruntime-web),
+                     blobs.ts (the engines' cache: download with progress, size, delete)
+src/app/             engine.ts, maia.ts (signals, settings, the workers' clients)
+src/ui/              Engine.tsx (the bar, the lines, the eval bar), EngineSettings.tsx, MaiaDialog.tsx
+```
+
+#### 5.29 Engines and the model on the site
+
+- `vendor/stockfish/`: npm `stockfish@18.0.0`'s `stockfish-18-lite-single.js` and `.wasm`
+  (GPL-3, its `Copying.txt`), with a README giving their source and sha256. `vendor/maia/`:
+  `maia3_simplified.onnx` (CSSLab/maia-platform-frontend at `a6e52f5`, GPL-3, no separate model
+  licence: D11), with a README crediting CSSLab and the Maia papers, and the sha256.
+  onnxruntime-web 1.30.0 (MIT) is an npm dependency; its `ort-wasm-simd-threaded.{mjs,wasm}`
+  are bundled, never fetched from a CDN (`env.wasm.wasmPaths` set to the built files).
+- The build emits them under content-hashed names. The service worker leaves them out of the
+  shell's precache and serves them from a cache of their own (`repworks-engines`): cache first,
+  else fetched and kept; on activation it deletes only the entries no kept version names.
+- `src/platform/blobs.ts`: whether a file is stored, its download with progress (a streamed
+  `fetch` through the worker, so the cache fills as it goes), the stored size, delete. The
+  storage is persistent already (`persist()`, §4.9).
+
+Tests: the build's listing (the binaries out of `__PRECACHE__`, in the engines' list, hashed);
+Playwright on the built site: the engine file fetched once, then served from the cache with the
+network cut; a deploy with another shell keeping the engines' cache; nothing requested from a
+CDN (any request off the site's origin, Lichess, ChessDB and GitHub fails the test).
+
+Live (desktop and phone): the first download's time; offline after a reload.
+
+#### 5.30 Stockfish in a worker
+
+- `core/engine/uci.ts` (pure): an `info` line to `{depth, seldepth, multipv, score (cp or mate,
+  from White's side), nodes, nps, time, pv (UCI)}`; a PV to SAN with chessops (castling as UCI
+  `e1g1` from the engine); `bestmove`.
+- `core/engine/search.ts` (pure, the clock passed in): Qchess's lifecycle as a state machine:
+  one `go` at a time; a new position sends `stop` and starts once `bestmove` arrives; info of a
+  stopped search is dropped; the lines shown never go to a lower depth; `go depth D movetime T`,
+  and "+" goes deeper (`go infinite` until stopped); the result kept per position key and
+  MultiPV (an LRU of 300, mistake-lab's), so coming back shows it at once and only deepens.
+- `src/platform/stockfish.ts`: a classic worker on the vendored build, the wasm's URL in its hash
+  (the build reads it there); `uci`, `isready`, `Hash 16` (32 on the desktop); a crash or no
+  `bestmove` within 3 s of a `stop` terminates it and starts a new one (mistake-lab's guard);
+  three failures in a row and it gives up with a message.
+- Off while the page is hidden; one tab at a time (a `BroadcastChannel`: a tab starting the
+  engine stops it in the others, as Qchess's `qchessSfOwner`).
+
+Tests: `uci.test.ts` (cp and mate from White's side with Black to move, lower and upper bounds,
+MultiPV, a PV with castling and a promotion in SAN); `search.test.ts` over a fake engine (a new
+position while one runs: `stop`, then the new `go` only after `bestmove`; the stopped search's
+lines dropped; no shallower lines shown; the cache answering and deepening; "+"); and
+`stockfish.test.ts` running the real build under Node (a copy as `.cjs` with its wasm, as a
+child process): `bestmove` on fixed positions (mate in one and in two, a hanging queen, a
+stalemate-avoiding move), MultiPV 3, `stop` mid-search followed by another search.
+Playwright (desktop, the container's Chromium): the worker from the build gives mate in one,
+and a position changed mid-search answers the new position (the browser's `stop`).
+
+Live: (phone) the depth reached in 8 s and the heat over ten minutes.
+
+#### 5.31 The engine panel on the study page (Qchess's engine bar)
+
+- **The bar**, at the top of the panel (on the phone, under the move buttons, above the
+  notation): the engine's switch, "SF18", "Depth 18 · 650 kn/s" (the speed while it computes),
+  "+" to go deeper once a search is done, the threat button (Qchess's W: the position with the
+  other side to move, its best move as a red arrow), ⚙ (`EngineSettings.tsx`: depth 20/30/40,
+  lines 1–5, max time 5/8/30 s, arrows on or off; Qchess's defaults, lines 3 for the outline's
+  MultiPV arrows). On or off per device, off by default; the settings per device.
+- **The lines**: one row per PV: the eval from White's side (`+0.38`, `#3`, `-#2`), then the
+  moves in SAN with move numbers, cut to the row on the phone. A move is a clickable line
+  (§5.12's preview): the board shows the position after it, ◀ ▶ step, Back returns, and the
+  preview bar's **Add** puts the PV up to the move shown into the chapter at the board's move
+  (an ordinary edit: it follows moves already there and adds the rest as a variation; undo).
+- **The eval bar** on the board's right edge (Qchess's place), White's win% (Lichess's formula,
+  `core/engine/winning.ts`), turned with the board; a mate fills it.
+- **Arrows** (chessground's auto shapes, never saved): the first move of each line, the best
+  one darkest and thickest, the others fainter as their eval falls behind (mistake-lab's
+  rule); the threat in red. They give way to the chapter's own arrows while a comment line is
+  previewed.
+- Never in training, Read or Play; the explorer and the engine are independent.
+
+Tests: `winning.test.ts`, `shapes.test.ts` (the arrows' order and opacity by the eval gap,
+mates); Playwright with a fake engine worker (scripted UCI, routed in the e2e server): the bar
+switched on and remembered, the lines with evals from White's side after a Black move, the
+eval bar's share, a PV move previewed and stepped, Add putting the line into the chapter and
+undo taking it back, the threat arrow, a new move mid-search showing only the new position's
+lines, the panel on the phone (nothing wider than the screen), nothing running in training.
+
+Live (desktop and phone): beside Qchess's SF18 on the same positions (the best move the same,
+evals close at the same depth); the arrows' readability; a line added and synced.
+
+#### 5.32 Maia in a worker
+
+- `core/maia/encode.ts` (pure), q_extension's encoding on chessops: `tokens(fen)` (64×12, from
+  the side to move's view, flipped with the colours swapped when Black moves), `moveIndex`,
+  `policy(fen, logits)` (softmax over the legal moves, the tail under 0.1% dropped, SAN from the
+  real position), and `expectedScore(fen, valueLogits)` (Qchess's Ms: loss/draw/win to the
+  mover's score, `w + d/2`).
+- `core/maia/batch.ts`: q_extension's `createMaia` (one run at a time; requests made meanwhile
+  share the next batch, up to 32; memo by position key and rating; in-flight sharing), the
+  `run` and `defer` passed in.
+- `src/platform/maiaWorker.ts`, a module worker: onnxruntime-web, wasm, one thread; the model
+  from the engines' cache; messages `init` (→ `ready` or `missing`), `download` (→ `progress`,
+  then `ready`), `policy {id, fen, elo}`, `scores {id, fen, sans, elo}` (the positions after the
+  moves, in one batch), and a port for the explorer worker (§5.34). The page ends it after 90 s
+  unused and when Maia is switched off (an ORT session holds hundreds of MB; Qchess and
+  q_extension do the same).
+- `src/app/maia.ts`: Maia's state (off, missing, downloading n%, loading, ready, error), the
+  rating (per device: "as the explorer's filter" by default, or 600–2600 by 100), and
+  `MaiaDialog.tsx`, Qchess's dialog: what Maia is, the one-time download of about 60 MB (a
+  mobile-data warning on the phone), credit to CSSLab and maiachess.com, Download/Cancel, then
+  the progress; Delete in the settings.
+
+Tests: `encode.test.ts` (tokens of a position and its colour-flipped twin; indices of a
+promotion and castling; the policy over given logits; the expected score from both sides) and
+`maia.test.ts`, running onnxruntime-web under Node on the vendored model against
+`test/fixtures/maia/reference.json`: 50 fixed positions (12 chosen: openings, en passant,
+promotions with and without capture, castling both ways, endgames; 38 from seeded random games;
+22 with Black to move) at five ratings, whose top five and value logits were computed by
+q_extension's `maia.mjs` (`c26242f`) on onnxruntime-node 1.30.0 (`scripts/maia-reference.mjs`,
+run once with both at hand). Checked: the same moves in the same order wherever the reference's
+neighbours differ by more than 0.01, probabilities within 0.01, the expected score within 0.01;
+and the onnxruntime-web values themselves stored, to 1e-6, so a change of runtime shows.
+`batch.test.ts` (q_extension's: requests in one turn share a run, the memo, a failed run
+rejecting its batch only). Playwright (desktop): the dialog, a download from the built site
+with progress, the worker's top five on three fixture positions equal to Node's onnxruntime-web
+(the same wasm, to 1e-6), Delete.
+
+Live: (phone) the download on Wi-Fi, a position's time, the memory (the page not reloaded by
+Android after ten minutes with Maia on).
+
+#### 5.33 Maia in the explorer panel (Qchess's Ml and Ms)
+
+- A **Maia switch** in the engine bar, as Qchess's "Maia3"; on, the explorer gains two columns
+  before the bars: **Ml**, the move's likelihood at the rating (`9.5%`, `31%`), and **Ms**,
+  Maia's expected score for the side to move after the move, for the first four rows (Qchess's
+  `TOP_N`), `…` while asked. Maia's top four moves the table lacks are added as rows (purple
+  names, "Maia" in place of the bar), placed as Qchess's novelties are. **Sort by Ml** (Qchess's
+  `maia` order) in the menu and on the Ml title.
+- Maia's answers kept per position and rating for the session; asked after the panel's 280 ms,
+  the position left dropping its request. On the phone the two columns take the place the bar's
+  labels leave (checked for overflow).
+
+Tests: `table.test.ts` (Maia's rows added and placed, the Ml sort, rows the games and Maia
+share); Playwright with a fake Maia worker: the switch, the columns' values and titles, Maia's
+added row, the sort, nothing wider than the phone, Maia off in training.
+
+Live (desktop): Ml and Ms beside Qchess's Maia3 at the same rating on three positions (the same
+top four, likelihoods and scores within a point: both run onnxruntime-web).
+
+#### 5.34 Maia in the Practical column (q_extension's fill-in and preview)
+
+- The explorer worker's `provider.maia` asks the Maia worker over a `MessageChannel` the page
+  sets up, batched (`core/maia/batch.ts`); `service.ts` stops forcing `maia: false`. With Maia
+  ready, q_extension's defaults apply: under 100 games Maia's policy is blended in as pseudo-
+  games, under 10 Maia alone decides (`maiaUntil`, `maiaOnlyBelow`, `maiaWeight`), at the
+  filter's rating (`maiaEloFor`).
+- **The preview** (`createPreviewedSearch`, ported and switched off in §5.21): the same rows with
+  Maia's predictions in place of games, fast because only ChessDB and Maia are asked. The Prac
+  header switches the column between the Lichess values and Maia's (purple italics, q_extension's
+  `qx-maia`); a value resting mostly on Maia is purple; the details say Maia's share.
+- Settings: "Maia in the Practical column" (on once Maia is on) and the preview (on), under the
+  explorer's settings.
+
+Tests: `service.test.ts` (Maia asked for a thin position, the blend's weight, Maia missing
+leaving the node a leaf, the preview's rows asking no explorer), the ported `pe.test.ts` Maia
+sections now through the service; Playwright with fake Maia and explorer: a purple value, the
+header switch, the details' Maia line.
+
+Live (desktop): beside q_extension's column with Maia on (values within a point at the same
+depth); (phone) a search's time with Maia.
+
+#### 5.35 The analysis board (a scratch chapter) and "add to a chapter"
+
+- `#/analysis/<fen>`: the study page's view over a chapter kept on the device only (never
+  synced), with the engine, Maia and the explorer; a FEN pasted or the start position; from the
+  home screen ("Analysis board") and from a move's menu ("Analyse from here").
+- **Add to a chapter**: the scratch line from where it began into a chosen chapter whose tree
+  reaches that position (the one it came from first), as a variation, synced like any edit.
+
+Tests: `fsm.test.ts` (the route), Playwright: a FEN pasted and analysed with the fake engine,
+the line added to the chapter it came from, nothing synced from the scratch board.
+
+Live: one session on each device.
+
+#### 5.36 Threads (cross-origin isolation through the service worker)
+
+Built if its check passes in the container's Chromium; else written up for the owner.
+- The service worker adds `Cross-Origin-Opener-Policy: same-origin` and
+  `Cross-Origin-Embedder-Policy: require-corp` to the pages it serves, so the page is
+  `crossOriginIsolated` from its second load (the first, before the worker controls it, runs
+  one thread). Every cross-origin request the site makes is CORS (GitHub, Lichess, ChessDB, the
+  local explorer), which COEP allows; Lichess's login is a redirect, which COOP allows (D17).
+- When isolated, the multi-threaded lite build (`stockfish-18-lite.{js,wasm}`, npm 18.0.0) and a
+  Threads setting (Qchess's 1/3/7; default half the cores, at most 4, on the desktop, and 1 on
+  the phone).
+
+Tests: Playwright on the built site: isolated after a reload, the GitHub, Lichess and ChessDB
+fakes still answered, the threaded engine's `bestmove`, more nodes per second than one thread.
+
+Live (desktop and phone): isolation, the login and the sync unaffected, the speed.
+
+#### 5.37 Phase 3 acceptance test, and exit
+
+**Acceptance test (live, desktop + Android phone)**, on the owner's repertoire:
+1. Desktop: the engine on at 1. e4 c5 2. Nf3 and two other positions beside Qchess's SF18 (the
+   same best move, evals within 0.2 at depth 20); the lines, arrows and eval bar.
+2. Phone: the engine on for a session: the depth in 8 s, the heat, off when the page is hidden.
+3. Maia downloaded on both (the phone on Wi-Fi); Ml and Ms beside Qchess's Maia3 at one rating;
+   still there offline after a reload.
+4. A PV line previewed and added to a chapter on the phone, seen on the desktop after a sync.
+5. The Practical column with Maia on a thin position, and the Maia preview.
+6. The analysis board: a FEN pasted, analysed, its line added to a chapter.
+7. If built: threads on the desktop.
+
+**Phase 3 exit**: unit and e2e tests green; the acceptance test passed live; a week of use.
 
 Risks:
-- memory and battery on the phone (Maia 46 MB plus ORT plus Stockfish);
-- the model download over mobile data, which must be cached and persisted;
-- COEP side effects if threads are turned on.
+- Memory and battery on the phone (Maia's session, onnxruntime-web and Stockfish): Maia's worker
+  ends when unused, the engine stops when the page is hidden.
+- The 60 MB download over mobile data: asked first, kept for good in the engines' cache.
+- `stop` in the browser's worker (mistake-lab avoids it): a watchdog restarts the worker.
+- onnxruntime-web's numbers differ from onnxruntime-node's by up to 0.0043 in probability:
+  compared within 0.01; Qchess also runs onnxruntime-web (1.26), so it is the closer reference.
+- COEP side effects if threads are turned on (§5.36).
 
 Checks:
-- Maia's top-5 probabilities match q_extension's Node runner on 50 fixed positions, to 1e-4;
-- speed measured on the phone;
-- Stockfish's bestmove on fixed test positions.
+- Maia's top five against q_extension's Node runner on 50 fixed positions (the moves in order,
+  within 0.01; the encoding exact);
+- Stockfish's `bestmove` on fixed positions, under Node and in the browser;
+- speed measured on the phone (TESTING.md).
 
 ### Phase 4: Intuition storm and puzzles
 

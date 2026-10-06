@@ -1052,3 +1052,34 @@ its reason:
 - **"Gaps" without a reference study is not built:** it would need an explorer request for every
   position of the repertoire where the opponent moves.
 
+
+## Revision of 2026-10-06 (Phase 3 planned)
+Phase 3 is planned in depth in `PLAN.md` §5.29–§5.37, from mistake-lab (its architecture
+reference, engine, analysis mode and Maia code), q_extension's `tools/repgen/maia.mjs` and Maia
+provider (`c26242f`), and Qchess's engine bar and Maia integration, read live on the test
+account. The technical calls, each with its reason:
+- **D11: the model and both engines are downloaded when first used, into a cache of their own
+  (`repworks-engines`), not precached with the shell.** The shell is precached anew on every
+  deploy; Maia's 60 MB (the model and onnxruntime-web's wasm) would come with each one. Maia
+  asks first, as Qchess does; Stockfish (7.3 MB) doesn't.
+- **Stockfish 18 lite single from npm `stockfish@18.0.0`**, byte-identical to mistake-lab's
+  build, vendored with its licence. `stockfish@19.0.0` exists (a 1.8 MB lite build, another
+  small net); 18 stays because it is proven on the owner's phone in mistake-lab.
+- **`stop`, as Qchess and Lichess do, with mistake-lab's restart as the fallback.** mistake-lab
+  never sends `stop` ("WASM crashes"); under Node the same build ends its search on `stop` and
+  runs the next one. A worker that gives no `bestmove` within 3 s of a `stop` is restarted.
+- **The Maia check is "the same top five, within 0.01", not "to 1e-4".** The model's weights are
+  float16; onnxruntime-web and onnxruntime-node give logits up to 0.09 apart (web's own
+  optimization levels differ by 0.08), the probabilities up to 0.0043 on 50 positions. The
+  encoding and the policy are checked exactly, the runtimes within 0.01, and the web runtime's
+  own values to 1e-6 (Node and the browser run the same wasm).
+- **No move tables shipped:** mistake-lab's `all_moves_maia3.json` is q_extension's index
+  formula, all 4,352 entries.
+- **D21: Maia in the explorer as Qchess's** (Ml and Ms columns, Maia's moves as rows, a sort by
+  Ml), its rating following the Lichess filter (q_extension's `maiaEloFor`) unless one is chosen.
+- **The study page is the analysis board**; a PV is previewed as a clickable line and added to the
+  chapter only by its Add. A scratch board for positions in no study comes later in the phase.
+- **Neither engine runs in training, Read or Play.**
+- **Threads (§5.36) through cross-origin isolation added by the service worker**, built only if
+  it checks out in the container's Chromium (every cross-origin request the site makes is CORS,
+  and the login is a redirect).
