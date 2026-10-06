@@ -16,6 +16,9 @@ function chapter(cid: string, pgn: string): Chapter {
   return parsed.chapter;
 }
 
+/** Whether some line runs through the node at `path`. */
+const onSomeLine = (lines: readonly { path: readonly string[] }[], path: readonly string[]) => lines.some((l) => path.every((san, i) => l.path[i] === san));
+
 const pgn = (side: string, moves: string, extra = '') => `[Orientation "${side}"]\n${extra}\n${moves} *\n`;
 
 /** The key of the position after the moves, from the standard start. */
@@ -45,8 +48,8 @@ test("a Black chapter's cards are Black's moves; White's are the opponent's", ()
   const text = readFileSync(new URL('../../../fixtures/data-repo/studies/Rep0Najd/Ch1Najdf.pgn', import.meta.url), 'utf8');
   const result = indexChapter('Rep0Najd', chapter('Ch1Najdf', text));
   assert.ok(result.ok);
-  const own = result.index.moves.filter((m) => m.card).map((m) => m.san);
-  const theirs = result.index.moves.filter((m) => !m.card).map((m) => m.san);
+  const own = result.index.moves.filter((m) => m.card).map((m) => m.at.san);
+  const theirs = result.index.moves.filter((m) => !m.card).map((m) => m.at.san);
   assert.deepEqual(own, ['c5', 'd6', 'cxd4', 'Nc6']);
   assert.deepEqual(theirs, ['e4', 'Nf3', 'd4', 'd4']);
   assert.equal(result.index.side, 'black');
@@ -57,7 +60,7 @@ test('a start position with Black to move makes cards from it', () => {
   const result = indexChapter('Study001', chapter('Ch1Fen01', pgn('black', '1... c5 2. Nf3 d6', `[SetUp "1"]\n[FEN "${fen}"]`)));
   assert.ok(result.ok);
   const first = result.index.moves[0]!;
-  assert.equal(first.san, 'c5');
+  assert.equal(first.at.san, 'c5');
   assert.equal(first.card, repertoireCard(positionKey(fen), 'c7c5'));
   assert.deepEqual(result.index.lines.map((l) => l.cards.length), [2]);
 });
@@ -97,16 +100,16 @@ test('lines come in tree order, and every own move lies on a line', () => {
     result.index.lines.map((l) => l.path.join(' ')),
     ['e4 e5 Nf3 Nc6 Bb5', 'e4 e5 Nf3 d6 d4', 'e4 c5 Nf3', 'e4 c5 c3'],
   );
-  const onLines = new Set(result.index.lines.flatMap((l) => l.cards));
-  for (const m of result.index.moves) if (m.card) assert.ok(onLines.has(m.card), m.san);
+  for (const m of result.index.moves) assert.ok(onSomeLine(result.index.lines, m.at.path), m.at.san);
   assert.deepEqual(result.index.lines[1]!.cards.length, 3);
 });
 
 test('a chapter marked known says so on its lines', () => {
   const known = indexChapter('Study001', chapter('Known001', pgn('white', '1. e4 e5 2. Nf3', '[RepworksKnown "true"]')));
   const fresh = indexChapter('Study001', chapter('Fresh001', pgn('white', '1. e4 e5 2. Nf3')));
-  assert.ok(known.ok && fresh.ok);
-  assert.deepEqual([known.index.lines[0]!.known, fresh.index.lines[0]!.known], [true, false]);
+  const other = indexChapter('Study001', chapter('Other001', pgn('white', '1. e4 e5 2. Nf3', '[RepworksKnown "false"]')));
+  assert.ok(known.ok && fresh.ok && other.ok);
+  assert.deepEqual([known.index.lines[0]!.known, fresh.index.lines[0]!.known, other.index.lines[0]!.known], [true, false, false]);
 });
 
 test('a chapter without a side is skipped with its reason; reference studies make no cards', () => {
@@ -146,10 +149,72 @@ test('random chapters: every own move is on a line, every line ends at a leaf, a
     const again = indexChapter('Study001', c);
     assert.ok(once.ok && again.ok, `seed ${seed}`);
     assert.deepEqual(once, again);
-    const onLines = new Set(once.index.lines.flatMap((l) => l.cards));
-    for (const m of once.index.moves) if (m.card) assert.ok(onLines.has(m.card), `seed ${seed}: ${m.at.path.join(' ')}`);
+    for (const m of once.index.moves) assert.ok(onSomeLine(once.index.lines, m.at.path), `seed ${seed}: ${m.at.path.join(' ')}`);
+    // One line per leaf, and every line ends at one.
+    let leaves = 0;
+    const count = (n: { children: { children: unknown[] }[] }, depth: number): void => {
+      if (depth > 0 && n.children.length === 0) leaves++;
+      for (const ch of n.children) count(ch as never, depth + 1);
+    };
+    count(c.root as never, 0);
+    assert.equal(once.index.lines.length, leaves, `seed ${seed}`);
     for (const line of once.index.lines) assert.equal(nodeAt(c, line.path)?.children.length, 0, `seed ${seed}`);
     // Own moves alternate with the opponent's: on each line, every other move is a card.
     for (const line of once.index.lines) assert.ok(Math.abs(line.cards.length * 2 - line.path.length) <= 1, `seed ${seed}`);
   }
+});
+
+test('one own move played in two chapters is not a conflict; the opponent moves are listed by where they are played', () => {
+  const a = chapter('ChapterA', pgn('white', '1. e4 e5 2. Nf3'));
+  const b = chapter('ChapterB', pgn('white', '1. e4 c5 2. Nf3'));
+  const index = combineIndex([indexChapter('Study001', a), indexChapter('Study001', b)]);
+  assert.deepEqual(conflicts(index), []);
+  const afterE4 = index.positions.get(keyAfter('e4') as never)!;
+  assert.deepEqual([...afterE4.opponent].map(([uci, at]) => [uci, at.map((o) => `${o.cid} ${o.san}`)]), [
+    ['e7e5', ['ChapterA e5']],
+    ['c7c5', ['ChapterB c5']],
+  ]);
+});
+
+test('lines follow the order of the studies and of their chapters', () => {
+  const ch = (cid: string, moves: string) => chapter(cid, pgn('white', moves));
+  const index = indexStudies([
+    { sid: 'Study002', kind: 'repertoire', chapters: [ch('Second02', '1. d4'), ch('First002', '1. c4')] },
+    { sid: 'Study001', kind: 'repertoire', chapters: [ch('Only0001', '1. e4')] },
+  ]);
+  assert.deepEqual(index.lines.map((l) => `${l.sid}/${l.cid}`), ['Study002/Second02', 'Study002/First002', 'Study001/Only0001']);
+});
+
+test('a start position that is not legal is skipped with its reason', () => {
+  const bad: Chapter = { id: 'BadFen01', headers: [['Orientation', 'white'], ['FEN', '8/8/8/8/8/8/8/8 w - - 0 1'], ['SetUp', '1']], root: { comments: [], shapes: [], nags: [], startingComments: [], children: [] } };
+  assert.deepEqual(indexChapter('Study001', bad), { ok: false, sid: 'Study001', cid: 'BadFen01', reason: 'the start position is not legal' });
+});
+
+test('a move whose continuation was cut still ends a line, so its own moves are on one', () => {
+  const c = chapter('Cut00001', pgn('white', '1. e4 e5 2. Nf3'));
+  // A child that isn't a legal move here, as a hand-edited tree could hold.
+  const e5 = c.root.children[0]!.children[0]!;
+  e5.children = [{ ...e5.children[0]!, san: 'Ke3', children: [] }];
+  const result = indexChapter('Study001', c);
+  assert.ok(result.ok);
+  assert.deepEqual(result.index.lines.map((l) => l.path.join(' ')), ['e4 e5']);
+  assert.equal(result.index.lines[0]!.cards.length, 1);
+});
+
+test('the PGN fixtures index, each with the side the import would give it', async () => {
+  const { parseGames } = await import('../../../../src/core/pgn/parse.ts');
+  const { readdirSync } = await import('node:fs');
+  const dir = new URL('../../../fixtures/pgn/', import.meta.url);
+  let n = 0;
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.pgn'))) {
+    for (const parsed of parseGames(readFileSync(new URL(file, dir), 'utf8'), () => `Fix${String(n++).padStart(5, '0')}`)) {
+      if (!parsed.ok) continue;
+      const c = parsed.chapter;
+      if (!c.headers.some(([k]) => k === 'Orientation')) c.headers.push(['Orientation', 'white']);
+      const result = indexChapter('Fixtures', c);
+      assert.ok(result.ok, file);
+      for (const m of result.index.moves) assert.ok(onSomeLine(result.index.lines, m.at.path), `${file}: ${m.at.path.join(' ')}`);
+    }
+  }
+  assert.ok(n > 5);
 });

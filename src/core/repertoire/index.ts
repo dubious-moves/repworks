@@ -26,12 +26,12 @@ export interface Occurrence {
   cid: string;
   /** The path to the node of the move itself (its last SAN is the move). */
   path: readonly string[];
+  san: string;
 }
 
 export interface IndexedMove {
   key: PositionKey;
   uci: string;
-  san: string;
   /** Set for an own move; an opponent's move makes no card. */
   card?: CardId;
   at: Occurrence;
@@ -89,7 +89,7 @@ export function indexChapter(sid: string, chapter: Chapter): ChapterIndexing {
   const lines: Line[] = [];
 
   const walk = (node: RootNode | MoveNode, pos: Position, path: string[], cards: CardId[]) => {
-    if (path.length > 0 && node.children.length === 0) lines.push({ sid, cid, known, path, cards });
+    let walked = 0;
     for (const child of node.children) {
       const move = parseSan(pos, child.san);
       // A chapter as parsed holds legal moves only (§4.5); anything else is left out with what
@@ -98,7 +98,7 @@ export function indexChapter(sid: string, chapter: Chapter): ChapterIndexing {
       const key = positionKeyOf(pos);
       const uci = standardUci(pos, move);
       const childPath = [...path, child.san];
-      const indexed: IndexedMove = { key, uci, san: child.san, at: { sid, cid, path: childPath } };
+      const indexed: IndexedMove = { key, uci, at: { sid, cid, path: childPath, san: child.san } };
       let childCards = cards;
       if (pos.turn === side) {
         indexed.card = repertoireCard(key, uci);
@@ -107,8 +107,11 @@ export function indexChapter(sid: string, chapter: Chapter): ChapterIndexing {
       moves.push(indexed);
       const after = pos.clone();
       after.play(move);
+      walked++;
       walk(child, after, childPath, childCards);
     }
+    // A line ends where the walk stops: at a leaf, or before moves that were left out.
+    if (path.length > 0 && walked === 0) lines.push({ sid, cid, known, path, cards });
   };
   walk(chapter.root, start, [], []);
   return { ok: true, index: { sid, cid, side, known, moves, lines } };

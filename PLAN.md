@@ -1057,12 +1057,22 @@ panel (target under 300 ms).
   more than one own move. A chapter's side is its `Orientation` header (`white` or `black`); a
   chapter without one makes nothing and is listed in `skipped`, as is one whose start isn't legal.
 - The known mark is read from `[RepworksKnown "true"]` and carried on each line.
+- A chapter without `Orientation` makes no cards: its side would be a guess, and the import
+  always writes one (§4.10). The editor shows such a chapter from White's side.
+- A line ends where the walk stops: at a leaf, or before a move that isn't legal there, so every
+  indexed move lies on a line.
+- Known limit: in a Chess960 start (which the parser accepts), castling and a king move to the
+  same square would share a card. Repertoire chapters are standard chess, so this is left as is.
+- Reviewed after the push (an adversarial review, 2026-10-06): the leaf rule above was a bug, the
+  occurrence lacked its SAN, and the tests gained the PGN fixtures, the order of studies and
+  chapters, an illegal start, conflicts counted by move, a check by node rather than by card, and
+  a timing repertoire whose promotions are legal.
 - Not built yet: the cache by blob SHA, which belongs to the app (§5.7). The per-chapter parts are
   what it will keep.
 - Tests: `test/unit/core/repertoire/index.test.ts` (the cases above, the fixtures, an empty chapter,
-  and 200 random chapters: every own move on a line, lines end at leaves, the index is
-  deterministic) and `test/perf/repertoireIndex.test.ts`: 834 lines in 58–66 ms in this container,
-  under the 100 ms target.
+  and 200 random chapters: every move on a line, one line per leaf, the index is deterministic)
+  and `test/perf/repertoireIndex.test.ts`: about 836 lines in 52–66 ms in this container (best of
+  three runs), under the 100 ms target.
 
 #### 5.2 Grades, training settings, and the review event
 

@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { Chess, type Position } from 'chessops/chess';
 import { makeSan } from 'chessops/san';
 import type { NormalMove } from 'chessops/types';
-import { indexStudies } from '../../src/core/repertoire/index.ts';
+import { indexChapter, indexStudies } from '../../src/core/repertoire/index.ts';
 import type { Chapter, MoveNode } from '../../src/core/study/model.ts';
 import { mulberry32 } from '../support/random.ts';
 
@@ -15,7 +15,8 @@ function bigChapter(id: string, side: 'white' | 'black', leaves: number, seed: n
   let left = leaves;
   const legal = (pos: Position): NormalMove[] => {
     const out: NormalMove[] = [];
-    for (const [from, dests] of pos.allDests()) for (const to of dests) out.push({ from, to });
+    // A pawn reaching the last rank promotes (to a queen), or the move isn't legal.
+    for (const [from, dests] of pos.allDests()) for (const to of dests) out.push(pos.board.pawn.has(from) && (to >> 3 === 0 || to >> 3 === 7) ? { from, to, promotion: 'queen' } : { from, to });
     return out;
   };
   const grow = (pos: Position, depth: number): MoveNode[] => {
@@ -53,5 +54,18 @@ test('800 lines index in under 100 ms', () => {
   }
   console.log(`index of ${lines} lines: ${best.toFixed(1)} ms (best of 3)`);
   assert.ok(lines >= 800, `only ${lines} lines`);
+  // Every move generated is legal, so none is left out of the index.
+  const moves = (c: Chapter): number => {
+    let n = 0;
+    const walk = (node: { children: MoveNode[] }) => node.children.forEach((ch) => (n++, walk(ch)));
+    walk(c.root);
+    return n;
+  };
+  const total = chapters.reduce((sum, c) => sum + moves(c), 0);
+  const indexed = chapters.reduce((sum, c) => {
+    const r = indexChapter('Perf0001', c);
+    return sum + (r.ok ? r.index.moves.length : 0);
+  }, 0);
+  assert.equal(indexed, total);
   assert.ok(best < 100, `${best.toFixed(1)} ms`);
 });
