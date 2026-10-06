@@ -1,7 +1,7 @@
 // The training screen (PLAN.md §5.7): the board first; under it the feedback line, the line's
 // name and the comments of the move reached; one primary action per state, and the day's
 // counters. The screen stays on while a session runs (Screen Wake Lock).
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { makeFen } from 'chessops/fen';
 import { parseSan } from 'chessops/san';
 import { chessgroundDests, chessgroundMove } from 'chessops/compat';
@@ -115,9 +115,14 @@ export function TrainScreen(props: { of: SessionKind }) {
   }, [version]);
 
   const showing = running && s.selfGrade;
+  // Read when a key arrives, not when the listener was added: the listener is replaced in an effect,
+  // after the screen is drawn, so a 2 pressed just after 1 would otherwise reach the old one.
+  const showingNow = useRef(showing);
+  showingNow.current = showing;
   useEffect(() => {
     if (!running) return;
     const onKey = (e: KeyboardEvent) => {
+      const showing = showingNow.current;
       const target = e.target as HTMLElement | null;
       // Never swallowed in a text field, and a held key is one press.
       if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
@@ -136,7 +141,7 @@ export function TrainScreen(props: { of: SessionKind }) {
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [running, showing]);
+  }, [running]);
 
   // The ring's buttons, when they arrive as media keys rather than key events (§5.9).
   useEffect(() => {

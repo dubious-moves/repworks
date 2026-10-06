@@ -2172,6 +2172,29 @@ providers, give equal results (recorded in "as built").
 
 Live: none (pure code).
 
+**As built** (2026-10-06):
+- `src/core/explorer/search.ts`, `rounds.ts`, `limiter.ts`, `providers.ts`: the port, each naming
+  its source file and `c26242f`. Behaviour unchanged; TypeScript types for the provider, the
+  answers, the nodes and the row result. The clock, `sleep` and HTTP have no defaults (core reads
+  no clock and does no fetch). Two additions: `explorerUrl` takes `db: 'masters'` (its own URL,
+  no filter, its own cache key; Lichess's keys stay q_extension's), and `compactExplorer` keeps a
+  move's `averageRating` as `rating` for the panel's row title. `burstFor` is kept for its tests;
+  the site's token is its own, so `OWN_BURST`.
+- `test/unit/core/explorer/pe.test.ts` is q_extension's `test/pe.js` line for line (so it diffs
+  against its source), its 142 checks as `node:test` subtests, with a loader mapping its module
+  paths onto the port and `fetch` passed on as `http`. It is the one test file with
+  `@ts-nocheck`: typing it would cost the diff. 149 subtests pass.
+- `providersLocal.test.ts`: `test/explorerdb.js`'s cases for `providers.js`'s local path, against a
+  stand-in server on a free port (no token, no cache, no budget, a hit for the rounds; the address
+  cleared going back to Lichess; addresses spelled one way; a server that isn't one, or isn't
+  running), and Masters' URL and key.
+- **The differential check** (a scratch script, not in the repo): q_extension's `search.js` and
+  `rounds.js` beside the port on random trees (up to 6 plies, 1–4 moves a position, missing or
+  inconsistent counts, unknown and mated positions, mate scores) with random options (risk
+  aversion, Maia, Maia alone, the prepared split, a free explorer, the floors), `evaluateRow` at
+  depths 1, 3 and 5 and the rounds' every published result in order: equal on 4,400 comparisons
+  over three seeds.
+
 #### 5.22 The explorer worker and its cache
 
 - `src/platform/explorerCache.ts`: q_extension's `cache.js` on IndexedDB, database
