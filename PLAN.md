@@ -876,7 +876,8 @@ two nodes, not the tree. Keys: ← → ↑ ↓, Home, End. Clicking a move goes 
 
 **Edits.** Play a move to extend or branch. Per-node menu: delete from here, promote, make main
 line, copy the line as PGN. A comment box (sanitized, with a 4,000-character warning). Glyph
-buttons. Undo/redo for the session.
+buttons. Undo/redo for the session. (As built: the menu opens on a right-click or long-press of
+the move, and the comment and glyphs are in a dialog, as in Qchess.)
 
 **Layout** follows mistake-lab's mobile conventions as a spec: board first, a drawer, 44 px
 tap targets, feedback below the board, `touch-action: none` on the board, and no
@@ -947,6 +948,26 @@ and offline editing with the PWA killed and reopened.
   with the right number on the fixtures and 200 random trees); in Playwright, the editor tests
   read the new rows, and a wide-screen test checks the chapter list and that board and panel
   fit the window. Live: not yet seen on the owner's devices.
+- **The move menu and the comment dialog, as Qchess's** (D21, 2026-10-06, the owner's ask: the
+  glyphs, comment box and line actions under the notation left the notation little room on the
+  desktop). A right-click on a move opens its menu at the pointer, and shows that move: Comment,
+  Promote (not on a first continuation), Make main line (not on the main line), Delete from here,
+  Copy line as PGN; on the start, Comment alone. A right-click on a comment opens its move's
+  menu. The phone opens it by a long-press (Chrome fires `contextmenu`; the moves can't be
+  selected as text) and both open the shown move's menu from a ⋯ button at the end of the move
+  buttons, which on the phone now share one row. Comment opens a modal dialog: the text, then
+  Qchess's three rows of glyphs (move, observation, position; one grid of seven columns on a
+  phone), Clear glyphs, Save and Cancel. As in Qchess, a glyph applies at once and Cancel drops
+  only the text; Escape cancels, Ctrl+Enter saves, and the chapter's keys don't act behind it.
+  The text field takes the focus only with a mouse, so the phone's keyboard doesn't cover the
+  glyphs. The panel keeps the notation, a conflict box when the move shown has one, the drawer
+  and the move buttons. Read live on Qchess's study page with the owner's test account
+  (2026-10-06, 1600×900): the menu's items, colours and box, the dialog's layout, that glyphs
+  apply before Save, that Escape closes it. Tests: the editor and acceptance tests drive every
+  edit through the menu (by right-click and by ⋯) and the dialog, on desktop and the emulated
+  phone; a new test covers Escape, Ctrl+Enter, Clear glyphs, the menu's items on each kind of
+  move, and the start's comment. Live: not yet seen on the owner's devices; the long-press is
+  untested (Playwright's phone emulation sends a right-click, not a long touch).
 - **Not built yet**: the `parsed` cache of chapter models by blob SHA (§4.9). A chapter is parsed
   when it is opened, which is quick at repertoire sizes; the cache comes if the phone shows a
   need.

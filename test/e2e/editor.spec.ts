@@ -5,7 +5,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import type { FakeGit } from '../support/fakeGit.ts';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
-import { clickSquare, openDrawer, square } from './board.ts';
+import { clickSquare, openDrawer, openMoveMenu, square } from './board.ts';
 import { serveGithub, world } from './github.ts';
 import { serveSite, type SiteServer } from './server.ts';
 
@@ -66,12 +66,17 @@ test('open a chapter, move through it, and edit it: variation, comment, glyph, a
   await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 e6');
   await expect(page.locator('.notation .variation')).toHaveText(['2... Nc6 3. d4', '2... e6']);
 
-  // A comment and a glyph on it.
-  await page.getByLabel('Comment on this move').fill('The {Taimanov} way');
-  await page.getByRole('button', { name: 'Save comment' }).click();
-  await page.getByRole('button', { name: 'Good move' }).click();
-  await expect(page.getByRole('button', { name: 'Good move' })).toHaveAttribute('aria-pressed', 'true');
+  // A comment and a glyph on it, in the dialog the move's menu opens (a right-click).
+  await openMoveMenu(page, 'e4 c5 Nf3 e6');
+  await page.getByRole('menuitem', { name: 'Comment' }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Comment on this move').fill('The {Taimanov} way');
+  await dialog.getByRole('button', { name: 'Good move' }).click();
+  await expect(dialog.getByRole('button', { name: 'Good move' })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('.move.current')).toContainText('e6!');
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator('.notation')).toContainText('The Taimanov way');
 
   // An arrow in draw mode, and a circle by a tap.
   await page.getByRole('button', { name: 'Draw mode' }).click();
@@ -107,15 +112,72 @@ test('line actions: promote, make main line, delete from here', async ({ page })
   const git = await setUp(page);
   await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf?at=e4,c5,Nf3,Nc6`);
   await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 Nc6');
-  await page.getByRole('button', { name: 'Make main line' }).click();
+  await openMoveMenu(page, 'e4 c5 Nf3 Nc6');
+  // The second of two moves can be promoted; it isn't the main line.
+  await expect(page.getByRole('menuitem')).toHaveText(['Comment', 'Promote', 'Make main line', 'Delete from here', 'Copy line as PGN']);
+  await page.getByRole('menuitem', { name: 'Make main line' }).click();
   await expect(page.locator('.notation .pair .move[data-path="e4 c5 Nf3 Nc6"]')).toBeVisible();
   await expect(page.locator('.notation .variation')).toHaveText(['2... d6 3. d4 cxd4']);
   await expect(page.locator('.notation .pair .move[data-path="e4 c5 Nf3 Nc6 d4"]')).toBeVisible();
-  await page.getByRole('button', { name: 'Delete from here' }).click();
+  // Now first and on the main line: neither promote nor make main line. The ⋯ button opens the
+  // menu of the move shown.
+  await openMoveMenu(page);
+  await expect(page.getByRole('menuitem')).toHaveText(['Comment', 'Delete from here', 'Copy line as PGN']);
+  await page.getByRole('menuitem', { name: 'Delete from here' }).click();
   await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3');
   await expect(page.locator('.notation')).not.toContainText('Nc6');
   await sync(page, git, (t) => !t.includes('Nc6'));
   expect(git.textsOf().get(CHAPTER)).toContain('2. Nf3 { A made-up comment } { [%csl Gd4][%cal Gd2d4] } 2... d6 3. d4 cxd4 *');
+});
+
+test('the comment dialog: Escape drops the draft, Ctrl+Enter saves, glyphs clear, the start takes a comment', async ({ page }) => {
+  const git = await setUp(page);
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf?at=e4,c5,Nf3,d6`);
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 d6');
+  const dialog = page.getByRole('dialog');
+
+  // A right-click on another move shows that move and opens its menu; Escape closes the menu.
+  await openMoveMenu(page, 'e4 c5');
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('menu')).toHaveCount(0);
+
+  // Escape drops a draft, and the keys don't move along the line behind the dialog.
+  await openMoveMenu(page);
+  await page.getByRole('menuitem', { name: 'Comment' }).click();
+  await dialog.getByRole('textbox').fill('dropped');
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator('.notation')).not.toContainText('dropped');
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5');
+
+  // Ctrl+Enter saves; the comment opens again with its text, and a glyph is cleared.
+  await openMoveMenu(page);
+  await page.getByRole('menuitem', { name: 'Comment' }).click();
+  await dialog.getByRole('textbox').fill('kept');
+  await dialog.getByRole('button', { name: 'Mistake' }).click();
+  await dialog.getByRole('textbox').press('Control+Enter');
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator('.notation')).toContainText('kept');
+  await expect(page.locator('.move.current')).toContainText('c5?');
+  await openMoveMenu(page);
+  await page.getByRole('menuitem', { name: 'Comment' }).click();
+  await expect(dialog.getByRole('textbox')).toHaveValue('kept');
+  await dialog.getByRole('button', { name: 'Clear glyphs' }).click();
+  await expect(page.locator('.move.current')).not.toContainText('c5?');
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+
+  // The start's menu holds only the comment before the first move.
+  await page.locator('.notation .move.start').click({ button: 'right' });
+  await expect(page.getByRole('menuitem')).toHaveText(['Comment']);
+  await page.getByRole('menuitem', { name: 'Comment' }).click();
+  await expect(dialog.getByRole('heading')).toHaveText('Comment before the first move');
+  await expect(dialog.getByRole('group', { name: 'Glyphs' })).toHaveCount(0);
+  await dialog.getByRole('textbox').fill('Before it all');
+  await dialog.getByRole('button', { name: 'Save' }).click();
+
+  await sync(page, git, (t) => t.includes('Before it all'));
+  expect(git.textsOf().get(CHAPTER)).toContain('{ Before it all }\n1. e4 c5 { kept } 2. Nf3');
 });
 
 test('chapters: add one, rename it, change its side, and delete it', async ({ page }) => {

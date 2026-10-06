@@ -35,3 +35,19 @@ export async function drawInDrawMode(page: Page, from: string, to: string, orien
   await page.mouse.up();
   await page.getByRole('button', { name: 'Draw mode' }).click();
 }
+
+/** Opens a move's menu: by a right-click on the move, or for the move shown by the ⋯ button. */
+export async function openMoveMenu(page: Page, path?: string) {
+  if (path === undefined) await page.getByRole('button', { name: 'Move menu' }).click();
+  else await page.locator(`.notation .move[data-path="${path}"]`).click({ button: 'right' });
+  await page.getByRole('menu', { name: 'Move' }).waitFor();
+}
+
+/** Writes the comment on the move shown, through its menu and the comment dialog. */
+export async function comment(page: Page, text: string) {
+  await openMoveMenu(page);
+  await page.getByRole('menuitem', { name: 'Comment' }).click();
+  await page.getByRole('dialog').getByRole('textbox').fill(text);
+  await page.getByRole('dialog').getByRole('button', { name: 'Save' }).click();
+  await page.getByRole('dialog').waitFor({ state: 'detached' });
+}

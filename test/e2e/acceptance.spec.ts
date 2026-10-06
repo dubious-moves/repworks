@@ -8,7 +8,7 @@
 // N = 2. Nf3 (its comment), S = 2... Nc6 and what follows, P = 3. d4, Q = 3... cxd4.
 import { test, expect, devices, type Browser, type Page } from '@playwright/test';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
-import { clickSquare, drawInDrawMode } from './board.ts';
+import { clickSquare, comment, drawInDrawMode, openMoveMenu } from './board.ts';
 import { serveGithub, world } from './github.ts';
 import { serveSite, type SiteServer } from './server.ts';
 
@@ -32,11 +32,6 @@ async function device(browser: Browser, name: string, github: Parameters<typeof 
   // The worker controls the page once the shell is cached, so the app starts offline later.
   await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
   return page;
-}
-
-async function comment(page: Page, text: string) {
-  await page.getByLabel('Comment on this move').fill(text);
-  await page.getByRole('button', { name: 'Save comment' }).click();
 }
 
 /**
@@ -85,7 +80,8 @@ test('two devices edit offline, sync, lose nothing, and agree', async ({ browser
   await desktop.locator('.move[data-path="e4 c5 Nf3"]').click();
   await comment(desktop, 'desktop text');
   await desktop.locator('.move[data-path="e4 c5 Nf3 Nc6"]').click();
-  await desktop.getByRole('button', { name: 'Delete from here' }).click();
+  await openMoveMenu(desktop, 'e4 c5 Nf3 Nc6');
+  await desktop.getByRole('menuitem', { name: 'Delete from here' }).click();
   await desktop.locator('.move[data-path="e4 c5 Nf3 d6 d4"]').click();
   await expect(desktop.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 d6 d4');
   await drawInDrawMode(desktop, 'f8', 'b4', 'black', 'blue');
@@ -101,7 +97,11 @@ test('two devices edit offline, sync, lose nothing, and agree', async ({ browser
   await clickSquare(phone, 'd4', 'black');
   await expect(phone.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 Nc6 d4 cxd4');
   await phone.locator('.move[data-path="e4 c5 Nf3 d6 d4 cxd4"]').click();
-  await phone.getByRole('button', { name: 'Good move' }).click();
+  await openMoveMenu(phone);
+  await phone.getByRole('menuitem', { name: 'Comment' }).click();
+  await phone.getByRole('dialog').getByRole('button', { name: 'Good move' }).click();
+  await expect(phone.locator('.move.current')).toContainText('cxd4!');
+  await phone.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
   await phone.getByText('Chapter and study').click();
   await phone.getByLabel('Name', { exact: true }).fill('Phone chapter');
   await phone.getByRole('button', { name: 'Add chapter' }).click();

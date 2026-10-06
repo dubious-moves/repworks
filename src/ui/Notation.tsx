@@ -1,6 +1,7 @@
 // The notation (PLAN.md §4.11, D21): the main line in rows of two moves, comments and variations
 // on rows of their own, as Qchess's study page shows them. Each move reads its own "current"
 // signal, so stepping through a line redraws the move left and the move reached, not the tree.
+// Right-click (long-press on the phone) opens a move's menu; on a comment, its move's.
 import { effect, signal, type Signal } from '@preact/signals';
 import { useEffect, useMemo, useRef } from 'preact/hooks';
 import { at, goTo } from '../app/editor.ts';
@@ -8,6 +9,7 @@ import { hasMarker } from '../core/merge/markers.ts';
 import type { Chapter } from '../core/study/model.ts';
 import { notation, pathKey, type Cell, type Inline, type Line, type Move as MoveData } from '../core/study/notation.ts';
 import type { Path } from '../core/study/tree.ts';
+import { openMenu } from './MoveMenu.tsx';
 
 const current = new Map<string, Signal<boolean>>();
 let shown = pathKey(at.peek());
@@ -26,6 +28,13 @@ effect(() => {
   shown = key;
   currentOf(key).value = true;
 });
+
+function menuAt(path: Path) {
+  return (e: MouseEvent) => {
+    e.preventDefault();
+    openMenu(path, e.clientX, e.clientY);
+  };
+}
 
 /** Scrolls the move list, and only the move list, to keep the move shown in view. */
 function reveal(el: HTMLElement) {
@@ -50,6 +59,7 @@ function Move(props: { move: MoveData; number?: string | undefined; class?: stri
       class={`move${props.class ? ` ${props.class}` : ''}${isCurrent ? ' current' : ''}`}
       data-path={m.key}
       onClick={() => goTo(m.path)}
+      onContextMenu={menuAt(m.path)}
       aria-current={isCurrent ? 'true' : undefined}
     >
       {props.number && <span class="number">{`${props.number} `}</span>}
@@ -63,7 +73,7 @@ function Comment(props: { text: string; path: Path; row?: boolean }) {
   const conflict = hasMarker(props.text);
   const Tag = props.row ? 'div' : 'span';
   return (
-    <Tag class={`comment${props.row ? ' comment-row' : ''}${conflict ? ' conflict' : ''}`} onClick={() => goTo(props.path)}>
+    <Tag class={`comment${props.row ? ' comment-row' : ''}${conflict ? ' conflict' : ''}`} onClick={() => goTo(props.path)} onContextMenu={menuAt(props.path)}>
       {conflict ? '⚠ conflict: open the move to resolve it' : props.text}
     </Tag>
   );
@@ -109,7 +119,7 @@ export function Notation(props: { chapter: Chapter }) {
   return (
     <div class="notation" role="list" aria-label="Moves">
       <div class="start-row">
-        <span class={`move start${startCurrent ? ' current' : ''}`} data-path="" onClick={() => goTo([])}>
+        <span class={`move start${startCurrent ? ' current' : ''}`} data-path="" onClick={() => goTo([])} onContextMenu={menuAt([])}>
           Start
         </span>
       </div>

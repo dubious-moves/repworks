@@ -1,8 +1,8 @@
 // The chapter view (PLAN.md §4.11, D21), laid out as Qchess's study page: on a wide screen the
-// chapters on the left, the board, and a panel with the notation, the tools for the move shown
-// (glyphs, comment, conflicts, line actions, the chapter and study drawer) and the move buttons.
-// On the phone: the board, the move buttons, the notation, then the tools. Play a move to extend
-// a line or branch from it.
+// chapters on the left, the board, and a panel with the notation, the conflicts at the move
+// shown, the chapter and study drawer, and the move buttons. On the phone: the board, the move
+// buttons, the notation, then the drawer. Play a move to extend a line or branch from it; a
+// move's other edits are in its menu (right-click, long-press or ⋯) and the comment dialog.
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { makeFen } from 'chessops/fen';
 import { makeSan, parseSan } from 'chessops/san';
@@ -16,7 +16,6 @@ import {
   at,
   chapter,
   conflictsHere,
-  currentLinePgn,
   deleteOpenChapter,
   doc,
   edit,
@@ -37,12 +36,11 @@ import {
 } from '../app/editor.ts';
 import { open } from '../app/mode.ts';
 import { isKeptMarker, parseTextConflict, type OpenConflict } from '../core/merge/markers.ts';
-import { LICHESS_COMMENT_LIMIT, sanitizeComment } from '../core/pgn/comment.ts';
-import { GLYPHS, MOVE_GLYPHS, POSITION_GLYPHS } from '../core/pgn/nags.ts';
 import { header, type Brush, type Chapter } from '../core/study/model.ts';
-import { deletePath, makeMainline, ownComment, promote, setComment, setShapes, toggleGlyph } from '../core/study/ops.ts';
+import { setShapes } from '../core/study/ops.ts';
 import { nodeAt, positionAt, samePath, type Path } from '../core/study/tree.ts';
 import { Board } from './Board.tsx';
+import { CommentDialog, MoveMenu, openMenu } from './MoveMenu.tsx';
 import { Notation } from './Notation.tsx';
 
 const BRUSH_NAMES: Brush[] = ['green', 'red', 'blue', 'yellow'];
@@ -69,7 +67,7 @@ export function ChapterView() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
-      if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+      if (target && (/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName) || target.closest('dialog'))) return;
       const ctrl = e.ctrlKey || e.metaKey;
       const keys: Record<string, () => void> = {
         ArrowLeft: () => move('prev'),
@@ -186,7 +184,7 @@ export function ChapterView() {
             <div class="cv-panel">
               <Notation chapter={c} />
               <div class="cv-tools">
-                {node && doc.value && <NodePanel chapter={c} path={path} />}
+                {doc.value && <Conflicts />}
                 <ChapterDrawer />
               </div>
               {drawMode && (
@@ -219,92 +217,41 @@ export function ChapterView() {
                 <button type="button" aria-pressed={drawMode} aria-label="Draw mode" class={drawMode ? 'on' : ''} onClick={() => setDrawMode(!drawMode)}>
                   ✎
                 </button>
+                <button
+                  type="button"
+                  aria-label="Move menu"
+                  aria-haspopup="menu"
+                  onClick={(e) => {
+                    const r = e.currentTarget.getBoundingClientRect();
+                    openMenu(at.peek(), r.left, r.bottom, r.top);
+                  }}
+                >
+                  ⋯
+                </button>
               </div>
             </div>
           </div>
         </div>
       )}
       {!(c && board) && <ChapterDrawer />}
+      {/* Outside the frame, whose size containment would place a fixed menu inside it. */}
+      <MoveMenu />
+      <CommentDialog />
     </div>
   );
 }
 
-function NodePanel(props: { chapter: Chapter; path: Path }) {
-  const node = nodeAt(props.chapter, props.path)!;
-  const conflicts = conflictsHere.value.filter((x) => samePath(x.path, props.path));
-  const isMove = props.path.length > 0;
-  const [copied, setCopied] = useState(false);
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(currentLinePgn());
-      setCopied(true);
-    } catch {
-      setCopied(false);
-    }
-  };
+/** The conflicts at the move shown, resolved where they stand. */
+function Conflicts() {
+  const path = at.value;
+  const here = conflictsHere.value.filter((x) => samePath(x.path, path));
+  if (!here.length) return null;
   return (
-    <section class="node-panel" aria-label="This move">
-      {conflicts.map((x, i) => (
+    <section class="node-panel" aria-label="Conflicts at this move">
+      {here.map((x, i) => (
         <ConflictBox key={`${x.index}-${x.starting}-${i}`} conflict={x} />
       ))}
-      {isMove && (
-        <div class="glyphs" role="group" aria-label="Glyphs">
-          {[...MOVE_GLYPHS, ...POSITION_GLYPHS, 146].map((nag) => (
-            <button
-              key={nag}
-              type="button"
-              title={GLYPHS[nag]!.name}
-              aria-label={GLYPHS[nag]!.name}
-              aria-pressed={node.nags.includes(nag)}
-              class={node.nags.includes(nag) ? 'on' : ''}
-              onClick={() => edit((c) => toggleGlyph(c, props.path, nag))}
-            >
-              {GLYPHS[nag]!.symbol}
-            </button>
-          ))}
-        </div>
-      )}
-      <CommentBox key={props.path.join(' ')} chapter={props.chapter} path={props.path} />
-      {isMove && (
-        <div class="actions">
-          <button type="button" onClick={() => edit((c) => deletePath(c, props.path), props.path.slice(0, -1))}>
-            Delete from here
-          </button>
-          <button type="button" onClick={() => edit((c) => promote(c, props.path))}>
-            Promote
-          </button>
-          <button type="button" onClick={() => edit((c) => makeMainline(c, props.path))}>
-            Make main line
-          </button>
-          <button type="button" onClick={() => void copy()}>
-            {copied ? 'Copied' : 'Copy line as PGN'}
-          </button>
-        </div>
-      )}
     </section>
-  );
-}
-
-function CommentBox(props: { chapter: Chapter; path: Path }) {
-  const node = nodeAt(props.chapter, props.path)!;
-  const own = ownComment(node);
-  const editable = own === undefined || !own.includes('<<<<<<<');
-  const [draft, setDraft] = useState(editable ? (own ?? '') : '');
-  const checked = sanitizeComment(draft);
-  const save = () => {
-    if (!editable || checked.text === (own ?? '')) return;
-    edit((c) => setComment(c, props.path, draft));
-  };
-  if (!editable) return null;
-  return (
-    <label class="comment-box">
-      {props.path.length ? 'Comment on this move' : 'Comment before the first move'}
-      <textarea name="comment" rows={3} value={draft} onInput={(e) => setDraft(e.currentTarget.value)} onBlur={save} />
-      {checked.tooLong && <span class="warn">Over {LICHESS_COMMENT_LIMIT.toLocaleString('en')} characters: Lichess would cut it.</span>}
-      <button type="button" disabled={checked.text === (own ?? '')} onClick={save}>
-        Save comment
-      </button>
-    </label>
   );
 }
 

@@ -15,6 +15,13 @@ decisions, with a revision log; `PLAN.md` §4 is Phase 0 in build order.
 - Push to `main` only when `npm run check`, `npm test` and `npm run e2e` pass. CI deploys `main`
   to GitHub Pages.
 - puzzle-explorer, mistake-lab, q_extension and lichessable are read-only references.
+- Qchess (qchess.net) is read live on the owner's test account, user `Testers`, whose password
+  is in the environment variable `QCHESS_PASSWORD` (set in the cloud environment, never in this
+  public repo). Anything may be done to that account and its studies; the test study is
+  https://qchess.net/study/3411d48d-b0f1-43fb-a667-b49057243e1c, and new ones may be made.
+  Headless: log in at `/login` (`#username`, `#password`, `#login-btn`), wait for
+  `/api/auth/me`, then remove `[id^=tour]` and `.study-modal-overlay.active` on a study page
+  before clicking.
 
 ## Commands
 

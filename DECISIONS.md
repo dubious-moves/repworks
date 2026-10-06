@@ -487,6 +487,9 @@ first and improved later:
 - The explorer (Lichess database, ChessDB, the Practical column: Phase 2 in `PLAN.md`) goes in
   the panel under the notation, laid out like Qchess's, and can be turned on and off.
 - Comments, including the percentages repgen writes, show as ordinary comments for now.
+- A move's edits are in Qchess's right-click menu (long-press on the phone, or a ⋯ button),
+  and its comment and glyphs in Qchess's comment dialog, not in tools under the notation
+  (asked by the owner, 2026-10-06).
 
 ## What carries over (checked against the code)
 
@@ -801,3 +804,12 @@ Technical calls made while building `PLAN.md` §5.3–§5.5, each with its reaso
 - **The queue takes the time now as well as the day's bounds.** A reviewed card is due for the
   whole of its due day, but a learning step ends at its own time: without `now`, a move taught at
   10:00 would be asked again at once rather than from 14:00.
+
+## Revision of 2026-10-06 (the move menu and the comment dialog)
+- **D21 extended: a move's edits move into a menu and a dialog, as in Qchess.** The owner found
+  the editing tools under the notation too cramped on the desktop and asked for Qchess's
+  right-click menu and comment popup, so the panel's room goes to the notation. Read live on
+  Qchess with the owner's test account. Technical calls: the menu also opens from a ⋯ button
+  (keyboard, and a phone whose long-press doesn't reach the page); glyphs apply at once and
+  Cancel drops only the text, as Qchess does; the conflict boxes stay in the panel, since they
+  appear only at a conflicted move and need room. `PLAN.md` §4.11 (as built).
