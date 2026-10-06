@@ -38,10 +38,12 @@ decisions, with a revision log; `PLAN.md` §4 is Phase 0 in build order.
 
 - A testing data repo, only for Claude sessions' live checks, is named in the environment
   variable `REPWORKS_TESTING_DATA` (owner/repo) with a fine-grained token in
-  `REPWORKS_TESTING_PAT` (never in this repo). On 2026-10-06 it couldn't be reached from the cloud
-  container: `api.github.com` goes through the session's GitHub proxy, which refuses a repo the
-  Claude GitHub App can't access (`add_repo` was refused). Live checks against it need the owner
-  to give the Claude GitHub App access to that repo first.
+  `REPWORKS_TESTING_PAT` (never in this repo). The Claude GitHub App has access to it (since
+  2026-10-06), so `add_repo` attaches it and git can clone it. The site itself can't use it from
+  a cloud container: the container's proxy drops the credentials of a web page's cross-site
+  requests to `api.github.com` (those with `sec-fetch-site: cross-site`), so the app in headless
+  Chromium gets 404 for a private repo whatever token it holds. Live checks of the app against
+  GitHub stay with the owner's devices.
 
 ## Commands
 

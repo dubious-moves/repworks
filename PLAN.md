@@ -2002,8 +2002,10 @@ a learned line trained again in learn mode changes nothing.
   refused, nothing to train, "Learn the next line", "Study" with nothing on the board; "1"
   mid-session after a wrong move, Again recorded, and back to moves). Two existing specs now
   click a move's text rather than its middle, which the larger `+1` pill covers.
-- Not checked live: the testing data repo (`REPWORKS_TESTING_DATA`) wasn't reachable from the
-  build container (CLAUDE.md), so everything above was checked against the fake GitHub only.
+- Not checked live: everything above was checked against the fake GitHub only. Once the owner
+  gave the Claude GitHub App access to the testing data repo, the built app was run against it
+  in headless Chromium, but the container's proxy drops a web page's credentials to
+  `api.github.com` (CLAUDE.md), so the app got 404 and couldn't sync from there.
 
 #### 5.14 Phase 1 acceptance test, and exit
 
