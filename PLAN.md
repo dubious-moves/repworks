@@ -1049,6 +1049,21 @@ Tests (`test/unit/core/repertoire`):
 Live: the index build time on the phone with the owner's real repertoire, read from the debug
 panel (target under 300 ms).
 
+**As built** (2026-10-06):
+- `src/core/repertoire/index.ts`: `indexChapter(sid, chapter)` gives one chapter's moves (each with
+  its position key, standard UCI, SAN, the card for an own move, and its node) and lines;
+  `combineIndex(parts)` joins the parts in the order given; `indexStudies(studies)` does both for
+  the repertoire studies, leaving reference studies out; `conflicts(index)` lists positions with
+  more than one own move. A chapter's side is its `Orientation` header (`white` or `black`); a
+  chapter without one makes nothing and is listed in `skipped`, as is one whose start isn't legal.
+- The known mark is read from `[RepworksKnown "true"]` and carried on each line.
+- Not built yet: the cache by blob SHA, which belongs to the app (§5.7). The per-chapter parts are
+  what it will keep.
+- Tests: `test/unit/core/repertoire/index.test.ts` (the cases above, the fixtures, an empty chapter,
+  and 200 random chapters: every own move on a line, lines end at leaves, the index is
+  deterministic) and `test/perf/repertoireIndex.test.ts`: 834 lines in 58–66 ms in this container,
+  under the 100 ms target.
+
 #### 5.2 Grades, training settings, and the review event
 
 **Grades** (`core/train/grade.ts`): right or wrong, as Chessable grades (the owner's choice,
