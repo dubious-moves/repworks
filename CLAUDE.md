@@ -1,6 +1,7 @@
 # Repworks: notes for Claude sessions
 
-Read `PLAN.md` and `DECISIONS.md` before changing anything. `DECISIONS.md` holds the binding
+Read `PLAN.md` and `DECISIONS.md` before changing anything; `TESTING.md` lists what waits for
+the owner's live testing. `DECISIONS.md` holds the binding
 decisions, with a revision log; `PLAN.md` §4 is Phase 0 in build order.
 
 ## How we work
@@ -21,9 +22,11 @@ decisions, with a revision log; `PLAN.md` §4 is Phase 0 in build order.
 - Working through the plan: when a task or phase is done and pushed, start the next cloud session
   (`create_session`, claude-code-remote tools) with a prompt naming the next part of `PLAN.md`
   and anything it needs that isn't in the repo, then end with a short reply: what was built, what
-  the owner can test, and the new session's link. Don't chain when the next step needs the owner
-  (an answer, a live test on their device that gates the work); stop and say exactly what is
-  needed.
+  the owner can test, and the new session's link. Keep going across phase boundaries: the owner
+  wants as much built as possible, then one testing session over everything. A live check only
+  the owner can do goes in `TESTING.md` and doesn't stop the chain; build on the best guess.
+  Stop only when nothing useful can be built without the owner, and say exactly what is needed.
+  No limit on the number of chained sessions.
 - puzzle-explorer, mistake-lab, q_extension and lichessable are read-only references.
 - Qchess (qchess.net) is read live on the owner's test account, user `Testers`, whose password
   is in the environment variable `QCHESS_PASSWORD` (set in the cloud environment, never in this
