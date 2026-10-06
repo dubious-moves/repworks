@@ -6,7 +6,7 @@ it the same day. Phase 0 is built: §4.1 to §4.11 are on `main` (each part's "A
 where the build differed). What remains is live: the spike's re-run (§4.2), the real Qchess and
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
-with four questions for the owner (§5.13). Read with `DECISIONS.md`, which this plan updates (its
+with the owner's answers and two follow-up questions (§5.13). Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -268,6 +268,19 @@ read by its commit's SHA, as the app reads it) and G7b (blobs read through Graph
 reads them). The rest waits for the owner's re-run: the GraphQL and REST writes, Lichess, the
 phone and the installed PWA. Until then the adapters' error shapes follow GitHub's
 documentation and community reports (`test/support/fakeGithub.ts` says which).
+
+The owner's runs on the phone (Brave 154 on Android 10, in a browser tab): one on 2026-10-05 with
+an earlier build, and one on 2026-10-06 with `f857b73`:
+- G1, G1b and G1c passed from the phone too: the repo, `/rate_limit` (core and GraphQL limits
+  5,000) and the `X-GitHub-Api-Version` header all answer the page.
+- G2 still got 409 "Git Repository is empty.", and the 2026-10-06 run stopped there, as it now
+  should (the earlier build carried on into G3–G5 and G17).
+- G1 still reports the data repo as **public**.
+
+So the data repo needs a first commit and its visibility set to private before the spike can go
+further (the owner's steps, as §8 lists them). The token needs only what §8 says: access to that
+one repo, with Contents read and write; GitHub adds Metadata read by itself. G1's
+`"permissions": {"admin": true, …}` is the owner's role on the repo, not the token's.
 
 ### 4.3 Position key
 
@@ -1314,29 +1327,42 @@ the same ply and a line before the move) and their edge cases (a remark in paren
 glyphs on a move, a first move that is illegal) in Node; Playwright: preview a line from a
 comment and step back out.
 
-#### 5.13 Questions for the owner (asked 2026-10-06)
+#### 5.13 Questions for the owner
 
-Recommendations, with what the build does meanwhile:
+Asked on 2026-10-06; the owner answered the same day:
 
-1. **The default daily limit of new moves.** It is a setting; the default should come from §5.5
-   run on the real repertoire. That needs the repertoire: either the owner runs `node
-   scripts/queue-sim.ts` with `REPWORKS_FIXTURES` and pastes the table, or a Claude session clones
-   `skAeglund/repworks-data` outside this repo for the run and records only the aggregate numbers
-   here. Recommendation: the second, with 20 a day as the provisional default (synthetic run,
-   §5.5: about 75 reviews a day by day 90 at 0.9).
-2. **The grade rule.** Recommendation: mistake-lab's thresholds as they are (under 3 s Easy,
-   under 15 s Good, slower Hard, a wrong move or a hint Again), with two additions: the first
-   answer after a line is taught counts Good at most; in show and grade, known is Good and failed
-   is Again.
-3. **FSRS retention.** Recommendation: 0.9, FSRS's default and mistake-lab's. 0.93 costs 15–20%
-   more reviews for a few points of recall. It is a synced setting, and changing it later
-   re-replays every card (§5.2).
-4. **What has to be built before Phase 1 goes into daily use** (and Qchess editing stops, D18).
-   Recommendation: daily use once §5.1–§5.8 are built and the Phase 0 acceptance test has passed:
-   cards, the queue, the trainer with teaching, suspend, and the mistakes. Show and grade, the
-   Read and Interactive views, badges, copy continuation and clickable lines follow within Phase
-   1, and lichessable retires (D20) only once show and grade is in use, since the ring session is
-   lichessable's.
+1. **The default daily limit of new moves.** The owner: the limit makes no sense for lines
+   already learned before (in Chessable or Qchess). That changes D19's intake, so a follow-up went
+   back (below, 1a) before anything is built on it.
+2. **The grade rule.** The owner: mistake-lab's time-based rule suits its mistakes and missed
+   tactics; repertoire review should work more like Chessable's. A follow-up went back (2a).
+3. **FSRS retention: 0.9**, as recommended. Decided.
+4. **What has to be built before daily use: §5.1–§5.8** (cards, the queue, the trainer with
+   teaching, suspend, the mistakes) and the Phase 0 acceptance test passed. The rest follows within
+   Phase 1; lichessable retires once show and grade is in use. Decided, as recommended.
+
+Follow-ups, asked 2026-10-06:
+
+- **1a. Lines learned before.** Recommendation: a "known" mark on a chapter (with a button for a
+  whole study), set in the import review or later in the chapter drawer. A known line's moves skip
+  teaching and the daily limit: they wait in a pool of their own ("Known lines: 1,240 moves not yet
+  reviewed"), offered after the day's due reviews, line by line, for as long as the owner cares to
+  train, and their first answer is an ordinary review. A wrong first answer teaches the move and
+  counts as a miss. The limit then applies only to lines not marked, which are new material. D19
+  holds in what matters: no state is imported, and every card earns its schedule here. The
+  simulation (§5.5) shows the review wave a big first week of known lines makes, days later.
+- **2a. Chessable-like grading.** Chessable grades each move right or wrong, with no clock, and
+  moves a right answer up a fixed ladder of intervals (hours, then days, then weeks and months)
+  while a wrong one sends it back down. That description is from memory: lichessable's notes don't
+  record Chessable's schedule, and it wasn't checked here. Two ways to get it:
+  - (A, recommended) FSRS with two grades: right first time is Good, a wrong move or a hint is
+    Again, and time doesn't count. It feels like Chessable (right or wrong, nothing timed), and
+    FSRS still spaces each move by its own record, so a move often missed comes back sooner than
+    a fixed ladder would bring it, and a move always right stretches further. Chessable's
+    same-day first review after learning becomes one learning step: a taught line comes back about
+    4 hours later the same day, instead of the immediate recall pass of §5.6.
+  - (B) Chessable's ladder itself, as a scheduler beside FSRS. Familiar, but not adaptive, and
+    "difficult moves" (D16) would rest on counted misses instead of FSRS difficulty.
 
 #### 5.14 Phase 1 acceptance test, and exit
 

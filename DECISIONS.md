@@ -722,3 +722,20 @@ decisions, each with its reason (the owner's four questions are in `PLAN.md` §5
 - **D3: conflicting moves in the trainer.** Both own moves are accepted. When the move the line
   expected is due and the other one was played, the trainer asks the expected one too, in the same
   position, so a preferred line can't keep its sibling due for ever (the outline's risk).
+
+## Revision of 2026-10-06 (the owner's answers on Phase 1)
+The owner answered `PLAN.md` §5.13's four questions:
+- **FSRS retention 0.9**, as recommended (a synced setting, `PLAN.md` §5.2).
+- **Daily use starts once `PLAN.md` §5.1–§5.8 are built** and Phase 0's acceptance test has passed;
+  lichessable retires (D20) once show and grade is in use. As recommended.
+- **The daily limit of new moves shouldn't hold back lines learned before.** This changes D19's
+  intake ("new cards come in line by line, up to a daily limit"), so a proposal went back to the
+  owner (`PLAN.md` §5.13, 1a: a "known" mark on chapters, whose moves skip teaching and the limit)
+  and nothing is built on it until they answer.
+- **Repertoire review should grade like Chessable's, not like mistake-lab's time-based rule.** A
+  proposal went back too (§5.13, 2a: FSRS with right/wrong grades only, and a same-day learning
+  step).
+
+Phase 0's spike, run on the phone on 2026-10-05 and 2026-10-06 (`PLAN.md` §4.2): reads from the
+page work from Android too; the data repo is still empty and still public, so the writes wait for
+the owner to add a first commit and make it private.
