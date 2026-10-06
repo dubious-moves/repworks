@@ -2007,6 +2007,129 @@ a learned line trained again in learn mode changes nothing.
   in headless Chromium, but the container's proxy drops a web page's credentials to
   `api.github.com` (CLAUDE.md), so the app got 404 and couldn't sync from there.
 
+#### 5.17 The owner's second testing notes: learning, feedback, auto-play, time travel
+
+The owner's notes of 2026-10-06, sent to a side session while the chain built Phase 2. They are
+Phase 1 follow-ups, **built next**, before the chain goes on with Phase 2's next part. The
+owner's words where they set a detail, then what is to be built.
+
+How auto-play stood when the notes came (`trainer.ts`, `kindOf`): always on, no setting. In the
+queue an own move is played for the user when it was answered earlier in the session (right or
+wrong), is suspended, or was reviewed and isn't due. In a picked line and Learn (`practice`),
+a reviewed move that isn't due is asked, ungraded. A move never answered is never auto-played.
+
+1. **Learn without the arrow.** "There should be an option to try to learn without hints." A
+   per-device training setting, *New moves: show the move (arrow and SAN, as now) / let me try
+   first*. With "try first" a new move is asked like a due one, with "New move" and no arrow; a
+   wrong move or Hint shows the arrow, as the `wrong` state already does. Either way it records
+   one `taught` and no review (a new card has no grade to lose); the note says whether it was
+   found unaided ("New move found: Nf3").
+2. **The line's end keeps the board.** "After learning a variation, there's no need to hide the
+   board." A picked line's or Learn's end leaves the board at the line's last position, with the
+   comments of its last move; the numbers and the buttons ("Next line", "Again", "Today's
+   queue") sit where the feedback line and the buttons were, so nothing jumps. The session's
+   end (the queue's) keeps its summary, also under the board.
+3. **Auto-advance.** "An option to automatically move on to the next variation." A per-device
+   setting, *At a line's end: wait / go on*. With "go on", a picked line moves to the list's next
+   line (Learn: the chapter's next line with new moves) after a pause of four paces, with
+   "Next: Line 7 · Stop" shown during the pause; Escape or Stop cancels it. The queue already
+   goes on by itself.
+4. **Quieter feedback.** "The constant swapping between 'Your move' and 'Correct' gets
+   annoying." The notes `yourMove` and `correct` show nothing. The feedback line keeps its height
+   (so the board never moves) and shows only what asks something of the user: "Not in your
+   repertoire: try again", the new move, the conflict's "find it", a suspend's undo, and later
+   the alternative's note (§5.18). Speech says nothing for them either.
+5. **Where a learned line starts.** "Instead of skipping right to the first key move, the
+   option to auto-play the moves to get there." A per-device setting, *A line starts*:
+   - **at its first new or due move** (as now: a line sharing its start with the board starts
+     there, else the board jumps to the position before the first ask or teach);
+   - **auto-played from the start**: the board goes to the chapter's start and the line's moves
+     up to the first ask or teach are played at the pace, own moves included, before asking;
+   - **from the start, asked**: as Chessable with auto-play off: from move 1 every own move is
+     asked (ungraded unless due, as `practice`), opponent moves played at the pace.
+   Default: auto-played from the start for Learn and a picked line, first new or due move for
+   the queue (the queue's lines mostly share their start with the board already). The setting
+   is one for each, in the training settings.
+6. **Auto-play as lichessable's.** "I want the auto-play feature as it works in lichessable. We
+   should at least have the mode where any move that has been answered correctly in the current
+   session is auto-played (if auto-play setting is enabled)." The build session reads
+   lichessable's auto-play design and code first (read-only reference: its `DESIGN-autoplay.md`
+   and the trainer it describes) and ports its modes as a per-device setting, *Auto-play*, with
+   at least:
+   - **off**: every own move of a line is asked, wherever met; graded only when the card is due
+     today (or new and taught), else asked with no event, as `practice`. Suspended moves are
+     still played (they are the owner's "always play this").
+   - **moves answered right this session** (the owner's minimum): a move answered right first
+     time earlier in the session is played for the user; a move answered wrong is asked again
+     when met on a later line, with no second grade (a card is graded once a session), so the
+     owner meets the miss again.
+   - lichessable's other modes as its design gives them (proven moves across sessions, if it has
+     that; the current "not due is played" behaviour of the queue is one of them).
+   Today's behaviour (answered right or wrong → played; reviewed and not due → played in the
+   queue) maps to whichever mode matches it, and that mode is the default until the owner says
+   otherwise. The rule stays in `kindOf`, one function, with the mode an option of `Trainer`.
+7. **Time travel.** "A way to fast-forward time. It's useful for the user, but also for testing
+   purposes." In the training settings (and the debug panel): *Time: now / +1 hour / +4 hours /
+   +1 day / +1 week / custom*, with a banner on every screen while it is on ("Time +1 day ·
+   Back to now"). Kept per tab (`sessionStorage`), so a reload keeps it and a new tab starts at
+   now. While it is on, everything that reads the clock to *decide* uses the shifted time: the
+   day's bounds, what is due, the learning step, the queue, the line list's "Due …", the pins.
+   **Events are still recorded at the real time.** A shifted timestamp would be synced into the
+   real log for good, leaving cards scheduled from a future that never happened; recorded at the
+   real time, a move answered ahead is an early review, which FSRS models (a short elapsed time
+   raises stability less). So the user can train tomorrow's reviews today, and a test can bring
+   the learning step's reviews due at once. What follows, said in the banner's help: new moves
+   taught while shifted count to the real day's limit when back at now. The `Clock` port gains
+   the offset (`src/platform`), and core keeps taking time as an input.
+
+Tests: the trainer's options in `trainer.test.ts` (try first: no arrow until wrong or Hint, one
+`taught`; each auto-play mode on a session with a move answered right and one answered wrong,
+met again on a later line; each line start; the 120 random repertoires re-run under every mode:
+every planned ask graded once, every teach taught once); the clock's offset in Node (queue,
+day bounds and learning step shifted, events at the real time). Playwright, desktop and phone:
+a picked line ending with the board still shown and going on by itself to the next; "Your move"
+and "Correct" never shown; a learned line auto-played from the start; time travel +4 hours
+bringing a just-taught move due, its review event carrying the real time, and the banner's
+"Back to now".
+
+Live (owner, phone and desktop): the new settings' defaults in a real session; whether the
+quieter feedback line is enough; auto-play's modes against what the owner knows from
+lichessable.
+
+#### 5.18 Alternative moves (Chessable's), planned for later
+
+"We need to plan to implement the 'alternative moves' as used in Chessable, including an easy
+way to add/save them. An alternative move is a 'soft fail' which gets a free retry (doesn't count
+for grading)." Not built until the owner answers the storage question below; build it after
+§5.17, or later in the chain if the answer comes later.
+
+- **In training**: a move played where an own move is asked, which isn't the repertoire's but is
+  saved as an alternative for that position, takes the move back with "Good alternative, but
+  your repertoire plays something else: try again", and doesn't count: not in the review's `w`,
+  no Again, no Hint. The same alternative played twice in one ask is still free; any other
+  wrong move counts as now.
+- **Saving one**: after a wrong move, the "try again" line offers **"Save as alternative"**
+  (one tap; undo until the next move). It saves the move just played for that position and
+  removes it from the ask's wrong moves, so the grade is as if it was never played. Also in the
+  study view's move menu on an own-side position ("Alternatives here: Nc3 ✕ · Add…"), and listed
+  in the card panel (§5.7).
+- **Keyed by position**, like cards (`positionKeyOf`), so an alternative saved once holds in
+  every chapter and transposition reaching that position, for that side.
+- **Storage: the owner's choice** (a data format their real data is written in). Recommended:
+  **events in the progress log**, `{"k":"alt","key":"<positionKey>","uci":"g1f3","on":true}`
+  (and `on:false` to remove), replayed into a set like pins: append-only, merged and synced by
+  what exists, and the study PGN (Qchess's and Lichess's round-trips) untouched. The other
+  choice: a sideline own move in the study itself, marked (a comment tag); visible in the PGN and
+  in Qchess, but it changes the studies' text, risks being read as a repertoire move by anything
+  that doesn't know the mark, and isn't position-keyed.
+- **Chessable's own alternatives**: if the owner's course exports carry them, an import of
+  them as `alt` events (to check against an export in the data repo).
+
+Tests: the trainer (an alternative is free, twice; another wrong move after it counts; saving
+one mid-ask removes it from `w` and the grade is Good when right next); replay of `alt` events
+(add, remove, both devices); Playwright: a wrong move saved as an alternative, then played on a
+later line and taken back for free.
+
 #### 5.14 Phase 1 acceptance test, and exit
 
 **Acceptance test (live, desktop + Android phone)**, after Phase 0's (§4.11) and once §5.15 is
@@ -2040,6 +2163,9 @@ Risks:
 Planned on 2026-10-06, after Phase 1's build (§5.16) and while its live checks wait for the owner
 (TESTING.md). The parts below are in build order; each lists its tasks, the tests that prove it,
 and what only a live check can show, on which device. Numbering goes on from Phase 1's.
+The owner's second testing notes (§5.17, Phase 1 follow-ups) are built before the next part of
+Phase 2 that isn't started yet; §5.18 (alternative moves) waits for the owner's answer on its
+storage.
 
 **Scope**, from the outline the owner approved:
 - **Lichess explorer** with `src/pe`'s limiter and an IndexedDB cache; repertoire marks on the

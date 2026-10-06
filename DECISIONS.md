@@ -984,3 +984,22 @@ designs. The technical calls, each with its reason:
 - **For the owner (`PLAN.md` §5.27): the course tree as a "Study" tab of the explorer panel**
   rather than lichessable's Miller columns, since a study here is already a tree. Not built until
   the owner answers.
+
+## Revision of 2026-10-06 (the owner's second testing notes)
+The owner's notes on training, planned in `PLAN.md` §5.17 (built next, before Phase 2 goes on)
+and §5.18 (alternative moves, waiting for the owner's choice of storage). The calls, each with
+its reason:
+- **D16: auto-play becomes a setting with lichessable's modes,** at least "off" and "moves
+  answered right this session" (the owner's minimum). A move answered wrong is then asked again
+  on a later line, with no second grade, since a card is graded once a session.
+- **Time travel shifts what the clock decides, not what it records.** Events keep the real time:
+  a shifted timestamp would be synced into the real log for good, while a review made ahead is an
+  early review, which FSRS models.
+- **The feedback line says only what asks something of the user;** "Your move" and "Correct"
+  go, at the owner's request, and the line keeps its height so the board doesn't move.
+- **New per-device settings** (localStorage, like the pace): new moves shown or tried first, a
+  line's end waiting or going on, where a line starts (first new or due move, auto-played from
+  the start, or asked from the start), and auto-play's mode. None changes card states, so none
+  needs syncing.
+- **Open for the owner (§5.18): where alternative moves are stored.** Recommended: events in the
+  progress log, keyed by position, leaving the studies' PGN untouched.
