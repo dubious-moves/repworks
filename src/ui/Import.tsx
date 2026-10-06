@@ -7,7 +7,7 @@ import { extractStudyId, LichessError, type LichessStudyInfo } from '../core/imp
 import { describeNote, headerCounts, readImport, sidesMissing, type ImportChoices, type ImportReading, type Side } from '../core/import/plan.ts';
 import type { StudyKind, StudySource } from '../core/study/model.ts';
 import { lichess, lichessUser, logInWithLichess, logOutOfLichess } from '../app/lichess.ts';
-import { navigate } from '../app/route.ts';
+import { open } from '../app/mode.ts';
 import { notice, saveImport } from '../app/state.ts';
 
 interface Read {
@@ -48,7 +48,11 @@ function FileSource(props: { onRead: (read: Read) => void }) {
     const reading = readImport(pgn);
     if (reading.chapters.length === 0 && reading.refused.length === 0) return setError('No game found in that PGN.');
     setError(undefined);
-    const fallbackName = name.replace(/\.qchess\.pgn$|\.pgn$/i, '').replace(/_\d{4}-\d\d-\d\d$/, '').replace(/_/g, ' ') || 'Imported study';
+    const fallbackName =
+      name
+        .replace(/\.qchess\.pgn$|\.pgn$/i, '')
+        .replace(/_\d{4}-\d\d-\d\d$/, '')
+        .replace(/_/g, ' ') || 'Imported study';
     props.onRead({ reading, source: sourceOfFile(reading, name), fallbackName });
   };
   const pick = async (e: Event) => {
@@ -133,7 +137,15 @@ function LichessSource(props: { onRead: (read: Read) => void }) {
       </p>
       <label>
         Study URL or ID
-        <input name="lichess-study" value={input} onInput={(e) => setInput(e.currentTarget.value)} placeholder="https://lichess.org/study/…" autocomplete="off" autocapitalize="off" spellcheck={false} />
+        <input
+          name="lichess-study"
+          value={input}
+          onInput={(e) => setInput(e.currentTarget.value)}
+          placeholder="https://lichess.org/study/…"
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck={false}
+        />
       </label>
       <div class="actions">
         <button type="button" disabled={busy || !id} onClick={() => id && void fetchStudy(id)}>
@@ -230,13 +242,16 @@ function Review(props: { read: Read; onCancel: () => void }) {
     if (!result.ok) return setError(`Not imported: ${result.error}.`);
     const made = result.studies.map((s) => `“${s.meta.name}” (${s.meta.kind}, ${s.chapters.length} chapter${s.chapters.length === 1 ? '' : 's'})`);
     notice.value = { kind: 'done', message: `Imported ${made.join(' and ')}. It syncs with the next sync.` };
-    navigate({ name: 'home' });
+    open({ name: 'list' });
   };
   return (
     <form class="card form review" onSubmit={(e) => void submit(e)}>
-      <h2>Import {reading.chapters.length} chapter{reading.chapters.length === 1 ? '' : 's'}</h2>
+      <h2>
+        Import {reading.chapters.length} chapter{reading.chapters.length === 1 ? '' : 's'}
+      </h2>
       <p class="muted">
-        From {source.kind === 'lichess' ? 'Lichess' : source.kind === 'qchess' ? 'Qchess' : 'a PGN file'}: {source.name ?? source.id}. A new study is made every time; nothing on this device is replaced.
+        From {source.kind === 'lichess' ? 'Lichess' : source.kind === 'qchess' ? 'Qchess' : 'a PGN file'}: {source.name ?? source.id}. A new study is made every time; nothing on this device is
+        replaced.
       </p>
       <label>
         Study name

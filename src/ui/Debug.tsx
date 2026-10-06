@@ -4,16 +4,20 @@ import { useEffect, useState } from 'preact/hooks';
 import { requestCounts } from '../app/requests.ts';
 import { device, localStore, recordTestReview, settings, syncNow } from '../app/state.ts';
 import { dataVersion, syncStatus } from '../app/sync.ts';
+import { cardStates, type CardRow } from '../app/overview.ts';
 import type { LocalState } from '../core/sync/ports.ts';
 import { OtherDeviceCode, SetupForm } from './Setup.tsx';
 import { formatTime } from './Sync.tsx';
 
 export function Debug() {
   const [state, setState] = useState<LocalState | undefined>(undefined);
+  const [cards, setCards] = useState<CardRow[]>([]);
   const version = dataVersion.value;
   const phase = syncStatus.value.phase;
   useEffect(() => {
-    void localStore()?.state().then(setState, () => setState(undefined));
+    const store = localStore();
+    void store?.state().then(setState, () => setState(undefined));
+    if (store) void cardStates(store).then(setCards, () => setCards([]));
   }, [version, phase]);
   const d = device.value;
   const r = settings.value;
@@ -67,6 +71,38 @@ export function Debug() {
           Record a test review
         </button>
       </div>
+      <h3>Card states (replay of every device's log)</h3>
+      {cards.length === 0 ? (
+        <p class="muted">No reviews yet.</p>
+      ) : (
+        <div class="table-scroll">
+          <table class="cards">
+            <thead>
+              <tr>
+                <th>Card</th>
+                <th>Reviews</th>
+                <th>Due</th>
+                <th>Stability</th>
+                <th>Difficulty</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cards.map((c) => (
+                <tr key={c.card}>
+                  <td>
+                    <code>{c.card}</code>
+                    {c.suspended && ' (suspended)'}
+                  </td>
+                  <td>{c.reviews}</td>
+                  <td>{c.due === undefined ? 'new' : new Date(c.due).toISOString().slice(0, 16).replace('T', ' ')}</td>
+                  <td>{c.stability.toFixed(4)}</td>
+                  <td>{c.difficulty.toFixed(4)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
       <OtherDeviceCode />
       <SetupForm title="Change the token" />
     </details>

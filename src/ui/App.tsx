@@ -1,6 +1,11 @@
-import { route } from '../app/route.ts';
+import { useEffect, useState } from 'preact/hooks';
+import { mode } from '../app/mode.ts';
+import { findConflicts } from '../app/overview.ts';
 import { online, shellVersion, updateReady } from '../app/shell.ts';
-import { device, fatal, ready, studies } from '../app/state.ts';
+import { device, fatal, localStore, ready, studies } from '../app/state.ts';
+import { dataVersion } from '../app/sync.ts';
+import { ChapterView } from './ChapterView.tsx';
+import { ConflictsView } from './Conflicts.tsx';
 import { Debug } from './Debug.tsx';
 import { ImportScreen } from './Import.tsx';
 import { SetupForm } from './Setup.tsx';
@@ -28,7 +33,7 @@ export function App() {
         </div>
       )}
       <SyncBanners />
-      <main class="content">{ready.value && (!device.value ? <SetupForm /> : route.value.name === 'import' ? <ImportScreen /> : <Home />)}</main>
+      <main class="content">{ready.value && (!device.value ? <SetupForm /> : <Screen />)}</main>
       <footer class="footer">
         build {__BUILD_ID__}
         {shellVersion.value && <> · shell {shellVersion.value.slice(0, 8)}</>} · <a href={`${import.meta.env.BASE_URL}spike.html`}>remote spike</a>
@@ -37,7 +42,26 @@ export function App() {
   );
 }
 
+function Screen() {
+  switch (mode.value.name) {
+    case 'import':
+      return <ImportScreen />;
+    case 'conflicts':
+      return <ConflictsView />;
+    case 'chapter':
+      return <ChapterView />;
+    case 'list':
+      return <Home />;
+  }
+}
+
 function Home() {
+  const [conflicts, setConflicts] = useState(0);
+  const version = dataVersion.value;
+  useEffect(() => {
+    const store = localStore();
+    if (store) void findConflicts(store).then((o) => setConflicts(o.conflicts.length + o.copies.length));
+  }, [version]);
   return (
     <>
       <section class="card">
@@ -53,13 +77,22 @@ function Home() {
           <ul class="studies">
             {studies.value.map((s) => (
               <li key={s.id}>
-                <span class="study-name">{s.name}</span>
+                <a class="study-name" href={`#/study/${s.id}`}>
+                  {s.name}
+                </a>
                 <span class="muted">
                   {s.kind} · {s.chapters} chapter{s.chapters === 1 ? '' : 's'}
                 </span>
               </li>
             ))}
           </ul>
+        )}
+        {conflicts > 0 && (
+          <p>
+            <a href="#/conflicts">
+              {conflicts} open conflict{conflicts === 1 ? '' : 's'}
+            </a>
+          </p>
         )}
       </section>
       <Debug />

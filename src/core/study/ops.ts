@@ -237,3 +237,14 @@ export function reorderChapters(meta: StudyMeta, order: readonly string[]): Edit
 
 export const addChapterToStudy = (meta: StudyMeta, cid: string): StudyMeta => (meta.chapters.includes(cid) ? meta : { ...meta, chapters: [...meta.chapters, cid] });
 export const removeChapterFromStudy = (meta: StudyMeta, cid: string): StudyMeta => ({ ...meta, chapters: meta.chapters.filter((c) => c !== cid) });
+
+/**
+ * Drawing a shape, as chessground's right-drag does: one with the same ends goes, and comes back
+ * in the new colour if the colour differs. The phone's draw mode draws through this.
+ */
+export function toggleShape(shapes: readonly Shape[], shape: Shape): Shape[] {
+  const sameEnds = (s: Shape) => s.orig === shape.orig && s.dest === shape.dest;
+  const similar = shapes.find(sameEnds);
+  const rest = shapes.filter((s) => !sameEnds(s));
+  return similar && similar.brush === shape.brush ? rest : [...rest, shape];
+}

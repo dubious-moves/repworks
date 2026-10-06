@@ -225,3 +225,12 @@ test('random edits on random chapters always leave a valid chapter', () => {
     }
   }
 });
+
+test('toggleShape draws as chessground does: the same shape goes, another colour replaces it', () => {
+  const arrow = { brush: 'green' as const, orig: 'e2' as const, dest: 'e4' as const };
+  const circle = { brush: 'red' as const, orig: 'd4' as const };
+  assert.deepEqual(ops.toggleShape([], arrow), [arrow]);
+  assert.deepEqual(ops.toggleShape([arrow, circle], arrow), [circle]);
+  assert.deepEqual(ops.toggleShape([arrow, circle], { ...arrow, brush: 'blue' }), [circle, { ...arrow, brush: 'blue' }]);
+  assert.deepEqual(ops.toggleShape([arrow], { brush: 'green', orig: 'e2' }), [arrow, { brush: 'green', orig: 'e2' }]);
+});

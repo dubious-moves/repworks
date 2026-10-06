@@ -2,8 +2,9 @@
 
 Status: plan of 2026-10-05, written in a planning session and updated the same day with the
 owner's answers to its questions and with the organization they created (§8). The owner approved
-it the same day. Phase 0 is being built in order: §4.1 to §4.10 are on `main` (each part's "As
-built" notes say where the build differed), and the live checks wait for the owner. Read with
+it the same day. Phase 0 is built: §4.1 to §4.11 are on `main` (each part's "As built" notes say
+where the build differed). What remains is live: the spike's re-run (§4.2), the real Qchess and
+Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Read with
 `DECISIONS.md`, which this plan updates (its revision log lists every change and why).
 
 Contents:
@@ -844,6 +845,52 @@ Tests:
 
 Live (desktop and phone): every editor action above by hand, including draw mode by finger,
 and offline editing with the PWA killed and reopened.
+
+**As built** (where the build settled details the plan left open, or changed them):
+- **Modes** (`src/core/app/fsm.ts`): the study list, import, conflicts, and a chapter, each with
+  its address: `#/study/<sid>/<cid>?at=e4,c5`. The move shown is kept in the address (replaced,
+  not pushed, so stepping through a line doesn't fill the browser's history), so a reload or a
+  link from the conflicts view opens at that move. Settings and setup stay in the list's debug
+  panel.
+- **Keys**: ← → along the line, ↑ ↓ to the previous or next variation at this move, Home and End
+  to the start and the end of the line; Ctrl+Z / Ctrl+Y (or Ctrl+Shift+Z) undo and redo.
+- **The notation** is laid out in core (`src/core/study/notation.ts`) with the PGN writer's
+  numbering rules, tested against the writer on every fixture and 200 random trees. Each move
+  reads its own "current" signal, so moving redraws two moves.
+- **Shapes change only by drawing.** chessground clears a move's arrows on a left click (Lichess
+  does the same); here that would delete them from the study whenever a piece is moved, so the
+  board ignores clears that don't come from a drawing gesture. Right-drag and the phone's draw
+  mode toggle a shape as chessground does (same shape off, another colour replaces it). Draw mode
+  catches touches and clicks before chessground sees them, since `viewOnly` can't change after
+  the board starts.
+- **Edits** are core's operations; each new chapter is written at once as the device's working
+  copy, in order. When a sync or another tab changes the open chapter's file, it is read again,
+  the move shown is kept where it still exists, and undo starts over (it would otherwise undo
+  someone else's work). A chapter whose file can't be read, or holds illegal moves an edit would
+  cut, is shown without editing. A promotion asks for the piece.
+- **Conflicts** are resolved where they stand (`src/core/merge/resolve.ts`): for clashing text,
+  either side, both, or a text written by hand; for a line kept after a delete, keep it (the
+  marker goes) or delete it. The conflicts view also lists conflict copies of unmergeable files.
+- **Chapters and the study** (a drawer under the notation): the chapter's side, rename, move up
+  or down, delete, add a chapter; the study's name (rewriting every readable chapter's
+  `StudyName`) and kind.
+- **The debug panel** shows the card states from replaying every device's log plus this
+  device's unsent events: reviews, due time, stability and difficulty to four places, for step 6
+  of the acceptance test.
+- **Not built yet**: the `parsed` cache of chapter models by blob SHA (§4.9). A chapter is parsed
+  when it is opened, which is quick at repertoire sizes; the cache comes if the phone shows a
+  need.
+- **Tests**: modes, history, navigation, notation, resolution and `toggleShape` in Node.
+  Playwright on desktop and phone: open a chapter and move through it, a variation played on
+  the board, a comment, a glyph, an arrow and a circle in draw mode, undo and redo, line actions,
+  chapters added, renamed, turned and deleted, the conflicts view and both resolutions, an
+  unreadable chapter left alone; each checked in the PGN that reaches the fake repo. And a
+  **rehearsal of the acceptance test** (`test/e2e/acceptance.spec.ts`): a desktop page and an
+  emulated Pixel 7 against one fake GitHub, both offline, the edits of steps 3 and 4 (the phone
+  reloaded offline with its edits kept), synced in step 5's order. It checks step 6's result
+  byte for byte in the merged PGN, on both devices' screens, two conflicts listed on each, the
+  same card states on both after four reviews, one commit per sync named by device; and step 7.
+  The live test on the owner's devices against the real GitHub is still to do.
 
 **Acceptance test (live, desktop + Android phone).**
 1. Both devices synced, with the same repertoire study open: an imported copy of one of the

@@ -103,6 +103,13 @@ async function readStudies(s: IdbStore): Promise<StudyRow[]> {
   return rows.sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/** Writes working copies (null deletes a file) and lets the sync and the other tabs know. */
+export async function saveFiles(files: ReadonlyMap<string, string | null>): Promise<void> {
+  if (!store || files.size === 0) return;
+  await store.editMany(files);
+  await controller?.changed();
+}
+
 /** Writes an import's new studies into the working copies; they go out with the next sync. */
 export async function saveImport(reading: ImportReading, choices: ImportChoices): Promise<ImportBuild> {
   if (!store) return { ok: false, error: 'the local database is not open' };
@@ -113,8 +120,7 @@ export async function saveImport(reading: ImportReading, choices: ImportChoices)
   }
   const result = buildImport(reading, choices, { random: cryptoRandom, taken, now: new Date().toISOString() });
   if (!result.ok) return result;
-  await store.editMany(result.files);
-  await controller?.changed();
+  await saveFiles(result.files);
   return result;
 }
 

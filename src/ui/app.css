@@ -362,3 +362,264 @@ textarea.script {
   cursor: pointer;
   min-height: 32px;
 }
+
+/* The chapter view (PLAN.md §4.11): board first, 44 px tap targets, feedback under the board. */
+
+.chapter-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.chapter-head .back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  font-size: 1.3rem;
+  text-decoration: none;
+}
+
+.chapter-head .titles {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.chapter-head select {
+  min-height: 44px;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 6px;
+}
+
+.study-title {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.board {
+  width: min(100%, 560px, calc(100dvh - 200px));
+  min-width: 260px;
+  aspect-ratio: 1;
+  margin: 0 auto;
+  touch-action: none;
+}
+
+.board .cg-host {
+  width: 100%;
+  height: 100%;
+}
+
+.board-draw {
+  outline: 3px solid var(--warn);
+  outline-offset: 2px;
+}
+
+.controls,
+.brushes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 4px;
+}
+
+.controls button {
+  min-width: 44px;
+  padding: 0 10px;
+}
+
+.controls button.on,
+.glyphs button.on {
+  background: var(--warn);
+  color: #1b1b1b;
+}
+
+.brush {
+  width: 44px;
+  padding: 0;
+}
+
+.brush.on {
+  outline: 3px solid var(--text);
+}
+
+.brush-green {
+  background: #15781b;
+}
+
+.brush-red {
+  background: #882020;
+}
+
+.brush-blue {
+  background: #003088;
+}
+
+.brush-yellow {
+  background: #e68f00;
+}
+
+.feedback {
+  min-height: 1.4em;
+  margin: 4px 0;
+  text-align: center;
+  color: var(--warn);
+}
+
+.promotion {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.notation {
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 10px;
+  line-height: 2;
+  margin-bottom: 12px;
+}
+
+.notation .move {
+  display: inline-block;
+  padding: 0 3px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.notation .move.main {
+  font-weight: 600;
+}
+
+.notation .move.current {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.notation .number {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.notation .glyphs {
+  color: var(--warn);
+}
+
+.notation .comment {
+  color: #a9c7b0;
+  margin: 0 6px 0 2px;
+  white-space: pre-wrap;
+  cursor: pointer;
+}
+
+.notation .comment.conflict {
+  color: var(--warn);
+  font-weight: 600;
+}
+
+.notation .paren {
+  color: var(--muted);
+}
+
+.node-panel .glyphs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.node-panel .glyphs button {
+  min-width: 44px;
+  padding: 0 6px;
+}
+
+.comment-box {
+  display: block;
+  margin: 8px 0;
+}
+
+.comment-box textarea,
+.conflict-box textarea {
+  display: block;
+  width: 100%;
+  margin: 4px 0 6px;
+  padding: 8px 10px;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 6px;
+}
+
+.conflict-box {
+  border-left: 4px solid var(--warn);
+  background: var(--surface);
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  border-radius: 6px;
+}
+
+.conflict-box .side {
+  white-space: pre-wrap;
+  margin: 4px 0;
+}
+
+.drawer summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.drawer h3,
+.debug h3 {
+  font-size: 0.95rem;
+  margin: 16px 0 4px;
+}
+
+.conflicts {
+  padding-left: 18px;
+}
+
+.conflicts li {
+  margin: 8px 0;
+}
+
+.table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+table.cards code {
+  word-break: break-all;
+}
+
+table.cards {
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  width: 100%;
+}
+
+table.cards th,
+table.cards td {
+  text-align: left;
+  padding: 2px 8px 2px 0;
+}
+
+@media (min-width: 900px) {
+  .cv-columns {
+    display: grid;
+    grid-template-columns: minmax(300px, 560px) minmax(300px, 1fr);
+    gap: 20px;
+    align-items: start;
+  }
+}
