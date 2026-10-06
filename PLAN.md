@@ -3309,6 +3309,30 @@ fakes still answered, the threaded engine's `bestmove`, more nodes per second th
 
 Live (desktop and phone): isolation, the login and the sync unaffected, the speed.
 
+**As built** (2026-10-06): its check passed in the container's Chromium, so it is built, **as an
+opt-in** rather than with the default planned above:
+- With isolation always on, the whole e2e suite passed but for the offline starts: after an
+  offline reload the page read "synced" where it reads "offline" (Playwright's offline emulation
+  seems to reach the new process COOP opens only late; the page itself reported
+  `navigator.onLine` false once asked). Harmless or not, it showed that isolation changes how
+  every page loads, and the installed app on Android and the Lichess login under COOP can only
+  be checked on the owner's devices. So isolation is on only while more than one thread is
+  chosen: **Threads defaults to 1** (Qchess's 1/3/7 became 1, 2, 4, 8 as far as the cores go).
+- `src/sw/sw.ts`: when the flag `isolate` is in Cache Storage `repworks-flags`
+  (`src/platform/isolation.ts` writes it and tells the worker), every response it serves gets
+  `Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Embedder-Policy: require-corp` and
+  `Cross-Origin-Resource-Policy: same-origin`; the page is isolated from its next load.
+- `vendor/stockfish/stockfish-18-lite.{js,wasm}`: npm `stockfish@18.0.0`'s threaded lite build
+  (sha256 in the README), engine files like the others ("Stockfish 18 threads" in the list).
+  `app/engine.ts` runs it, with `setoption name Threads value N`, when the page is isolated and
+  more than one thread is chosen, else the single-threaded build; a change of threads ends the
+  worker and the next position starts the right one. The bar reads "SF18 ×2"; the settings say
+  a reload is needed and offer it.
+- Tests: `test/e2e/threads.spec.ts` (desktop, the real threaded engine): not isolated by default;
+  two threads chosen and the page reloaded: isolated, the threaded build downloaded and running
+  at depth 16 or more as "SF18 ×2", an edit synced as before; back to one thread, not isolated
+  after the next load.
+
 #### 5.37 Phase 3 acceptance test, and exit
 
 **Acceptance test (live, desktop + Android phone)**, on the owner's repertoire:

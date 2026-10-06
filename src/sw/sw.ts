@@ -53,6 +53,7 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('message', (event) => {
   if (event.data === 'version') event.source?.postMessage({ version: __VERSION__ });
+  if (event.data === 'isolation') isolate = undefined;
 });
 
 self.addEventListener('fetch', (event) => {
@@ -61,8 +62,31 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   const scope = new URL(self.registration.scope);
   if (url.origin !== scope.origin || !url.pathname.startsWith(scope.pathname)) return;
-  event.respondWith(respond(request, url, scope));
+  event.respondWith(respond(request, url, scope).then(async (r) => ((await isolating()) ? isolated(r) : r)));
 });
+
+// Whether to isolate: the app sets the flag when more than one engine thread is chosen
+// (src/platform/isolation.ts), and tells this worker, which keeps it in memory meanwhile.
+const FLAGS = 'repworks-flags';
+let isolate: Promise<boolean> | undefined;
+const isolating = (): Promise<boolean> => (isolate ??= caches.open(FLAGS).then((c) => c.match('isolate')).then((r) => !!r, () => false));
+
+/**
+ * Cross-origin isolation (PLAN.md §5.36), which GitHub Pages can't send: when the app asks for it,
+ * every response this worker gives the site's pages carries COOP and COEP, so a page it controls is
+ * `crossOriginIsolated` and the threaded Stockfish can share memory. Every cross-origin request
+ * the site makes is CORS (GitHub, Lichess, ChessDB, a local explorer), which COEP allows, and the
+ * Lichess login is a redirect, which COOP allows. A page's first load, before this worker
+ * controls it, isn't isolated: it runs the single-threaded engine.
+ */
+function isolated(response: Response): Response {
+  if (response.type === 'opaqueredirect' || response.status === 0) return response;
+  const headers = new Headers(response.headers);
+  headers.set('Cross-Origin-Opener-Policy', 'same-origin');
+  headers.set('Cross-Origin-Embedder-Policy', 'require-corp');
+  headers.set('Cross-Origin-Resource-Policy', 'same-origin');
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
 
 async function precache(): Promise<void> {
   const cache = await caches.open(SHELL);

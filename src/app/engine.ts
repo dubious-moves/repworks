@@ -9,8 +9,9 @@ import type { Position } from 'chessops/chess';
 import { makeFen } from 'chessops/fen';
 import { positionKeyOf } from '../core/chess/positionKey.ts';
 import { createSearch, type Analysis, type Search, type SearchRequest } from '../core/engine/search.ts';
-import { ENGINES, ensure } from '../platform/blobs.ts';
-import { startStockfish, type EngineProcess } from '../platform/stockfish.ts';
+import { ensure } from '../platform/blobs.ts';
+import { startStockfish, stockfishFiles, type EngineProcess } from '../platform/stockfish.ts';
+import { isolated, wantIsolation } from '../platform/isolation.ts';
 
 export interface EnginePrefs {
   on: boolean;
@@ -19,10 +20,12 @@ export interface EnginePrefs {
   /** Seconds; 0 for no limit. */
   movetime: number;
   arrows: boolean;
+  /** Engine threads (§5.36): more than one needs the page isolated, which the service worker does. */
+  threads: number;
 }
 
 // Qchess's defaults (depth 20, 8 s), with three lines for the outline's MultiPV arrows.
-export const DEFAULT_ENGINE_PREFS: EnginePrefs = { on: false, depth: 20, lines: 3, movetime: 8, arrows: true };
+export const DEFAULT_ENGINE_PREFS: EnginePrefs = { on: false, depth: 20, lines: 3, movetime: 8, arrows: true, threads: 1 };
 export const DEPTHS = [20, 30, 40] as const;
 export const MOVETIMES = [5, 8, 30] as const;
 
@@ -62,7 +65,23 @@ export function updateEnginePrefs(patch: Partial<EnginePrefs>): void {
     if (patch.on) claimTab();
     else stopEngine();
   }
+  // Threads (§5.36): the page isolated from its next load when more than one is wanted, and the
+  // engine started again with the build and threads that now apply.
+  if ('threads' in patch) {
+    void wantIsolation((patch.threads ?? 1) > 1);
+    if (runningThreads() !== started) teardown();
+  }
   refresh();
+}
+
+/** Ends the worker and the search; the next position starts them again. */
+function teardown(): void {
+  clearTimeout(watchdog);
+  proc?.terminate();
+  proc = undefined;
+  search = undefined;
+  analysis.value = undefined;
+  engineStatus.value = { kind: 'off' };
 }
 
 const RESTART_AFTER_STOP_MS = 3000;
@@ -80,6 +99,9 @@ let board: Position | undefined;
 let deeper = false;
 
 const hashMb = (): number => (matchMedia('(max-width: 768px)').matches ? 16 : 32);
+/** The threads the engine runs with: those chosen when the page is isolated, else one. */
+export const runningThreads = (): number => (isolated() ? Math.max(1, enginePrefs.peek().threads) : 1);
+let started = 1;
 
 // The lines come many times a second at low depths: shown at most every 100 ms.
 function show(a: Analysis): void {
@@ -116,6 +138,7 @@ function spawn(): void {
       crashed: (reason) => restart(reason),
     },
     hashMb(),
+    started,
   );
 }
 
@@ -137,8 +160,10 @@ async function startEngine(): Promise<void> {
   if (starting) return starting;
   starting = (async () => {
     try {
-      engineStatus.value = { kind: 'loading', received: 0, total: ENGINES.stockfishJs.bytes + ENGINES.stockfishWasm.bytes };
-      await ensure([ENGINES.stockfishJs, ENGINES.stockfishWasm], (p) => {
+      started = runningThreads();
+      const files = stockfishFiles(started);
+      engineStatus.value = { kind: 'loading', received: 0, total: files.reduce((n, f) => n + f.bytes, 0) };
+      await ensure(files, (p) => {
         engineStatus.value = { kind: 'loading', ...p };
       });
       failures = 0;

@@ -1103,3 +1103,20 @@ account. The technical calls, each with its reason:
   `.claude/settings.json` (`effortLevel: high`): the app passes `CLAUDE_EFFORT` to the session,
   which wins. Sessions chained by `create_session` do run at high. The owner sets High in the
   app's picker before starting a session.
+
+## Revision of 2026-10-06 (Phase 3 built through §5.36)
+`PLAN.md` §5.29–§5.36 are built. Calls made while building, each with its reason:
+- **D17: cross-origin isolation is opt-in, on only while more than one engine thread is chosen
+  (Threads defaults to 1).** It checked out in the container's Chromium (the threaded engine runs,
+  GitHub, Lichess and ChessDB still answer), but it changes how every page loads, and the
+  installed app on Android and the Lichess login under COOP can only be checked on the owner's
+  devices; with it always on, the offline-start tests saw "synced" where "offline" was due (a
+  Playwright emulation artefact, most likely, but not provably).
+- **onnxruntime-web's non-bundled build** (`ort.wasm.min.mjs`, its 24 KB glue as an engine file):
+  the default build points at its wasm in a way Vite copies into `assets/`, which the shell would
+  have precached (14 MB with every deploy).
+- **§5.32 and §5.33 were built together**: Maia's switch and columns are how its worker is used.
+- **The explorer gives up the engine section's height** on a wide screen, so its own height still
+  stays constant between moves (the owner's notes on §5.23).
+- **Maia in the Practical column: the Prac title sorts first and switches to Maia's values on a
+  second click**, q_extension's rule kept beside the owner's sorting titles.

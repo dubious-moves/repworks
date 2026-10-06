@@ -13,6 +13,12 @@ build mistake-lab serves (`engine/`), PLAN.md §5.29.
 | --- | --- | --- |
 | `stockfish-18-lite-single.js` | 20,670 | `2278005057f381491f1c9bb3e44c9f5920b3a00bef9759e33cc6582769a1f1fe` |
 | `stockfish-18-lite-single.wasm` | 7,295,411 | `a8fbc05ec6920b56d7485826dcb02c5ffd2826bcbf751cf973046f237a9096f1` |
+| `stockfish-18-lite.js` | 32,109 | `f79e667c9d56ee768aca35e8343f91548ceef6a732f67cd82f267cf9eab7f665` |
+| `stockfish-18-lite.wasm` | 7,093,151 | `d50136919dcd90e75eb8df78b255d47d618962b670028b38961343f6eb409174` |
+
+`stockfish-18-lite.{js,wasm}` is the multi-threaded build of the same engine and net, from the same
+package (§5.36): it needs `SharedArrayBuffer`, so a page that is cross-origin isolated, which
+the site's service worker makes it when more than one thread is chosen.
 
 The site serves them under content-hashed names and downloads them when the engine is first
 switched on (vite.config.ts, `src/platform/blobs.ts`). The worker finds its wasm from the hash of

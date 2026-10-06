@@ -50,6 +50,8 @@ export default defineConfig({
 const ENGINE_FILES: Record<string, string> = {
   stockfishJs: 'vendor/stockfish/stockfish-18-lite-single.js',
   stockfishWasm: 'vendor/stockfish/stockfish-18-lite-single.wasm',
+  stockfishMtJs: 'vendor/stockfish/stockfish-18-lite.js',
+  stockfishMtWasm: 'vendor/stockfish/stockfish-18-lite.wasm',
   maiaModel: 'vendor/maia/maia3_simplified.onnx',
   ortWasm: 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm',
   ortMjs: 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.mjs',

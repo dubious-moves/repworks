@@ -17,8 +17,12 @@ export interface EngineEvents {
 
 const HANDSHAKE_MS = 10_000;
 
-export function startStockfish(events: EngineEvents, hashMb: number): EngineProcess {
-  const url = `${ENGINES.stockfishJs.url}#${encodeURIComponent(new URL(ENGINES.stockfishWasm.url, location.href).href)}`;
+/** The build's files: the single-threaded one, or the threaded one (§5.36, isolated pages only). */
+export const stockfishFiles = (threads: number) => (threads > 1 ? [ENGINES.stockfishMtJs, ENGINES.stockfishMtWasm] : [ENGINES.stockfishJs, ENGINES.stockfishWasm]);
+
+export function startStockfish(events: EngineEvents, hashMb: number, threads = 1): EngineProcess {
+  const [js, wasm] = stockfishFiles(threads);
+  const url = `${js!.url}#${encodeURIComponent(new URL(wasm!.url, location.href).href)}`;
   const worker = new Worker(url);
   const queue: string[] = [];
   let ready = false;
@@ -41,6 +45,7 @@ export function startStockfish(events: EngineEvents, hashMb: number): EngineProc
       clearTimeout(timer);
       timer = setTimeout(() => fail('Stockfish did not start (no readyok)'), HANDSHAKE_MS);
       worker.postMessage(`setoption name Hash value ${hashMb}`);
+      if (threads > 1) worker.postMessage(`setoption name Threads value ${threads}`);
       worker.postMessage('isready');
       return;
     }

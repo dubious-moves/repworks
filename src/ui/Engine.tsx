@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useRef } from 'preact/hooks';
 import { Chess, type Position } from 'chessops/chess';
 import { parseFen } from 'chessops/fen';
-import { analysis, enginePrefs, engineStatus, goDeeper, retryEngine, setThreat, threat, updateEnginePrefs } from '../app/engine.ts';
+import { analysis, enginePrefs, engineStatus, goDeeper, retryEngine, runningThreads, setThreat, threat, updateEnginePrefs } from '../app/engine.ts';
 import { previewOf, showLine } from '../app/preview.ts';
 import type { Analysis, EngineLine } from '../core/engine/search.ts';
 import { engineArrows, type EngineArrow } from '../core/engine/shapes.ts';
@@ -89,7 +89,7 @@ export function EnginePanel(props: { board: Position | undefined }) {
           <input type="checkbox" role="switch" aria-label="Engine" checked={on} onChange={(e) => updateEnginePrefs({ on: e.currentTarget.checked })} />
           <span class="slider" />
         </label>
-        <span class="engine-name">SF18</span>
+        <span class="engine-name">SF18{on && runningThreads() > 1 ? ` ×${runningThreads()}` : ''}</span>
         <span class="engine-depth" aria-live="polite">
           {on ? statusText(props.board, shown) : ''}
         </span>

@@ -10,6 +10,8 @@ declare module 'virtual:repworks-engines' {
   export const ENGINES: {
     stockfishJs: EngineFile;
     stockfishWasm: EngineFile;
+    stockfishMtJs: EngineFile;
+    stockfishMtWasm: EngineFile;
     maiaModel: EngineFile;
     ortWasm: EngineFile;
     ortMjs: EngineFile;

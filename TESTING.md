@@ -133,6 +133,10 @@ couldn't be tested then (the day's limit was used up), so the training items bel
 - §5.35: the analysis board (desktop and phone): a FEN pasted and analysed; "Analyse from here"
   on a chapter's move, a line played and added back (on the other device after a sync); the
   board as left after closing the app.
+- §5.36: threads on the desktop (Engine settings → Threads 2 or 4, then the reload it offers):
+  "SF18 ×4" and its speed against one thread at the same position; then, with threads on, the
+  Lichess login (log out and in again), a sync, the explorer and Maia, all as before; the
+  installed app on the phone with 2 threads (whether Android keeps it isolated after a reload).
 
 ### The change to q_extension for §5.25 (Repworks sessions can't push there)
 
