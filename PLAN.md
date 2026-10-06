@@ -2,8 +2,9 @@
 
 Status: plan of 2026-10-05, written in a planning session and updated the same day with the
 owner's answers to its questions and with the organization they created (§8). The owner approved
-it the same day; Phase 0 is next and nothing is built yet. Read with `DECISIONS.md`, which this
-plan updates (its revision log lists every change and why).
+it the same day. Phase 0 is being built in order: §4.1 to §4.10 are on `main` (each part's "As
+built" notes say where the build differed), and the live checks wait for the owner. Read with
+`DECISIONS.md`, which this plan updates (its revision log lists every change and why).
 
 Contents:
 1. Summary
@@ -758,6 +759,45 @@ Tests:
   folder, a default intro, a chapter stored without headers, a folder name with a quote) gives
   the expected headers, and the result imports with the right sides and the right companion
   reference study.
+
+**As built** (where the build settled details the plan left open, or changed them):
+- **The export script** (`scripts/qchess-export.js`) was written against the study page's source
+  as fetched again on 2026-10-06 (without login): `studyData.chapters[]` (`name`, `pgn`,
+  `perspective`, `is_intro`, `chapter_uuid`, `exclude_from_movetrainer`, `fen`) and
+  `studyData.folders[]` (`name`, `chapter_uuids`, `exclude_from_movetrainer`). Besides the three
+  headers above it adds `[StudyName]`, so the import knows the study's name. Qchess writes header
+  values without escaping and its reader stops at the first quote, so a chapter name with a quote
+  breaks Qchess's own header block; the script reads each header line up to its last quote and
+  writes the values escaped. An empty chapter made from a FEN gets `[SetUp]`/`[FEN]` from the
+  chapter's `fen`. The file is saved as `<study>.qchess.pgn`.
+- **One file, two uses.** Off a Qchess page the script hands back its pure part,
+  `qchessStudyToPgn(studyData, isDefaultIntro)`, which the Node tests run through `vm`. The site
+  bundles the same file (Vite `?raw`), so the import screen copies it to the clipboard, or shows
+  it, with the steps to run it.
+- **Stored chapters** keep every header as read, plus: `ChapterName` when missing (from `Event`,
+  else the players, else the number), the chosen side in `Orientation`, and the study's name in
+  `StudyName` (rewritten as a study rename rewrites it, Lichess-style `Event` included). So a
+  Lichess chapter imported under its own study name is stored byte for byte as exported.
+- **The source** is `lichess` (with the Lichess study ID), `qchess` (a file with Qchess's
+  headers, or named `*.qchess.pgn`), else `file`, with the file name.
+- **The review** before an import: the name (from `[StudyName]`, else the file name), repertoire
+  or reference, each chapter's side (one button sets every chapter still without one), the
+  chapters left out as unreadable, and the report (parser notes with the moves written out, and
+  the headers kept with how many chapters carry each). A reference import keeps Qchess's untrained
+  chapters in the one study.
+- **Lichess**: `src/platform/lichess.ts` holds the client and the login; the client ID is
+  `repworks` and the redirect is the site's own address. The redirect's `?code=…&state=…` leaves
+  the address bar before anything else runs, like a setup link, and the import screen opens
+  again. The token is kept in localStorage (`repworks-lichess`), with its expiry, and logging out
+  revokes it. The study list asks Lichess for a username's studies, filled in with the logged-in
+  user's.
+- **Routes** start here: `#/` (studies) and `#/import` (`src/core/app/route.ts`).
+- **Tests**: `test/unit/core/import` (reading, sides, companion study, new IDs over taken ones,
+  the report), `test/unit/scripts/qchessExport.test.ts` (the hand-built `studyData` above, then
+  its import), `test/unit/platform/lichess.test.ts` (requests, errors, and the PKCE round trip
+  against a fake Lichess), and Playwright on desktop and phone (`test/e2e/import.spec.ts`): a
+  Qchess file, pasted PGN needing sides, a public Lichess study, the login then a private study,
+  and copying the script. All against mocks: none of it has met the real Qchess or Lichess yet.
 
 Live:
 - desktop: export each Qchess repertoire study with the script and import it. Check the chapter

@@ -235,3 +235,130 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 }
+
+/* Import (PLAN.md §4.10) */
+
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.card-head h2 {
+  margin: 0;
+}
+
+a.button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 6px;
+  border: 1px solid rgb(255 255 255 / 20%);
+  background: var(--accent);
+  color: var(--accent-text);
+  text-decoration: none;
+}
+
+button.secondary {
+  background: transparent;
+}
+
+button.link {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #9fd3a8;
+  text-decoration: underline;
+  text-align: left;
+}
+
+.form label {
+  display: block;
+  margin: 10px 0;
+}
+
+.form input:not([type='radio']):not([type='file']),
+.form textarea,
+.form select,
+textarea.script {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 4px;
+  padding: 8px 10px;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 6px;
+}
+
+.form input[type='file'] {
+  display: block;
+  margin-top: 4px;
+  min-height: 44px;
+}
+
+textarea.script {
+  font-family: ui-monospace, monospace;
+  font-size: 0.8rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.choice {
+  border: 0;
+  padding: 0;
+  margin: 10px 0;
+}
+
+.choice label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  margin: 0;
+}
+
+.chapters,
+.pick {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+}
+
+.chapters li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid rgb(255 255 255 / 8%);
+}
+
+.form .chapters select {
+  width: auto;
+  margin: 0;
+}
+
+.pick li {
+  padding: 8px 0;
+}
+
+.steps {
+  padding-left: 20px;
+}
+
+.report summary {
+  cursor: pointer;
+  min-height: 32px;
+}

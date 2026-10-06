@@ -2,10 +2,13 @@
 // working view, and the actions the UI calls. §4.11 moves the screens into a state machine.
 import { effect, signal } from '@preact/signals';
 import { classifyPath } from '../core/data/layout.ts';
+import { buildImport, type ImportBuild, type ImportChoices, type ImportReading } from '../core/import/plan.ts';
 import type { StudyKind } from '../core/study/model.ts';
 import { parseStudyMeta, reconcileChapterOrder } from '../core/study/studyMeta.ts';
 import type { SetupParse, SetupRequest } from '../core/sync/setup.ts';
+import { cryptoRandom } from '../platform/browser.ts';
 import { IdbStore, type DeviceRecord, type RemoteSettings } from '../platform/idbStore.ts';
+import { finishLichessLogin } from './lichess.ts';
 import { applySetup, publicRepoWarning, takeSetupFromAddress, type Notice } from './setup.ts';
 import { dataVersion, SyncController } from './sync.ts';
 
@@ -28,7 +31,7 @@ export const fatal = signal<string | undefined>(undefined);
 let store: IdbStore | undefined;
 let controller: SyncController | undefined;
 
-export async function startApp(link: SetupParse | undefined): Promise<void> {
+export async function startApp(link: SetupParse | undefined, lichessCallback?: string): Promise<void> {
   try {
     store = await IdbStore.open();
   } catch (error) {
@@ -39,6 +42,11 @@ export async function startApp(link: SetupParse | undefined): Promise<void> {
   if (link) await setUpFrom(link, false);
   await reload();
   ready.value = true;
+  if (lichessCallback) {
+    const done = await finishLichessLogin(lichessCallback);
+    notice.value = done.notice;
+    if (done.returnTo) location.hash = done.returnTo;
+  }
   await controller.start();
   effect(() => {
     void dataVersion.value;
@@ -93,6 +101,21 @@ async function readStudies(s: IdbStore): Promise<StudyRow[]> {
     rows.push({ id: meta.value.id, name: meta.value.name, kind: meta.value.kind, chapters });
   }
   return rows.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Writes an import's new studies into the working copies; they go out with the next sync. */
+export async function saveImport(reading: ImportReading, choices: ImportChoices): Promise<ImportBuild> {
+  if (!store) return { ok: false, error: 'the local database is not open' };
+  const taken = new Set<string>();
+  for (const path of await store.paths()) {
+    const where = classifyPath(path);
+    if (where.kind === 'study' || where.kind === 'chapter') taken.add(where.sid);
+  }
+  const result = buildImport(reading, choices, { random: cryptoRandom, taken, now: new Date().toISOString() });
+  if (!result.ok) return result;
+  await store.editMany(result.files);
+  await controller?.changed();
+  return result;
 }
 
 /** A review of a made-up card, for checking sync and replay by hand (the acceptance test). */

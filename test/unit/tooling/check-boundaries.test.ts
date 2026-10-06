@@ -27,6 +27,8 @@ const clean = {
   'src/core/chess/a.ts': `import { parseFen } from 'chessops/fen';\nimport type { B } from '../study/b.ts';\nexport const a = (t: number, b: B) => new Date(t);\n`,
   'src/core/study/b.ts': `// Date.now() in a comment is fine\nexport type B = { s: 'Math.random()' };\nexport * from './c.ts';\n`,
   'src/core/study/c.ts': `export {};\n`,
+  // The word import at the end of a string, followed by another string, is not an import.
+  'src/core/study/d.ts': `export const r = { name: 'import' };\nexport const e = (x: string) => x.replace(/a/, 'b') + 'nothing to import' + ':';\n`,
 };
 
 test('clean core passes', () => {

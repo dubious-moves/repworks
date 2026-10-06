@@ -129,6 +129,10 @@ for (const file of walk(core)) {
 
   for (const pattern of SPECIFIER_PATTERNS) {
     for (const match of text.matchAll(pattern)) {
+      // The keyword must be code: `'… to import' }` ends a string, it doesn't start an import.
+      // `bare` blanks string contents at the same offsets.
+      const keyword = match[0].startsWith('import') ? 'import' : 'export';
+      if (bare.slice(match.index, match.index + keyword.length) !== keyword) continue;
       const specifier = match[2];
       const line = lineOf(text, match.index);
       if (specifier.startsWith('.')) {

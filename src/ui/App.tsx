@@ -1,6 +1,8 @@
+import { route } from '../app/route.ts';
 import { online, shellVersion, updateReady } from '../app/shell.ts';
 import { device, fatal, ready, studies } from '../app/state.ts';
 import { Debug } from './Debug.tsx';
+import { ImportScreen } from './Import.tsx';
 import { SetupForm } from './Setup.tsx';
 import { SyncBanners, SyncChip } from './Sync.tsx';
 
@@ -26,7 +28,7 @@ export function App() {
         </div>
       )}
       <SyncBanners />
-      <main class="content">{ready.value && (device.value ? <Home /> : <SetupForm />)}</main>
+      <main class="content">{ready.value && (!device.value ? <SetupForm /> : route.value.name === 'import' ? <ImportScreen /> : <Home />)}</main>
       <footer class="footer">
         build {__BUILD_ID__}
         {shellVersion.value && <> · shell {shellVersion.value.slice(0, 8)}</>} · <a href={`${import.meta.env.BASE_URL}spike.html`}>remote spike</a>
@@ -39,9 +41,14 @@ function Home() {
   return (
     <>
       <section class="card">
-        <h2>Studies</h2>
+        <div class="card-head">
+          <h2>Studies</h2>
+          <a class="button" href="#/import">
+            Import
+          </a>
+        </div>
         {studies.value.length === 0 ? (
-          <p class="muted">No studies yet. Import arrives in the next part of Phase 0.</p>
+          <p class="muted">No studies yet: import one.</p>
         ) : (
           <ul class="studies">
             {studies.value.map((s) => (
