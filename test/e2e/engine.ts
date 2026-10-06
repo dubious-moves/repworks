@@ -26,7 +26,8 @@ export const LINES: Record<string, [number, number, string][]> = {
 
 export const SLOW = 400;
 
-export function fakeEngine(): string {
+/** `slow`: how long a search takes to reach depth 20, in ms. */
+export function fakeEngine(slow = SLOW): string {
   return `
 const LINES = ${JSON.stringify(LINES)};
 let fen = '';
@@ -54,8 +55,8 @@ onmessage = (e) => {
   if (c.startsWith('go')) {
     searching = true;
     timers.push(setTimeout(() => emit(8), 20));
-    timers.push(setTimeout(() => emit(20), ${SLOW}));
-    timers.push(setTimeout(finish, ${SLOW} + 20));
+    timers.push(setTimeout(() => emit(20), ${slow}));
+    timers.push(setTimeout(finish, ${slow} + 20));
   }
   if (c === 'stop') finish();
 };

@@ -30,7 +30,9 @@ export function statusText(s: SyncStatus): string {
     case 'error':
       return 'sync error';
     case 'idle':
-      return waiting || (s.lastSynced ? `synced ${formatTime(s.lastSynced)}` : 'synced');
+      // Idle before the first sync has even begun is not "synced": a set-up device whose studies
+      // haven't arrived yet would say so (and tests waiting for "synced" went on too early).
+      return waiting || (s.lastSynced ? `synced ${formatTime(s.lastSynced)}` : 'not synced yet');
   }
 }
 

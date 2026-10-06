@@ -102,10 +102,13 @@ test('a new position mid-search stops the old one first; Black to move is scored
 });
 
 test('a position changed while the engine searches: stop, then the new position', async ({ page }) => {
+  // A slow engine (3 s a search), so the move is always made while the start is searched.
+  await site.close();
+  site = await serveSite({ engine: fakeEngine(3000) });
   await openChapter(page);
   const panel = page.getByRole('region', { name: 'Engine' });
   await panel.getByRole('switch', { name: 'Engine' }).check();
-  // Straight on, before the start's search ends (it takes 400 ms).
+  // Straight on, while the start's search runs.
   await expect.poll(() => commands(site.requests)).toContain('go depth 20 movetime 8000');
   await page.getByRole('button', { name: 'Next move' }).click();
   await expect(panel.locator('.engine-line').first()).toHaveText(/1… c5/);
