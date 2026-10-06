@@ -19,7 +19,7 @@ decisions, with a revision log; `PLAN.md` §4 is Phase 0 in build order.
 ## Commands
 
 ```sh
-npm test         # node --test over test/unit and test/sim (no build)
+npm test         # node --test over test/unit and test/sim, then test/perf alone (no build)
 npm run check    # tsc for each project (app, core alone, service worker, tests) + boundary check
 npm run e2e      # vite build, then Playwright (desktop and emulated phone)
 ```

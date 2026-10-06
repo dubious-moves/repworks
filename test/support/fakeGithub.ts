@@ -2,8 +2,11 @@
 // with GitHub's shapes, status codes and headers, and failing as the Faults say. Shapes:
 // - REST, from GitHub's documentation, and checked live from this origin where the proxy
 //   allowed (§4.2: the repo, the rate-limit headers);
-// - the GraphQL stale error, STALE_DATA "Expected branch to point to …", is from GitHub's
-//   community reports until the spike's G10 records it from the browser.
+// - the errors as the spike recorded them from the browser on 2026-10-06 (§4.2): GraphQL's
+//   stale head (G10) and a deletion of a missing path (G11), a bad token (G12b, G14b: 401 "Bad
+//   credentials" on both paths), and REST's stale ref (G14: 422 "Update is not a fast forward");
+// - a tree read by a commit's SHA answers 200 with the tree's entries, but its `sha` is not the
+//   commit's tree (G6b). The spike didn't record which value it is; here it is the commit's SHA.
 import type { FakeGit } from './fakeGit.ts';
 import { Faults, type Fault, type Op } from './faults.ts';
 
@@ -145,7 +148,7 @@ export class FakeGithub {
       // Directories appear as tree entries too.
       const dirs = new Set([...files.keys()].flatMap((p) => p.split('/').slice(0, -1).map((_, i, parts) => parts.slice(0, i + 1).join('/'))));
       const trees = [...dirs].map((d) => ({ path: d, mode: '040000', type: 'tree', sha: '0'.repeat(40), url: '' }));
-      return this.response(200, { sha: tree, url: `https://api.github.com${repo}/git/trees/${tree}`, tree: [...trees, ...entries], truncated: false });
+      return this.response(200, { sha, url: `https://api.github.com${repo}/git/trees/${sha}`, tree: [...trees, ...entries], truncated: false });
     }
     if (method === 'GET' && path.startsWith(`${repo}/git/commits/`)) {
       const c = this.git.commits.get(path.slice(`${repo}/git/commits/`.length));
@@ -221,11 +224,18 @@ export class FakeGithub {
       const message = input.message.body ? `${input.message.headline}\n\n${input.message.body}` : input.message.headline;
       const add = new Map((input.fileChanges.additions ?? []).map((a) => [a.path, Buffer.from(a.contents, 'base64').toString('utf8')] as [string, string]));
       const remove = (input.fileChanges.deletions ?? []).map((d) => d.path);
+      const missing = this.git.head === input.expectedHeadOid ? remove.find((p) => !this.git.filesOf(this.git.head).has(p)) : undefined;
+      if (missing !== undefined) {
+        return this.response(200, {
+          data: { createCommitOnBranch: null },
+          errors: [{ type: 'NOT_FOUND', path: ['createCommitOnBranch'], locations: [{ line: 2, column: 3 }], message: `A path was requested for deletion which does not exist as of commit oid \`${this.git.head}\`` }],
+        });
+      }
       const made = this.git.commitIfHead(input.expectedHeadOid, message, add, remove);
       if (made === 'stale') {
         return this.response(200, {
           data: { createCommitOnBranch: null },
-          errors: [{ type: 'STALE_DATA', path: ['createCommitOnBranch'], locations: [{ line: 2, column: 3 }], message: `Expected branch to point to "${input.expectedHeadOid}" but it did not. Pull and try again.` }],
+          errors: [{ type: 'STALE_DATA', path: ['createCommitOnBranch'], locations: [{ line: 2, column: 3 }], message: `Expected branch to point to "${input.expectedHeadOid}" but it did not.  Pull and try again.` }],
         });
       }
       this.landed = true;

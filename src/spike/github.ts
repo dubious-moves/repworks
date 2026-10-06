@@ -204,16 +204,27 @@ export async function runGithubChecks(token: string, repo: string, log: Log): Pr
       return { ok: h.status === 200 && tree !== '', ms: h.ms, detail: { status: h.status, tree, headers: visible(h) } };
     });
     let readme: { path: string; sha: string } | undefined;
+    let listing = '';
+    const listOf = (entries: { path: string; type: string; sha: string }[]) => entries.map((e) => `${e.type} ${e.sha} ${e.path}`).sort().join('\n');
     await step('G6', 'GET the recursive tree', async () => {
       const h = await http(token, 'GET', `/repos/${repo}/git/trees/${tree}?recursive=1`);
       const entries = (h.json as { tree?: { path: string; type: string; sha: string; size?: number }[]; truncated?: boolean } | undefined)?.tree ?? [];
+      listing = listOf(entries);
       readme = entries.find((e) => e.type === 'blob');
       return { ok: h.status === 200, ms: h.ms, detail: { status: h.status, entries: entries.length, truncated: (h.json as { truncated?: boolean } | undefined)?.truncated, firstBlob: readme?.path, headers: visible(h) } };
     });
+    // The app takes only the entries from this answer: its sha isn't the commit's tree (the
+    // phone's run of 2026-10-06), so it is recorded, not checked.
     await step('G6b', "GET the recursive tree by the commit's SHA (how the app reads it, one request fewer)", async () => {
       const h = await http(token, 'GET', `/repos/${repo}/git/trees/${head}?recursive=1`);
-      const sha = (h.json as { sha?: string } | undefined)?.sha;
-      return { ok: h.status === 200 && sha === tree, ms: h.ms, detail: { status: h.status, treeShaMatches: sha === tree, body: h.status === 200 ? undefined : excerpt(h.text) } };
+      const j = h.json as { sha?: string; tree?: { path: string; type: string; sha: string }[] } | undefined;
+      const sameEntries = h.status === 200 && listing !== '' && listOf(j?.tree ?? []) === listing;
+      const sha = j?.sha;
+      return {
+        ok: sameEntries,
+        ms: h.ms,
+        detail: { status: h.status, sameEntriesAsG6: sameEntries, shaInAnswer: sha, commitTree: tree, shaIs: sha === tree ? 'the tree' : sha === head ? 'the commit' : 'neither', body: h.status === 200 ? undefined : excerpt(h.text) },
+      };
     });
     await step('G7', 'GET a blob raw (Accept: application/vnd.github.raw+json) and check its SHA here', async () => {
       if (!readme) return { ok: false, detail: { note: 'no blob in the tree' } };

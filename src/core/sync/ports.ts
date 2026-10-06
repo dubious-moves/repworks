@@ -12,13 +12,17 @@ export interface RemoteHead {
 
 export interface RemoteTree {
   commit: string;
+  /**
+   * The commit's tree, or '' when the remote didn't learn it: GitHub's tree read by a commit's
+   * SHA doesn't say (spike G6b, PLAN.md §4.2). Only a remote that needs it relies on it.
+   */
   tree: string;
   /** path → blob SHA, every file in the commit. */
   files: Map<string, string>;
 }
 
 export interface CommitRequest {
-  /** The commit the branch must point to for the commit to land, and its tree. */
+  /** The commit the branch must point to for the commit to land, and its tree ('' if unknown). */
   parent: { commit: string; tree: string };
   message: string;
   /** path → new content (UTF-8 text). */

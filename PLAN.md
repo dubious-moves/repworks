@@ -6,7 +6,7 @@ it the same day. Phase 0 is built: §4.1 to §4.11 are on `main` (each part's "A
 where the build differed). What remains is live: the spike's re-run (§4.2), the real Qchess and
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
-with the owner's answers and two follow-up questions (§5.13). Read with `DECISIONS.md`, which this plan updates (its
+with the owner's answers (§5.13). Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -89,7 +89,7 @@ findings below was kept in `prototypes/` until Phase 0 replaced it with tested c
 | --- | --- | --- |
 | GitHub rate limits | Personal token: 5,000 requests/hour. Secondary limits: ≤100 concurrent; ≤900 points/minute on REST (GET 1, write 5); ≤80 content-creating requests/minute and ≤500/hour, per account. An authorized conditional GET answered 304 doesn't count against the primary limit. | github/docs: `data/reusables/rest-api/*.md`, `best-practices-for-using-the-rest-api.md` |
 | Git Data API commits atomically, refuses stale writes | Yes. Create tree (with `base_tree`; entries may carry `content` directly, and `sha: null` deletes) → create commit → update ref with `force: false` (422 if not a fast-forward). That's three write calls, since blobs can be inlined. A fine-grained token with Contents read/write covers all of it. A ref can't be created in an empty repo, so the data repo needs a first commit. | github/docs `src/rest/data/fpt-2026-03-10/git.json` |
-| One-call commit | GraphQL `createCommitOnBranch`: additions and deletions on a branch, refused unless `expectedHeadOid` is the current head. Fine-grained tokens work with GraphQL. | github/docs `src/graphql/data/fpt/schema-commits.json`, `forming-calls-with-graphql.md`. **Not exercised live** (§4.2). |
+| One-call commit | GraphQL `createCommitOnBranch`: additions and deletions on a branch, refused unless `expectedHeadOid` is the current head. Fine-grained tokens work with GraphQL. | github/docs `src/graphql/data/fpt/schema-commits.json`, `forming-calls-with-graphql.md`. Exercised live from the phone on 2026-10-06 (spike G8–G12, §4.2): it commits, and refuses a stale head with `STALE_DATA`. |
 | File and read limits | Blob read ≤100 MB, with a raw media type available. Recursive tree ≤100,000 entries / 7 MB. Git warns above 50 MiB and refuses above 100 MiB. Pages site ≤1 GB, soft 100 GB/month. | `git.json`, `data/variables/large_files.yml`, `github-pages-limits.md` |
 | Token expiry | A personal account may create fine-grained tokens with no expiry. A token unused for a year is revoked. A token pushed to a public repo or gist is revoked automatically. | `managing-your-personal-access-tokens.md`, `token-expiration-and-revocation.md` |
 | CORS on the GitHub API | REST answers any origin, allows `Authorization` and `If-None-Match`, and exposes `ETag` and the rate-limit headers. | `using-cors-and-jsonp-to-make-cross-origin-requests.md` |
@@ -116,16 +116,16 @@ Not verified, and where each gets verified:
 - The Qchess export script on the owner's real studies, and their import: Phase 0, §4.10 and
   §4.5 (b).
 - GraphQL commits with a fine-grained token from a browser, and the exact error for a stale
-  head: Phase 0 spike, §4.2 (the owner's first run stopped at the empty data repo; the re-run
-  covers it).
+  head: checked live on the phone on 2026-10-06 (spike, §4.2). Still to run: the spike on the
+  desktop, and from the installed app.
 - Lichess's API answering a web page (study export, `/api/token`): checked live from the
   build session's container on 2026-10-05, once lichess.org was reachable. `GET
   /api/study/by/<user>` answers `Access-Control-Allow-Origin: *`, and the preflights of a
   `POST /api/token` and of a study export with `Authorization` both answer 204 with any origin
   and `Authorization` allowed. The spike still runs the OAuth round trip and a private export.
 - GitHub Pages sending `Access-Control-Allow-Origin: *`, which puzzle-explorer-data's fetches
-  need now that the site has its own origin (D17). github.io is still unreachable from here, so
-  the spike checks it (§4.2).
+  need now that the site has its own origin (D17): checked live on the phone on 2026-10-06
+  (spike P1: `meta.json` read cross-origin, §4.2).
 - How durable IndexedDB is on the phone, and the Lichess OAuth redirect inside an installed
   PWA: Phase 0 live checks on the phone.
 
@@ -277,8 +277,37 @@ an earlier build, and one on 2026-10-06 with `f857b73`:
   should (the earlier build carried on into G3–G5 and G17).
 - G1 still reports the data repo as **public**.
 
-So the data repo needs a first commit and its visibility set to private before the spike can go
-further (the owner's steps, as §8 lists them). The token needs only what §8 says: access to that
+So the data repo needed a first commit and its visibility set to private before the spike could
+go further (the owner's steps, as §8 lists them).
+
+The owner then did both, and ran the spike again on the phone (2026-10-06, build `069d93a`, the
+same browser). Everything up to the Lichess steps ran:
+- **Writes.** GraphQL `createCommitOnBranch` committed (G8, G9), and the PGN read back byte for
+  byte (G8b). A stale `expectedHeadOid` gives HTTP 200 with `errors[0].type` `STALE_DATA` and
+  `Expected branch to point to "<the expectedHeadOid sent>" but it did not.  Pull and try again.`
+  (two spaces) (G10). The REST path works too (G13), and its stale ref is 422 "Update is not a
+  fast forward" (G14). A bad token is 401 "Bad credentials" on both (G12b, G14b). Each commit was
+  readable at once (first read after it). **GraphQL stays the default write path**, REST behind
+  `&write=rest`.
+- **Two answers the app must not trip on.** Deleting a path that isn't there is refused with
+  `NOT_FOUND` (G11); the sync never asks for it, since it deletes only what the head it commits on
+  has. A commit with no changes is made, as an empty commit (G12); the sync never sends one.
+- **Reads.** A 304 is free (G4: the remaining count didn't move), and an old ETag after the ref
+  moved gets the new head (G15). Blobs read raw and through GraphQL match their SHAs (G7, G7b),
+  and the comparison gives the commit messages lost acknowledgements need (G16).
+- **G6b failed, and found a bug.** The tree read by the commit's SHA lists the files, but the
+  `sha` in GitHub's answer is not the commit's tree. The app kept that value as the base tree, and
+  the REST write path built its next commit on it (GraphQL writes don't use it, so the default
+  path was unaffected). Fixed on 2026-10-06: a REST commit now takes its parent's tree from GitHub
+  (the parent commit, read once, or its own last commit), and a tree read by commit SHA reports no
+  tree. The fake GitHub now answers the same way, which made 18 REST tests fail until the fix. G6b
+  now checks that the files listed are G6's, and records which SHA GitHub returns.
+- **Storage.** `persist()` was refused in the browser tab (S1, Brave: quota 2 GB). The installed
+  app may differ; the live check stays. Web Locks and BroadcastChannel are there (S3).
+- **P1**: puzzle-explorer-data's `meta.json` reads cross-origin from the site (D12).
+
+The real error shapes are in `test/support/fakeGithub.ts` and the spike's e2e mock. Still to run:
+the Lichess steps (L1–L4), the installed app (S2's second half), and the desktop. The token needs only what §8 says: access to that
 one repo, with Contents read and write; GitHub adds Metadata read by itself. G1's
 `"permissions": {"admin": true, …}` is the owner's role on the repo, not the token's.
 
@@ -947,8 +976,7 @@ each lists its scope, what it reuses, its main risks and the checks that would p
 
 Planned on 2026-10-06, while Phase 0's live checks are still to run (§4.11). The parts below are
 in build order. Each lists its tasks, the tests that prove it, and what only a live check can
-show, on which device. Four questions are the owner's (§5.13); the build waits for their answers
-before it relies on them.
+show, on which device. The owner's answers to its questions are in §5.13.
 
 **Scope**, from the outline the owner approved:
 - **Cards.** One card per repertoire move of the chapter's side: `r|positionKey|uci` (§4.4).
@@ -997,8 +1025,9 @@ repertoire study (D3: reference studies make no cards):
   where an occurrence is `{ sid, cid, path, san }`. A position can hold several own moves: those
   are the repertoire conflicts (D3), listed by `conflicts(index)`.
 - `lines`: every path from a chapter's start to a leaf, in tree order (the main line first, then
-  each variation where it branches, depth first), with its own moves' cards in order. Studies go
-  in the order of the study list, chapters in their study's order.
+  each variation where it branches, depth first), with its own moves' cards in order, and
+  whether its chapter is marked known (§5.3). Studies go in the order of the study list,
+  chapters in their study's order.
 - A chapter with illegal moves contributes the part that parses (§4.5); an unreadable chapter
   contributes nothing and is listed. A card with events but no move in the index any more (the
   move was deleted) stays in the log, is left out of the queue, and is counted in the debug
@@ -1022,31 +1051,29 @@ panel (target under 300 ms).
 
 #### 5.2 Grades, training settings, and the review event
 
-**Grades** (`core/train/grade.ts`), mistake-lab's repertoire rule, its thresholds as settings:
+**Grades** (`core/train/grade.ts`): right or wrong, as Chessable grades (the owner's choice,
+§5.13), and FSRS spaces each move by its own record:
 
 | Answer | Grade |
 | --- | --- |
-| right first time, under 3 s | Easy (4) |
-| right first time, under 15 s | Good (3) |
-| right first time, slower | Hard (2) |
-| any wrong move first, or a hint | Again (1) |
+| right first time | Good (3) |
+| a wrong move first, or a hint | Again (1) |
 
-- The time runs from the moment the board takes input (the opponent's move has landed) to the
-  move being dropped. A move played into another repertoire move of the same position is right
-  (§5.6).
-- **The first answer after a line is taught counts Good at most** (pending the owner's answer,
-  §5.13 question 2). Right after being shown a move, a quick answer tests short-term memory,
-  and an Easy first grade would put the card 16 days out (FSRS-5's first Easy stability, at
-  retention 0.9). Good gives 3 days, Again 1.
-- Show and grade (§5.10) has no time to measure in the same way: a known card is Good, a failed
-  one Again (also question 2).
+- Time doesn't grade. It is still recorded (`ms`), for the debug panel's averages and §5.5.
+- A move played into another repertoire move of the same position is right (§5.6).
+- **Learning step.** A taught move isn't asked again at once: it comes due 4 hours after it was
+  taught (`learnStepHours`, a synced setting), for its first review, as Chessable brings a new
+  line back the same day. Right then gives Good (3 days at retention 0.9, FSRS-5's first Good
+  stability), wrong gives Again (1 day). A move taught late in the evening is simply due the next
+  day.
+- Show and grade (§5.9): a card the owner knew is Good, a failed one Again.
 
 **Training settings** (`core/train/settings.ts`). Some must be the same on every device, or two
 devices would replay the same events into different card states, which the acceptance test
 forbids (§4.11 step 6). Those are synced, in a new data-repo file:
 
 ```
-settings.json   { "format": 1, "train": { "newPerDay": 20, "retention": 0.9, "easyMs": 3000, "goodMs": 15000 } }
+settings.json   { "format": 1, "train": { "newPerDay": 20, "retention": 0.9, "learnStepHours": 4 } }
 ```
 
 - Merged three-way per field, like `study.json`'s name and kind (§4.7); a field changed on both
@@ -1056,6 +1083,10 @@ settings.json   { "format": 1, "train": { "newPerDay": 20, "retention": 0.9, "ea
 - The rest is per device, in localStorage: the auto-play pace (fast 450 ms, normal 600 ms,
   relaxed 900 ms per move; lichessable's floor of ~450 ms), speech on or off, and the
   show-and-grade keys.
+
+**A new event kind, `taught`** (`{"k":"taught","card":…}`), is recorded when a new move has been
+shown and played. It starts the learning step, and it is what the daily limit counts, from every
+device's log. A card taught and never reviewed is in learning: replay gives it no FSRS state yet.
 
 **The review event** gains two optional fields, so that the day's mistakes can be read back from
 the log on any device and after a reload, with nothing else stored:
@@ -1068,8 +1099,8 @@ the log on any device and after a reload, with nothing else stored:
 drops unknown fields from the parsed event and keeps the line as written, so builds from before
 this change replay these events unchanged.
 
-Tests: the grade table on its boundaries (2,999 / 3,000 / 14,999 / 15,000 ms), the cap after
-teaching, a wrong move then the right one is Again; `settings.json` parses, rejects bad values
+Tests: the grade table (right, wrong then right, a hint, a conflict move); time never changes a
+grade; `settings.json` parses, rejects bad values
 (a retention outside 0.7–0.99, a negative limit) and merges per field; the new fields round-trip
 through `formatEvent`/`parseLog`, and a Phase 0 parse of the new line gives the same replay.
 
@@ -1078,21 +1109,29 @@ through `formatEvent`/`parseLog`, and a Phase 0 parse of the new line gives the 
 `todaysQueue(index, states, settings, day)` in `core/train/queue.ts`. Core has no clock, so the
 app passes in `day = { start, end }`: the device's local midnight and the next one, in ms (as
 §4.8 has it, "due today" is asked with the device's own calendar).
-- **Due**: cards in the index, not suspended, reviewed at least once, with `due < day.end`, the
-  earliest first.
-- **New today**: cards whose first review falls in the day, from every device's log, so the
-  phone and the desktop share one limit. Room for new moves = `newPerDay` minus that.
-- **New lines**: lines in the index's order that still hold a card never reviewed and not
-  suspended. A line is taken while there is room, and a line once taken is taken whole, even past
-  the limit, so the day's new material is whole lines. A new card already taken by an earlier
-  line today (a shared prefix) isn't counted twice.
+- **Due**: cards in the index, not suspended, reviewed at least once, with `due < day.end`; and
+  cards taught but not yet reviewed whose learning step has passed (§5.2). The earliest first.
+- **New today**: cards taught in the day, from every device's log, so the phone and the desktop
+  share one limit. Room for new moves = `newPerDay` minus that.
+- **New lines**: lines of chapters not marked known, in the index's order, that still hold a card
+  never taught or reviewed and not suspended. A line is taken while there is room, and a line
+  once taken is taken whole, even past the limit, so the day's new material is whole lines. A new
+  card already taken by an earlier line today (a shared prefix) isn't counted twice.
+- **Known lines** (the owner's answer, §5.13): a chapter marked known (a `[RepworksKnown "true"]`
+  header, set in the import review or the chapter drawer, with a button for the whole study) holds
+  lines learned before, in Chessable or Qchess. Their cards never reviewed skip teaching and the
+  limit. They form a pool of their own, in the index's order, offered after the day's due moves
+  and new lines, for as long as the owner trains ("Known lines: 1,240 moves not yet reviewed").
+  The first answer is an ordinary review: right is Good, wrong teaches the move and is Again. No
+  state is imported (D19): each card earns its schedule here.
 - **Scope**: the whole repertoire, or one study (the study list gets a Train button per
   repertoire study).
 - The home screen shows "Train: 23 due · 18 new".
 
 Tests: with a fake clock and a time zone given as day bounds, a card due at 23:59 local counts
-today and one due at 00:01 doesn't; a card first reviewed yesterday doesn't use today's room; the
-whole-line rule; suspended and orphaned cards are left out; reviews from two devices share the
+today and one due at 00:01 doesn't; a card taught yesterday doesn't use today's room; a taught
+card comes due after its step; the whole-line rule; known chapters' lines go to the pool, never
+use the limit, and are never taught first; suspended and orphaned cards are left out; reviews from two devices share the
 limit; the result doesn't depend on the order of the events.
 
 #### 5.4 The line planner
@@ -1102,7 +1141,8 @@ limit; the result doesn't depend on the order of the events.
   through the lines in the index's order, take each line that holds a due card not yet covered,
   so consecutive lines share prefixes and the board's positions follow on from each other. A
   review line ends at its last due card: nothing after it would be asked.
-- **New lines**: today's new lines (§5.3), after the review lines.
+- **New lines**: today's new lines (§5.3), after the review lines; then the known pool, line by
+  line, until the owner stops.
 - A plan is data: the lines, each with the cards it asks. The trainer (§5.6) may still change
   course when a conflict move is played.
 
@@ -1117,9 +1157,10 @@ come in, and what that costs per day.
 - It reads a data-repo checkout (`REPWORKS_FIXTURES=<path>`), builds the index, and simulates 90
   days from all-new cards for several daily limits and both retentions, through the real queue,
   planner and FSRS.
-- A review succeeds with FSRS's own retrievability at that moment; successes are split
-  Easy/Good/Hard by an assumed share (30/60/10, varied to show how much it matters); the first
-  answer after teaching succeeds 90% of the time.
+- A review succeeds with FSRS's own retrievability at that moment, and is Good; a miss is Again.
+  The first answer after the learning step succeeds 90% of the time; a known line's first answer
+  succeeds at an assumed rate (varied), and the known pool is taken at a few assumed paces (100,
+  300 moves a day, or all in a week), to show the wave of reviews it brings days later.
 - It prints, per setting: cards and lines in the repertoire, the day the last new line comes in,
   reviews a day at days 30, 60 and 90 and the peak, and an estimate of minutes a day (asked moves
   at 8 s, auto-played moves at the pace, new moves at 20 s). These are assumptions until a week
@@ -1158,9 +1199,7 @@ States:
 - `auto`: an own move the session doesn't ask is played after the pace delay.
 - `ask`: the user's move is asked (a due card); the clock for the grade starts.
 - `teach`: a new card is shown (arrow and SAN, "New move"); the user plays it; its comments show
-  after it. No grade yet.
-- `recall`: after a new line has been taught, the same line is walked again from its start and
-  its new moves are asked; that answer is their first review (§5.2: Good at most).
+  after it. A `taught` event is recorded; the first review comes after the learning step (§5.2).
 - `wrong`: the move played isn't in the repertoire here; the board takes it back and asks again.
   A second wrong move, or Hint, shows the move with an arrow and the user plays it.
 - `lineDone`, then the next line; `sessionDone` with the day's numbers.
@@ -1168,9 +1207,11 @@ States:
 Which own moves are asked:
 - a due card not answered yet today is asked;
 - a card reviewed at least once and not due, or suspended, is played for the user (D16);
-- a card never reviewed is never auto-played (lichessable's rule). On a new line it is taught.
-  Met on a review line (a move added in the middle of a known line), it is taught there and
-  counts towards today's new moves.
+- a card never taught or reviewed is never auto-played (lichessable's rule). On a new line it is
+  taught. Met on a review line (a move added in the middle of a known line), it is taught there
+  and counts towards today's new moves; in a chapter marked known, it is asked instead;
+- a card taught and still in its learning step is played for the user, with its arrow shown
+  first, so a line can pass through it before its first review.
 
 Conflicting moves (D3), at a position with more than one own move:
 - the line's own move is the expected one, and every other own move there is accepted too;
@@ -1192,7 +1233,7 @@ Tests (`test/unit/core/train/trainer.test.ts`): a line with nothing due auto-pla
 asks nothing; a due card is asked and graded by time; a wrong move then the right one records
 Again with `w`; Hint records Again with `h`; a never-reviewed card on a review line is taught; a
 suspended card is played; the conflict rule (the other move accepted, the due one asked after);
-a promotion asks for the piece; teach then recall on a new line gives one review per new card;
+a promotion asks for the piece; teaching records one `taught` event per new card and no review;
 pace delays never under 450 ms; every effect sequence is deterministic for a given input.
 
 #### 5.7 The training screen
@@ -1327,42 +1368,22 @@ the same ply and a line before the move) and their edge cases (a remark in paren
 glyphs on a move, a first move that is illegal) in Node; Playwright: preview a line from a
 comment and step back out.
 
-#### 5.13 Questions for the owner
+#### 5.13 The owner's answers
 
-Asked on 2026-10-06; the owner answered the same day:
+Asked on 2026-10-06; the owner answered the same day, then the two follow-ups:
 
-1. **The default daily limit of new moves.** The owner: the limit makes no sense for lines
-   already learned before (in Chessable or Qchess). That changes D19's intake, so a follow-up went
-   back (below, 1a) before anything is built on it.
-2. **The grade rule.** The owner: mistake-lab's time-based rule suits its mistakes and missed
-   tactics; repertoire review should work more like Chessable's. A follow-up went back (2a).
-3. **FSRS retention: 0.9**, as recommended. Decided.
-4. **What has to be built before daily use: §5.1–§5.8** (cards, the queue, the trainer with
-   teaching, suspend, the mistakes) and the Phase 0 acceptance test passed. The rest follows within
-   Phase 1; lichessable retires once show and grade is in use. Decided, as recommended.
+1. **The daily limit of new moves** holds back new material only. Lines learned before (in
+   Chessable or Qchess) are marked known per chapter, and their moves come in without the limit
+   (§5.3). The default limit still comes from §5.5 on the real repertoire (20 meanwhile).
+2. **Grading like Chessable's: option A.** Right first time is Good, a wrong move or a hint is
+   Again, time doesn't count, and FSRS spaces each move; a taught line comes back once 4 hours
+   later (§5.2). Not chosen: Chessable's fixed ladder of intervals.
+3. **FSRS retention: 0.9.**
+4. **Daily use once §5.1–§5.8 are built** and the Phase 0 acceptance test has passed. The rest
+   follows within Phase 1; lichessable retires once show and grade is in use.
 
-Follow-ups, asked 2026-10-06:
-
-- **1a. Lines learned before.** Recommendation: a "known" mark on a chapter (with a button for a
-  whole study), set in the import review or later in the chapter drawer. A known line's moves skip
-  teaching and the daily limit: they wait in a pool of their own ("Known lines: 1,240 moves not yet
-  reviewed"), offered after the day's due reviews, line by line, for as long as the owner cares to
-  train, and their first answer is an ordinary review. A wrong first answer teaches the move and
-  counts as a miss. The limit then applies only to lines not marked, which are new material. D19
-  holds in what matters: no state is imported, and every card earns its schedule here. The
-  simulation (§5.5) shows the review wave a big first week of known lines makes, days later.
-- **2a. Chessable-like grading.** Chessable grades each move right or wrong, with no clock, and
-  moves a right answer up a fixed ladder of intervals (hours, then days, then weeks and months)
-  while a wrong one sends it back down. That description is from memory: lichessable's notes don't
-  record Chessable's schedule, and it wasn't checked here. Two ways to get it:
-  - (A, recommended) FSRS with two grades: right first time is Good, a wrong move or a hint is
-    Again, and time doesn't count. It feels like Chessable (right or wrong, nothing timed), and
-    FSRS still spaces each move by its own record, so a move often missed comes back sooner than
-    a fixed ladder would bring it, and a move always right stretches further. Chessable's
-    same-day first review after learning becomes one learning step: a taught line comes back about
-    4 hours later the same day, instead of the immediate recall pass of §5.6.
-  - (B) Chessable's ladder itself, as a scheduler beside FSRS. Familiar, but not adaptive, and
-    "difficult moves" (D16) would rest on counted misses instead of FSRS difficulty.
+Still open: running §5.5 on the real repertoire, by the owner or by a Claude session cloning
+`skAeglund/repworks-data` outside this repo (only totals recorded here).
 
 #### 5.14 Phase 1 acceptance test, and exit
 
@@ -1370,7 +1391,7 @@ Follow-ups, asked 2026-10-06:
 repertoire imported a last time from Qchess (D18):
 1. Both devices synced. The home screen shows the same "due · new" counts on both.
 2. Desktop: train part of the day's queue: learn one new line, answer one due move wrong, suspend
-   one move, pin the mistake.
+   one move, pin the mistake; mark one chapter known and answer two of its moves.
 3. Phone, offline: train the rest of the queue; the desktop's new line isn't offered again, and
    the day's new limit counts the desktop's moves.
 4. Both online, synced. Then on both: the same card states (debug panel, rounded as in §4.8), the

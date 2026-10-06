@@ -40,7 +40,7 @@ A push to `main` that passes CI deploys to GitHub Pages.
 - `src/platform`: browser adapters (IndexedDB, GitHub, Lichess, service worker registration).
 - `src/app`: the composition root and app state. `src/ui`: Preact components.
 - `src/sw`: the service worker.
-- `test/unit`, `test/sim`: Node tests. `test/e2e`: Playwright tests.
+- `test/unit`, `test/sim`: Node tests; `test/perf`: timing tests, run alone after them. `test/e2e`: Playwright tests.
 
 ## Licence and credits
 

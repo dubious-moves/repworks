@@ -739,3 +739,28 @@ The owner answered `PLAN.md` §5.13's four questions:
 Phase 0's spike, run on the phone on 2026-10-05 and 2026-10-06 (`PLAN.md` §4.2): reads from the
 page work from Android too; the data repo is still empty and still public, so the writes wait for
 the owner to add a first commit and make it private.
+
+## Revision of 2026-10-06 (Phase 1's follow-ups answered; the spike on the phone)
+The owner answered the two follow-ups (`PLAN.md` §5.13):
+- **D19's intake: lines learned before are marked known, per chapter,** and their moves come in
+  without the daily limit, in a pool of their own after the day's due moves and new lines. Their
+  first answer is an ordinary review, so no state is imported: D19's fresh start holds. The limit
+  holds back new material only. Technical calls: the mark is a chapter header,
+  `[RepworksKnown "true"]`, since chapter-level facts live in the PGN headers (`PLAN.md` §4.4);
+  a whole study can be marked with one button.
+- **Grades: right or wrong, as Chessable grades.** Right first time is Good, a wrong move or a
+  hint is Again, and time doesn't count; FSRS still spaces each move by its own record (option A).
+  A taught move comes back for its first review after a 4-hour learning step, as Chessable brings a
+  new line back the same day. Technical calls: a `taught` event kind starts the step and is what
+  the daily limit counts, on every device; the step is a synced setting (`learnStepHours`).
+  Mistake-lab's time-based rule stays mistake-lab's, for mistakes and missed tactics (Phase 5).
+- **The replay benchmark runs alone,** after the other tests (`test/perf`), as the owner agreed: it
+  measures wall-clock time, and beside the simulations it lost its margin in a 4-core container.
+
+The spike ran through on the phone (`PLAN.md` §4.2):
+- **D4's write path: GraphQL, as planned,** now exercised live: it commits, and refuses a stale
+  head with `STALE_DATA`. REST works too and stays the fallback. The real error shapes are in the
+  fake GitHub.
+- **D4's reads: a tree read by a commit's SHA doesn't give the commit's tree SHA.** The REST write
+  path built on that value; it now takes the parent's tree from GitHub itself.
+- **D12: puzzle-explorer-data answers the site cross-origin.**

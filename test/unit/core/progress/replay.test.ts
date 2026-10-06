@@ -6,27 +6,7 @@ import { compactions, dayFiles, readProgress, unionLogs } from '../../../../src/
 import { foldCard, Replay, type DeviceEvent } from '../../../../src/core/progress/replay.ts';
 import { State } from '../../../../src/core/progress/fsrs.ts';
 import { mulberry32 } from '../../../support/random.ts';
-
-const DAY = 86_400_000;
-const iso = (ms: number) => new Date(ms).toISOString();
-const t0 = Date.UTC(2026, 9, 1, 8);
-
-function reviewEvent(n: number, t: number, card: string, g: 1 | 2 | 3 | 4): KnownEvent {
-  return { v: 1, n, t: iso(t), k: 'review', card, g };
-}
-const asDevice = (device: string, events: KnownEvent[]): DeviceEvent[] =>
-  events.map((e) => ({ device, n: e.n, t: Date.parse(e.t), k: e.k, event: e, raw: formatEvent(e) }));
-
-function randomHistory(seed: number, count: number, cards: number) {
-  const random = mulberry32(seed);
-  const events: { t: number; card: string; g: 1 | 2 | 3 | 4 }[] = [];
-  let t = t0;
-  for (let i = 0; i < count; i++) {
-    t += Math.floor(random() * DAY * 0.3);
-    events.push({ t, card: `r|card${Math.floor(random() * cards)}|e2e4`, g: (1 + Math.floor(random() * 4)) as 1 | 2 | 3 | 4 });
-  }
-  return events;
-}
+import { asDevice, DAY, iso, randomHistory, reviewEvent, t0 } from '../../../support/reviewHistory.ts';
 
 const statesOf = (r: Replay) => new Map([...r.states].sort(([a], [b]) => (a < b ? -1 : 1)));
 
@@ -124,15 +104,3 @@ test('an own file that differs from the remote copy: the union of lines by n', (
   assert.equal(u.problems.length, 1);
 });
 
-test('100,000 events replay in under 200 ms', () => {
-  const history = randomHistory(4, 100_000, 3000);
-  const events = asDevice('Desktop1', history.map((h, i) => reviewEvent(i + 1, h.t, h.card, h.g)));
-  let best = Infinity;
-  for (let run = 0; run < 3; run++) {
-    const start = performance.now();
-    new Replay().add(events);
-    best = Math.min(best, performance.now() - start);
-  }
-  console.log(`replay of 100,000 events: ${best.toFixed(1)} ms (best of 3)`);
-  assert.ok(best < 200, `${best.toFixed(1)} ms`);
-});

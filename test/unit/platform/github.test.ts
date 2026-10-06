@@ -53,10 +53,26 @@ test("a tree is read by the commit's SHA, or through the commit if GitHub refuse
   for (const treesByCommit of [true, false]) {
     const { git, config: c, seen } = setup({ treesByCommit });
     const tree = await restRemote(c).files(git.head);
-    assert.equal(tree.tree, git.commits.get(git.head)!.tree);
+    // Read by the commit's SHA, GitHub's answer doesn't say which tree it is (spike G6b).
+    assert.equal(tree.tree, treesByCommit ? '' : git.commits.get(git.head)!.tree);
     assert.deepEqual([...tree.files.keys()], ['README.md', 'bom.pgn']);
     assert.equal(seen.length, treesByCommit ? 1 : 3);
   }
+});
+
+test("a REST commit builds on its parent's tree as GitHub states it, never on a tree SHA kept from before", async () => {
+  const { git, config: c, seen } = setup();
+  const remote = restRemote(c);
+  const parent = git.head;
+  const first = await remote.commit({ parent: { commit: parent, tree: 'not-a-tree-sha' }, message: 'one', add: new Map([['a.pgn', 'A\n']]), remove: [] });
+  assert.ok(first.ok);
+  assert.deepEqual([...git.filesOf(git.head).keys()].sort(), ['README.md', 'a.pgn', 'bom.pgn']);
+  // Its own commit's tree is known: the next commit asks GitHub for nothing but the three writes.
+  const before = seen.length;
+  const second = await remote.commit({ parent: { commit: first.commit, tree: '' }, message: 'two', add: new Map([['b.pgn', 'B\n']]), remove: ['a.pgn'] });
+  assert.ok(second.ok);
+  assert.equal(seen.length - before, 3);
+  assert.deepEqual([...git.filesOf(git.head).keys()].sort(), ['README.md', 'b.pgn', 'bom.pgn']);
 });
 
 test('a blob keeps its byte-order mark, so its text hashes back to its SHA', async () => {

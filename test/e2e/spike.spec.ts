@@ -79,10 +79,15 @@ class FakeGitHub {
         fileChanges: { additions: { path: string; contents: string }[]; deletions: { path: string }[] };
       };
       const head = this.refs.get(input.branch.branchName);
+      // The errors as the spike recorded them on the phone, 2026-10-06 (G10, G11).
       if (head !== input.expectedHeadOid) {
-        return json(200, { data: { createCommitOnBranch: null }, errors: [{ type: 'STALE_DATA', path: ['createCommitOnBranch'], message: `Expected branch to point to "${input.expectedHeadOid}" but it did not. Pull and try again.` }] });
+        return json(200, { data: { createCommitOnBranch: null }, errors: [{ type: 'STALE_DATA', path: ['createCommitOnBranch'], locations: [{ line: 2, column: 3 }], message: `Expected branch to point to "${input.expectedHeadOid}" but it did not.  Pull and try again.` }] });
       }
       const entries = new Map(this.trees.get(this.commits.get(head)!.tree)!);
+      const missing = input.fileChanges.deletions.find((d) => !entries.has(d.path));
+      if (missing) {
+        return json(200, { data: { createCommitOnBranch: null }, errors: [{ type: 'NOT_FOUND', path: ['createCommitOnBranch'], locations: [{ line: 2, column: 3 }], message: `A path was requested for deletion which does not exist as of commit oid \`${head}\`` }] });
+      }
       for (const a of input.fileChanges.additions) {
         const text = Buffer.from(a.contents, 'base64').toString('utf8');
         this.blobs.set(blobSha(text), text);
@@ -132,10 +137,11 @@ class FakeGitHub {
       return json(201, { sha: this.putCommit(body!['tree'] as string, body!['parents'] as string[], body!['message'] as string) });
     }
     if ((m = new RegExp(`^${base}/git/trees/([0-9a-f]+)$`).exec(p))) {
-      // A commit is taken for its tree, as git resolves a tree-ish.
+      // A commit is taken for its tree, as git resolves a tree-ish; the answer's sha is then not
+      // the commit's tree (G6b on the phone, 2026-10-06): here, the SHA asked for.
       const sha = this.trees.has(m[1]!) ? m[1]! : this.commits.get(m[1]!)?.tree;
       const t = sha === undefined ? undefined : this.trees.get(sha);
-      return t ? json(200, { sha, truncated: false, tree: [...t].map(([path, sha]) => ({ path, type: 'blob', mode: '100644', sha })) }) : json(404, { message: 'Not Found' });
+      return t ? json(200, { sha: m[1]!, truncated: false, tree: [...t].map(([path, sha]) => ({ path, type: 'blob', mode: '100644', sha })) }) : json(404, { message: 'Not Found' });
     }
     if (p === `${base}/git/trees` && method === 'POST') {
       const entries = new Map(this.trees.get(body!['base_tree'] as string)!);
@@ -242,6 +248,9 @@ test('the spike runs every check against mocks, and its report holds no token', 
   expect(byId.get('S1')?.detail).toHaveProperty('persistGranted');
   expect(String(byId.get('G10')!.detail['fullBody'])).toContain('STALE_DATA');
   expect(String(byId.get('G14')!.detail['fullBody'])).toContain('not a fast forward');
+  expect(String(byId.get('G11')!.detail['fullBody'])).toContain('NOT_FOUND');
+  // GitHub's tree read by a commit's SHA names some other SHA; the report says which.
+  expect(byId.get('G6b')!.detail['shaIs']).toBe('the commit');
 });
 
 test('on an empty data repo the spike stops at once and says what to do', async ({ page }) => {
