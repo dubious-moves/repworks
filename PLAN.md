@@ -7,7 +7,7 @@ where the build differed). What remains is live: the spike's re-run (§4.2), the
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
 with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
-for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Read with `DECISIONS.md`, which this plan updates (its
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06). Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -3365,25 +3365,384 @@ Checks:
 
 ### Phase 4: Intuition storm and puzzles
 
-Scope:
-- **The storm** on the repertoire's frontiers (lichessable §27): line ends, games from the
-  explorer and `/game/export`, ChessDB walks, filters, three grading tiers, the position store,
-  stats as progress events, sets.
-- **Puzzles** from games that played the user's lines (§29): the anchor band, the two gather
-  stages, the body archive, the disguise.
+Planned on 2026-10-06, after Phase 3's build (through §5.36) and while its live checks wait for
+the owner (TESTING.md). The parts below are in build order; each lists its tasks, the tests that
+prove it, and what only a live check can show, on which device. Numbering goes on from §5.38.
+
+**Scope**, from the outline the owner approved:
+- **The storm** on the repertoire's frontiers (lichessable §27): positions from real games that
+  went on past the end of one of the repertoire's lines (and, as lichessable's second source,
+  past an opponent's reply the repertoire doesn't answer), the user to move, graded by how much
+  winning chance the move gives up; a timed storm and an untimed set; the gathered positions kept
+  so a session starts at once; the answers as progress events, so the record and what is done
+  follow the owner across devices.
+- **Puzzles** from games that played the repertoire's lines (lichessable §29): Lichess puzzles
+  whose game passed through one of the repertoire's positions, from the published
+  puzzle-explorer-data set, dealt among the storm's cards and answered, not graded.
+
+**Sources, read for this plan** (2026-10-06, clones outside this repo):
+- lichessable at `b435906`: `CLAUDE.md` (its section 27 notes), `DESIGN-intuition-storm.md`'s
+  section map, then §1–§11 (the wire, the findings, the pipeline, the rules, the verdict, the
+  clock, the producer), §14 (what shipped: the permission, the one-ply card, the producer, the
+  ply range, the review, the invented line, the store, the tombstones, the line-end rule), §16
+  (win probability), §17 (the set), §19 (uncovered replies), §23 and §26 (Stockfish at gather
+  time, the walk's scorer), with the rest by headings; `DESIGN-storm-puzzles.md` in full;
+  `content/puzzles.js`; `dev/check-storm.js` (its harness, its slice list and its section
+  banners: 1,043 assertions, all passing at `b435906` under Node 22) and the shipped functions it
+  executes (`stormFrontiers`, `stormDecisions`, `stormUncoveredMoves`, `stormUserEval`,
+  `stormWinPct`, `stormWpLoss`, `stormPickReject`, `stormMoveLoss`, `stormMoverCp`, `stormGrade`,
+  `stormPoints`, `stormCandidate`, `stormAdvance`, `stormReentered`, `stormWalkGame`,
+  `stormRandomLine`, `stormCard`, `stormPickGames`, `stormDrawFrontier`, `stormRetain`,
+  `stormDone`, `stormStoreDraw`, the set's four, `stormAnchorAdd` and the puzzle rules), and
+  `CONFIG.storm`'s numbers; `DESIGN-ui-inventory.md`'s rules (one primary per state, one meaning
+  per colour).
+- puzzle-explorer at `a732ead`: `README.md`, `lib/offline.js` (`groupByShard`), `lib/cache.js`
+  (the build stamp, shards as text), `lib/posKey.js`, and `index.html`'s data client
+  (`DATA_BASE_URL`, `meta.json` once per load, `index/<hex>.json`, `puzzles/<hex>.ndjson`).
+- puzzle-explorer-data at `8a7ba97`, sparsely: `meta.json` and 42 index shards and two body
+  shards (below).
+- Qchess's Intuition Storm lobby (`/intuitionstormlobby`), lichessable's model: three minutes, one
+  move per position from real games, good within 0.3 of the best (+2), "alrightish" within 0.7
+  (+1), worse −2, and afterwards every position of the run with an analysis board.
+
+**Checked for this plan** (live from this container, and scratch code outside the repo, 2026-10-06):
+- **`lichess.org/game/export/<id>` answers a web page, for a simple request only.** A `GET` with
+  an `Origin` gets `200`, `application/x-chess-pgn` and `Access-Control-Allow-Origin: *`, but its
+  preflight answers **404**, so a request carrying `Authorization` or any non-safelisted header
+  fails in a browser. **`POST /api/games/export/_ids`** (up to 300 ids, `Content-Type:
+  text/plain`, a simple request) answers the same way with both games of a two-id test, and its
+  preflight answers 204; so one request fetches every game a gather pass picked, with no token.
+  `explorer.lichess.org/masters/pgn/<id>` answers `*` too (the masters fallback lichessable kept).
+  The explorer itself (`/lichess` and `/masters`) answers 401 without a token, so the storm's
+  games need the Lichess login the site already has (D9); without one, the walk invents lines
+  (lichessable §14.10).
+- **ChessDB's `queryall` defaults to `learn=1`** (32 moves listed and 32 scored at 1. e4 e5
+  2. Nf3 Nc6 3. d4, against 1 scored with `learn=0`), which is what the site's provider already
+  sends: lichessable §3.3's only usable mode, with no change.
+- **The dataset**: `meta.json` (built 2026-05-23): 4,096 index and 4,096 body shards, 3,697,478
+  puzzles, `maxEmissionPly` 22, rating floor 1000, entries `[id, rating, colour, ply, startPly,
+  themes]`, a puzzle's `fen` is the solver's position and `moves[0]` the solver's first move.
+  An index shard is 0.9 MB (290 KB gzipped), a body shard 350 KB (86 KB gzipped, ~920 bodies,
+  383 bytes each). github.io is refused by this container's proxy (as in §2); the phone read
+  `meta.json` cross-origin in the spike (P1, §4.2).
+- **The archive's size, measured on public repertoire studies** (Lichess studies `QrC8ydO1`, a
+  Caro-Kann tree of 1,736 positions, `27vWwNxV` and `2gxtnutR`, keyed with the site's
+  `positionKey` and hashed as the dataset does): positions at plies 12–24 (lichessable's anchor
+  band) number 1,092, 660 and 537, in **950, 617 and 489 distinct index shards**, so scanning a
+  whole repertoire downloads **~140–280 MB**. 40 of `QrC8ydO1`'s shards fetched from the dataset
+  repo: 31 of 43 anchors have puzzles; filtered as lichessable does (the side that solves, the
+  game's ply in the band) **664 puzzles, 663 distinct, in 617 distinct body shards** (median
+  rating 1551): about 16,000 for the whole study, whose bodies alone would cost nearly every body
+  shard (**~350 MB**). Kept, they are small: 383 bytes a body, ~50 a candidate (6 MB and 1 MB
+  for all of them). So the archive's size on the phone is not the problem; the downloads are, and
+  the design bounds them (§5.47).
+- `src/core/sync/gitHash.ts`'s `sha1Hex` gives the dataset's shard names in core (no Web Crypto
+  needed there); `positionKey` is the dataset's key already (D10).
+
+**Decisions** (technical calls, each with its reason; in DECISIONS.md's revision log):
+- **The answers are progress events (`k:"storm"`), and nothing else storm-related is synced.**
+  The outline's "stats as progress events": an answer names its position (`s|<key>`) or puzzle
+  (`z|<id>`), its band, and its chapter; the record, the positions done (answered well within 60
+  days, lichessable's tombstone window) and the ones missed are replayed from the log on every
+  device. Old devices skip the kind (the log's rule).
+- **The gathered positions and the puzzles collected stay on the device** (IndexedDB, the cache
+  tier of D5): they are third parties' answers (the explorer, ChessDB, Stockfish, the dataset),
+  rebuilt anywhere. lichessable carried its store between devices because its devices each paid
+  a Chessable wire; here the events already carry what matters (what is done, what was missed),
+  and no new file kind goes into the data repo. If the phone's gather proves too slow (a live
+  check), a per-device store file, one writer like progress, is the later step.
+- **lichessable's rules are ported as they shipped**, numbers included (`CONFIG.storm`, below):
+  the five win-probability bands (§16), the flat penalty, the streak, the pick and stop rules,
+  the store's draw order, the set, the anchor band. Its Chessable plumbing is not (cards, the
+  wire, the course page, host permissions): the repertoire index (§5.1) is the course tree, and
+  the progress log is the wire.
+- **Games through the explorer worker, in one batch per gather pass**: the explorer's
+  `topGames`/`recentGames` (lichessable's relaxed filter: every speed, ratings 1000–2500, beside
+  the panel's own requests and the same limiter), then the picked ids in one `_ids` export with
+  no token; the masters PGN when lichess.org fails.
+- **ChessDB scores the walk, Stockfish where ChessDB has nothing** (lichessable §26's `hybrid`),
+  and **a stored position is re-scored by Stockfish when the device is idle on the storm's
+  screen** (§23's standard: MultiPV 12 at depth 20; deepened positions dealt first), because
+  ChessDB's best move is measured optimistic (a winner's curse, §23.1). Never `queue` or `store`
+  (D9).
+- **The storm is its own screen** (`#/storm`), from the home screen and a study's menu, with the
+  repertoire, a study, a chapter or a position as its scope (lichessable §14.21, §28). Neither
+  the engine panel nor the explorer is shown while a card is up; both are a press away in the
+  review (§5.35's analysis board).
+- **Puzzles: the index scan is bounded per press and the bodies are fetched as needed.** A
+  collect scans at most 100 index shards (≈30 MB; the deepest anchors first, the rest on the next
+  press), says the size first, and keeps candidates only; bodies come in grouped by shard for a
+  working set of about 60, and stay (the archive). The base URL is a setting (D12), checked by
+  reading its `meta.json`.
+
+`CONFIG.storm`'s numbers, carried as they are (`src/core/storm/config.ts`): frontier lines of 4
+plies at least; the user's eval at the frontier and the card within −100…+200 cp; offered from
+ply 2 to 16 past the line's end (choices 1–8 and 4–24); walks stop at a 150 cp error by either
+side or |eval| > 250; at least 6 moves scored; best − 5th ≥ 60 cp and best − 2nd ≤ 300; not in
+check, not a forced recapture; win% by Lichess's `k` 0.00368208, evals clamped at ±1000; bands
+under 3, 6, 10 and 20 points of win% (great +2, good +1, inaccuracy 0, mistake −1, blunder −2,
+penalties flat, the streak multiplying up to ×4 every 4); three minutes, the clock running only
+while a card waits for a move, the verdict up 2.6 s; a set of 6, three tries, clean on great or
+good; two games a frontier (four when gathering), the invented line among the top 4 moves within
+40 cp; replies of 3% and 20 games at least, four per position; the store at most 900, drawn by
+misses, then deepened, then reach, then at random; puzzles from anchors at plies 12–24 (clamped to
+`maxEmissionPly`), ratings 1200–2600, a solved puzzle retired like a position.
+
+Where the new code goes:
+
+```
+src/core/storm/    config.ts, grade.ts (win%, bands, points, the three tiers' loss), walk.ts
+                   (candidate, pick rules, the game walk, the invented line), sources.ts (line
+                   ends and decision points from the index, scopes), store.ts (draw, retirement
+                   from events), set.ts, record.ts (events → the record), verdict.ts (the lines)
+src/core/puzzles/  dataset.ts (shards, tuples, filters, themes), anchors.ts, puzzles.ts (candidates,
+                   bodies, plies, draw)
+src/core/progress/ events.ts gains `storm`; cards.ts gains `s|` and `z|`
+src/platform/      stormStore.ts (IndexedDB: positions, candidates, bodies), puzzleData.ts (meta,
+                   shards, grouped bodies)
+src/app/           storm.ts (the session), gather.ts (the producer), puzzles.ts (collect, deal)
+src/ui/            Storm.tsx (home, card, clock, verdict), StormReview.tsx, StormSettings.tsx
+```
+
+#### 5.39 The storm's rules in core, with `check-storm.js`'s assertions
+
+- `src/core/storm/` (pure, the random source and the clock passed in), ported from the shipped
+  functions: `winPct`, `wpLoss`, `grade` (five bands and `unknown`), `points` (the sign rule: a
+  penalty flat, never multiplied), `moverCp` (Stockfish's White-relative score to the mover's,
+  mates as 10,000 less their distance), `moveLoss` (the list tier, the child tier with its
+  negation), `userEval` (flipped on the side to move in the position, never the line's side),
+  `candidate` and `pickReject`, `advance`, `reentered`, `walkGame` (from the start through the
+  game's moves to the frontier, then up to `maxPly` with the stop rules, the scores asked of an
+  injected `ask`), `randomLine` (the invented walk), `pickGames`, `drawFrontier` (weighted by the
+  lines ending there), the set's `clean`, `held`, `outcome` and `tally`, the verdict lines
+  (`verdictLine`, `bestLine`: signed points, win% to one decimal under ten, "level with the best",
+  the same move never named twice).
+- On chessops: SAN, UCI and FENs through the site's own helpers (`standardUci`, `positionKey`), so
+  castling is standard UCI, as ChessDB and Lichess's games write it.
+
+Tests: `test/unit/core/storm/*.test.ts`, the assertions of `check-storm.js` sections 1–13 and
+the pure parts of 14–17 (the perspective flip, the grader and the child negation, the bands
+solved at equality against 30 and 70 cp within 5, the clamp and the mate cases, the flat penalty
+on a long streak, every pick rule, the frontier set, the walk over a scripted ChessDB reaching
+each stop, the card, the verdict lines with their wordings, the engine tier's flip as a
+relation, the ply range, the invented line, the uncovered source's rules), translated from
+Chessable variations to chapters; each file's header lists the assertions carried and those left
+behind with why (the Chessable wire, cards, course pages, `chrome.*`). Each control lichessable
+recorded is re-run once on the port (the change made, the named assertions failing, the change
+undone) and listed in the file's header.
+
+Live: none (pure).
+
+#### 5.40 Sources and scopes from the repertoire
+
+- `core/storm/sources.ts` over the index (§5.1): **line ends**: each line's last position, keyed,
+  with its side (the chapter's), the lines ending there (`n`), its names and chapters; lines
+  shorter than 4 plies and chapters from a set-up FEN left out; an end both sides reach left out;
+  an end where another line of the same side goes on left out (§14.18), and a walk stopping when
+  it re-enters a position the side's lines answer (§14.18.4). **Decision points** (§19): every
+  position where the opponent is to move that a line passes, with the replies the repertoire
+  covers there; `uncoveredMoves` from the explorer's answer (3% and 20 games, four at most, by
+  games).
+- **Scopes**: the whole repertoire, a study, a chapter, or a position (§28: the lines through it,
+  and their ends past it); a scope that leaves nothing says so (§14.21.3).
+
+Tests: `sources.test.ts` on built chapters: the ends and their sides, the ambiguous end, the end
+another line continues, a set-up FEN, the short line, a transposition into an answered position
+stopping the walk, decision points and their covered replies (castling given in standard UCI by
+the explorer and in SAN by the chapter), the scopes.
+
+Live: none.
+
+#### 5.41 Answers in the progress log, and the record
+
+- `core/progress/events.ts`: `k:"storm"` with `card` (`s|<positionKey>` or `z|<puzzleId>`), `b`
+  (great, good, ok, bad, blunder, unknown), and optional `u` (the move, UCI), `wp` (the win% lost,
+  in tenths), `m` (`"set"` for a set's first answer), `c` (`<sid>/<cid>`, the line's chapter).
+  An unanswered card writes nothing.
+- `core/storm/store.ts` and `record.ts`, replayed from the log: a position or puzzle is **done**
+  once its latest answer is great or good, for 60 days; its **misses** are its answers since that
+  weren't; the **record** per chapter and source (positions, replies, puzzles kept apart):
+  answered, found (great and good), the average win% lost, the bands, the storm's and the set's
+  answers told apart (§21).
+
+Tests: `events.test.ts` (the kind read and written, bad fields refused, an old reader skipping
+it), `store.test.ts` (done by any device's answer, the window's edge near the epoch, misses
+counted, `unknown` neither), `record.test.ts` (the denominators: unknown out of both, the bands
+summed, a set's answers marked).
+
+Live: none.
+
+#### 5.42 The gather: positions found and kept
+
+- **The explorer worker** gains `stormGames` (a position's `topGames` and `recentGames` at the
+  relaxed filter, beside the panel's requests, through the same limiter and cache, priority under
+  the panel's) and `pgns` (ids → one `POST /api/games/export/_ids`, text/plain, no token, one at
+  a time, a 429 pausing it a minute; the masters PGN for a masters id or when Lichess refuses);
+  and `scores` (ChessDB `queryall` through the existing provider, its cache keeping misses too).
+- `src/platform/stormStore.ts`: positions by key (the FEN, the side, the ply past the end, the
+  line's chapter and names, the move that arrived, the scored list with its source and depth,
+  the reach in games, invented or not, when), at most 900, oldest out.
+- `src/app/gather.ts` (lichessable's `harvestFrontier`): frontiers drawn by `n`; each scored once
+  (the eval band at stage 0, one request a line); with games: two picked (four in a gather), the
+  walk scored by ChessDB, Stockfish (MultiPV 6, depth 14) on a miss; with none, or no login: the
+  invented line, by Stockfish. Survivors stored, a position twice never. **Gather** on the storm's
+  home runs it with a count, the requests spent (explorer, games, ChessDB, searches) and Stop; the
+  screen kept on (§5.7's wake lock); while a session runs, the producer keeps 3 cards ready from
+  the store, and gathers only when it runs dry.
+
+Tests: `gather.test.ts` with fake explorer, games and ChessDB and a scripted engine: a frontier's
+positions stored with their list; no games → the invented line; no login → invented only; the
+batch export asked once for a pass's games; ChessDB unknown → the engine's list; the caps; a
+stored position not stored twice. `service.test.ts`: the new messages (the export's body and no
+`Authorization`, a 429's pause, the masters fallback). Playwright (desktop): Gather on the fixture
+repertoire with fake services: the count, the requests, Stop.
+
+Live (desktop and phone): a gather on the real repertoire: positions per minute, requests per
+position, the phone's time with the engine's share.
+
+#### 5.43 The storm (timed)
+
+- `#/storm[/<sid>[/<cid>]][?fen=…]`; "Storm" on the home screen, "Storm from here" in a move's
+  menu, "Storm" in a study's settings. The home: the scope, the store's count (and how many are
+  done), Gather, Start; the settings (ply range, source: line ends, replies or both).
+- **A card**: the board turned to the side to move, the move that led there tinted, the line's
+  name; one move. **The verdict**: the band's word and colour (green, dim green, neutral, amber,
+  red: one ramp), the move's rank and win% lost, the best move; points, the streak; the clock
+  (3:00, amber under 30 s) runs only while a card waits for a move. Grading: the stored list, then
+  the child (ChessDB for a ChessDB list), then Stockfish on both positions (depth 18, 8 s) when
+  neither answers, the board held shut meanwhile; `unknown` scores nothing and holds the streak.
+- **The review** when the clock ends or on End (the card left on the board kept, unanswered):
+  every position with the move played, its band and loss; the best move hidden until asked (`b`);
+  Try again (`t`, scored nothing); Analyse (the analysis board, §5.35, with the engine and the
+  explorer).
+- Answers written as `storm` events; a done position leaves the store (great or good), a missed
+  one comes back first next time.
+
+Tests: Playwright (desktop and phone) with a store seeded through the page and fake ChessDB and
+engine: a card, a great and a blunder with their points, the streak's multiplier, the clock
+paused while grading, the review with the best hidden, Try again scoring nothing, the events
+written and synced, the done position not dealt again, nothing wider than the phone, the engine
+panel and explorer absent during a card.
+
+Live (desktop and phone): a real three-minute storm on the repertoire: the cards' quality, the
+verdicts against Qchess's feel, the waits.
+
+#### 5.44 The set (untimed)
+
+- Six positions, no clock: great or good resolves; inaccuracy, mistake and blunder **hold** the
+  card with Try again (three at most, the best move still hidden) and Show the move; then Next and
+  Analyse. A second pass over those not found first time. The score is how many were found first
+  time (`set.ts`'s tally). Only the first answer of the first pass is written (`m:"set"`).
+
+Tests: Playwright: a held card, three tries, the move shown, the second pass, the tally, one event
+per position.
+
+Live: (phone) a set on the real repertoire.
+
+#### 5.45 Stockfish's standard for the store
+
+- On the storm's home with nothing else running (and never during a card), stored positions
+  scored by ChessDB are re-scored by Stockfish: MultiPV 12 at depth 20 (§23's standard; a list
+  below it doesn't count), deepened positions dealt first; the engine shared with the study page's
+  through the one-tab rule (§5.30). A setting turns it off on the phone.
+
+Tests: `gather.test.ts` (the deepen order, a list cut short not stored as deepened, the draw
+preferring deepened); Playwright with the scripted engine (the count of deepened positions rising
+on the home, stopping when a session starts).
+
+Live: (desktop and phone) the time per position; whether the phone should deepen at all.
+
+#### 5.46 The record
+
+- On the storm's home: per chapter (and for the whole scope) the answers, the share found, the
+  average win% lost, a five-colour bar of the bands; positions, replies and puzzles apart; the
+  storm's and the set's answers told apart. From the events, so the same on every device after a
+  sync.
+
+Tests: Playwright: the record after a seeded log, and after a session.
+
+Live: the record the same on both devices after a sync.
+
+#### 5.47 The puzzle dataset
+
+- `core/puzzles/dataset.ts` (pure): the shard of a key or an id (`sha1Hex`, three hex), the tuple
+  accessors and filters (colour, the game's ply, the puzzle's start ply, rating, themes: a
+  missing field passes, a missing theme list passes but an empty one doesn't), the append-only
+  theme list and its labels, `groupByShard`; `puzzles.ts`: a candidate from a tuple and its
+  anchor, a ready puzzle from a body (refused if a move doesn't replay), its plies (the solver
+  moves first: `moves[0]` is never the opponent's), the user's plies, the draw (misses, then at
+  random).
+- `src/platform/puzzleData.ts`: the base URL (a setting, default
+  `https://skaeglund.github.io/puzzle-explorer-data/`), `meta.json` read once per load (its build
+  stamp and `maxEmissionPly`), an index shard fetched and only the wanted keys' entries kept, body
+  shards fetched for a group of ids; nothing sent but the `GET`s.
+- The store gains candidates (by id: rating, colour, the game's ply, the start ply, the anchor's
+  key and chapter) and bodies (the archive: kept across dataset rebuilds, a candidate whose body is
+  gone fetched again).
+
+Tests: `dataset.test.ts` (lichessable's `check-puzzles.js` cases: keys after a double push both
+ways, shard names checked against Node's SHA-1, the filters and the missing-field rule, the theme
+codes), `puzzles.test.ts` (`check-storm.js` §29, §29b, §29d: replay, the solver's plies, the
+malformed body, the draw, retirement); a Playwright test with a fake dataset served by the e2e
+server (two index and two body shards from fixtures cut out of the real ones, CC0).
+
+Live: (phone and desktop) the base URL read cross-origin.
+
+#### 5.48 Puzzles in the storm and the set
+
+- **Anchors** (`core/puzzles/anchors.ts`): every position the scope's lines reach at plies 12–24
+  (the shallowest ply any line reaches it at decides, plies counted in the game, a set-up chapter
+  falling out), with the chapters' sides.
+- **Collect** (the storm's home, beside Gather): says the size first ("about 30 MB: 100 of 950
+  positions; on Wi-Fi"), then scans up to 100 shards, the deepest anchors first, keeping at most
+  200 candidates an anchor, filtered by side, the game's ply and rating; the next press goes on
+  where it stopped; "Collected: 950 of 950 positions, 16,000 puzzles" when done. Bodies for a
+  working set of 60 fetched grouped by shard, in the background while the home is open.
+- **Dealt** in the storm and the set at a share (a setting: 0, 10, 25 (the default once
+  collected), 50, 75, 100): the board in the solver's position after the opponent's move
+  (animated in a set, tinted in the storm); the solution walked as a training line, the
+  opponent's replies played; the first wrong move ends it (blunder) or holds it in a set; solved
+  is great. **The disguise** (§13): before the first move, a puzzle card and a position card read
+  the same (the line's name only; no rating, depth or themes, "Find a good move" on both). The
+  review prints all of it, the solution behind Show.
+- Answers as `storm` events on `z|<id>`; solved puzzles retired for 60 days on every device.
+
+Tests: `anchors.test.ts` (the band, the shallowest ply, a set-up chapter, both sides); Playwright
+with the fake dataset: the size asked first, a collect, a puzzle dealt among positions, solved,
+missed, the disguise's text before a move, the review.
+
+Live (desktop, then phone on Wi-Fi): a collect on the real repertoire (its size and time against
+the estimate); puzzles in a real session; the share that feels right.
+
+#### 5.49 Phase 4 acceptance test, and exit
+
+**Acceptance test (live, desktop + Android phone)**, on the owner's repertoire:
+1. Desktop: Gather on the whole repertoire; the positions, the requests, the time.
+2. Desktop: a storm and a set; the verdicts beside an engine's view of a few positions in the
+   review; Analyse from the review.
+3. Phone: a storm from a chapter and from a position; the answers on the desktop's record after a
+   sync, and a position done on the phone not dealt on the desktop.
+4. Collect puzzles on the desktop, and on the phone over Wi-Fi; puzzles dealt in both modes.
+5. A week of daily storms.
+
+**Phase 4 exit**: unit and e2e tests green; the acceptance test passed live; lichessable's storm
+no longer used.
 
 Risks:
-- Porting a large body of measured rules (the 410 KB design). Mitigation: port the pure
-  functions with lichessable's `dev/check-storm.js` assertions alongside.
-- Whether `lichess.org/game/export` answers a web page (the extension used a host permission).
-  If not, use the masters PGN fallback the design already has.
-- The dataset site is 5 GB, five times GitHub Pages' documented 1 GB, so it is served at
-  GitHub's discretion (puzzle-explorer's README documents an R2 fallback). Keep the base URL
-  configurable.
-- The archive's size on the phone.
-- Never ChessDB `queue`/`store`.
+- Porting a large body of measured rules: ported function by function with `check-storm.js`'s
+  assertions and its controls re-run (§5.39).
+- Gathering on the phone (the engine): ChessDB first, the engine only on a miss; the deepen pass
+  can be turned off there; the store syncing is the fallback (decisions above).
+- The dataset's 5 GB beyond Pages' documented 1 GB (D12): the base URL is a setting; R2 is
+  puzzle-explorer's documented fallback.
+- The puzzle downloads (~140–280 MB to scan a repertoire, more to hold every body): bounded per
+  press and said first; bodies only for a working set.
+- `/game/export` refusing pages one day (its preflight already 404s): the masters PGN and the
+  invented line keep the storm going.
+- Never ChessDB `queue`/`store` (D9).
 
-Checks: the ported assertions; request budgets measured; live sessions on the phone.
+Checks: the ported assertions and their controls; requests per position measured on the real
+repertoire (TESTING.md); live sessions on the phone.
 
 ### Phase 5: Mistake review, and migration from mistake-lab
 

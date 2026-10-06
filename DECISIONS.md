@@ -1120,3 +1120,38 @@ account. The technical calls, each with its reason:
   stays constant between moves (the owner's notes on §5.23).
 - **Maia in the Practical column: the Prac title sorts first and switches to Maia's values on a
   second click**, q_extension's rule kept beside the owner's sorting titles.
+
+## Revision of 2026-10-06 (Phase 4 planned)
+Phase 4 is planned in depth in `PLAN.md` §5.39–§5.49, from lichessable (`b435906`: its storm and
+puzzle designs, `content/puzzles.js`, `dev/check-storm.js` with its 1,043 assertions and the
+shipped functions they execute), puzzle-explorer (`a732ead`), the dataset (`8a7ba97`, sparsely)
+and Qchess's Intuition Storm lobby. The outline's open questions, settled with evidence:
+- **`lichess.org/game/export` answers a web page, for simple requests only**: `GET` gets
+  `Access-Control-Allow-Origin: *`, but its preflight answers 404, so no token or custom header
+  may go with it. `POST /api/games/export/_ids` (text/plain, up to 300 ids) answers the same way,
+  so a gather pass fetches all its games in one request with no token. The masters PGN stays as
+  the fallback; the explorer that names the games needs the Lichess login (it answers 401
+  without), and without one the walk invents its lines.
+- **The archive's size on the phone is small; the downloads are not.** Measured on public
+  repertoire studies of 537–1,092 positions in lichessable's anchor band: 489–950 index shards
+  (~140–280 MB to scan), about 16,000 puzzles for the largest, whose bodies would take nearly all
+  4,096 body shards (~350 MB), while the bodies kept weigh ~6 MB. So a collect scans at most 100
+  shards a press, says the size first, keeps candidates only, and fetches bodies for a working set.
+- **D12: the dataset's base URL is a setting**, checked by reading its `meta.json`; bodies are
+  kept across rebuilds.
+
+The technical calls, each with its reason:
+- **The storm's answers are progress events (`k:"storm"`, cards `s|<positionKey>` and
+  `z|<puzzleId>`), as the outline said; the gathered positions and collected puzzles stay on
+  each device** (D5's cache tier). They are third parties' answers and rebuild anywhere; the
+  events carry what must cross devices (done, missed, the record), and no new file kind enters
+  the data repo. A per-device store file is the step after, if gathering on the phone is too slow.
+- **lichessable's rules and numbers are ported as shipped** (five win% bands, flat penalties,
+  the streak, the pick and stop rules, the draw order, the set, the anchor band), with
+  `check-storm.js`'s assertions and controls; its Chessable plumbing (cards, wire, host
+  permissions) is replaced by the repertoire index and the progress log.
+- **ChessDB scores the walk with Stockfish on a miss; stored positions are re-scored by Stockfish
+  (MultiPV 12, depth 20) when idle**, because ChessDB's best move measured optimistic
+  (lichessable §23.1). Never `queue` or `store` (D9).
+- **The storm is its own screen** (`#/storm`), with the repertoire, a study, a chapter or a
+  position as its scope; no engine or explorer while a card is up.
