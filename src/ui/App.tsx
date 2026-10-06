@@ -16,6 +16,7 @@ import { ReadView } from './Read.tsx';
 import { TrainScreen } from './Train.tsx';
 import { TrainCard } from './TrainCard.tsx';
 import { TrainSettingsDialog } from './TrainSettings.tsx';
+import { ExplorerSettingsDialog } from './ExplorerSettings.tsx';
 import { confirmDeleteStudy, openNewStudy, openStudySettings, StudyDialogs } from './StudyDialogs.tsx';
 
 export function App() {
@@ -43,6 +44,7 @@ export function App() {
       <main class="content">{ready.value && (!device.value ? <SetupForm /> : <Screen />)}</main>
       <StudyDialogs />
       <TrainSettingsDialog />
+      <ExplorerSettingsDialog />
       <footer class="footer">
         build {__BUILD_ID__}
         {shellVersion.value && <> · shell {shellVersion.value.slice(0, 8)}</>} · <a href={`${import.meta.env.BASE_URL}spike.html`}>remote spike</a>

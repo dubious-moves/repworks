@@ -30,6 +30,7 @@ import { endPreviewOnBoard, PreviewBar, previewBoard } from './CommentText.tsx';
 import { ModeSwitch } from './ModeSwitch.tsx';
 import { openChapterSettings, openNewChapter, openStudySettings } from './StudyDialogs.tsx';
 import { TranspositionList } from './Transpositions.tsx';
+import { Explorer, ExplorerToggle } from './Explorer.tsx';
 
 const BRUSH_NAMES: Brush[] = ['green', 'red', 'blue', 'yellow'];
 
@@ -245,6 +246,7 @@ export function ChapterView() {
                 {doc.value && <Conflicts />}
                 <CardPanel />
               </div>
+              <Explorer chapter={c} path={path} />
               {drawMode && (
                 <div class="brushes" role="radiogroup" aria-label="Colour">
                   {BRUSH_NAMES.map((b) => (
@@ -254,6 +256,7 @@ export function ChapterView() {
                 </div>
               )}
               <div class="controls">
+                <ExplorerToggle />
                 <button type="button" aria-label="Start" onClick={() => move('start')}>
                   ⏮
                 </button>

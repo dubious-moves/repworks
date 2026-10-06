@@ -1794,3 +1794,285 @@ a.button.secondary {
 .preview-buttons button {
   min-width: 44px;
 }
+
+/* The explorer panel (PLAN.md §5.23, D21), as Qchess's: tabs, a header row, a row per move with
+   its eval, share, count and a white/grey/black bar of its results, novelties, and Σ. */
+
+.explorer {
+  font-size: 0.85rem;
+  border-top: 1px solid rgb(255 255 255 / 10%);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.explorer-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  background: #2b3f63;
+}
+
+.explorer-tabs button[role='tab'] {
+  flex: 1 1 0;
+  min-height: 34px;
+  padding: 0 6px;
+  border: 0;
+  background: none;
+  color: #e8ecf5;
+  font-weight: 600;
+}
+
+.explorer-tabs button[role='tab'].on {
+  background: #4a6ba6;
+}
+
+.explorer-tabs .explorer-gear {
+  min-height: 34px;
+  color: #e8ecf5;
+}
+
+.explorer-head,
+.ex-row {
+  display: grid;
+  grid-template-columns: 58px 50px 40px minmax(44px, auto) minmax(60px, 1fr);
+  align-items: center;
+  column-gap: 6px;
+  padding: 0 8px;
+}
+
+.explorer-head.no-games,
+.explorer-rows.no-games .ex-row {
+  grid-template-columns: 58px 50px 1fr;
+}
+
+.explorer-head {
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  min-height: 30px;
+}
+
+.explorer-head .ex-sort {
+  grid-column: -2;
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.explorer-head.no-games .ex-sort {
+  grid-column: 3;
+}
+
+.explorer-head .ex-sort select {
+  max-width: 7em;
+  min-height: 26px;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 4px;
+}
+
+.explorer-rows {
+  overflow-y: auto;
+  min-height: 0;
+  padding-bottom: 4px;
+}
+
+.ex-row {
+  min-height: 24px;
+  margin-bottom: 3px;
+  cursor: pointer;
+}
+
+.ex-row:hover,
+.ex-row:focus-visible {
+  background: rgb(255 255 255 / 6%);
+  outline: none;
+}
+
+/* The chapter plays it here: Qchess's lighter band. */
+.ex-row.covered {
+  background: rgb(255 255 255 / 13%);
+}
+
+.ex-row .ex-move {
+  white-space: nowrap;
+  overflow: hidden;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.ex-row.novelty .ex-move {
+  color: #ff9800;
+}
+
+.ex-rep {
+  min-height: 0;
+  height: 16px;
+  padding: 0 5px;
+  font-size: 0.7rem;
+  line-height: 14px;
+  border-radius: 8px;
+  border: 0;
+  background: #48566e;
+  color: #e8ecf5;
+}
+
+.ex-eval {
+  text-align: right;
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: #bdbdbd;
+}
+
+.ex-eval.plus {
+  color: #4caf50;
+}
+
+.ex-eval.minus {
+  color: #f44336;
+}
+
+.ex-share {
+  text-align: right;
+  font-size: 0.72rem;
+  color: #bdbdbd;
+}
+
+.ex-count {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.ex-bar {
+  display: flex;
+  height: 18px;
+  min-width: 0;
+  font-size: 0.7rem;
+  overflow: hidden;
+}
+
+.ex-bar > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.ex-white {
+  background: #fff;
+  color: #333;
+}
+
+.ex-draw {
+  background: gray;
+  color: #ddd;
+}
+
+.ex-black {
+  background: #000;
+  color: #ddd;
+}
+
+.ex-bar.ex-novelty {
+  align-items: center;
+  padding-left: 10px;
+  color: #fff;
+}
+
+.ex-total {
+  cursor: default;
+  font-weight: 700;
+}
+
+.ex-total:hover {
+  background: none;
+}
+
+.explorer-note {
+  margin: 8px 10px;
+}
+
+.explorer-note p {
+  margin: 0 0 6px;
+}
+
+.controls .explorer-toggle {
+  font-size: 1.1rem;
+}
+
+.controls .explorer-toggle.on {
+  background: #4a6ba6;
+  color: #fff;
+}
+
+@media (pointer: coarse) {
+  .ex-row {
+    min-height: 32px;
+  }
+}
+
+@media (min-width: 900px) {
+  .cv-panel .explorer {
+    flex: 0 1 auto;
+    max-height: 48%;
+  }
+}
+
+/* The explorer's settings: chips for the filter, checkboxes in a row. */
+.explorer-settings fieldset {
+  border: 1px solid rgb(255 255 255 / 15%);
+  border-radius: 6px;
+  margin: 10px 0;
+  padding: 6px 10px;
+}
+
+.explorer-settings .chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.chip-toggle {
+  min-height: 36px;
+  padding: 0 10px;
+  background: var(--bg);
+  color: var(--muted);
+}
+
+.chip-toggle.on {
+  background: #4a6ba6;
+  color: #fff;
+}
+
+.form label.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.form label.check input {
+  display: inline-block;
+  width: auto;
+  min-height: 0;
+  margin: 4px 0 0;
+}
+
+/* Nine move buttons with the explorer's: one row in the panel at every width, sharing it. */
+.cv-panel .controls {
+  flex-wrap: nowrap;
+  gap: 4px;
+}
+
+.cv-panel .controls button {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 64px;
+  padding: 0;
+}

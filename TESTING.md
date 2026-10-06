@@ -58,3 +58,13 @@ couldn't be tested then (the day's limit was used up), so the training items bel
   (desktop and phone): "Study" from the training screen opens the line at the board's move, an
   edit there, and "Train" takes the session up again with the edit in it and nothing asked
   twice. Whether the chapter ⚙ by the phone's chapter menu is easy to find.
+
+## Phase 2
+
+- §5.23: the explorer panel with the owner's Lichess login, on desktop and phone: on 1. e4 c5
+  2. Nf3 the Lichess tab beside Qchess's Lichess tab with the same filter (moves, shares, counts,
+  bars) and the Eval column beside Qchess's; Masters and ChessDB; a row tapped playing its move;
+  the ⛁ button turning the panel off and on (and remembered); the settings' filter; the phone's
+  layout (the panel after the notation, rows readable and tappable). If the login was made before
+  this build, the explorer uses the same token: no new login is needed.
+- §5.22: a reload answering from the cache (the panel fills at once on a position seen before).

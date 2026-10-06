@@ -104,8 +104,9 @@ function moverScore(r: TableRow, turn: Side): number {
 
 export function buildTable(input: TableInput): Table {
   const { turn, games, evals } = input;
-  const covered = input.covered ?? new Set<string>();
-  const rep = input.repertoire ?? new Map<string, number>();
+  // By SAN without check marks: the chapter, Lichess and ChessDB may disagree on a `+` only.
+  const covered = new Set([...(input.covered ?? [])].map(moveKey));
+  const rep = new Map([...(input.repertoire ?? [])].map(([san, n]) => [moveKey(san), n] as const));
   const evalOf = new Map<string, Eval>();
   if (evals && evals.status === 'ok') {
     for (const m of evals.moves ?? []) {
@@ -115,7 +116,7 @@ export function buildTable(input: TableInput): Table {
   }
   const base = (san: string): Pick<TableRow, 'covered' | 'repertoire'> & { eval?: Eval } => {
     const e = evalOf.get(moveKey(san));
-    return { covered: covered.has(san), repertoire: rep.get(san) ?? 0, ...(e ? { eval: e } : {}) };
+    return { covered: covered.has(moveKey(san)), repertoire: rep.get(moveKey(san)) ?? 0, ...(e ? { eval: e } : {}) };
   };
 
   const rows: TableRow[] = [];

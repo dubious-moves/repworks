@@ -2225,6 +2225,28 @@ lookup refused with a clear reason, ChessDB still answering; Masters asked witho
 Live (desktop, then phone): the panel's first answers with the owner's Lichess login; a reload
 answering from the cache; the request counts after ten minutes of browsing (the debug panel).
 
+**As built** (2026-10-06):
+- The worker's logic is core's, `src/core/explorer/service.ts` (`createExplorerService`), so Node
+  tests drive it; `src/platform/explorerWorker.ts` only wires it to `fetch`, the cache, the clock
+  and `postMessage`. Lookups go out at priority 1000 (the search's are at most about 11), so the
+  panel never waits behind a search. A lookup answers in two messages, `games` then `evals`, as
+  Qchess's panel draws twice. A 429 from the explorer is told to the page (`paused`); the
+  providers wait it out and ask again. With no token, the Practical rows answer at once with the
+  reason rather than failing request by request.
+- Masters is Lichess's even with a local explorer set (the local index is Lichess games).
+- `src/app/explorer.ts`: the device's explorer settings (localStorage `repworks-explorer`), the
+  worker started on first use with the Lichess token (`lichessToken()`, re-sent on a login or
+  logout), the bucket kept in `sessionStorage`, and the panel's lookups: asked 280 ms after a
+  position is shown, the previous one dropped, answers kept for the session (errors aren't, so
+  coming back asks again).
+- Tests: `test/unit/core/explorer/service.test.ts` (a lookup asked once then from the cache,
+  move counters aside; Masters with no filter and ChessDB's tab asking ChessDB alone; no login:
+  the games refused with a login offered, ChessDB answering, the Practical rows saying why; a 429
+  told, waited out and answered; a dropped lookup's queued request gone; a search's rows by
+  depth 1 then 3, final; a new root sweeping the old one's queue; a row taken out reported as
+  excluded), `test/unit/platform/explorerCache.test.ts` (a record read back by another instance,
+  expiry on read, the two stores, memory only without IndexedDB).
+
 #### 5.23 The explorer panel (D21)
 
 `src/ui/Explorer.tsx` under the notation in the chapter view's panel (on the phone, after the
@@ -2263,6 +2285,39 @@ phone's layout (the panel after the notation, nothing wider than the screen).
 
 Live (desktop and phone): the panel beside Qchess's on the same positions (moves, shares,
 counts and bars equal for the same filter); the phone's layout and scrolling; the toggle.
+
+**As built** (2026-10-06):
+- `src/ui/Explorer.tsx`, under the notation's Read/Play buttons and the move's card in the
+  chapter view's panel; on a wide screen it takes up to half the panel and scrolls, on the phone
+  it follows the notation. The database button (`⛁`) is first in the move-button bar, which now
+  keeps its nine buttons on one row at every width.
+- Tabs: Lichess (named Local when a local explorer is set), Masters, ChessDB; ⚙ opens the
+  explorer's settings (`ExplorerSettings.tsx`: the Lichess login, Qchess's time controls and
+  rating buttons, the past 6 months, and §5.24's Practical options and §5.25's address, already
+  there). The sort is a `<select>` in the header (Qchess's menu items), saved per device; the
+  default is Qchess's, by eval.
+- Rows (`core/explorer/table.ts`): SAN, eval (ChessDB's, in pawns from White's side, green, red
+  or grey; mates as `#n`), share, count, the three-part bar with labels from 15%, a row's title
+  its average rating (Lichess's answer has it); novelty rows in orange; Σ. Moves are matched
+  across the chapter, Lichess and ChessDB without check marks. A move other repertoire chapters
+  play here (the index's positions, own and opponent moves alike) carries their count; it opens
+  the transposition list's "Other chapters", which goes to that chapter at the move.
+- Without a login the games tabs say Lichess's explorer needs one and offer it, coming back to
+  the chapter; ChessDB's tab works. Errors have a Retry. While Lichess has asked to slow down,
+  the panel says it waits.
+- Every e2e page that has studies routes the explorer and ChessDB to a fake (`test/e2e/explorer.ts`,
+  through `serveGithub`), so no test reaches the network; requests from the worker are
+  intercepted like the page's.
+- Tests: `test/unit/core/explorer/table.test.ts` (rows, shares, ratings, evals from White's side
+  with Black to move, novelties, Σ; Qchess's formats; every sort; ChessDB's tab; check marks) and
+  `test/e2e/explorer.spec.ts` on desktop and the emulated phone (the rows by eval and by
+  popularity, the chapter's band, the Alapin's mark on 1. e4, the token and filter in the
+  request; a row clicked playing its move; the panel turned off and still off after a reload; the
+  Masters URL with no filter and ChessDB's tab; the repertoire mark leading to the Alapin at
+  2. c3; no login; a 429; the filter changed in the settings reaching the request; nothing in the
+  panel wider than the phone).
+- Not checked live: the real explorer needs a Lichess token, which this container doesn't have;
+  ChessDB was reached from the container (§2). Both wait for the owner (TESTING.md).
 
 #### 5.24 The Practical column and the prepared score
 

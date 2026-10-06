@@ -40,6 +40,9 @@ export const lichessUser = signal<string | undefined>(auth.token() ? (auth.usern
 
 export const lichess = lichessClient({ token: () => auth.token() });
 
+/** The token on this device, for the explorer (any scope will do, PLAN.md §5.23); '' without a login. */
+export const lichessToken = (): string => auth.token() ?? '';
+
 /** Takes Lichess's answer out of the address bar; the whole address, if it was one. */
 export function takeLichessCallback(): string | undefined {
   const params = new URLSearchParams(location.search);

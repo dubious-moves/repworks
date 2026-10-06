@@ -4,6 +4,7 @@ import type { Page } from '@playwright/test';
 import { FakeGit } from '../support/fakeGit.ts';
 import { FakeGithub } from '../support/fakeGithub.ts';
 import { fixtureFiles, REPO, TOKEN } from '../support/syncWorld.ts';
+import { serveExplorer } from './explorer.ts';
 
 // GitHub's CORS headers, as api.github.com sent them to this project's container on 2026-10-05.
 const CORS = {
@@ -13,6 +14,8 @@ const CORS = {
 };
 
 export async function serveGithub(page: Page, github: FakeGithub): Promise<void> {
+  // Every page with studies has the explorer panel (§5.23): it never reaches the network in tests.
+  await serveExplorer(page);
   await page.route('https://api.github.com/**', async (route) => {
     const request = route.request();
     if (request.method() === 'OPTIONS') {
