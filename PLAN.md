@@ -4235,6 +4235,22 @@ drilled.
 
 Live: (desktop) a sequence made from a real mistake.
 
+**As built** (2026-10-07): `src/core/games/saved.ts` (`readSavedItem`, `savedItems`: a card's latest
+`saved` event, naming its own card; `sequenceLines`, mistake-lab's tree walk; `validateSequence`,
+its `validateSequenceLines`; `sequenceItem`, `practiceMistakeItem` and their dedup rules), the deck
+reading them (`savedDeck` in `src/app/games.ts`), `src/app/sequence.ts` and the analysis board's
+"Save as a sequence…" (`#/analysis?fen=…&seq=<pid>`, opened by "Make a sequence" on a mistake card
+or a game's mistake; `seq=*` for one from a practice game's review, §5.57): Stockfish checks each
+position where the user moves (three lines, the trainer's depth, twelve positions at most, the rest
+listed as not checked), the warnings link to their move on the board, and a sequence made from a
+mistake card drops that card. Practice mistakes are saved from the practice game's review (§5.57).
+Tests: `test/unit/core/games/saved.test.ts`, with **the same warnings as mistake-lab's own
+`validateSequenceLines`** on eight cases (`test/fixtures/games/sequences.json`, recorded by
+`mistake-lab-sequences.cjs` from its code at `c525403`; two controls); `test/e2e/games.spec.ts`
+(desktop and phone: a sequence built from a game's mistake, its warning, saved, the mistake gone
+from the deck, the sequence drilled and synced). Also fixed: the game trainer's board now sends
+castling as standard UCI (e1g1), as the analyzer's lines and Stockfish write it.
+
 #### 5.57 Practice: playing on, advantages, and the game review
 
 - `practice.ts`: the opponent's move (the explorer at the practice filter, weighted by games, with

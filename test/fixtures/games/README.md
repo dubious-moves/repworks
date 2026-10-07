@@ -18,3 +18,9 @@ extraction's tests (PLAN.md §5.52):
 at `c525403` and run in Node with chess.js 0.10.3 by `mistake-lab-harness.cjs`
 (`node mistake-lab-harness.cjs <mistake-lab>/index.html analyzed_games.json`, with `chess.js@0.10.3`
 installed beside it), no repertoire and nothing invalidated.
+
+`sequences.json` holds the sequence checks' cases (PLAN.md §5.56): each a tree of lines from one
+Italian position and the engine's lines at its positions, its lines in mistake-lab's shape
+(`mlLines`, made by the site's own `sequenceLines`), and `expected`: the warnings and unverified items
+mistake-lab's own `validateSequenceLines` gives, cut out of `index.html` at `c525403` and run in Node
+by `mistake-lab-sequences.cjs` (`node mistake-lab-sequences.cjs <mistake-lab>/index.html sequences.json`).

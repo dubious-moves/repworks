@@ -25,6 +25,9 @@ interface ItemBase {
   ply: number;
   fenBefore: string;
   color: Color;
+  /** A saved item's (§5.56): when it was saved, and the card it came from. */
+  savedAt?: number;
+  from?: string;
 }
 export interface MistakeItem extends ItemBase {
   kind: 'mistake';
@@ -47,6 +50,8 @@ export interface TacticItem extends ItemBase {
   /** For sorting, as mistake-lab's: the swing's size. */
   wpDrop: number;
   found: boolean;
+  /** A sequence made on the analysis board (§5.56), not one the analyzer found. */
+  sequence?: true;
 }
 export interface AdvantageItem extends ItemBase {
   kind: 'advantage';

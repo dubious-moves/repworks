@@ -4,7 +4,9 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { makeFen } from 'chessops/fen';
 import { addToChapter, targetsFor, type Target } from '../app/analysis.ts';
-import { at, chapter, feedback, openScratch } from '../app/editor.ts';
+import { at, chapter, feedback, goTo, openScratch } from '../app/editor.ts';
+import { checkSequence, saveSequence, sourceMistake, type CheckResult } from '../app/sequence.ts';
+import type { Chapter } from '../core/study/model.ts';
 import { mode, open } from '../app/mode.ts';
 import { positionAt } from '../core/study/tree.ts';
 
@@ -19,6 +21,9 @@ export function AnalysisHead() {
   const c = chapter.value;
   const [fen, setFen] = useState('');
   const [adding, setAdding] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const m = mode.value;
+  const seq = m.name === 'analysis' ? m.seq : undefined;
   const start = c ? positionAt(c, []) : undefined;
   const line = at.value;
   return (
@@ -47,7 +52,13 @@ export function AnalysisHead() {
       <button type="button" disabled={!line.length} title={line.length ? 'Add the line to the move shown to a chapter' : 'Play a move first'} onClick={() => setAdding(true)}>
         Add to a chapter…
       </button>
+      {seq && (
+        <button type="button" class="secondary" title="Save the lines on the board as a drill: the main line first, each branch another line" onClick={() => setSaving(true)}>
+          Save as a sequence…
+        </button>
+      )}
       {adding && c && <AddDialog targets={targetsFor(c)} sans={line} onClose={() => setAdding(false)} />}
+      {saving && c && <SequenceDialog chapter={c} seq={seq} onClose={() => setSaving(false)} />}
     </div>
   );
 }
@@ -100,6 +111,96 @@ function AddDialog(props: { targets: Target[]; sans: readonly string[]; onClose(
           <button type="submit" class="primary" disabled={!props.targets.length}>
             Add
           </button>
+        </div>
+      </form>
+    </dialog>
+  );
+}
+
+/** Saves the board's lines as a sequence (§5.56), once Stockfish has checked them. */
+function SequenceDialog(props: { chapter: Chapter; seq: string | undefined; onClose(): void }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const [result, setResult] = useState<CheckResult | undefined>(undefined);
+  const [progress, setProgress] = useState<[number, number]>([0, 0]);
+  const [saved, setSaved] = useState(false);
+  useEffect(() => {
+    if (!ref.current!.open) ref.current!.showModal();
+    let live = true;
+    void checkSequence(props.chapter, (d, of) => live && setProgress([d, of])).then((r) => live && setResult(r));
+    return () => {
+      live = false;
+    };
+  }, []);
+  const source = sourceMistake(props.seq);
+  const check = result?.ok ? result.check : undefined;
+  const show = (path: readonly string[]) => {
+    goTo(path);
+    props.onClose();
+  };
+  const userMoves = check ? check.lines[0]!.filter((mv) => mv.user).length : 0;
+  return (
+    <dialog ref={ref} class="study-dialog" aria-labelledby="dialog-sequence" data-testid="sequence-dialog" onCancel={(e) => (e.preventDefault(), props.onClose())}>
+      <form
+        class="form"
+        method="dialog"
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (check) void saveSequence(check, props.seq).then((card) => card && setSaved(true));
+        }}
+      >
+        <h2 id="dialog-sequence">Save as a sequence</h2>
+        {!result && (
+          <p class="muted" role="status">
+            Stockfish is checking the lines{progress[1] ? `: position ${progress[0] + 1} of ${progress[1]}` : ''}…
+          </p>
+        )}
+        {result && !result.ok && <p class="warn">{result.error}</p>}
+        {check && !saved && (
+          <>
+            <p>
+              <strong data-testid="sequence-main">{check.lines[0]!.map((mv) => mv.san).join(' ')}</strong>
+            </p>
+            <p>
+              {userMoves} move{userMoves === 1 ? '' : 's'} to find{check.lines.length > 1 ? ` · ${check.lines.length - 1} other line${check.lines.length > 2 ? 's' : ''}` : ''}
+            </p>
+            {check.warnings.length > 0 && (
+              <ul class="warn" data-testid="sequence-warnings">
+                {check.warnings.map((w, i) => (
+                  <li key={i}>
+                    <button type="button" class="link" title="Show it on the board" onClick={() => show(w.path)}>
+                      {w.text}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {check.unverified.length > 0 && <p class="muted">Not checked: {check.unverified.map((u) => u.text).join(', ')}</p>}
+            {check.duplicate && <p class="warn">This sequence is already saved.</p>}
+            {source && <p class="muted">Saving takes the mistake ({source.san}) out of the game cards: the sequence stands for it.</p>}
+          </>
+        )}
+        {saved && (
+          <p role="status" data-testid="sequence-saved">
+            Saved: the sequence is in your game cards.
+          </p>
+        )}
+        <div class="dialog-buttons">
+          <span class="spacer" />
+          {saved ? (
+            <a class="button" href="#/games">
+              Back to the games
+            </a>
+          ) : (
+            <>
+              <button type="button" class="secondary" onClick={props.onClose}>
+                Cancel
+              </button>
+              <button type="submit" class="primary" disabled={!check || check.duplicate}>
+                {check?.warnings.length ? 'Save anyway' : 'Save'}
+              </button>
+            </>
+          )}
         </div>
       </form>
     </dialog>

@@ -7,6 +7,7 @@ import { computed, effect, signal } from '@preact/signals';
 import { readChesscomGame } from '../core/games/chesscom.ts';
 import { deckOf, gameQueue, type DeckCard } from '../core/games/deck.ts';
 import { extractGame, type GameItem } from '../core/games/extract.ts';
+import { savedItems, type SavedItem } from '../core/games/saved.ts';
 import { readGame, readGamesFile, type GameRecord } from '../core/games/record.ts';
 import type { PositionKey } from '../core/chess/positionKey.ts';
 import type { RepertoireIndex } from '../core/repertoire/index.ts';
@@ -140,7 +141,13 @@ export function startGames(): void {
 
 /* ------------------------------------------------------------------ the deck and today's queue */
 
-/** The deck: every item shown, less the dropped (§5.53). */
+/** The items saved on the site (§5.56): sequences and practice mistakes, from their events. */
+export const savedDeck = computed<SavedItem[]>(() => {
+  const data = trainData.value;
+  return data ? savedItems(data.states.keys(), data.eventsOf) : [];
+});
+
+/** The deck: every item shown, less the dropped (§5.53), with the saved items. */
 export const gameDeck = computed<DeckCard[]>(() => {
   const rows = gameRows.value;
   const data = trainData.value;
@@ -148,7 +155,7 @@ export const gameDeck = computed<DeckCard[]>(() => {
   const eventsOf = data ? data.eventsOf : () => [];
   return deckOf(
     rows.map((r) => r.items),
-    [],
+    savedDeck.value,
     eventsOf,
   );
 });

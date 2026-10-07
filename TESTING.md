@@ -172,6 +172,10 @@ couldn't be tested then (the day's limit was used up), so the training items bel
   tactics and advantages). Review: a real day's game cards (mistakes judged by Stockfish: the waits
   on the phone; whether the words match mistake-lab's), a tactic with its other lines, Drop and Put
   back, and the cards on the other device after a sync. Whether 10 new game cards a day is right.
+- §5.56 (desktop): a sequence from a real mistake: a game card's "Make a sequence", the refutation
+  and its branches built on the analysis board, "Save as a sequence…": whether Stockfish's warnings
+  are the ones mistake-lab would give, the time the check takes; then the sequence drilled from the
+  game cards, and the mistake gone from them (on the other device after a sync).
 - §5.64 (desktop): Games → Set up → "Move mistake-lab's progress here": the gist, Dry run (a
   token only if the gist won't read without one; it isn't kept), and read the report: the cards'
   counts against mistake-lab, the re-made keys, what is left behind. If it looks right, Run, then

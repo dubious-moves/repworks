@@ -6,7 +6,8 @@ import { chessgroundDests } from 'chessops/compat';
 import { normalizeMove } from 'chessops/chess';
 import { makeUci, parseSquare } from 'chessops/util';
 import type { Key } from '@lichess-org/chessground/types';
-import type { Role, SquareName } from 'chessops/types';
+import { isNormal, type Role, type SquareName } from 'chessops/types';
+import { standardUci } from '../core/chess/uci.ts';
 import { open } from '../app/mode.ts';
 import { recordEvent } from '../app/state.ts';
 import { trainData } from '../app/train.ts';
@@ -356,6 +357,14 @@ function GameView(props: { id: string; ply?: number }) {
                 <button type="button" class="link" onClick={() => void recordEvent({ t: new Date().toISOString(), k: 'drop', card, on: !dropped })}>
                   {dropped ? 'Put back' : 'Drop'}
                 </button>
+                {it.kind === 'mistake' && !dropped && (
+                  <>
+                    {' '}
+                    <button type="button" class="link" onClick={() => open({ name: 'analysis', fen: it.fenBefore, seq: it.pid })}>
+                      Make a sequence
+                    </button>
+                  </>
+                )}
               </li>
             );
           })}
@@ -386,7 +395,9 @@ function PlayBoard(props: { run: CardRun; asking: boolean; arrows: { orig: strin
   const onMove = (orig: Key, dest: Key) => {
     const piece = pos.board.get(parseSquare(orig)!);
     if (piece?.role === 'pawn' && (dest[1] === '8' || dest[1] === '1')) return setPromotion({ orig, dest });
-    playMove(makeUci(normalizeMove(pos, { from: parseSquare(orig)!, to: parseSquare(dest)! })));
+    // Standard UCI (castling as e1g1), as the analyzer's lines and Stockfish write it.
+    const move = normalizeMove(pos, { from: parseSquare(orig)!, to: parseSquare(dest)! });
+    playMove(isNormal(move) ? standardUci(pos, move) : makeUci(move));
   };
   return (
     <div class="train-board">
@@ -543,6 +554,11 @@ function Card(props: { s: GameSession; r: CardRun }) {
           <button type="button" class="secondary" onClick={() => open({ name: 'analysis', fen: r.board })}>
             Analyse
           </button>
+          {item.kind === 'mistake' && (
+            <button type="button" class="secondary" title="Build the lines that refute it on the analysis board, and drill them as a sequence instead" onClick={() => open({ name: 'analysis', fen: item.fenBefore, seq: item.pid })}>
+              Make a sequence
+            </button>
+          )}
           {item.kind === 'tactic' && (r.tactic?.lines.length ?? 0) > 1 && (
             <button type="button" class="secondary" onClick={dropLine} title="Take this line out of the tactic">
               Drop this line

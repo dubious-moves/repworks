@@ -363,7 +363,8 @@ function savedMistake(m: unknown): MistakeItem | undefined {
     kind: 'mistake',
     pid: `${gameId}_${ply}`,
     gameId,
-    ply,
+    // mistake-lab's practice items count the plies before the move; the site's items, the move's own.
+    ply: ply + 1,
     fenBefore,
     key: k.key,
     color: m['playerColor'] === 'black' ? 'black' : 'white',
@@ -395,5 +396,7 @@ function savedTactic(m: unknown): TacticItem | undefined {
   if (!main) return undefined;
   const lines = [main, ...arr(m['tacticAltLines']).map(line).filter((l): l is TacticMove[] => !!l)];
   const wpSwing = num(m['wpSwing']) ?? 0;
-  return { kind: 'tactic', pid: `${gameId}_t${ply}`, gameId, ply, fenBefore, color: m['playerColor'] === 'black' ? 'black' : 'white', lines, wpSwing, wpDrop: num(m['wpDrop']) ?? Math.abs(wpSwing), found: m['found'] === true };
+  const item: TacticItem = { kind: 'tactic', pid: `${gameId}_t${ply}`, gameId, ply: ply + 1, fenBefore, color: m['playerColor'] === 'black' ? 'black' : 'white', lines, wpSwing, wpDrop: num(m['wpDrop']) ?? Math.abs(wpSwing), found: m['found'] === true };
+  if (m['_isSequence'] === true) item.sequence = true;
+  return item;
 }

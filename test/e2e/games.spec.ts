@@ -3,7 +3,8 @@
 // Lichess's export with one more game, and the fake engine scripted for the mistakes' positions.
 // The games are read, one is opened, and the day's three cards are answered: a mistake with the
 // best move (Easy), one with a blunder then the best move (Again), and the tactic through its two
-// lines (Easy); the reviews synced.
+// lines (Easy); the reviews synced. Then (§5.56) a mistake made into a sequence on the analysis
+// board, checked against the fake engine's lines, saved in the mistake's place and drilled.
 import { test, expect, type Page } from '@playwright/test';
 import { Chess } from 'chessops/chess';
 import { makeFen } from 'chessops/fen';
@@ -29,6 +30,7 @@ const G1_AT = after(G1.slice(0, 6));
 const G2_AT = after(G2.slice(0, 6));
 const G2_G4 = after([...G2.slice(0, 6), 'g4']);
 const TACTIC_FEN = 'r1bqk1nr/pppnppbp/3p2p1/8/2BPP3/5N2/PPP2PPP/RNBQK2R w KQkq - 2 5';
+const SEQ_AT = after([...G1.slice(0, 6), 'Nxd4', 'exd4']);
 
 let site: SiteServer;
 test.beforeAll(async () => {
@@ -45,6 +47,11 @@ test.beforeAll(async () => {
         [3, 30, 'e2e3 f8e7'],
       ],
       [G2_G4.key]: [[1, 350, 'f6g4 e2e3']],
+      [SEQ_AT.key]: [
+        [1, 30, 'e1g1 g8f6'],
+        [2, 20, 'd2d3 g8f6'],
+        [3, -50, 'c2c3 d4c3'],
+      ],
     }),
   });
 });
@@ -203,4 +210,51 @@ test('games read from the Gist and Lichess, a game opened, the day’s cards ans
   // Nothing wider than the phone.
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);
+});
+
+test('a mistake made into a sequence on the analysis board, checked, saved in its place and drilled (§5.56)', async ({ page }) => {
+  const w = await setUp(page);
+  await page.getByRole('link', { name: 'Games' }).click();
+  await page.getByRole('button', { name: 'Refresh' }).click();
+  await expect(page.getByTestId('games-queue')).toContainText('0 due · 3 new today');
+  await page.getByTestId('game-row').filter({ hasText: 'Blackburne' }).click();
+  await page.getByTestId('game-item').getByRole('button', { name: 'Make a sequence' }).click();
+  await expect(page).toHaveURL(/#\/analysis\?fen=.*&seq=GameOne1_7$/);
+
+  // The refutation, and the castle that follows.
+  for (const [from, to] of [['f3', 'd4'], ['e5', 'd4'], ['e1', 'g1']] as const) {
+    await clickSquare(page, from, 'white');
+    await clickSquare(page, to, 'white');
+  }
+  await expect(page.locator('.notation')).toContainText('O-O');
+  await page.getByRole('button', { name: 'Save as a sequence…' }).click();
+  const dialog = page.getByTestId('sequence-dialog');
+  await expect(dialog.getByTestId('sequence-main')).toHaveText('Nxd4 exd4 O-O');
+  await expect(dialog).toContainText('2 moves to find');
+  // d3 is within 5 points of O-O there, and no line has it.
+  await expect(dialog.getByTestId('sequence-warnings')).toContainText('d3 is as good');
+  await expect(dialog).toContainText('takes the mistake (Nxe5) out');
+  await dialog.getByRole('button', { name: 'Save anyway' }).click();
+  await expect(dialog.getByTestId('sequence-saved')).toBeVisible();
+  await dialog.getByRole('link', { name: 'Back to the games' }).click();
+  // The mistake out, the sequence in.
+  await expect(page.getByTestId('games-queue')).toContainText('0 due · 3 new today');
+
+  await page.getByRole('link', { name: 'Review' }).click();
+  const card = page.locator('.game-card');
+  await expect(card).toHaveAttribute('data-card', /^m\|_practice_tactic_\d+_[a-z0-9]+_t6$/);
+  await play(page, 'f3d4');
+  await expect(card).toHaveAttribute('data-step', '2');
+  await expect(card).toHaveAttribute('data-phase', 'asking');
+  await play(page, 'e1g1');
+  await expect(page.getByTestId('game-feedback')).toHaveText('Solved');
+  await expect(card).toContainText('Recorded: Easy');
+
+  await page.locator('.chip').click();
+  await expect
+    .poll(() => [...w.git.textsOf()].filter(([p]) => p.startsWith('progress/')).map(([, t]) => t).join(''), { timeout: 15_000 })
+    .toMatch(/"k":"review","card":"m\|_practice_tactic_[^"]+","g":4/);
+  const log = [...w.git.textsOf()].filter(([p]) => p.startsWith('progress/')).map(([, t]) => t).join('');
+  expect(log).toContain('"k":"drop","card":"m|GameOne1_7","on":true');
+  expect(log).toMatch(/"k":"saved","card":"m\|_practice_tactic_[^"]+","item":\{"kind":"tactic"/);
 });

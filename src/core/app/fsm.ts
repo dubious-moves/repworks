@@ -14,8 +14,9 @@
 //   #/read/<sid>/<cid>[?at=e4,e5][&from=1]  a chapter's line read through, from a move (§5.10)
 //   #/play/<sid>/<cid>[?at=e4,e5][&from=1]  the same line played, every own move asked (§5.10)
 //   #/coverage/<sid>                    a study's coverage against the repertoire, or a reference study's against it (§5.26)
-//   #/analysis[?fen=…][&from=<sid>/<cid>&at=e4,e5]  the analysis board: a scratch chapter, from a
-//                                       FEN or a chapter's move (§5.35)
+//   #/analysis[?fen=…][&from=<sid>/<cid>&at=e4,e5][&seq=<pid>|*]  the analysis board: a scratch
+//                                       chapter, from a FEN or a chapter's move (§5.35); `seq`
+//                                       saves its lines as a sequence (§5.56)
 //   #/storm[/<sid>[/<cid>[?at=e4,e5]]]  the storm (§5.43): the repertoire, a study, a chapter, or
 //                                       the lines through a chapter's move
 //   #/games                             the games and their cards (§5.54)
@@ -53,9 +54,11 @@ export type Mode =
   | { name: 'coverage'; sid: string }
   /**
    * The analysis board (§5.35): a chapter on this device only, from `fen` (the board's last one
-   * when none), opened from a chapter's move (`from`, where its lines go back to) or not.
+   * when none), opened from a chapter's move (`from`, where its lines go back to) or not; with
+   * `seq`, its lines can be saved as a sequence (§5.56): `seq` the mistake card's pid it replaces,
+   * or `*` for none.
    */
-  | { name: 'analysis'; fen?: string; from?: { sid: string; cid: string; at: string[] } }
+  | { name: 'analysis'; fen?: string; from?: { sid: string; cid: string; at: string[] }; seq?: string }
   /** The storm (§5.43): over the repertoire, a study, a chapter, or the lines through `at`. */
   | { name: 'storm'; sid?: string; cid?: string; at?: string[] }
   /** The games (§5.54); with `id`, one game, at `ply` (0 the start). */
@@ -163,6 +166,8 @@ export function parseHash(hash: string): Mode {
     if (f) mode.fen = f;
     const from = query.split('&').find((q) => q.startsWith('from='))?.slice(5).split('/');
     if (from?.length === 2 && isId(from[0]) && isId(from[1])) mode.from = { sid: from[0], cid: from[1], at: atOf(query) ?? [] };
+    const seq = query.split('&').find((q) => q.startsWith('seq='))?.slice(4);
+    if (seq && (seq === '*' || GAME_ID.test(seq))) mode.seq = seq;
     return mode;
   }
   if (parts[0] === 'learn' && parts.length === 3 && isId(parts[1]) && isId(parts[2])) return { name: 'learn', sid: parts[1], cid: parts[2] };
@@ -220,6 +225,7 @@ export function modeHash(mode: Mode): string {
       const q = [
         ...(mode.fen ? [`fen=${encodeURIComponent(mode.fen)}`] : []),
         ...(mode.from ? [`from=${mode.from.sid}/${mode.from.cid}`, ...(mode.from.at.length ? [`at=${mode.from.at.map(encodeURIComponent).join(',')}`] : [])] : []),
+        ...(mode.seq ? [`seq=${mode.seq}`] : []),
       ];
       return `#/analysis${q.length ? `?${q.join('&')}` : ''}`;
     }
