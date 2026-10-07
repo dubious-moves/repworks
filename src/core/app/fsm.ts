@@ -21,6 +21,7 @@
 //   #/games                             the games and their cards (§5.54)
 //   #/games/<id>[?ply=n]                one game, at a ply
 //   #/games/review                      the game cards due, as a session (§5.55)
+//   #/migrate                           the migration from mistake-lab (§5.64)
 // A setup link (#setup?…) is read and removed before any of this (src/app/setup.ts).
 import { isId } from '../study/ids.ts';
 
@@ -60,7 +61,9 @@ export type Mode =
   /** The games (§5.54); with `id`, one game, at `ply` (0 the start). */
   | { name: 'games'; id?: string; ply?: number }
   /** The game cards due, as a session (§5.55). */
-  | { name: 'gamesReview' };
+  | { name: 'gamesReview' }
+  /** The migration from mistake-lab (§5.64). */
+  | { name: 'migrate' };
 
 export type Practice = 'retry' | 'drill' | 'pinned' | 'pins';
 const PRACTICE_HASH: Record<Practice, string> = { retry: '#/mistakes/retry', drill: '#/mistakes/drill', pinned: '#/pinned', pins: '#/pinned/all' };
@@ -141,6 +144,7 @@ export function parseHash(hash: string): Mode {
     return m;
   }
   if (parts[0] === 'coverage' && parts.length === 2 && isId(parts[1])) return { name: 'coverage', sid: parts[1] };
+  if (parts.length === 1 && parts[0] === 'migrate') return { name: 'migrate' };
   if (parts[0] === 'games') {
     if (parts.length === 1) return { name: 'games' };
     if (parts.length === 2 && parts[1] === 'review') return { name: 'gamesReview' };
@@ -208,6 +212,8 @@ export function modeHash(mode: Mode): string {
       return mode.id ? `#/games/${mode.id}${mode.ply !== undefined ? `?ply=${mode.ply}` : ''}` : '#/games';
     case 'gamesReview':
       return '#/games/review';
+    case 'migrate':
+      return '#/migrate';
     case 'storm':
       return `#/storm${mode.sid ? `/${mode.sid}${mode.cid ? `/${mode.cid}${atQuery(mode.at)}` : ''}` : ''}`;
     case 'analysis': {

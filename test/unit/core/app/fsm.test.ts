@@ -113,6 +113,7 @@ test('the games’ addresses (§5.54, §5.55): the list, a game at a ply, the re
   const cases: [string, Mode][] = [
     ['#/games', { name: 'games' }],
     ['#/games/review', { name: 'gamesReview' }],
+    ['#/migrate', { name: 'migrate' }],
     ['#/games/AbCd1234', { name: 'games', id: 'AbCd1234' }],
     ['#/games/chesscom_1234567?ply=31', { name: 'games', id: 'chesscom_1234567', ply: 31 }],
   ];

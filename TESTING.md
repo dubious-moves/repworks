@@ -172,6 +172,11 @@ couldn't be tested then (the day's limit was used up), so the training items bel
   tactics and advantages). Review: a real day's game cards (mistakes judged by Stockfish: the waits
   on the phone; whether the words match mistake-lab's), a tactic with its other lines, Drop and Put
   back, and the cards on the other device after a sync. Whether 10 new game cards a day is right.
+- §5.64 (desktop): Games → Set up → "Move mistake-lab's progress here": the gist, Dry run (a
+  token only if the gist won't read without one; it isn't kept), and read the report: the cards'
+  counts against mistake-lab, the re-made keys, what is left behind. If it looks right, Run, then
+  sync. Best done once the rest of Phase 5 is built (the saved items and plan cards show in the
+  session from §5.56 and §5.61), and only once: a second run is refused.
 - §5.66: the owner's answer on where the analyzer's output lives (PLAN.md, Phase 5, "The owner's
   choice"): (a) the data repo through a converter, recommended, or (b) the Gist, read-only.
 

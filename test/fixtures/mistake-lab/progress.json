@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "positions": {
+    "GameOne1_7": { "completed": true, "lastSeen": "2026-09-30T08:00:05.000Z", "firstReview": "2026-08-01T09:00:00.000Z", "recidGraded": ["GameTwo2"], "srs": { "state": 2, "stability": 9.4, "difficulty": 5.2, "due": "2026-10-08", "reps": 4, "lapses": 1, "lastReview": "2026-09-30T08:00:00.000Z", "elapsedDays": 6, "scheduledDays": 8 } },
+    "GameOne1_t9": { "completed": true, "invalidatedLines": ["c4f7,e8f8,f3g5"], "srs": { "state": 2, "stability": 3.1, "difficulty": 6, "due": "2026-10-03", "reps": 2, "lapses": 0, "lastReview": "2026-09-30T10:00:00.000Z", "elapsedDays": 1, "scheduledDays": 3 } },
+    "GameOne1_a31": { "completed": true, "invalidated": true, "srs": { "state": 3, "stability": 1.2, "difficulty": 8, "due": "2026-10-02", "reps": 1, "lapses": 1, "lastReview": "2026-10-01T10:00:00.000Z", "elapsedDays": 0, "scheduledDays": 1 } },
+    "chesscom_1234_15": { "completed": true, "srs": { "state": 2, "stability": 20, "difficulty": 4, "due": "2026-10-01", "reps": 3, "lapses": 0, "lastReview": "2026-09-11T07:00:00.000Z", "elapsedDays": 12, "scheduledDays": 20 } },
+    "_practice_1790000000000_12": { "completed": true, "srs": { "state": 2, "stability": 5, "difficulty": 5, "due": "2026-10-12", "reps": 2, "lapses": 0, "lastReview": "2026-10-07T06:00:00.000Z", "elapsedDays": 2, "scheduledDays": 5 } },
+    "p_8/6K1/8/3pP3/8/2b5/8/k7 w - d6": { "completed": true, "srs": { "state": 2, "stability": 4, "difficulty": 5, "due": "2026-10-06", "reps": 2, "lapses": 0, "lastReview": "2026-10-02T06:00:00.000Z", "elapsedDays": 2, "scheduledDays": 4 } },
+    "r_rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq -": { "completed": true, "srs": { "state": 2, "stability": 30, "difficulty": 3, "due": "2026-10-20", "reps": 6, "lapses": 0, "lastReview": "2026-09-20T06:00:00.000Z", "elapsedDays": 20, "scheduledDays": 30 } },
+    "Corrupt1_5": { "srs": { "state": 2, "stability": null, "difficulty": 5, "due": "2026-10-01", "reps": 2, "lapses": 0, "lastReview": "2026-09-20T06:00:00.000Z", "elapsedDays": 0, "scheduledDays": 3 } },
+    "NewOne11_3": { "srs": { "state": 0, "stability": 0, "difficulty": 0, "due": null, "reps": 0, "lapses": 0, "lastReview": null, "elapsedDays": 0, "scheduledDays": 0 } },
+    "nonsense": { "completed": true }
+  },
+  "notes": {
+    "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq -": { "text": "Against 1.e4 the plan is {c5} and d6.\nKeep the knight on f6.", "arrows": [{ "from": "c7", "to": "c5", "color": "green" }, { "from": "d7", "to": "d6", "color": "blue" }], "circles": [{ "square": "e4", "color": "red" }], "drawInterval": 750, "updated": 1790000000000 },
+    "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq -": { "text": "From the Lichess study.", "arrows": [], "circles": [], "updated": 1790000000000, "source": "study" },
+    "rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq -": { "deleted": true, "updated": 1790000000000 }
+  },
+  "planCards": [
+    { "id": "plan_8/6K1/8/3pP3/8/2b5/8/k7 w - d6", "positionKey": "8/6K1/8/3pP3/8/2b5/8/k7 w - d6", "fen": "8/6K1/8/3pP3/8/2b5/8/k7 w - d6 0 2", "color": "white", "source": "user", "createdAt": 1790000000000, "updated": 1790000000000 },
+    { "id": "plan_x", "positionKey": "rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq -", "deleted": true, "updated": 1790000000000 }
+  ],
+  "repertoire": {
+    "studies": [{ "id": "AbCdEfGh", "color": "black", "name": "Sicilian", "addedAt": 1 }],
+    "deletedStudies": [],
+    "customDeviations": [{ "positionKey": "rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq -", "fenBefore": "rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2", "repertoireMove": { "san": "d6", "uci": "d7d6" }, "playerColor": "black", "source": "manual", "addedAt": 1790000000000 }],
+    "dismissed": ["rnbqkbnr/pppppppp/8/8/2P5/8/PP1PPPPP/RNBQKBNR b KQkq -"],
+    "todoLists": [{ "id": "todo_AbCdEfGh", "studyId": "AbCdEfGh", "variations": [] }]
+  },
+  "practiceScoreboard": {
+    "rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq -": [
+      { "ts": 1790000500000, "result": "win", "finalCp": -1012.4, "moves": 31, "preset": "easy" },
+      { "ts": 1790000100000, "result": "loss", "finalCp": 512, "moves": 18 }
+    ]
+  },
+  "practiceMistakes": [
+    { "type": "mistake", "gameId": "_practice_1790000000000", "movePly": 12, "fenBefore": "r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4", "sanPlayed": "Ng5", "cpLoss": 120, "cpBefore": 30, "cpAfter": -90, "wpDrop": 11.2, "playerColor": "white", "moveNumber": 4 }
+  ],
+  "practiceTactics": [
+    { "type": "tactic", "gameId": "_practice_tactic_1790000000000_ab12", "movePly": 9, "fenBefore": "r1bqk1nr/pppnppbp/3p2p1/8/2BPP3/5N2/PPP2PPP/RNBQK2R w KQkq - 2 5", "playerColor": "white", "moveNumber": 5,
+      "tacticMoves": [{ "uci": "c4f7", "san": "Bxf7+", "fen": "x", "isUser": true }, { "uci": "e8f8", "san": "Kf8", "fen": "x", "isUser": false }, { "uci": "f3g5", "san": "Ng5", "fen": "x", "isUser": true }],
+      "tacticAltLines": [[{ "uci": "c4f7", "san": "Bxf7+", "fen": "x", "isUser": true }, { "uci": "e8f7", "san": "Kxf7", "fen": "x", "isUser": false }, { "uci": "f3g5", "san": "Ng5+", "fen": "x", "isUser": true }]],
+      "wpSwing": 35, "wpDrop": 0, "found": false, "_isSequence": true, "_chainSig": "c4f7" },
+    { "type": "tactic", "gameId": "_practice_tactic_broken", "movePly": 3, "fenBefore": "not a fen" }
+  ]
+}

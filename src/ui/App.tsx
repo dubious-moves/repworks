@@ -11,6 +11,7 @@ import { ConflictsView } from './Conflicts.tsx';
 import { CoverageView } from './Coverage.tsx';
 import { StormScreen } from './Storm.tsx';
 import { GamesScreen } from './Games.tsx';
+import { MigrateScreen } from './Migrate.tsx';
 import { Debug } from './Debug.tsx';
 import { ImportScreen } from './Import.tsx';
 import { SetupForm } from './Setup.tsx';
@@ -103,6 +104,8 @@ function Screen() {
       return <GamesScreen {...(mode.value.id ? { id: mode.value.id } : {})} {...(mode.value.ply !== undefined ? { ply: mode.value.ply } : {})} />;
     case 'gamesReview':
       return <GamesScreen review />;
+    case 'migrate':
+      return <MigrateScreen />;
     case 'list':
       return <Home />;
   }

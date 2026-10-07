@@ -218,7 +218,8 @@ function Sources() {
             The gist is read only, as mistake-lab reads it: the analyzer keeps writing its games there. Lichess’s own games come in too (with its analysis where you asked Lichess for one); chess.com’s only through the analyzer if chess.com doesn’t answer this page.{' '}
             <button type="button" class="link" onClick={() => void forgetGames()}>
               Forget the games on this device
-            </button>
+            </button> ·{' '}
+            <a href="#/migrate">Move mistake-lab’s progress here</a>
           </p>
         </div>
       )}
