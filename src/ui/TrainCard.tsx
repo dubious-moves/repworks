@@ -43,6 +43,9 @@ export function TrainCard() {
           {queue.later.length} more today from {clock(queue.later[0]!.due)}
         </p>
       )}
+      {queue.newLines.length === 0 && queue.room > 0 && queue.pausedLines > 0 && (
+        <p class="muted">No new lines · {queue.pausedLines} paused: a study's line list adds the next 10 by priority.</p>
+      )}
       {queue.knownCards.length > 0 && <p class="muted">Known lines: {queue.knownCards.length.toLocaleString('en')} moves not yet reviewed</p>}
       {(mistakes > 0 || pins.pinned.length > 0) && (
         <p class="train-mistakes">

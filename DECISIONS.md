@@ -1356,3 +1356,11 @@ The technical calls, each with its reason:
 - **Prioritizing keeps lines already learned, and further lines come in by hand** (the owner's
   answers): a ranking never stops reviews the owner didn't give up, and nothing is unpaused
   without a press.
+
+## Revision of 2026-10-07 (prioritize a study and paused lines, built)
+- **Maia fills a thin explorer for the reach as well as for natural moves**: deep in a line the
+  explorer has a handful of games, and Maia's guess is better than shares from noise.
+- **Gaps only where the study answers some reply**: at a line's end every reply is uncovered by
+  design, so listing them would bury the real holes.
+- **A paused line picked from the list shows its never-learned moves as new moves** (nothing
+  recorded), rather than asking moves the owner has never seen.

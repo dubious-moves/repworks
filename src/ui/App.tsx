@@ -26,6 +26,7 @@ import { ReadView } from './Read.tsx';
 import { TrainScreen } from './Train.tsx';
 import { TrainCard } from './TrainCard.tsx';
 import { TrainSettingsDialog } from './TrainSettings.tsx';
+import { PriorityDialog } from './Priority.tsx';
 import { TimeBanner } from './TimeTravel.tsx';
 import { ExplorerSettingsDialog } from './ExplorerSettings.tsx';
 import { EngineSettingsDialog } from './EngineSettings.tsx';
@@ -72,6 +73,7 @@ export function App() {
         <ExplorerSettingsDialog />
         <EngineSettingsDialog />
         <MaiaDialog />
+        <PriorityDialog />
       </Guard>
       <footer class="footer">
         build {__BUILD_ID__}

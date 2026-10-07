@@ -7,7 +7,7 @@ where the build differed). What remains is live: the spike's re-run (§4.2), the
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
 with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
-for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are planned, not built. Read with `DECISIONS.md`, which this plan updates (its
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -2340,7 +2340,7 @@ desktop checks beside it.
   saved already are refused with the reason; Cancel, Escape or moving to another move ends it
   with nothing saved. One alternative per press. Test: `alternatives.spec.ts` (both viewports).
 
-#### 5.70 Prioritize a study, and paused lines (planned 2026-10-07, not built)
+#### 5.70 Prioritize a study, and paused lines (planned and built 2026-10-07)
 
 The owner's request: a study's lines (or one chapter's) ranked by how likely the owner is to face
 them and how much knowing them matters. Lines outside the chosen set are **paused**: kept in the
@@ -2492,6 +2492,34 @@ queue, plan and list, and 150 random repertoires with random marks: no held card
 taught, every due card asked once) and `test/e2e/priority.spec.ts` (desktop and phone: a line
 paused, practised with nothing recorded, unpaused; a chapter paused and unpaused; the home's
 count).
+
+**As built, (b)–(d)** (2026-10-07): `src/core/repertoire/priority.ts` (`rankLines`, `keptLines`,
+`coverageOf`). Every position of the scope's lines is looked up once (its first FEN; the explorer
+ignores the move counters), with progress. Two choices made in the build: **Maia fills a thin
+explorer for the reach too**, not only for natural moves (deep in a line the explorer has a handful
+of games, and Maia's guess beats a split by noise); and **gaps are reported only where the scope
+answers some reply**, since at a line's end every reply is uncovered by design (the script reports
+those when its depth cut stops a line). A covered reply nobody knows gets the floor, so with no data
+at all the covered replies share equally. The greedy order recomputes a value only when its stale
+upper bound could still win (values only fall as moves are taken). `src/app/priority.ts`: the
+explorer through the worker's `practiceGames` (its limiter and cache), at the panel's ratings and
+speeds (this device's, the checklist's by default), Maia's policy where the explorer has under 20
+games and Maia is on, a stop that ends the run at the next lookup, Apply (`applyChanges`: kept lines
+unpaused, the rest paused, must-learn lines left alone, only changed marks recorded) and `addNext`
+(each side of the study ranked with the active lines taken first, the paused lines merged by value,
+the best ten unpaused). `src/ui/Priority.tsx`: the panel (scope: the whole study or the chapter;
+the side when the study has both; the filters; Natural moves count less; Rank, with progress, an
+estimate and Stop; the slider with the coverage; Keep lines already learned; Apply: pause n,
+unpause m; the table, each line opening its training; the replies not answered, each opening the
+chapter at the position). The line list has a bar on a study's list (Prioritize…, and while lines
+are paused their count, "No new lines" when the active ones have nothing new, and Add the next 10)
+and Prioritize… in each chapter's menu; the home card says "No new lines · N paused" when that is
+why nothing new comes. Tests: `test/unit/core/repertoire/priority.test.ts` (reach renormalized, the
+floor and no data, natural moves reordering lines, learned and shared moves, lines taken first, kept
+lines and coverage, a transposition's shares and its gap, a conflict, FEN chapters hung or on their
+own, Maia filling in, one lookup per position, the same ranking twice) and
+`test/e2e/priority.spec.ts` (desktop and phone: ranked from the fake explorer, the gap, two lines
+kept at 82%, Apply pausing the third, Add the next 10 unpausing it, the events synced).
 
 #### 5.14 Phase 1 acceptance test, and exit
 

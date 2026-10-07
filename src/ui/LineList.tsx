@@ -10,6 +10,7 @@ import { useEffect, useMemo } from 'preact/hooks';
 import type { Position } from 'chessops/chess';
 import { open } from '../app/mode.ts';
 import { setMark, setMarks } from '../app/lineMarks.ts';
+import { addNext, growError, growing, openPriority } from '../app/priority.ts';
 import { dayOf, type TrainData } from '../app/train.ts';
 import { chapterRows, type ChapterRows, type LineRow } from '../core/train/browse.ts';
 import { header } from '../core/study/model.ts';
@@ -74,6 +75,8 @@ export function LineList(props: {
   if (groups.length === 0) return <p class="muted line-list-empty">No repertoire lines here yet.</p>;
   let study: string | undefined;
   return (
+    <>
+    {scope !== undefined && <PriorityBar groups={groups} scope={scope} />}
     <div class="line-list" role="list" aria-label="Lines">
       {groups.map((g) => {
         const heading = scope === undefined && g.sid !== study ? (study = g.sid) : undefined;
@@ -84,6 +87,41 @@ export function LineList(props: {
           </div>
         );
       })}
+    </div>
+    </>
+  );
+}
+
+/**
+ * A study's list (§5.70): Prioritize…, and while lines are paused, their count and "Add the next
+ * 10 by priority", saying so when the active lines have nothing new left.
+ */
+function PriorityBar(props: { groups: ChapterRows[]; scope: string }) {
+  const { groups, scope } = props;
+  const paused = groups.reduce((a, g) => a + g.paused, 0);
+  const fresh = groups.some((g) => g.lines.some((r) => r.state === 'new'));
+  const busy = growing.value?.sid === scope ? growing.value : undefined;
+  return (
+    <div class="line-list-bar" role="group" aria-label="Priority">
+      {paused > 0 && (
+        <span class="muted">
+          {!fresh && 'No new lines · '}
+          {paused} paused
+        </span>
+      )}
+      {paused > 0 && (
+        <button type="button" class="secondary" disabled={!!busy} onClick={() => void addNext(scope, 10)}>
+          {busy ? `Ranking… ${busy.done}/${busy.total || '…'}` : 'Add the next 10'}
+        </button>
+      )}
+      <button type="button" class="secondary" onClick={() => openPriority(scope)}>
+        Prioritize…
+      </button>
+      {growError.value && (
+        <span class="error" role="alert">
+          {growError.value}
+        </span>
+      )}
     </div>
   );
 }
@@ -127,12 +165,12 @@ function ChapterBlock(props: { group: ChapterRows; data: TrainData; open: boolea
             </span>
           )
         )}
-        <button type="button" class="line-list-more" aria-label={`${name}: more`} aria-expanded={menuOpen} onClick={() => toggleMenu(key)}>
+        <button type="button" class="line-list-more" aria-label="Chapter menu" title="Pause, unpause, prioritize" aria-expanded={menuOpen} onClick={() => toggleMenu(key)}>
           ⋯
         </button>
       </div>
       {menuOpen && (
-        <div class="line-list-menu" role="group" aria-label={`${name}: lines`}>
+        <div class="line-list-menu" role="group" aria-label="Chapter actions">
           {g.paused < g.lines.length && (
             <button type="button" class="secondary" onClick={() => void chapterMark(g, 'paused')}>
               Pause all lines
@@ -143,6 +181,16 @@ function ChapterBlock(props: { group: ChapterRows; data: TrainData; open: boolea
               Unpause all lines
             </button>
           )}
+          <button
+            type="button"
+            class="secondary"
+            onClick={() => {
+              menuFor.value = undefined;
+              openPriority(g.sid, g.cid);
+            }}
+          >
+            Prioritize…
+          </button>
         </div>
       )}
       {isOpen && (
@@ -179,11 +227,11 @@ function ChapterBlock(props: { group: ChapterRows; data: TrainData; open: boolea
                   <span class="line-list-moves">{movesFrom(start, row.line.path, Math.min(row.fork, row.line.path.length - 1))}</span>
                   {l.text && <span class={`line-list-label tone-${l.tone}`}>{l.text}</span>}
                 </button>
-                <button type="button" class="line-list-more" aria-label={`Line ${row.number}: more`} aria-expanded={rowMenu} onClick={() => toggleMenu(rowKey)}>
+                <button type="button" class="line-list-more" aria-label="Line menu" title="Pause, must learn" aria-expanded={rowMenu} onClick={() => toggleMenu(rowKey)}>
                   ⋯
                 </button>
                 {rowMenu && (
-                  <div class="line-list-menu" role="group" aria-label={`Line ${row.number}`}>
+                  <div class="line-list-menu" role="group" aria-label="Line actions">
                     <button type="button" class="secondary" onClick={() => void lineMark(row.line, paused ? 'none' : 'paused')}>
                       {paused ? 'Unpause' : 'Pause'}
                     </button>

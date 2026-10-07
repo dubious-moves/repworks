@@ -2,8 +2,14 @@
 // phone, with the fixture repertoire (a Black Sicilian: 1... c5 due, 2... d6 suspended, three new
 // moves). A line paused from the line list shows ⏸ and leaves the home screen's new moves; picked,
 // it is practised with nothing recorded, and Unpause brings it back. A chapter paused and unpaused
-// as a whole.
+// as a whole. The study prioritized from the fake explorer (2. Nf3 70%, 2. c3 30%; 1. d4 40%
+// uncovered): two lines kept, the Alapin paused, then added back by "Add the next 10".
 import { test, expect, type Locator, type Page } from '@playwright/test';
+import { Chess } from 'chessops/chess';
+import { makeFen } from 'chessops/fen';
+import { parseSan } from 'chessops/san';
+import { makeUci } from 'chessops/util';
+import { fakeExplorer, lichessLogin, serveExplorer } from './explorer.ts';
 import type { FakeGit } from '../support/fakeGit.ts';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
 import { clickSquare } from './board.ts';
@@ -62,7 +68,7 @@ test('a line paused from the list: ⏸, out of the new moves, practised with not
   const list = await lines(page);
   await list.getByRole('button', { name: 'Alapin', exact: true }).click();
   const row = list.locator('.line-list-row').filter({ hasText: 'Nf6' });
-  await row.getByRole('button', { name: 'Line 1: more' }).click();
+  await row.getByRole('button', { name: 'Line menu' }).click();
   await row.getByRole('button', { name: 'Pause' }).click();
   await expect(row.locator('.dot-paused')).toBeVisible();
   await expect(row).toContainText('Paused');
@@ -99,7 +105,7 @@ test('a chapter paused as a whole and unpaused; the home screen counts the pause
   await asked(page);
   const list = await lines(page);
   const main = list.locator('.line-list-chapter').filter({ hasText: 'Main line' });
-  await main.getByRole('button', { name: 'Main line: more' }).click();
+  await main.getByRole('button', { name: 'Chapter menu' }).click();
   await list.getByRole('button', { name: 'Pause all lines' }).click();
   await expect(main).toContainText('2 paused');
   await expect(list.locator('.line-list-row .dot-paused')).toHaveCount(2);
@@ -112,7 +118,7 @@ test('a chapter paused as a whole and unpaused; the home screen counts the pause
   await asked(page);
   const again = await lines(page);
   const head = again.locator('.line-list-chapter').filter({ hasText: 'Main line' });
-  await head.getByRole('button', { name: 'Main line: more' }).click();
+  await head.getByRole('button', { name: 'Chapter menu' }).click();
   await again.getByRole('button', { name: 'Unpause all lines' }).click();
   await expect(head).not.toContainText('paused');
   await sync(page);
@@ -122,5 +128,60 @@ test('a chapter paused as a whole and unpaused; the home screen counts the pause
     ['l|Rep0Najd|Ch1Najdf|e4 c5 Nf3 Nc6 d4', 'paused'],
     ['l|Rep0Najd|Ch1Najdf|e4 c5 Nf3 d6 d4 cxd4', 'none'],
     ['l|Rep0Najd|Ch1Najdf|e4 c5 Nf3 Nc6 d4', 'none'],
+  ]);
+});
+
+const at = (sans: string[]) => {
+  const pos = Chess.default();
+  for (const s of sans) pos.play(parseSan(pos, s)!);
+  return pos;
+};
+const fourFields = (sans: string[]) => makeFen(at(sans).toSetup()).split(' ').slice(0, 4).join(' ');
+const games = (sans: string[], san: string, n: number) => ({ san, uci: makeUci(parseSan(at(sans), san)!), white: n / 2, draws: 0, black: n / 2 });
+
+test('a study prioritized: ranked from the explorer, two lines kept, the third paused, then added back', async ({ page }) => {
+  const { git, github } = world();
+  await page.clock.install({ time: DAY });
+  await serveGithub(page, github);
+  const ex = fakeExplorer();
+  ex.games.set(fourFields([]), [games([], 'e4', 600), games([], 'd4', 400)]);
+  ex.games.set(fourFields(['e4', 'c5']), [games(['e4', 'c5'], 'Nf3', 700), games(['e4', 'c5'], 'c3', 300)]);
+  await serveExplorer(page, ex);
+  await lichessLogin(page);
+  await page.goto(`${site.url}#setup?repo=${encodeURIComponent(REPO)}&token=${TOKEN}&name=desktop`);
+  await expect(page.locator('.chip')).toHaveText(/^synced/);
+
+  await page.goto(`${site.url}#/train/Rep0Najd`);
+  await asked(page);
+  const list = await lines(page);
+  await list.getByRole('group', { name: 'Priority' }).getByRole('button', { name: 'Prioritize…' }).click();
+  const dialog = page.getByRole('dialog', { name: /Prioritize: Test repertoire/ });
+  await dialog.getByRole('button', { name: 'Rank 3 lines' }).click();
+  const rows = dialog.locator('.priority-table tbody tr');
+  await expect(rows).toHaveCount(3);
+  // 2. Nf3's two lines first (each 70%: Black's two answers there each keep the full reach), then the Alapin.
+  await expect(rows.nth(0)).toContainText('Main line · Line 1');
+  await expect(rows.nth(1)).toContainText('Main line · Line 2');
+  await expect(rows.nth(2)).toContainText('Alapin · Line 1');
+  await expect(rows.nth(2)).toContainText('30%');
+  await expect(dialog.locator('.priority-gaps')).toContainText('1. d4');
+  await expect(dialog.getByRole('button', { name: 'Nothing to change' })).toBeDisabled();
+
+  await dialog.getByRole('slider', { name: 'Lines to keep' }).fill('2');
+  await expect(dialog.locator('.priority-count')).toContainText('Lines to keep: 2 · 82% of your games here');
+  await expect(rows.nth(2)).toContainText('→ paused');
+  await dialog.getByRole('button', { name: 'Apply: pause 1' }).click();
+  await expect(dialog).toContainText('Applied: 1 line changed');
+  await dialog.getByRole('button', { name: 'Done' }).click();
+  await expect(dialog).toHaveCount(0);
+
+  const bar = (await lines(page)).getByRole('group', { name: 'Priority' });
+  await expect(bar).toContainText('1 paused');
+  await bar.getByRole('button', { name: 'Add the next 10' }).click();
+  await expect(bar).not.toContainText('paused');
+  await sync(page);
+  expect(pushed(git).map((e) => [e['k'], e['card'], e['mark']])).toEqual([
+    ['line', ALAPIN, 'paused'],
+    ['line', ALAPIN, 'none'],
   ]);
 });

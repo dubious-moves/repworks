@@ -3648,3 +3648,110 @@ a.button.disabled {
   font-size: 0.8em;
   font-weight: normal;
 }
+
+.line-list-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px 8px;
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  border-bottom: 1px solid rgb(255 255 255 / 8%);
+}
+
+.line-list-bar button {
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: 0.8rem;
+}
+
+.priority-dialog {
+  width: min(760px, calc(100vw - 32px));
+}
+
+.priority-row,
+.priority-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+
+.priority-filter {
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 6px;
+  padding: 8px 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.chip-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.85rem;
+}
+
+.priority-count {
+  display: grid;
+  gap: 6px;
+}
+
+.priority-count input[type='range'] {
+  width: 100%;
+}
+
+.priority-scoring progress {
+  width: 100%;
+}
+
+.priority-table-wrap {
+  max-height: 45dvh;
+  overflow: auto;
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 6px;
+}
+
+.priority-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.priority-table th,
+.priority-table td {
+  padding: 4px 8px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid rgb(255 255 255 / 6%);
+}
+
+.priority-table th {
+  position: sticky;
+  top: 0;
+  background: #1a1a1a;
+}
+
+.priority-table tr.dropped td {
+  opacity: 0.55;
+}
+
+.priority-moves {
+  display: block;
+  font-size: 0.8rem;
+}
+
+.priority-will {
+  color: #e0b84a;
+  white-space: nowrap;
+}
+
+.priority-gaps h3 {
+  font-size: 0.95rem;
+  margin: 8px 0 4px;
+}
+
+.priority-gaps ul {
+  margin: 0;
+  padding-left: 18px;
+}

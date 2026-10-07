@@ -5,6 +5,19 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## Prioritize a study, and paused lines (§5.70)
+
+- Desktop, with the Lichess login: on the training screen of a real study, the line list's
+  Prioritize…, then Rank. Is the order sensible? Compare it with `prioritize_repertoire.py` for the
+  same study and filters (the order differs on purpose where moves are natural: untick "Natural
+  moves count less" to rank by likelihood alone). How long did a first run take, and a second (from
+  the cache)?
+- Apply with the number you want; then on the phone after a sync: the ⏸ lines, the home card's
+  "· N paused", and today's new moves only from active lines.
+- A paused line picked from the list: practised, nothing recorded; Unpause from there.
+- "Add the next 10" once the active lines are learned; and a line's ⋯ (right-click on the desktop)
+  with Pause and Must learn.
+
 ## The practice game's review reworked (§5.57, 2026-10-07)
 
 - Desktop, then phone: a practice game's review (end one, or reopen one from Games' history). The
