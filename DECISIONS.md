@@ -1332,3 +1332,9 @@ The technical calls, each with its reason:
   retry. The commit goes through REST's tree, commit and fast-forward-only ref update from the same
   parent, so a GraphQL commit that landed after all refuses it as stale and the next pull adopts
   the first; a blob query that failed is read through REST. GraphQL stays the default write.
+
+## Revision of 2026-10-07 (Quiz from here, Practise from here, Collect all)
+- **"Play from here" is "Quiz from here"** (the owner's naming): "Play" read as a game against the
+  database or an engine; the view asks the line's moves. "Practise from here" is the game.
+- **Collect has an all-at-once button.** The 100-shard bound was a phone-driven default, not a
+  desktop limit; both buttons are on both devices, the plain one still the cautious default.

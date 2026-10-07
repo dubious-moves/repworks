@@ -11,7 +11,7 @@ fixes them and updates this file.
   the list of moves under it; ↑ ↓ choose, → ▶ or Enter go on, a tap on a move goes along it, ← or
   Escape close it. On the phone, does the list sit where you'd look (under the move, or above it
   when there's no room)?
-- "Read from here" and "Play from here" are only in the move menu now (right-click, long-press, or
+- "Read from here" and "Play from here" (now "Quiz from here") are only in the move menu now (right-click, long-press, or
   ⋯): the panel has their room back.
 - The explorer stuck on "Asking…": fixed where it was found (the panel's request shared with the
   Practical search of the move before, and dropped with it when the board moved on), and a request
@@ -195,6 +195,10 @@ explorer's Eval column too far from the move (§5.67).
   downloaded, the time, how many puzzles), then on the phone over Wi-Fi; the dataset read
   cross-origin from the deployed site (D12); puzzles in a real storm and set at 25%: whether the
   disguise holds, whether the puzzles feel related to your lines, the share that feels right.
+- §5.68: "Collect all" on the storm's Puzzles card on the desktop (a repertoire with more than 100
+  index files left): it runs through, Stop ends it, a reload keeps what was read, and it goes on
+  while you look at another screen; "Practise from here" in a study's move menu starts a game as the
+  chapter's side from that position.
 - §5.49: Phase 4's acceptance test (desktop and Android phone), then a week of daily storms.
 
 ## Phase 5

@@ -223,9 +223,9 @@ function PuzzlesCard(props: { scope: StormScopeData }) {
       if (prefs.share > 0 && now && !now.running && now.candidates > now.ready && now.ready < WORKING_SET) void fillBodies(scope).then(() => refreshPuzzles(scope));
     });
   }, [scope, prefs.share, prefs.base]);
-  useEffect(() => stopPuzzles, []);
   const shards = Math.min(st?.shardsLeft ?? 0, SHARDS_PER_COLLECT);
   const mb = Math.round(shards * SHARD_MB);
+  const allMb = Math.round((st?.shardsLeft ?? 0) * SHARD_MB);
   return (
     <section class="card storm-puzzles" aria-label="Puzzles">
       <h2>Puzzles</h2>
@@ -241,9 +241,16 @@ function PuzzlesCard(props: { scope: StormScopeData }) {
             Stop
           </button>
         ) : armed ? (
-          <button type="button" onClick={() => (setArmed(false), void collect(scope))}>
-            Collect: about {mb} MB
-          </button>
+          <>
+            <button type="button" onClick={() => (setArmed(false), void collect(scope))}>
+              Collect: about {mb} MB
+            </button>
+            {(st?.shardsLeft ?? 0) > shards && (
+              <button type="button" class="secondary" onClick={() => (setArmed(false), void collect(scope, true))}>
+                Collect all: about {allMb} MB
+              </button>
+            )}
+          </>
         ) : (
           <button type="button" class="secondary" disabled={!st || st.shardsLeft === 0} onClick={() => setArmed(true)}>
             {st && st.shardsLeft === 0 && st.anchors > 0 ? 'Collected' : 'Collect puzzles…'}
@@ -263,6 +270,7 @@ function PuzzlesCard(props: { scope: StormScopeData }) {
       {armed && !st?.running && (
         <p class="muted" role="status">
           Reads {shards} of the dataset’s index files ({st?.shardsLeft ?? 0} left in all) for the positions 12 to 24 plies into your lines, deepest first, then fetches {WORKING_SET} puzzles. Best on Wi-Fi.
+          {(st?.shardsLeft ?? 0) > shards && ' Collect all goes on until every file is read or you press Stop, with the page open; what it has read is kept.'}
         </p>
       )}
       {st?.note && (

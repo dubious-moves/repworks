@@ -219,7 +219,7 @@ test('train ↔ study from the chapter view: a repertoire study trains, the Inte
   await expect(page).toHaveURL(/#\/train\/Rep0Najd$/);
   await asked(page);
 
-  // Play from here, to the study at the board's move, and Train: played again from that move.
+  // Quiz from here, to the study at the board's move, and Train: played again from that move.
   await page.goto(`${site.url}#/play/Rep0Najd/Ch2Alapn?at=e4`);
   await asked(page);
   await page.getByRole('group', { name: 'Study or train' }).getByRole('button', { name: 'Study' }).click();

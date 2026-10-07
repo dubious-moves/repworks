@@ -81,7 +81,7 @@ test('play: every own move asked, a wrong move taken back, the other line follow
   const git = await setUp(page);
   const before = ownProgress(git).map((p) => git.textsOf().get(p));
   await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf`);
-  await fromMenu(page, 'Play from here');
+  await fromMenu(page, 'Quiz from here');
   await expect(page).toHaveURL(/#\/play\/Rep0Najd\/Ch1Najdf$/);
   await expect(page.locator('.study-title')).toHaveText('Play · Main line');
   await expect(page.locator('.cg-wrap')).toHaveClass(/orientation-black/);
@@ -114,14 +114,14 @@ test('play: every own move asked, a wrong move taken back, the other line follow
   await expect(page).toHaveURL(/#\/study\/Rep0Najd\/Ch1Najdf\?at=e4,c5,Nf3,Nc6,d4$/);
 });
 
-test('play from the move menu, from the move shown; read the line from the end', async ({ page, isMobile }) => {
+test('quiz from the move menu, from the move shown; read the line from the end', async ({ page, isMobile }) => {
   await setUp(page);
   await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf?at=e4,c5,Nf3`);
   await expect(page.locator('.move.current')).toHaveText('Nf3');
   const nf3 = page.locator('.move[data-path="e4 c5 Nf3"]');
   if (isMobile) await page.getByRole('button', { name: 'Move menu' }).click();
   else await nf3.click({ button: 'right' });
-  await page.getByRole('menuitem', { name: 'Play from here' }).click();
+  await page.getByRole('menuitem', { name: 'Quiz from here' }).click();
   await expect(page).toHaveURL(/#\/play\/Rep0Najd\/Ch1Najdf\?at=e4,c5,Nf3$/);
   const feedback = page.locator('.train-feedback');
   await asked(page);
@@ -135,7 +135,7 @@ test('play from the move menu, from the move shown; read the line from the end',
   await expect(page.getByRole('region', { name: 'Session done' })).toContainText('2 moves, 1 right first time');
   await page.getByRole('button', { name: 'Read the line' }).click();
   await expect(page.locator('.read-move')).toContainText('2. Nf3');
-  await page.getByRole('button', { name: 'Play from here' }).click();
+  await page.getByRole('button', { name: 'Quiz from here' }).click();
   await expect(page).toHaveURL(/#\/play\/Rep0Najd\/Ch1Najdf\?at=e4,c5,Nf3$/);
 });
 

@@ -2310,6 +2310,21 @@ desktop checks beside it.
 - Not changed: "New move found: Nd5" replaced at once by the next prompt (Claude in Chrome's note):
   the quieter feedback line (§5.17) shows only what asks something of the user.
 
+#### 5.68 The owner's notes of 2026-10-07 (later): Quiz from here, Practise from here, Collect all
+
+- **"Play from here" is now "Quiz from here"** (the move menu and Read): it opens the Interactive
+  view, which asks the line's own moves and plays against nothing; "Play" suggested a game.
+- **"Practise from here" in the study's move menu**: a practice game (§5.57) from the position after
+  the move, as the chapter's side (its Orientation), against the database, then Maia, then
+  Stockfish, with the repertoire check and the review. Reference studies have it too.
+- **Collect all** beside "Collect: about n MB" on the storm's Puzzles card, when more index files are
+  left than one press reads (100): reads every one left, deepest anchors first, saved shard by shard,
+  Stop ends it, and it keeps going while the app is open on another screen (the card no longer
+  stops a collect when it is left). The 100-shard bound stays on the plain button, for the phone.
+  A page closed ends it; it can't run without the page. Tests: the move menu's items in
+  `editor.spec.ts`, `views.spec.ts` (Quiz); Collect all itself isn't driven (the fake dataset's
+  anchors fall in fewer than 100 shards): TESTING.md.
+
 #### 5.14 Phase 1 acceptance test, and exit
 
 **Acceptance test (live, desktop + Android phone)**, after Phase 0's (§4.11) and once §5.15 is

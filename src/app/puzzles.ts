@@ -122,9 +122,10 @@ export function stopPuzzles(): void {
 
 /**
  * Reads up to `SHARDS_PER_COLLECT` index shards for the scope's anchors not read yet (the deepest
- * first), keeping the entries `selectEntries` picks; then fills the working set of bodies.
+ * first), or all of them when `all`, keeping the entries `selectEntries` picks; then fills the
+ * working set of bodies.
  */
-export async function collect(s: StormScopeData): Promise<void> {
+export async function collect(s: StormScopeData, all = false): Promise<void> {
   if (puzzleState.value?.running) return;
   stop = false;
   await refreshPuzzles(s, { running: true, note: 'Reading the dataset…', error: undefined });
@@ -142,7 +143,7 @@ export async function collect(s: StormScopeData): Promise<void> {
       const sh = shardOf(a.key);
       const list = byShard.get(sh);
       if (list) list.push(a);
-      else if (byShard.size < SHARDS_PER_COLLECT) byShard.set(sh, [a]);
+      else if (all || byShard.size < SHARDS_PER_COLLECT) byShard.set(sh, [a]);
     }
     const held = new Set((await stormStore().all<PuzzleCandidate>('puzzleCandidates')).map((c) => c.id));
     let read = 0;

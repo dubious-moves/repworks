@@ -113,7 +113,15 @@ export function MoveMenu() {
     if (trainData.value?.chapters.has(`${s.sid}/${s.cid}`)) items.push({ label: 'Storm from here', run: () => open({ name: 'storm', sid: s.sid, cid: s.cid, at: [...m.path] }) });
     // Qchess's two training views of the line through this move (§5.10).
     items.push({ label: 'Read from here', run: () => open({ name: 'read', sid: s.sid, cid: s.cid, at: [...m.path] }) });
-    items.push({ label: 'Play from here', run: () => open({ name: 'play', sid: s.sid, cid: s.cid, at: [...m.path] }) });
+    items.push({ label: 'Quiz from here', run: () => open({ name: 'play', sid: s.sid, cid: s.cid, at: [...m.path] }) });
+    // A game from this position against the database, Maia and Stockfish, as the chapter's side (§5.57).
+    items.push({
+      label: 'Practise from here',
+      run: () => {
+        const pos = positionAt(c, m.path);
+        if (pos) open({ name: 'playOn', fen: makeFen(pos.toSetup()), side: side.peek() });
+      },
+    });
     // A plan card for this position (§5.61): its content is the comments there, read live.
     const pos = positionAt(c, m.path);
     const node = nodeAt(c, m.path);

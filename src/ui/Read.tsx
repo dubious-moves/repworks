@@ -1,6 +1,6 @@
 // The Read view (PLAN.md §5.10), after Qchess's: a chapter's line through a move, to the end of
 // the main line below it, stepped through with ← and →. The board with the study's arrows, the
-// move and its comments in large text; no editing. "Play from here" opens the Interactive view
+// move and its comments in large text; no editing. "Quiz from here" opens the Interactive view
 // at the move shown; Escape or "Edit" goes back to the chapter at it.
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { makeFen } from 'chessops/fen';
@@ -204,7 +204,7 @@ export function ReadView(props: { sid: string; cid: string; at: string[]; from?:
           </p>
           <div class="actions">
             <button type="button" onClick={() => open({ name: 'play', sid, cid, at: props.at, from: shown })}>
-              Play from here
+              Quiz from here
             </button>
             <button type="button" class="secondary" onClick={toChapter}>
               Edit
