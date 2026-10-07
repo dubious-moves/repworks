@@ -1318,3 +1318,9 @@ The technical calls, each with its reason:
 - **The explorer filters the Games list** while it is off the start, practice games included (they are
   in the list too); the colour filter is the list's.
 
+## Revision of 2026-10-07 (Hide time trouble; §6 built)
+- **"Hide time trouble" leaves the mistakes out of the game cards too**, not only the list's counts, as
+  mistake-lab's filter does (its queue is its filtered list); the cards come back when it is off.
+- **§6's list of what was left of mistake-lab is built**: mistake-lab can retire once the owner's
+  checks pass (§5.65), its analyzer staying until §5.66's answer (D8).
+

@@ -2,7 +2,9 @@
 // of §5.55 (mistake-lab's rules).
 //
 // Controls re-run on this port (2026-10-07), each failing exactly the named assertions:
-// - a snapshot taken after a review → "a snapshot: taken by a card never reviewed, ignored after a review".
+// - a snapshot taken after a review → "a snapshot: taken by a card never reviewed, ignored after a review";
+// - "Hide time trouble" leaving out every item flagged, a tactic's or an advantage's flag included
+//   (mistake-lab's filter is on mistakes only) → "Hide time trouble: …".
 // (A relapse applied twice for one game fails nothing: the second one's game is never after the
 // last review, which the first just set, so the guard holds it; the once-per-game rule stays for
 // events that disagree on the game's time.)
@@ -12,7 +14,10 @@ import { formatEvent, parseLog, type KnownEvent } from '../../../../src/core/pro
 import { Replay, toDeviceEvents, type DeviceEvent } from '../../../../src/core/progress/replay.ts';
 import { gameCard, planCard } from '../../../../src/core/progress/cards.ts';
 import type { PositionKey } from '../../../../src/core/chess/positionKey.ts';
-import { deckOf, dropsOf, gameQueue, lineFingerprint } from '../../../../src/core/games/deck.ts';
+import { deckOf, dropsOf, gameQueue, lineFingerprint, withoutTimeTrouble } from '../../../../src/core/games/deck.ts';
+import { readFileSync } from 'node:fs';
+import { readGamesFile } from '../../../../src/core/games/record.ts';
+import { extractGame } from '../../../../src/core/games/extract.ts';
 import type { GameItem, MistakeItem, TacticItem } from '../../../../src/core/games/extract.ts';
 import { classifyWpDrop, judgeMove, mistakeGrade, tacticGrade } from '../../../../src/core/games/grade.ts';
 
@@ -182,4 +187,16 @@ test('a move judged from the lines, or from the position after it; great and mis
   assert.equal(miss.classification, 'miss');
   // A mate delivered that the lines missed is the best.
   assert.equal(judgeMove(lines, 'h5f7', 10000)!.classification, 'best');
+});
+
+test('Hide time trouble: the mistakes flagged left out, as mistake-lab’s applyFilters; tactics and advantages kept', () => {
+  const file = JSON.parse(readFileSync(new URL('../../../fixtures/games/analyzed_games.json', import.meta.url), 'utf8')) as unknown;
+  const items = readGamesFile(file).games.flatMap((g) => extractGame(g).items);
+  const flagged = items.filter((i) => i.kind === 'mistake' && i.timeTrouble);
+  assert.ok(flagged.length > 0, 'the fixture games have mistakes made in time trouble');
+  assert.equal(withoutTimeTrouble(items, false), items);
+  assert.deepEqual(withoutTimeTrouble(items, true), items.filter((i) => !flagged.includes(i)));
+  // Only a mistake's flag counts (an item of another kind carrying one is kept).
+  const odd = [{ kind: 'tactic', timeTrouble: true }, { kind: 'advantage', timeTrouble: true }, { kind: 'mistake', timeTrouble: true }, { kind: 'mistake', timeTrouble: false }];
+  assert.deepEqual(withoutTimeTrouble(odd, true).map((i) => i.kind), ['tactic', 'advantage', 'mistake']);
 });

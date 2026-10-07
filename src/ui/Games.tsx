@@ -20,7 +20,7 @@ import { closeLine, continueSession, dropCard, dropLine, endGameSession, gameSes
 import { lineFen, lineScore, moveAt, type EngineLine } from '../core/games/engineLine.ts';
 import { plansInDeck, setPlanCard } from '../app/plans.ts';
 import { cpFor, type GameItem } from '../core/games/extract.ts';
-import { dropsOf } from '../core/games/deck.ts';
+import { dropsOf, withoutTimeTrouble } from '../core/games/deck.ts';
 import { CLASSIFICATION } from '../core/games/grade.ts';
 import { replay } from '../core/games/positions.ts';
 import { resultFor, type GameRecord } from '../core/games/record.ts';
@@ -162,6 +162,9 @@ function Home() {
               <input type="checkbox" checked={f.speed.includes(sp)} onChange={(e) => filter({ speed: (e.target as HTMLInputElement).checked ? [...f.speed, sp] : f.speed.filter((x) => x !== sp) })} /> {sp}
             </label>
           ))}
+          <label class="chip" title="Leave out the mistakes made with under 45 s left and under 10 s spent: in the counts and in the game cards">
+            <input type="checkbox" checked={f.hideTimeTrouble} onChange={(e) => filter({ hideTimeTrouble: (e.target as HTMLInputElement).checked })} /> Hide time trouble ⏱
+          </label>
         </div>
         {rows && rows.length === 0 && <p class="muted">No games on this device yet: set up a source above, then Refresh.</p>}
         <ul class="games-list">
@@ -218,7 +221,7 @@ function GameRowView(props: { row: GameRow; cards: number }) {
   const g = props.row.game;
   const opp = opponentOf(g);
   const counts = { mistake: 0, tactic: 0, advantage: 0 };
-  for (const it of props.row.items) counts[it.kind]++;
+  for (const it of withoutTimeTrouble(props.row.items, gamesPrefs.value.filters.hideTimeTrouble)) counts[it.kind]++;
   const result = resultFor(g);
   return (
     <li class={`games-row result-${result}`}>
@@ -443,7 +446,13 @@ function GameView(props: { id: string; ply?: number }) {
                 <button type="button" class="link" onClick={() => setPly(it.ply - 1)}>
                   {KIND_WORD[it.kind]} at move {Math.ceil(it.ply / 2)}
                   {it.kind === 'mistake' ? ` (${it.san}, −${it.wpDrop}%)` : it.kind === 'advantage' ? ` (+${(it.peakCp / 100).toFixed(1)})` : ''}
-                </button>{' '}
+                </button>
+                {it.kind === 'mistake' && it.timeTrouble && (
+                  <span class="muted" title="Time trouble: under 45 s left and under 10 s spent">
+                    {' '}
+                    ⏱
+                  </span>
+                )}{' '}
                 <button type="button" class="link" onClick={() => void recordEvent({ t: new Date().toISOString(), k: 'drop', card, on: !dropped })}>
                   {dropped ? 'Put back' : 'Drop'}
                 </button>
@@ -663,6 +672,7 @@ function Card(props: { s: GameSession; r: CardRun }) {
         <p class="train-counters">
           {s.index + 1} of {s.cards.length} · {KIND_WORD[item.kind]}
           {game ? ` · ${game.speed} against ${opponentOf(game).name}` : ` · ${openingNameOf(item.fenBefore) || 'from practice'}`}
+          {item.kind === 'mistake' && item.timeTrouble && <span title="Time trouble: under 45 s left and under 10 s spent"> · ⏱ time trouble</span>}
           <RecidBadge pid={item.pid} />
         </p>
         <p class="train-line">

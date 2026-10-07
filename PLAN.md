@@ -7,7 +7,7 @@ where the build differed). What remains is live: the spike's re-run (§4.2), the
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
 with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
-for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.55, with the migration (§5.64) built ahead; where the analyzer's output lives waits for the owner's answer (§5.66). Read with `DECISIONS.md`, which this plan updates (its
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -4643,6 +4643,19 @@ code** on `test/fixtures/games/openings.json` (`mistake-lab-openings.cjs`; nine 
 transposition, a game from a position, one cut by an illegal move, an en passant, an empty one; two
 controls), and `test/e2e/games.spec.ts` (desktop and phone: the rows, the list filtered, Back, the
 name, a practice game titled by it).
+
+**As built, item 5** (2026-10-07): "Hide time trouble ⏱" in the Games filters (the setting already
+kept on the device): on, the mistakes made in time trouble (under 45 s left and under 10 s spent,
+§5.52) are left out of the games' counts and of the game cards (`withoutTimeTrouble` in
+`src/core/games/deck.ts`, mistake-lab's `applyFilters` rule: mistakes only, tactics and advantages
+kept); the mark ⏱ on such a mistake in a game's items and on its card in the session. Tests:
+`test/unit/core/games/deck.test.ts` (on the fixture games; one control), `test/e2e/games.spec.ts`
+(desktop and phone: the mark, the counts and the queue with it on and off, kept on the device).
+
+**§6's list is built** (2026-10-07): with it, nothing of mistake-lab is left that doesn't wait for
+the owner (§5.65's acceptance test, §5.66's answer). Left out on purpose and said in each item: the
+engine line started by moving an opponent's piece and its Copy as PGN (item 1), practice deviations
+added to the Repertoire check (item 2).
 
 Side tasks, outside this repo:
 - **Chessable courses**: the owner's own export script (D14). Its PGN imports like any other

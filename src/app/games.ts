@@ -5,7 +5,7 @@
 // (trainData), so a review recorded here is a progress event like any other.
 import { computed, effect, signal } from '@preact/signals';
 import { readChesscomGame } from '../core/games/chesscom.ts';
-import { deckOf, gameQueue, type DeckCard } from '../core/games/deck.ts';
+import { deckOf, gameQueue, withoutTimeTrouble, type DeckCard } from '../core/games/deck.ts';
 import { extractGame, type GameItem } from '../core/games/extract.ts';
 import { savedItems, type SavedItem } from '../core/games/saved.ts';
 import { historyOf, type HistoryEntry } from '../core/games/practice.ts';
@@ -197,7 +197,7 @@ export const gameDeck = computed<DeckCard[]>(() => {
   const eventsOf = data ? data.eventsOf : () => [];
   return [
     ...deckOf(
-      rows.map((r) => r.items),
+      rows.map((r) => withoutTimeTrouble(r.items, gamesPrefs.value.filters.hideTimeTrouble)),
       savedDeck.value,
       eventsOf,
     ),

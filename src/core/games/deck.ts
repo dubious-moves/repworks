@@ -38,6 +38,14 @@ export interface DeckCard {
   item: GameItem | PlanItem;
 }
 
+/**
+ * "Hide time trouble" (§6, item 5; mistake-lab's `hideTimeTrouble` in `applyFilters`): the
+ * mistakes made in time trouble left out of the list and the deck, tactics and advantages kept.
+ */
+export function withoutTimeTrouble<I extends { kind: string; timeTrouble?: boolean }>(items: readonly I[], hide: boolean): readonly I[] {
+  return hide ? items.filter((i) => !(i.kind === 'mistake' && i.timeTrouble)) : items;
+}
+
 /** The deck: the games' items as mistake-lab shows them, less the dropped, with saved items. */
 export function deckOf(itemsByGame: Iterable<readonly GameItem[]>, saved: readonly GameItem[], eventsOf: (card: string) => readonly DeviceEvent[]): DeckCard[] {
   const out: DeckCard[] = [];

@@ -224,6 +224,8 @@ couldn't be tested then (the day's limit was used up), so the training items bel
 - §6 item 4 (desktop, then phone): Games → Explorer on the real games beside mistake-lab's Opening
   explorer: the moves and results at a few positions, the list filtered, the opening names; how long
   the first opening takes on the phone; a practice game from there titled by the opening.
+- §6 item 5 (desktop): Games → "Hide time trouble ⏱": the counts beside mistake-lab's with its own
+  "Hide time trouble" on; the game cards' queue with it on.
 - §5.66: the owner's answer on where the analyzer's output lives (PLAN.md, Phase 5, "The owner's
   choice"): (a) the data repo through a converter, recommended, or (b) the Gist, read-only.
 

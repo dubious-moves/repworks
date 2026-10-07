@@ -7,7 +7,8 @@
 // the right move at a press and hidden; after the blunder at once, at the reply, stepped, extended
 // past its end, branched by a move on the board, and stepped back before the move to try again.
 // The games' own explorer (§6, item 4): the games by position, filtering the list, and the opening
-// name titling a practice game from there. Then (§5.56) a mistake made into a sequence on the analysis
+// name titling a practice game from there. "Hide time trouble" (§6, item 5): the queen's gambit
+// game's mistake was made with 40 s left after 5 s spent. Then (§5.56) a mistake made into a sequence on the analysis
 // board, checked against the fake engine's lines, saved in the mistake's place and drilled.
 import { test, expect, type Page } from '@playwright/test';
 import { Chess } from 'chessops/chess';
@@ -75,7 +76,7 @@ const GAMES = {
   usernames: ['me'],
   games: [
     { id: 'GameOne1', rated: true, speed: 'blitz', createdAt: 1_790_000_000_000, status: 'resign', winner: 'black', players, opening: { name: 'Blackburne Shilling Gambit' }, moves: G1.join(' '), analysis: cps(20, 30, 20, 30, 25, 40, -600, -650), clocks: [180, 180, 178, 178, 175, 176, 170, 172], _clocksStamped: true },
-    { id: 'GameTwo2', rated: true, speed: 'rapid', createdAt: 1_790_000_100_000, status: 'resign', winner: 'black', players, opening: { name: 'Queen’s Gambit Declined' }, moves: G2.join(' '), analysis: cps(20, 30, 20, 30, 25, 30, -250, -240, -250, -240) },
+    { id: 'GameTwo2', rated: true, speed: 'rapid', createdAt: 1_790_000_100_000, status: 'resign', winner: 'black', players, opening: { name: 'Queen’s Gambit Declined' }, moves: G2.join(' '), analysis: cps(20, 30, 20, 30, 25, 30, -250, -240, -250, -240), clocks: [60, 60, 55, 55, 45, 50, 40, 48, 35, 45], _clocksStamped: true },
     {
       id: 'GameTri3',
       rated: true,
@@ -317,4 +318,28 @@ test('the games’ own explorer: moves and results by position, the list filtere
   await page.goBack();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);
+});
+
+test('Hide time trouble: the mistake marked, then left out of the counts and the game cards, kept on the device (§6)', async ({ page }) => {
+  await setUp(page);
+  await page.getByRole('link', { name: 'Games' }).click();
+  await page.getByRole('button', { name: 'Refresh' }).click();
+  await expect(page.getByTestId('games-queue')).toContainText('0 due · 3 new today');
+  const qgd = page.getByTestId('game-row').filter({ hasText: 'Queen’s Gambit Declined' });
+  await expect(qgd).toContainText('1✗');
+  await qgd.click();
+  await expect(page.getByTestId('game-item')).toContainText('⏱');
+  await page.locator('.back').click();
+  const chip = page.locator('label.chip', { hasText: 'Hide time trouble' }).locator('input');
+  await chip.check();
+  await expect(page.getByTestId('games-queue')).toContainText('0 due · 2 new today');
+  await expect(qgd).toContainText('—');
+  // Kept (the setting is this device's; the test's start script writes the settings on every load, so no reload here).
+  await page.evaluate(() => (location.hash = '#/'));
+  await page.getByRole('link', { name: 'Games' }).click();
+  await expect(chip).toBeChecked();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('repworks-games') ?? '{}').filters?.hideTimeTrouble)).toBe(true);
+  await expect(page.getByTestId('games-queue')).toContainText('0 due · 2 new today');
+  await chip.uncheck();
+  await expect(page.getByTestId('games-queue')).toContainText('0 due · 3 new today');
 });
