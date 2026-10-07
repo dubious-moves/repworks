@@ -4377,6 +4377,19 @@ Playwright: enrol, review, remove.
 
 Live: (phone) a plan card reviewed.
 
+**As built** (2026-10-07): `src/core/games/plans.ts` (`planEnrolments`, `planNotes`: the comments and
+shapes of every node of every study that reaches the position, a chapter's start included, so the
+migration's "Notes" study counts; `planDeck`), `src/app/plans.ts` (the notes read from the working
+copies whenever the data or the enrolments change), the move menu's "Make a plan card" (on a move
+or start with a comment or a shape) and "Remove the plan card", and the card in the game cards'
+session: the board turned to the card's side, Show plan (the comments, the shapes on the board),
+then Again/Hard/Good/Easy; Skip is Again, as mistake-lab's; Open the chapter; Remove the card. The
+comments are shown as text (their lines not clickable here). Plan cards are new cards like the
+others, so the daily limit of new game cards counts them; mistake-lab had no limit for them. "N plan
+cards need content" on the Games screen counts those whose position has no comment. Tests:
+`test/unit/core/games/plans.test.ts` (two controls), `test/e2e/plans.spec.ts` (desktop and phone:
+enrol, review, remove, synced).
+
 #### 5.62 The variation checklist
 
 - `checklist.ts`, a port of `generateTodoVariations`: the repertoire study's covered tree scored by

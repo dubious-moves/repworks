@@ -189,6 +189,10 @@ couldn't be tested then (the day's limit was used up), so the training items bel
   a move added there, Dismiss (and on the other device after a sync); the weak spots in both lenses;
   the "↻ Transfer" line on the Games screen beside mistake-lab's, and whether the reschedules on
   relapse look right (the cards it makes due).
+- §5.61 (phone): a plan card made from a commented move (the move menu: Make a plan card), then
+  reviewed with the game cards on the phone after a sync: the board, Show plan, the grade; whether
+  the comments read well as a plan's back, and whether plan cards should count against the daily
+  limit of new game cards (they do now).
 - §5.64 (desktop): Games → Set up → "Move mistake-lab's progress here": the gist, Dry run (a
   token only if the gist won't read without one; it isn't kept), and read the report: the cards'
   counts against mistake-lab, the re-made keys, what is left behind. If it looks right, Run, then

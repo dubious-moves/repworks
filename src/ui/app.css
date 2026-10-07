@@ -3144,3 +3144,12 @@ a.button.disabled {
 .recid-dim {
   opacity: 0.6;
 }
+
+/* Plan cards (§5.61). */
+.plan-notes p {
+  white-space: pre-wrap;
+  margin: 0 0 8px;
+}
+.grade-row {
+  margin: 8px 0;
+}

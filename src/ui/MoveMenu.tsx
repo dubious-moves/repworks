@@ -4,7 +4,9 @@
 // for the notation.
 import { signal } from '@preact/signals';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { chapter, doc, edit, feedback, goTo, SCRATCH, study } from '../app/editor.ts';
+import { chapter, doc, edit, feedback, goTo, SCRATCH, side, study } from '../app/editor.ts';
+import { planEnrolled, setPlanCard } from '../app/plans.ts';
+import { positionKeyOf } from '../core/chess/positionKey.ts';
 import { makeFen } from 'chessops/fen';
 import { trainData } from '../app/train.ts';
 import { open } from '../app/mode.ts';
@@ -112,6 +114,15 @@ export function MoveMenu() {
     // Qchess's two training views of the line through this move (§5.10).
     items.push({ label: 'Read from here', run: () => open({ name: 'read', sid: s.sid, cid: s.cid, at: [...m.path] }) });
     items.push({ label: 'Play from here', run: () => open({ name: 'play', sid: s.sid, cid: s.cid, at: [...m.path] }) });
+    // A plan card for this position (§5.61): its content is the comments there, read live.
+    const pos = positionAt(c, m.path);
+    const node = nodeAt(c, m.path);
+    if (pos && node) {
+      const key = positionKeyOf(pos);
+      const enrolled = planEnrolled.value.has(key);
+      if (enrolled) items.push({ label: 'Remove the plan card', run: () => setPlanCard(key, side.peek(), false) });
+      else if (node.comments.some((t) => t.trim()) || node.shapes.length) items.push({ label: 'Make a plan card', run: () => (setPlanCard(key, side.peek(), true), (feedback.value = 'Plan card made: it comes up with the game cards')) });
+    }
   }
 
   const onKey = (e: KeyboardEvent) => {

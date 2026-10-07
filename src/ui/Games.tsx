@@ -15,7 +15,8 @@ import { forgetGames, gameById, gameDeck, gameQueueNow, gameRows, gamesPrefs, pr
 import type { HistoryEntry } from '../core/games/practice.ts';
 import { recid } from '../app/repertoireCheck.ts';
 import { badgeOf } from '../core/games/recidivism.ts';
-import { continueSession, dropCard, dropLine, endGameSession, gameSession, hint, hintMove, MAX_TRIES, playMove, revealBest, skipCard, startGameSession, tryAgain, type CardRun, type GameSession } from '../app/gameTrainer.ts';
+import { continueSession, dropCard, dropLine, endGameSession, gameSession, gradePlan, hint, hintMove, MAX_TRIES, playMove, revealBest, showPlan, skipCard, startGameSession, tryAgain, type CardRun, type GameSession } from '../app/gameTrainer.ts';
+import { plansInDeck, setPlanCard } from '../app/plans.ts';
 import { cpFor, type GameItem } from '../core/games/extract.ts';
 import { dropsOf } from '../core/games/deck.ts';
 import { CLASSIFICATION } from '../core/games/grade.ts';
@@ -28,7 +29,7 @@ import { PracticeBoard } from './Practice.tsx';
 import { useWakeLock } from './Train.tsx';
 
 const sq = (u: string, i: number) => u.slice(i, i + 2) as SquareName;
-const KIND_WORD: Record<GameItem['kind'], string> = { mistake: 'Mistake', tactic: 'Tactic', advantage: 'Advantage' };
+const KIND_WORD: Record<GameItem['kind'] | 'plan', string> = { mistake: 'Mistake', tactic: 'Tactic', advantage: 'Advantage', plan: 'Plan' };
 const SPEEDS = ['bullet', 'blitz', 'rapid', 'classical', 'correspondence'];
 
 export function GamesScreen(props: { id?: string; ply?: number; review?: boolean }) {
@@ -105,6 +106,11 @@ function Home() {
           )}
         </p>
         <RecidSummary />
+        {plansInDeck.value.needContent > 0 && (
+          <p class="muted">
+            {plansInDeck.value.needContent} plan card{plansInDeck.value.needContent === 1 ? '' : 's'} need content: no comment at {plansInDeck.value.needContent === 1 ? 'its position' : 'their positions'} any more.
+          </p>
+        )}
         <p>
           <a href="#/repertoire-check">Repertoire check</a> <span class="muted">· deviations, gaps and weak spots from these games</span>
         </p>
@@ -541,6 +547,57 @@ function Card(props: { s: GameSession; r: CardRun }) {
   const { s, r } = props;
   const item = r.card.item;
   const game = gameById.value.get(item.gameId)?.game;
+  if (item.kind === 'plan') {
+    const n = item.note;
+    return (
+      <div class="train-grid game-card plan-card" data-phase={s.phase} data-card={r.card.card} data-kind="plan">
+        <PlayBoard run={r} asking={false} arrows={r.revealed ? n.shapes.map((x) => ({ orig: x.orig, ...(x.dest ? { dest: x.dest } : {}), brush: x.brush })) : []} />
+        <div class="train-panel">
+          <p class="train-counters">
+            {s.index + 1} of {s.cards.length} · Plan
+          </p>
+          <p class="train-line">
+            <strong>Recall the plan</strong>
+          </p>
+          {r.revealed ? (
+            <div class="plan-notes" data-testid="plan-notes">
+              {n.comments.map((c, i) => (
+                <p key={i}>{c}</p>
+              ))}
+            </div>
+          ) : (
+            <div class="actions">
+              <button type="button" onClick={showPlan}>
+                Show plan
+              </button>
+            </div>
+          )}
+          {r.revealed && (
+            <div class="actions grade-row" role="group" aria-label="Grade">
+              {([1, 2, 3, 4] as const).map((g) => (
+                <button key={g} type="button" class={g === 1 ? 'secondary' : ''} onClick={() => gradePlan(g)}>
+                  {GRADE_WORD[g]}
+                </button>
+              ))}
+            </div>
+          )}
+          <div class="actions train-actions">
+            {!r.revealed && (
+              <button type="button" class="secondary" onClick={skipCard}>
+                Skip
+              </button>
+            )}
+            <a class="button secondary" href={`#/study/${n.places[0]!.sid}/${n.places[0]!.cid}${n.places[0]!.path.length ? `?at=${n.places[0]!.path.map(encodeURIComponent).join(',')}` : ''}`}>
+              Open the chapter
+            </a>
+            <button type="button" class="secondary" title="Remove this plan card (the chapter’s move menu enrols it again)" onClick={() => (setPlanCard(item.key, item.color, false), continueSession())}>
+              Remove the card
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
   if (item.kind === 'advantage')
     return (
       <div class="game-card advantage-card" data-phase={s.phase} data-card={r.card.card} data-kind="advantage">

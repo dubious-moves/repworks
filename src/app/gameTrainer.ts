@@ -173,6 +173,8 @@ function nextCard(): void {
         gameSession.value = { ...st, phase: 'right', run: { ...st.run, ...(g ? { graded: g } : {}) } };
       },
     });
+  } else if (item.kind === 'plan') {
+    // Recalled, then shown and graded by the owner (mistake-lab's plan card: no engine, no moves).
   } else if (item.kind === 'tactic') {
     const drops = dropsOf(trainData.value?.eventsOf(card.card) ?? []);
     run.tactic = startTactic(liveLines(item, drops));
@@ -336,6 +338,19 @@ export function skipCard(): void {
 }
 
 export function continueSession(): void {
+  nextCard();
+}
+
+/** A plan card's back: the notes shown, then the owner's own grade (§5.61). */
+export function showPlan(): void {
+  const r = gameSession.value?.run;
+  if (r?.card.item.kind === 'plan') setRun({ revealed: true });
+}
+
+export function gradePlan(g: Grade): void {
+  const r = gameSession.value?.run;
+  if (r?.card.item.kind !== 'plan' || !r.revealed) return;
+  record(r.card.card, g);
   nextCard();
 }
 

@@ -17,6 +17,7 @@ import { openGamesStore, type GamesStore, type StoredGame } from '../platform/ga
 import { gistId, readGist } from '../platform/gist.ts';
 import { userGames } from '../platform/lichessGames.ts';
 import { lichessToken } from './lichess.ts';
+import { plansInDeck, startPlans } from './plans.ts';
 import { decidingNow } from './time.ts';
 import { dayOf, trainData } from './train.ts';
 
@@ -139,6 +140,7 @@ let started = false;
 export function startGames(): void {
   if (started) return;
   started = true;
+  startPlans();
   void readStored();
   let lastIndex: unknown;
   let lastSince: Since | undefined;
@@ -172,11 +174,14 @@ export const gameDeck = computed<DeckCard[]>(() => {
   const data = trainData.value;
   if (!rows) return [];
   const eventsOf = data ? data.eventsOf : () => [];
-  return deckOf(
-    rows.map((r) => r.items),
-    savedDeck.value,
-    eventsOf,
-  );
+  return [
+    ...deckOf(
+      rows.map((r) => r.items),
+      savedDeck.value,
+      eventsOf,
+    ),
+    ...plansInDeck.value.cards,
+  ];
 });
 
 export function gameQueueNow(now: number = decidingNow()) {

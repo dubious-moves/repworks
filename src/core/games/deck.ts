@@ -5,6 +5,7 @@
 import { gameCard, type CardId } from '../progress/cards.ts';
 import type { CardState, DeviceEvent } from '../progress/replay.ts';
 import { shownItems, type GameItem, type TacticItem } from './extract.ts';
+import type { PlanItem } from './plans.ts';
 
 export interface DropState {
   /** The item is out of the deck. */
@@ -34,7 +35,7 @@ export function liveLines(item: TacticItem, drops: DropState): TacticItem['lines
 
 export interface DeckCard {
   card: CardId;
-  item: GameItem;
+  item: GameItem | PlanItem;
 }
 
 /** The deck: the games' items as mistake-lab shows them, less the dropped, with saved items. */
