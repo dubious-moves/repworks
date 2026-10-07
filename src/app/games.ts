@@ -8,6 +8,7 @@ import { readChesscomGame } from '../core/games/chesscom.ts';
 import { deckOf, gameQueue, type DeckCard } from '../core/games/deck.ts';
 import { extractGame, type GameItem } from '../core/games/extract.ts';
 import { savedItems, type SavedItem } from '../core/games/saved.ts';
+import { historyOf, type HistoryEntry } from '../core/games/practice.ts';
 import { readGame, readGamesFile, type GameRecord } from '../core/games/record.ts';
 import type { PositionKey } from '../core/chess/positionKey.ts';
 import type { RepertoireIndex } from '../core/repertoire/index.ts';
@@ -145,6 +146,12 @@ export function startGames(): void {
 export const savedDeck = computed<SavedItem[]>(() => {
   const data = trainData.value;
   return data ? savedItems(data.states.keys(), data.eventsOf) : [];
+});
+
+/** The practice games kept (§5.57), newest first, from their `played` events. */
+export const practiceHistory = computed<HistoryEntry[]>(() => {
+  const data = trainData.value;
+  return data ? historyOf(data.states.keys(), data.eventsOf) : [];
 });
 
 /** The deck: every item shown, less the dropped (§5.53), with the saved items. */

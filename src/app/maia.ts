@@ -197,6 +197,19 @@ export function requestPolicy(fen: string): void {
   );
 }
 
+/**
+ * Maia's policy at `fen` and `elo`, for practice's opponent (§5.57): null when Maia is off, or not
+ * ready within 5 s of starting (mistake-lab waits as long for its model).
+ */
+export async function maiaPolicy(fen: string, elo: number): Promise<MaiaMove[] | null> {
+  if (!maiaPrefs.peek().on) return null;
+  if (!worker && maiaState.peek().kind === 'off') startWorker();
+  for (let waited = 0; maiaState.peek().kind === 'loading' && waited < 5000; waited += 100) await new Promise((r) => setTimeout(r, 100));
+  if (maiaState.peek().kind !== 'ready') return null;
+  const r = await ask<Extract<FromMaia, { type: 'answer' } | { type: 'error' }>>({ type: 'ask', fen, elo });
+  return r.type === 'answer' ? r.policy : null;
+}
+
 /** Qchess's Ms for `sans` at `fen` (those not asked yet). */
 export function requestScores(fen: string, sans: readonly string[]): void {
   if (!maiaPrefs.peek().on || maiaState.peek().kind !== 'ready') return;

@@ -4269,6 +4269,30 @@ reload and on the other device after a sync.
 
 Live: (desktop and phone) a practice game; the opponent's feel against mistake-lab's.
 
+**As built** (2026-10-07): `src/core/games/practice.ts` (`pickExplorerMove`, `maiaPick`,
+`trackAdvantage`, `advantageGrade`, `resultOf`, `reviewOf`, `historyEntry`, `readHistoryEntry`,
+`historyOf`: mistake-lab's defaults, 5 games and 5% of the position's, Maia at 2000 and precision
+0.75, the explorer at 1600–2000 blitz to classical), `src/app/practice.ts` (the game: the explorer
+worker's `practiceGames` at the practice filter with the Lichess login, Maia's policy when Maia is
+on, then Stockfish; each user move judged by the game trainer's Stockfish client in the
+background, at its depth (18, 16 on a narrow screen) rather than mistake-lab's silent depth 22, so
+the phone isn't kept searching; an advantage drill waits for each judge, as mistake-lab's does,
+so a collapse ends it before the opponent answers, and has no hint, as mistake-lab hides it there;
+Claim victory after three moves at +10; the result as a `practice` event at the start's position, the
+grade of an advantage card, the history entry once the judges are in) and `src/ui/Practice.tsx`
+(`#/practice?fen=…[&side=…]`, from a game's move ("Practise from here"), a mistake answered ("Play
+on"), and the analysis board ("Practise"); the review: the result, the accuracy, the graph, the moves
+with their marks, the key moves with Retry, Show the line, Save as a mistake (§5.56) and Make a
+sequence; the opponent's settings kept on the device; `#/games/history/<id>` reopening a review).
+Advantage cards are in the game cards' session now. The history is merged into the games list by
+date (colour and speed filters, the correspondence bucket, as mistake-lab's). Tests:
+`test/unit/core/games/practice.test.ts`, **the same answers as mistake-lab's own code** on every case
+of `test/fixtures/games/practice.json` (`mistake-lab-practice.cjs` runs its functions at `c525403` in
+a sandbox; two controls), and `test/e2e/practice.spec.ts` (desktop and phone: a game against the fake
+explorer stopped after five moves, its review, a practice mistake saved, the history after a reload,
+the events synced; an advantage card's collapse graded Again). Not built: the corrected-deviation
+banner during practice ("Ignore for this game?") and resuming a game after a reload.
+
 #### 5.58 Deviations from the repertoire in real games
 
 - `deviations.ts`: each game walked against the repertoire index for the user's colour; the first

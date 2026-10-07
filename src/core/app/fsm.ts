@@ -22,6 +22,9 @@
 //   #/games                             the games and their cards (§5.54)
 //   #/games/<id>[?ply=n]                one game, at a ply
 //   #/games/review                      the game cards due, as a session (§5.55)
+//   #/games/history/<id>                a practice game's review, from the history (§5.57)
+//   #/practice?fen=…[&side=black]       playing on from a position (§5.57), as the side given
+//                                       (the side to move when none)
 //   #/migrate                           the migration from mistake-lab (§5.64)
 // A setup link (#setup?…) is read and removed before any of this (src/app/setup.ts).
 import { isId } from '../study/ids.ts';
@@ -66,7 +69,11 @@ export type Mode =
   /** The game cards due, as a session (§5.55). */
   | { name: 'gamesReview' }
   /** The migration from mistake-lab (§5.64). */
-  | { name: 'migrate' };
+  | { name: 'migrate' }
+  /** Playing on from a position (§5.57), as `side` (the side to move when none). */
+  | { name: 'playOn'; fen: string; side?: 'white' | 'black' }
+  /** A practice game's review, reopened from the history (§5.57). */
+  | { name: 'history'; id: string };
 
 export type Practice = 'retry' | 'drill' | 'pinned' | 'pins';
 const PRACTICE_HASH: Record<Practice, string> = { retry: '#/mistakes/retry', drill: '#/mistakes/drill', pinned: '#/pinned', pins: '#/pinned/all' };
@@ -151,6 +158,7 @@ export function parseHash(hash: string): Mode {
   if (parts[0] === 'games') {
     if (parts.length === 1) return { name: 'games' };
     if (parts.length === 2 && parts[1] === 'review') return { name: 'gamesReview' };
+    if (parts.length === 3 && parts[1] === 'history' && GAME_ID.test(parts[2]!)) return { name: 'history', id: parts[2]! };
     if (parts.length === 2 && GAME_ID.test(parts[1]!)) {
       const m: Mode = { name: 'games', id: parts[1] };
       const ply = /(?:^|&)ply=(\d{1,4})(?:&|$)/.exec(query)?.[1];
@@ -158,6 +166,15 @@ export function parseHash(hash: string): Mode {
       return m;
     }
     return { name: 'games' };
+  }
+  if (parts.length === 1 && parts[0] === 'practice') {
+    const fen = query.split('&').find((q) => q.startsWith('fen='));
+    const f = fen === undefined ? undefined : decode(fen.slice(4));
+    if (!f) return { name: 'games' };
+    const mode: Mode = { name: 'playOn', fen: f };
+    const side = query.split('&').find((q) => q.startsWith('side='))?.slice(5);
+    if (side === 'white' || side === 'black') mode.side = side;
+    return mode;
   }
   if (parts.length === 1 && parts[0] === 'analysis') {
     const mode: Mode = { name: 'analysis' };
@@ -219,6 +236,10 @@ export function modeHash(mode: Mode): string {
       return '#/games/review';
     case 'migrate':
       return '#/migrate';
+    case 'playOn':
+      return `#/practice?fen=${encodeURIComponent(mode.fen)}${mode.side ? `&side=${mode.side}` : ''}`;
+    case 'history':
+      return `#/games/history/${mode.id}`;
     case 'storm':
       return `#/storm${mode.sid ? `/${mode.sid}${mode.cid ? `/${mode.cid}${atQuery(mode.at)}` : ''}` : ''}`;
     case 'analysis': {

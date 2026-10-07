@@ -2,8 +2,8 @@
 // SRS. A mistake: the position before it, the user's move judged by Stockfish (the position's
 // lines, searched as the card opens, then the position after the move when it isn't one of them),
 // the grade recorded on the first try; a wrong move offers Try again, three at most, then the best
-// move. A tactic: its lines played through, the opponent's replies after 0.4 s. Advantages wait
-// for practice (§5.57) and are left out of the session for now.
+// move. A tactic: its lines played through, the opponent's replies after 0.4 s. An advantage: the
+// practice game's drill from its peak (§5.57), graded by its outcome.
 import { signal } from '@preact/signals';
 import { makeFen } from 'chessops/fen';
 import { makeSanAndPlay } from 'chessops/san';
@@ -18,6 +18,7 @@ import { positionOf } from '../core/storm/walk.ts';
 import { analyseForStorm, cancelStormEngine, endStormEngine, type EngineAnswer } from './stormEngine.ts';
 import { recordEvent } from './state.ts';
 import { gameQueueNow } from './games.ts';
+import { leavePractice, loadOpponent, practice, startPractice } from './practice.ts';
 import { trainData } from './train.ts';
 
 export const MAX_TRIES = 3;
@@ -123,22 +124,20 @@ function playOn(fen: string, uci: string): string | undefined {
 
 /* ------------------------------------------------------------------ the session */
 
-/** Today's game cards, due first; advantages wait for practice (§5.57). */
-export function sessionCards(): { cards: DeckCard[]; advantages: number } {
+/** Today's game cards, due first. */
+export function sessionCards(): DeckCard[] {
   const q = gameQueueNow();
-  const all = [...q.due, ...q.fresh];
-  const cards = all.filter((c) => c.item.kind !== 'advantage');
-  return { cards, advantages: all.length - cards.length };
+  return [...q.due, ...q.fresh];
 }
 
 export function startGameSession(): void {
-  const { cards, advantages } = sessionCards();
-  gameSession.value = { cards, index: -1, phase: 'done', results: new Map(), ...(advantages ? { message: `${advantages} advantage drill${advantages === 1 ? '' : 's'} wait for practice.` } : {}) };
+  gameSession.value = { cards: sessionCards(), index: -1, phase: 'done', results: new Map() };
   nextCard();
 }
 
 export function endGameSession(): void {
   gameSession.value = undefined;
+  if (practice.peek()?.setup.kind === 'advantage') leavePractice();
   cancelStormEngine();
   endStormEngine();
 }
@@ -154,8 +153,27 @@ function nextCard(): void {
     return;
   }
   const item = card.item;
+  if (practice.peek()?.setup.kind === 'advantage') leavePractice();
   const run: CardRun = { card, fen: item.fenBefore, board: item.fenBefore, tries: 0, hint: 0, revealed: false, tacticWrong: 0 };
-  if (item.kind === 'tactic') {
+  if (item.kind === 'advantage') {
+    // The drill from the peak, silent (mistake-lab's advantage mode); the practice game records the grade.
+    startPractice({
+      kind: 'advantage',
+      fen: item.fenBefore,
+      color: item.color,
+      silent: true,
+      title: `from +${(item.peakCp / 100).toFixed(1)}`,
+      opponent: loadOpponent(),
+      card: card.card,
+      peakCp: item.peakCp,
+      onEnd: (g) => {
+        const st = gameSession.value;
+        if (!st?.run || st.run.card !== card) return;
+        if (g) st.results.set(card.card, g);
+        gameSession.value = { ...st, phase: 'right', run: { ...st.run, ...(g ? { graded: g } : {}) } };
+      },
+    });
+  } else if (item.kind === 'tactic') {
     const drops = dropsOf(trainData.value?.eventsOf(card.card) ?? []);
     run.tactic = startTactic(liveLines(item, drops));
   } else {

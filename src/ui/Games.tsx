@@ -11,7 +11,8 @@ import { standardUci } from '../core/chess/uci.ts';
 import { open } from '../app/mode.ts';
 import { recordEvent } from '../app/state.ts';
 import { trainData } from '../app/train.ts';
-import { forgetGames, gameById, gameDeck, gameQueueNow, gameRows, gamesPrefs, refreshGames, refreshState, setGamesPrefs, startGames, type GameFilters, type GameRow, type Since } from '../app/games.ts';
+import { forgetGames, gameById, gameDeck, gameQueueNow, gameRows, gamesPrefs, practiceHistory, refreshGames, refreshState, setGamesPrefs, startGames, type GameFilters, type GameRow, type Since } from '../app/games.ts';
+import type { HistoryEntry } from '../core/games/practice.ts';
 import { continueSession, dropCard, dropLine, endGameSession, gameSession, hint, hintMove, MAX_TRIES, playMove, revealBest, skipCard, startGameSession, tryAgain, type CardRun, type GameSession } from '../app/gameTrainer.ts';
 import { cpFor, type GameItem } from '../core/games/extract.ts';
 import { dropsOf } from '../core/games/deck.ts';
@@ -21,6 +22,7 @@ import { resultFor, type GameRecord } from '../core/games/record.ts';
 import { gameCard } from '../core/progress/cards.ts';
 import { positionOf } from '../core/storm/walk.ts';
 import { Board } from './Board.tsx';
+import { PracticeBoard } from './Practice.tsx';
 import { useWakeLock } from './Train.tsx';
 
 const sq = (u: string, i: number) => u.slice(i, i + 2) as SquareName;
@@ -75,7 +77,10 @@ function Home() {
     for (const c of deck) m.set(c.item.gameId, (m.get(c.item.gameId) ?? 0) + 1);
     return m;
   }, [deck]);
-  const shown = (rows ?? []).filter((r) => passes(r, f));
+  // The practice games merged into the list by date (mistake-lab's review history): colour and
+  // speed filters only, every one in the correspondence bucket.
+  const hist = practiceHistory.value.filter((h) => (!f.color || h.playerColor === f.color) && (!f.speed.length || f.speed.includes('correspondence')));
+  const shown: ({ at: number; row: GameRow } | { at: number; h: HistoryEntry })[] = [...(rows ?? []).filter((r) => passes(r, f)).map((row) => ({ at: row.game.createdAt, row })), ...hist.map((h) => ({ at: h.ts, h }))].sort((a, b) => b.at - a.at);
   const filter = (patch: Partial<GameFilters>) => setGamesPrefs({ filters: { ...f, ...patch } });
   return (
     <>
@@ -103,7 +108,7 @@ function Home() {
         <div class="card-head">
           <h2>Games</h2>
           <span class="muted" data-testid="games-count">
-            {rows ? `${shown.length} of ${rows.length}` : 'Reading…'}
+            {rows ? `${shown.length - hist.length} of ${rows.length}${hist.length ? ` · ${hist.length} practice` : ''}` : 'Reading…'}
           </span>
         </div>
         <div class="games-filters">
@@ -130,9 +135,7 @@ function Home() {
         </div>
         {rows && rows.length === 0 && <p class="muted">No games on this device yet: set up a source above, then Refresh.</p>}
         <ul class="games-list">
-          {shown.slice(0, limit).map((r) => (
-            <GameRowView key={r.game.id} row={r} cards={inDeck.get(r.game.id) ?? 0} />
-          ))}
+          {shown.slice(0, limit).map((x) => ('row' in x ? <GameRowView key={x.row.game.id} row={x.row} cards={inDeck.get(x.row.game.id) ?? 0} /> : <HistoryRow key={x.h.id} h={x.h} />))}
         </ul>
         {shown.length > limit && (
           <button type="button" class="secondary" onClick={() => setLimit(limit + 50)}>
@@ -168,6 +171,26 @@ function GameRowView(props: { row: GameRow; cards: number }) {
         <span class="games-items" title={`${counts.mistake} mistakes, ${counts.tactic} tactics, ${counts.advantage} advantages; ${props.cards} in the deck`}>
           {g.evals ? [counts.mistake ? `${counts.mistake}✗` : '', counts.tactic ? `${counts.tactic}⚡` : '', counts.advantage ? `${counts.advantage}♛` : ''].filter(Boolean).join(' ') || '—' : <span class="muted">not analysed</span>}
         </span>
+      </a>
+    </li>
+  );
+}
+
+const OUTCOME_WORD: Record<string, string> = { win: 'Won', loss: 'Lost', draw: 'Drawn', stopped: 'Stopped', ended: 'Ended' };
+const SOURCE_WORD: Record<string, string> = { practice: 'Practice', advantage: 'Advantage drill', todo: 'Checklist', checklist: 'Checklist', cont: 'Played on', 'tactic-cont': 'Played on' };
+
+function HistoryRow(props: { h: HistoryEntry }) {
+  const h = props.h;
+  return (
+    <li class={`games-row history-row result-${h.outcome}`}>
+      <a href={`#/games/history/${h.id}`} data-testid="history-row">
+        <span class="games-date">{new Date(h.ts).toISOString().slice(0, 10)}</span>
+        <span class={`games-side side-${h.playerColor}`} title={h.playerColor === 'white' ? 'You played White' : 'You played Black'} />
+        <span class="games-opp">{SOURCE_WORD[h.source] ?? 'Practice'}</span>
+        <span class="games-result">{OUTCOME_WORD[h.outcome] ?? h.outcome}</span>
+        <span class="muted games-speed">{h.userMoveCount} moves</span>
+        <span class="muted games-opening">{h.openingName}</span>
+        <span class="games-items">{h.accuracy !== null ? `${h.accuracy}%` : '—'}</span>
       </a>
     </li>
   );
@@ -370,6 +393,9 @@ function GameView(props: { id: string; ply?: number }) {
           })}
         </ul>
         <div class="actions">
+          <button type="button" onClick={() => open({ name: 'playOn', fen, side: g.color })}>
+            Practise from here
+          </button>
           <button type="button" class="secondary" onClick={() => open({ name: 'analysis', fen })}>
             Analyse this position
           </button>
@@ -472,6 +498,30 @@ function Card(props: { s: GameSession; r: CardRun }) {
   const { s, r } = props;
   const item = r.card.item;
   const game = gameById.value.get(item.gameId)?.game;
+  if (item.kind === 'advantage')
+    return (
+      <div class="game-card advantage-card" data-phase={s.phase} data-card={r.card.card} data-kind="advantage">
+        <p class="train-counters">
+          {s.index + 1} of {s.cards.length} · Advantage{game ? ` · ${game.speed} against ${opponentOf(game).name}` : ''} · you were +{(item.peakCp / 100).toFixed(1)} at move {Math.ceil(item.ply / 2)}
+        </p>
+        <PracticeBoard onNext={continueSession} />
+        <div class="actions train-actions">
+          {s.phase !== 'right' && !s.results.has(r.card.card) && (
+            <button type="button" class="secondary" onClick={skipCard}>
+              Skip
+            </button>
+          )}
+          {game && (
+            <a class="button secondary" href={`#/games/${game.id}?ply=${item.ply - 1}`}>
+              View the game
+            </a>
+          )}
+          <button type="button" class="secondary" onClick={dropCard} title="Take this item out of the deck">
+            Drop
+          </button>
+        </div>
+      </div>
+    );
   const asking = s.phase === 'asking';
   const hm = hintMove(r);
   const arrows: { orig: string; dest?: string; brush: string }[] = [];
@@ -539,6 +589,11 @@ function Card(props: { s: GameSession; r: CardRun }) {
           {(s.phase === 'right' || r.revealed || s.phase === 'unjudged') && (
             <button type="button" onClick={continueSession}>
               Next
+            </button>
+          )}
+          {s.phase === 'right' && (
+            <button type="button" class="secondary" title="Play the game on from here against the database, Maia and Stockfish" onClick={() => open({ name: 'playOn', fen: r.board, side: item.color })}>
+              Play on
             </button>
           )}
           {(asking || s.phase === 'wrong') && !graded && (

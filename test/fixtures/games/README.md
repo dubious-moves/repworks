@@ -24,3 +24,10 @@ Italian position and the engine's lines at its positions, its lines in mistake-l
 (`mlLines`, made by the site's own `sequenceLines`), and `expected`: the warnings and unverified items
 mistake-lab's own `validateSequenceLines` gives, cut out of `index.html` at `c525403` and run in Node
 by `mistake-lab-sequences.cjs` (`node mistake-lab-sequences.cjs <mistake-lab>/index.html sequences.json`).
+
+`practice.json` holds practice's cases (PLAN.md §5.57): explorer answers and draws, Maia's
+probabilities at four precisions, advantage drills (scores and win% given up per move), two games to
+review (with a repertoire's moves by position) and stopped games' scores; `expected` is what
+mistake-lab's own `pickExplorerMove`, `maiaSampleMove`, `updateAdvantageTracking` with
+`finishAdvantage`, `buildContLineReviewData` and `evalToResult` give, run at `c525403` by
+`mistake-lab-practice.cjs` (the page's UI calls stubbed, `Math.random` the case's draw).

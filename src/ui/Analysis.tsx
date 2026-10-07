@@ -52,6 +52,18 @@ export function AnalysisHead() {
       <button type="button" disabled={!line.length} title={line.length ? 'Add the line to the move shown to a chapter' : 'Play a move first'} onClick={() => setAdding(true)}>
         Add to a chapter…
       </button>
+      <button
+        type="button"
+        class="secondary"
+        disabled={!c}
+        title="Play the game on from the move shown against the database, Maia and Stockfish"
+        onClick={() => {
+          const pos = c && positionAt(c, line);
+          if (pos) open({ name: 'playOn', fen: makeFen(pos.toSetup()), side: pos.turn });
+        }}
+      >
+        Practise
+      </button>
       {seq && (
         <button type="button" class="secondary" title="Save the lines on the board as a drill: the main line first, each branch another line" onClick={() => setSaving(true)}>
           Save as a sequence…

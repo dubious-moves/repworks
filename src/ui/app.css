@@ -3080,3 +3080,32 @@ a.button.disabled {
   opacity: 0.5;
   pointer-events: none;
 }
+
+/* Practice (§5.57): the history's rows in the games list, the classifications, the opponent's settings. */
+.history-row a {
+  border-left: 3px solid #8b7dd8;
+}
+.practice-cls {
+  font-weight: 600;
+  margin-left: 1px;
+}
+.practice-opponent {
+  margin: 12px 0;
+}
+.practice-opponent label {
+  white-space: nowrap;
+}
+.practice-opponent input[type='number'] {
+  width: 5.5em;
+}
+.advantage-card .train-actions {
+  margin-top: 8px;
+}
+
+/* The analysis board's head: its buttons wrap below the FEN on a narrow screen (§5.56, §5.57). */
+.analysis-head {
+  flex-wrap: wrap;
+}
+.analysis-head .titles {
+  flex: 1 1 16em;
+}

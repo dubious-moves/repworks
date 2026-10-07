@@ -67,7 +67,9 @@ export type ToWorker =
   /** The storm's games as PGN: Lichess ids in one export, or one masters game. */
   | { type: 'gamePgns'; id: number; ids: string[]; masters?: boolean }
   /** ChessDB's scored moves for the storm's walk, under every other lookup. */
-  | { type: 'scores'; id: number; fen: string };
+  | { type: 'scores'; id: number; fen: string }
+  /** Practice's opponent (§5.57): a position's Lichess games at the practice filter, above the search. */
+  | { type: 'practiceGames'; id: number; fen: string; speeds: string[]; ratings: number[] };
 
 export interface LookupError {
   message: string;
@@ -91,7 +93,9 @@ export type FromWorker =
   | { type: 'gamePgns'; id: number; text: string }
   | { type: 'gamePgns'; id: number; error: LookupError }
   | { type: 'scores'; id: number; evals: ChessdbAnswer }
-  | { type: 'scores'; id: number; error: LookupError };
+  | { type: 'scores'; id: number; error: LookupError }
+  | { type: 'practiceGames'; id: number; games: CompactExplorer }
+  | { type: 'practiceGames'; id: number; error: LookupError };
 
 export interface ServiceOptions {
   http: Http;
@@ -238,6 +242,16 @@ export function createExplorerService(o: ServiceOptions): ExplorerService {
     providers.explorer(fen, filter, undefined, { priority: 300 }).then(
       (games) => o.post({ type: 'stormGames', id, games }),
       (e: PeError) => o.post({ type: 'stormGames', id, error: reasonOf(e, 'Lichess') }),
+    );
+  }
+
+  /* ---------------------------------------------------------------- practice's opponent (§5.57) */
+
+  function practiceGames(id: number, fen: string, speeds: string[], ratings: number[]) {
+    const filter: ExplorerFilter = { speeds: [...speeds], ratings: [...ratings], db: 'lichess' };
+    providers.explorer(fen, filter, undefined, { priority: 800 }).then(
+      (games) => o.post({ type: 'practiceGames', id, games }),
+      (e: PeError) => o.post({ type: 'practiceGames', id, error: reasonOf(e, 'Lichess') }),
     );
   }
 
@@ -423,6 +437,8 @@ export function createExplorerService(o: ServiceOptions): ExplorerService {
           return searchRows(msg);
         case 'stormGames':
           return stormGames(msg.id, msg.fen);
+        case 'practiceGames':
+          return practiceGames(msg.id, msg.fen, msg.speeds, msg.ratings);
         case 'gamePgns':
           return gamePgns(msg.id, msg.ids, !!msg.masters);
         case 'scores':
