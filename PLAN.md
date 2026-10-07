@@ -2233,8 +2233,8 @@ later line and taken back for free.
   moves (shown by a second wrong move, the arrow goes and the ask goes on with the first);
   **"Undo"** puts it back, until the next move. Saved in every kind of session, graded or not.
 - The study: the card panel of an own move lists **"Alternatives here: e5 ✕"** for its position,
-  each removed by its ✕. Adding one from the study isn't built: the training screen's button is
-  the one way in, where the wrong move is in hand.
+  each removed by its ✕. Adding one from the study is built in §5.69 (the training screen's
+  button is the other way in, where the wrong move is in hand).
 - Not built: an import of Chessable's own alternatives from a course export (to check against an
   export in the data repo first).
 
@@ -2324,6 +2324,21 @@ desktop checks beside it.
   A page closed ends it; it can't run without the page. Tests: the move menu's items in
   `editor.spec.ts`, `views.spec.ts` (Quiz); Collect all itself isn't driven (the fake dataset's
   anchors fall in fewer than 100 shards): TESTING.md.
+
+#### 5.69 The owner's notes of 2026-10-07 (last): ✎ and ⋯ on touch only, alternatives added from the study
+
+- **The ✎ (draw mode) and ⋯ (move menu) buttons are hidden where there is a mouse** (`hover: hover`
+  and `pointer: fine`, any width): a right-click on a move opens its menu and a right-drag or
+  Shift-drag on the board draws (chessground's own; Shift red, Alt blue), so the buttons only
+  took room from the move buttons. The phone keeps both. The e2e helpers (`openMoveMenu`,
+  `drawInDrawMode`) use the buttons where they are shown and the mouse gestures where not.
+- **"Add alternative…" in the study** (completes §5.18, whose "As built" left adding to the
+  training screen): the card panel of an own move gets the button. It shows the position *before*
+  that move on the board (the notation stays on the move, nothing is written to the chapter), and
+  the move played there is saved as an `alt` event for that position, as training's "Save as
+  alternative" does, with the card panel's list showing it. The repertoire's own move and one
+  saved already are refused with the reason; Cancel, Escape or moving to another move ends it
+  with nothing saved. One alternative per press. Test: `alternatives.spec.ts` (both viewports).
 
 #### 5.14 Phase 1 acceptance test, and exit
 

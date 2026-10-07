@@ -58,3 +58,31 @@ test('a wrong move saved as an alternative is free next time, and is listed and 
   await panel.getByRole('button', { name: 'Remove e5 from the alternatives' }).click();
   await expect(panel.locator('.card-alts')).toHaveCount(0);
 });
+
+test('an alternative is added from the study: the move played on the board is saved, and the chapter is not changed', async ({ page }) => {
+  const { github } = world();
+  await page.clock.install({ time: new Date('2026-12-01T10:00:00Z') });
+  await serveGithub(page, github);
+  await page.goto(`${site.url}#setup?repo=${encodeURIComponent(REPO)}&token=${TOKEN}&name=desktop`);
+  await expect(page.locator('.chip')).toHaveText(/^synced/);
+
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf?at=e4,c5`);
+  const panel = page.getByRole('region', { name: 'Training card' });
+  const variations = await page.locator('.notation .variation').count();
+  await panel.getByRole('button', { name: 'Add alternative…' }).click();
+  await expect(panel).toContainText('Play the alternative on the board.');
+  // The board shows the position before 1... c5, and the notation still stands at c5.
+  await play(page, 'e7', 'e5');
+  await expect(page.locator('.cv-board .feedback')).toHaveText('e5 saved as an alternative');
+  await expect(panel.locator('.card-alts')).toContainText('Alternatives here: e5');
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5');
+  await expect(page.locator('.notation .variation')).toHaveCount(variations);
+
+  // The repertoire's own move, and one saved already, are refused with a reason.
+  await panel.getByRole('button', { name: 'Add alternative…' }).click();
+  await play(page, 'c7', 'c5');
+  await expect(page.locator('.cv-board .feedback')).toHaveText("c5 is the repertoire's move here already");
+  await panel.getByRole('button', { name: 'Add alternative…' }).click();
+  await page.keyboard.press('Escape');
+  await expect(panel.getByRole('button', { name: 'Add alternative…' })).toBeVisible();
+});

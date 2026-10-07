@@ -12,7 +12,7 @@ import { parseSquare } from 'chessops/util';
 import { chessgroundDests, chessgroundMove } from 'chessops/compat';
 import { normalizeMove } from 'chessops/chess';
 import type { Key } from '@lichess-org/chessground/types';
-import type { Role } from 'chessops/types';
+import type { Move, Role } from 'chessops/types';
 import { afterEdits, at, chapter, conflictsHere, doc, edit, feedback, move, play, problem, redoEdit, resolve, SCRATCH, side, study, undoEdit } from '../app/editor.ts';
 import { AnalysisHead } from './Analysis.tsx';
 import { open } from '../app/mode.ts';
@@ -24,7 +24,7 @@ import { setShapes } from '../core/study/ops.ts';
 import { pathKey } from '../core/study/notation.ts';
 import { nodeAt, positionAt, samePath, type Path } from '../core/study/tree.ts';
 import { Board } from './Board.tsx';
-import { CardPanel } from './CardPanel.tsx';
+import { addAlternative, altAdding, CardPanel } from './CardPanel.tsx';
 import { CommentDialog, MoveMenu, openMenu } from './MoveMenu.tsx';
 import { BranchPicker, branchOpen, chooseBranch, closeBranches, stepOn } from './BranchPicker.tsx';
 import { Notation } from './Notation.tsx';
@@ -90,6 +90,7 @@ export function ChapterView() {
         ArrowUp: () => void (chooseBranch(-1) || move('up')),
         ArrowDown: () => void (chooseBranch(1) || move('down')),
         ...(picking ? { Enter: () => void stepOn(), Escape: closeBranches } : {}),
+        ...(altAdding.peek() ? { Escape: () => (altAdding.value = undefined) } : {}),
         Home: () => move('start'),
         End: () => move('end'),
         w: () => setThreat(!threat.peek()),
@@ -104,7 +105,12 @@ export function ChapterView() {
     return () => document.removeEventListener('keydown', onKey);
   }, []);
 
-  const board = useMemo(() => (c ? boardState(c, path) : undefined), [c, path]);
+  // Picking an alternative (§5.18) shows the position before the own move, and nothing is written to the chapter.
+  const adding = altAdding.value && samePath(altAdding.value, path) ? path : undefined;
+  useEffect(() => {
+    if (altAdding.peek() && !samePath(altAdding.peek()!, path)) altAdding.value = undefined;
+  }, [path]);
+  const board = useMemo(() => (c ? boardState(c, adding ? adding.slice(0, -1) : path) : undefined), [c, path, adding]);
   // The engine looks at the board's position (§5.31), and at nothing once the page is left.
   useEffect(() => analysePosition(board?.pos), [board]);
   useEffect(() => () => analysePosition(undefined), []);
@@ -123,12 +129,16 @@ export function ChapterView() {
     const to = parseSquare(dest)!;
     const piece = board.pos.board.get(from);
     if (piece?.role === 'pawn' && (dest[1] === '8' || dest[1] === '1')) return setPromotion({ orig, dest });
-    const m = normalizeMove(board.pos, { from, to });
-    play(makeSan(board.pos, m));
+    submit(normalizeMove(board.pos, { from, to }));
+  };
+  const submit = (m: Move) => {
+    if (!board) return;
+    if (adding) addAlternative(adding, m);
+    else play(makeSan(board.pos, m));
   };
   const promote_ = (role: Role) => {
     if (!board || !promotion) return;
-    play(makeSan(board.pos, { from: parseSquare(promotion.orig)!, to: parseSquare(promotion.dest)!, promotion: role }));
+    submit({ from: parseSquare(promotion.orig)!, to: parseSquare(promotion.dest)!, promotion: role });
     setPromotion(undefined);
   };
 
@@ -223,7 +233,7 @@ export function ChapterView() {
                 dests={doc.value && !shownLine ? board.dests : new Map()}
                 lastMove={shownLine ? shownLine.lastMove : board.lastMove}
                 check={shownLine?.check ?? board.check}
-                shapes={shownLine ? [] : (node?.shapes ?? [])}
+                shapes={shownLine || adding ? [] : (node?.shapes ?? [])}
                 drawMode={drawMode}
                 brush={brush}
                 onMove={onMove}
@@ -286,13 +296,14 @@ export function ChapterView() {
                 <button type="button" aria-label="Redo" disabled={!doc.value?.future.length} onClick={redoEdit}>
                   ↷
                 </button>
-                <button type="button" aria-pressed={drawMode} aria-label="Draw mode" class={drawMode ? 'on' : ''} onClick={() => setDrawMode(!drawMode)}>
+                <button type="button" aria-pressed={drawMode} aria-label="Draw mode" class={`touch-only${drawMode ? ' on' : ''}`} onClick={() => setDrawMode(!drawMode)}>
                   ✎
                 </button>
                 <button
                   type="button"
                   aria-label="Move menu"
                   aria-haspopup="menu"
+                  class="touch-only"
                   onClick={(e) => {
                     const r = e.currentTarget.getBoundingClientRect();
                     openMenu(at.peek(), r.left, r.bottom, r.top);

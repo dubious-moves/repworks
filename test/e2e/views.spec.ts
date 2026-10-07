@@ -6,7 +6,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import type { FakeGit } from '../support/fakeGit.ts';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
-import { clickSquare, comment } from './board.ts';
+import { clickSquare, comment, openMoveMenu } from './board.ts';
 import { serveGithub, world } from './github.ts';
 import { serveSite, type SiteServer } from './server.ts';
 
@@ -32,7 +32,7 @@ async function setUp(page: Page): Promise<FakeGit> {
 
 /** A view opened from the move menu at the move shown (the ⋯ button: the big buttons are gone). */
 async function fromMenu(page: Page, name: string) {
-  await page.getByRole('button', { name: 'Move menu' }).click();
+  await openMoveMenu(page);
   await page.getByRole('menuitem', { name }).click();
 }
 
@@ -119,7 +119,7 @@ test('quiz from the move menu, from the move shown; read the line from the end',
   await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf?at=e4,c5,Nf3`);
   await expect(page.locator('.move.current')).toHaveText('Nf3');
   const nf3 = page.locator('.move[data-path="e4 c5 Nf3"]');
-  if (isMobile) await page.getByRole('button', { name: 'Move menu' }).click();
+  if (isMobile) await openMoveMenu(page);
   else await nf3.click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Quiz from here' }).click();
   await expect(page).toHaveURL(/#\/play\/Rep0Najd\/Ch1Najdf\?at=e4,c5,Nf3$/);
@@ -231,13 +231,13 @@ test('copy continuation: from the variation’s first move to the end of its lin
   await setUp(page);
   await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf?at=e4,c5,Nf3,Nc6`);
   await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 Nc6');
-  await page.getByRole('button', { name: 'Move menu' }).click();
+  await openMoveMenu(page);
   await page.getByRole('menuitem', { name: 'Copy continuation' }).click();
   await expect(page.locator('.cv-board .feedback')).toHaveText('Continuation copied');
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('2... Nc6 3. d4');
   // On the main line after the fork: from the main line's move at the fork.
   await page.locator('.move[data-path="e4 c5 Nf3 d6 d4 cxd4"]').click();
-  await page.getByRole('button', { name: 'Move menu' }).click();
+  await openMoveMenu(page);
   await page.getByRole('menuitem', { name: 'Copy continuation' }).click();
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('2... d6 3. d4 cxd4');
 });

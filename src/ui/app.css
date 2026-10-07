@@ -3307,3 +3307,11 @@ a.button.disabled {
   background: rgb(255 255 255 / 12%);
   color: #fff;
 }
+
+/* A mouse has the board's right-click and Shift-drag for drawing and the move's context menu, so
+   the ✎ and ⋯ buttons are for touch alone. */
+@media (hover: hover) and (pointer: fine) {
+  .cv-panel .controls button.touch-only {
+    display: none;
+  }
+}

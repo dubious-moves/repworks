@@ -35,23 +35,35 @@ export async function chapterSettings(page: Page, name: string) {
   return page.getByRole('dialog', { name: 'Chapter settings' });
 }
 
-/** Draws an arrow (or, from a square to itself, a circle) in draw mode. */
+/**
+ * Draws an arrow (or, from a square to itself, a circle): in draw mode where the ✎ button is
+ * shown (touch), else by a right-drag, its colour from the modifier keys as chessground reads
+ * them (Shift red, Alt blue, both yellow).
+ */
 export async function drawInDrawMode(page: Page, from: string, to: string, orientation: 'white' | 'black', brush = 'green') {
-  await page.getByRole('button', { name: 'Draw mode' }).click();
-  await page.getByRole('radio', { name: brush }).click();
+  const toggle = page.getByRole('button', { name: 'Draw mode' });
+  const touch = await toggle.isVisible();
+  if (touch) {
+    await toggle.click();
+    await page.getByRole('radio', { name: brush }).click();
+  }
   const a = await square(page, from, orientation);
   const b = await square(page, to, orientation);
+  const keys = { green: [], red: ['Shift'], blue: ['Alt'], yellow: ['Alt', 'Shift'] }[brush as 'green'] ?? [];
+  for (const k of keys) await page.keyboard.down(k);
   await page.mouse.move(a.x, a.y);
-  await page.mouse.down();
+  await page.mouse.down({ button: touch ? 'left' : 'right' });
   await page.mouse.move(b.x, b.y, { steps: 4 });
-  await page.mouse.up();
-  await page.getByRole('button', { name: 'Draw mode' }).click();
+  await page.mouse.up({ button: touch ? 'left' : 'right' });
+  for (const k of keys) await page.keyboard.up(k);
+  if (touch) await toggle.click();
 }
 
-/** Opens a move's menu: by a right-click on the move, or for the move shown by the ⋯ button. */
+/** Opens a move's menu: by a right-click on the move, or for the move shown by the ⋯ button (touch) or a right-click on it. */
 export async function openMoveMenu(page: Page, path?: string) {
-  if (path === undefined) await page.getByRole('button', { name: 'Move menu' }).click();
-  else await page.locator(`.notation .move[data-path="${path}"]`).click({ button: 'right' });
+  const button = page.getByRole('button', { name: 'Move menu' });
+  if (path === undefined && (await button.isVisible())) await button.click();
+  else await page.locator(path === undefined ? '.notation .move.current' : `.notation .move[data-path="${path}"]`).click({ button: 'right' });
   await page.getByRole('menu', { name: 'Move' }).waitFor();
 }
 

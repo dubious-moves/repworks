@@ -5,7 +5,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import type { FakeGit } from '../support/fakeGit.ts';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
-import { chapterSettings, clickSquare, newChapter, openMoveMenu, square } from './board.ts';
+import { chapterSettings, clickSquare, drawInDrawMode, newChapter, openMoveMenu } from './board.ts';
 import { serveGithub, world } from './github.ts';
 import { serveSite, type SiteServer } from './server.ts';
 
@@ -81,18 +81,9 @@ test('open a chapter, move through it, and edit it: variation, comment, glyph, a
   await expect(dialog).toHaveCount(0);
   await expect(page.locator('.notation')).toContainText('The Taimanov way');
 
-  // An arrow in draw mode, and a circle by a tap.
-  await page.getByRole('button', { name: 'Draw mode' }).click();
-  await page.getByRole('radio', { name: 'red' }).click();
-  const from = await square(page, 'd7', 'black');
-  const to = await square(page, 'd5', 'black');
-  await page.mouse.move(from.x, from.y);
-  await page.mouse.down();
-  await page.mouse.move(to.x, to.y, { steps: 4 });
-  await page.mouse.up();
-  await page.getByRole('radio', { name: 'green' }).click();
-  await clickSquare(page, 'd4', 'black');
-  await page.getByRole('button', { name: 'Draw mode' }).click();
+  // An arrow, and a circle by a tap (draw mode on touch, right-drag and right-click with a mouse).
+  await drawInDrawMode(page, 'd7', 'd5', 'black', 'red');
+  await drawInDrawMode(page, 'd4', 'd4', 'black', 'green');
   // Drawing didn't move a piece.
   await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 e6');
 

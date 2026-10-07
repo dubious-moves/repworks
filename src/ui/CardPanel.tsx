@@ -1,11 +1,13 @@
 // The card of the move shown (PLAN.md §5.7): for an own move of a repertoire chapter, where its
 // card stands (new, learning, due, reviewed) and the suspend toggle, "Always play this for me";
 // and the alternatives saved for its position (§5.18), each removed by its ✕. They are saved in
-// training, after a wrong move.
+// training, after a wrong move, or here: "Add alternative" shows the position before the move and
+// saves the move played on the board, which is not written into the study.
+import { signal } from '@preact/signals';
 import { decidingNow } from '../app/time.ts';
 import { parseSan } from 'chessops/san';
-import { isNormal } from 'chessops/types';
-import { at, chapter, side, study } from '../app/editor.ts';
+import { isNormal, type Move } from 'chessops/types';
+import { at, chapter, feedback, side, study } from '../app/editor.ts';
 import { recordEvent } from '../app/state.ts';
 import { dayOf, trainData } from '../app/train.ts';
 import { positionKeyOf } from '../core/chess/positionKey.ts';
@@ -15,7 +17,7 @@ import { parseUciMove } from '../core/chess/uci.ts';
 import { makeSan } from 'chessops/san';
 import { alternativesAt } from '../core/train/alternatives.ts';
 import { dueAt, statusOf } from '../core/train/queue.ts';
-import { positionAt } from '../core/study/tree.ts';
+import { positionAt, samePath, type Path } from '../core/study/tree.ts';
 
 const when = (ms: number) => {
   const today = dayOf(decidingNow());
@@ -24,6 +26,31 @@ const when = (ms: number) => {
   if (ms < today.end) return `today${ms > today.now ? ` from ${time}` : ''}`;
   return new Date(ms).toLocaleDateString([], { day: 'numeric', month: 'short', year: ms - today.now > 300 * 86_400_000 ? 'numeric' : undefined });
 };
+
+/** The own move whose alternative is being picked on the board (it shows the position before it). */
+export const altAdding = signal<Path | undefined>(undefined);
+
+/**
+ * Saves `m`, played on the board before the own move at `path`, as an alternative for that
+ * position. Says why when it isn't one: the repertoire's own move, or one saved already.
+ */
+export function addAlternative(path: Path, m: Move): void {
+  const c = chapter.peek();
+  const data = trainData.peek();
+  const before = c && positionAt(c, path.slice(0, -1));
+  if (!before || !data || !isNormal(m)) return;
+  const repertoire = parseSan(before, path[path.length - 1]!);
+  const key = positionKeyOf(before);
+  const uci = standardUci(before, m);
+  const san = makeSan(before, m);
+  if (repertoire && isNormal(repertoire) && standardUci(before, repertoire) === uci) feedback.value = `${san} is the repertoire's move here already`;
+  else if (alternativesAt(data.alternatives, key).includes(uci)) feedback.value = `${san} is an alternative here already`;
+  else {
+    void recordEvent({ t: new Date().toISOString(), k: 'alt', card: repertoireCard(key, uci), on: true });
+    feedback.value = `${san} saved as an alternative`;
+  }
+  altAdding.value = undefined;
+}
 
 export function CardPanel() {
   const c = chapter.value;
@@ -57,6 +84,18 @@ export function CardPanel() {
       <button type="button" class="secondary" aria-pressed={suspended} onClick={toggle}>
         {suspended ? 'Ask me this move again' : 'Always play this for me'}
       </button>
+      {altAdding.value && samePath(altAdding.value, path) ? (
+        <p class="card-alts" role="status">
+          <span class="muted">Play the alternative on the board.</span>{' '}
+          <button type="button" class="secondary" onClick={() => (altAdding.value = undefined)}>
+            Cancel
+          </button>
+        </p>
+      ) : (
+        <button type="button" class="secondary" onClick={() => (altAdding.value = [...path])}>
+          Add alternative…
+        </button>
+      )}
       {alts.length > 0 && (
         <p class="card-alts">
           <span class="muted">Alternatives here:</span>{' '}

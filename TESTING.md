@@ -5,6 +5,15 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## The owner's last notes of 2026-10-07 (§5.69)
+
+- Desktop: the ✎ and ⋯ buttons are gone from the move buttons (right-click a move for its menu;
+  right-drag on the board to draw). The phone still has both.
+- "Add alternative…" in the card panel of an own move in a repertoire chapter: the board shows the
+  position before the move, the move you play is saved as an alternative (and listed there; ✕
+  removes it). Checked by tests on a desktop and an emulated phone only. On the phone, is tapping a
+  piece and its square on that board as natural as in training?
+
 ## The owner's notes of 2026-10-07 (§5.67)
 
 - The branch picker in the chapter view (Qchess's): → or ▶ on a move where the line branches opens
