@@ -4403,6 +4403,29 @@ on a fake explorer.
 
 Live: (desktop) a checklist for a real study beside mistake-lab's.
 
+**As built** (2026-10-07): `src/core/games/checklist.ts` (`generateChecklist`: mistake-lab's
+covered-tree walk, its study's first move at each of the study's positions, every covered reply at
+the opponent's, the explorer's shares by UCI and by SAN, a covered reply the explorer lacks at
+0.0002, gaps from 8%; `apportionSlots`, the selection, the reserve by stepping the quota, the
+dedup; `excludeVariation`, `completedPresets`, `presetStats`, `presetOpen`, `PRESETS`),
+`src/app/checklist.ts` (the explorer asked through the worker's `practiceGames` at 1600–2500, blitz
+to correspondence; the lists kept on this device, made again at will, as mistake-lab's are
+regenerable definitions; exclusions as `drop` events on `c|<leafKey>`, synced, a line refilled from
+the reserve at once; Restore all), the checklist on `#/repertoire-check` (a study, the number of
+lines, the plies, Make; each line's Easy/Medium/Hard chips with the last five attempts' score, a
+draw half, coloured as mistake-lab's, ✓ when won, opened in order; ✕; the uncovered replies with
+Practise) and `#/checklist/<sid>/<n>?preset=…` (the drill: the lead-up from the start, the
+opponent's moves played, a move off the prep refused; then §5.57's game from the line's end, silent,
+the preset's opponent, never collapsing, won by mate or Claim victory: a `practice` event at the
+leaf with the preset; stopped, nothing is counted). The weak spots' practice lens opens a
+checklist line's drill at that difficulty. Maia's rating per preset is the preset's (mistake-lab's
+adjustable one isn't built). Tests: `test/unit/core/games/checklist.test.ts`, **the same
+variations, reserve and gaps as mistake-lab's own `generateTodoVariations`** on six cases of
+`test/fixtures/games/checklist.json` (`mistake-lab-checklist.cjs`; two controls), the apportionment,
+an exclusion, completion; `test/e2e/checklist.spec.ts` (desktop and phone: a checklist made from
+the fake explorer, a lead-up with a refused move, the game won by Claim victory, the line checked
+off at Easy and synced).
+
 #### 5.63 Voice input
 
 - `voice.ts`, a port of the lexicon and matcher (homophones, phrasings per legal move, the edit

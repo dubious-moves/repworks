@@ -30,6 +30,7 @@ test('hashes parse to modes, and modes write back to the same hash', () => {
     ['#/practice?fen=8%2F8%2F8%2F8%2F8%2F8%2F8%2FK6k%20w%20-%20-%200%201', { name: 'playOn', fen: '8/8/8/8/8/8/8/K6k w - - 0 1' }],
     ['#/games/history/rev_1790000000000_ab12cd', { name: 'history', id: 'rev_1790000000000_ab12cd' }],
     ['#/repertoire-check', { name: 'repCheck' }],
+    ['#/checklist/Rep0Najd/3?preset=hard', { name: 'checklist', sid: 'Rep0Najd', i: 3, preset: 'hard' }],
     ['#/show', { name: 'show' }],
     ['#/show/Rep0Najd', { name: 'show', sid: 'Rep0Najd' }],
     ['#/mistakes', { name: 'mistakes' }],

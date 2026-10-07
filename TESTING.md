@@ -193,6 +193,11 @@ couldn't be tested then (the day's limit was used up), so the training items bel
   reviewed with the game cards on the phone after a sync: the board, Show plan, the grade; whether
   the comments read well as a plan's back, and whether plan cards should count against the daily
   limit of new game cards (they do now).
+- §5.62 (desktop): Repertoire check → Variation checklist for a real study (with the Lichess login),
+  beside mistake-lab's for the same study, lines and plies: the same lines in the same order (the
+  explorer's numbers move a little with time), the time it takes; a line drilled at Easy (the
+  lead-up, the game, Claim victory) and checked off, on the other device after a sync (the list is
+  made on each device; the results and the lines taken out are synced).
 - §5.64 (desktop): Games → Set up → "Move mistake-lab's progress here": the gist, Dry run (a
   token only if the gist won't read without one; it isn't kept), and read the report: the cards'
   counts against mistake-lab, the re-made keys, what is left behind. If it looks right, Run, then

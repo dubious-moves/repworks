@@ -14,6 +14,7 @@ import { GamesScreen } from './Games.tsx';
 import { MigrateScreen } from './Migrate.tsx';
 import { HistoryScreen, PracticeScreen } from './Practice.tsx';
 import { RepertoireCheckScreen } from './RepertoireCheck.tsx';
+import { ChecklistDrill } from './Checklist.tsx';
 import { Debug } from './Debug.tsx';
 import { ImportScreen } from './Import.tsx';
 import { SetupForm } from './Setup.tsx';
@@ -31,7 +32,7 @@ import { confirmDeleteStudy, openNewStudy, openStudySettings, StudyDialogs } fro
 
 export function App() {
   return (
-    <div class={`shell${mode.value.name === 'chapter' || mode.value.name === 'analysis' ? ' shell-chapter' : ''}${['train', 'learn', 'practice', 'show', 'read', 'play', 'storm', 'gamesReview', 'playOn', 'history'].includes(mode.value.name) || (mode.value.name === 'games' && !!mode.value.id) ? ' shell-train' : ''}`}>
+    <div class={`shell${mode.value.name === 'chapter' || mode.value.name === 'analysis' ? ' shell-chapter' : ''}${['train', 'learn', 'practice', 'show', 'read', 'play', 'storm', 'gamesReview', 'playOn', 'history', 'checklist'].includes(mode.value.name) || (mode.value.name === 'games' && !!mode.value.id) ? ' shell-train' : ''}`}>
       <header class="topbar">
         <img class="topbar-icon" src={`${import.meta.env.BASE_URL}icons/icon.svg`} alt="" width={28} height={28} />
         <h1>Repworks</h1>
@@ -114,6 +115,8 @@ function Screen() {
       return <HistoryScreen id={mode.value.id} />;
     case 'repCheck':
       return <RepertoireCheckScreen />;
+    case 'checklist':
+      return <ChecklistDrill key={`${mode.value.sid}/${mode.value.i}/${mode.value.preset}`} sid={mode.value.sid} i={mode.value.i} preset={mode.value.preset} />;
     case 'list':
       return <Home />;
   }

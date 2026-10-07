@@ -7,7 +7,8 @@ function cutter(src) {
   const fn = (name) => {
     const start = src.search(new RegExp(`\\n(async )?function ${name}\\(`));
     if (start < 0) throw new Error(name);
-    let i = src.indexOf('{', start), depth = 0;
+    // The body's brace: after the parameters (a default like `opts = {}` has braces of its own).
+    let i = src.indexOf(') {', start) + 2, depth = 0;
     for (; i < src.length; i++) { const c = src[i]; if (c === '{') depth++; else if (c === '}') { depth--; if (depth === 0) break; } }
     return src.slice(start, i + 1);
   };

@@ -356,7 +356,8 @@ function finish(g: number, reason: EndReason): void {
   const userMoves = p.moves.filter((m) => m.isUser).length;
   const finalCp = userCp === undefined ? null : p.setup.color === 'white' ? userCp : -userCp;
   // The scoreboard (mistake-lab's recordPracticeResult): practice from a position, and a checklist's drill.
-  if (p.setup.kind !== 'advantage' && reason !== 'interrupted') {
+  // A checklist drill stopped or interrupted counts nothing (mistake-lab's abandoned drill).
+  if (p.setup.kind !== 'advantage' && reason !== 'interrupted' && !(p.setup.kind === 'checklist' && reason === 'stopped')) {
     const key = p.setup.leaf ?? keyFen(p.setup.fen)?.key;
     if (key) void recordEvent({ t, k: 'practice', card: practiceCard(key), res: result, ...(p.setup.preset ? { preset: p.setup.preset } : {}), ...(finalCp !== null ? { cp: Math.round(finalCp) } : {}), mv: userMoves });
   }

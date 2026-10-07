@@ -41,3 +41,9 @@ with `computeHumanWeakSpots` and `computeBotWeakSpots` give, run at `c525403` by
 `mistake-lab-repcheck.cjs` (through `mistake-lab-sandbox.cjs`; chess.js 0.10.3 replays the practice
 games: `node mistake-lab-repcheck.cjs <mistake-lab>/index.html repcheck.json <a folder with chess.js@0.10.3
 installed>`).
+
+`checklist.json` holds the checklist's cases (PLAN.md §5.62): an 11-line White study (its lines,
+and mistake-lab's per-study trie of it: the first own move at each position), the explorer's games
+at its opponent's positions, and six settings (slots, plies, an exclusion); `expected` is what
+mistake-lab's own `generateTodoVariations` gives, run at `c525403` by `mistake-lab-checklist.cjs`
+(its study fetch, PGN parser and explorer stubbed from the fixture; chess.js 0.10.3 walks the moves).

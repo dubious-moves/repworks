@@ -3153,3 +3153,24 @@ a.button.disabled {
 .grade-row {
   margin: 8px 0;
 }
+
+/* The variation checklist (§5.62). */
+.checklist-lines {
+  padding-left: 1.5em;
+  margin: 0;
+}
+.checklist-lines li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--surface);
+}
+.checklist-line {
+  font-variant-numeric: tabular-nums;
+}
+.preset-chip {
+  font-size: 0.8rem;
+  padding: 2px 8px;
+  min-height: 32px;
+}
+.preset-chip.done {
+  font-weight: 600;
+}
