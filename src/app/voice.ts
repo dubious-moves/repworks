@@ -143,11 +143,15 @@ export function answerPending(yes: boolean): void {
   void heard([yes ? 'yes' : 'no']);
 }
 
+let lastDeviation: unknown;
 // The opponent's moves spoken while voice is on; voice ends with the game.
 effect(() => {
   const p = practice.value;
   if (!voice.peek().on) return;
   if (!p || p.phase === 'over') return voiceOff();
+  // A move taken back by the repertoire check (mistake-lab says the study move).
+  if (p.deviation && p.deviation !== lastDeviation) void say(`Repertoire deviation. Study move is ${moveToSpeech(p.deviation.repSan)}.`);
+  lastDeviation = p.deviation;
   for (; seen < p.moves.length; seen++) {
     const m = p.moves[seen]!;
     if (m.isUser) continue;

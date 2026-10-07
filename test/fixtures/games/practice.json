@@ -737,6 +737,7 @@
       "g1f3"
      ]
     ],
+    "corrected": [],
     "evalPoints": [
      {
       "idx": -1,
@@ -801,7 +802,236 @@
     "accuracy": 100,
     "keyMoves": [],
     "deviations": [],
+    "corrected": [],
     "evalPoints": []
+   }
+  },
+  {
+   "name": "corrected deviation: Nc3 tried, undone, Nf3 played",
+   "baseFen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+   "moves": [
+    {
+     "san": "e4",
+     "uci": "e2e4",
+     "isUser": true,
+     "classification": "best",
+     "wpDrop": 0,
+     "cpLoss": 0,
+     "bestCp": 30,
+     "afterCp": 30,
+     "fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1"
+    },
+    {
+     "san": "c5",
+     "uci": "c7c5",
+     "isUser": false,
+     "fen": "rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2"
+    },
+    {
+     "san": "Nf3",
+     "uci": "g1f3",
+     "isUser": true,
+     "classification": "best",
+     "wpDrop": 0,
+     "cpLoss": 0,
+     "bestCp": 30,
+     "afterCp": 30,
+     "repTried": {
+      "san": "Nc3",
+      "uci": "b1c3"
+     },
+     "fen": "rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2"
+    },
+    {
+     "san": "d6",
+     "uci": "d7d6",
+     "isUser": false,
+     "fen": "rnbqkbnr/pp2pppp/3p4/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 0 3"
+    },
+    {
+     "san": "d4",
+     "uci": "d2d4",
+     "isUser": true,
+     "classification": "best",
+     "wpDrop": 0,
+     "cpLoss": 0,
+     "bestCp": 30,
+     "afterCp": 30,
+     "fen": "rnbqkbnr/pp2pppp/3p4/2p5/3PP3/5N2/PPP2PPP/RNBQKB1R b KQkq - 0 3"
+    }
+   ],
+   "trie": {
+    "rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq -": [
+     {
+      "san": "Nf3",
+      "uci": "g1f3"
+     }
+    ]
+   },
+   "expected": {
+    "tally": {
+     "great": 0,
+     "best": 3,
+     "excellent": 0,
+     "good": 0,
+     "book": 0,
+     "miss": 0,
+     "inaccuracy": 0,
+     "mistake": 0,
+     "blunder": 0
+    },
+    "accuracy": 100,
+    "keyMoves": [
+     2
+    ],
+    "deviations": [
+     [
+      2,
+      "g1f3"
+     ]
+    ],
+    "corrected": [
+     [
+      2,
+      "b1c3"
+     ]
+    ],
+    "evalPoints": [
+     {
+      "idx": -1,
+      "cp": 30
+     },
+     {
+      "idx": 0,
+      "cp": 30
+     },
+     {
+      "idx": 1,
+      "cp": 30
+     },
+     {
+      "idx": 2,
+      "cp": 30
+     },
+     {
+      "idx": 3,
+      "cp": 30
+     },
+     {
+      "idx": 4,
+      "cp": 30
+     }
+    ]
+   }
+  },
+  {
+   "name": "corrected deviation no longer: the tried move is in the repertoire now",
+   "baseFen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+   "moves": [
+    {
+     "san": "e4",
+     "uci": "e2e4",
+     "isUser": true,
+     "classification": "best",
+     "wpDrop": 0,
+     "cpLoss": 0,
+     "bestCp": 30,
+     "afterCp": 30,
+     "fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1"
+    },
+    {
+     "san": "c5",
+     "uci": "c7c5",
+     "isUser": false,
+     "fen": "rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2"
+    },
+    {
+     "san": "Nf3",
+     "uci": "g1f3",
+     "isUser": true,
+     "classification": "best",
+     "wpDrop": 0,
+     "cpLoss": 0,
+     "bestCp": 30,
+     "afterCp": 30,
+     "repTried": {
+      "san": "Nc3",
+      "uci": "b1c3"
+     },
+     "fen": "rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2"
+    },
+    {
+     "san": "d6",
+     "uci": "d7d6",
+     "isUser": false,
+     "fen": "rnbqkbnr/pp2pppp/3p4/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 0 3"
+    },
+    {
+     "san": "d4",
+     "uci": "d2d4",
+     "isUser": true,
+     "classification": "best",
+     "wpDrop": 0,
+     "cpLoss": 0,
+     "bestCp": 30,
+     "afterCp": 30,
+     "fen": "rnbqkbnr/pp2pppp/3p4/2p5/3PP3/5N2/PPP2PPP/RNBQKB1R b KQkq - 0 3"
+    }
+   ],
+   "trie": {
+    "rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq -": [
+     {
+      "san": "Nf3",
+      "uci": "g1f3"
+     },
+     {
+      "san": "Nc3",
+      "uci": "b1c3"
+     }
+    ]
+   },
+   "expected": {
+    "tally": {
+     "great": 0,
+     "best": 3,
+     "excellent": 0,
+     "good": 0,
+     "book": 0,
+     "miss": 0,
+     "inaccuracy": 0,
+     "mistake": 0,
+     "blunder": 0
+    },
+    "accuracy": 100,
+    "keyMoves": [],
+    "deviations": [],
+    "corrected": [],
+    "evalPoints": [
+     {
+      "idx": -1,
+      "cp": 30
+     },
+     {
+      "idx": 0,
+      "cp": 30
+     },
+     {
+      "idx": 1,
+      "cp": 30
+     },
+     {
+      "idx": 2,
+      "cp": 30
+     },
+     {
+      "idx": 3,
+      "cp": 30
+     },
+     {
+      "idx": 4,
+      "cp": 30
+     }
+    ]
    }
   }
  ],

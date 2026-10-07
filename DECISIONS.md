@@ -1290,3 +1290,14 @@ The technical calls, each with its reason:
 - **Left out**: starting a line by moving an opponent's piece (mistake-lab's own issue #23 is open on
   it) and Copy as PGN; promotions in a branch are the user's choice, where mistake-lab always queens.
 
+## Revision of 2026-10-07 (practice: resume, premoves, the repertoire check, the hint; §6 item 2)
+- **The repertoire check runs in every game practised from a position** (from a game's move, after a
+  mistake card, from the analysis board), not only mistake-lab's filter practice: the site has one kind
+  of practice game, and the check only asks before ply 20 where the repertoire has a move.
+- **A move taken back is kept with the game, not added to the Repertoire check**: mistake-lab saves it
+  as a custom deviation, which the migration turns into repertoire content (D15's revision); a move
+  the user got wrong while practising isn't repertoire content. The review and the history entry show
+  it ("corrected: you first tried e6").
+- **The game in play is kept in this device's storage** (`repworks-practice-game`), not synced: it is
+  a game in progress on one device, as mistake-lab's is; four hours, two moves, as mistake-lab's.
+

@@ -212,6 +212,11 @@ couldn't be tested then (the day's limit was used up), so the training items bel
   wait while Stockfish extends it), a move of your own on the board (a branch in brackets), back
   before your move (Try again); after a right move, Show the engine's line. Whether the lines read as
   mistake-lab's and the waits on the phone are bearable.
+- §6 item 2 (phone, then desktop): a practice game from an opening position of your repertoire
+  ("Practise from here" on an early move): a move off the repertoire taken back (the study move
+  named), the Hint, Ignore for this game; a premove while the opponent thinks; on the phone, switch to
+  another app for a while and come back (or reload): "Game in progress", Resume; Stop & review: the
+  corrected deviation in the key moves.
 - §5.66: the owner's answer on where the analyzer's output lives (PLAN.md, Phase 5, "The owner's
   choice"): (a) the data repo through a converter, recommended, or (b) the Gist, read-only.
 

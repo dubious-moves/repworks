@@ -31,6 +31,8 @@ export interface BoardProps {
   onShapes(shapes: Shape[]): void;
   /** Shapes drawn but not the chapter's (the engine's arrows, §5.31). */
   autoShapes?: readonly { orig: string; dest?: string; brush: string; lineWidth?: number }[];
+  /** Premoves for `color` while the other side is to move (a practice game): the one set, and its events. */
+  premove?: { color: 'white' | 'black'; current: [Key, Key] | undefined; onSet(orig: Key, dest: Key): void; onUnset(): void };
 }
 
 const BRUSHES: readonly string[] = ['green', 'red', 'blue', 'yellow'];
@@ -46,7 +48,8 @@ function config(p: BoardProps): Config {
     turnColor: p.turn,
     check: p.check,
     lastMove: p.lastMove,
-    movable: { free: false, color: p.dests.size && !p.drawMode ? p.turn : undefined, dests: p.dests, showDests: true },
+    movable: { free: false, color: p.drawMode ? undefined : p.dests.size ? p.turn : p.premove && p.premove.color !== p.turn ? p.premove.color : undefined, dests: p.dests, showDests: true },
+    premovable: { enabled: !!p.premove, showDests: true },
     draggable: { enabled: !p.drawMode },
     selectable: { enabled: !p.drawMode },
     drawable: {
@@ -92,6 +95,7 @@ export function Board(p: BoardProps) {
         },
       },
       movable: { ...config(props.current).movable, events: { after: (orig, dest) => props.current.onMove(orig, dest) } },
+      premovable: { ...config(props.current).premovable, events: { set: (orig, dest) => props.current.premove?.onSet(orig, dest), unset: () => props.current.premove?.onUnset() } },
     });
     api.current = board;
 
@@ -148,6 +152,8 @@ export function Board(p: BoardProps) {
   // notation has already left.
   useLayoutEffect(() => {
     api.current?.set(config(p));
+    // A premove played or dropped by the game is taken off the board too.
+    if (api.current?.state.premovable.current && !p.premove?.current) api.current.cancelPremove();
   });
 
   return (

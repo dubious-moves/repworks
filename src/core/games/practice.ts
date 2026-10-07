@@ -141,6 +141,48 @@ export interface PlayedMove {
   /** The score after the move, for the user. */
   afterCp?: number;
   bestMoveUci?: string;
+  /** The move first tried here and taken back by the repertoire check (mistake-lab's `repTried`). */
+  repTried?: { san: string; uci: string };
+}
+
+/** The repertoire check while practising asks before this ply (mistake-lab's FILTER PRACTICE: `ply < 20`). */
+export const REP_CHECK_PLIES = 20;
+
+/** A position's ply from its FEN's move number and side to move (mistake-lab's `(moveNum - 1) * 2 + (black ? 1 : 0)`). */
+export function plyOfFen(fen: string): number {
+  const [, turn, , , , full] = fen.split(' ');
+  return ((parseInt(full ?? '1', 10) || 1) - 1) * 2 + (turn === 'b' ? 1 : 0);
+}
+
+/**
+ * The repertoire check on a move about to be played while practising: a move the repertoire
+ * doesn't have, at a position before ply 20 where it has one, is taken back (`refuse`, the
+ * repertoire's move); unless ignored for this game.
+ */
+export function repertoireCheck(fen: string, entries: readonly { uci: string; san?: string }[] | undefined, move: { uci: string; san?: string }, ignored: boolean): { refuse: false } | { refuse: true; uci: string; san: string | undefined } {
+  if (ignored || !entries?.length || plyOfFen(fen) >= REP_CHECK_PLIES) return { refuse: false };
+  if (entries.some((e) => e.uci === move.uci || (!!e.san && e.san === move.san))) return { refuse: false };
+  return { refuse: true, uci: entries[0]!.uci, san: entries[0]!.san };
+}
+
+/** What the repertoire says of a user's move: its own (`own`), or another move it has there (`dev`); `tried` for a corrected deviation. */
+export interface RepertoireVerdict {
+  own: boolean;
+  dev?: string;
+  tried?: string;
+}
+
+/**
+ * A user's move against the repertoire's moves at its position (the first its main one), as
+ * `buildContLineReviewData` stamps `_repDeviation`: a move it doesn't have is a deviation; its own
+ * move, played after the repertoire check took back another it doesn't have, a corrected one.
+ */
+export function repertoireVerdict(entries: readonly { uci: string; san?: string }[] | undefined, move: { uci: string; san?: string; repTried?: { uci: string; san?: string } }): RepertoireVerdict {
+  if (!entries?.length) return { own: false };
+  const has = (m: { uci: string; san?: string }) => entries.some((e) => e.uci === m.uci || (!!e.san && e.san === m.san));
+  if (!has(move)) return { own: false, dev: entries[0]!.uci };
+  if (move.repTried && !has(move.repTried)) return { own: true, dev: entries[0]!.uci, tried: move.repTried.uci };
+  return { own: true };
 }
 
 export interface Review {
@@ -151,6 +193,8 @@ export interface Review {
   keyMoves: number[];
   /** Repertoire deviations among the key moves: the repertoire's move there. */
   deviations: Map<number, string>;
+  /** The corrected ones among them: the move first tried. */
+  corrected: Map<number, string>;
   judged: number;
   /** The graph: the score for the user, by move index (−1 the start). */
   evalPoints: { idx: number; cp: number; classification?: Classification }[];
@@ -163,7 +207,7 @@ const CLASSES: Classification[] = ['great', 'best', 'excellent', 'good', 'book',
  * is the repertoire's (`own`, never a key move) or the repertoire has another move there (`dev`,
  * the move it has).
  */
-export function reviewOf(moves: readonly PlayedMove[], repertoire: (i: number) => { own: boolean; dev?: string } = () => ({ own: false })): Review {
+export function reviewOf(moves: readonly PlayedMove[], repertoire: (i: number) => RepertoireVerdict = () => ({ own: false })): Review {
   const tally = Object.fromEntries(CLASSES.map((c) => [c, 0])) as Record<Classification, number>;
   const userMoves = moves.filter((m) => m.isUser && m.classification);
   for (const m of userMoves) tally[m.classification!]++;
@@ -171,10 +215,12 @@ export function reviewOf(moves: readonly PlayedMove[], repertoire: (i: number) =
   const accuracy = userMoves.length ? Math.round((good / userMoves.length) * 100) : 100;
   const keyMoves: number[] = [];
   const deviations = new Map<number, string>();
+  const corrected = new Map<number, string>();
   moves.forEach((m, i) => {
     if (!m.isUser) return;
     const rep = repertoire(i);
     if (rep.dev) deviations.set(i, rep.dev);
+    if (rep.dev && rep.tried) corrected.set(i, rep.tried);
     const isKey = !!m.classification && (m.wpDrop ?? 0) > PRACTICE.keyWp && !rep.own;
     if (isKey || rep.dev) keyMoves.push(i);
   });
@@ -189,7 +235,7 @@ export function reviewOf(moves: readonly PlayedMove[], repertoire: (i: number) =
       if (next) evalPoints.push({ idx: i, cp: next.bestCp! });
     }
   });
-  return { tally, accuracy, keyMoves, deviations, judged: userMoves.length, evalPoints };
+  return { tally, accuracy, keyMoves, deviations, corrected, judged: userMoves.length, evalPoints };
 }
 
 /* ------------------------------------------------------------------ the history */
@@ -226,6 +272,7 @@ export function historyEntry(a: { id: string; ts: number; baseFen: string; color
   const moves = a.moves.map((m) => {
     const o: PlayedMove = { san: m.san, uci: m.uci, isUser: m.isUser };
     for (const k of ['classification', 'wpDrop', 'cpLoss', 'bestCp', 'afterCp', 'bestMoveUci'] as const) if (m[k] !== undefined) (o as unknown as Record<string, unknown>)[k] = m[k];
+    if (m.repTried) o.repTried = { san: m.repTried.san, uci: m.repTried.uci };
     return o;
   });
   return { id: a.id, ts: a.ts, updatedAt: a.ts, baseFen: a.baseFen, playerColor: a.color, source: a.source, outcome: a.outcome, finalCp: a.finalCp === null ? null : Math.round(a.finalCp), openingName: a.title, accuracy: a.review.judged ? a.review.accuracy : null, keyMoveCount: a.review.keyMoves.length, userMoveCount, moves };
@@ -241,6 +288,8 @@ export function readHistoryEntry(o: unknown): HistoryEntry | undefined {
     if (typeof m['classification'] === 'string' && (CLASSES as string[]).includes(m['classification'])) mv.classification = m['classification'] as Classification;
     for (const k of ['wpDrop', 'cpLoss', 'bestCp', 'afterCp'] as const) if (num(m[k]) !== undefined) mv[k] = num(m[k])!;
     if (typeof m['bestMoveUci'] === 'string') mv.bestMoveUci = m['bestMoveUci'];
+    const tried = m['repTried'];
+    if (isObj(tried) && typeof tried['uci'] === 'string' && typeof tried['san'] === 'string') mv.repTried = { san: tried['san'], uci: tried['uci'] };
     moves.push(mv);
   }
   const ts = num(o['ts']) ?? 0;

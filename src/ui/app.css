@@ -3197,3 +3197,17 @@ a.button.disabled {
     display: none;
   }
 }
+.practice-deviation {
+  border-left: 3px solid #8b7dd8;
+  padding: 0.3rem 0.6rem;
+  margin: 0.4rem 0;
+}
+.practice-deviation p {
+  margin: 0 0 0.3rem;
+}
+.rep-dev {
+  color: #8b7dd8;
+}
+.resume-banner .train-board {
+  max-width: 16rem;
+}

@@ -8,11 +8,13 @@
 // - the explorer's 5% share taken of the moves' sum instead of the position's games → "the
 //   explorer's pick" ("5% of the position, not of the moves listed");
 // - a dip counted whatever the move gave up → "the advantage drill" ("a low score by a good move
-//   does not count").
+//   does not count");
+// - a corrected deviation flagged even when the move first tried is in the repertoire now (PLAN.md
+//   §6 item 2) → "the review: …" ("corrected deviation no longer: …").
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { advantageGrade, historyEntry, historyOf, maiaPick, pickExplorerMove, readHistoryEntry, resultOf, reviewOf, startTrack, trackAdvantage, type ExplorerMove, type PlayedMove } from '../../../../src/core/games/practice.ts';
+import { advantageGrade, repertoireVerdict, historyEntry, historyOf, maiaPick, pickExplorerMove, readHistoryEntry, resultOf, reviewOf, startTrack, trackAdvantage, type ExplorerMove, type PlayedMove } from '../../../../src/core/games/practice.ts';
 import { parseLog } from '../../../../src/core/progress/events.ts';
 import { toDeviceEvents, type DeviceEvent } from '../../../../src/core/progress/replay.ts';
 
@@ -20,7 +22,7 @@ const cases = JSON.parse(readFileSync(new URL('../../../fixtures/games/practice.
   explorer: { name: string; data: { white: number; draws: number; black: number; moves: ExplorerMove[] }; rnd: number; expected: string | null }[];
   maia: { name: string; probs: number[]; precision: number; rnd: number; expected: number }[];
   advantage: { name: string; peak: number; steps: [number, number][]; end: 'victory' | 'draw' | 'interrupted'; expected: { collapsedAt: number; claimAt: number; minCp: number | null; above: number; grade: number | null } }[];
-  review: { name: string; baseFen: string; moves: (PlayedMove & { fen: string })[]; trie: Record<string, { san: string; uci: string }[]>; expected: { tally: Record<string, number>; accuracy: number; keyMoves: number[]; deviations: [number, string][]; evalPoints: { idx: number; cp: number }[] } }[];
+  review: { name: string; baseFen: string; moves: (PlayedMove & { fen: string })[]; trie: Record<string, { san: string; uci: string }[]>; expected: { tally: Record<string, number>; accuracy: number; keyMoves: number[]; deviations: [number, string][]; corrected: [number, string][]; evalPoints: { idx: number; cp: number }[] } }[];
   results: { cp: number | null; color: 'white' | 'black'; expected: string }[];
 };
 
@@ -59,15 +61,10 @@ test('the advantage drill: the lowest score, the run at +10, the collapse and th
 test('the review: the tally, the accuracy, the key moves, the deviations and the graph, as mistake-lab’s', () => {
   for (const c of cases.review) {
     const fens = c.moves.map((_, i) => (i === 0 ? c.baseFen : c.moves[i - 1]!.fen));
-    const rep = (i: number) => {
-      const entries = c.trie[fens[i]!.split(' ').slice(0, 4).join(' ')];
-      if (!entries?.length) return { own: false };
-      const m = c.moves[i]!;
-      return entries.some((e) => e.uci === m.uci || e.san === m.san) ? { own: true } : { own: false, dev: entries[0]!.uci };
-    };
+    const rep = (i: number) => repertoireVerdict(c.trie[fens[i]!.split(' ').slice(0, 4).join(' ')], c.moves[i]!);
     const r = reviewOf(c.moves, rep);
     assert.deepEqual(
-      { tally: r.tally, accuracy: r.accuracy, keyMoves: r.keyMoves, deviations: [...r.deviations], evalPoints: r.evalPoints.map((p) => ({ idx: p.idx, cp: p.cp })) },
+      { tally: r.tally, accuracy: r.accuracy, keyMoves: r.keyMoves, deviations: [...r.deviations], corrected: [...r.corrected], evalPoints: r.evalPoints.map((p) => ({ idx: p.idx, cp: p.cp })) },
       { ...c.expected, tally: c.expected.tally },
       c.name,
     );

@@ -73,7 +73,7 @@ for (const c of cases.review) {
   w.set({ repertoireTrie: new Map(Object.entries(c.trie)), contLine: { baseFen: c.baseFen, moves: c.moves.map((m) => ({ ...m })) } });
   const d = w.buildContLineReviewData();
   const moves = w.get('contLine').moves;
-  c.expected = { tally: d.tally, accuracy: d.accuracy, keyMoves: d.keyMoves, deviations: moves.map((m, i) => (m._repDeviation ? [i, m._repDeviation.uci] : null)).filter(Boolean), evalPoints: d.evalPoints.map((p) => ({ idx: p.idx, cp: p.cp })) };
+  c.expected = { tally: d.tally, accuracy: d.accuracy, keyMoves: d.keyMoves, deviations: moves.map((m, i) => (m._repDeviation ? [i, m._repDeviation.uci] : null)).filter(Boolean), corrected: moves.map((m, i) => (m._repDeviation?.corrected ? [i, m._repDeviation.tried.uci] : null)).filter(Boolean), evalPoints: d.evalPoints.map((p) => ({ idx: p.idx, cp: p.cp })) };
 }
 for (const c of cases.results) {
   const w = world();

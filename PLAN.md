@@ -4290,8 +4290,8 @@ date (colour and speed filters, the correspondence bucket, as mistake-lab's). Te
 of `test/fixtures/games/practice.json` (`mistake-lab-practice.cjs` runs its functions at `c525403` in
 a sandbox; two controls), and `test/e2e/practice.spec.ts` (desktop and phone: a game against the fake
 explorer stopped after five moves, its review, a practice mistake saved, the history after a reload,
-the events synced; an advantage card's collapse graded Again). Not built: the corrected-deviation
-banner during practice ("Ignore for this game?") and resuming a game after a reload.
+the events synced; an advantage card's collapse graded Again). The corrected-deviation banner and
+resuming a game after a reload came with §6's second item (below).
 
 #### 5.58 Deviations from the repertoire in real games
 
@@ -4581,6 +4581,29 @@ step** on ten cases of `test/fixtures/games/engineline.json` (`mistake-lab-engin
 engine whose answers are recorded; two controls), and `test/e2e/games.spec.ts` (desktop and phone: the
 line after a right move shown and hidden; after a blunder, stepped, extended, branched, and back to Try
 again).
+
+**As built, item 2** (2026-10-07): in `src/app/practice.ts` and `src/ui/Practice.tsx`, for a game
+practised from a position (Practise from here, Play on, the analysis board's Practise): **the
+repertoire check** (`repertoireCheck` in `src/core/games/practice.ts`: before ply 20, at a position
+where the repertoire has a move of the user's side, a move it doesn't have, by UCI or SAN, is taken
+back with "e6 isn't your repertoire: the study move is d6" and Ignore for this game; the first move
+tried there is kept with the move then played, `repTried`, in the game and its history entry; the
+review marks it "corrected: you first tried e6", `repertoireVerdict`, mistake-lab's
+`_repDeviation` with `corrected`); **the hint** (the repertoire's move at the position, else
+Stockfish's best, the piece then the arrow; H); **premoves** (chessground's, set while the opponent
+thinks, played after its move when legal, a pawn to the last rank a queen, dropped otherwise); and
+**the game kept on the device** (`src/core/games/resume.ts`: saved at every change, offered within
+four hours from two moves played, on the practice screen after a reload and on the Games screen;
+cleared when the game ends or is left; every kind, an advantage drill resumed on the practice screen
+records its grade itself). With voice on, a move taken back is said ("Repertoire deviation. Study
+move is d6"). Not as mistake-lab: a move taken back isn't added to the Repertoire check's
+deviations (mistake-lab saves it as a custom deviation; here the review and the history keep it),
+and the check runs in every game practised from a position, where mistake-lab's runs in its filter
+practice only. Tests: `test/unit/core/games/practice.test.ts` (**the corrected deviation as
+mistake-lab's own `buildContLineReviewData`** on two new cases of `practice.json`, one control),
+`test/unit/core/games/resume.test.ts` (the four hours, two moves, the ply-20 window, the check's
+matching; two controls), `test/e2e/practice.spec.ts` (desktop and phone: e6 taken back, the hint,
+d6, a premove played after a slow opponent, a reload and Resume, the review's corrected deviation).
 
 Side tasks, outside this repo:
 - **Chessable courses**: the owner's own export script (D14). Its PGN imports like any other

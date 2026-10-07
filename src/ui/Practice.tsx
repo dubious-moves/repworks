@@ -11,7 +11,7 @@ import type { Key } from '@lichess-org/chessground/types';
 import { open } from '../app/mode.ts';
 import { recordEvent } from '../app/state.ts';
 import { practiceHistory, savedDeck } from '../app/games.ts';
-import { claimVictory, gameOfHistory, loadOpponent, saveOpponent, judge, leavePractice, practice, practiceMove, practiceReview, startPractice, stopPractice, type Opponent, type PracticeGame, type PracticeMove } from '../app/practice.ts';
+import { claimVictory, clearPremove, discardSaved, gameOfHistory, ignoreRepertoire, loadOpponent, practiceHint, resumePractice, savedPractice, saveOpponent, judge, leavePractice, practice, practiceMove, practiceReview, setPremove, startPractice, stopPractice, type Opponent, type PracticeGame, type PracticeMove } from '../app/practice.ts';
 import { parseUciMove, standardUci } from '../core/chess/uci.ts';
 import { makeFen } from 'chessops/fen';
 import { CLASSIFICATION } from '../core/games/grade.ts';
@@ -19,7 +19,7 @@ import { PRACTICE } from '../core/games/practice.ts';
 import { practiceMistakeItem, practiceMistakeSaved } from '../core/games/saved.ts';
 import { gameCard } from '../core/progress/cards.ts';
 import { positionOf } from '../core/storm/walk.ts';
-import { Board } from './Board.tsx';
+import { Board, type BoardProps } from './Board.tsx';
 import { answerPending, repeatOpponent, setVoiceConfirm, voice, voiceConfirm, voiceOff, voiceOn } from '../app/voice.ts';
 import { useWakeLock } from './Train.tsx';
 
@@ -62,7 +62,7 @@ function OpponentSettings(props: { value: Opponent; onChange(o: Opponent): void 
 
 /* ------------------------------------------------------------------ a board that takes moves */
 
-export function MoveBoard(props: { fen: string; orientation: 'white' | 'black'; movable: boolean; lastUci?: string | undefined; arrows?: { orig: string; dest?: string; brush: string }[]; onMove(uci: string): void }) {
+export function MoveBoard(props: { fen: string; orientation: 'white' | 'black'; movable: boolean; lastUci?: string | undefined; arrows?: { orig: string; dest?: string; brush: string }[]; onMove(uci: string): void; premove?: BoardProps['premove'] }) {
   const pos = useMemo(() => positionOf(props.fen), [props.fen]);
   const [promotion, setPromotion] = useState<{ orig: Key; dest: Key } | undefined>(undefined);
   if (!pos) return null;
@@ -76,7 +76,7 @@ export function MoveBoard(props: { fen: string; orientation: 'white' | 'black'; 
   };
   return (
     <div class="train-board">
-      <Board fen={props.fen} orientation={props.orientation} turn={pos.turn} dests={dests} lastMove={last} check={pos.isCheck()} shapes={[]} autoShapes={props.arrows ?? []} drawMode={false} brush="green" onMove={onMove} onShapes={() => undefined} />
+      <Board fen={props.fen} orientation={props.orientation} turn={pos.turn} dests={dests} lastMove={last} check={pos.isCheck()} shapes={[]} autoShapes={props.arrows ?? []} drawMode={false} brush="green" onMove={onMove} onShapes={() => undefined} {...(props.premove ? { premove: props.premove } : {})} />
       {promotion && (
         <div class="promotion" role="dialog" aria-label="Promote to">
           {(['queen', 'rook', 'bishop', 'knight'] as Role[]).map((role) => (
@@ -116,6 +116,15 @@ const GRADE_WORD = { 1: 'Again', 2: 'Hard', 3: 'Good', 4: 'Easy' } as const;
 export function PracticeBoard(props: { onNext?: () => void }) {
   const p = practice.value;
   useWakeLock(!!p && p.phase !== 'over');
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = (e.target as HTMLElement | null)?.tagName;
+      if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT' || e.key !== 'h') return;
+      void practiceHint();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
   if (!p) return <p class="muted">Setting up…</p>;
   if (p.phase === 'over') return <PracticeReview game={p} onNext={props.onNext} />;
   const s = p.setup;
@@ -124,9 +133,13 @@ export function PracticeBoard(props: { onNext?: () => void }) {
   const lastUser = [...p.moves].reverse().find((m) => m.isUser);
   const cls = !s.silent && lastUser?.classification ? CLASSIFICATION[lastUser.classification] : undefined;
   const userMoves = p.moves.filter((m) => m.isUser).length;
+  const hint = p.hint?.fen === fen && p.hint.uci ? p.hint : undefined;
+  const arrows = hint ? [{ orig: hint.uci!.slice(0, 2), ...(hint.level === 2 ? { dest: hint.uci!.slice(2, 4) } : {}), brush: 'blue' }] : [];
+  const canHint = s.kind === 'practice' && p.phase === 'user';
+  const premove: BoardProps['premove'] = { color: s.color, current: p.premove ? [p.premove.from as Key, p.premove.to as Key] : undefined, onSet: (o, d) => setPremove(o, d), onUnset: clearPremove };
   return (
-    <div class="train-grid practice-game" data-phase={p.phase} data-moves={p.moves.length}>
-      <MoveBoard fen={fen} orientation={s.color} movable={p.phase === 'user'} lastUci={last?.uci} onMove={(u) => void practiceMove(u)} />
+    <div class="train-grid practice-game" data-phase={p.phase} data-moves={p.moves.length} data-premove={p.premove ? p.premove.from + p.premove.to : ''}>
+      <MoveBoard fen={fen} orientation={s.color} movable={p.phase === 'user'} lastUci={last?.uci} arrows={arrows} onMove={(u) => void practiceMove(u)} premove={premove} />
       <div class="train-panel">
         <p class="train-counters">
           {s.kind === 'advantage' ? 'Convert the advantage' : s.kind === 'checklist' ? `Checklist · ${s.preset}` : 'Practice'} · {s.title}
@@ -140,6 +153,16 @@ export function PracticeBoard(props: { onNext?: () => void }) {
                 ? 'Your move (the last one is being judged)'
                 : 'Your move'}
         </p>
+        {p.deviation && (
+          <div class="practice-deviation" role="status" data-testid="practice-deviation">
+            <p>
+              📖 <strong>{p.deviation.san}</strong> isn’t your repertoire: the study move is <strong>{p.deviation.repSan}</strong>.
+            </p>
+            <button type="button" class="secondary" onClick={ignoreRepertoire}>
+              Ignore for this game
+            </button>
+          </div>
+        )}
         {p.source && !s.silent && <p class="muted">Opponent: {p.source}</p>}
         {p.note && <p class="muted">{p.note}</p>}
         <MoveList moves={p.moves} baseFen={s.fen} />
@@ -148,6 +171,11 @@ export function PracticeBoard(props: { onNext?: () => void }) {
           {p.claim && (
             <button type="button" onClick={claimVictory}>
               Claim victory
+            </button>
+          )}
+          {canHint && (
+            <button type="button" class="secondary" title="The repertoire’s move, else Stockfish’s: the piece, then the move (H)" disabled={hint?.level === 2} onClick={() => void practiceHint()}>
+              Hint
             </button>
           )}
           <button type="button" class="secondary" onClick={stopPractice} title={userMoves < PRACTICE.reviewMinMoves ? `Kept in the history from ${PRACTICE.reviewMinMoves} of your moves` : 'End here and review the game'}>
@@ -337,12 +365,13 @@ export function PracticeReview(props: { game: PracticeGame; onNext?: (() => void
               const mv = g.moves[i]!;
               const cls = mv.classification ? CLASSIFICATION[mv.classification] : undefined;
               const dev = review.deviations.get(i);
+              const tried = review.corrected.has(i) ? mv.repTried?.san : undefined;
               return (
                 <li key={i} class={key === i ? 'current' : ''}>
                   <button type="button" class="link" onClick={() => (setKey(i), setRetry(undefined), setLine(undefined), setSavedNote(undefined))}>
                     {mv.san}
                   </button>{' '}
-                  <span style={cls ? { color: cls.colour } : undefined}>{dev ? 'off the repertoire' : (cls?.word ?? '')}</span>
+                  <span style={cls && !dev ? { color: cls.colour } : undefined} class={dev ? 'rep-dev' : ''}>{tried ? `📖 corrected: you first tried ${tried}` : dev ? '📖 off the repertoire' : (cls?.word ?? '')}</span>
                   {mv.wpDrop ? <span class="muted"> −{mv.wpDrop}%</span> : null}
                   {key === i && (
                     <div class="actions">
@@ -398,12 +427,28 @@ export function PracticeReview(props: { game: PracticeGame; onNext?: (() => void
 /** `#/practice?fen=…`: a game from any position. */
 export function PracticeScreen(props: { fen: string; side?: 'white' | 'black' | undefined }) {
   const [opponent, setOpponent] = useState(loadOpponent);
-  useEffect(() => {
+  // A game kept on this device (a reload, a switch of app) is offered first; one just resumed is played on.
+  const [saved, setSaved] = useState(() => (practice.peek()?.phase !== 'over' && practice.peek()?.setup.fen === props.fen ? undefined : savedPractice()));
+  const start = () => {
     const pos = positionOf(props.fen);
     if (pos) startPractice({ kind: 'practice', fen: props.fen, color: props.side ?? pos.turn, silent: false, title: 'From a position', opponent });
+  };
+  useEffect(() => {
+    const live = practice.peek();
+    if (!saved && !(live && live.phase !== 'over' && live.setup.fen === props.fen)) start();
     return () => leavePractice();
   }, [props.fen, props.side]);
   const ok = !!positionOf(props.fen);
+  if (saved)
+    return (
+      <div class="games">
+        <ResumeBanner
+          onResume={() => (resumePractice(saved), setSaved(undefined))}
+          onDiscard={() => (discardSaved(), setSaved(undefined), start())}
+          saved={saved}
+        />
+      </div>
+    );
   return (
     <div class="games">
       <div class="chapter-head">
@@ -443,5 +488,28 @@ export function HistoryScreen(props: { id: string }) {
       </div>
       {game ? <PracticeReview game={game} /> : <p class="warn">That practice game isn’t in the history on this device.</p>}
     </div>
+  );
+}
+
+/** A practice game kept on this device: Resume or Discard (mistake-lab's "Game in progress"). */
+export function ResumeBanner(props: { saved: NonNullable<ReturnType<typeof savedPractice>>; onResume(): void; onDiscard(): void }) {
+  const g = props.saved.game;
+  const fen = g.moves.at(-1)?.fen ?? g.setup.fen;
+  return (
+    <section class="card resume-banner" data-testid="practice-resume">
+      <p>
+        <strong>Game in progress</strong> · {g.setup.title} · {g.moves.length} move{g.moves.length === 1 ? '' : 's'} played ·{' '}
+        <span class="muted">{new Date(props.saved.savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+      </p>
+      <MoveBoard fen={fen} orientation={g.setup.color} movable={false} lastUci={g.moves.at(-1)?.uci} onMove={() => undefined} />
+      <div class="actions">
+        <button type="button" onClick={props.onResume}>
+          Resume
+        </button>
+        <button type="button" class="secondary" onClick={props.onDiscard}>
+          Discard
+        </button>
+      </div>
+    </section>
   );
 }

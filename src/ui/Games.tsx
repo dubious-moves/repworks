@@ -27,7 +27,8 @@ import { resultFor, type GameRecord } from '../core/games/record.ts';
 import { gameCard } from '../core/progress/cards.ts';
 import { positionOf } from '../core/storm/walk.ts';
 import { Board } from './Board.tsx';
-import { PracticeBoard } from './Practice.tsx';
+import { PracticeBoard, ResumeBanner } from './Practice.tsx';
+import { discardSaved, resumePractice, savedPractice } from '../app/practice.ts';
 import { useWakeLock } from './Train.tsx';
 
 const sq = (u: string, i: number) => u.slice(i, i + 2) as SquareName;
@@ -87,8 +88,16 @@ function Home() {
   const hist = practiceHistory.value.filter((h) => (!f.color || h.playerColor === f.color) && (!f.speed.length || f.speed.includes('correspondence')));
   const shown: ({ at: number; row: GameRow } | { at: number; h: HistoryEntry })[] = [...(rows ?? []).filter((r) => passes(r, f)).map((row) => ({ at: row.game.createdAt, row })), ...hist.map((h) => ({ at: h.ts, h }))].sort((a, b) => b.at - a.at);
   const filter = (patch: Partial<GameFilters>) => setGamesPrefs({ filters: { ...f, ...patch } });
+  const [saved, setSaved] = useState(savedPractice);
   return (
     <>
+      {saved && (
+        <ResumeBanner
+          saved={saved}
+          onResume={() => (resumePractice(saved), open({ name: 'playOn', fen: saved.game.setup.fen, side: saved.game.setup.color }))}
+          onDiscard={() => (discardSaved(), setSaved(undefined))}
+        />
+      )}
       <section class="card games-cards">
         <div class="card-head">
           <h2>Game cards</h2>

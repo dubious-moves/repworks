@@ -4,6 +4,10 @@
 // line, saved as a practice mistake), the history entry after a reload, and the events synced.
 // Then an advantage card from mistake-lab's Gist, drilled in the game cards' session: the user's
 // move lets the advantage fall to +0.6, which ends the drill as a collapse, graded Again.
+// Then (PLAN.md §6, item 2) a game as Black from 1.e4 against the test repertoire (1...c5 2.Nf3 d6
+// 3.d4 cxd4): 2...e6 taken back ("isn't your repertoire"), the hint, 2...d6 played; a premove
+// (3...cxd4) set while the opponent thinks and played after its move; the page reloaded and the game
+// resumed; its review showing the corrected deviation.
 import { test, expect, type Page } from '@playwright/test';
 import { Chess } from 'chessops/chess';
 import { makeFen } from 'chessops/fen';
@@ -204,4 +208,73 @@ test('voice input (§5.63): a move said and played, the opponent’s spoken, a m
   await page.evaluate(() => (window as unknown as { __say(a: string[]): void }).__say(['yes']));
   await expect(game).toHaveAttribute('data-moves', '4');
   await expect(page.getByTestId('practice-moves')).toContainText('2. Nf3');
+});
+
+test('practising from a position: the repertoire check, the hint, a premove, and the game resumed after a reload', async ({ page }) => {
+  await setUp(page);
+  const line = ['e4', 'c5', 'Nf3', 'd6', 'd4', 'cxd4', 'Nxd4', 'Nf6', 'Nc3', 'a6', 'Be2'];
+  const ex = fakeExplorer();
+  for (let i = 2; i < line.length; i += 2) {
+    const pos = Chess.default();
+    for (const san of line.slice(0, i)) pos.play(parseSan(pos, san)!);
+    ex.games.set(after(line.slice(0, i)).key, [{ san: line[i]!, uci: makeUci(parseSan(pos, line[i]!)!), white: 40, draws: 20, black: 40 }]);
+  }
+  await serveExplorer(page, ex);
+  // The opponent's 3.d4 comes late, so a premove can be set while it thinks.
+  const slow = after(line.slice(0, 4)).key;
+  await page.route('https://explorer.lichess.org/**', async (route) => {
+    const fen = new URL(route.request().url()).searchParams.get('fen') ?? '';
+    if (route.request().method() !== 'OPTIONS' && fen.split(' ').slice(0, 4).join(' ') === slow) await new Promise((r) => setTimeout(r, 2500));
+    await route.fallback();
+  });
+  await page.evaluate((fen) => (location.hash = '#/practice?fen=' + encodeURIComponent(fen)), after(['e4']).fen);
+  const game = page.locator('.practice-game');
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  const move = async (uci: string) => {
+    await clickSquare(page, uci.slice(0, 2), 'black');
+    await clickSquare(page, uci.slice(2, 4), 'black');
+  };
+  await move('c7c5');
+  await expect(game).toHaveAttribute('data-moves', '2');
+  await expect(game).toHaveAttribute('data-phase', 'user');
+
+  // Off the repertoire: taken back, the study move named; the hint points at it.
+  await move('e7e6');
+  await expect(page.getByTestId('practice-deviation')).toContainText('e6 isn’t your repertoire: the study move is d6');
+  await expect(game).toHaveAttribute('data-moves', '2');
+  const hint = page.getByRole('button', { name: 'Hint' });
+  await hint.click();
+  await hint.click();
+  await expect(hint).toBeDisabled();
+  await move('d7d6');
+  await expect(page.getByTestId('practice-deviation')).toHaveCount(0);
+  await expect(game).toHaveAttribute('data-moves', '3');
+
+  // A premove while the opponent thinks, played once it has moved.
+  await expect(game).toHaveAttribute('data-phase', 'opponent');
+  await move('c5d4');
+  await expect(game).toHaveAttribute('data-premove', 'c5d4');
+  await expect(game).toHaveAttribute('data-moves', '6');
+  await expect(game).toHaveAttribute('data-premove', '');
+  await expect(game).toHaveAttribute('data-phase', 'user');
+
+  // A reload: the game offered again, and resumed where it was.
+  await page.reload();
+  const banner = page.getByTestId('practice-resume');
+  await expect(banner).toContainText('6 moves played');
+  await banner.getByRole('button', { name: 'Resume' }).click();
+  await expect(game).toHaveAttribute('data-moves', '6');
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  await move('g8f6');
+  await expect(game).toHaveAttribute('data-moves', '8');
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  await move('a7a6');
+  await expect(game).toHaveAttribute('data-moves', '10');
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  await page.getByRole('button', { name: 'Stop & review' }).click();
+  const review = page.getByTestId('practice-review');
+  await expect(review.getByTestId('practice-keys')).toContainText('d6 📖 corrected: you first tried e6');
+  // Ended: nothing is offered again.
+  await page.reload();
+  await expect(page.getByTestId('practice-resume')).toHaveCount(0);
 });
