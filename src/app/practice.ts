@@ -212,7 +212,8 @@ function played(fen: string, uci: string): { san: string; fen: string } | undefi
 /* ------------------------------------------------------------------ judging the user's moves */
 
 const searches = new Map<string, Promise<Awaited<ReturnType<typeof analyseForStorm>>>>();
-function analyse(fen: string, lines: number) {
+/** A position's lines at the judges' depth, kept for the review (its lines and its eval bar ask again). */
+export function analyse(fen: string, lines: number) {
   const key = `${fen}|${lines}`;
   let p = searches.get(key);
   if (!p) {

@@ -4495,6 +4495,28 @@ explorer stopped after five moves, its review, a practice mistake saved, the his
 the events synced; an advantage card's collapse graded Again). The corrected-deviation banner and
 resuming a game after a reload came with §6's second item (below).
 
+**The review reworked** (2026-10-07, the owner's note: "more like mistake-lab", whose Game Review
+was read at its current `main`: `showReviewKeyMoveInfo`, `showReviewBestArrow`,
+`showReviewBestLine`, `showReviewRefutation`, `handleReviewRetryResult`): the board with an eval bar
+beside it (the judges' scores, `positionEvals`: before and after each user move, an opponent's move
+by the next user move's; a position no judge scored searched once; a line's own score while it is
+shown) and the move's classification as a badge on its square's corner; ⏮ ◀ ▶ ⏭, ← → Home End
+through the whole game, opened on its last move; the summary (the result, the accuracy, the tally
+in mistake-lab's colours, the graph with the key moves as dots, the key moves); the move's card
+(its word and colour, the loss, the repertoire's note, ↺ Retry, Show best (the board before the
+move, the best move's arrow green and the move played red, the best move named), Show line (the
+best move and Stockfish's line after it, ten plies), Show refutation (the move and the opponent's
+best answer, opened on the answer; more than 5 points given up, mistake-lab's rule), Save as a
+mistake, Make a sequence, ◀ ▶ between the key moves); a retry's result as mistake-lab's card (★
+Best move!, better than the original, its own Show best, Show line and Show refutation, Try again,
+Next key move); the lines are the game cards' engine line (`core/games/engineLine.ts`, a `plies`
+option): stepped, extended past their end, branched by a move on the board (`src/app/reviewLine.ts`,
+the panel shared as `src/ui/EngineLinePanel.tsx`); the move list in two columns. On a phone the
+move's card comes first under the board. Tests: `positionEvals` and the longer line (unit); the
+practice game's e2e (desktop and phone) steps the game, checks the badge and the eval, opens Show
+best, Show line (stepped) and Show refutation, retries the best move. Real games' view
+(`#/games/<id>`) is unchanged.
+
 #### 5.58 Deviations from the repertoire in real games
 
 - `deviations.ts`: each game walked against the repertoire index for the user's colour; the first

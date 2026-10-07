@@ -68,14 +68,14 @@ export function continuation(fen: string, pv: readonly string[], max = ENGINE_LI
 }
 
 /**
- * The line after the user's move: the move, then the engine's continuation to six plies, opened at
- * the opponent's reply (or at `startIdx`). Nothing when the engine gave no continuation.
+ * The line after the user's move: the move, then the engine's continuation to six plies (`plies`),
+ * opened at the opponent's reply (or at `startIdx`). Nothing when the engine gave no continuation.
  */
-export function buildEngineLine(baseFen: string, userUci: string, cont: readonly string[], cpWhite: number | null, opts: { wrongMove?: boolean; startIdx?: number } = {}): EngineLine | undefined {
+export function buildEngineLine(baseFen: string, userUci: string, cont: readonly string[], cpWhite: number | null, opts: { wrongMove?: boolean; startIdx?: number; plies?: number } = {}): EngineLine | undefined {
   const pos = positionOf(baseFen);
   const user = pos && play(pos, userUci);
   if (!pos || !user) return undefined;
-  const moves = [{ ...user, isUser: true }, ...continuation(user.fen, cont, ENGINE_LINE_PLY - 1)];
+  const moves = [{ ...user, isUser: true }, ...continuation(user.fen, cont, (opts.plies ?? ENGINE_LINE_PLY) - 1)];
   if (moves.length <= 1) return undefined;
   return { baseFen, moves, currentIdx: opts.startIdx ?? 1, alternatives: [], activeAlt: -1, cpWhite, wrongMove: !!opts.wrongMove };
 }

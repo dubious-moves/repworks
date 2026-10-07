@@ -31,6 +31,8 @@ export interface BoardProps {
   onShapes(shapes: Shape[]): void;
   /** Shapes drawn but not the chapter's (the engine's arrows, §5.31). */
   autoShapes?: readonly { orig: string; dest?: string; brush: string; lineWidth?: number }[];
+  /** A move's classification on its square's corner (a game's review: mistake-lab's badge). */
+  badge?: { square: string; symbol: string; colour: string; word: string } | undefined;
   /** Premoves for `color` while the other side is to move (a practice game): the one set, and its events. */
   premove?: { color: 'white' | 'black'; current: [Key, Key] | undefined; onSet(orig: Key, dest: Key): void; onUnset(): void };
 }
@@ -159,6 +161,21 @@ export function Board(p: BoardProps) {
   return (
     <div class={`board${p.drawMode ? ' board-draw' : ''}`} ref={wrap}>
       <div class="cg-host" ref={el} />
+      {p.badge && <Badge {...p.badge} orientation={p.orientation} />}
     </div>
+  );
+}
+
+/** The badge at the square's top right corner, kept on the board at its edge. */
+function Badge(props: { square: string; symbol: string; colour: string; word: string; orientation: 'white' | 'black' }) {
+  const file = props.square.charCodeAt(0) - 97;
+  const rank = Number(props.square[1]) - 1;
+  if (!(file >= 0 && file < 8 && rank >= 0 && rank < 8)) return null;
+  const col = props.orientation === 'white' ? file : 7 - file;
+  const row = props.orientation === 'white' ? 7 - rank : rank;
+  return (
+    <span class="board-badge" data-testid="board-badge" title={props.word} aria-label={props.word} style={{ left: `${Math.min(col + 1, 7.8) * 12.5}%`, top: `${Math.max(row, 0.2) * 12.5}%`, background: props.colour }}>
+      {props.symbol}
+    </span>
   );
 }

@@ -238,6 +238,22 @@ export function reviewOf(moves: readonly PlayedMove[], repertoire: (i: number) =
   return { tally, accuracy, keyMoves, deviations, corrected, judged: userMoves.length, evalPoints };
 }
 
+/**
+ * The score for the user at each position of the game, for the eval bar: index 0 the start, `i + 1`
+ * after move `i`. A user's move gives the score before it (its best line's) and after it; an
+ * opponent's move the score the user's next move found. Undefined where no judge says.
+ */
+export function positionEvals(moves: readonly PlayedMove[]): (number | undefined)[] {
+  const out: (number | undefined)[] = new Array<number | undefined>(moves.length + 1).fill(undefined);
+  moves.forEach((m, i) => {
+    if (!m.isUser) return;
+    if (m.bestCp != null) out[i] = m.bestCp;
+    if (m.afterCp != null) out[i + 1] = m.afterCp;
+    else if (m.bestCp != null && m.cpLoss != null) out[i + 1] = m.bestCp - m.cpLoss;
+  });
+  return out;
+}
+
 /* ------------------------------------------------------------------ the history */
 
 export type HistorySource = 'practice' | 'advantage' | 'cont' | 'tactic-cont' | 'todo' | 'checklist';

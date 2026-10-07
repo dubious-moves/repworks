@@ -1,7 +1,6 @@
 // The games (PLAN.md §5.54, §5.55): the games kept on this device with their filters and the
 // day's game cards; one game on the board with its evaluation graph and its items; and the game
 // cards' session (the mistake trainer). mistake-lab's Games and Review tabs, on the site's SRS.
-import { Fragment } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { chessgroundDests } from 'chessops/compat';
 import { normalizeMove } from 'chessops/chess';
@@ -17,7 +16,7 @@ import type { HistoryEntry } from '../core/games/practice.ts';
 import { recid } from '../app/repertoireCheck.ts';
 import { badgeOf } from '../core/games/recidivism.ts';
 import { closeLine, continueSession, dropCard, dropLine, endGameSession, gameSession, gradePlan, hint, hintMove, lineMove, lineStep, lineToAlt, lineToMain, MAX_TRIES, playMove, revealBest, showLine, showPlan, skipCard, startGameSession, tryAgain, type CardRun, type GameSession } from '../app/gameTrainer.ts';
-import { lineFen, lineScore, moveAt, type EngineLine } from '../core/games/engineLine.ts';
+import { lineFen, moveAt, type EngineLine } from '../core/games/engineLine.ts';
 import { plansInDeck, setPlanCard } from '../app/plans.ts';
 import { cpFor, type GameItem } from '../core/games/extract.ts';
 import { dropsOf, withoutTimeTrouble } from '../core/games/deck.ts';
@@ -27,6 +26,7 @@ import { resultFor, type GameRecord } from '../core/games/record.ts';
 import { gameCard } from '../core/progress/cards.ts';
 import { positionOf } from '../core/storm/walk.ts';
 import { Board } from './Board.tsx';
+import { EngineLinePanel } from './EngineLinePanel.tsx';
 import { MoveBoard, PracticeBoard, ResumeBanner } from './Practice.tsx';
 import { explorerRows, openingNameAt, reaches } from '../core/games/openings.ts';
 import { keyFen } from '../core/chess/positionKey.ts';
@@ -771,78 +771,16 @@ function Card(props: { s: GameSession; r: CardRun }) {
   );
 }
 
-/** mistake-lab's engine line panel: the moves as PGN with the alternatives in brackets, each a click away; ‹ › step it. */
+/** The game card's engine line: Hide the line (none after a wrong move: stepping back is Try again). */
 function LinePanel(props: { line: EngineLine; busy: boolean; wrong: boolean }) {
-  const l = props.line;
-  const [, turn, , , , full] = l.baseFen.split(' ');
-  const startNum = Number(full) || 1;
-  const startWhite = turn === 'w';
-  const byBranch = new Map<number, number[]>();
-  l.alternatives.forEach((a, i) => byBranch.set(a.branchIdx, [...(byBranch.get(a.branchIdx) ?? []), i]));
-  // Move numbers by the index on the path: index i is the (i+1)-th ply after the start.
-  const numbered = (idx: number, first: boolean) => {
-    const ply = idx + (startWhite ? 0 : 1);
-    const num = startNum + Math.floor(ply / 2);
-    const white = ply % 2 === 0;
-    return white ? `${num}. ` : first ? `${num}… ` : '';
-  };
-  const alt = (ai: number) => {
-    const a = l.alternatives[ai]!;
-    return (
-      <span key={`alt${ai}`} class="line-alt" data-alt={ai}>
-        (
-        {a.moves.map((m, j) => {
-          const idx = a.branchIdx + 1 + j;
-          const active = l.activeAlt === ai && l.currentIdx === idx;
-          return (
-            <span key={j} class={`game-move${active ? ' current' : ''}`}>
-              <span class="muted">{numbered(idx, j === 0)}</span>
-              <button type="button" class="link" data-idx={idx} onClick={() => lineToAlt(ai, idx)}>
-                {m.san}
-              </button>{' '}
-            </span>
-          );
-        })}
-        ){' '}
-      </span>
-    );
-  };
-  const score = lineScore(l);
   return (
-    <div class="engine-line-box" data-testid="engine-line" data-idx={l.currentIdx} data-alt={l.activeAlt}>
-      <p class="muted">
-        Engine line{score != null ? ` · ${Math.abs(score) >= 10000 ? (score > 0 ? '+M' : '−M') : `${score >= 0 ? '+' : '−'}${(Math.abs(score) / 100).toFixed(1)}`}` : ''}
-        {props.busy ? ' · Stockfish is thinking…' : ''}
-      </p>
-      <div class="game-moves">
-        {(byBranch.get(-1) ?? []).map(alt)}
-        {l.moves.map((m, i) => (
-          <Fragment key={i}>
-            <span class={`game-move${l.activeAlt === -1 && l.currentIdx === i ? ' current' : ''}${m.isUser ? ' line-user' : ''}`}>
-              <span class="muted">{numbered(i, i === 0)}</span>
-              <button type="button" class="link" data-idx={i} onClick={() => lineToMain(i)}>
-                {m.san}
-              </button>{' '}
-            </span>
-            {(byBranch.get(i) ?? []).map(alt)}
-          </Fragment>
-        ))}
-      </div>
-      <div class="actions">
-        <button type="button" class="secondary" aria-label="Back a move" onClick={() => lineStep(-1)}>
-          ‹
+    <EngineLinePanel line={props.line} busy={props.busy} title="Engine line" hint={`← → to step${props.wrong ? ', back before your move to try again' : ''} · a move on the board branches`} onMain={lineToMain} onAlt={lineToAlt} onStep={lineStep}>
+      {!props.wrong && (
+        <button type="button" class="secondary" onClick={closeLine}>
+          Hide the line
         </button>
-        <button type="button" class="secondary" aria-label="On a move" onClick={() => lineStep(1)}>
-          ›
-        </button>
-        {!props.wrong && (
-          <button type="button" class="secondary" onClick={closeLine}>
-            Hide the line
-          </button>
-        )}
-        <span class="muted line-hint">← → to step{props.wrong ? ', back before your move to try again' : ''} · a move on the board branches</span>
-      </div>
-    </div>
+      )}
+    </EngineLinePanel>
   );
 }
 

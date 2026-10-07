@@ -640,6 +640,29 @@ textarea.script {
   height: 100%;
 }
 
+.board {
+  position: relative;
+}
+
+/* A move's classification on its square's corner (a game's review), mistake-lab's badge. */
+.board-badge {
+  position: absolute;
+  z-index: 3;
+  width: max(20px, 4.6%);
+  aspect-ratio: 1;
+  transform: translate(-55%, -45%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 55%);
+  color: #fff;
+  font-size: clamp(10px, 1.9cqw, 14px);
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+}
+
 .board-draw {
   outline: 3px solid var(--warn);
   outline-offset: 2px;
@@ -3236,6 +3259,235 @@ a.button.disabled {
 }
 .resume-banner .train-board {
   max-width: 16rem;
+}
+
+/* A practice game's review (§5.57): the eval bar by the board, the buttons under it; the summary,
+   the move's card (or its line, or a retry) and the moves beside it. On a phone the move's card
+   comes first, under the board. */
+.review-board-row {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+.review-board-main {
+  flex: 1;
+  min-width: 0;
+  container-type: inline-size;
+}
+.review-board-main .board {
+  width: 100%;
+  min-width: 0;
+}
+.review-board .move-buttons {
+  justify-content: center;
+}
+.review-board .move-buttons button {
+  min-width: 56px;
+}
+.review-eval {
+  position: relative;
+  flex: 0 0 22px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: #3a3a3a;
+}
+.review-eval.unknown {
+  opacity: 0.45;
+}
+.review-eval-white {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #e8e8e8;
+  transition: height 0.3s;
+}
+.review-eval.flipped .review-eval-white {
+  top: 0;
+  bottom: auto;
+}
+.review-eval-score {
+  position: absolute;
+  left: 0;
+  right: 0;
+  font-size: 9px;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: -0.05em;
+  white-space: nowrap;
+}
+.review-eval-score.bottom {
+  bottom: 3px;
+}
+.review-eval-score.top {
+  top: 3px;
+}
+.review-eval-score.on-white {
+  color: #333;
+}
+.review-eval-score.on-black {
+  color: #ddd;
+}
+.review-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.review-panel > * {
+  margin: 0;
+}
+.review-summary {
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--accent-text);
+}
+.review-summary p {
+  margin: 0 0 6px;
+}
+.review-big {
+  font-size: 1.6rem;
+  margin-right: 4px;
+}
+.review-tally {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.review-graph {
+  height: 90px;
+}
+.review-graph .eval-area {
+  opacity: 0.6;
+}
+.review-keys {
+  list-style: none;
+  padding: 0;
+  margin: 6px 0;
+  display: grid;
+  gap: 2px;
+}
+.review-keys li {
+  padding: 3px 6px;
+  border-radius: 4px;
+}
+.review-keys li.current {
+  background: rgb(255 255 255 / 8%);
+}
+.review-card {
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--cls, var(--muted));
+  background-image: linear-gradient(90deg, color-mix(in srgb, var(--cls, transparent) 12%, transparent), transparent 70%);
+}
+.review-card p {
+  margin: 0 0 6px;
+}
+.review-focus .engine-line-box {
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--line-colour, #62cf8e);
+}
+.review-focus .engine-line-box > p:first-child {
+  margin: 0 0 4px;
+  color: var(--text);
+  font-weight: 700;
+}
+.review-focus .engine-line-box .actions {
+  margin: 8px 0 0;
+}
+.review-focus.refutation .engine-line-box {
+  --line-colour: #ef5f5f;
+}
+.review-card .actions {
+  margin: 8px 0 0;
+}
+.review-card-title {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+.review-card code {
+  font-family: inherit;
+  font-weight: 600;
+}
+.review-keynav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgb(255 255 255 / 8%);
+}
+.review-keynav .muted {
+  flex: 1;
+  text-align: center;
+  font-size: 0.85rem;
+}
+.review-moves {
+  max-height: 15rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 4px 0;
+  position: relative;
+}
+.review-row {
+  display: grid;
+  grid-template-columns: 2.6rem 1fr 1fr;
+  align-items: center;
+}
+.review-row:nth-child(even) {
+  background: rgb(255 255 255 / 3%);
+}
+.review-num {
+  color: var(--muted);
+  text-align: right;
+  padding-right: 8px;
+  font-size: 0.85rem;
+}
+.review-cell {
+  min-height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+.review-cell.empty {
+  color: var(--muted);
+  padding: 0 8px;
+}
+.review-cell:not(.empty):hover {
+  background: rgb(255 255 255 / 8%);
+}
+.review-cell.current {
+  background: var(--accent);
+  color: var(--accent-text);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 25%);
+}
+.review-cell .practice-cls {
+  margin-left: 3px;
+}
+@media (pointer: fine) {
+  .review-card .actions button,
+  .review-keynav button {
+    min-height: 34px;
+    padding: 0 12px;
+  }
+}
+@media (max-width: 899px) {
+  .review-focus {
+    order: -1;
+  }
+  .review-board .move-buttons {
+    margin: 6px 0;
+  }
 }
 .games-explorer summary h2 {
   display: inline;

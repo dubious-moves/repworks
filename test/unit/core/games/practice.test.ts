@@ -14,7 +14,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { advantageGrade, repertoireVerdict, historyEntry, historyOf, maiaPick, pickExplorerMove, readHistoryEntry, resultOf, reviewOf, startTrack, trackAdvantage, type ExplorerMove, type PlayedMove } from '../../../../src/core/games/practice.ts';
+import { advantageGrade, positionEvals, repertoireVerdict, historyEntry, historyOf, maiaPick, pickExplorerMove, readHistoryEntry, resultOf, reviewOf, startTrack, trackAdvantage, type ExplorerMove, type PlayedMove } from '../../../../src/core/games/practice.ts';
 import { parseLog } from '../../../../src/core/progress/events.ts';
 import { toDeviceEvents, type DeviceEvent } from '../../../../src/core/progress/replay.ts';
 
@@ -112,4 +112,16 @@ test('the history: five user moves at least, slim, read back, the latest version
       ['rev_x', 'ended'],
     ],
   );
+});
+
+test('the eval bar’s scores: before and after each user move, an opponent’s move by the next user move', () => {
+  const moves: PlayedMove[] = [
+    { san: 'e4', uci: 'e2e4', isUser: true, bestCp: 30, afterCp: 25 },
+    { san: 'c5', uci: 'c7c5', isUser: false },
+    { san: 'Nf3', uci: 'g1f3', isUser: true, bestCp: 35, cpLoss: 5 },
+    { san: 'd6', uci: 'd7d6', isUser: false },
+    { san: 'd4', uci: 'd2d4', isUser: true },
+    { san: 'cxd4', uci: 'c5d4', isUser: false },
+  ];
+  assert.deepEqual(positionEvals(moves), [30, 25, 35, 30, undefined, undefined, undefined]);
 });

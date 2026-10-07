@@ -5,6 +5,15 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## The practice game's review reworked (§5.57, 2026-10-07)
+
+- Desktop, then phone: a practice game's review (end one, or reopen one from Games' history). The
+  eval bar beside the board, the classification badge on the move's square, ◀ ▶ (← →) through the
+  whole game; a key move's card: Show best (arrows), Show line and Show refutation (each a line to
+  step with ← → or ‹ ›, a move on the board branches it), ↺ Retry and its result card. Checked by
+  tests with a scripted engine on a desktop and an emulated phone only: are the real Stockfish
+  lines' waits acceptable on the phone, and is the layout what you wanted?
+
 ## The owner's last notes of 2026-10-07 (§5.69)
 
 - Desktop: the ✎ and ⋯ buttons are gone from the move buttons (right-click a move for its menu;

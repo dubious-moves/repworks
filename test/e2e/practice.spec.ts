@@ -1,7 +1,8 @@
 // Practice (PLAN.md §5.57), on a desktop viewport and an emulated phone: a game played on from the
 // start against the fake explorer (a Lichess login on the device), with the fake engine judging the
-// user's moves (a blunder among them), stopped after five moves; its review (the key move, its
-// line, saved as a practice mistake), the history entry after a reload, and the events synced.
+// user's moves (a blunder among them), stopped after five moves; its review (stepped through, the
+// key move's card, badge and eval, its best move, best line and refutation, a retry, saved as a
+// practice mistake), the history entry after a reload, and the events synced.
 // Then an advantage card from mistake-lab's Gist, drilled in the game cards' session: the user's
 // move lets the advantage fall to +0.6, which ends the drill as a collapse, graded Again.
 // Then (PLAN.md §6, item 2) a game as Black from 1.e4 against the test repertoire (1...c5 2.Nf3 d6
@@ -157,11 +158,51 @@ test('a practice game: played against the explorer, stopped, reviewed, kept in t
   await expect(review.getByTestId('practice-end')).toContainText('Stopped.');
   await expect(review.getByTestId('practice-accuracy')).toContainText('1 key move');
   await expect(review.getByTestId('practice-keys')).toContainText('d4');
+  // The whole game stepped through: the review opens on the last move; ← → and Home step it.
+  await expect(review).toHaveAttribute('data-at', '9');
+  await page.keyboard.press('ArrowLeft');
+  await expect(review).toHaveAttribute('data-at', '8');
+  await page.keyboard.press('Home');
+  await expect(review).toHaveAttribute('data-at', '-1');
+  await review.getByRole('button', { name: 'Forward' }).click();
+  await expect(review).toHaveAttribute('data-at', '0');
+  // The key move: its card, its classification on the board, the eval bar from the judges.
   await review.getByTestId('practice-keys').getByRole('button', { name: 'd4' }).click();
-  await review.getByRole('button', { name: 'Show the line' }).click();
-  await expect(review.getByTestId('practice-line')).toHaveText('Best: Bb5+ Bd7');
-  await review.getByRole('button', { name: 'Save as a mistake' }).click();
+  await expect(review).toHaveAttribute('data-at', '4');
+  const card = review.getByTestId('review-move');
+  await expect(card).toContainText('Blunder · 3. d4');
+  await expect(review.getByTestId('board-badge')).toHaveAttribute('title', 'Blunder');
+  await expect(review.getByTestId('review-eval')).toHaveAttribute('aria-label', 'Eval −1.5');
+  // Show best: the best move named, its arrow on the position before.
+  await card.getByRole('button', { name: 'Show best' }).click();
+  await expect(review).toHaveAttribute('data-view', 'best');
+  await expect(card.getByTestId('review-best')).toContainText('Best: Bb5+');
+  // Show line: the best move and the engine's line after it, stepped with →.
+  await card.getByRole('button', { name: 'Show line' }).click();
+  const line = review.getByTestId('engine-line');
+  await expect(line).toContainText('Best line: 3. Bb5+');
+  await expect(line.locator('.game-moves')).toContainText('3. Bb5+ Bd7');
+  await expect(line).toHaveAttribute('data-idx', '0');
+  await page.keyboard.press('ArrowRight');
+  await expect(line).toHaveAttribute('data-idx', '1');
+  await line.getByRole('button', { name: '← Back' }).click();
+  // Show refutation: the move played and the opponent's answer, opened on the answer.
+  await card.getByRole('button', { name: 'Show refutation' }).click();
+  await expect(line).toContainText('Refutation of 3. d4');
+  await expect(line.locator('.game-moves')).toContainText('3. d4 cxd4 4. Nxd4');
+  await expect(line).toHaveAttribute('data-idx', '1');
+  await line.getByRole('button', { name: '← Back' }).click();
+  // Retry: the best move found.
+  await card.getByRole('button', { name: '↺ Retry' }).click();
+  await expect(review).toHaveAttribute('data-view', 'retry');
+  await clickSquare(page, 'f1', 'white');
+  await clickSquare(page, 'b5', 'white');
+  await expect(review.getByTestId('practice-retry')).toHaveText('★ Best move!');
+  await expect(review.getByTestId('board-badge')).toHaveAttribute('title', 'Best move');
+  await review.getByRole('button', { name: 'Done' }).click();
+  await card.getByRole('button', { name: '💾 Save as a mistake' }).click();
   await expect(review).toContainText('Saved: it is in your game cards.');
+  await expect(card.getByRole('button', { name: '✓ Saved' })).toBeDisabled();
   await expect(review).toContainText('Kept in the history.');
 
   // After a reload: the game in the list, its review reopened.

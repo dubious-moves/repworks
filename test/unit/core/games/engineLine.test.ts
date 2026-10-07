@@ -112,3 +112,13 @@ test('castling is kept as standard UCI; an illegal move is refused', () => {
   assert.equal(branch(line, 'e2e4').kind, 'illegal');
   assert.equal(buildEngineLine(ITALIAN, 'e1e8', ['d4f5'], 0), undefined);
 });
+
+test('a longer line on request: the best line and the refutation in the review run to ten plies', () => {
+  const start = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+  const pv = 'e7e5 g1f3 b8c6 f1b5 a7a6 b5a4 g8f6 e1g1 f8e7 f1e1 b7b5'.split(' ');
+  assert.equal(buildEngineLine(start, 'e2e4', pv, 0)!.moves.length, 6);
+  const long = buildEngineLine(start, 'e2e4', pv, 0, { plies: 10, startIdx: 0 })!;
+  assert.deepEqual(long.moves.map((m) => m.san).slice(-2), ['O-O', 'Be7']);
+  assert.equal(long.moves.length, 10);
+  assert.equal(long.currentIdx, 0);
+});
