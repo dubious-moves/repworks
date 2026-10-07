@@ -161,6 +161,14 @@ couldn't be tested then (the day's limit was used up), so the training items bel
   disguise holds, whether the puzzles feel related to your lines, the share that feels right.
 - §5.49: Phase 4's acceptance test (desktop and Android phone), then a week of daily storms.
 
+## Phase 5
+
+- §5.51 (once built): chess.com's archives from the page (`api.chess.com`), which this container
+  can't reach: Games → the chess.com name, Refresh; the page says whether chess.com answered. If it
+  is refused, chess.com games keep coming through the analyzer.
+- §5.66: the owner's answer on where the analyzer's output lives (PLAN.md, Phase 5, "The owner's
+  choice"): (a) the data repo through a converter, recommended, or (b) the Gist, read-only.
+
 ### The change to q_extension for §5.25 (Repworks sessions can't push there)
 
 `explorerdb serve` answers the extension, whose requests carry no page origin; a web page's need

@@ -7,7 +7,7 @@ where the build differed). What remains is live: the spike's re-run (§4.2), the
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
 with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
-for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Read with `DECISIONS.md`, which this plan updates (its
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07); where the analyzer's output lives waits for the owner's answer (§5.66). Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -3898,37 +3898,433 @@ repertoire (TESTING.md); live sessions on the phone.
 
 ### Phase 5: Mistake review, and migration from mistake-lab
 
-Scope:
-- Games from Lichess and chess.com.
-- The analyzer's output. It is a desktop Node tool that lives in `mistake-lab/analyzer`, not in
-  q_extension (D8 corrected). It writes to the Gist today; switch it to the data repo (one
-  writer, devices only read) or read the Gist during the move.
-- Mistake, tactic and advantage cards; continuation practice (opponent from the database, then
-  Maia, then Stockfish); deviations from the repertoire in real games; the recidivism tracker;
-  weak spots; the variation checklist; plan cards; game review history; voice input.
+Planned on 2026-10-07, after Phase 4's build (through §5.48) and while the earlier phases' live
+checks wait for the owner (TESTING.md). The parts below are in build order; each lists its tasks,
+the tests that prove it, and what only a live check can show, on which device. Numbering goes on
+from §5.49.
 
-Migration (one-off, re-runnable as a dry run):
-- Read the Gist with a token entered once.
-- `positions[pid].srs` becomes one `snapshot` event per card (a kind added in this phase),
-  re-keyed through `positionKey`:
-  - `p_<key>` becomes `p|key`;
-  - game items become `m|…`;
-  - `r_<key>` repertoire states are left behind and counted in the report. By then the site's
-    own repertoire cards have been in use since Phase 1, started fresh (D19), and a migrated
-    state would overwrite them.
-- Notes become a "Notes" reference study: one chapter per position, from its FEN, with the note
-  as the root comment and its arrows as shapes.
-- Plan-card enrolments, custom deviations and dismissals become events.
-- A report lists unmapped and re-keyed entries.
+**Scope**, from the outline the owner approved (D8, D15, D5):
+- **Games** from Lichess and chess.com, analysed offline by mistake-lab's analyzer (D8), and the
+  mistakes, tactics and lost advantages found in them, as cards (`m|…`) on the site's own SRS.
+- **Practice** from those positions: the mistake retried, the tactic played out, the advantage
+  converted, and any position played on against a human-like opponent (the explorer's games,
+  then Maia, then Stockfish), with a review of the game at the end, kept as history.
+- **What the games say about the repertoire**: deviations from it in real games, whether drilled
+  positions are answered better later (recidivism), the opponent replies that score badly (weak
+  spots), and the variation checklist.
+- **Plan cards** (`p|key`): recall of a position's idea, its content the position's comments.
+- **Voice input** for moves while playing on.
+- **The migration** of mistake-lab's progress (D15), dry run first, after which mistake-lab
+  retires (D20).
+
+**Sources, read for this plan** (2026-10-07, clones outside this repo):
+- mistake-lab at `c525403`: `docs/architecture-reference.md` in full (item types and IDs,
+  extraction and caches, the SRS grades, recidivism, sequence conversion, continuation practice and
+  its persistence, game review history, advantage and tactic modes, detected tactics, the
+  repertoire check, the variation checklist, weak spots, filter practice, plan cards, notes, the
+  Gist's files and merge, voice, mobile); in `index.html`: `fetchGames` (the Gist path and the
+  standalone Lichess path), `extractMistakesForGame` and `extractAllMistakes` (thresholds,
+  advantage peaks and their exclusions, tactics from the analyzer), `posId`, `fsrs_review`,
+  `recordReview`, `getCardForPosition`, `isDue`, `addCustomDeviation`, `gistRead`; `analyzer/analyze.js`
+  in full by sections (its flags, the Lichess and chess.com fetchers, `normalizeChesscomGame`,
+  clocks, `analyzeGame`, the tactic scanner and its thresholds, the Gist's games file and its
+  `version: 2` object, the local `analyzed_games.json`).
+- github/docs at `8794b3c` (`src/github-apps/data/fpt-2026-03-10`): the fine-grained token's
+  Gists permission covers writes only (create, update, delete); reading a gist needs none.
+
+**Checked for this plan** (live from this container, and scratch code outside the repo, 2026-10-07):
+- **Lichess's game export answers a web page, with or without a token.**
+  `GET /api/games/user/<name>` (`Accept: application/x-ndjson`, `evals`, `clocks`, `opening`,
+  `pgnInJson`) answers `200` with `Access-Control-Allow-Origin: *`; its preflight answers `204`
+  allowing `Authorization`, so the site's Lichess login can go with it (a faster stream). Without a
+  browser `User-Agent` it answers 404 (curl's default), which a browser never meets.
+- **chess.com's API could not be checked**: this container's proxy refuses `api.chess.com`
+  (CONNECT 403), and so does `www.chess.com`. Third-party reports (a chess.com forum thread on
+  "CORS errors on monthly game archives", an in-browser analyzer that proxies it) say the archives
+  don't answer other origins. So chess.com games come through the analyzer, which runs in Node
+  (no CORS), and the page's own chess.com fetch is tried once and says so when refused; the
+  owner's browser settles it (TESTING.md).
+- **The size of the game data**: 200 of the owner's public Lichess games (62 plies on average):
+  3.6 KB a game as Lichess exports it, **4.3 KB in mistake-lab's analyzer shape** (plus its
+  tactics' lines, a FEN on every move, ~1–2 KB where a game has one), so a Gist games file of
+  1,000 games is about 5 MB. Kept on the phone in a compact form (the moves, the evals as
+  integers, the clocks in seconds, the players, the result, the opening; tactics as UCI lines
+  without FENs), **0.9 KB a game**: about 1 MB for 1,000 games, 5 MB for 5,000. The size on the
+  phone is no problem; what matters is not re-reading a 5 MB file on every change (below).
+- **The Gist from a page**: `api.github.com` answers any origin (§2); a gist file over 1 MB comes
+  back truncated and is read from its `raw_url` (`gist.githubusercontent.com`), which mistake-lab
+  already does from its own page every day. This container can reach neither (the proxy binds the
+  GitHub API to the session's repositories and refuses the raw host), so the Gist is read live
+  only on the owner's devices; the dry run is built against a fixture in the documented shape.
+- **Mistake-lab's progress shape**, for the migration's fixture: `positions[pid].{srs, lastSeen,
+  completed, invalidated, invalidatedLines, firstReview, recidGraded}` with `srs` as `fsrs_review`
+  writes it (`state, stability, difficulty, reps, lapses, elapsedDays, scheduledDays`, `lastReview`
+  an ISO time, `due` a local `YYYY-MM-DD`); `notes[key].{text, arrows, circles, drawInterval,
+  updated, source}`; `planCards[]`; `repertoire.{studies, deletedStudies, customDeviations,
+  dismissed, todoLists}`; `practiceScoreboard`, `practiceMistakes`, `practiceTactics`; the review
+  history (`mistakelab_reviews.json`) and the eval cache (`mistakelab_evals.json`) in files of
+  their own. pids: `<gameId>_<ply>` (mistake), `<gameId>_t<ply>` (tactic), `<gameId>_a<ply>`
+  (advantage), `r_<key>` and `p_<key>`.
+
+**The owner's choice** (asked, not yet answered; nothing waits on it but §5.66):
+- **Where the analyzer's output lives once mistake-lab retires.** (a) **The data repo**, with the
+  analyzer as its only writer: `games/<YYYY-MM>.jsonl`, one compact game a line, read by every
+  device through the sync it already has (no second token, a month's file downloaded only when it
+  changes, history in git). It needs the analyzer to write there: a small converter in this repo
+  (`scripts/games-to-data.mjs`, run after the analyzer on its `analyzed_games.json` into a checkout
+  of the data repo, then committed) or a patch to the analyzer (it is in mistake-lab, which
+  Repworks sessions don't push to; a patch goes in TESTING.md as q_extension's did). (b) **The
+  Gist, read-only**, as mistake-lab reads it: the analyzer unchanged, the gist's ID entered once
+  per device, the whole file read again whenever the analyzer writes. **Recommended: (a), through
+  the converter**, because the games then live with everything else and cost one small download a
+  month; (b) is what the site does until the answer, since the migration reads the Gist anyway
+  (§5.51), so nothing built now is wasted either way.
+
+**Decisions** (technical calls, each with its reason; in DECISIONS.md's revision log):
+- **Games are derived data on each device** (D5's derived tier): a compact record per game in
+  IndexedDB (`repworks-games`), rebuilt from its source; only what the owner does with them is
+  synced, as progress events. Two devices reading the same source compute the same items, and
+  their pids are mistake-lab's, so a card means the same game move everywhere.
+- **Game cards are `m|<pid>`, with mistake-lab's pid kept verbatim** (`m|abc123XY_17`,
+  `m|abc123XY_t23`, `m|abc123XY_a31`, `m|_practice_…`): the migration then maps game cards one to
+  one, and a game analysed before and after it is the same card. **Plan cards are `p|<key>`**, the
+  key re-made through `positionKey` (D10). Their reviews are ordinary `review` events, folded by the
+  same FSRS replay as the repertoire's.
+- **Grades follow mistake-lab's rules** (its SRS section): a mistake by the win% the answer gives
+  up (best or within 2 → Easy, 5 → Good, 10 → Hard, more or a hint → Again; a first wrong try
+  recorded at once), a tactic by its line (perfect Easy, a hint Hard, a wrong move Again), a plan
+  by the owner's own grade. Stockfish grades a mistake's answer on the device (§5.30's worker), as
+  mistake-lab's pre-analysis does; the analyzer's evals are the game's, not the answer's.
+- **New event kinds** (each skipped by older readers, the log's rule): `snapshot` (the migration's
+  FSRS state of one card, D15), `drop` (an item, or one of a tactic's lines, taken out of the deck,
+  and back with `on: false`), `relapse` (a drilled position met again in a later game and missed:
+  an Again review at the game's time, once per card and game), `plan` (a plan card enrolled or
+  removed), `dismiss` (a position's deviations ignored), `saved` (a practice item made on the site:
+  a position and its line, the item itself in the event, since it comes from no game), `played` (a
+  finished practice game, slim: its start, moves and classifications, for the history and
+  recidivism), `practice` (a practice result at a position: win, draw or loss, with the checklist's
+  preset).
+- **A snapshot is applied only to a card with no review before it**: the site's own reviews win
+  over a migrated state (as D19 has it for the repertoire), and the report counts the snapshots
+  skipped that way.
+- **Custom deviations become a repertoire study** ("From mistake-lab", one chapter per position from
+  its FEN, with the move), not events as D15 first said: a move to play at a position is repertoire
+  content, the site owns the studies (D3), and the trainer and every repertoire tool then know it;
+  its cards start new (D19). Dismissals and plan enrolments stay events.
+- **Lichess's export from the page** fills in games the analyzer hasn't seen yet: deviations and
+  weak spots need only moves, and Lichess's own server analysis (where the owner asked for one)
+  gives their mistakes. The analyzer's record of a game replaces the page's.
+- **The opponent in practice is mistake-lab's chain**: the explorer's games at the practice filter,
+  a move drawn weighted by games (not the top move); then Maia (§5.32) at its rating; then
+  Stockfish. Practice is never graded into a card except where mistake-lab grades it (advantage
+  items, through the drill's end).
+- **Recidivism is derived**, as mistake-lab's: from the games, the cards' first reviews (replay) and
+  the `relapse` events already written; the auto-reschedule writes one `relapse` event per card and
+  game, so two devices that both find it fold it once.
+- **The screens**: `#/games` (the games, their filters, a game's review), `#/games/review` (the
+  game cards due, as a session), `#/games/<id>` (one game), `#/practice?fen=…` (playing on from a
+  position), `#/repertoire-check` (deviations, weak spots, the checklist), with "Games" on the home
+  screen beside Storm. Plan cards are reviewed in the game cards' session and enrolled from a
+  chapter's move menu.
+
+Where the new code goes:
+
+```
+src/core/games/    record.ts (the compact game, from mistake-lab's shape, Lichess's and chess.com's),
+                   positions.ts (keys, moves and evals per ply), extract.ts (mistakes, tactics,
+                   advantages), items.ts (pids, cards, saved items, drops), grade.ts, queue.ts,
+                   deviations.ts, recidivism.ts, weakSpots.ts, checklist.ts, practice.ts (the
+                   opponent's pick, the game's review), voice.ts, migrate.ts (the dry run's report
+                   and the events)
+src/core/progress/ events.ts gains the kinds above; cards.ts `gameCard`, `planCard`; replay.ts
+                   folds `snapshot`, `relapse`
+src/platform/      gamesStore.ts (IndexedDB `repworks-games`), gist.ts (a gist's files),
+                   lichessGames.ts (the user's export as a stream), voice.ts (Web Speech)
+src/app/           games.ts (sources, extraction, the deck), gameTrainer.ts, practice.ts,
+                   repertoireCheck.ts, migrate.ts
+src/ui/            Games.tsx, GameReview.tsx, GameTrainer.tsx, Practice.tsx, RepertoireCheck.tsx,
+                   Migrate.tsx
+scripts/           games-to-data.mjs (if the owner chooses (a))
+```
+
+#### 5.50 Games in core
+
+- `core/games/record.ts`: the compact game (`GameRecord`: id, platform, time, speed, rated, the
+  user's colour, the opponent and both ratings, the result and how it ended, the opening's name, a
+  start FEN when not the standard one, SAN moves, evals per ply as White-relative centipawns or
+  mates, clocks in seconds, the analyzer's tactics as UCI lines, the source, and whether the
+  analysis is the analyzer's or Lichess's). Readers: mistake-lab's analyzer game (Lichess's JSON
+  plus `analysis`, `clocks` already in seconds once `_clocksStamped`, `tactics`, `_playerColor`,
+  `_source`), Lichess's export (`clocks` in centiseconds, `analysis` with `best` and `judgment`
+  kept as evals only), and chess.com's archive game as the analyzer normalizes it. The user's
+  colour by mistake-lab's rule (`usernames`, the name or the id, then `_playerColor`).
+- `positions.ts`: a game replayed once with chessops (moves that won't replay end it there, as
+  mistake-lab's `break`), giving each ply's position key, SAN and standard UCI.
+
+Tests: `record.test.ts` on fixture games (public Lichess games, CC0, cut to a few): each shape read,
+the colour rule, clocks in both units, a chess.com game, a start FEN, a game with an illegal move
+cut and reported; `positions.test.ts` (keys against `positionKey`, castling as standard UCI).
+
+Live: none.
+
+#### 5.51 Where the games come from
+
+- `platform/gist.ts`: a gist's files by ID (`GET /gists/<id>`, a truncated file read again from
+  its `raw_url`), with the data repo's token when it is a GitHub token (reading a gist needs no
+  permission) and none otherwise; ETag kept, so an unchanged gist is a 304.
+- `platform/lichessGames.ts`: the user's games since the newest kept one, streamed as NDJSON
+  (`/api/games/user/<name>`, `evals`, `clocks`, `opening`, `since`), with the Lichess login when
+  there is one.
+- `platform/gamesStore.ts`: IndexedDB `repworks-games`: games by id, the source's stamp (the gist's
+  ETag, the newest Lichess game), and the items extracted per game with the extraction's version.
+- `app/games.ts`: settings on this device (the gist's ID, the Lichess and chess.com names, a date
+  limit as mistake-lab's: all, 3, 6, 12 or 24 months), a refresh on opening Games and from its
+  button, the counts ("1,214 games · 980 analysed · read from the Gist 2 minutes ago").
+
+Tests: `gist.test.ts` and `lichessGames.test.ts` with fake fetches (the truncated file, the 304,
+the stream cut mid-line, a 429), `gamesStore.test.ts` (fake-indexeddb); Playwright: Games set up
+with a fake gist and a fake Lichess, the counts, a refresh adding one game.
+
+Live (desktop, then phone): the real Gist read; the time and the size; Lichess's stream with the
+login; chess.com from the page (expected to be refused; the page says so).
+
+#### 5.52 Mistakes, tactics and advantages found
+
+- `extract.ts`, a port of `extractMistakesForGame` and the advantage pass of `extractAllMistakes`:
+  a mistake where the user's move gives up more than 10 points of win%, with its clock (time
+  trouble: under 45 s left and under 10 s spent); repertoire moves left out (the repertoire index's
+  moves for that side, §5.1, where mistake-lab used its trie); tactics from the analyzer's (three
+  plies and two user moves at least); advantages: from ply 16, the user at +300 for two moves
+  running, the highest such position not inside a tactic, dropped when the user won, lost on time
+  while still ahead, or collapsed in time trouble, and replacing the mistakes from its ply on.
+- The extraction's version and its parameters (10, 300, 2) kept with each game's items, so a change
+  re-extracts.
+
+Tests: `extract.test.ts` on the fixture games, with **the same per-game counts as mistake-lab's own
+`extractMistakesForGame`**, run once in Node on those games by a scratch harness (its expected
+counts, ids and win% drops recorded in the fixture with that provenance), and each rule in
+isolation (the threshold's edge, the clock rule, the repertoire move left out, a tactic too short,
+each advantage exclusion, the replacement).
+
+Live: (desktop) the counts on the owner's real games beside mistake-lab's Review tab.
+
+#### 5.53 Game cards, their events, and the deck
+
+- `progress/events.ts`: `drop`, `relapse`, `plan`, `dismiss`, `saved`, `played`, `practice` and
+  `snapshot`, each with its fields checked and an older reader skipping it; `cards.ts`: `gameCard`
+  (`m|<pid>`), `planCard` (`p|<key>`); `replay.ts`: `snapshot` and `relapse` folded (above), the
+  others into nothing.
+- `items.ts` and `queue.ts`: the deck (every item not dropped, saved items from `saved` events,
+  dropped tactic lines left out, a tactic with none left out with it), the day's game cards due and
+  new (a daily limit of new game cards, a setting, 10 by default; mistake-lab had none, but its
+  queue was its whole backlog), ordered as mistake-lab's (due first, then new by the size of the
+  drop).
+
+Tests: `events.test.ts` additions (each kind read, written, refused when malformed, skipped by an
+old reader), `replay.test.ts` (a snapshot taken, a snapshot after a review ignored, a relapse once
+per game, a relapse older than the last review ignored), `queue.test.ts` (the deck, drops, the
+limit, the order).
+
+Live: none.
+
+#### 5.54 The Games screen
+
+- `#/games`: the games, newest first, each with its opponent, result, speed, opening and its counts
+  of mistakes, tactics and advantages; filters as mistake-lab's (colour, speed, rated, platform,
+  hide time trouble), kept on the device; the day's game cards ("12 due · 5 new", Review); the
+  sources and Refresh.
+- `#/games/<id>`: the game on the board, stepped with ← → and its notation, the eval graph from its
+  evals, its items marked on the graph and in the notation; "Practise from here" at any move.
+
+Tests: Playwright (desktop and phone) with the fixture games: the list, a filter, a game's graph and
+items, nothing wider than the phone.
+
+Live: (phone) the list's speed on the real games.
+
+#### 5.55 The mistake trainer
+
+- `#/games/review`: the deck's cards in turn. A mistake: the board at the position before it,
+  turned to the user, the game's move hidden; the user's move graded by Stockfish (the position's
+  best line at depth 16–22, mistake-lab's adaptive depth, then the position after the move), the
+  verdict in mistake-lab's six words and colours (best, excellent, good, inaccuracy, mistake,
+  blunder; great and miss by its context rules), the grade recorded on the first try; a wrong move
+  shows the engine's line and Try again (three tries, then the best move), Hint (the piece, then
+  the arrow) grades Again; Skip grades Again. Then: Play on (§5.57), Show the engine's line, View
+  the game, Drop this item.
+- A tactic: its line played, the opponent's replies after 0.4 s, alternative lines in turn, a line
+  dropped by the owner; graded as above.
+- A plan card (§5.61) and an advantage (§5.57) open their own boards from the same session.
+
+Tests: Playwright (desktop and phone) with the scripted engine: a mistake answered with the best
+move (Easy) and with a worse one (Again, Try again, the best move shown), a hint, Skip, a tactic
+through its reply and an alternative line, a dropped item gone from the deck after a sync, the
+events written.
+
+Live: (desktop and phone) a real day's game cards; the engine's waits on the phone.
+
+#### 5.56 Saved items: sequences and practice mistakes
+
+- A mistake made into a sequence (mistake-lab's sequence conversion): from the analysis board
+  (§5.35) opened on the position, the lines built there saved as a tactic (`saved` event) with the
+  5-win% validation; a mistake made while practising saved as a practice mistake.
+
+Tests: unit (the validation, the dedup by position and line); Playwright: a sequence saved and
+drilled.
+
+Live: (desktop) a sequence made from a real mistake.
+
+#### 5.57 Practice: playing on, advantages, and the game review
+
+- `practice.ts`: the opponent's move (the explorer at the practice filter, weighted by games, with
+  minimum games and share; Maia at its rating and precision when the explorer has nothing; then
+  Stockfish), silent or with feedback per move; the end (mate, draw, a claim of victory at +1000
+  three times, Stop); the review: every user move classified by Stockfish in the background
+  (depth 22), the accuracy, the eval graph, the key moves with Retry and Show the line.
+- Advantage cards: the drill from the peak, silent, ended as mistake-lab ends it (600 cp is good
+  enough), graded by its outcome.
+- A finished practice game of at least five user moves becomes a `played` event (the history:
+  reopened from Games, merged into its list as mistake-lab's review history).
+
+Tests: unit (the opponent's pick with a seeded random, the ends, the accuracy); Playwright with
+the fake explorer and engine: a practice game to Stop, its review, the history entry after a
+reload and on the other device after a sync.
+
+Live: (desktop and phone) a practice game; the opponent's feel against mistake-lab's.
+
+#### 5.58 Deviations from the repertoire in real games
+
+- `deviations.ts`: each game walked against the repertoire index for the user's colour; the first
+  position where the user left the repertoire (a deviation: the move played, the repertoire's move,
+  the games) and where the opponent played a reply the repertoire doesn't cover (a gap), grouped
+  by position across games, both filtered by colour and speed; dismissed positions left out
+  (`dismiss` events).
+- On `#/repertoire-check`: the deviations and gaps, newest first, each opening its chapter at the
+  position (to add the move there) or the line's training (§5.16), with Dismiss; a deviation also
+  pins the repertoire move (§5.8) at a press.
+
+Tests: unit on built chapters and fixture games (a deviation, a gap, a transposition into the
+repertoire, the user's colour, a dismissal); Playwright: the list and a chapter opened from it.
+
+Live: (desktop) the deviations of the real games against the real repertoire, beside
+mistake-lab's Repertoire tab.
+
+#### 5.59 Recidivism
+
+- `recidivism.ts`, a port of `computeRecidivism`: drilled items (reviewed at least once, not
+  dropped; mistakes and tactics, not plans or advantages) met again in a later game with the user
+  to move: fixed, relapsed (any new mistake there), the same move again; in-app encounters from
+  `played` events shown dimmed, never graded. The summary ("↻ Transfer: 9 fixed · 3 relapsed") on
+  the Games screen and a badge per card; Reschedule on relapse (a setting, on) writes the `relapse`
+  events.
+
+Tests: unit (each verdict, the gates: analysed games only, the side to move, the source game, the
+first review's time, one encounter per game; the reschedule's guards).
+
+Live: (desktop) the summary on the real games beside mistake-lab's.
+
+#### 5.60 Weak spots
+
+- `weakSpots.ts`, a port of the dashboard: the human lens (opponent replies at recurring positions
+  scoring under 50% over 5 games at least, the near-universal ones left out) from the games, and
+  the bot lens from `practice` events; on `#/repertoire-check`, worst first, each opening the
+  position on the analysis board or its checklist drill.
+
+Tests: unit (the score, the gates, the order).
+
+Live: (desktop) the real weak spots beside mistake-lab's.
+
+#### 5.61 Plan cards
+
+- Enrolled from a chapter's move menu ("Make a plan card") at a position with a comment; the card
+  reads the comments on every node reaching the position (notes are comments, D3) with their
+  shapes, live; reviewed in the game cards' session: the board, "Recall the plan", Show plan, then
+  Again/Hard/Good/Easy; removed from the same menu (`plan` events, `on: false`).
+
+Tests: unit (the content from several chapters, a card with no content left out and counted);
+Playwright: enrol, review, remove.
+
+Live: (phone) a plan card reviewed.
+
+#### 5.62 The variation checklist
+
+- `checklist.ts`, a port of `generateTodoVariations`: the repertoire study's covered tree scored by
+  the explorer (ratings 1600–2500, blitz to correspondence), slots apportioned by d'Hondt over it,
+  the reserve, exclusions (`drop` events on `c|<leafKey>`); drilled per preset (easy, medium, hard:
+  the explorer's ratings and Maia's rating for the opponent) through §5.57's practice after the
+  lead-up, a win checking it off (`practice` events with the preset); the win rate per preset.
+
+Tests: unit (the apportionment's nesting, the reserve's order, exclusions, completion from events)
+on a fake explorer.
+
+Live: (desktop) a checklist for a real study beside mistake-lab's.
+
+#### 5.63 Voice input
+
+- `voice.ts`, a port of the lexicon and matcher (homophones, phrasings per legal move, the edit
+  distance); `platform/voice.ts` over the Web Speech API (five alternatives); in practice games, a
+  move heard is confirmed or played, the opponent's move spoken (§5.9's speech).
+
+Tests: unit (the lexicon's cases, ambiguity refused); Playwright: a faked recognizer playing a move.
+
+Live: (phone) voice in a practice game, with and without Bluetooth.
+
+#### 5.64 The migration (dry run, then the run)
+
+- `migrate.ts` (pure): mistake-lab's progress, games and review history in, a report and the events
+  out. Per card: `positions[pid].srs` → a `snapshot` (game items as `m|<pid>`, plan cards as
+  `p|<key>` re-keyed through `positionKey`, every key that changes listed), `r_` states counted and
+  left behind (D15, D19); `invalidated` → `drop`, `invalidatedLines` → `drop` with the line;
+  `recidGraded` → `relapse` stand-ins (so a relapse is never applied twice); `planCards` →
+  `plan`; `dismissed` → `dismiss`; `practiceMistakes`, `practiceTactics` → `saved`;
+  `practiceScoreboard` → `practice`; the review history → `played`; notes → a "Notes" reference
+  study (one chapter per position, from its FEN, the note as the root comment, its arrows and
+  circles as shapes; study comments auto-imported from Lichess left out, as they are in the studies
+  already); custom deviations → the "From mistake-lab" repertoire study. Left behind and counted:
+  the eval cache, the checklist definitions (regenerated), `completed` and `lastSeen`.
+- `#/migrate` (from Settings): the gist's ID and a token entered once, never stored; Dry run shows
+  the report (cards by kind, re-keyed keys, items whose game is missing, each thing left behind);
+  Run writes the events and the studies in one sync, and refuses a second run (it finds its own
+  marker event).
+
+Tests: `migrate.test.ts` on a fixture in the documented shape (every field above, a pid of each
+kind, a legacy pseudo-legal en passant key, a corrupt card, an `r_` card, a deleted plan card, a
+tombstoned note): the report's numbers, the events, the studies; replay after the run giving the
+cards' FSRS states as mistake-lab had them (due dates within a day: mistake-lab's are local dates);
+the queue sizes before and after (the outline's check).
+
+Live: (desktop) the dry run on the real Gist, its report read by the owner, then the run (TESTING.md).
+
+#### 5.65 Phase 5 acceptance test, and exit
+
+**Acceptance test (live, desktop + Android phone)**, on the owner's games and progress:
+1. Desktop: the dry run's report; the run; the game cards' queue beside mistake-lab's for the same
+   day.
+2. Desktop: a day's game cards; a practice game and its review; the deviations, weak spots and
+   checklist beside mistake-lab's.
+3. Phone: the game cards after a sync; a practice game with voice; a plan card.
+4. A week with mistake-lab closed.
+
+**Phase 5 exit**: unit and e2e tests green; the acceptance test passed live; mistake-lab no longer
+used (D20); its analyzer still runs from its repo until the tools move (D8).
+
+#### 5.66 The analyzer's output in the data repo (the owner's choice first)
+
+Built only if the owner chooses (a) above: `scripts/games-to-data.mjs` (the analyzer's
+`analyzed_games.json` → `games/<YYYY-MM>.jsonl` in a data repo checkout, compact records, a month
+rewritten only when its games changed), `layout.ts`'s `games/` path kind (never written by a
+device, never merged), and the site reading it as a source beside the Gist.
 
 Risks:
-- mistake-lab's breadth (about 30,000 lines of features);
-- the size of the game data on the phone.
+- mistake-lab's breadth (about 30,000 lines): ported part by part, its rules as spec, the parts in
+  order of daily use, each with mistake-lab's numbers.
+- The engine on the phone for grading (mistake-lab grades the same way on the same phone).
+- chess.com from a page (unverified): the analyzer stays its path.
+- The Gist's read limits and size: ETag, read only on Games' refresh, the raw URL for big files.
+- The migration on real data: a dry run first, a fixture in the documented shape, the run refusing
+  to repeat.
 
-Checks:
-- for the same games, the same mistakes extracted as mistake-lab (per-game counts);
-- the migration dry-run report;
-- queue sizes before and after migration.
+Checks: the same per-game counts as mistake-lab (§5.52); the migration's dry-run report and the
+queue sizes before and after (§5.64); the live comparisons beside mistake-lab (TESTING.md).
 
 ---
 

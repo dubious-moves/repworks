@@ -1191,3 +1191,41 @@ Calls made while building, each with its reason:
   to be met); nothing is asked of the dataset before Collect.
 - **A puzzle accepts any mate as well as the solution's move** (Lichess's own rule for puzzles
   ending in mate), and its opponent's replies are played after 0.4 s with the clock stopped.
+
+## Revision of 2026-10-07 (Phase 5 planned)
+Phase 5 is planned in depth in `PLAN.md` §5.50–§5.66, from mistake-lab (`c525403`: its
+architecture reference in full, `index.html`'s game loading, extraction, SRS and Gist code, and
+`analyzer/analyze.js`). Settled with evidence:
+- **Lichess's game export answers a web page**, with or without the login (`200`,
+  `Access-Control-Allow-Origin: *`; preflight `204` allowing `Authorization`), checked live.
+  **chess.com's could not be checked** (this container's proxy refuses it; third-party reports say
+  it doesn't answer other origins), so chess.com games come through the analyzer; the owner's
+  browser settles it (TESTING.md).
+- **The game data's size on the phone is small**: 4.3 KB a game in the analyzer's shape (about
+  5 MB for 1,000 games), 0.9 KB in the compact form kept on the device, measured on 200 of the
+  owner's public Lichess games.
+- **Reading a gist needs no token permission** (github/docs `8794b3c`: the fine-grained Gists
+  permission covers writes only), so the Gist is read with the gist's ID; mistake-lab's own page
+  reads its raw files cross-origin every day.
+
+Asked of the owner (D5's open point, a format the owner's data would be written in): **where the
+analyzer's output lives once mistake-lab retires**, (a) the data repo, `games/<YYYY-MM>.jsonl`
+written by a converter run after the analyzer (recommended), or (b) the Gist, read-only. Until the
+answer the site reads the Gist, which the migration needs anyway (§5.66 waits).
+
+The technical calls, each with its reason:
+- **D5: games are derived data on each device**, rebuilt from their source; only what is done with
+  them is synced, as progress events.
+- **Game cards are `m|<pid>`, with mistake-lab's pid verbatim; plan cards `p|<key>`** re-keyed
+  through `positionKey` (D10): the migration maps game cards one to one.
+- **mistake-lab's grades, thresholds and numbers are ported as they are** (the 10-point mistake,
+  the advantage rules, the grade bands, the recidivism gates, weak spots' 50% over 5 games, the
+  checklist's presets), with its per-game counts as the extraction's test.
+- **New event kinds**: `snapshot`, `drop`, `relapse`, `plan`, `dismiss`, `saved`, `played`,
+  `practice`. A snapshot is applied only to a card with no review before it, so the site's own
+  reviews win over a migrated state.
+- **D15 changed in one detail: custom deviations become a repertoire study** ("From mistake-lab",
+  a chapter per position), not events: a move to play is repertoire content and the site owns the
+  studies (D3); its cards start new (D19). Dismissals and plan enrolments stay events.
+- **A daily limit of new game cards** (10 by default): mistake-lab's queue had none, and its whole
+  backlog would arrive on the first day.
