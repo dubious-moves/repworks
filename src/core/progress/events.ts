@@ -84,8 +84,102 @@ export interface StormEvent extends Base {
   /** The line's chapter: `<sid>/<cid>`. */
   c?: string;
 }
-export type KnownEvent = ReviewEvent | SuspendEvent | UnsuspendEvent | ForgetEvent | TaughtEvent | PinEvent | UnpinEvent | DrillEvent | AltEvent | StormEvent;
-export const KNOWN_KINDS = ['review', 'suspend', 'unsuspend', 'forget', 'taught', 'pin', 'unpin', 'drill', 'alt', 'storm'] as const;
+// Phase 5's kinds (PLAN.md §5.53). Game cards are `m|<pid>` (mistake-lab's pid), plan cards
+// `p|<positionKey>`; a dismissed position is `d|<key>`, a practice history entry `h|<id>`, a
+// practice result's position `x|<key>`, a checklist line `c|<key>`.
+
+/**
+ * A card's FSRS state carried over from mistake-lab (D15): applied only to a card with no review
+ * before it, so the site's own reviews win.
+ */
+export interface SnapshotEvent extends Base {
+  k: 'snapshot';
+  card: string;
+  /** FSRS state: 0 new, 1 learning, 2 review, 3 relearning. */
+  st: 0 | 1 | 2 | 3;
+  stab: number;
+  diff: number;
+  reps: number;
+  lapses: number;
+  /** The interval set at the last review, in days. */
+  sched: number;
+  /** The last review's time. */
+  last: string;
+  /** The first review's time, when known (recidivism's transfer credit). */
+  first?: string;
+}
+/** An item taken out of the deck (`on`), or back (`on: false`); with `line`, one tactic line (its UCI moves joined by commas). */
+export interface DropEvent extends Base {
+  k: 'drop';
+  card: string;
+  on: boolean;
+  line?: string;
+}
+/** A drilled position missed again in a later game: an Again review at the game's time, once per card and game. */
+export interface RelapseEvent extends Base {
+  k: 'relapse';
+  card: string;
+  /** The game's id. */
+  g: string;
+  /** When the game was played. */
+  at: string;
+}
+/** A plan card enrolled (`on`) or removed, with the side the board is turned to. */
+export interface PlanEvent extends Base {
+  k: 'plan';
+  card: string;
+  on: boolean;
+  side: 'white' | 'black';
+}
+/** A position's repertoire deviations ignored (`on`), or shown again. */
+export interface DismissEvent extends Base {
+  k: 'dismiss';
+  card: string;
+  on: boolean;
+}
+/** A practice item made on the site (a sequence, a practice mistake): the item itself, since no game holds it. */
+export interface SavedEvent extends Base {
+  k: 'saved';
+  card: string;
+  item: Record<string, unknown>;
+}
+/** A finished practice game, slim (its start, moves and classifications): the history. */
+export interface PlayedEvent extends Base {
+  k: 'played';
+  card: string;
+  game: Record<string, unknown>;
+}
+/** A practice result at a position: the checklist's `preset` when a drill's. */
+export interface PracticeEvent extends Base {
+  k: 'practice';
+  card: string;
+  res: 'win' | 'draw' | 'loss';
+  preset?: string;
+  /** The final evaluation, White-relative centipawns. */
+  cp?: number;
+  /** The user's moves played. */
+  mv?: number;
+}
+export type KnownEvent =
+  | ReviewEvent
+  | SuspendEvent
+  | UnsuspendEvent
+  | ForgetEvent
+  | TaughtEvent
+  | PinEvent
+  | UnpinEvent
+  | DrillEvent
+  | AltEvent
+  | StormEvent
+  | SnapshotEvent
+  | DropEvent
+  | RelapseEvent
+  | PlanEvent
+  | DismissEvent
+  | SavedEvent
+  | PlayedEvent
+  | PracticeEvent;
+export const KNOWN_KINDS = ['review', 'suspend', 'unsuspend', 'forget', 'taught', 'pin', 'unpin', 'drill', 'alt', 'storm', 'snapshot', 'drop', 'relapse', 'plan', 'dismiss', 'saved', 'played', 'practice'] as const;
 
 /** A line as read. `event` is set for the kinds this code knows; `raw` is always the line itself. */
 export interface LogLine {
@@ -203,6 +297,89 @@ function knownEvent(o: Record<string, unknown>): KnownEvent | string {
       }
       return event;
     }
+    case 'snapshot': {
+      if (!/^[mp]\|.+$/.test(card)) return 'card must be a game card (m|…) or a plan card (p|…)';
+      const st = o['st'];
+      if (st !== 0 && st !== 1 && st !== 2 && st !== 3) return 'st must be an FSRS state from 0 to 3';
+      const nums: Record<string, number> = {};
+      for (const f of ['stab', 'diff', 'reps', 'lapses', 'sched']) {
+        const x = o[f];
+        if (typeof x !== 'number' || !Number.isFinite(x) || x < 0) return `${f} must be a non-negative number`;
+        nums[f] = x;
+      }
+      const last = o['last'];
+      if (typeof last !== 'string' || !ISO.test(last)) return 'last must be a UTC time';
+      const event: SnapshotEvent = { ...base, k: 'snapshot', st, stab: nums['stab']!, diff: nums['diff']!, reps: nums['reps']!, lapses: nums['lapses']!, sched: nums['sched']!, last };
+      const first = o['first'];
+      if (first !== undefined) {
+        if (typeof first !== 'string' || !ISO.test(first)) return 'first must be a UTC time';
+        event.first = first;
+      }
+      return event;
+    }
+    case 'drop': {
+      const on = o['on'];
+      if (typeof on !== 'boolean') return 'on must be true or false';
+      const event: DropEvent = { ...base, k: 'drop', on };
+      const line = o['line'];
+      if (line !== undefined) {
+        if (typeof line !== 'string' || !/^[a-h][1-8][a-h][1-8][qrbn]?(,[a-h][1-8][a-h][1-8][qrbn]?)*$/.test(line)) return 'line must be UCI moves joined by commas';
+        event.line = line;
+      }
+      return event;
+    }
+    case 'relapse': {
+      if (!card.startsWith('m|')) return 'card must be a game card (m|…)';
+      const g = o['g'];
+      if (typeof g !== 'string' || g === '') return 'g must name the game';
+      const at = o['at'];
+      if (typeof at !== 'string' || !ISO.test(at)) return 'at must be a UTC time';
+      return { ...base, k: 'relapse', g, at };
+    }
+    case 'plan': {
+      if (!card.startsWith('p|') || card.length < 3) return 'card must be a plan card (p|<position>)';
+      const on = o['on'];
+      if (typeof on !== 'boolean') return 'on must be true or false';
+      const side = o['side'];
+      if (side !== 'white' && side !== 'black') return 'side must be white or black';
+      return { ...base, k: 'plan', on, side };
+    }
+    case 'dismiss': {
+      if (!card.startsWith('d|') || card.length < 3) return 'card must be a position (d|<position>)';
+      const on = o['on'];
+      if (typeof on !== 'boolean') return 'on must be true or false';
+      return { ...base, k: 'dismiss', on };
+    }
+    case 'saved': {
+      if (!card.startsWith('m|')) return 'card must be a game card (m|…)';
+      const item = o['item'];
+      if (typeof item !== 'object' || item === null || Array.isArray(item)) return 'item must be an object';
+      return { ...base, k: 'saved', item: item as Record<string, unknown> };
+    }
+    case 'played': {
+      if (!card.startsWith('h|')) return 'card must be a history entry (h|…)';
+      const game = o['game'];
+      if (typeof game !== 'object' || game === null || Array.isArray(game)) return 'game must be an object';
+      return { ...base, k: 'played', game: game as Record<string, unknown> };
+    }
+    case 'practice': {
+      if (!card.startsWith('x|') || card.length < 3) return 'card must be a position (x|<position>)';
+      const res = o['res'];
+      if (res !== 'win' && res !== 'draw' && res !== 'loss') return 'res must be win, draw or loss';
+      const event: PracticeEvent = { ...base, k: 'practice', res };
+      const preset = o['preset'];
+      if (preset !== undefined) {
+        if (typeof preset !== 'string' || preset === '') return 'preset must name the preset';
+        event.preset = preset;
+      }
+      for (const f of ['cp', 'mv'] as const) {
+        const x = o[f];
+        if (x === undefined) continue;
+        if (!Number.isSafeInteger(x)) return `${f} must be an integer`;
+        event[f] = x as number;
+      }
+      return event;
+    }
     default:
       return { ...base, k: 'forget' };
   }
@@ -219,6 +396,25 @@ export function formatEvent(event: KnownEvent): string {
   }
   if (event.k === 'drill') o['ok'] = event.ok;
   if (event.k === 'alt') o['on'] = event.on;
+  if (event.k === 'snapshot') {
+    Object.assign(o, { st: event.st, stab: event.stab, diff: event.diff, reps: event.reps, lapses: event.lapses, sched: event.sched, last: event.last });
+    if (event.first !== undefined) o['first'] = event.first;
+  }
+  if (event.k === 'drop') {
+    o['on'] = event.on;
+    if (event.line !== undefined) o['line'] = event.line;
+  }
+  if (event.k === 'relapse') Object.assign(o, { g: event.g, at: event.at });
+  if (event.k === 'plan') Object.assign(o, { on: event.on, side: event.side });
+  if (event.k === 'dismiss') o['on'] = event.on;
+  if (event.k === 'saved') o['item'] = event.item;
+  if (event.k === 'played') o['game'] = event.game;
+  if (event.k === 'practice') {
+    o['res'] = event.res;
+    if (event.preset !== undefined) o['preset'] = event.preset;
+    if (event.cp !== undefined) o['cp'] = event.cp;
+    if (event.mv !== undefined) o['mv'] = event.mv;
+  }
   if (event.k === 'storm') {
     o['b'] = event.b;
     if (event.u !== undefined) o['u'] = event.u;

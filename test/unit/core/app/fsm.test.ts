@@ -108,3 +108,18 @@ test('the notation keys move along lines and between variations', () => {
   assert.deepEqual(nearest(c, ['e4', 'd5', 'exd5']), ['e4']);
   assert.deepEqual(step(c, ['e4', 'd5'], 'next'), ['e4']);
 });
+
+test('the games’ addresses (§5.54, §5.55): the list, a game at a ply, the review; anything else the list', () => {
+  const cases: [string, Mode][] = [
+    ['#/games', { name: 'games' }],
+    ['#/games/review', { name: 'gamesReview' }],
+    ['#/games/AbCd1234', { name: 'games', id: 'AbCd1234' }],
+    ['#/games/chesscom_1234567?ply=31', { name: 'games', id: 'chesscom_1234567', ply: 31 }],
+  ];
+  for (const [hash, m] of cases) {
+    assert.deepEqual(parseHash(hash), m, hash);
+    assert.equal(modeHash(m), hash);
+  }
+  assert.deepEqual(parseHash('#/games/a%2Fb'), { name: 'games' });
+  assert.deepEqual(parseHash('#/games/a/b'), { name: 'games' });
+});

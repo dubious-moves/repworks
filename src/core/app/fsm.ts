@@ -18,6 +18,9 @@
 //                                       FEN or a chapter's move (§5.35)
 //   #/storm[/<sid>[/<cid>[?at=e4,e5]]]  the storm (§5.43): the repertoire, a study, a chapter, or
 //                                       the lines through a chapter's move
+//   #/games                             the games and their cards (§5.54)
+//   #/games/<id>[?ply=n]                one game, at a ply
+//   #/games/review                      the game cards due, as a session (§5.55)
 // A setup link (#setup?…) is read and removed before any of this (src/app/setup.ts).
 import { isId } from '../study/ids.ts';
 
@@ -53,7 +56,11 @@ export type Mode =
    */
   | { name: 'analysis'; fen?: string; from?: { sid: string; cid: string; at: string[] } }
   /** The storm (§5.43): over the repertoire, a study, a chapter, or the lines through `at`. */
-  | { name: 'storm'; sid?: string; cid?: string; at?: string[] };
+  | { name: 'storm'; sid?: string; cid?: string; at?: string[] }
+  /** The games (§5.54); with `id`, one game, at `ply` (0 the start). */
+  | { name: 'games'; id?: string; ply?: number }
+  /** The game cards due, as a session (§5.55). */
+  | { name: 'gamesReview' };
 
 export type Practice = 'retry' | 'drill' | 'pinned' | 'pins';
 const PRACTICE_HASH: Record<Practice, string> = { retry: '#/mistakes/retry', drill: '#/mistakes/drill', pinned: '#/pinned', pins: '#/pinned/all' };
@@ -86,6 +93,8 @@ export function transition(mode: Mode, event: ModeEvent): Mode {
 }
 
 const SAN = /^[A-Za-z0-9+#=-]+$/;
+/** A game's id: Lichess's eight characters, `chesscom_<n>`, mistake-lab's `_practice_…`. */
+const GAME_ID = /^[A-Za-z0-9_]{1,60}$/;
 
 const decode = (part: string): string | undefined => {
   try {
@@ -132,6 +141,17 @@ export function parseHash(hash: string): Mode {
     return m;
   }
   if (parts[0] === 'coverage' && parts.length === 2 && isId(parts[1])) return { name: 'coverage', sid: parts[1] };
+  if (parts[0] === 'games') {
+    if (parts.length === 1) return { name: 'games' };
+    if (parts.length === 2 && parts[1] === 'review') return { name: 'gamesReview' };
+    if (parts.length === 2 && GAME_ID.test(parts[1]!)) {
+      const m: Mode = { name: 'games', id: parts[1] };
+      const ply = /(?:^|&)ply=(\d{1,4})(?:&|$)/.exec(query)?.[1];
+      if (ply !== undefined) m.ply = Number(ply);
+      return m;
+    }
+    return { name: 'games' };
+  }
   if (parts.length === 1 && parts[0] === 'analysis') {
     const mode: Mode = { name: 'analysis' };
     const fen = query.split('&').find((q) => q.startsWith('fen='));
@@ -184,6 +204,10 @@ export function modeHash(mode: Mode): string {
       return PRACTICE_HASH[mode.run];
     case 'coverage':
       return `#/coverage/${mode.sid}`;
+    case 'games':
+      return mode.id ? `#/games/${mode.id}${mode.ply !== undefined ? `?ply=${mode.ply}` : ''}` : '#/games';
+    case 'gamesReview':
+      return '#/games/review';
     case 'storm':
       return `#/storm${mode.sid ? `/${mode.sid}${mode.cid ? `/${mode.cid}${atQuery(mode.at)}` : ''}` : ''}`;
     case 'analysis': {

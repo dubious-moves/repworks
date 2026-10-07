@@ -2,8 +2,8 @@
 // (t, device, n), folded per card. Card state is never stored or merged: it is this fold, so a
 // review made offline on one device can't be lost to another, and two devices that hold the same
 // events compute the same states.
-import type { KnownEvent, LogLine } from './events.ts';
-import { DEFAULT_PARAMS, newCard, review, type FsrsCard, type FsrsGrade, type FsrsParams } from './fsrs.ts';
+import type { KnownEvent, LogLine, RelapseEvent, SnapshotEvent } from './events.ts';
+import { DEFAULT_PARAMS, newCard, review, validCard, type FsrsCard, type FsrsGrade, type FsrsParams } from './fsrs.ts';
 
 export interface DeviceEvent {
   device: string;
@@ -24,7 +24,11 @@ export interface CardState {
   lastGrade?: FsrsGrade;
   /** When the move was first taught (§5.2); a card taught and never reviewed is in learning. */
   taught?: number;
+  /** Set when a migrated state (§5.64) was taken. */
+  snapshot?: true;
 }
+
+const DAY_MS = 86_400_000;
 
 export const order = (a: DeviceEvent, b: DeviceEvent) => a.t - b.t || (a.device < b.device ? -1 : a.device > b.device ? 1 : 0) || a.n - b.n;
 
@@ -38,6 +42,7 @@ export function toDeviceEvents(device: string, lines: readonly LogLine[]): Devic
 
 export function foldCard(events: readonly DeviceEvent[], params: FsrsParams = DEFAULT_PARAMS): CardState {
   const state: CardState = { card: newCard(), suspended: false, reviews: 0 };
+  let relapses: Set<string> | undefined;
   for (const { event, t } of events) {
     if (!event) continue;
     switch (event.k) {
@@ -61,6 +66,13 @@ export function foldCard(events: readonly DeviceEvent[], params: FsrsParams = DE
       case 'taught':
         state.taught ??= t;
         break;
+      // Phase 5 (§5.53): kept out of line, so this loop stays small enough to inline `review`.
+      case 'snapshot':
+        takeSnapshot(state, event);
+        break;
+      case 'relapse':
+        relapses = applyRelapse(state, event, relapses, params);
+        break;
       // Pins and drills (§5.8) never change a card's schedule: core/train/pins.ts reads them.
       // Nor do alternatives (§5.18): core/train/alternatives.ts reads them.
       case 'pin':
@@ -69,10 +81,51 @@ export function foldCard(events: readonly DeviceEvent[], params: FsrsParams = DE
       case 'alt':
       // Storm answers (§5.41) neither: core/storm/store.ts reads them.
       case 'storm':
+      // Nor Phase 5's marks (§5.53): core/games reads them.
+      case 'drop':
+      case 'plan':
+      case 'dismiss':
+      case 'saved':
+      case 'played':
+      case 'practice':
         break;
     }
   }
   return state;
+}
+
+/**
+ * mistake-lab's state (D15, §5.64), taken only by a card the site hasn't reviewed: its own
+ * reviews win. A corrupt state starts new, as mistake-lab's SRS-8 rule does.
+ */
+function takeSnapshot(state: CardState, event: SnapshotEvent): void {
+  if (state.reviews > 0 || state.snapshot) return;
+  const last = Date.parse(event.last);
+  const card: FsrsCard = { state: event.st, stability: event.stab, difficulty: event.diff, reps: event.reps, lapses: event.lapses, elapsedDays: 0, scheduledDays: event.sched };
+  if (event.st !== 0) {
+    card.lastReview = last;
+    card.due = last + event.sched * DAY_MS;
+  }
+  state.card = validCard(card);
+  state.snapshot = true;
+  if (event.first !== undefined) state.firstReview = Date.parse(event.first);
+  else if (event.st !== 0) state.firstReview ??= last;
+}
+
+/**
+ * An Again at the game's time (§5.59), once per game, and never before the card's last review
+ * or on a card never reviewed (mistake-lab's guards).
+ */
+function applyRelapse(state: CardState, event: RelapseEvent, seen: Set<string> | undefined, params: FsrsParams): Set<string> {
+  const games = seen ?? new Set<string>();
+  if (games.has(event.g)) return games;
+  games.add(event.g);
+  const at = Date.parse(event.at);
+  const lastReview = state.card.lastReview;
+  if (state.card.state === 0 || lastReview === undefined || lastReview >= at) return games;
+  state.card = review(state.card, 1, at, params);
+  state.lastGrade = 1;
+  return games;
 }
 
 export interface DuplicateClash {
