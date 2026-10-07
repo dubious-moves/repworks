@@ -1,6 +1,7 @@
 // The games (PLAN.md §5.54, §5.55): the games kept on this device with their filters and the
 // day's game cards; one game on the board with its evaluation graph and its items; and the game
 // cards' session (the mistake trainer). mistake-lab's Games and Review tabs, on the site's SRS.
+import { Fragment } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { chessgroundDests } from 'chessops/compat';
 import { normalizeMove } from 'chessops/chess';
@@ -15,7 +16,8 @@ import { forgetGames, gameById, gameDeck, gameQueueNow, gameRows, gamesPrefs, pr
 import type { HistoryEntry } from '../core/games/practice.ts';
 import { recid } from '../app/repertoireCheck.ts';
 import { badgeOf } from '../core/games/recidivism.ts';
-import { continueSession, dropCard, dropLine, endGameSession, gameSession, gradePlan, hint, hintMove, MAX_TRIES, playMove, revealBest, showPlan, skipCard, startGameSession, tryAgain, type CardRun, type GameSession } from '../app/gameTrainer.ts';
+import { closeLine, continueSession, dropCard, dropLine, endGameSession, gameSession, gradePlan, hint, hintMove, lineMove, lineStep, lineToAlt, lineToMain, MAX_TRIES, playMove, revealBest, showLine, showPlan, skipCard, startGameSession, tryAgain, type CardRun, type GameSession } from '../app/gameTrainer.ts';
+import { lineFen, lineScore, moveAt, type EngineLine } from '../core/games/engineLine.ts';
 import { plansInDeck, setPlanCard } from '../app/plans.ts';
 import { cpFor, type GameItem } from '../core/games/extract.ts';
 import { dropsOf } from '../core/games/deck.ts';
@@ -463,20 +465,26 @@ function GameView(props: { id: string; ply?: number }) {
 
 function PlayBoard(props: { run: CardRun; asking: boolean; arrows: { orig: string; dest?: string; brush: string }[] }) {
   const r = props.run;
-  const pos = useMemo(() => positionOf(r.board)!, [r.board]);
+  // With the engine's line shown, the board is the line's (a move on it goes along the line or branches it).
+  const line = r.line;
+  const fen = r.pendingFen ?? (line ? lineFen(line) : r.board);
+  const pos = useMemo(() => positionOf(fen)!, [fen]);
   const [promotion, setPromotion] = useState<{ orig: Key; dest: Key } | undefined>(undefined);
-  const dests = props.asking ? (chessgroundDests(pos) as Map<Key, Key[]>) : new Map<Key, Key[]>();
-  const last = r.lastUci ? ([sq(r.lastUci, 0), sq(r.lastUci, 2)] as [Key, Key]) : undefined;
+  const movable = props.asking || (!!line && !r.lineBusy);
+  const dests = movable ? (chessgroundDests(pos) as Map<Key, Key[]>) : new Map<Key, Key[]>();
+  const lastUci = r.pendingFen ? undefined : line ? moveAt(line, line.currentIdx)?.uci : r.lastUci;
+  const last = lastUci ? ([sq(lastUci, 0), sq(lastUci, 2)] as [Key, Key]) : undefined;
+  const send = (uci: string) => (line ? lineMove(uci) : playMove(uci));
   const onMove = (orig: Key, dest: Key) => {
     const piece = pos.board.get(parseSquare(orig)!);
     if (piece?.role === 'pawn' && (dest[1] === '8' || dest[1] === '1')) return setPromotion({ orig, dest });
     // Standard UCI (castling as e1g1), as the analyzer's lines and Stockfish write it.
     const move = normalizeMove(pos, { from: parseSquare(orig)!, to: parseSquare(dest)! });
-    playMove(isNormal(move) ? standardUci(pos, move) : makeUci(move));
+    send(isNormal(move) ? standardUci(pos, move) : makeUci(move));
   };
   return (
     <div class="train-board">
-      <Board fen={r.board} orientation={r.card.item.color} turn={pos.turn} dests={dests} lastMove={last} check={pos.isCheck()} shapes={[]} autoShapes={props.arrows} drawMode={false} brush="green" onMove={onMove} onShapes={() => undefined} />
+      <Board fen={fen} orientation={r.card.item.color} turn={pos.turn} dests={dests} lastMove={last} check={pos.isCheck()} shapes={[]} autoShapes={line ? [] : props.arrows} drawMode={false} brush="green" onMove={onMove} onShapes={() => undefined} />
       {promotion && (
         <div class="promotion" role="dialog" aria-label="Promote to">
           {(['queen', 'rook', 'bishop', 'knight'] as Role[]).map((role) => (
@@ -484,7 +492,7 @@ function PlayBoard(props: { run: CardRun; asking: boolean; arrows: { orig: strin
               key={role}
               type="button"
               onClick={() => {
-                playMove(makeUci({ from: parseSquare(promotion.orig)!, to: parseSquare(promotion.dest)!, promotion: role }));
+                send(makeUci({ from: parseSquare(promotion.orig)!, to: parseSquare(promotion.dest)!, promotion: role }));
                 setPromotion(undefined);
               }}
             >
@@ -510,7 +518,8 @@ function Review() {
     const onKey = (e: KeyboardEvent) => {
       const st = gameSession.value;
       if (!st || (e.target as HTMLElement | null)?.tagName === 'INPUT') return;
-      if (e.key === 'h') hint();
+      if (st.run?.line && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) lineStep(e.key === 'ArrowLeft' ? -1 : 1);
+      else if (e.key === 'h') hint();
       else if (e.key === 't') tryAgain();
       else if (e.key === 'n' && st.phase !== 'asking' && st.phase !== 'judging' && st.phase !== 'reply') continueSession();
       else return;
@@ -670,6 +679,7 @@ function Card(props: { s: GameSession; r: CardRun }) {
             {r.bestLine && r.bestLine.length > 1 ? ` (${r.bestLine.join(' ')})` : ''} · played in the game: {item.san}
           </p>
         )}
+        {r.line && <LinePanel line={r.line} busy={!!r.lineBusy} wrong={s.phase === 'wrong'} />}
         {graded && <p class="muted">Recorded: {GRADE_WORD[graded]}</p>}
         <div class="actions train-actions">
           {asking && (
@@ -690,6 +700,11 @@ function Card(props: { s: GameSession; r: CardRun }) {
           {(s.phase === 'right' || r.revealed || s.phase === 'unjudged') && (
             <button type="button" onClick={continueSession}>
               Next
+            </button>
+          )}
+          {s.phase === 'right' && item.kind === 'mistake' && r.played && !r.line && (
+            <button type="button" class="secondary" onClick={showLine}>
+              Show the engine’s line
             </button>
           )}
           {s.phase === 'right' && (
@@ -724,6 +739,81 @@ function Card(props: { s: GameSession; r: CardRun }) {
             Drop
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** mistake-lab's engine line panel: the moves as PGN with the alternatives in brackets, each a click away; ‹ › step it. */
+function LinePanel(props: { line: EngineLine; busy: boolean; wrong: boolean }) {
+  const l = props.line;
+  const [, turn, , , , full] = l.baseFen.split(' ');
+  const startNum = Number(full) || 1;
+  const startWhite = turn === 'w';
+  const byBranch = new Map<number, number[]>();
+  l.alternatives.forEach((a, i) => byBranch.set(a.branchIdx, [...(byBranch.get(a.branchIdx) ?? []), i]));
+  // Move numbers by the index on the path: index i is the (i+1)-th ply after the start.
+  const numbered = (idx: number, first: boolean) => {
+    const ply = idx + (startWhite ? 0 : 1);
+    const num = startNum + Math.floor(ply / 2);
+    const white = ply % 2 === 0;
+    return white ? `${num}. ` : first ? `${num}… ` : '';
+  };
+  const alt = (ai: number) => {
+    const a = l.alternatives[ai]!;
+    return (
+      <span key={`alt${ai}`} class="line-alt" data-alt={ai}>
+        (
+        {a.moves.map((m, j) => {
+          const idx = a.branchIdx + 1 + j;
+          const active = l.activeAlt === ai && l.currentIdx === idx;
+          return (
+            <span key={j} class={`game-move${active ? ' current' : ''}`}>
+              <span class="muted">{numbered(idx, j === 0)}</span>
+              <button type="button" class="link" data-idx={idx} onClick={() => lineToAlt(ai, idx)}>
+                {m.san}
+              </button>{' '}
+            </span>
+          );
+        })}
+        ){' '}
+      </span>
+    );
+  };
+  const score = lineScore(l);
+  return (
+    <div class="engine-line-box" data-testid="engine-line" data-idx={l.currentIdx} data-alt={l.activeAlt}>
+      <p class="muted">
+        Engine line{score != null ? ` · ${Math.abs(score) >= 10000 ? (score > 0 ? '+M' : '−M') : `${score >= 0 ? '+' : '−'}${(Math.abs(score) / 100).toFixed(1)}`}` : ''}
+        {props.busy ? ' · Stockfish is thinking…' : ''}
+      </p>
+      <div class="game-moves">
+        {(byBranch.get(-1) ?? []).map(alt)}
+        {l.moves.map((m, i) => (
+          <Fragment key={i}>
+            <span class={`game-move${l.activeAlt === -1 && l.currentIdx === i ? ' current' : ''}${m.isUser ? ' line-user' : ''}`}>
+              <span class="muted">{numbered(i, i === 0)}</span>
+              <button type="button" class="link" data-idx={i} onClick={() => lineToMain(i)}>
+                {m.san}
+              </button>{' '}
+            </span>
+            {(byBranch.get(i) ?? []).map(alt)}
+          </Fragment>
+        ))}
+      </div>
+      <div class="actions">
+        <button type="button" class="secondary" aria-label="Back a move" onClick={() => lineStep(-1)}>
+          ‹
+        </button>
+        <button type="button" class="secondary" aria-label="On a move" onClick={() => lineStep(1)}>
+          ›
+        </button>
+        {!props.wrong && (
+          <button type="button" class="secondary" onClick={closeLine}>
+            Hide the line
+          </button>
+        )}
+        <span class="muted line-hint">← → to step{props.wrong ? ', back before your move to try again' : ''} · a move on the board branches</span>
       </div>
     </div>
   );

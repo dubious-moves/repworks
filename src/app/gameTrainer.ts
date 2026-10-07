@@ -2,14 +2,17 @@
 // SRS. A mistake: the position before it, the user's move judged by Stockfish (the position's
 // lines, searched as the card opens, then the position after the move when it isn't one of them),
 // the grade recorded on the first try; a wrong move offers Try again, three at most, then the best
-// move. A tactic: its lines played through, the opponent's replies after 0.4 s. An advantage: the
-// practice game's drill from its peak (§5.57), graded by its outcome.
+// move; the engine's line after a move (mistake-lab's ENGINE LINES, PLAN.md §6) opens at once after
+// a wrong one and at a press after a right one, stepped, extended and branched on the board. A
+// tactic: its lines played through, the opponent's replies after 0.4 s. An advantage: the practice
+// game's drill from its peak (§5.57), graded by its outcome.
 import { signal } from '@preact/signals';
 import { makeFen } from 'chessops/fen';
 import { makeSanAndPlay } from 'chessops/san';
 import { parseUci } from 'chessops/util';
 import type { DeckCard } from '../core/games/deck.ts';
 import { dropsOf, liveLines, lineFingerprint } from '../core/games/deck.ts';
+import { addBranch, branch, buildEngineLine, endFen, extend, goTo, goToAlt, goToMain, step, type EngineLine } from '../core/games/engineLine.ts';
 import type { MistakeItem } from '../core/games/extract.ts';
 import { goodEnough, judgeMove, mistakeGrade, moverScore, tacticGrade, type Judged, type MoverLine } from '../core/games/grade.ts';
 import { expected, nextLine, playReply, playUser, repliesDue, startTactic, type TacticRun } from '../core/games/tactic.ts';
@@ -58,6 +61,13 @@ export interface CardRun {
   revealed: boolean;
   tactic?: TacticRun;
   tacticWrong: number;
+  /** The last move judged, with the engine's line after it (UCI) and the score after it (White's view). */
+  played?: { uci: string; cont: string[]; cpWhite: number | null };
+  /** The engine's line shown on the board. */
+  line?: EngineLine;
+  /** A search for the line is running: a branch (`pendingFen` on the board) or an extension. */
+  lineBusy?: boolean;
+  pendingFen?: string;
 }
 
 export interface GameSession {
@@ -113,6 +123,9 @@ function sanLine(fen: string, pv: readonly string[]): string[] {
   }
   return out;
 }
+
+/** A White-relative score as centipawns, a mate as ±10,000. */
+const whiteCp = (l: { score: { cp?: number; mate?: number } } | undefined): number | null => (l ? moverScore(l.score, 'white') : null);
 
 function playOn(fen: string, uci: string): string | undefined {
   const pos = positionOf(fen);
@@ -211,14 +224,20 @@ async function mistakeMove(item: MistakeItem, uci: string): Promise<void> {
   const after = playOn(r.fen, uci);
   if (!after) return;
   setRun({ board: after, lastUci: uci }, 'judging');
-  const lines = moverLines(r.fen, await analyse(r.fen, 3));
+  const answer = await analyse(r.fen, 3);
+  const lines = moverLines(r.fen, answer);
   let afterCp: number | undefined;
+  // The engine's line after the move: its own line when the move is one of the position's, else the search after it.
+  const matched = answer?.lines.find((l) => l.pv[0] === uci);
+  let played: CardRun['played'] = { uci, cont: matched ? matched.pv.slice(1) : [], cpWhite: whiteCp(matched) };
   if (!lines.some((l) => l.move === uci)) {
     const pos = positionOf(after);
     if (pos?.isEnd()) afterCp = pos.isCheckmate() ? 10000 : 0;
     else {
-      const a = moverLines(after, await analyse(after, 1))[0];
-      if (a) afterCp = -a.cp;
+      const a = await analyse(after, 1);
+      const m = moverLines(after, a)[0];
+      if (m) afterCp = -m.cp;
+      played = { uci, cont: a?.lines[0]?.pv ?? [], cpWhite: whiteCp(a?.lines[0]) };
     }
   }
   const s = gameSession.value;
@@ -231,13 +250,22 @@ async function mistakeMove(item: MistakeItem, uci: string): Promise<void> {
   // The first try decides the grade (mistake-lab locks it): a later right answer changes nothing.
   if (first) record(s.run.card.card, mistakeGrade({ wpDrop: judged.wpDrop, exactBest: judged.exactBest, hint: s.run.hint > 0 }));
   const best = lines[0]?.move;
-  const patch: Partial<CardRun> = { tries, judged };
+  const patch: Partial<CardRun> = { tries, judged, played };
   if (best && !s.run.bestSan) {
     patch.bestUci = best;
     patch.bestSan = sanLine(r.fen, [best])[0] ?? best;
   }
-  if (!ok && tries >= MAX_TRIES) patch.revealed = true;
+  if (!ok && tries >= MAX_TRIES) {
+    // The best move shown on the card's position (mistake-lab's revealBestMove owns the board then).
+    patch.revealed = true;
+    patch.board = r.fen;
+  } else if (!ok) {
+    // The refutation, opened at the opponent's reply; stepping back before the move is Try again.
+    const line = buildEngineLine(r.fen, uci, played.cont, played.cpWhite, { wrongMove: true });
+    if (line) patch.line = line;
+  }
   setRun(patch, ok ? 'right' : 'wrong');
+  if (patch.line) prepareExtension(patch.line);
 }
 
 function tacticMove(uci: string): void {
@@ -248,7 +276,20 @@ function tacticMove(uci: string): void {
   if (!answer.ok) {
     const after = playOn(r.board, uci);
     if (r.tacticWrong === 0) record(r.card.card, 1);
-    setRun({ board: after ?? r.board, lastUci: uci, tacticWrong: r.tacticWrong + 1, tries: r.tries + 1 }, 'wrong');
+    const tries = r.tries + 1;
+    setRun({ board: after ?? r.board, lastUci: uci, tacticWrong: r.tacticWrong + 1, tries }, 'wrong');
+    // The refutation, as after a mistake's wrong move (mistake-lab's tactic engine line).
+    if (after)
+      void analyse(after, 1).then((a) => {
+        const now = gameSession.value;
+        if (now?.phase !== 'wrong' || now.run?.card !== r.card || now.run.tries !== tries || now.run.line) return;
+        const best = a?.lines[0];
+        const line = buildEngineLine(r.board, uci, best?.pv ?? [], whiteCp(best), { wrongMove: true });
+        if (line) {
+          setRun({ line });
+          prepareExtension(line);
+        }
+      });
     return;
   }
   const board = playOn(r.board, uci)!;
@@ -302,10 +343,11 @@ export function tryAgain(): void {
     let fen = r.fen;
     for (const uci of r.tactic.played) fen = playOn(fen, uci) ?? fen;
     const last = r.tactic.played[r.tactic.played.length - 1];
-    setRun({ board: fen, ...(last ? { lastUci: last } : {}) }, 'asking');
+    const { line: _line, lineBusy: _busy, pendingFen: _pending, lastUci: _tried, ...kept } = r;
+    gameSession.value = { ...s, phase: 'asking', run: { ...kept, board: fen, ...(last ? { lastUci: last } : {}) } };
     return;
   }
-  const { lastUci: _tried, ...rest } = r;
+  const { lastUci: _tried, line: _line, lineBusy: _busy, pendingFen: _pending, ...rest } = r;
   gameSession.value = { ...s, phase: 'asking', run: { ...rest, board: r.fen } };
 }
 
@@ -314,7 +356,10 @@ export function revealBest(): void {
   const r = gameSession.value?.run;
   if (!r) return;
   if (!r.graded && r.tries === 0 && !gameSession.value!.results.has(r.card.card)) record(r.card.card, 1);
-  setRun({ revealed: true });
+  // The arrow is drawn on the card's position, not on the board after a wrong move or a line.
+  const s = gameSession.value!;
+  const { line: _line, lineBusy: _busy, pendingFen: _pending, lastUci: _last, ...rest } = r;
+  gameSession.value = { ...s, run: { ...rest, revealed: true, ...(r.tactic ? { board: r.board, ...(r.lastUci ? { lastUci: r.lastUci } : {}) } : { board: r.fen }) } };
 }
 
 /** The hint: first the piece, then the move. A hint makes the grade Again (Hard for a tactic). */
@@ -371,3 +416,104 @@ export function dropLine(): void {
   nextCard();
 }
 
+
+/* ------------------------------------------------------------------ the engine's line */
+
+/** The line after the move found (mistake-lab's "Show engine line" after a good move). */
+export function showLine(): void {
+  const s = gameSession.value;
+  const r = s?.run;
+  if (!s || !r?.played || r.line || s.phase !== 'right') return;
+  const line = buildEngineLine(r.fen, r.played.uci, r.played.cont, r.played.cpWhite);
+  if (!line) return;
+  setRun({ line });
+  prepareExtension(line);
+}
+
+/** The line put away: the board as it was. */
+export function closeLine(): void {
+  const r = gameSession.value?.run;
+  if (!r?.line) return;
+  if (gameSession.value!.phase === 'wrong') return tryAgain();
+  const s = gameSession.value!;
+  const { line: _line, lineBusy: _busy, pendingFen: _pending, ...rest } = r;
+  gameSession.value = { ...s, run: rest };
+}
+
+const lineOf = (): { r: CardRun; line: EngineLine } | undefined => {
+  const r = gameSession.value?.run;
+  return r?.line ? { r, line: r.line } : undefined;
+};
+const setLine = (line: EngineLine, extra: Partial<CardRun> = {}) => {
+  const r = gameSession.value?.run;
+  if (!r?.line) return;
+  const { pendingFen: _pending, ...rest } = r;
+  const s = gameSession.value!;
+  gameSession.value = { ...s, run: { ...rest, line, ...extra } };
+};
+
+/** The search at the line's end, started ahead of a step past it (mistake-lab's prepareEngineLineExtension). */
+function prepareExtension(line: EngineLine): void {
+  const end = endFen(line);
+  if (end) void analyse(end, 1);
+}
+
+/** ← or →: past the end the line is extended by a search; back before a wrong move is Try again. */
+export function lineStep(delta: number): void {
+  const at = lineOf();
+  if (!at) return;
+  const st = step(at.line, delta);
+  if (st.kind === 'go') return setLine(st.line);
+  if (st.kind === 'retry') return tryAgain();
+  if (st.kind !== 'extend' || at.r.lineBusy) return;
+  const end = endFen(at.line);
+  if (!end) return;
+  const card = at.r.card;
+  setLine(at.line, { lineBusy: true });
+  void analyse(end, 1).then((a) => {
+    const now = lineOf();
+    if (!now || now.r.card !== card) return;
+    const best = a?.lines[0];
+    const line = best ? extend(now.line, end, best.pv, whiteCp(best)) : now.line;
+    setLine(line, { lineBusy: false });
+    if (line !== now.line) prepareExtension(line);
+  });
+}
+
+export function lineToMain(idx: number): void {
+  const at = lineOf();
+  if (at) setLine(goToMain(at.line, idx));
+}
+
+export function lineToAlt(alt: number, idx: number): void {
+  const at = lineOf();
+  if (at) setLine(goToAlt(at.line, alt, idx));
+}
+
+/** A move on the board while the line is shown: along the line, or a new branch searched by Stockfish. */
+export function lineMove(uci: string): void {
+  const at = lineOf();
+  if (!at || at.r.lineBusy) return;
+  const b = branch(at.line, uci);
+  if (b.kind === 'illegal') return;
+  const card = at.r.card;
+  if (b.kind === 'follow') {
+    setLine(b.line);
+    const reply = b.reply;
+    if (reply !== undefined)
+      setTimeout(() => {
+        const now = lineOf();
+        if (now && now.r.card === card && now.line.currentIdx === b.line.currentIdx && now.line.activeAlt === b.line.activeAlt) setLine(goTo(now.line, reply));
+      }, 400);
+    return;
+  }
+  setLine(at.line, { lineBusy: true, pendingFen: b.fen });
+  void analyse(b.fen, 1).then((a) => {
+    const now = lineOf();
+    if (!now || now.r.card !== card) return;
+    const best = a?.lines[0];
+    const line = addBranch(now.line, b, best?.pv ?? [], whiteCp(best));
+    setLine(line, { lineBusy: false });
+    prepareExtension(line);
+  });
+}

@@ -207,6 +207,11 @@ couldn't be tested then (the day's limit was used up), so the training items bel
   counts against mistake-lab, the re-made keys, what is left behind. If it looks right, Run, then
   sync. Best done once the rest of Phase 5 is built (the saved items and plan cards show in the
   session from §5.56 and §5.61), and only once: a second run is refused.
+- §6 item 1 (desktop, then phone): in the game cards, a mistake answered wrong: the engine's line
+  under the board at the opponent's reply, stepped with ‹ › (← → on the desktop), past its end (a
+  wait while Stockfish extends it), a move of your own on the board (a branch in brackets), back
+  before your move (Try again); after a right move, Show the engine's line. Whether the lines read as
+  mistake-lab's and the waits on the phone are bearable.
 - §5.66: the owner's answer on where the analyzer's output lives (PLAN.md, Phase 5, "The owner's
   choice"): (a) the data repo through a converter, recommended, or (b) the Gist, read-only.
 

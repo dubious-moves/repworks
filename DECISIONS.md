@@ -1278,3 +1278,15 @@ The technical calls, each with its reason:
   analyzer's lines and Stockfish write it.
 - **What is left of mistake-lab** (an audit of its reference against what was built) is in `PLAN.md`
   §6, built before it retires: none of it needs the owner.
+
+## Revision of 2026-10-07 (the engine line after a move, PLAN.md §6 item 1)
+- **mistake-lab's engine line is ported from its code, not its reference**: run in Node on ten cases,
+  its states after every step are the port's test. Where the two disagree the code wins: stepping
+  back into an alternative's shared start stays in the alternative (the reference says it returns to
+  the main line).
+- **The line uses the trainer's depth (18, 16 on a narrow screen)** for branches and extensions, not
+  mistake-lab's adaptive 16–22 and its depth-22 prepared extension: one engine client, the phone not
+  kept searching.
+- **Left out**: starting a line by moving an opponent's piece (mistake-lab's own issue #23 is open on
+  it) and Copy as PGN; promotions in a branch are the user's choice, where mistake-lab always queens.
+

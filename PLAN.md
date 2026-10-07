@@ -4222,7 +4222,7 @@ asked), Drop this line. Advantages are left out of the session until §5.57 and 
 Lichess read, a game opened and stepped to its mistake, a mistake answered best (Easy), one with a
 blunder then Try again (Again), the tactic with a wrong move then both lines, three reviews synced,
 nothing wider than the phone; it waits on the moves played, `data-step`, never on the phase alone).
-Not built yet: the engine's line after a wrong move (Show the move gives the best line in SAN).
+The engine's line after a move came with §6's first item (below).
 
 #### 5.56 Saved items: sequences and practice mistakes
 
@@ -4562,6 +4562,25 @@ what was built, 2026-10-07; built in this order before it retires, none needing 
    board, each move's results from the user's games there, the opening name a position is most
    often reached in (used to title practice games and saved items, `lookupOpeningName`).
 5. "Hide time trouble" in the games list and the game cards (TIME TROUBLE: the setting exists).
+
+**As built, item 1** (2026-10-07): `src/core/games/engineLine.ts` (`buildEngineLine`, `continuation`,
+`step`, `goTo`, `goToMain`, `goToAlt`, `branch` with `addBranch`, `extend`: mistake-lab's six plies,
+opened at the opponent's reply, the next six from a search at the end, a branch searched and added as
+an alternative, a branch inside one replacing its rest; stepping back into an alternative's shared
+start stays in it, as its code does), and in the game cards' session: after a mistake card's wrong move
+(not the third, where the best move is shown on the card's position) the refutation from the
+position's own line or the search after the move; after a tactic's wrong move the search after it; after
+a right move "Show the engine's line" (and Hide). The line under the board, its moves as PGN with the
+alternatives in brackets, each a click away; ‹ › and ← → step it; a move on the board goes along the
+line or branches it; back before a wrong move is Try again. The search at the line's end starts ahead
+(mistake-lab's prepared extension), on the trainer's depth. Not ported: starting a line by moving an
+opponent's piece (its issue #23 open) and Copy as PGN. Also fixed: the best move shown after three
+tries or Show the move is drawn on the card's position, not on the board after the wrong move. Tests:
+`test/unit/core/games/engineLine.test.ts`, **the same states as mistake-lab's own code after every
+step** on ten cases of `test/fixtures/games/engineline.json` (`mistake-lab-engineline.cjs`, a stand-in
+engine whose answers are recorded; two controls), and `test/e2e/games.spec.ts` (desktop and phone: the
+line after a right move shown and hidden; after a blunder, stepped, extended, branched, and back to Try
+again).
 
 Side tasks, outside this repo:
 - **Chessable courses**: the owner's own export script (D14). Its PGN imports like any other

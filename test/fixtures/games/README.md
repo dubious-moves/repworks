@@ -52,3 +52,12 @@ mistake-lab's own `generateTodoVariations` gives, run at `c525403` by `mistake-l
 marked), and the moves to speak; `expected` and `speechExpected` are what mistake-lab's own
 `voiceHeardToValues`, `voiceMatchMove` and `voiceMoveToSpeech` give, run at `c525403` by
 `mistake-lab-voice.cjs` (chess.js 0.10.3 for its moves).
+
+`engineline.json` holds the engine line's cases (PLAN.md §6, item 1): a position, the user's move, a
+continuation (or the engine's after the move) and the steps taken (‹ ›, a move clicked, a move on the
+board: the line's next, another, an alternative's); `expected` is the state after each step in
+mistake-lab's own `buildEngineLine`, `lineStep`, `goToMainLineMove`, `goToAltLineMove`,
+`handleEngineLineBranch` and `extendEngineLine`, run at `c525403` by `mistake-lab-engineline.cjs`
+(`node mistake-lab-engineline.cjs <index.html> engineline.json <dir with chess.js@0.10.3>`). Its engine is
+a stand-in (a legal line chosen by a hash of the FEN), and every answer it gave is in `engine`.
+

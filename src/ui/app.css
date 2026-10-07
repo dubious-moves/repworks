@@ -3183,3 +3183,17 @@ a.button.disabled {
   gap: 8px;
   margin: 8px 0;
 }
+.engine-line-box .game-moves {
+  max-height: 9rem;
+}
+.engine-line-box .line-user button {
+  font-weight: 600;
+}
+.engine-line-box .line-alt {
+  color: var(--muted);
+}
+@media (max-width: 768px) {
+  .engine-line-box .line-hint {
+    display: none;
+  }
+}

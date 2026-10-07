@@ -3,7 +3,10 @@
 // Lichess's export with one more game, and the fake engine scripted for the mistakes' positions.
 // The games are read, one is opened, and the day's three cards are answered: a mistake with the
 // best move (Easy), one with a blunder then the best move (Again), and the tactic through its two
-// lines (Easy); the reviews synced. Then (§5.56) a mistake made into a sequence on the analysis
+// lines (Easy); the reviews synced. The engine's line after a move (PLAN.md §6, item 1): shown after
+// the right move at a press and hidden; after the blunder at once, at the reply, stepped, extended
+// past its end, branched by a move on the board, and stepped back before the move to try again.
+// Then (§5.56) a mistake made into a sequence on the analysis
 // board, checked against the fake engine's lines, saved in the mistake's place and drilled.
 import { test, expect, type Page } from '@playwright/test';
 import { Chess } from 'chessops/chess';
@@ -29,6 +32,8 @@ const G2 = 'd4 d5 c4 e6 Nc3 Nf6 Bg5 Be7 e3 O-O'.split(' ');
 const G1_AT = after(G1.slice(0, 6));
 const G2_AT = after(G2.slice(0, 6));
 const G2_G4 = after([...G2.slice(0, 6), 'g4']);
+const G2_LINE_END = after([...G2.slice(0, 6), 'g4', 'Nxg4', 'e3']);
+const G2_BRANCH = after([...G2.slice(0, 6), 'g4', 'Nxg4', 'h3']);
 const TACTIC_FEN = 'r1bqk1nr/pppnppbp/3p2p1/8/2BPP3/5N2/PPP2PPP/RNBQK2R w KQkq - 2 5';
 const SEQ_AT = after([...G1.slice(0, 6), 'Nxd4', 'exd4']);
 
@@ -47,6 +52,8 @@ test.beforeAll(async () => {
         [3, 30, 'e2e3 f8e7'],
       ],
       [G2_G4.key]: [[1, 350, 'f6g4 e2e3']],
+      [G2_LINE_END.key]: [[1, 300, 'g4e3 f2e3']],
+      [G2_BRANCH.key]: [[1, 400, 'g4f6 g1f3']],
       [SEQ_AT.key]: [
         [1, 30, 'e1g1 g8f6'],
         [2, 20, 'd2d3 g8f6'],
@@ -157,14 +164,37 @@ test('games read from the Gist and Lichess, a game opened, the day’s cards ans
   await play(page, 'f3d4');
   await expect(page.getByTestId('game-feedback')).toHaveText(/Best move/);
   await expect(card).toContainText('Recorded: Easy');
+  const line = page.getByTestId('engine-line');
+  await page.getByRole('button', { name: 'Show the engine’s line' }).click();
+  await expect(line).toContainText('4. Nxd4 exd4');
+  await expect(line).toHaveAttribute('data-idx', '1');
+  await page.getByRole('button', { name: 'Hide the line' }).click();
+  await expect(line).toHaveCount(0);
   await page.getByRole('button', { name: 'Next' }).click();
 
   await expect(card).toHaveAttribute('data-card', 'm|GameTwo2_7');
   await play(page, 'g2g4');
   await expect(page.getByTestId('game-feedback')).toHaveText(/Blunder/);
   await expect(card).toContainText('Recorded: Again');
-  await page.getByRole('button', { name: 'Try again' }).click();
+  // The refutation, at the opponent's reply; stepped on, then extended by a search at its end.
+  await expect(line).toHaveText(/4\. g4 Nxg4 5\. e3/);
+  await expect(line).toHaveAttribute('data-idx', '1');
+  await page.keyboard.press('ArrowRight');
+  await expect(line).toHaveAttribute('data-idx', '2');
+  await page.keyboard.press('ArrowRight');
+  await expect(line).toHaveText(/5\. e3 Nxe3 6\. fxe3/);
+  await expect(line).toHaveAttribute('data-idx', '3');
+  // A move of its own on the board: a branch, with the engine's line after it, at its reply.
+  await line.getByRole('button', { name: 'Nxg4' }).click();
+  await expect(line).toHaveAttribute('data-idx', '1');
+  await play(page, 'h2h3');
+  await expect(line).toContainText('(5. h3 Nf6 6. Nf3 )');
+  await expect(line).toHaveAttribute('data-alt', '0');
+  await expect(line).toHaveAttribute('data-idx', '3');
+  // Back before the move: Try again.
+  for (let i = 0; i < 4; i++) await line.getByRole('button', { name: 'Back a move' }).click();
   await expect(card).toHaveAttribute('data-phase', 'asking');
+  await expect(line).toHaveCount(0);
   await play(page, 'g1f3');
   await expect(page.getByTestId('game-feedback')).toHaveText(/Best move/);
   await expect(card).toContainText('Recorded: Again');
