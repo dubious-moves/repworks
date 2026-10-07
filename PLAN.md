@@ -3485,7 +3485,7 @@ penalties flat, the streak multiplying up to ×4 every 4); three minutes, the cl
 while a card waits for a move, the verdict up 2.6 s; a set of 6, three tries, clean on great or
 good; two games a frontier (four when gathering), the invented line among the top 4 moves within
 40 cp; replies of 3% and 20 games at least, four per position; the store at most 900, drawn by
-misses, then deepened, then reach, then at random; puzzles from anchors at plies 12–24 (clamped to
+misses (fewest first: misses go to the back, §14.15), then deepened, then reach, then at random; puzzles from anchors at plies 12–24 (clamped to
 `maxEmissionPly`), ratings 1200–2600, a solved puzzle retired like a position.
 
 Where the new code goes:
@@ -3533,6 +3533,24 @@ undone) and listed in the file's header.
 
 Live: none (pure).
 
+**As built** (2026-10-07):
+- `src/core/storm/config.ts` (`STORM`: `CONFIG.storm`'s numbers; `withPlyRange` folding the
+  user's range in), `grade.ts` (`winPct`, `wpLoss`, `grade`, `points`, `nextStreak`, `moverCp`
+  from core/engine's White-relative `Score`, `moveLoss`, `engineLoss`, `userEval`), `walk.ts`
+  (`pickReject`, `candidate`, `advance`, `reentered`, `walkGame`, `randomLine`, `pickGames`,
+  `drawFrontier`, `bestMove`; chessops positions, standard UCI, the site's `positionKey` for the
+  frontier and re-entry where lichessable used three FEN fields), `set.ts`, `verdict.ts` (the two
+  lines, the source labels and sentences, the uncovered note; "ChessDB cannot score it" became
+  "nothing could score it", since Stockfish is asked too) and `games.ts` (`gamesFromPgn`: a batch
+  export to ids and SAN moves, chessops's PGN parser in place of `stormPgnMoves`).
+- Tests: `test/unit/core/storm/grade.test.ts`, `walk.test.ts`, `verdict.test.ts`, `set.test.ts`:
+  sections 1–4, 6–13 and the set's and the random factor's assertions, each file's header listing
+  what was carried, what was left behind (lichessable's slicing artefacts, its funnel counters,
+  Chessable's paused flag and its wire) and the controls re-run on the port: ten mutations
+  (the perspective flip, the engine flip, the child negation, a multiplied penalty, the spread
+  rule, re-entry's side, the blunder stop's sides, the same-move guard, the points' sign,
+  `unknown` held), each failing exactly the assertions its header names.
+
 #### 5.40 Sources and scopes from the repertoire
 
 - `core/storm/sources.ts` over the index (§5.1): **line ends**: each line's last position, keyed,
@@ -3553,6 +3571,14 @@ the explorer and in SAN by the chapter), the scopes.
 
 Live: none.
 
+**As built** (2026-10-07): `src/core/storm/sources.ts`: `stormLines` (each repertoire chapter's
+root-to-leaf lines with their positions, keys and movers; a set-up chapter marked), `coverage`,
+`frontiers` (ends, converging lines, the ambiguous and the covered counted), `decisions`,
+`uncoveredMoves` (by SAN), and the scopes (`lineInScope`, `inScope`; coverage stays the whole
+repertoire's). Tests: `sources.test.ts` (sections 5 and 13 on chapters, and the scopes), with three
+controls (the covered-end rule, the user's own moves as decision points, the explorer's UCI read
+for its SAN).
+
 #### 5.41 Answers in the progress log, and the record
 
 - `core/progress/events.ts`: `k:"storm"` with `card` (`s|<positionKey>` or `z|<puzzleId>`), `b`
@@ -3571,6 +3597,22 @@ counted, `unknown` neither), `record.test.ts` (the denominators: unknown out of 
 summed, a set's answers marked).
 
 Live: none.
+
+**As built** (2026-10-07):
+- `core/progress/events.ts`: `k:"storm"` as above (`b` one of the six bands, `wp` an integer of
+  tenths up to 1000, `c` as `<sid>/<cid>`); `cards.ts`: `stormCard`, `puzzleCard`; replay folds
+  the kind into nothing (the cards' FSRS states untouched).
+- `core/storm/store.ts`: `stormHistory` (done: the latest graded answer clean and within 60 days;
+  misses since it, `unknown` aside), `stormHistories`, `drawOrder` (done left out; then **misses
+  fewest first**, lichessable §14.15's "misses go to the back", which the plan's first draft had
+  reversed; then deepened, reach, random), `stormAnswer` (an answer's event). `record.ts`:
+  `stormRecord` (positions and puzzles apart, by chapter, sets counted), `foundShare`, `averageWp`.
+- The tests' example of an unknown kind was `storm`; it is `future` now (in the fixture data repo
+  too), since `storm` is known.
+- Tests: `test/unit/core/storm/store.test.ts` (the kind read and written, every bad field, a later
+  version skipped; done and its window, a miss bringing a position back, the epoch; misses; the
+  deal order; the record's denominators), with two controls (the draw hardest first, `unknown`
+  counted as graded).
 
 #### 5.42 The gather: positions found and kept
 
@@ -3616,7 +3658,7 @@ position, the phone's time with the engine's share.
   Try again (`t`, scored nothing); Analyse (the analysis board, §5.35, with the engine and the
   explorer).
 - Answers written as `storm` events; a done position leaves the store (great or good), a missed
-  one comes back first next time.
+  one stays, queued behind the positions not yet seen (§14.15).
 
 Tests: Playwright (desktop and phone) with a store seeded through the page and fake ChessDB and
 engine: a card, a great and a blunder with their points, the streak's multiplier, the clock

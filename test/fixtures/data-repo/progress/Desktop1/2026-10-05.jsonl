@@ -1,3 +1,3 @@
 {"v":1,"n":1,"t":"2026-10-05T14:03:12.345Z","k":"review","card":"r|rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq -|c7c5","g":3,"ms":4210}
 {"v":1,"n":2,"t":"2026-10-05T14:03:20.000Z","k":"suspend","card":"r|rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq -|d7d6"}
-{"v":1,"n":3,"t":"2026-10-05T14:04:00.000Z","k":"storm","stats":{"solved":4}}
+{"v":1,"n":3,"t":"2026-10-05T14:04:00.000Z","k":"future","stats":{"solved":4}}

@@ -1155,3 +1155,17 @@ The technical calls, each with its reason:
   (lichessable §23.1). Never `queue` or `store` (D9).
 - **The storm is its own screen** (`#/storm`), with the repertoire, a study, a chapter or a
   position as its scope; no engine or explorer while a card is up.
+
+## Revision of 2026-10-07 (Phase 4 built through §5.41)
+`PLAN.md` §5.39–§5.41 are built: the storm's rules in core with `check-storm.js`'s assertions,
+the sources over the repertoire's chapters, and the answers as progress events. Calls made while
+building, each with its reason:
+- **Misses go to the back of the deal** (lichessable §14.15), not to the front as the plan's first
+  draft said: hardest-first opened every session with the same handful of failures and starved the
+  positions never seen. The plan is corrected.
+- **The frontier and re-entry use the site's position key** (D10), where lichessable used the FEN's
+  first three fields: the same positions, with en passant only when it is legal.
+- **The controls are re-run on the port**, each mutation failing exactly the assertions its test
+  file's header names: a port that only passes proves less than one whose tests are seen to fail.
+- **`storm` stops being the tests' example of an unknown kind** (`future` instead, in the fixture
+  data repo too), since the log now knows it.

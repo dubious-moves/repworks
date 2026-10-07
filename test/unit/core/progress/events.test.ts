@@ -13,7 +13,7 @@ test('known events format and parse back; unknown kinds are kept verbatim and no
     { v: 1, n: 3, t: '2026-10-05T14:03:14.000Z', k: 'unsuspend', card: repertoireCard(key, 'e7e5') },
     { v: 1, n: 4, t: '2026-10-05T14:03:15.000Z', k: 'forget', card: repertoireCard(key, 'c7c5') },
   ];
-  const future = '{"v":1,"n":5,"t":"2026-10-05T14:04:00.000Z","k":"storm","weird": [1, 2]}';
+  const future = '{"v":1,"n":5,"t":"2026-10-05T14:04:00.000Z","k":"future","weird": [1, 2]}';
   const newer = '{"v":2,"n":6,"t":"2026-10-05T14:05:00.000Z","k":"review","card":"r|x|e2e4","g":3,"extra":true}';
   const text = writeLog([...events.map((e) => ({ raw: formatEvent(e) })), { raw: future }, { raw: newer }]);
   assert.equal(

@@ -67,6 +67,8 @@ export function foldCard(events: readonly DeviceEvent[], params: FsrsParams = DE
       case 'unpin':
       case 'drill':
       case 'alt':
+      // Storm answers (§5.41) neither: core/storm/store.ts reads them.
+      case 'storm':
         break;
     }
   }

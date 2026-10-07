@@ -48,7 +48,7 @@ test('a duplicate is applied once; a clash is reported; unknown kinds are skippe
   assert.equal(r.states.get('r|k|e2e4')!.reviews, 1);
   r.add([{ ...e[0]!, raw: `${e[0]!.raw} ` }]);
   assert.deepEqual(r.clashes, [{ device: 'Desktop1', n: 1 }]);
-  r.add([{ device: 'Desktop1', n: 2, t: t0 + 1, k: 'storm', raw: '{"v":1,"n":2,"t":"x","k":"storm"}' }]);
+  r.add([{ device: 'Desktop1', n: 2, t: t0 + 1, k: 'future', raw: '{"v":1,"n":2,"t":"x","k":"future"}' }]);
   assert.equal(r.states.size, 1);
 });
 
@@ -80,7 +80,7 @@ test('day files by UTC day; compaction keeps every line byte for byte, unknown k
   const late = Date.UTC(2026, 8, 30, 23, 59, 59);
   const files = dayFiles('Desktop1', [reviewEvent(2, late + 2000, 'r|a|e2e4', 3), reviewEvent(1, late, 'r|a|e2e4', 4), reviewEvent(3, Date.UTC(2026, 9, 2), 'r|b|d2d4', 1)]);
   assert.deepEqual([...files.keys()], ['progress/Desktop1/2026-09-30.jsonl', 'progress/Desktop1/2026-10-01.jsonl', 'progress/Desktop1/2026-10-02.jsonl']);
-  const unknown = '{"v":1,"n":9,"t":"2026-09-30T10:00:00.000Z","k":"storm","extra":[1,2]}';
+  const unknown = '{"v":1,"n":9,"t":"2026-09-30T10:00:00.000Z","k":"future","extra":[1,2]}';
   files.set('progress/Desktop1/2026-09-30.jsonl', `${files.get('progress/Desktop1/2026-09-30.jsonl')}${unknown}\n`);
   files.set('progress/Phone001/2026-09-29.jsonl', '{"v":1,"n":1,"t":"2026-09-29T10:00:00.000Z","k":"review","card":"r|a|e2e4","g":2}\n');
   const [only, ...rest] = compactions('Desktop1', files, '2026-10');

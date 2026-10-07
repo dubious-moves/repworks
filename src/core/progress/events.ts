@@ -63,8 +63,29 @@ export interface AltEvent extends Base {
   card: string;
   on: boolean;
 }
-export type KnownEvent = ReviewEvent | SuspendEvent | UnsuspendEvent | ForgetEvent | TaughtEvent | PinEvent | UnpinEvent | DrillEvent | AltEvent;
-export const KNOWN_KINDS = ['review', 'suspend', 'unsuspend', 'forget', 'taught', 'pin', 'unpin', 'drill', 'alt'] as const;
+/** A storm or set answer's band (§5.41): `unknown` when nothing could grade the move. */
+export type StormBand = 'great' | 'good' | 'ok' | 'bad' | 'blunder' | 'unknown';
+export const STORM_BANDS: readonly StormBand[] = ['great', 'good', 'ok', 'bad', 'blunder', 'unknown'];
+/**
+ * A storm answer (§5.41): `card` names the position (`s|<positionKey>`) or the puzzle
+ * (`z|<puzzleId>`). Answered well, it is done on every device for 60 days; the record is replayed
+ * from these. It never touches a repertoire card.
+ */
+export interface StormEvent extends Base {
+  k: 'storm';
+  card: string;
+  b: StormBand;
+  /** The move played, standard UCI. */
+  u?: string;
+  /** The win% given up, in tenths. */
+  wp?: number;
+  /** `set` for a set's first answer (an unhurried one, §21). */
+  m?: 'set';
+  /** The line's chapter: `<sid>/<cid>`. */
+  c?: string;
+}
+export type KnownEvent = ReviewEvent | SuspendEvent | UnsuspendEvent | ForgetEvent | TaughtEvent | PinEvent | UnpinEvent | DrillEvent | AltEvent | StormEvent;
+export const KNOWN_KINDS = ['review', 'suspend', 'unsuspend', 'forget', 'taught', 'pin', 'unpin', 'drill', 'alt', 'storm'] as const;
 
 /** A line as read. `event` is set for the kinds this code knows; `raw` is always the line itself. */
 export interface LogLine {
@@ -155,6 +176,33 @@ function knownEvent(o: Record<string, unknown>): KnownEvent | string {
       if (!/^r\|[^|]+\|[a-h][1-8][a-h][1-8][qrbn]?$/.test(card)) return 'card must be a move: r|<position>|<uci>';
       return { ...base, k: 'alt', on };
     }
+    case 'storm': {
+      if (!/^(s\|[^|]+|z\|[A-Za-z0-9]+)$/.test(card)) return 'card must be a storm position (s|<position>) or a puzzle (z|<id>)';
+      const b = o['b'];
+      if (typeof b !== 'string' || !(STORM_BANDS as readonly string[]).includes(b)) return 'b must be a band: ' + STORM_BANDS.join(', ');
+      const event: StormEvent = { ...base, k: 'storm', b: b as StormBand };
+      const u = o['u'];
+      if (u !== undefined) {
+        if (typeof u !== 'string' || !/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(u)) return 'u must be a move in UCI';
+        event.u = u;
+      }
+      const wp = o['wp'];
+      if (wp !== undefined) {
+        if (!Number.isSafeInteger(wp) || (wp as number) < 0 || (wp as number) > 1000) return 'wp must be tenths of a per cent, 0 to 1000';
+        event.wp = wp as number;
+      }
+      const m = o['m'];
+      if (m !== undefined) {
+        if (m !== 'set') return 'm must be "set" when present';
+        event.m = 'set';
+      }
+      const c = o['c'];
+      if (c !== undefined) {
+        if (typeof c !== 'string' || !/^[^/]+\/[^/]+$/.test(c)) return 'c must be <sid>/<cid>';
+        event.c = c;
+      }
+      return event;
+    }
     default:
       return { ...base, k: 'forget' };
   }
@@ -171,6 +219,13 @@ export function formatEvent(event: KnownEvent): string {
   }
   if (event.k === 'drill') o['ok'] = event.ok;
   if (event.k === 'alt') o['on'] = event.on;
+  if (event.k === 'storm') {
+    o['b'] = event.b;
+    if (event.u !== undefined) o['u'] = event.u;
+    if (event.wp !== undefined) o['wp'] = event.wp;
+    if (event.m !== undefined) o['m'] = event.m;
+    if (event.c !== undefined) o['c'] = event.c;
+  }
   return JSON.stringify(o);
 }
 

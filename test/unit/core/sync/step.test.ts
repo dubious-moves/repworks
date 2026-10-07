@@ -233,7 +233,7 @@ for (const kind of KINDS) {
     const files = new Map([
       ['repworks.json', '{ "format": 1 }\n'],
       ['devices/DeskTest.json', '{ "name": "desktop", "created": "2026-09-01T00:00:00.000Z" }\n'],
-      ['progress/DeskTest/2026-09-29.jsonl', '{"v":1,"n":1,"t":"2026-09-29T10:00:00.000Z","k":"review","card":"r|a|e2e4","g":3}\n{"v":1,"n":2,"t":"2026-09-29T10:01:00.000Z","k":"storm","stats":{"solved":2}}\n'],
+      ['progress/DeskTest/2026-09-29.jsonl', '{"v":1,"n":1,"t":"2026-09-29T10:00:00.000Z","k":"review","card":"r|a|e2e4","g":3}\n{"v":1,"n":2,"t":"2026-09-29T10:01:00.000Z","k":"future","stats":{"solved":2}}\n'],
       ['progress/DeskTest/2026-09-30.jsonl', '{"v":1,"n":3,"t":"2026-09-30T23:59:00.000Z","k":"review","card":"r|a|e2e4","g":4}\n'],
       ['progress/DeskTest/2026-10-01.jsonl', '{"v":1,"n":4,"t":"2026-10-01T08:00:00.000Z","k":"review","card":"r|a|e2e4","g":3}\n'],
     ]);
@@ -249,7 +249,7 @@ for (const kind of KINDS) {
     assert.ok(!after.has('progress/DeskTest/2026-09-29.jsonl') && !after.has('progress/DeskTest/2026-09-30.jsonl'));
     const month = parseLog(after.get('progress/DeskTest/2026-09.jsonl')!).lines;
     assert.deepEqual(month.map((l) => l.n), [1, 2, 3, 5]);
-    assert.equal(month[1]!.raw, '{"v":1,"n":2,"t":"2026-09-29T10:01:00.000Z","k":"storm","stats":{"solved":2}}', 'an unknown kind survives byte for byte');
+    assert.equal(month[1]!.raw, '{"v":1,"n":2,"t":"2026-09-29T10:01:00.000Z","k":"future","stats":{"solved":2}}', 'an unknown kind survives byte for byte');
     assert.deepEqual(parseLog(after.get('progress/DeskTest/2026-10-05.jsonl')!).lines.map((l) => l.n), [6]);
     assert.ok(after.has('progress/DeskTest/2026-10-01.jsonl'), 'the current month stays in day files');
     converged(world, a);

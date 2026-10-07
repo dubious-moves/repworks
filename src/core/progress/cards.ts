@@ -1,10 +1,14 @@
 // Card IDs carry a kind letter (PLAN.md §4.4): `r|<positionKey>|<uci>` is a repertoire move.
-// Later phases add `p|key` (plan recall), `m|…` (game mistakes) and `z|id` (puzzles).
+// The storm (§5.41) adds `s|<positionKey>` (a storm position) and `z|<id>` (a Lichess puzzle);
+// Phase 5 adds `p|key` (plan recall) and `m|…` (game mistakes).
 import type { PositionKey } from '../chess/positionKey.ts';
 
 export type CardId = string & { readonly __brand: 'CardId' };
 
 export const repertoireCard = (key: PositionKey, uci: string) => `r|${key}|${uci}` as CardId;
+
+export const stormCard = (key: PositionKey) => `s|${key}` as CardId;
+export const puzzleCard = (id: string) => `z|${id}` as CardId;
 
 export type ParsedCard = { kind: 'repertoire'; key: PositionKey; uci: string } | { kind: 'other'; letter: string };
 
