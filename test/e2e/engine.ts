@@ -26,10 +26,10 @@ export const LINES: Record<string, [number, number, string][]> = {
 
 export const SLOW = 400;
 
-/** `slow`: how long a search takes to reach depth 20, in ms. */
-export function fakeEngine(slow = SLOW): string {
+/** `slow`: how long a search takes to reach depth 20, in ms; `extra`: more positions' lines. */
+export function fakeEngine(slow = SLOW, extra: Record<string, [number, number, string][]> = {}): string {
   return `
-const LINES = ${JSON.stringify(LINES)};
+const LINES = ${JSON.stringify({ ...LINES, ...extra })};
 let fen = '';
 let timers = [];
 let searching = false;

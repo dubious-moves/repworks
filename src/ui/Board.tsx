@@ -30,7 +30,7 @@ export interface BoardProps {
   onMove(orig: Key, dest: Key): void;
   onShapes(shapes: Shape[]): void;
   /** Shapes drawn but not the chapter's (the engine's arrows, §5.31). */
-  autoShapes?: readonly { orig: string; dest: string; brush: string; lineWidth?: number }[];
+  autoShapes?: readonly { orig: string; dest?: string; brush: string; lineWidth?: number }[];
 }
 
 const BRUSHES: readonly string[] = ['green', 'red', 'blue', 'yellow'];
@@ -51,7 +51,7 @@ function config(p: BoardProps): Config {
     selectable: { enabled: !p.drawMode },
     drawable: {
       shapes: toDraw(p.shapes),
-      autoShapes: (p.autoShapes ?? []).map((a) => ({ orig: a.orig as Key, dest: a.dest as Key, brush: a.brush, ...(a.lineWidth ? { modifiers: { lineWidth: a.lineWidth } } : {}) })),
+      autoShapes: (p.autoShapes ?? []).map((a) => ({ orig: a.orig as Key, ...(a.dest ? { dest: a.dest as Key } : {}), brush: a.brush, ...(a.lineWidth ? { modifiers: { lineWidth: a.lineWidth } } : {}) })),
     },
   };
 }

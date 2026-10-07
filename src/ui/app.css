@@ -2915,3 +2915,168 @@ a.button.secondary {
   width: 100%;
   margin-top: 6px;
 }
+
+/* The games (PLAN.md §5.54, §5.55). */
+.games-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.games-filters label.chip {
+  cursor: pointer;
+}
+.games-setup {
+  display: grid;
+  gap: 8px;
+  max-width: 34rem;
+}
+.games-setup label {
+  display: grid;
+  gap: 2px;
+}
+.games-status {
+  margin: 6px 0 0;
+  padding-left: 1.2em;
+}
+.games-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.games-row a {
+  display: grid;
+  grid-template-columns: 6.5em 0.8em minmax(6em, 1fr) 4em 6em minmax(0, 2fr) 6em;
+  gap: 6px;
+  align-items: center;
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--surface);
+  color: inherit;
+  text-decoration: none;
+  min-height: 44px;
+}
+.games-row a:hover {
+  background: var(--surface);
+}
+.games-opening,
+.games-opp {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.games-side {
+  width: 0.8em;
+  height: 0.8em;
+  border-radius: 2px;
+  border: 1px solid var(--muted);
+}
+.games-side.side-white {
+  background: #eee;
+}
+.games-side.side-black {
+  background: #222;
+}
+.result-win .games-result {
+  color: #62cf8e;
+}
+.result-loss .games-result {
+  color: #ef5f5f;
+}
+.games-items {
+  text-align: right;
+  white-space: nowrap;
+}
+@media (max-width: 768px) {
+  .games-row a {
+    grid-template-columns: 0.8em minmax(0, 1fr) auto;
+    grid-template-areas: 'side opp result' 'side opening items';
+  }
+  .games-date,
+  .games-speed {
+    display: none;
+  }
+  .games-side {
+    grid-area: side;
+  }
+  .games-opp {
+    grid-area: opp;
+  }
+  .games-result {
+    grid-area: result;
+  }
+  .games-opening {
+    grid-area: opening;
+  }
+  .games-items {
+    grid-area: items;
+  }
+}
+.eval-graph {
+  width: 100%;
+  height: 120px;
+  display: block;
+  margin: 8px 0;
+  background: #2b2b2b;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.eval-graph .eval-area {
+  fill: #ddd;
+  opacity: 0.85;
+}
+.eval-graph .eval-line {
+  stroke: #999;
+  stroke-width: 1;
+}
+.eval-graph .eval-mid {
+  stroke: #777;
+  stroke-dasharray: 4 4;
+}
+.eval-graph .eval-cursor {
+  stroke: #5b9bd5;
+  stroke-width: 2;
+}
+.eval-graph .eval-item {
+  stroke-width: 2;
+  opacity: 0.8;
+}
+.eval-item.item-mistake {
+  stroke: #e07a3a;
+}
+.eval-item.item-tactic {
+  stroke: #5b9bd5;
+}
+.eval-item.item-advantage {
+  stroke: #8b7dd8;
+}
+.game-moves {
+  max-height: 14rem;
+  overflow-y: auto;
+  line-height: 1.8;
+}
+.game-move.current button {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-radius: 3px;
+}
+.game-move.item-mistake button {
+  color: #e07a3a;
+}
+.game-move.item-tactic button {
+  color: #5b9bd5;
+}
+.game-move.item-advantage button {
+  color: #8b7dd8;
+}
+.game-items {
+  padding-left: 1.2em;
+}
+.game-items .dropped {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+a.button.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}

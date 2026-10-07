@@ -7,7 +7,7 @@ where the build differed). What remains is live: the spike's re-run (§4.2), the
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
 with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
-for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07); where the analyzer's output lives waits for the owner's answer (§5.66). Read with `DECISIONS.md`, which this plan updates (its
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.55; where the analyzer's output lives waits for the owner's answer (§5.66). Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -4067,6 +4067,16 @@ cut and reported; `positions.test.ts` (keys against `positionKey`, castling as s
 
 Live: none.
 
+**As built** (2026-10-07): `src/core/games/record.ts` (`readGame`, `readGamesFile`, `userColor`,
+`resultFor`; evals as `{cp}` or `{mate}`; chess.com's result, ratings and time loss read from the
+PGN, as mistake-lab's `getGameResultInfo` and its advantage rule read them; a missing `rated` read
+as rated, as mistake-lab does), `positions.ts` (`replay`: one FEN a ply, the key its first four
+fields, the game's own SAN kept), and `chesscom.ts` (`readChesscomGame`, the analyzer's
+`normalizeChesscomGame` on chessops's PGN parser, clocks from `%clk`). Tests:
+`test/unit/core/games/extract.test.ts` (with §5.52's) on `test/fixtures/games` (its README says how
+they were made: 16 public Lichess games run through mistake-lab's analyzer's tactic scan with the
+vendored Stockfish, and mistake-lab's own test game with seven variations).
+
 #### 5.51 Where the games come from
 
 - `platform/gist.ts`: a gist's files by ID (`GET /gists/<id>`, a truncated file read again from
@@ -4088,6 +4098,16 @@ with a fake gist and a fake Lichess, the counts, a refresh adding one game.
 Live (desktop, then phone): the real Gist read; the time and the size; Lichess's stream with the
 login; chess.com from the page (expected to be refused; the page says so).
 
+**As built** (2026-10-07): `src/platform/gist.ts` (`gistId`, `readGist`: no token unless given, the
+raw URL without one, the ETag), `lichessGames.ts` (`userGames`, 300 a refresh, `since` the newest
+Lichess game kept), `gamesStore.ts` (IndexedDB `repworks-games`: games and meta; an analyzer's
+record never replaced by a page's export), `src/app/games.ts` (the settings on this device:
+the gist, the Lichess and chess.com names, the date filter, new cards a day; Refresh, with a line
+per source; chess.com's archives tried from the page, the last two months, and said to come through
+the analyzer when refused). The items are not stored: each game's are extracted when first read and
+kept in memory for its record (0.8 s for 1,000 games in Node; the repertoire filter applied after,
+below). Tests: `test/unit/platform/games.test.ts`, and `test/e2e/games.spec.ts` (below).
+
 #### 5.52 Mistakes, tactics and advantages found
 
 - `extract.ts`, a port of `extractMistakesForGame` and the advantage pass of `extractAllMistakes`:
@@ -4108,6 +4128,17 @@ each advantage exclusion, the replacement).
 
 Live: (desktop) the counts on the owner's real games beside mistake-lab's Review tab.
 
+**As built** (2026-10-07): `src/core/games/extract.ts` (`extractGame`, `shownItems`; an advantage
+keeps the mistakes it replaces, so dropping it gives them back, as mistake-lab's invalidated
+advantage does). **The same items as mistake-lab on all 24 fixture games** (83 items: mistakes with
+their win% drops, cp and time trouble, two analyzer tactics, the advantages and each exclusion),
+against `mistake-lab-items.json`, which mistake-lab's own `extractMistakesForGame` and advantage
+pass produced (cut out of `index.html` at `c525403` and run in Node with chess.js 0.10.3). Three
+controls re-run (the advantage from ply 15, `heldAdvantage` reset, the clock rule's previous ply),
+each failing the assertions its test's header names; two of them failed nothing on the real games
+at first, so `synthEdge15` and `synthHeld` were added to the fixture. The repertoire's moves are
+left out after extraction (the app's cache, §5.51), which is mistake-lab's own post-filter.
+
 #### 5.53 Game cards, their events, and the deck
 
 - `progress/events.ts`: `drop`, `relapse`, `plan`, `dismiss`, `saved`, `played`, `practice` and
@@ -4127,6 +4158,15 @@ limit, the order).
 
 Live: none.
 
+**As built** (2026-10-07): the eight kinds in `core/progress/events.ts`; `cards.ts`: `gameCard`,
+`planCard`, `dismissCard`, `historyCard`, `practiceCard`, `checklistCard`; `replay.ts` folds
+`snapshot` (its due the last review plus its interval) and `relapse` in helpers kept out of the
+fold's loop (inline, they slowed the 100,000-event replay past its 200 ms budget); `core/games/deck.ts`
+(`dropsOf`, `deckOf`, `gameQueue`: the limit counts cards first reviewed today, a snapshot's not)
+and `grade.ts` (§5.55's rules). Tests: `test/unit/core/games/deck.test.ts`, one control (a snapshot
+after a review); a relapse applied twice fails nothing, since the guard on the last review already
+holds it, and the test's header says so.
+
 #### 5.54 The Games screen
 
 - `#/games`: the games, newest first, each with its opponent, result, speed, opening and its counts
@@ -4140,6 +4180,13 @@ Tests: Playwright (desktop and phone) with the fixture games: the list, a filter
 items, nothing wider than the phone.
 
 Live: (phone) the list's speed on the real games.
+
+**As built** (2026-10-07): `src/ui/Games.tsx` (`#/games`: the game cards' counts and Review, the
+sources, the filters (colour, rated, platform, speeds), the list fifty at a time; `#/games/<id>`:
+the board stepped with the buttons and ← →, the evaluation graph from the user's side with the
+items marked (a click moves to the ply), the moves with the items coloured, each item with Drop or
+Put back, Analyse this position, On Lichess). "Games" on the home screen beside Storm. "Practise
+from here" comes with §5.57. Hide time trouble is kept in the settings, not yet in the list.
 
 #### 5.55 The mistake trainer
 
@@ -4161,6 +4208,21 @@ through its reply and an alternative line, a dropped item gone from the deck aft
 events written.
 
 Live: (desktop and phone) a real day's game cards; the engine's waits on the phone.
+
+**As built** (2026-10-07): `src/app/gameTrainer.ts` and the session in `Games.tsx`. A mistake: the
+position's three lines searched as the card opens (the storm's Stockfish client, depth 18, 16 on a
+narrow screen, 8 s), the move judged from them or from one search after it (a mate +10,000, a
+stalemate 0), mistake-lab's word and colour, the first try's grade recorded at once; Try again up
+to three tries, Show the move, Hint (the piece, then the arrow: Again); Skip (Again), Next, View
+the game, Analyse, Drop. A tactic: its live lines through `core/games/tactic.ts` (the replies after
+0.4 s, a move of another line switching to it, the next line from where the opponent's reply
+differs; a line leaving a solved one at the user's own move is mistake-lab's optional kind and not
+asked), Drop this line. Advantages are left out of the session until §5.57 and counted. Tests:
+`test/unit/core/games/tactic.test.ts`; `test/e2e/games.spec.ts` (desktop and phone: the Gist and
+Lichess read, a game opened and stepped to its mistake, a mistake answered best (Easy), one with a
+blunder then Try again (Again), the tactic with a wrong move then both lines, three reviews synced,
+nothing wider than the phone; it waits on the moves played, `data-step`, never on the phase alone).
+Not built yet: the engine's line after a wrong move (Show the move gives the best line in SAN).
 
 #### 5.56 Saved items: sequences and practice mistakes
 

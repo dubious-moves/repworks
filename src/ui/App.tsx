@@ -10,6 +10,7 @@ import { ChapterView } from './ChapterView.tsx';
 import { ConflictsView } from './Conflicts.tsx';
 import { CoverageView } from './Coverage.tsx';
 import { StormScreen } from './Storm.tsx';
+import { GamesScreen } from './Games.tsx';
 import { Debug } from './Debug.tsx';
 import { ImportScreen } from './Import.tsx';
 import { SetupForm } from './Setup.tsx';
@@ -27,7 +28,7 @@ import { confirmDeleteStudy, openNewStudy, openStudySettings, StudyDialogs } fro
 
 export function App() {
   return (
-    <div class={`shell${mode.value.name === 'chapter' || mode.value.name === 'analysis' ? ' shell-chapter' : ''}${['train', 'learn', 'practice', 'show', 'read', 'play', 'storm'].includes(mode.value.name) ? ' shell-train' : ''}`}>
+    <div class={`shell${mode.value.name === 'chapter' || mode.value.name === 'analysis' ? ' shell-chapter' : ''}${['train', 'learn', 'practice', 'show', 'read', 'play', 'storm', 'gamesReview'].includes(mode.value.name) || (mode.value.name === 'games' && !!mode.value.id) ? ' shell-train' : ''}`}>
       <header class="topbar">
         <img class="topbar-icon" src={`${import.meta.env.BASE_URL}icons/icon.svg`} alt="" width={28} height={28} />
         <h1>Repworks</h1>
@@ -98,6 +99,10 @@ function Screen() {
       const m = mode.value;
       return <StormScreen where={{ ...(m.sid ? { sid: m.sid } : {}), ...(m.cid ? { cid: m.cid } : {}), ...(m.at ? { at: m.at } : {}) }} />;
     }
+    case 'games':
+      return <GamesScreen {...(mode.value.id ? { id: mode.value.id } : {})} {...(mode.value.ply !== undefined ? { ply: mode.value.ply } : {})} />;
+    case 'gamesReview':
+      return <GamesScreen review />;
     case 'list':
       return <Home />;
   }
@@ -119,6 +124,9 @@ function Home() {
           <div class="actions">
             <a class="button secondary" href="#/storm">
               Storm
+            </a>
+            <a class="button secondary" href="#/games">
+              Games
             </a>
             <a class="button secondary" href="#/analysis">
               Analysis board

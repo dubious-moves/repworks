@@ -1229,3 +1229,20 @@ The technical calls, each with its reason:
   studies (D3); its cards start new (D19). Dismissals and plan enrolments stay events.
 - **A daily limit of new game cards** (10 by default): mistake-lab's queue had none, and its whole
   backlog would arrive on the first day.
+
+## Revision of 2026-10-07 (Phase 5 built through §5.55)
+`PLAN.md` §5.50–§5.55 are built. Calls made while building, each with its reason:
+- **The extraction is tested against mistake-lab's own code**, not a reading of it: its
+  `extractMistakesForGame` and advantage pass, cut out of `index.html` and run in Node, produced
+  the expected items for the fixture games, and the port matches them item for item.
+- **Items are extracted in memory per game, not stored**, and the repertoire's moves are left out
+  afterwards (mistake-lab's own post-filter when its trie loads late): a sync that changes the
+  repertoire then costs no re-extraction. 1,000 games extract in 0.8 s in Node.
+- **The Gist is read without a token** (a secret gist's ID is enough, and a fine-grained token's
+  Gists permission is for writes only), so Games needs no new token; the migration (§5.64) asks for
+  one once, as D15 says.
+- **A tactic's optional lines are not asked** (those leaving a solved line at the user's own move:
+  mistake-lab's "Find a stronger move", outside its grade).
+- **Advantage cards wait for practice (§5.57)**: they are counted on the session's last screen and
+  left out of it, rather than shown as a card that can't be played yet.
+

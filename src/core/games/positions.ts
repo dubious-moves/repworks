@@ -3,7 +3,7 @@
 // is reported. Pure.
 import { Chess, type Position } from 'chessops/chess';
 import { makeFen, parseFen } from 'chessops/fen';
-import { makeSanAndPlay, parseSan } from 'chessops/san';
+import { parseSan } from 'chessops/san';
 import { isNormal } from 'chessops/types';
 import { positionKeyOf, type PositionKey } from '../chess/positionKey.ts';
 import { standardUci } from '../chess/uci.ts';
@@ -48,12 +48,14 @@ export function replay(game: Pick<GameRecord, 'initialFen' | 'moves'>): Replayed
       stopped = { ply: i + 1, san };
       break;
     }
+    // One FEN a ply: the key is its first four fields (positionKeyOf's own rule), and the SAN is
+    // the game's, which parseSan just accepted (Lichess and chess.js both write canonical SAN).
     const fenBefore = makeFen(pos.toSetup());
-    const keyBefore = positionKeyOf(pos);
+    const keyBefore = fenBefore.split(' ', 4).join(' ') as PositionKey;
     const turn = pos.turn;
     const uci = standardUci(pos, move);
-    const canonical = makeSanAndPlay(pos, move);
-    plies.push({ ply: i + 1, fenBefore, keyBefore, turn, san: canonical, uci });
+    pos.play(move);
+    plies.push({ ply: i + 1, fenBefore, keyBefore, turn, san, uci });
   }
   const out: Replayed = { plies, finalFen: makeFen(pos.toSetup()), finalKey: positionKeyOf(pos) };
   if (stopped) out.stopped = stopped;

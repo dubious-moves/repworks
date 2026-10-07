@@ -166,6 +166,12 @@ couldn't be tested then (the day's limit was used up), so the training items bel
 - §5.51 (once built): chess.com's archives from the page (`api.chess.com`), which this container
   can't reach: Games → the chess.com name, Refresh; the page says whether chess.com answered. If it
   is refused, chess.com games keep coming through the analyzer.
+- §5.51–§5.55 (desktop, then phone): Games → Set up: mistake-lab's gist (its ID or address), your
+  Lichess name; Refresh: the games read (the count against mistake-lab's), the time it took. A
+  game's graph and items against mistake-lab's Games tab for the same game (the same mistakes,
+  tactics and advantages). Review: a real day's game cards (mistakes judged by Stockfish: the waits
+  on the phone; whether the words match mistake-lab's), a tactic with its other lines, Drop and Put
+  back, and the cards on the other device after a sync. Whether 10 new game cards a day is right.
 - §5.66: the owner's answer on where the analyzer's output lives (PLAN.md, Phase 5, "The owner's
   choice"): (a) the data repo through a converter, recommended, or (b) the Gist, read-only.
 

@@ -100,13 +100,24 @@ async function readStored(): Promise<void> {
   rebuild();
 }
 
+// Each game's items, kept while its record is the same object (a refresh that changes games reads
+// them again). The repertoire's moves are left out afterwards, so a sync that changes the
+// repertoire doesn't extract every game again: mistake-lab's own post-filter, which it runs when its
+// trie loads after the extraction (its advantages are found before that filter too).
+const extracted = new WeakMap<GameRecord, GameItem[]>();
+const itemsOf = (g: GameRecord) => {
+  let items = extracted.get(g);
+  if (!items) extracted.set(g, (items = extractGame(g).items));
+  return items;
+};
+
 function rebuild(): void {
   const cutoff = sinceCutoff(gamesPrefs.peek().since, Date.now());
   const isRep = repertoireMoves(trainData.peek()?.index);
   gameRows.value = stored
     .filter((s) => s.game.createdAt >= cutoff)
     .sort((a, b) => b.game.createdAt - a.game.createdAt)
-    .map((s) => ({ game: s.game, source: s.source, items: extractGame(s.game, isRep).items }));
+    .map((s) => ({ game: s.game, source: s.source, items: itemsOf(s.game).filter((it) => it.kind !== 'mistake' || !isRep(it.key, it.uci)) }));
 }
 
 let started = false;
