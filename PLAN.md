@@ -2245,7 +2245,7 @@ Taken in a session beside Phase 3's build, so as not to interrupt it.
   row's own grid, so a longer count pushed its bar right. It now has one width for the header and
   every row, from the longest count shown (a digit about 0.48 rem, a comma half that).
 - **Explorer: Eval further right** on the desktop (Move 62 px, Eval 60 px, from 58 and 50); the
-  phone keeps the old widths, where the row has no room to give.
+  phone keeps the old widths, where the row has no room to give. (Too far: back left in §5.67.)
 - **Practical: a "+" on hover** for a cell not computed (Qchess's), in place of the dashed box;
   faint and always shown where there is no hover (the phone).
 - **Dialogs wider on the desktop** (600 px from 420; the comment dialog 560 from 460), and **closed
@@ -2266,6 +2266,49 @@ it, `ready` back at its start with no arrow, the next sequence after it; a due m
 sequence before it); the settings' parsing and options; the random-session check with sequences
 on; Playwright, desktop and phone: a sequence watched, stepped, played; a dialog closed by its
 backdrop and not by a click inside it; the explorer's bars at one x.
+
+#### 5.67 The owner's fourth testing notes (built 2026-10-07)
+
+From the owner's first pass over the test sheet and three screenshots, with Claude in Chrome's
+desktop checks beside it.
+- **The branch picker** (Qchess's): → or ▶ on a move where the line branches no longer takes the
+  main line at once; it opens a list of the moves that go on (`2...d6`, `2...Nc6`), the main line's
+  chosen, under the move in the notation (above it where there's no room). ↑ ↓ choose, → ▶ or
+  Enter go along the one chosen, a click or tap goes along it too, ← or Escape close the list
+  where it stands; any other move (a click in the notation, ⏮ ⏭) closes it. Where nothing
+  branches → steps as before, and at a line's end it still enters the comment's line (§5.12).
+  `src/ui/BranchPicker.tsx`.
+- **"Read from here" and "Play from here"** leave the chapter view's panel: both are in the move
+  menu (right-click, long-press, ⋯), which the e2e tests now use.
+- **The explorer stuck on "Asking…"** (a screenshot on a deep Benoni line): the panel's request
+  for a position joined one already queued for it (the explorer and ChessDB share identical
+  requests), and when that one was the Practical search's for the position before, stepping on
+  swept it as stale and the panel's lookup was cancelled with it, silently. A shared request now
+  keeps each asker's staleness and is dropped only when every asker is stale, and an asker joining
+  raises it to its own priority (the panel's request no longer waits behind the search's). Also:
+  the worker gives up an explorer or ChessDB request after 30 s (`AbortSignal.timeout`), since one
+  that never settled held the explorer's single lane for good; the panel says "Lichess didn't
+  answer in 30 seconds" with Retry. Game exports have no limit. Tests:
+  `test/unit/core/explorer/service.test.ts` (the panel answered after the search moved on, and its
+  request moved up to the panel's priority; both failed before the fix).
+- **Explorer columns**: Eval right after the move (desktop Move 56 px, Eval 48 px; phone 52 and
+  46), as Qchess's. **"⇅ Sort"** as Qchess's: a fixed label with the select over it, so Maia's two
+  columns no longer cut it to "Sort l".
+- **Storm: the scope picked on its page** (the owner's note, not in the plan before): Study (whole
+  repertoire or one) and Chapter (all, or one) at the top of the storm's home; they open the same
+  routes as "Storm from here" and the study's settings (`#/storm/<sid>/<cid>`), so the storm,
+  the set and the gather all follow them. The record is the scope's (`recordOver` in
+  `src/core/storm/record.ts`: the chapters' rows added up; answers naming no chapter count in the
+  whole record only), with a table **by study** on the whole repertoire and **by chapter** in a
+  study (every chapter, answered or not), each name opening its scope. Tests: `store.test.ts`
+  (a study's and a chapter's record), `storm.spec.ts` (the tables, a study and a chapter picked,
+  back to the whole repertoire).
+- **The gather's counts and Stop** (Claude in Chrome's note): the request counts are shown as each
+  request goes out (at most four times a second), not when a walk ends, and Stop ends the gather
+  at once: the request under way is given up and Stockfish's search for it stopped; the walk it
+  belonged to is left out. Test: `storm.spec.ts` (the counts while an export hangs, Stop within 2 s).
+- Not changed: "New move found: Nd5" replaced at once by the next prompt (Claude in Chrome's note):
+  the quieter feedback line (§5.17) shows only what asks something of the user.
 
 #### 5.14 Phase 1 acceptance test, and exit
 

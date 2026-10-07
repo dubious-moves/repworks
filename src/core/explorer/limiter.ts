@@ -71,7 +71,8 @@ export interface LimiterSnapshot {
 }
 
 export interface RateLimiter {
-  schedule<T>(fn: () => T | Promise<T>, isStale?: () => boolean, priority?: number): Promise<T>;
+  /** As the lane's: the promise carries its job, so a caller joining it can raise its priority. */
+  schedule<T>(fn: () => T | Promise<T>, isStale?: () => boolean, priority?: number): Promise<T> & { job: { priority: number } };
   sweep(): void;
   queued(): number;
   pause(ms: number): void;
@@ -150,15 +151,20 @@ export function createRateLimiter(o: { now: Now; sleep: Sleep; ratePerMin?: numb
   }
 
   return {
-    schedule<T>(fn: () => T | Promise<T>, isStale?: () => boolean, priority?: number): Promise<T> {
-      return new Promise<T>((resolve, reject) => {
-        jobs.push({ fn, isStale, priority: priority || 0, seq: seq++, resolve: resolve as (v: unknown) => void, reject });
+    schedule<T>(fn: () => T | Promise<T>, isStale?: () => boolean, priority?: number) {
+      const job = { fn, isStale, priority: priority || 0, seq: seq++ } as Job;
+      const p = new Promise<T>((resolve, reject) => {
+        job.resolve = resolve as (v: unknown) => void;
+        job.reject = reject;
+        jobs.push(job);
         if (!pumping) {
           pumping = true;
           // Start on a microtask, so jobs queued in the same tick compete on priority.
           void Promise.resolve().then(step);
         }
-      });
+      }) as Promise<T> & { job: { priority: number } };
+      p.job = job;
+      return p;
     },
     sweep,
     queued: () => jobs.length,

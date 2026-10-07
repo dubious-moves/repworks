@@ -184,6 +184,7 @@ export function createExplorerService(o: ServiceOptions): ExplorerService {
     if (e.message === 'no-token') return { message: 'Lichess’s explorer needs a Lichess login (any account; no permission is asked for).', login: true };
     if (e.status === 401) return { message: 'Lichess refused the login (401): log in again.', login: true };
     if (e.status) return { message: `${source} answered HTTP ${e.status}.` };
+    if (e.name === 'TimeoutError') return { message: `${source} didn’t answer in 30 seconds.` };
     return { message: `${source} didn’t answer: ${e.message || String(e)}` };
   }
 

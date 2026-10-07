@@ -41,7 +41,7 @@ import {
   type StormWhere,
 } from '../app/storm.ts';
 import { STORM } from '../core/storm/config.ts';
-import { averageWp, foundShare, type RecordRow } from '../core/storm/record.ts';
+import { averageWp, blankRow, foundShare, recordOver, type RecordRow } from '../core/storm/record.ts';
 import { setTally } from '../core/storm/set.ts';
 import { bestLine, formatWp, gapNote, sourceTitle, verdictLine, type CardFacts } from '../core/storm/verdict.ts';
 import { storedList, type StoredPosition } from '../core/storm/harvest.ts';
@@ -96,19 +96,22 @@ export function StormScreen(props: { where: StormWhere }) {
           <span class="study-title">Storm · {scope.title}</span>
         </div>
       </div>
-      {!s ? <Home scope={scope} /> : s.phase === 'done' ? <Review s={s} scope={scope} /> : <Card s={s} />}
+      {!s ? <Home scope={scope} where={props.where} /> : s.phase === 'done' ? <Review s={s} scope={scope} /> : <Card s={s} />}
     </div>
   );
 }
 
-function Home(props: { scope: StormScopeData }) {
+function Home(props: { scope: StormScopeData; where: StormWhere }) {
   const scope = props.scope;
+  const where = props.where;
   const home = stormHome.value;
   const g = gathering.value;
   const prefs = stormPrefs.value;
   const prefs2 = puzzlePrefs.value;
   const data = trainData.value;
   const record = data ? recordOf(data) : undefined;
+  // The record of the scope picked: a study's or a chapter's chapters added up (a position's: its chapter's).
+  const shown = record && where.sid ? recordOver(record, (k) => (where.cid ? k === `${where.sid}/${where.cid}` : k.startsWith(`${where.sid}/`))) : record;
   // Stockfish's standard while the home is open and nothing else runs (§5.45).
   useEffect(() => {
     if (prefs.deepen && home && home.deep < home.stored && !g?.running && !deepening.value) void deepen(scope);
@@ -119,6 +122,7 @@ function Home(props: { scope: StormScopeData }) {
   return (
     <div class="storm-home">
       <section class="card">
+        {data && <ScopePicker data={data} where={where} disabled={!!g?.running} />}
         <p>
           {scope.frontiers.length} line end{scope.frontiers.length === 1 ? '' : 's'} and {scope.decisions.length} place{scope.decisions.length === 1 ? '' : 's'} where the opponent may leave your lines.
         </p>
@@ -195,9 +199,10 @@ function Home(props: { scope: StormScopeData }) {
         </label>
       </section>
       <PuzzlesCard scope={scope} />
-      {record && <Record r={record.positions} title="Positions" />}
-      {record && data && record.chapters.size > 0 && <ByChapter record={record} names={(k) => chapterName(data, k)} />}
-      {record && record.puzzles.answered > 0 && <Record r={record.puzzles} title="Puzzles" />}
+      {shown && <Record r={shown.positions} title={`Positions · ${where.sid ? scope.title : 'whole repertoire'}`} />}
+      {record && data && !where.sid && <Breakdown title="By study" head="Study" rows={byStudy(data, record)} />}
+      {record && data && where.sid && !where.cid && <Breakdown title="By chapter" head="Chapter" rows={byChapter(data, record, where.sid)} />}
+      {shown && shown.puzzles.answered > 0 && <Record r={shown.puzzles} title="Puzzles" />}
     </div>
   );
 }
@@ -274,23 +279,95 @@ function PuzzlesCard(props: { scope: StormScopeData }) {
   );
 }
 
-function chapterName(data: NonNullable<typeof trainData.value>, key: string): string {
-  const c = data.chapters.get(key);
-  const name = c?.headers.find(([k]) => k === 'ChapterName')?.[1];
-  const study = data.studyNames.get(key.split('/')[0]!);
-  return name ? (study ? `${study} · ${name}` : name) : key;
+type Data = NonNullable<typeof trainData.value>;
+
+const chapterTitle = (data: Data, key: string) => data.chapters.get(key)?.headers.find(([k]) => k === 'ChapterName')?.[1] ?? key.split('/')[1]!;
+
+/** The repertoire's studies, each with its chapters' keys (`<sid>/<cid>`), in the repertoire's order. */
+function studiesOf(data: Data): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  for (const k of data.chapters.keys()) {
+    const sid = k.split('/')[0]!;
+    out.set(sid, [...(out.get(sid) ?? []), k]);
+  }
+  return out;
 }
 
-/** The record per chapter (§5.46): the answers, the share found, the average given up, the bands. */
-function ByChapter(props: { record: ReturnType<typeof recordOf>; names(key: string): string }) {
-  const rows = [...props.record.chapters].map(([k, v]) => ({ k, name: props.names(k), r: v.positions, p: v.puzzles })).sort((a, b) => b.r.answered + b.p.answered - (a.r.answered + a.p.answered));
+/**
+ * The scope the storm deals from and gathers for: a study, then one of its chapters, or the whole
+ * repertoire. "Storm from here" on a move narrows it to the lines through that move.
+ */
+function ScopePicker(props: { data: Data; where: StormWhere; disabled: boolean }) {
+  const { data, where } = props;
+  const studies = studiesOf(data);
+  return (
+    <div class="storm-scope">
+      <label>
+        Study{' '}
+        <select value={where.sid ?? ''} disabled={props.disabled} onChange={(e) => open({ name: 'storm', ...(e.currentTarget.value ? { sid: e.currentTarget.value } : {}) })}>
+          <option value="">Whole repertoire</option>
+          {[...studies.keys()].map((sid) => (
+            <option key={sid} value={sid}>
+              {data.studyNames.get(sid) ?? sid}
+            </option>
+          ))}
+        </select>
+      </label>
+      {where.sid && (
+        <label>
+          Chapter{' '}
+          <select value={where.cid ?? ''} disabled={props.disabled} onChange={(e) => open({ name: 'storm', sid: where.sid!, ...(e.currentTarget.value ? { cid: e.currentTarget.value } : {}) })}>
+            <option value="">All chapters</option>
+            {(studies.get(where.sid) ?? []).map((k) => (
+              <option key={k} value={k.split('/')[1]}>
+                {chapterTitle(data, k)}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      {where.at && <span class="muted">from the move {where.at.length ? where.at.join(' ') : 'at the start'}</span>}
+    </div>
+  );
+}
+
+interface BreakdownRow {
+  key: string;
+  name: string;
+  r: RecordRow;
+  open(): void;
+}
+
+/** Each study's record, its row opening the study's scope. */
+function byStudy(data: Data, record: ReturnType<typeof recordOf>): BreakdownRow[] {
+  return [...studiesOf(data).keys()].map((sid) => ({
+    key: sid,
+    name: data.studyNames.get(sid) ?? sid,
+    r: recordOver(record, (k) => k.startsWith(`${sid}/`)).positions,
+    open: () => open({ name: 'storm', sid }),
+  }));
+}
+
+/** A study's chapters' records, each row opening the chapter's scope. */
+function byChapter(data: Data, record: ReturnType<typeof recordOf>, sid: string): BreakdownRow[] {
+  return (studiesOf(data).get(sid) ?? []).map((k) => ({
+    key: k,
+    name: chapterTitle(data, k),
+    r: record.chapters.get(k)?.positions ?? blankRow(),
+    open: () => open({ name: 'storm', sid, cid: k.split('/')[1]! }),
+  }));
+}
+
+/** The record per study or chapter (§5.46): the answers, the share found, the average given up, the bands. */
+function Breakdown(props: { title: string; head: string; rows: BreakdownRow[] }) {
+  if (!props.rows.length) return null;
   return (
     <section class="card storm-record">
-      <h2>By chapter</h2>
+      <h2>{props.title}</h2>
       <table class="storm-chapters">
         <thead>
           <tr>
-            <th>Chapter</th>
+            <th>{props.head}</th>
             <th>Answered</th>
             <th>Found</th>
             <th>Given up</th>
@@ -298,12 +375,16 @@ function ByChapter(props: { record: ReturnType<typeof recordOf>; names(key: stri
           </tr>
         </thead>
         <tbody>
-          {rows.map(({ k, name, r }) => {
+          {props.rows.map(({ key, name, r, open: go }) => {
             const found = foundShare(r);
             const avg = averageWp(r);
             return (
-              <tr key={k}>
-                <td>{name}</td>
+              <tr key={key}>
+                <td>
+                  <button type="button" onClick={go}>
+                    {name}
+                  </button>
+                </td>
                 <td>{r.answered}</td>
                 <td>{found === null ? '—' : `${Math.round(found)}%`}</td>
                 <td>{avg === null ? '—' : formatWp(avg)}</td>

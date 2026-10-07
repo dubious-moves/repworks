@@ -175,6 +175,39 @@ test('a new root sweeps the old one’s queued requests, and the old one posts n
   assert.ok(!w.posts.some((m) => m.type === 'update' && m.gen === 1));
 });
 
+test('the panel joining a request the Practical search queued is answered after the search moves on (stuck "Asking…")', async () => {
+  const held: ((r: HttpResponse) => void)[] = [];
+  const w = world({ explorer: () => new Promise<HttpResponse>((r) => held.push(r)) });
+  w.service.handle({ type: 'search', gen: 1, rootFen: START, rows: ['e4', 'd4'], shares: { e4: 0.5, d4: 0.5 } });
+  await settle();
+  assert.equal(explorerUrls(w.urls).length, 1, 'e4’s position in flight, d4’s queued');
+  // The board steps to 1. d4: the panel asks the position the search has queued.
+  const afterD4 = 'rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1';
+  w.service.handle({ type: 'lookup', id: 7, tab: 'lichess', fen: afterD4 });
+  await settle();
+  // The search moves to the new root: the old root's queued requests are swept.
+  w.service.handle({ type: 'search', gen: 2, rootFen: afterD4, rows: [], shares: {} });
+  while (held.length && !w.posts.some((m) => m.type === 'games' && m.id === 7)) {
+    held.shift()!(json(200, { white: 1, draws: 0, black: 0, moves: [] }));
+    await settle();
+  }
+  assert.ok(w.posts.some((m) => m.type === 'games' && m.id === 7 && 'games' in m), 'the panel got its games');
+});
+
+test('the panel joining a queued search request moves it to the panel’s priority', async () => {
+  const held: ((r: HttpResponse) => void)[] = [];
+  const w = world({ explorer: () => new Promise<HttpResponse>((r) => held.push(r)) });
+  w.service.handle({ type: 'search', gen: 1, rootFen: START, rows: ['e4', 'd4', 'Nf3', 'c4'], shares: { e4: 0.4, d4: 0.3, Nf3: 0.2, c4: 0.1 } });
+  await settle();
+  const afterC4 = 'rnbqkbnr/pppppppp/8/8/2P5/8/PP1PPPPP/RNBQKBNR b KQkq - 0 1';
+  w.service.handle({ type: 'lookup', id: 8, tab: 'lichess', fen: afterC4 });
+  await settle();
+  held.shift()!(json(200, { white: 1, draws: 0, black: 0, moves: [] }));
+  await settle();
+  // c4 had the smallest share: without the raise it would come last; now it is next.
+  assert.match(decodeURIComponent(explorerUrls(w.urls)[1]!), /2P5/);
+});
+
 test('a row taken out while it runs is reported as excluded', async () => {
   const held: ((r: HttpResponse) => void)[] = [];
   const w = world({ explorer: () => new Promise<HttpResponse>((r) => held.push(r)) });

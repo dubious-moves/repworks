@@ -271,7 +271,12 @@ export interface Providers {
   limiterRestore(s: Partial<LimiterSnapshot> | null | undefined): void;
 }
 
-type Joined<T> = Promise<T> & { job?: { priority: number } | null };
+/**
+ * A request shared by everyone who asked for it while it was on its way: its job (to raise its
+ * priority) and its askers' staleness tests. It is dropped only once every asker has gone stale, so
+ * the panel joining a position the Practical search queued keeps it when the search moves on.
+ */
+type Joined<T> = Promise<T> & { job?: { priority: number } | null; askers?: ((() => boolean) | undefined)[] };
 
 export function createProviders(o: ProvidersOptions): Providers {
   const stats = o.stats || {};
@@ -300,10 +305,21 @@ export function createProviders(o: ProvidersOptions): Providers {
   const inflight = new Map<string, Joined<unknown>>(); // identical concurrent requests share one fetch
   const asking = new Map<string, Promise<boolean>>(); // analysis requests on their way
 
-  function once<T>(key: string, make: () => Joined<T>): Joined<T> {
+  /** The request under `key` already on its way, joined by one more asker; or undefined. */
+  function join<T>(key: string, isStale: (() => boolean) | undefined, priority: number | undefined): Joined<T> | undefined {
     const hit = inflight.get(key);
-    if (hit) return hit as Joined<T>;
-    const p = make();
+    if (!hit) return undefined;
+    hit.askers?.push(isStale);
+    if (hit.job && (priority || 0) > hit.job.priority) hit.job.priority = priority!;
+    return hit as Joined<T>;
+  }
+
+  function once<T>(key: string, isStale: (() => boolean) | undefined, priority: number | undefined, make: (stale: () => boolean) => Joined<T>): Joined<T> {
+    const hit = join<T>(key, isStale, priority);
+    if (hit) return hit;
+    const askers = [isStale];
+    const p = make(() => askers.every((f) => !!f && f()));
+    p.askers = askers;
     inflight.set(key, p);
     const clear = () => {
       inflight.delete(key);
@@ -320,9 +336,10 @@ export function createProviders(o: ProvidersOptions): Providers {
     const key = fenKey(fen) + '#' + filterHash(filter);
     const counts = ctx.counts || {};
     return o.cache.get('explorer', key, TTL.explorer).then((hit) => {
-      if (hit || inflight.has('x' + key)) {
+      const joined = hit ? undefined : join<CompactExplorer>('x' + key, isStale, ctx.priority);
+      if (hit || joined) {
         counts.hits = (counts.hits || 0) + 1;
-        return (hit as CompactExplorer) || (inflight.get('x' + key) as Promise<CompactExplorer>);
+        return (hit as CompactExplorer) || joined!;
       }
       counts.misses = (counts.misses || 0) + 1;
       const budget = ctx.budget;
@@ -330,9 +347,10 @@ export function createProviders(o: ProvidersOptions): Providers {
         if (!ctx.exempt && budget.spent >= budget.limit) throw BudgetOut();
         budget.spent++;
       }
-      const p = once<CompactExplorer>('x' + key, function attempt(): Promise<CompactExplorer> {
-        return lichess
-          .schedule(
+      const p = once<CompactExplorer>('x' + key, isStale, ctx.priority, (stale) => {
+        const out: { job: { priority: number } | null } = { job: null };
+        const attempt = (): Promise<CompactExplorer> => {
+          const scheduled = lichess.schedule(
             () =>
               o
                 .getToken()
@@ -356,15 +374,20 @@ export function createProviders(o: ProvidersOptions): Providers {
                     return o.cache.put('explorer', key, v).then(() => v);
                   });
                 }),
-            isStale,
-            ctx.priority,
-          )
-          .catch((e: PeError) => {
+            stale,
+            out.job ? out.job.priority : ctx.priority,
+          );
+          out.job = scheduled.job;
+          return scheduled.catch((e: PeError) => {
             // Re-queued only after this job has left the lane, so the retry waits out the pause
             // like everything else instead of deadlocking on itself.
             if (e && e.retry) return attempt();
             throw e;
           });
+        };
+        const shared = attempt() as Joined<CompactExplorer>;
+        Object.defineProperty(shared, 'job', { get: () => out.job });
+        return shared;
       });
       if (budget) {
         p.catch((e: PeError) => {
@@ -386,7 +409,7 @@ export function createProviders(o: ProvidersOptions): Providers {
     const counts = ctx.counts || {};
     counts.hits = (counts.hits || 0) + 1;
     const url = localExplorerUrl(fen, filter, address);
-    return once<CompactExplorer>('l' + url, () => {
+    return once<CompactExplorer>('l' + url, undefined, 0, () => {
       bump('localRequests');
       return Promise.resolve()
         .then(() => o.http(url))
@@ -426,9 +449,7 @@ export function createProviders(o: ProvidersOptions): Providers {
       // unknown one until it is known, for a while.
       const asked = hit && ask && now() - Math.max(hit.t || 0, ask.t) >= TTL.recheck && (hit.status === 'ok' ? ask.t >= (hit.t || 0) : now() - ask.t < TTL.recheckFor);
       if (hit && !asked && (hit.status === 'ok' || now() - hit.t < TTL.chessdbUnknown)) return hit;
-      const joined = inflight.get('c' + key);
-      if (joined && joined.job && (priority || 0) > joined.job.priority) joined.job.priority = priority!;
-      return once<ChessdbAnswer>('c' + key, () => {
+      return once<ChessdbAnswer>('c' + key, isStale, priority, (stale) => {
         const out: { job: { priority: number } | null } = { job: null };
         function attempt(tries: number): Promise<ChessdbAnswer> {
           const p = cdbLane(
@@ -446,12 +467,12 @@ export function createProviders(o: ProvidersOptions): Providers {
                   return o.cache.put('chessdb', key, v).then(() => v);
                 });
             },
-            isStale,
+            stale,
             out.job ? out.job.priority : priority,
           );
           out.job = p.job;
           return p.catch((e: PeError) => {
-            if (!cdbRetryable(e) || tries >= CDB_RETRIES || (isStale && isStale())) throw e;
+            if (!cdbRetryable(e) || tries >= CDB_RETRIES || stale()) throw e;
             return sleep(CDB_RETRY_MS * (tries + 1)).then(() => attempt(tries + 1));
           });
         }

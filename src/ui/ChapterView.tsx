@@ -26,6 +26,7 @@ import { nodeAt, positionAt, samePath, type Path } from '../core/study/tree.ts';
 import { Board } from './Board.tsx';
 import { CardPanel } from './CardPanel.tsx';
 import { CommentDialog, MoveMenu, openMenu } from './MoveMenu.tsx';
+import { BranchPicker, branchOpen, chooseBranch, closeBranches, stepOn } from './BranchPicker.tsx';
 import { Notation } from './Notation.tsx';
 import { endPreviewOnBoard, PreviewBar, previewBoard } from './CommentText.tsx';
 import { ModeSwitch } from './ModeSwitch.tsx';
@@ -81,11 +82,14 @@ export function ChapterView() {
           return step[e.key]!();
         }
       }
+      // Where the line branches, → opens the list of moves that go on (Qchess's), ↑ ↓ choose.
+      const picking = branchOpen();
       const keys: Record<string, () => void> = {
-        ArrowLeft: () => move('prev'),
-        ArrowRight: () => void (jumpIntoComment() || move('next')),
-        ArrowUp: () => move('up'),
-        ArrowDown: () => move('down'),
+        ArrowLeft: () => (picking ? closeBranches() : move('prev')),
+        ArrowRight: () => void (stepOn() || jumpIntoComment()),
+        ArrowUp: () => void (chooseBranch(-1) || move('up')),
+        ArrowDown: () => void (chooseBranch(1) || move('down')),
+        ...(picking ? { Enter: () => void stepOn(), Escape: closeBranches } : {}),
         Home: () => move('start'),
         End: () => move('end'),
         w: () => setThreat(!threat.peek()),
@@ -247,14 +251,6 @@ export function ChapterView() {
             <div class="cv-panel">
               <EnginePanel board={board.pos} />
               <Notation chapter={c} />
-              {!scratch && <div class="actions cv-views">
-                <button type="button" class="secondary" onClick={() => open({ name: 'read', sid: s.sid, cid: s.cid, at: [...at.peek()] })}>
-                  Read from here
-                </button>
-                <button type="button" class="secondary" onClick={() => open({ name: 'play', sid: s.sid, cid: s.cid, at: [...at.peek()] })}>
-                  Play from here
-                </button>
-              </div>}
               {!scratch && (
                 <div class="cv-tools">
                   {doc.value && <Conflicts />}
@@ -278,7 +274,7 @@ export function ChapterView() {
                 <button type="button" aria-label="Previous move" onClick={() => move('prev')}>
                   ◀
                 </button>
-                <button type="button" aria-label="Next move" onClick={() => move('next')}>
+                <button type="button" aria-label="Next move" onClick={() => void stepOn()}>
                   ▶
                 </button>
                 <button type="button" aria-label="End of the line" onClick={() => move('end')}>
@@ -311,6 +307,7 @@ export function ChapterView() {
       )}
       {/* Outside the frame, whose size containment would place a fixed menu inside it. */}
       <MoveMenu />
+      <BranchPicker />
       <TranspositionList />
       <CommentDialog />
     </div>

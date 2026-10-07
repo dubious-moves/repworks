@@ -266,8 +266,9 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
             Ms
           </span>
         )}
-        <label class="ex-sort" title="Sort order">
-          <span aria-hidden="true">⇅</span>
+        {/* Qchess's "⇅ Sort": the select lies over the label, so its text never gets clipped. */}
+        <label class="ex-sort" title={`Sort order: ${SORT_LABELS[p.sort]}`}>
+          <span aria-hidden="true">⇅ Sort</span>
           <select aria-label="Sort" value={p.sort} onChange={(e) => setPrefs({ sort: e.currentTarget.value as SortMode })}>
             {(Object.keys(SORT_LABELS) as SortMode[]).filter((k) => k !== 'maia' || maiaOn).map((k) => (
               <option key={k} value={k}>

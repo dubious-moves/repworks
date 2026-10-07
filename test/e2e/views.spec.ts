@@ -30,6 +30,12 @@ async function setUp(page: Page): Promise<FakeGit> {
   return git;
 }
 
+/** A view opened from the move menu at the move shown (the ⋯ button: the big buttons are gone). */
+async function fromMenu(page: Page, name: string) {
+  await page.getByRole('button', { name: 'Move menu' }).click();
+  await page.getByRole('menuitem', { name }).click();
+}
+
 /** Progress files this device wrote (the fixture's devices excluded). */
 const ownProgress = (git: FakeGit) => [...git.textsOf().keys()].filter((p) => p.startsWith('progress/') && !p.startsWith('progress/Desktop1/') && !p.startsWith('progress/Phone001/'));
 
@@ -37,7 +43,7 @@ test('read: a line stepped through with its comments, then back to the chapter a
   await setUp(page);
   await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf`);
   await page.locator('.move[data-path="e4"]').click({ position: { x: 6, y: 8 } }); // the move, not its +1
-  await page.getByRole('button', { name: 'Read from here' }).click();
+  await fromMenu(page, 'Read from here');
   await expect(page).toHaveURL(/#\/read\/Rep0Najd\/Ch1Najdf\?at=e4$/);
   await expect(page.locator('.study-title')).toHaveText('Read · Main line');
   const move = page.locator('.read-move');
@@ -66,7 +72,7 @@ test('read: a line stepped through with its comments, then back to the chapter a
 
   // From a variation's move, the line goes through it.
   await page.locator('.move[data-path="e4 c5 Nf3 Nc6"]').click();
-  await page.getByRole('button', { name: 'Read from here' }).click();
+  await fromMenu(page, 'Read from here');
   await expect(move).toContainText('2... Nc6');
   await expect(move).toContainText('4 / 5');
 });
@@ -75,7 +81,7 @@ test('play: every own move asked, a wrong move taken back, the other line follow
   const git = await setUp(page);
   const before = ownProgress(git).map((p) => git.textsOf().get(p));
   await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf`);
-  await page.getByRole('button', { name: 'Play from here' }).click();
+  await fromMenu(page, 'Play from here');
   await expect(page).toHaveURL(/#\/play\/Rep0Najd\/Ch1Najdf$/);
   await expect(page.locator('.study-title')).toHaveText('Play · Main line');
   await expect(page.locator('.cg-wrap')).toHaveClass(/orientation-black/);
@@ -131,6 +137,54 @@ test('play from the move menu, from the move shown; read the line from the end',
   await expect(page.locator('.read-move')).toContainText('2. Nf3');
   await page.getByRole('button', { name: 'Play from here' }).click();
   await expect(page).toHaveURL(/#\/play\/Rep0Najd\/Ch1Najdf\?at=e4,c5,Nf3$/);
+});
+
+test('where the line branches, stepping on opens the list of moves: chosen with ↑ ↓ and →, or by a tap', async ({ page, isMobile }) => {
+  await setUp(page);
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf?at=e4,c5,Nf3`);
+  await expect(page.locator('.move.current')).toHaveText('Nf3');
+  const list = page.getByRole('listbox', { name: 'Choose the line' });
+  const current = page.locator('.move.current');
+  if (isMobile) {
+    await page.getByRole('button', { name: 'Next move' }).click();
+    await expect(list.getByRole('option')).toHaveText(['2...d6', '2...Nc6']);
+    await list.getByRole('option', { name: '2...Nc6' }).click();
+    await expect(list).toHaveCount(0);
+    await expect(current).toHaveAttribute('data-path', 'e4 c5 Nf3 Nc6');
+    // ▶ again on the list goes along the move chosen: the main line's first.
+    await page.getByRole('button', { name: 'Previous move' }).click();
+    await page.getByRole('button', { name: 'Next move' }).click();
+    await expect(list).toBeVisible();
+    await page.getByRole('button', { name: 'Next move' }).click();
+    await expect(current).toHaveAttribute('data-path', 'e4 c5 Nf3 d6');
+    return;
+  }
+  await page.keyboard.press('ArrowRight');
+  await expect(list.getByRole('option')).toHaveText(['2...d6', '2...Nc6']);
+  await expect(list.getByRole('option', { selected: true })).toHaveText('2...d6');
+  await expect(current).toHaveAttribute('data-path', 'e4 c5 Nf3');
+  await page.keyboard.press('ArrowDown');
+  await expect(list.getByRole('option', { selected: true })).toHaveText('2...Nc6');
+  await page.keyboard.press('ArrowRight');
+  await expect(list).toHaveCount(0);
+  await expect(current).toHaveAttribute('data-path', 'e4 c5 Nf3 Nc6');
+  // No branch: → steps on as before.
+  await page.keyboard.press('ArrowRight');
+  await expect(current).toHaveAttribute('data-path', 'e4 c5 Nf3 Nc6 d4');
+  // Escape and ← close the list where it stands; Enter goes along the main line.
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('ArrowRight');
+  await expect(list).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(list).toHaveCount(0);
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowLeft');
+  await expect(list).toHaveCount(0);
+  await expect(current).toHaveAttribute('data-path', 'e4 c5 Nf3');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('Enter');
+  await expect(current).toHaveAttribute('data-path', 'e4 c5 Nf3 d6');
 });
 
 test('transposition badges: a new move order shows ⇄1 both ways and leads to the other; +1 leads to the other chapter', async ({ page, isMobile }) => {
@@ -256,7 +310,7 @@ test('line jumping: → on a line’s last move enters its comment’s line, in 
   await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 d6 d4 cxd4');
 
   // The Read view: the line's end, then into the comment; Escape leaves the line, then the view.
-  await page.getByRole('button', { name: 'Read from here' }).click();
+  await fromMenu(page, 'Read from here');
   await expect(page.locator('.read-move')).toContainText('3... cxd4');
   await expect(page.locator('.read-comments .line-move')).toHaveText(['Nxd4', 'Nf6', 'Nc3']);
   await page.keyboard.press('ArrowRight');

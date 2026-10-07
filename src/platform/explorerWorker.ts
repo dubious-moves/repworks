@@ -4,6 +4,7 @@
 // the page hands over (`maiaPort`), as q_extension's background asked the tab for Maia.
 import { createExplorerService, type ToWorker } from '../core/explorer/service.ts';
 import type { MaiaMove } from '../core/explorer/search.ts';
+import { CHESSDB_URL, EXPLORER_BASE } from '../core/explorer/providers.ts';
 import type { FromMaia } from '../core/maia/protocol.ts';
 import { createExplorerCache } from './explorerCache.ts';
 
@@ -49,8 +50,14 @@ function askMaia(fen: string, elo: number): Promise<MaiaMove[] | null> {
   });
 }
 
+// A request that never settles would hold the explorer's single lane for good, and the panel would
+// say "Asking…" from then on: an explorer or ChessDB answer not come in 30 s is given up (the panel
+// then offers Retry). The game exports are left alone: a long one takes its time.
+const TIMEOUT_MS = 30_000;
+const timed = (url: string) => url.startsWith(EXPLORER_BASE) || url.startsWith(CHESSDB_URL);
+
 const service = createExplorerService({
-  http: (url, init) => fetch(url, init),
+  http: (url, init) => fetch(url, timed(url) ? { ...init, signal: AbortSignal.timeout(TIMEOUT_MS) } : init),
   cache: createExplorerCache(),
   now: () => Date.now(),
   sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),

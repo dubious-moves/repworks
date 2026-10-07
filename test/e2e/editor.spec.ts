@@ -47,6 +47,9 @@ test('open a chapter, move through it, and edit it: variation, comment, glyph, a
   await page.locator('.move[data-path="e4 c5 Nf3"]').click();
   await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3');
   await expect(page).toHaveURL(/\?at=e4,c5,Nf3$/);
+  // Nf3 branches: ▶ opens the list of moves (the branch picker), ▶ again goes along the main line.
+  await page.getByRole('button', { name: 'Next move' }).click();
+  await expect(page.getByRole('listbox', { name: 'Choose the line' })).toBeVisible();
   await page.getByRole('button', { name: 'Next move' }).click();
   await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 d6');
   if (!isMobile) {

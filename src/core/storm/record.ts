@@ -66,3 +66,27 @@ export const foundShare = (r: RecordRow): number | null => (r.graded ? (100 * r.
 
 /** The average win% lost, or null with nothing measured. */
 export const averageWp = (r: RecordRow): number | null => (r.wpCount ? r.wpTenths / 10 / r.wpCount : null);
+
+/** Rows added up. */
+export function sumRows(rows: Iterable<RecordRow>): RecordRow {
+  const out = blankRow();
+  for (const r of rows) {
+    out.answered += r.answered;
+    out.graded += r.graded;
+    out.found += r.found;
+    out.wpTenths += r.wpTenths;
+    out.wpCount += r.wpCount;
+    out.set += r.set;
+    for (const b of Object.keys(out.bands) as StormBand[]) out.bands[b] += r.bands[b];
+  }
+  return out;
+}
+
+/**
+ * The record of a study or a chapter (the storm page's scope): the chapters `keep` takes, by their
+ * `<sid>/<cid>`, added up. Answers that name no chapter count in the whole record only.
+ */
+export function recordOver(rec: StormRecord, keep: (chapter: string) => boolean): { positions: RecordRow; puzzles: RecordRow } {
+  const kept = [...rec.chapters].filter(([k]) => keep(k)).map(([, v]) => v);
+  return { positions: sumRows(kept.map((v) => v.positions)), puzzles: sumRows(kept.map((v) => v.puzzles)) };
+}

@@ -13,7 +13,7 @@ import { stormCard, puzzleCard } from '../../../../src/core/progress/cards.ts';
 import type { PositionKey } from '../../../../src/core/chess/positionKey.ts';
 import { STORM as C } from '../../../../src/core/storm/config.ts';
 import { drawOrder, stormAnswer, stormHistories, stormHistory } from '../../../../src/core/storm/store.ts';
-import { averageWp, foundShare, stormRecord } from '../../../../src/core/storm/record.ts';
+import { averageWp, foundShare, recordOver, stormRecord } from '../../../../src/core/storm/record.ts';
 
 const DAY = 86_400_000;
 const KEY = 'r1bqkbnr/pppp1ppp/2n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R b KQkq -' as PositionKey;
@@ -96,4 +96,26 @@ test('the record’s denominators: positions and puzzles apart, unknown out, by 
   assert.equal(r.chapters.get('S1/c1')!.puzzles.answered, 1);
   assert.equal(stormRecord(events, t).puzzles.answered, 1);
   assert.equal(foundShare(stormRecord([]).positions), null);
+});
+
+test('the record of a study or a chapter (the storm page’s scope): its chapters added up', () => {
+  const t = Date.UTC(2026, 9, 7);
+  const r = stormRecord([
+    ev('d', 's|a', 'great', t, ',"wp":0,"c":"S1/c1"'),
+    ev('d', 's|b', 'bad', t, ',"wp":120,"c":"S1/c2"'),
+    ev('d', 's|c', 'good', t, ',"wp":20,"m":"set","c":"S2/c1"'),
+    ev('d', 's|d', 'unknown', t, ',"c":"S1/c2"'),
+    ev('d', 'z|P1', 'great', t, ',"c":"S1/c1"'),
+    ev('d', 's|e', 'great', t),
+  ]);
+  const study = recordOver(r, (k) => k.startsWith('S1/'));
+  assert.deepEqual([study.positions.answered, study.positions.graded, study.positions.found, study.positions.set], [3, 2, 1, 0]);
+  assert.deepEqual(study.positions.bands, { great: 1, good: 0, ok: 0, bad: 1, blunder: 0, unknown: 1 });
+  assert.equal(averageWp(study.positions), 6);
+  assert.equal(study.puzzles.answered, 1);
+  const other = recordOver(r, (k) => k === 'S2/c1');
+  assert.deepEqual([other.positions.answered, other.positions.set, other.puzzles.answered], [1, 1, 0]);
+  // An answer naming no chapter is the whole record's only.
+  assert.equal(r.positions.answered, 5);
+  assert.equal(recordOver(r, () => true).positions.answered, 4);
 });

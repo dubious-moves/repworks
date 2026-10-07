@@ -97,26 +97,34 @@ export interface Spent {
 }
 const blankSpent = (): Spent => ({ explorer: 0, games: 0, chessdb: 0, searches: 0 });
 
-function harvestIo(spent: Spent): HarvestIo {
+/**
+ * The gather's requests, each counted as it goes out (`spent`, then `tick` so the page shows it at
+ * once) and each given up the moment the gather is stopped (`guard` rejects then).
+ */
+function harvestIo(spent: Spent, tick: () => void, guard: <T>(p: Promise<T>) => Promise<T>): HarvestIo {
+  const count = (k: keyof Spent) => {
+    spent[k]++;
+    tick();
+  };
   return {
     explorer: async (fen) => {
-      spent.explorer++;
-      const r = await ask({ type: 'stormGames', fen });
+      count('explorer');
+      const r = await guard(ask({ type: 'stormGames', fen }));
       return r.type === 'stormGames' && 'games' in r ? { total: r.games.total, moves: r.games.moves, gameIds: r.games.gameIds ?? [] } : null;
     },
     pgns: async (ids) => {
-      spent.games++;
-      const r = await ask({ type: 'gamePgns', ids });
+      count('games');
+      const r = await guard(ask({ type: 'gamePgns', ids }));
       return r.type === 'gamePgns' && 'text' in r ? r.text : '';
     },
     cdb: async (fen) => {
-      spent.chessdb++;
-      const r = await ask({ type: 'scores', fen });
+      count('chessdb');
+      const r = await guard(ask({ type: 'scores', fen }));
       return r.type === 'scores' && 'evals' in r ? cdbList(r.evals) : 'error';
     },
     engine: async (fen, lines, depth) => {
-      spent.searches++;
-      const a = await analyseForStorm(fen, lines, depth, 8000);
+      count('searches');
+      const a = await guard(analyseForStorm(fen, lines, depth, 8000));
       const pos = positionOf(fen);
       return a && pos ? engineList(a.lines, pos.turn, a.depth, STORM) : null;
     },
@@ -214,6 +222,8 @@ export interface Gathering {
 }
 export const gathering = signal<Gathering | undefined>(undefined);
 let stopGather = false;
+let stopNow: (() => void) | undefined;
+const STOPPED = new Error('stopped');
 
 /** Walks the scope's line ends (and replies) until stopped or done, storing what passes. */
 export async function gather(s: StormScopeData): Promise<void> {
@@ -221,7 +231,19 @@ export async function gather(s: StormScopeData): Promise<void> {
   stopDeepening();
   stopGather = false;
   const spent = blankSpent();
-  const io = harvestIo(spent);
+  // Stop gives up the request under way: the walk it was part of is left out, nothing waits on it.
+  const stopped = new Promise<never>((_, reject) => (stopNow = () => reject(STOPPED)));
+  stopped.catch(() => undefined);
+  const guard = <T>(p: Promise<T>) => Promise.race([p, stopped]);
+  // The counts as requests go out, at most four times a second, the last always shown.
+  let later: ReturnType<typeof setTimeout> | undefined;
+  const tick = () => {
+    later ??= setTimeout(() => {
+      later = undefined;
+      if (g.running) show();
+    }, 250);
+  };
+  const io = harvestIo(spent, tick, guard);
   const c = config();
   const source = stormPrefs.value.source;
   const ends = source === 'replies' ? [] : s.frontiers.slice();
@@ -252,8 +274,9 @@ export async function gather(s: StormScopeData): Promise<void> {
     }
     g.note = stopGather ? 'Stopped.' : of ? 'Every line end and reply walked.' : g.note;
   } catch (e) {
-    g.note = `The gather stopped: ${e instanceof Error ? e.message : String(e)}`;
+    g.note = e === STOPPED ? 'Stopped.' : `The gather stopped: ${e instanceof Error ? e.message : String(e)}`;
   } finally {
+    stopNow = undefined;
     g.running = false;
     show();
     await refreshHome(s);
@@ -262,6 +285,10 @@ export async function gather(s: StormScopeData): Promise<void> {
 
 export function stopGathering(): void {
   stopGather = true;
+  if (!stopNow) return;
+  stopNow();
+  // Stockfish's search for the gather stops too (nothing else uses it while a gather runs).
+  cancelStormEngine();
 }
 
 /* ------------------------------------------------------------------ the deepened standard (§5.45) */

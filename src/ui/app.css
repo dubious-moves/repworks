@@ -1646,10 +1646,6 @@ a.button.secondary {
 
 /* The Read view (PLAN.md §5.10): the move and its comments in large text. */
 
-.cv-views {
-  margin: 6px 0;
-}
-
 .read-controls {
   justify-content: center;
 }
@@ -1806,9 +1802,10 @@ a.button.secondary {
    its eval, share, count and a white/grey/black bar of its results, novelties, and Σ. */
 
 .explorer {
-  /* The Move and Eval columns: Eval further right where there is room (the owner's third notes). */
-  --ex-move-w: 58px;
-  --ex-eval-w: 50px;
+  /* The Move and Eval columns: Eval close after the move, as Qchess's (the owner's 2026-10-07
+     notes: the third notes' wider gap was too wide). */
+  --ex-move-w: 52px;
+  --ex-eval-w: 46px;
   font-size: 0.85rem;
   border-top: 1px solid rgb(255 255 255 / 10%);
   display: flex;
@@ -1931,9 +1928,16 @@ a.button.secondary {
 .explorer-head .ex-sort {
   grid-column: -2;
   justify-self: end;
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 4px;
+  min-height: 24px;
+  padding: 0 8px;
+  white-space: nowrap;
+  color: var(--text);
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 4px;
+  cursor: pointer;
 }
 
 .explorer-head.no-games .ex-sort {
@@ -1941,13 +1945,15 @@ a.button.secondary {
 }
 
 .explorer-head .ex-sort select {
-  max-width: 7em;
-  min-height: 26px;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  min-height: 0;
+  opacity: 0;
   font: inherit;
   color: var(--text);
   background: var(--bg);
-  border: 1px solid rgb(255 255 255 / 20%);
-  border-radius: 4px;
+  cursor: pointer;
 }
 
 .explorer-rows {
@@ -2095,8 +2101,8 @@ a.button.secondary {
 
 @media (min-width: 900px) {
   .explorer {
-    --ex-move-w: 62px;
-    --ex-eval-w: 60px;
+    --ex-move-w: 56px;
+    --ex-eval-w: 48px;
   }
 
   .cv-panel .explorer {
@@ -2695,10 +2701,6 @@ a.button.secondary {
   background: #5c83ca;
 }
 
-.explorer-head.with-maia .ex-sort select {
-  max-width: 4.2em;
-}
-
 /* Maia in the Practical column (§5.34), as q_extension's: a value resting mostly on Maia is
    purple; Maia's own view purple italics, its best green with a purple underline. */
 .ex-row .ex-prac.maia {
@@ -2902,6 +2904,30 @@ a.button.secondary {
 
 .storm-chapters .bar-cell {
   width: 30%;
+}
+
+/* A study's or chapter's name opens its scope. */
+.storm-chapters td button {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: #8fb4f0;
+  cursor: pointer;
+}
+
+.storm-scope {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  margin-bottom: 8px;
+}
+
+.storm-scope select {
+  max-width: 100%;
 }
 
 @media (max-width: 480px) {
@@ -3253,4 +3279,31 @@ a.button.disabled {
   font-size: 0.8rem;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+/* The branch picker (Qchess's): the moves that go on where the line branches, under the move. */
+
+.branch-picker {
+  position: fixed;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-width: 90px;
+  padding: 4px 0;
+  background: #2c2c2c;
+  border: 1px solid #444;
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 50%);
+}
+
+.branch-picker [role='option'] {
+  padding: 6px 14px;
+  color: #ddd;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.branch-picker [role='option'].on {
+  background: rgb(255 255 255 / 12%);
+  color: #fff;
 }

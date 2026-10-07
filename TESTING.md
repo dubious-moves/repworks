@@ -5,6 +5,26 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## The owner's notes of 2026-10-07 (§5.67)
+
+- The branch picker in the chapter view (Qchess's): → or ▶ on a move where the line branches opens
+  the list of moves under it; ↑ ↓ choose, → ▶ or Enter go on, a tap on a move goes along it, ← or
+  Escape close it. On the phone, does the list sit where you'd look (under the move, or above it
+  when there's no room)?
+- "Read from here" and "Play from here" are only in the move menu now (right-click, long-press, or
+  ⋯): the panel has their room back.
+- The explorer stuck on "Asking…": fixed where it was found (the panel's request shared with the
+  Practical search of the move before, and dropped with it when the board moved on), and a request
+  Lichess or ChessDB leaves unanswered for 30 s now ends with "didn't answer in 30 seconds" and
+  Retry. If "Asking…" ever stays again, note the position and whether Prac was computing.
+- Explorer: Eval right after the move (Move 56 px and Eval 48 px on the desktop, 52 and 46 on the
+  phone); "⇅ Sort" no longer cut to "Sort l" with Maia on.
+- Storm: Study and Chapter pickers on its home (the scope the storm deals from and gathers for);
+  the record shown for the scope, with a table by study (whole repertoire) or by chapter (a
+  study), each name opening its scope.
+- Storm's gather: the request counts move as each request goes out, and Stop ends it at once (the
+  walk under way is left out).
+
 ## The blank page on the phone (2026-10-07)
 
 Reported by the owner on 2026-10-07 (build `60622b0`): after the update the page was empty on the
@@ -25,11 +45,11 @@ Reported by the owner on 2026-10-06: the spike's desktop run (all steps passed, 
 Qchess and Lichess imports on the desktop (§4.10), and the study editor on desktop and phone
 ("the current version is good"; their requests became §5.15).
 
-- §4.2: the spike from the installed app (S2's second half, and `persist()` there).
-- §4.5 (a): the owner's Lichess test study run through the round-trip suite (its export in the
-  data repo, by `REPWORKS_FIXTURES`), and our output imported back into Lichess and compared.
-- §4.10: the Lichess OAuth flow from the installed app on the phone.
-- §4.11: Phase 0's acceptance test (desktop and Android phone).
+Reported on 2026-10-07: the spike from the installed app on the phone (build `4ad54ce`: every step
+of that run passed, `persist()` granted, S2 reading the browser tab's markers; the failed steps in
+the same report were earlier runs: the data repo still empty on 10-05, `persist()` refused in a
+browser tab on 10-06), the round trip of the Lichess test study and back into Lichess, the Lichess
+OAuth flow on the phone, and Phase 0's acceptance test. Nothing of Phase 0 waits now.
 
 ## Phase 1
 
@@ -37,6 +57,8 @@ Reported by the owner on 2026-10-06 (build `95b0b76`): the study cards, making a
 study (synced to the phone), the chapter ⚙ on the phone, the transposition badges and the
 clickable lines work (§5.11, §5.12, §5.15 in part). Their requests became §5.16; training itself
 couldn't be tested then (the day's limit was used up), so the training items below still stand.
+On 2026-10-07 the owner reported the line list (a chapter opened, a line picked) working, and the
+explorer's Eval column too far from the move (§5.67).
 
 - §5.16: the line list on desktop and phone (a chapter opened, a line picked, due or not: its due
   moves graded, its new moves taught, the rest asked with nothing recorded; "Learn" on a

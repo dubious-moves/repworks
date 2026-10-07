@@ -171,11 +171,43 @@ test('the storm: positions gathered, a great move and a mistake scored, the revi
   expect(log).toContain('"b":"bad"');
   // The record on the home.
   await expect(page.locator('.storm-record').first()).toContainText('2 answered · 50% found');
-  // …and by chapter: the answers' chapters, from the positions' lines.
-  await expect(page.locator('.storm-chapters tbody tr').first()).toContainText('Test repertoire ·');
+  // …and by study: the answers' chapters, from the positions' lines.
+  await expect(page.locator('.storm-record h2').first()).toHaveText('Positions · whole repertoire');
+  await expect(page.locator('.storm-chapters tbody tr')).toHaveCount(1);
+  await expect(page.locator('.storm-chapters tbody tr td').nth(0)).toHaveText('Test repertoire');
+  await expect(page.locator('.storm-chapters tbody tr td').nth(1)).toHaveText('2');
+  // The study picked, from its row: its record, its chapters, and the scope the storm deals from.
+  await page.locator('.storm-chapters').getByRole('button', { name: 'Test repertoire' }).click();
+  await expect(page.locator('.study-title')).toHaveText('Storm · Test repertoire');
+  await expect(page).toHaveURL(/#\/storm\/Rep0Najd$/);
+  await expect(page.getByLabel('Study')).toHaveValue('Rep0Najd');
+  await expect(page.locator('.storm-record').first()).toContainText('2 answered · 50% found');
+  await expect(page.locator('.storm-record h2').nth(1)).toHaveText('By chapter');
+  await expect(page.locator('.storm-chapters tbody tr td:first-child')).toHaveText(['Main line', 'Alapin']);
+  // A chapter picked from the picker; then back to the whole repertoire.
+  await page.getByLabel('Chapter').selectOption({ label: 'Alapin' });
+  await expect(page.locator('.study-title')).toHaveText('Storm · Alapin');
+  await expect(page.locator('.storm-chapters')).toHaveCount(0);
+  await page.getByLabel('Study').selectOption({ label: 'Whole repertoire' });
+  await expect(page.locator('.study-title')).toHaveText('Storm · Whole repertoire');
+  await expect(page.getByLabel('Chapter')).toHaveCount(0);
 
   const wide = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(wide).toBeLessThanOrEqual(0);
+});
+
+test('the gather: its requests counted as they go out, and Stop at once while one is under way', async ({ page }) => {
+  await setUp(page);
+  // The game export never answers.
+  await page.route('https://lichess.org/api/games/export/**', () => new Promise<void>(() => undefined));
+  await page.getByRole('link', { name: 'Storm' }).click();
+  await page.getByRole('button', { name: 'Gather positions' }).click();
+  const status = page.locator('.storm-gather');
+  await expect(status).toContainText('Gathering: 0 of');
+  await expect(status).toContainText('1 explorer, 1 game exports');
+  await page.getByRole('button', { name: 'Stop' }).click();
+  await expect(status).toContainText('Stopped.', { timeout: 2_000 });
+  await expect(page.getByRole('button', { name: 'Gather positions' })).toBeEnabled();
 });
 
 test('the set: a mistake held, tried again, shown, and the second pass', async ({ page }) => {
