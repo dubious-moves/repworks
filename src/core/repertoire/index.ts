@@ -50,6 +50,10 @@ export interface Line {
   cards: readonly CardId[];
   /** Where each card's move is on the line: its index in `path`. */
   plies: readonly number[];
+  /** Paused by the owner (§5.70): left out of learning and review. Set by `markLines`. */
+  paused?: true;
+  /** Marked must-learn (§5.70): ranked first when a study is prioritized. Set by `markLines`. */
+  must?: true;
 }
 
 export interface ChapterIndex {

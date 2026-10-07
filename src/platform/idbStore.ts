@@ -174,6 +174,23 @@ export class IdbStore implements LocalStore {
     });
   }
 
+  /** Appends several events in one transaction (a study prioritized, §5.70), numbered in order. */
+  async recordMany(events: readonly DistributiveOmit<KnownEvent, 'n' | 'v'>[]): Promise<LocalEvent[]> {
+    return this.tx(['meta', 'log'], 'readwrite', async (s) => {
+      const meta = s('meta');
+      const counters = await IdbStore.counters(meta);
+      const out: LocalEvent[] = [];
+      for (const event of events) {
+        const n = counters.nextN++;
+        const line: LocalEvent = { n, t: event.t, raw: formatEvent({ ...event, v: 1, n } as KnownEvent) };
+        s('log').put(line, n);
+        out.push(line);
+      }
+      meta.put(counters, 'counters');
+      return out;
+    });
+  }
+
   /** The working view of the files `want` selects: path → text. */
   async read(want: (path: string) => boolean = () => true): Promise<Map<string, string>> {
     return this.tx(['meta', 'files', 'blobs'], 'readonly', async (s) => {

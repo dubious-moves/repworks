@@ -160,6 +160,17 @@ export interface PracticeEvent extends Base {
   /** The user's moves played. */
   mv?: number;
 }
+/** The marks a line can carry (§5.70): `none` clears one. */
+export type LineMark = 'paused' | 'must' | 'none';
+/**
+ * A line paused (left out of learning and review) or marked must-learn (§5.70), or the mark
+ * cleared: `card` is the line (`l|<sid>|<cid>|<moves>`), and the mark covers the lines extending it.
+ */
+export interface LineEvent extends Base {
+  k: 'line';
+  card: string;
+  mark: LineMark;
+}
 export type KnownEvent =
   | ReviewEvent
   | SuspendEvent
@@ -178,8 +189,9 @@ export type KnownEvent =
   | DismissEvent
   | SavedEvent
   | PlayedEvent
-  | PracticeEvent;
-export const KNOWN_KINDS = ['review', 'suspend', 'unsuspend', 'forget', 'taught', 'pin', 'unpin', 'drill', 'alt', 'storm', 'snapshot', 'drop', 'relapse', 'plan', 'dismiss', 'saved', 'played', 'practice'] as const;
+  | PracticeEvent
+  | LineEvent;
+export const KNOWN_KINDS = ['review', 'suspend', 'unsuspend', 'forget', 'taught', 'pin', 'unpin', 'drill', 'alt', 'storm', 'snapshot', 'drop', 'relapse', 'plan', 'dismiss', 'saved', 'played', 'practice', 'line'] as const;
 
 /** A line as read. `event` is set for the kinds this code knows; `raw` is always the line itself. */
 export interface LogLine {
@@ -380,6 +392,12 @@ function knownEvent(o: Record<string, unknown>): KnownEvent | string {
       }
       return event;
     }
+    case 'line': {
+      if (!/^l\|[^|]+\|[^|]+\|\S+( \S+)*$/.test(card)) return 'card must be a line: l|<sid>|<cid>|<moves>';
+      const mark = o['mark'];
+      if (mark !== 'paused' && mark !== 'must' && mark !== 'none') return 'mark must be paused, must or none';
+      return { ...base, k: 'line', mark };
+    }
     default:
       return { ...base, k: 'forget' };
   }
@@ -407,6 +425,7 @@ export function formatEvent(event: KnownEvent): string {
   if (event.k === 'relapse') Object.assign(o, { g: event.g, at: event.at });
   if (event.k === 'plan') Object.assign(o, { on: event.on, side: event.side });
   if (event.k === 'dismiss') o['on'] = event.on;
+  if (event.k === 'line') o['mark'] = event.mark;
   if (event.k === 'saved') o['item'] = event.item;
   if (event.k === 'played') o['game'] = event.game;
   if (event.k === 'practice') {

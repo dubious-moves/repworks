@@ -150,6 +150,13 @@ export async function recordEvent(event: Parameters<IdbStore['record']>[0]): Pro
   await controller?.changed();
 }
 
+/** Records several events at once (a study prioritized, §5.70), with one refresh after. */
+export async function recordEvents(events: readonly Parameters<IdbStore['record']>[0][]): Promise<void> {
+  if (!store || events.length === 0) return;
+  await store.recordMany(events);
+  await controller?.changed();
+}
+
 /** Starts a session (§5.7, §5.8): today's queue (everything, or one study), mistakes or pins. */
 export async function beginTraining(of: SessionKind): Promise<void> {
   if (store) await startSession(store, recordEvent, of);

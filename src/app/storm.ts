@@ -147,12 +147,16 @@ export interface StormScopeData {
   frontiers: Frontier[];
   decisions: DecisionPoint[];
   cont: ReturnType<typeof frontiers>['cont'];
+  /** Some repertoire lines are paused (§5.70): left out of `lines`, and of the stored positions. */
+  paused?: true;
 }
 
 export function scopeData(data: TrainData, where: StormWhere): StormScopeData | string {
   const chapters: { sid: string; chapter: Chapter }[] = [];
   for (const [k, chapter] of data.chapters) chapters.push({ sid: k.split('/')[0]!, chapter });
-  const lines = stormLines(chapters);
+  // Paused lines (§5.70) are not being learned, so the storm leaves them out.
+  const pausedKeys = new Set(data.index.lines.filter((l) => l.paused).map((l) => `${l.sid}/${l.cid}/${l.path.join(' ')}`));
+  const lines = stormLines(chapters).filter((l) => !pausedKeys.has(`${l.sid}/${l.cid}/${l.path.join(' ')}`));
   let scope: StormScope = { kind: 'all' };
   let title = 'Whole repertoire';
   if (where.sid && where.cid && where.at) {
@@ -171,12 +175,14 @@ export function scopeData(data: TrainData, where: StormWhere): StormScopeData | 
   }
   const f = frontiers(lines, config());
   const d = decisions(lines);
-  return { scope, title, lines, frontiers: inScope(f.frontiers, lines, scope), decisions: inScope(d.points, lines, scope), cont: f.cont };
+  const out: StormScopeData = { scope, title, lines, frontiers: inScope(f.frontiers, lines, scope), decisions: inScope(d.points, lines, scope), cont: f.cont };
+  if (pausedKeys.size > 0) out.paused = true;
+  return out;
 }
 
 /** Stored positions whose lines are in the scope (a position's: the lines through it). */
 export function storedInScope(positions: readonly StoredPosition[], s: StormScopeData): StoredPosition[] {
-  if (s.scope.kind === 'all') return positions.slice();
+  if (s.scope.kind === 'all' && !s.paused) return positions.slice();
   const keep = new Set(s.lines.filter((l) => lineInScope(l, s.scope)).map((l) => `${l.sid}/${l.cid}/${l.path.join(' ')}`));
   return positions.filter((p) => p.lines.some((r) => keep.has(`${r.sid}/${r.cid}/${r.path.join(' ')}`)));
 }

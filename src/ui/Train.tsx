@@ -28,6 +28,7 @@ import { Board } from './Board.tsx';
 import { ModeSwitch } from './ModeSwitch.tsx';
 import { CommentText, endPreviewOnBoard, PreviewBar, previewBoard } from './CommentText.tsx';
 import { firstNewLine, LineList, nextLine } from './LineList.tsx';
+import { setMark } from '../app/lineMarks.ts';
 import { openTrainSettings } from './TrainSettings.tsx';
 
 const ASKING = new Set(['ask', 'teach', 'wrong', 'shown']);
@@ -444,6 +445,7 @@ function Session(props: { s: SessionView }) {
         <p class="train-line">
           <strong>{chapterName}</strong> <span class="muted">{moves}</span>
         </p>
+        {s.of.kind === 'line' && s.line?.paused && <PausedLine line={s.line} />}
         {comments.length > 0 && (
           <div class="train-comments">
             {comments.map((c, i) => (
@@ -556,6 +558,32 @@ function lineNumber(index: RepertoireIndex, line: Line): number {
     if (l === line) return n;
   }
   return n;
+}
+
+/** A paused line picked from the list (§5.70): practised, nothing recorded, with Unpause. */
+function PausedLine(props: { line: Line }) {
+  const [unpaused, setUnpaused] = useState(false);
+  return (
+    <p class="train-paused" role="note">
+      {unpaused ? (
+        'Unpaused: pick the line again to learn it.'
+      ) : (
+        <>
+          Paused: practice only, nothing recorded.{' '}
+          <button
+            type="button"
+            class="secondary"
+            onClick={() => {
+              setUnpaused(true);
+              void setMark(props.line, 'none');
+            }}
+          >
+            Unpause
+          </button>
+        </>
+      )}
+    </p>
+  );
 }
 
 function chapterNameOf(s: SessionView, line: Line): string {

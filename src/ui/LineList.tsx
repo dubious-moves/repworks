@@ -2,15 +2,20 @@
 // live, 2026-10-06): each chapter with "Learn k/n" while it has new lines, opening to its lines,
 // "Line n" with a state dot and "Due now" / "Due in 3 days"; a line clicked is trained at once,
 // due or not. Here each line also shows its own moves, from where it leaves the line before it.
+// Each line's menu (⋯, or a right-click) pauses it or marks it must-learn (§5.70); a paused line
+// shows ⏸ for its dot, and the chapter's menu pauses or unpauses all its lines.
 import { decidingNow } from '../app/time.ts';
 import { signal } from '@preact/signals';
 import { useEffect, useMemo } from 'preact/hooks';
 import type { Position } from 'chessops/chess';
 import { open } from '../app/mode.ts';
+import { setMark, setMarks } from '../app/lineMarks.ts';
 import { dayOf, type TrainData } from '../app/train.ts';
 import { chapterRows, type ChapterRows, type LineRow } from '../core/train/browse.ts';
 import { header } from '../core/study/model.ts';
 import { startPosition } from '../core/study/tree.ts';
+import type { LineMark } from '../core/progress/events.ts';
+import type { Line } from '../core/repertoire/index.ts';
 
 /** Chapters opened in the list, by `sid/cid`; kept while the app runs, as Qchess keeps them. */
 const expanded = signal<ReadonlySet<string>>(new Set());
@@ -22,8 +27,13 @@ const toggle = (key: string) => {
 
 const DAY_MS = 86_400_000;
 
+/** The one menu open in the list: a line's (`sid/cid/n`) or a chapter's (`sid/cid`). */
+const menuFor = signal<string | undefined>(undefined);
+const toggleMenu = (key: string) => (menuFor.value = menuFor.peek() === key ? undefined : key);
+
 /** "Due now", "Due in 3 days", "New: 4 moves", as Qchess labels its lines. */
 function label(row: LineRow, today: { start: number; end: number }): { text: string; tone: string } {
+  if (row.state === 'paused') return { text: 'Paused', tone: 'paused' };
   if (row.state === 'new') return { text: `New · ${row.fresh}`, tone: 'new' };
   if (row.due > 0) return { text: 'Due now', tone: 'due' };
   if (row.next === undefined) return { text: '', tone: 'learned' };
@@ -84,8 +94,9 @@ function ChapterBlock(props: { group: ChapterRows; data: TrainData; open: boolea
   const chapter = data.chapters.get(key);
   const name = chapter ? (header(chapter, 'ChapterName') ?? g.cid) : g.cid;
   const start = useMemo(() => (chapter ? startPosition(chapter) : undefined), [chapter]);
-  const total = g.lines.length;
+  const total = g.lines.length - g.paused;
   const here = active && active.sid === g.sid && active.cid === g.cid;
+  const menuOpen = menuFor.value === key;
   return (
     <>
       <div class={`line-list-chapter${isOpen ? ' open' : ''}${here ? ' active' : ''}`}>
@@ -100,35 +111,88 @@ function ChapterBlock(props: { group: ChapterRows; data: TrainData; open: boolea
             {g.dueLines} due
           </span>
         )}
+        {g.paused > 0 && (
+          <span class="line-list-paused" title={`${g.paused} line${g.paused === 1 ? '' : 's'} paused`}>
+            {g.paused} paused
+          </span>
+        )}
         {g.learned < total ? (
           <button type="button" class="line-list-learn" title="Learn this chapter's new lines" onClick={() => open({ name: 'learn', sid: g.sid, cid: g.cid })}>
             Learn {g.learned}/{total}
           </button>
         ) : (
-          <span class="line-list-count">
-            {g.learned}/{total}
-          </span>
+          total > 0 && (
+            <span class="line-list-count">
+              {g.learned}/{total}
+            </span>
+          )
         )}
+        <button type="button" class="line-list-more" aria-label={`${name}: more`} aria-expanded={menuOpen} onClick={() => toggleMenu(key)}>
+          ⋯
+        </button>
       </div>
+      {menuOpen && (
+        <div class="line-list-menu" role="group" aria-label={`${name}: lines`}>
+          {g.paused < g.lines.length && (
+            <button type="button" class="secondary" onClick={() => void chapterMark(g, 'paused')}>
+              Pause all lines
+            </button>
+          )}
+          {g.paused > 0 && (
+            <button type="button" class="secondary" onClick={() => void chapterMark(g, 'none')}>
+              Unpause all lines
+            </button>
+          )}
+        </div>
+      )}
       {isOpen && (
         <div class="line-list-lines">
           {g.lines.map((row) => {
             const l = label(row, day);
             const current = here && row.line.path.length === active!.path.length && row.line.path.every((m, i) => m === active!.path[i]);
+            const rowKey = `${key}/${row.number}`;
+            const rowMenu = menuFor.value === rowKey;
+            const paused = row.state === 'paused';
             return (
-              <button
-                type="button"
-                key={row.number}
-                class={`line-list-line${current ? ' current' : ''}`}
-                aria-current={current ? 'true' : undefined}
-                title={movesFrom(start, row.line.path, 0)}
-                onClick={() => open({ name: 'train', sid: row.line.sid, cid: row.line.cid, at: [...row.line.path] })}
-              >
-                <span class={`dot dot-${row.due > 0 ? 'due' : row.state}`} aria-hidden="true" />
-                <span class="line-list-number">Line {row.number}</span>
-                <span class="line-list-moves">{movesFrom(start, row.line.path, Math.min(row.fork, row.line.path.length - 1))}</span>
-                {l.text && <span class={`line-list-label tone-${l.tone}`}>{l.text}</span>}
-              </button>
+              <div key={row.number} class={`line-list-row${rowMenu ? ' menu-open' : ''}`}>
+                <button
+                  type="button"
+                  class={`line-list-line${current ? ' current' : ''}${paused ? ' paused' : ''}`}
+                  aria-current={current ? 'true' : undefined}
+                  title={movesFrom(start, row.line.path, 0)}
+                  onClick={() => open({ name: 'train', sid: row.line.sid, cid: row.line.cid, at: [...row.line.path] })}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    toggleMenu(rowKey);
+                  }}
+                >
+                  <span class={`dot dot-${paused ? 'paused' : row.due > 0 ? 'due' : row.state}`} aria-hidden="true" />
+                  <span class="line-list-number">
+                    Line {row.number}
+                    {row.line.must && (
+                      <span class="line-list-must" title="Must learn" aria-label="must learn">
+                        {' '}
+                        ★
+                      </span>
+                    )}
+                  </span>
+                  <span class="line-list-moves">{movesFrom(start, row.line.path, Math.min(row.fork, row.line.path.length - 1))}</span>
+                  {l.text && <span class={`line-list-label tone-${l.tone}`}>{l.text}</span>}
+                </button>
+                <button type="button" class="line-list-more" aria-label={`Line ${row.number}: more`} aria-expanded={rowMenu} onClick={() => toggleMenu(rowKey)}>
+                  ⋯
+                </button>
+                {rowMenu && (
+                  <div class="line-list-menu" role="group" aria-label={`Line ${row.number}`}>
+                    <button type="button" class="secondary" onClick={() => void lineMark(row.line, paused ? 'none' : 'paused')}>
+                      {paused ? 'Unpause' : 'Pause'}
+                    </button>
+                    <button type="button" class="secondary" onClick={() => void lineMark(row.line, row.line.must ? 'none' : 'must')}>
+                      {row.line.must ? 'Not must-learn' : 'Must learn'}
+                    </button>
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>
@@ -137,11 +201,24 @@ function ChapterBlock(props: { group: ChapterRows; data: TrainData; open: boolea
   );
 }
 
+async function lineMark(line: Line, mark: LineMark): Promise<void> {
+  menuFor.value = undefined;
+  await setMark(line, mark);
+}
+
+/** Pause every line of a chapter but the must-learn ones, or unpause the paused ones. */
+async function chapterMark(g: ChapterRows, mark: 'paused' | 'none'): Promise<void> {
+  menuFor.value = undefined;
+  const lines = g.lines.map((r) => r.line).filter((l) => (mark === 'paused' ? !l.paused && !l.must : l.paused));
+  await setMarks(lines.map((line) => ({ line, mark })));
+}
+
 /** The next line after `path` in the list's order (its chapter's, then the next chapter's). */
 export function nextLine(data: TrainData, scope: string | undefined, at: { sid: string; cid: string; path: readonly string[] }): LineRow | undefined {
   const rows = chapterRows(data.index, data.states, data.settings, dayOf(decidingNow()), scope).flatMap((g) => g.lines);
   const i = rows.findIndex((r) => r.line.sid === at.sid && r.line.cid === at.cid && r.line.path.length === at.path.length && r.line.path.every((m, j) => m === at.path[j]));
-  return i >= 0 ? rows[i + 1] : undefined;
+  // A paused line (§5.70) is skipped: going on means training.
+  return i >= 0 ? rows.slice(i + 1).find((r) => r.state !== 'paused') : undefined;
 }
 
 /** The first line of the list with new moves: "Learn the next line". */

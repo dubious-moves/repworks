@@ -9,6 +9,8 @@
 //   only; a line the owner picks is learned whatever it says), and the rest are asked without a
 //   grade, so practising a line ahead of time changes no schedule (Qchess: a line not due, trained,
 //   is not saved). Suspended moves are still played for the user.
+// - A paused line (§5.70) is listed as paused, outside the chapter's count; picked, it is practised:
+//   every own move asked, nothing graded or taught.
 import type { CardId } from '../progress/cards.ts';
 import type { CardState } from '../progress/replay.ts';
 import type { Line, RepertoireIndex } from '../repertoire/index.ts';
@@ -16,7 +18,7 @@ import { planSession, type SessionPlan } from './plan.ts';
 import { dueAt, knownCardsOf, statusOf, type DailyQueue, type Day } from './queue.ts';
 import type { TrainSettings } from './settings.ts';
 
-export type LineState = 'new' | 'due' | 'learning' | 'learned';
+export type LineState = 'new' | 'due' | 'learning' | 'learned' | 'paused';
 
 export interface LineRow {
   line: Line;
@@ -36,9 +38,11 @@ export interface ChapterRows {
   sid: string;
   cid: string;
   lines: LineRow[];
-  /** Lines with nothing left to learn, of all. */
+  /** Active lines with nothing left to learn. */
   learned: number;
   dueLines: number;
+  /** Paused lines (§5.70): outside `learned` and the chapter's count. */
+  paused: number;
 }
 
 type States = ReadonlyMap<string, CardState>;
@@ -61,7 +65,7 @@ export function chapterRows(index: RepertoireIndex, states: States, settings: Tr
   for (const line of index.lines) {
     if (scope !== undefined && line.sid !== scope) continue;
     if (!current || current.sid !== line.sid || current.cid !== line.cid) {
-      out.push((current = { sid: line.sid, cid: line.cid, lines: [], learned: 0, dueLines: 0 }));
+      out.push((current = { sid: line.sid, cid: line.cid, lines: [], learned: 0, dueLines: 0, paused: 0 }));
       previous = [];
     }
     let fork = 0;
@@ -85,6 +89,11 @@ export function chapterRows(index: RepertoireIndex, states: States, settings: Tr
       const at = dueAt(state, settings);
       if (at !== undefined && (next === undefined || at < next)) next = at;
     }
+    if (line.paused) {
+      current.lines.push({ line, number: current.lines.length + 1, state: 'paused', fresh: freshCount, due: 0, fork });
+      current.paused++;
+      continue;
+    }
     const state: LineState = freshCount > 0 ? 'new' : due > 0 ? 'due' : learning ? 'learning' : 'learned';
     const row: LineRow = { line, number: current.lines.length + 1, state, fresh: freshCount, due, fork };
     if (next !== undefined) row.next = next;
@@ -106,6 +115,7 @@ export function findLine(index: RepertoireIndex, sid: string, cid: string, path:
  * (`practice`).
  */
 export function pickedPlan(index: RepertoireIndex, states: States, settings: TrainSettings, day: Day, line: Line): SessionPlan {
+  if (line.paused) return { lines: [{ kind: 'pick', line, end: line.path.length, ask: [], teach: [] }] };
   const known = knownCardsOf(index);
   const ask: CardId[] = [];
   const teach: CardId[] = [];
@@ -123,7 +133,7 @@ export function pickedPlan(index: RepertoireIndex, states: States, settings: Tra
  */
 export function learnPlan(index: RepertoireIndex, states: States, sid: string, cid: string): SessionPlan {
   const known = knownCardsOf(index);
-  const newLines = index.lines.filter((l) => l.sid === sid && l.cid === cid && !l.known && l.cards.some((c) => !known.has(c) && fresh(states.get(c))));
-  const queue: DailyQueue = { due: [], later: [], taughtToday: 0, room: 0, newLines, newCards: [], knownLines: [], knownCards: [], orphaned: [] };
+  const newLines = index.lines.filter((l) => l.sid === sid && l.cid === cid && !l.known && !l.paused && l.cards.some((c) => !known.has(c) && fresh(states.get(c))));
+  const queue: DailyQueue = { due: [], later: [], taughtToday: 0, room: 0, newLines, newCards: [], knownLines: [], knownCards: [], orphaned: [], pausedLines: 0 };
   return planSession(index, queue, states);
 }

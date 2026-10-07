@@ -19,6 +19,7 @@ export function TrainCard() {
       <div class="card-head">
         <h2>
           Train: <span class="train-due">{queue.due.length} due</span> · <span class="train-new">{queue.newCards.length} new</span>
+          {queue.pausedLines > 0 && <span class="train-paused-count muted"> · {queue.pausedLines} paused</span>}
         </h2>
         <div class="actions">
           <a class="button" href="#/train">

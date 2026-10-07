@@ -27,6 +27,8 @@ function Repertoire() {
       <h3>Repertoire</h3>
       <p class="repertoire-stats">
         {index.cards.size} cards · {index.lines.length} lines · {index.positions.size} positions · index built in {Math.round(data.indexMs)} ms
+        {index.lines.some((l) => l.paused) && <> · {index.lines.filter((l) => l.paused).length} paused</>}
+        {data.orphanMarks.length > 0 && <> · {data.orphanMarks.length} line marks on lines no longer in the repertoire</>}
       </p>
       {index.skipped.length > 0 && (
         <ul>

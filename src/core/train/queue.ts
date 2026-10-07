@@ -10,6 +10,7 @@
 import type { CardId } from '../progress/cards.ts';
 import type { CardState } from '../progress/replay.ts';
 import type { Line, RepertoireIndex } from '../repertoire/index.ts';
+import { heldCards } from './paused.ts';
 import type { TrainSettings } from './settings.ts';
 
 const HOUR_MS = 3_600_000;
@@ -68,6 +69,8 @@ export interface DailyQueue {
   knownCards: CardId[];
   /** Cards with events whose move is no longer in the repertoire: left out, and counted. */
   orphaned: CardId[];
+  /** Paused lines in scope (§5.70): their moves, unless on an active line too, are left out. */
+  pausedLines: number;
 }
 
 export interface QueueOptions {
@@ -93,11 +96,13 @@ export function todaysQueue(index: RepertoireIndex, states: ReadonlyMap<string, 
     return statusOf(state) === 'fresh' && !state?.suspended;
   };
 
+  // A card every line of which is paused is neither due nor new (§5.70).
+  const held = heldCards(index);
   const due: DueCard[] = [];
   const later: DueCard[] = [];
   for (const card of index.cards.keys()) {
     const state = states.get(card);
-    if (!state || state.suspended || !inScope(card)) continue;
+    if (!state || state.suspended || held.has(card) || !inScope(card)) continue;
     const at = dueAt(state, settings);
     if (at === undefined) continue;
     const learning = statusOf(state) === 'learning';
@@ -120,7 +125,7 @@ export function todaysQueue(index: RepertoireIndex, states: ReadonlyMap<string, 
   const newCards: CardId[] = [];
   const taken = new Set<CardId>();
   for (const line of lines) {
-    if (line.known) continue;
+    if (line.known || line.paused) continue;
     if (newCards.length >= room) break;
     const brings = [...new Set(line.cards)].filter((c) => !known.has(c) && !taken.has(c) && fresh(c));
     if (brings.length === 0) continue;
@@ -136,7 +141,7 @@ export function todaysQueue(index: RepertoireIndex, states: ReadonlyMap<string, 
   const knownCards: CardId[] = [];
   const pooled = new Set<CardId>();
   for (const line of lines) {
-    if (!line.known) continue;
+    if (!line.known || line.paused) continue;
     const brings = [...new Set(line.cards)].filter((c) => !pooled.has(c) && fresh(c));
     if (brings.length === 0) continue;
     knownLines.push(line);
@@ -151,7 +156,8 @@ export function todaysQueue(index: RepertoireIndex, states: ReadonlyMap<string, 
   for (const [card, s] of states) if (card.startsWith('r|') && !index.cards.has(card as CardId) && (s.reviews > 0 || s.taught !== undefined)) orphaned.push(card as CardId);
   orphaned.sort();
 
-  const queue: DailyQueue = { due, later, taughtToday, room, newLines, newCards, knownLines, knownCards, orphaned };
+  const pausedLines = lines.filter((l) => l.paused).length;
+  const queue: DailyQueue = { due, later, taughtToday, room, newLines, newCards, knownLines, knownCards, orphaned, pausedLines };
   if (scope !== undefined) queue.scope = scope;
   return queue;
 }

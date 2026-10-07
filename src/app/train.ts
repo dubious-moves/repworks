@@ -19,6 +19,7 @@ import { lineThrough, startPosition } from '../core/study/tree.ts';
 import { cardLine, drillLines, retryLines, todaysMistakes, type Mistake } from '../core/train/mistakes.ts';
 import { pinsOf, type PinState } from '../core/train/pins.ts';
 import { alternativesOf } from '../core/train/alternatives.ts';
+import { lineMarksOf, markLines } from '../core/train/paused.ts';
 import { findLine, learnPlan, pickedPlan } from '../core/train/browse.ts';
 import { interactivePlan, planSession, withoutAnswered, type SessionPlan } from '../core/train/plan.ts';
 import { ShowGrade, type Press, type ShowGradeEffect } from '../core/train/showGrade.ts';
@@ -53,6 +54,8 @@ export interface TrainData {
   pins: Map<string, PinState>;
   /** Moves saved as alternatives (§5.18). */
   alternatives: Set<CardId>;
+  /** Line marks (§5.70) that cover no line any more: kept, and counted in the debug panel. */
+  orphanMarks: string[];
 }
 
 /** Each chapter file's parse and index part, kept while its text is the same (§5.1). */
@@ -96,7 +99,6 @@ export async function loadTraining(store: IdbStore): Promise<TrainData> {
     }
   }
   for (const path of parts.keys()) if (!seen.has(path)) parts.delete(path);
-  const index = combineIndex(indexing);
   const indexMs = performance.now() - began;
 
   const replay = new Replay({ ...DEFAULT_PARAMS, retention: settings.retention });
@@ -104,7 +106,9 @@ export async function loadTraining(store: IdbStore): Promise<TrainData> {
   const device = await store.device();
   if (device) replay.add(toDeviceEvents(device.id, parseLog((await store.unsentEvents()).map((e) => e.raw).join('\n')).lines));
   const eventsOf = (card: string) => replay.eventsOf(card);
-  return { index, states: replay.states, settings, chapters, studyNames, indexMs, eventsOf, pins: pinsOf(replay.states.keys(), eventsOf), alternatives: alternativesOf(replay.states.keys(), eventsOf) };
+  // Paused and must-learn lines (§5.70) are marked on the index the queue, the plan and the list read.
+  const { index, orphans } = markLines(combineIndex(indexing), lineMarksOf(replay.states.keys(), eventsOf));
+  return { index, states: replay.states, settings, chapters, studyNames, indexMs, eventsOf, pins: pinsOf(replay.states.keys(), eventsOf), alternatives: alternativesOf(replay.states.keys(), eventsOf), orphanMarks: orphans };
 }
 
 /** The training data of the working view, read again whenever it changes (home, chapter view, debug). */
@@ -254,6 +258,7 @@ export async function startSession(store: IdbStore, record: (event: Parameters<I
   const scope = of.kind === 'queue' || of.kind === 'show' ? of.scope : undefined;
   let plan: SessionPlan;
   let index = data.index;
+  let pausedPick = false;
   if (of.kind === 'play') {
     const played = await playPlan(store, of);
     if (typeof played === 'string') {
@@ -271,6 +276,8 @@ export async function startSession(store: IdbStore, record: (event: Parameters<I
       return;
     }
     plan = pickedPlan(data.index, data.states, data.settings, dayOf(now), line);
+    // A paused line is practised (§5.70): nothing graded or taught on record.
+    if (line.paused) pausedPick = true;
   } else if (of.kind === 'learn') plan = learnPlan(data.index, data.states, of.sid, of.cid);
   else if (of.kind === 'retry') plan = { lines: retryLines(mistakesOf(data, Date.now())) };
   else if (of.kind === 'drill') plan = { lines: drillLines(mistakesOf(data, Date.now())) };
@@ -285,7 +292,7 @@ export async function startSession(store: IdbStore, record: (event: Parameters<I
   const grading = isGraded(of);
   const interactive = of.kind === 'play';
   const t = new Trainer({
-    record: grading,
+    record: grading && !pausedPick,
     askOnly: !grading && !interactive,
     askAll: interactive,
     follow: interactive,

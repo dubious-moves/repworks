@@ -2469,6 +2469,30 @@ it; the games are read for §5.58 already, so this can be a weight later); engin
 Stockfish search per position); a chapter imported with Qchess's `[QchessTrain "false"]` arriving
 paused instead of in a reference study (a possible follow-up, which would change §4.10).
 
+**As built, (a)** (2026-10-07): `lineCard`/`parseLineCard` (`src/core/progress/cards.ts`), the
+`line` event (`mark`: `paused`, `must` or `none`), and `src/core/train/paused.ts`: `lineMarksOf`
+(the last mark of each line card, `none` kept), `markLines` (new line objects carrying `paused` or
+`must`, the longest covering mark deciding, so a `none` on one extension beats a shorter paused
+mark; the marks covering no line returned as orphans) and `heldCards`. The app marks the index
+as it loads the training data (`src/app/train.ts`), so the queue (`pausedLines`, held cards
+left out), the planner (paused lines never walked), the line list (`paused` rows outside the
+chapter's count, Learn skipping them) and the storm (`scopeData` leaves paused lines out, and the
+stored positions of the whole repertoire are filtered by their lines once any line is paused) all
+read the flag. A paused line picked from the list is practised with `record` off: its moves
+are asked, and a move never learned is shown first, as a new move is (nothing is recorded,
+`taught` included). "Next line" after a picked line skips paused lines. The line list: ⏸ (two bars)
+for the dot, "Paused", ★ for must-learn, a ⋯ button per line (and a right-click) with Pause or
+Unpause and Must learn or Not must-learn, and a ⋯ per chapter with Pause all lines (must-learn
+lines kept) and Unpause all lines. `IdbStore.recordMany` and `recordEvents` write a batch in one
+transaction with one refresh. The home card reads "Train: 1 due · 1 new · 2 paused"; the debug
+panel counts paused lines and orphaned marks. Tests: `test/unit/core/train/paused.test.ts` (the
+event, a mark covering the extended line but not an earlier branch, the longest mark deciding,
+orphans, the last event across two devices, a card shared with another study's active line,
+queue, plan and list, and 150 random repertoires with random marks: no held card asked or
+taught, every due card asked once) and `test/e2e/priority.spec.ts` (desktop and phone: a line
+paused, practised with nothing recorded, unpaused; a chapter paused and unpaused; the home's
+count).
+
 #### 5.14 Phase 1 acceptance test, and exit
 
 **Acceptance test (live, desktop + Android phone)**, after Phase 0's (§4.11) and once §5.15 is

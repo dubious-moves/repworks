@@ -67,6 +67,8 @@ export function planSession(index: RepertoireIndex, queue: DailyQueue, states: R
   };
 
   for (const line of lines) {
+    // A paused line is never walked (§5.70): a due card on it lies on an active line too.
+    if (line.paused) continue;
     const end = endAt(line, (c) => due.has(c));
     if (end > 0) walk('review', line, end);
   }
