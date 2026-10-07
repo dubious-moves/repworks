@@ -13,6 +13,7 @@ import { StormScreen } from './Storm.tsx';
 import { GamesScreen } from './Games.tsx';
 import { MigrateScreen } from './Migrate.tsx';
 import { HistoryScreen, PracticeScreen } from './Practice.tsx';
+import { RepertoireCheckScreen } from './RepertoireCheck.tsx';
 import { Debug } from './Debug.tsx';
 import { ImportScreen } from './Import.tsx';
 import { SetupForm } from './Setup.tsx';
@@ -111,6 +112,8 @@ function Screen() {
       return <PracticeScreen fen={mode.value.fen} side={mode.value.side} />;
     case 'history':
       return <HistoryScreen id={mode.value.id} />;
+    case 'repCheck':
+      return <RepertoireCheckScreen />;
     case 'list':
       return <Home />;
   }

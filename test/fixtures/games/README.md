@@ -31,3 +31,13 @@ review (with a repertoire's moves by position) and stopped games' scores; `expec
 mistake-lab's own `pickExplorerMove`, `maiaSampleMove`, `updateAdvantageTracking` with
 `finishAdvantage`, `buildContLineReviewData` and `evalToResult` give, run at `c525403` by
 `mistake-lab-practice.cjs` (the page's UI calls stubbed, `Math.random` the case's draw).
+
+`repcheck.json` holds the repertoire checks' cases (PLAN.md §5.58–§5.60): 17 games made for the rules
+(moves, colour, result, speed, whether analysed, with their positions as mistake-lab caches them),
+a five-line repertoire and mistake-lab's trie of it, a dismissed position, drilled items, raw
+mistakes, practice games and practice results; `expected` is what mistake-lab's own
+`detectRepertoireDeviations`, `buildDrilledIndex` with `computeRecidivism`, and its position index
+with `computeHumanWeakSpots` and `computeBotWeakSpots` give, run at `c525403` by
+`mistake-lab-repcheck.cjs` (through `mistake-lab-sandbox.cjs`; chess.js 0.10.3 replays the practice
+games: `node mistake-lab-repcheck.cjs <mistake-lab>/index.html repcheck.json <a folder with chess.js@0.10.3
+installed>`).

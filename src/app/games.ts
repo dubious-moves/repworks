@@ -10,6 +10,7 @@ import { extractGame, type GameItem } from '../core/games/extract.ts';
 import { savedItems, type SavedItem } from '../core/games/saved.ts';
 import { historyOf, type HistoryEntry } from '../core/games/practice.ts';
 import { readGame, readGamesFile, type GameRecord } from '../core/games/record.ts';
+import { replay, type Replayed } from '../core/games/positions.ts';
 import type { PositionKey } from '../core/chess/positionKey.ts';
 import type { RepertoireIndex } from '../core/repertoire/index.ts';
 import { openGamesStore, type GamesStore, type StoredGame } from '../platform/gamesStore.ts';
@@ -31,6 +32,8 @@ export interface GamesPrefs {
   since: Since;
   /** New game cards a day (§5.53). */
   newPerDay: number;
+  /** Reschedule a card when its position is missed again in a later game (§5.59, mistake-lab's "Reschedule on relapse"). */
+  recidAuto: boolean;
   filters: GameFilters;
 }
 export interface GameFilters {
@@ -41,7 +44,7 @@ export interface GameFilters {
   hideTimeTrouble: boolean;
 }
 const PREFS_KEY = 'repworks-games';
-const DEFAULT_PREFS: GamesPrefs = { gist: '', lichess: '', chesscom: '', since: 'all', newPerDay: 10, filters: { color: '', speed: [], rated: '', platform: '', hideTimeTrouble: false } };
+const DEFAULT_PREFS: GamesPrefs = { gist: '', lichess: '', chesscom: '', since: 'all', newPerDay: 10, recidAuto: true, filters: { color: '', speed: [], rated: '', platform: '', hideTimeTrouble: false } };
 
 function loadPrefs(): GamesPrefs {
   try {
@@ -107,10 +110,19 @@ async function readStored(): Promise<void> {
 // repertoire doesn't extract every game again: mistake-lab's own post-filter, which it runs when its
 // trie loads after the extraction (its advantages are found before that filter too).
 const extracted = new WeakMap<GameRecord, GameItem[]>();
-const itemsOf = (g: GameRecord) => {
+/** A game's items as extracted, before the repertoire's moves are left out (recidivism reads these). */
+export const itemsOf = (g: GameRecord) => {
   let items = extracted.get(g);
   if (!items) extracted.set(g, (items = extractGame(g).items));
   return items;
+};
+
+// Each game replayed once while its record is the same object (deviations, weak spots, recidivism).
+const replays = new WeakMap<GameRecord, Replayed | null>();
+export const playedOf = (g: GameRecord): Replayed | undefined => {
+  let r = replays.get(g);
+  if (r === undefined) replays.set(g, (r = replay(g) ?? null));
+  return r ?? undefined;
 };
 
 function rebuild(): void {

@@ -25,6 +25,7 @@
 //   #/games/history/<id>                a practice game's review, from the history (§5.57)
 //   #/practice?fen=…[&side=black]       playing on from a position (§5.57), as the side given
 //                                       (the side to move when none)
+//   #/repertoire-check                  deviations, gaps and weak spots from the games (§5.58–§5.60)
 //   #/migrate                           the migration from mistake-lab (§5.64)
 // A setup link (#setup?…) is read and removed before any of this (src/app/setup.ts).
 import { isId } from '../study/ids.ts';
@@ -73,7 +74,9 @@ export type Mode =
   /** Playing on from a position (§5.57), as `side` (the side to move when none). */
   | { name: 'playOn'; fen: string; side?: 'white' | 'black' }
   /** A practice game's review, reopened from the history (§5.57). */
-  | { name: 'history'; id: string };
+  | { name: 'history'; id: string }
+  /** What the games say about the repertoire (§5.58–§5.60). */
+  | { name: 'repCheck' };
 
 export type Practice = 'retry' | 'drill' | 'pinned' | 'pins';
 const PRACTICE_HASH: Record<Practice, string> = { retry: '#/mistakes/retry', drill: '#/mistakes/drill', pinned: '#/pinned', pins: '#/pinned/all' };
@@ -155,6 +158,7 @@ export function parseHash(hash: string): Mode {
   }
   if (parts[0] === 'coverage' && parts.length === 2 && isId(parts[1])) return { name: 'coverage', sid: parts[1] };
   if (parts.length === 1 && parts[0] === 'migrate') return { name: 'migrate' };
+  if (parts.length === 1 && parts[0] === 'repertoire-check') return { name: 'repCheck' };
   if (parts[0] === 'games') {
     if (parts.length === 1) return { name: 'games' };
     if (parts.length === 2 && parts[1] === 'review') return { name: 'gamesReview' };
@@ -240,6 +244,8 @@ export function modeHash(mode: Mode): string {
       return `#/practice?fen=${encodeURIComponent(mode.fen)}${mode.side ? `&side=${mode.side}` : ''}`;
     case 'history':
       return `#/games/history/${mode.id}`;
+    case 'repCheck':
+      return '#/repertoire-check';
     case 'storm':
       return `#/storm${mode.sid ? `/${mode.sid}${mode.cid ? `/${mode.cid}${atQuery(mode.at)}` : ''}` : ''}`;
     case 'analysis': {

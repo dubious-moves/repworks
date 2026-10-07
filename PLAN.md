@@ -4310,6 +4310,18 @@ repertoire, the user's colour, a dismissal); Playwright: the list and a chapter 
 Live: (desktop) the deviations of the real games against the real repertoire, beside
 mistake-lab's Repertoire tab.
 
+**As built** (2026-10-07, with §5.59 and §5.60): `src/core/games/deviations.ts` (`findDeviations`:
+mistake-lab's walk, its trie the index's own moves by position; after a deviation the walk goes
+on, as mistake-lab's does, so the opponent's next reply is a gap too; `deviationPasses`), and
+`#/repertoire-check` (`src/ui/RepertoireCheck.tsx`, from the Games screen): the weak spots, the
+deviations (colour and speed filters; Open the chapter at the position, Train the line, Pin the
+repertoire's move, the game, Dismiss; the dismissed listed and restored) and the gaps (Open the
+chapter where the position is reached, Practise from the reply). **One difference from mistake-lab,
+on purpose**: it walks only the games that gave it an item (its games list drops the rest before the
+walk, and its weak spots read the same list); here every game in the date filter is walked, since
+a game played without a mistake is still a game played. The counts beside mistake-lab's will differ
+by those games.
+
 #### 5.59 Recidivism
 
 - `recidivism.ts`, a port of `computeRecidivism`: drilled items (reviewed at least once, not
@@ -4324,6 +4336,14 @@ first review's time, one encounter per game; the reschedule's guards).
 
 Live: (desktop) the summary on the real games beside mistake-lab's.
 
+**As built** (2026-10-07): `src/core/games/recidivism.ts` (`drilledIndex`, `recidivism`,
+`relapsesToWrite`, `badgeOf`; no eval cache here, so a mistake's "exact best" bonus flag is never
+set, as mistake-lab's without a cached search) and `src/app/repertoireCheck.ts` (the drilled items
+from the games and the saved items, the raw extraction's mistakes as the relapse signal, the
+history's practice games replayed; Reschedule on relapse in Games → Set up, on by default, writes
+each real game's relapse once per card and game). The summary is on the Games screen, the badge in
+the game cards' session.
+
 #### 5.60 Weak spots
 
 - `weakSpots.ts`, a port of the dashboard: the human lens (opponent replies at recurring positions
@@ -4334,6 +4354,16 @@ Live: (desktop) the summary on the real games beside mistake-lab's.
 Tests: unit (the score, the gates, the order).
 
 Live: (desktop) the real weak spots beside mistake-lab's.
+
+**As built** (2026-10-07): `src/core/games/weakSpots.ts` (`humanWeakSpots`, `botWeakSpots`,
+`WEAKSPOT`), shown first on `#/repertoire-check` with the two lenses (Your games, Practice), each row
+opening the position on the analysis board or practising from it (the checklist's drill comes with
+§5.62). Tests for §5.58–§5.60: `test/unit/core/games/repcheck.test.ts`, **the same answers as
+mistake-lab's own code** (`detectRepertoireDeviations`, `computeRecidivism`, its position index with
+`computeHumanWeakSpots` and `computeBotWeakSpots`) on `test/fixtures/games/repcheck.json` (17 games
+made for these rules, recorded by `mistake-lab-repcheck.cjs`; three controls), and
+`test/e2e/repcheck.spec.ts` (desktop and phone: the deviations, a gap, a dismissal synced, a relapse
+rescheduled once and synced, a chapter opened from a deviation).
 
 #### 5.61 Plan cards
 

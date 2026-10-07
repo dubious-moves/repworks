@@ -183,6 +183,12 @@ couldn't be tested then (the day's limit was used up), so the training items bel
   Save as a mistake; the game in the Games list after a reload, and on the other device after a
   sync. An advantage card in the game cards: the drill, Claim victory at +10, and its grade. On the
   phone: the waits while each move is judged (Stockfish in the background).
+- §5.58–§5.60 (desktop): Games → Repertoire check on the real games and repertoire, beside
+  mistake-lab's Repertoire tab: the deviations (expect more here: every game is walked, where
+  mistake-lab walks only the games that gave it a mistake), the gaps, a chapter opened from one and
+  a move added there, Dismiss (and on the other device after a sync); the weak spots in both lenses;
+  the "↻ Transfer" line on the Games screen beside mistake-lab's, and whether the reschedules on
+  relapse look right (the cards it makes due).
 - §5.64 (desktop): Games → Set up → "Move mistake-lab's progress here": the gist, Dry run (a
   token only if the gist won't read without one; it isn't kept), and read the report: the cards'
   counts against mistake-lab, the re-made keys, what is left behind. If it looks right, Run, then

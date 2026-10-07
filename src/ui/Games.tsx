@@ -13,6 +13,8 @@ import { recordEvent } from '../app/state.ts';
 import { trainData } from '../app/train.ts';
 import { forgetGames, gameById, gameDeck, gameQueueNow, gameRows, gamesPrefs, practiceHistory, refreshGames, refreshState, setGamesPrefs, startGames, type GameFilters, type GameRow, type Since } from '../app/games.ts';
 import type { HistoryEntry } from '../core/games/practice.ts';
+import { recid } from '../app/repertoireCheck.ts';
+import { badgeOf } from '../core/games/recidivism.ts';
 import { continueSession, dropCard, dropLine, endGameSession, gameSession, hint, hintMove, MAX_TRIES, playMove, revealBest, skipCard, startGameSession, tryAgain, type CardRun, type GameSession } from '../app/gameTrainer.ts';
 import { cpFor, type GameItem } from '../core/games/extract.ts';
 import { dropsOf } from '../core/games/deck.ts';
@@ -102,6 +104,10 @@ function Home() {
             'Reading…'
           )}
         </p>
+        <RecidSummary />
+        <p>
+          <a href="#/repertoire-check">Repertoire check</a> <span class="muted">· deviations, gaps and weak spots from these games</span>
+        </p>
       </section>
       <Sources />
       <section class="card">
@@ -144,6 +150,40 @@ function Home() {
         )}
       </section>
     </>
+  );
+}
+
+/** mistake-lab's transfer line: real games' encounters of drilled positions, practice's dimmed. */
+function RecidSummary() {
+  const s = recid.value?.summary;
+  if (!s || s.fixed + s.relapsed + s.inappFixed + s.inappRelapsed === 0) return null;
+  const total = s.fixed + s.relapsed;
+  return (
+    <p class="muted" data-testid="recid-summary" title="Drilled positions met again in later games: no new mistake there (fixed), or one (relapsed)">
+      ↻ Transfer:{' '}
+      {total ? (
+        <>
+          <span class="recid-good">{s.fixed} fixed</span> · <span class="recid-bad">{s.relapsed} relapsed</span> ({Math.round((100 * s.fixed) / total)}%)
+        </>
+      ) : (
+        'no game encounters yet'
+      )}
+      {s.inappFixed + s.inappRelapsed ? <span class="recid-dim"> · in practice {s.inappFixed}✓ {s.inappRelapsed}✗</span> : null}
+    </p>
+  );
+}
+
+/** A card's encounters (`recidBadgeHtml`): "↻ 2✓ 1✗!", practice's dimmed. */
+function RecidBadge(props: { pid: string }) {
+  const encs = recid.value?.byPid.get(props.pid);
+  if (!encs?.length) return null;
+  const b = badgeOf(encs);
+  return (
+    <span class="recid-badge" data-testid="recid-badge" title={`Met again after drilling: in games ${b.fixed} fixed, ${b.relapsed} relapsed${b.sameMove ? ' (the same move again!)' : ''}${b.inappFixed + b.inappRelapsed ? `; in practice ${b.inappFixed} fixed, ${b.inappRelapsed} relapsed` : ''}`}>
+      {' '}
+      · ↻ {b.fixed ? <span class="recid-good">{b.fixed}✓</span> : null} {b.relapsed ? <span class="recid-bad">{`${b.relapsed}✗${b.sameMove ? '!' : ''}`}</span> : null}
+      {b.inappFixed + b.inappRelapsed ? <span class="recid-dim"> app {b.inappFixed}✓{b.inappRelapsed}✗</span> : null}
+    </span>
   );
 }
 
@@ -233,6 +273,9 @@ function Sources() {
               <option value="12">the last year</option>
               <option value="24">the last 2 years</option>
             </select>
+          </label>
+          <label class="check">
+            <input type="checkbox" checked={prefs.recidAuto} onChange={(e) => setGamesPrefs({ recidAuto: (e.target as HTMLInputElement).checked })} /> Reschedule a card when its position is missed again in a later game
           </label>
           <label>
             New game cards a day
@@ -538,6 +581,7 @@ function Card(props: { s: GameSession; r: CardRun }) {
         <p class="train-counters">
           {s.index + 1} of {s.cards.length} · {KIND_WORD[item.kind]}
           {game ? ` · ${game.speed} against ${opponentOf(game).name}` : ''}
+          <RecidBadge pid={item.pid} />
         </p>
         <p class="train-line">
           <strong>{prompt}</strong> <span class="muted">· move {Math.ceil(item.ply / 2)}</span>

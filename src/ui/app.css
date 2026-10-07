@@ -3109,3 +3109,38 @@ a.button.disabled {
 .analysis-head .titles {
   flex: 1 1 16em;
 }
+
+/* The repertoire check (§5.58–§5.60) and recidivism's marks (§5.59). */
+.repcheck-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.repcheck-list li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--surface);
+}
+.repcheck-list .actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: 8px;
+}
+.score-pill {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+.recid-good {
+  color: #4caf50;
+}
+.recid-bad {
+  color: #ef5f5f;
+}
+.recid-dim {
+  opacity: 0.6;
+}
