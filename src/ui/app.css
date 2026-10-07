@@ -2770,3 +2770,148 @@ a.button.secondary {
   padding: 0 4px;
   font-size: 0.75rem;
 }
+
+/* The storm (PLAN.md §5.43, §5.46): one five-step ramp for the bands (green, dim green, neutral,
+   amber, red), the clock, the review's rows and the record's bar. */
+
+.storm {
+  --band-great: #5fbf55;
+  --band-good: #8fae6a;
+  --band-ok: #9a9a9a;
+  --band-bad: #d6a13a;
+  --band-blunder: #d9604a;
+}
+
+.storm-verdict.band-great,
+.storm-row.band-great {
+  color: var(--band-great);
+}
+
+.storm-verdict.band-good,
+.storm-row.band-good {
+  color: var(--band-good);
+}
+
+.storm-verdict.band-bad,
+.storm-row.band-bad {
+  color: var(--band-bad);
+}
+
+.storm-verdict.band-blunder,
+.storm-row.band-blunder {
+  color: var(--band-blunder);
+}
+
+.storm-clock {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.storm-clock.low {
+  color: var(--band-bad);
+}
+
+.storm-best {
+  overflow-wrap: anywhere;
+}
+
+.storm-settings label {
+  display: inline-block;
+  margin: 2px 0;
+}
+
+.storm-bar {
+  display: flex;
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.storm-bar .band-great {
+  background: var(--band-great);
+}
+
+.storm-bar .band-good {
+  background: var(--band-good);
+}
+
+.storm-bar .band-ok {
+  background: var(--band-ok);
+}
+
+.storm-bar .band-bad {
+  background: var(--band-bad);
+}
+
+.storm-bar .band-blunder {
+  background: var(--band-blunder);
+}
+
+.storm-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0;
+}
+
+.storm-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) 4em 6.5em 3.5em 4em;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-left: 3px solid transparent;
+  padding: 6px 8px;
+  min-height: 36px;
+}
+
+.storm-row > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.storm-row.current {
+  background: rgb(255 255 255 / 8%);
+  border-left-color: currentcolor;
+}
+
+@media (max-width: 480px) {
+  .storm-row {
+    grid-template-columns: minmax(0, 1fr) 3.5em 5.5em 3em;
+  }
+
+  .storm-row > span:last-child {
+    display: none;
+  }
+}
+
+.storm-chapters {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.storm-chapters th,
+.storm-chapters td {
+  text-align: left;
+  padding: 4px 6px;
+}
+
+.storm-chapters .bar-cell {
+  width: 30%;
+}
+
+@media (max-width: 480px) {
+  .storm-chapters th:last-child,
+  .storm-chapters .bar-cell {
+    display: none;
+  }
+}
+
+.storm-puzzles input[type='url'] {
+  width: 100%;
+  margin-top: 6px;
+}

@@ -204,6 +204,14 @@ function StudySettings(props: { study: StudyRef }) {
         </button>{' '}
         <span class="muted">{s.kind === 'reference' ? 'which of its lines your repertoire doesn’t have' : 'the lines of a reference study this one doesn’t have'}</span>
       </p>
+      {s.kind === 'repertoire' && (
+        <p>
+          <button type="button" class="secondary" onClick={() => (close(), open({ name: 'storm', sid: s.sid }))}>
+            Storm…
+          </button>{' '}
+          <span class="muted">positions past this study’s lines, from real games</span>
+        </p>
+      )}
       {error && (
         <p class="warn" role="alert">
           {error}

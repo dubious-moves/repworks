@@ -81,7 +81,7 @@ export function numbered(start: Position, path: readonly string[]): string {
   return out.join(' ');
 }
 
-function useWakeLock(active: boolean) {
+export function useWakeLock(active: boolean) {
   useEffect(() => {
     if (!active || !('wakeLock' in navigator)) return;
     let lock: WakeLockSentinel | undefined;

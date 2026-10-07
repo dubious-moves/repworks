@@ -7,7 +7,7 @@ where the build differed). What remains is live: the spike's re-run (§4.2), the
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
 with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
-for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06). Read with `DECISIONS.md`, which this plan updates (its
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -3642,6 +3642,32 @@ repertoire with fake services: the count, the requests, Stop.
 Live (desktop and phone): a gather on the real repertoire: positions per minute, requests per
 position, the phone's time with the engine's share.
 
+**As built** (2026-10-07, with §5.43 and §5.44 in one push: the storm's home hosts the gather):
+- The explorer worker (`core/explorer/service.ts`): `stormGames` (the relaxed filter, four top and
+  four recent games, Lichess's explorer even with a local one, priority 300), `gamePgns` (one
+  `POST /api/games/export/_ids`, `text/plain`, no token, one at a time, a 429 pausing a minute and
+  trying once more; masters games one by one from `/masters/pgn/<id>`), `scores` (ChessDB at
+  priority 1). `providers.ts` gained `games`, `mastersGame`, the `games` filter field (its own cache
+  key) and `gameIds` in the compact answer.
+- `core/storm/harvest.ts` (pure, I/O injected): `harvestFrontier` (§26.4's branch: the explorer
+  first; games → the hybrid walk, ChessDB with Stockfish on a miss and nothing on a transport
+  failure; none or no login → Stockfish's invented line seeded with the line's last move; the band
+  at stage 0 for one request), `harvestDecision` (§19: one explorer request, one score per reply),
+  `cdbList`, `engineList`, `storedPosition`/`storedList` (every scored move kept).
+- `src/platform/stormStore.ts`: IndexedDB `repworks-storm` (positions; puzzle candidates, bodies
+  and meta for §5.47), positions by card, at most 900, the oldest out. `src/app/stormEngine.ts`:
+  the storm's own Stockfish client (one position at a time over core's search, a search out of time
+  taken at the depth it reached), ended when the screen is left.
+- `src/app/storm.ts`: the scope's lines, ends and decision points from the repertoire chapters;
+  `gather` (line ends and replies in turn, each pass's positions stored, the requests counted:
+  explorer, game exports, ChessDB, Stockfish); Stop. The screen is kept on while it runs.
+- Tests: `harvest.test.ts` (games: one export, ChessDB's walk; ChessDB unknown → Stockfish 6PV
+  d14; a ChessDB failure scoring nothing; no games → the invented line with no ChessDB; the band's
+  refusal for one request; replies; the lists; a stored position's round trip),
+  `explorer/stormService.test.ts` (the filter and the names, the export's POST with no token, the
+  429 and its retry, the masters path, the scores), `platform/stormStore.test.ts`, and
+  `test/e2e/storm.spec.ts` (below).
+
 #### 5.43 The storm (timed)
 
 - `#/storm[/<sid>[/<cid>]][?fen=…]`; "Storm" on the home screen, "Storm from here" in a move's
@@ -3669,6 +3695,29 @@ panel and explorer absent during a card.
 Live (desktop and phone): a real three-minute storm on the repertoire: the cards' quality, the
 verdicts against Qchess's feel, the waits.
 
+**As built** (2026-10-07):
+- Route `#/storm[/<sid>[/<cid>[?at=…]]]` (`core/app/fsm.ts`): "Storm" on the home screen, "Storm…"
+  in a repertoire study's settings, "Storm from here" in a repertoire chapter's move menu (the
+  lines through that move: a chapter's path rather than the `?fen=` first planned, so the lines are
+  found without a search).
+- `src/ui/Storm.tsx`: the home (the scope's ends and decision points, positions ready and done for
+  now, Start storm, Set of 6, Gather/Stop with its progress and requests, the ply range and the
+  source); a card (the board turned to the user, the arriving move tinted, the clock running only
+  while a move is asked, points and streak, the band's word and colour on a five-step ramp, the
+  verdict line, the best line with its source in its title; the next card after 1.2 s on a clean
+  answer, 2.6 s otherwise; End); the review (every position, the one left on the board as "Not
+  answered", the best move behind "Best move" (b) on the board, the panel and the list, Try again
+  (t) scoring nothing, Analyse on the analysis board).
+- The grade (`gradeMove`): the stored list; else ChessDB on the position after the move (a ChessDB
+  list) or one Stockfish search of it (an engine list, §23); else two Stockfish searches (depth 20,
+  18 on a narrow screen, 8 s each); `unknown` otherwise. Every answer a `storm` event with the
+  chapter of the position's first line.
+- Tests: `test/e2e/storm.spec.ts` (desktop and phone, a fake explorer naming games, a fake export
+  and a ChessDB scoring every legal move): the home's counts, Gather (three exports, each a POST
+  with no token), the clock, no engine panel or explorer, a great move (+2), a mistake (−1, the
+  streak reset), the third card left unanswered, the review's hidden best move, the counts after
+  (one done for now), two events synced, the record, nothing wider than the phone.
+
 #### 5.44 The set (untimed)
 
 - Six positions, no clock: great or good resolves; inaccuracy, mistake and blunder **hold** the
@@ -3680,6 +3729,12 @@ Tests: Playwright: a held card, three tries, the move shown, the second pass, th
 per position.
 
 Live: (phone) a set on the real repertoire.
+
+**As built** (2026-10-07): in `src/app/storm.ts` and `Storm.tsx` as planned: six positions, a
+held card's Try again (three in all, the best move hidden) and Show the move, Next position and
+Analyse after a verdict, the second pass over the positions not found first time, the tally
+("5 of 6 found first time · 1 of 1 in the second pass"), only the first pass's first answers
+written (`m:"set"`). Tested in `storm.spec.ts` (desktop and phone).
 
 #### 5.45 Stockfish's standard for the store
 
@@ -3694,6 +3749,16 @@ on the home, stopping when a session starts).
 
 Live: (desktop and phone) the time per position; whether the phone should deepen at all.
 
+**As built** (2026-10-07): `core/storm/harvest.ts` (`needsDeepening`; `deepenedPosition`: an
+engine list below depth 20, or of fewer than three moves, is not stored as deepened, §23.7.2) and
+`app/storm.ts` (`deepen`: while the storm's home is open and no gather or session runs, the scope's
+kept positions not done, MultiPV 12 at depth 20 with a minute each; it yields at once to a gather
+or a session, cancelling the search in flight). On by default on a wide screen, off on a narrow
+one; "Stockfish re-scores the positions while this page is open" in the home's settings. The home
+says "Stockfish: 4 of 13 scored to depth 20 · scoring…". Tests: `harvest.test.ts` (the standard)
+and `storm.spec.ts` (with the fake engine: `MultiPV 12`, `go depth 20`, and no search while a card
+is up).
+
 #### 5.46 The record
 
 - On the storm's home: per chapter (and for the whole scope) the answers, the share found, the
@@ -3704,6 +3769,11 @@ Live: (desktop and phone) the time per position; whether the phone should deepen
 Tests: Playwright: the record after a seeded log, and after a session.
 
 Live: the record the same on both devices after a sync.
+
+**As built** (2026-10-07): on the storm's home, the positions' record (answered, found, the
+average win% given up, the sets' share, a five-colour bar), the puzzles' apart once there are
+any, and a table by chapter (`study · chapter`, answered, found, given up, the bar; the bar left
+out on a narrow screen), all from the events. Tested in `storm.spec.ts`.
 
 #### 5.47 The puzzle dataset
 
@@ -3730,6 +3800,24 @@ server (two index and two body shards from fixtures cut out of the real ones, CC
 
 Live: (phone and desktop) the base URL read cross-origin.
 
+**As built** (2026-10-07):
+- `src/core/puzzles/dataset.ts`: `shardOf` (core's `sha1Hex`), the tuple filters with the
+  missing-field rule and the theme exception, the append-only theme list, `groupByShard`,
+  `entriesFor` (an index shard's text, only the wanted keys parsed out), `bodiesFor` (a body shard,
+  only the wanted ids' lines parsed), `readMeta`. `puzzles.ts`: `pliesBefore`, `anchors`,
+  `selectEntries`, `puzzlePlies` (the solver first), `userPlies`, `readyPuzzle`.
+- `src/platform/puzzleData.ts`: the base URL (normalized; anything but http(s) refused),
+  `meta.json` once per page (asked again after a failure; a 3-character shard layout required),
+  index and body shards by shard name only. Plain GETs, no token.
+- The store holds candidates (by id), the ready bodies (the archive) and the scan record (the
+  anchors read, the build stamp, `maxEmissionPly`); no shard is kept.
+- Tests: `test/unit/core/puzzles/puzzles.test.ts` (on `test/fixtures/puzzles`, cut from the set at
+  `8a7ba97`, CC0: every published key of a shard hashes to it and is a fixed point of
+  `positionKey`; the filters; the readers; a body replayed with the solver first and refused when a
+  move won't replay; the band by the shallowest ply, a set-up fragment out, both sides kept; the
+  entries kept for an anchor), with two controls (`moves[0]` as the opponent's; the ply per line),
+  and `test/unit/platform/puzzleData.test.ts`.
+
 #### 5.48 Puzzles in the storm and the set
 
 - **Anchors** (`core/puzzles/anchors.ts`): every position the scope's lines reach at plies 12–24
@@ -3755,6 +3843,28 @@ missed, the disguise's text before a move, the review.
 
 Live (desktop, then phone on Wi-Fi): a collect on the real repertoire (its size and time against
 the estimate); puzzles in a real session; the share that feels right.
+
+**As built** (2026-10-07):
+- `src/app/puzzles.ts`: the base URL and the share (0–100%, 25 by default) per device; `collect`
+  (the scope's anchors not read yet, deepest first, at most 100 index shards a press, the entries
+  kept, saved as it goes; a new build stamp starts the scan again and keeps the bodies), then
+  `fillBodies` (the working set of 60, grouped by body shard, a body that won't replay dropping its
+  candidate), also run in the background when the home opens and candidates wait.
+- The storm's home: a Puzzles card ("3 ready · 3 found · 11 of 13 positions read"), Collect on two
+  presses (the first says "Collect: about 30 MB", how many index files and that Wi-Fi is best),
+  Stop, the share, the dataset's address. Start works with puzzles alone.
+- The session: a puzzle rides as a card (`z|<id>`, its solver's position, the opponent's move that
+  made it tinted); the solution's move or any mate goes on, the reply played 0.4 s later; solved is
+  great, a wrong move blunder (held in a set; Try again starts it over; Show the move reveals the
+  solution). **The disguise**: with puzzles in play, every card reads "Find a good move" and the
+  line's name only (no "plies past the line", no rating, depth or themes) until a move; after it, a
+  puzzle shows its solution, rating, how deep its game went into the line and its themes, as the
+  review does. In a set the share is decided once, spread among the six.
+- Tests: `test/e2e/puzzles.spec.ts` (desktop and phone, a fake dataset from the fixture bodies over
+  a 26-ply White chapter): nothing asked of the dataset before Collect, the size on the first
+  press, the collect (GETs only, no token), "Collected", the disguise, one solved through the
+  opponent's replies (+2), one missed (−2), the review, the `z|` events synced, nothing wider than
+  the phone.
 
 #### 5.49 Phase 4 acceptance test, and exit
 

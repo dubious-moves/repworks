@@ -9,6 +9,7 @@ import { dataVersion } from '../app/sync.ts';
 import { ChapterView } from './ChapterView.tsx';
 import { ConflictsView } from './Conflicts.tsx';
 import { CoverageView } from './Coverage.tsx';
+import { StormScreen } from './Storm.tsx';
 import { Debug } from './Debug.tsx';
 import { ImportScreen } from './Import.tsx';
 import { SetupForm } from './Setup.tsx';
@@ -26,7 +27,7 @@ import { confirmDeleteStudy, openNewStudy, openStudySettings, StudyDialogs } fro
 
 export function App() {
   return (
-    <div class={`shell${mode.value.name === 'chapter' || mode.value.name === 'analysis' ? ' shell-chapter' : ''}${['train', 'learn', 'practice', 'show', 'read', 'play'].includes(mode.value.name) ? ' shell-train' : ''}`}>
+    <div class={`shell${mode.value.name === 'chapter' || mode.value.name === 'analysis' ? ' shell-chapter' : ''}${['train', 'learn', 'practice', 'show', 'read', 'play', 'storm'].includes(mode.value.name) ? ' shell-train' : ''}`}>
       <header class="topbar">
         <img class="topbar-icon" src={`${import.meta.env.BASE_URL}icons/icon.svg`} alt="" width={28} height={28} />
         <h1>Repworks</h1>
@@ -93,6 +94,10 @@ function Screen() {
     }
     case 'coverage':
       return <CoverageView sid={mode.value.sid} />;
+    case 'storm': {
+      const m = mode.value;
+      return <StormScreen where={{ ...(m.sid ? { sid: m.sid } : {}), ...(m.cid ? { cid: m.cid } : {}), ...(m.at ? { at: m.at } : {}) }} />;
+    }
     case 'list':
       return <Home />;
   }
@@ -112,6 +117,9 @@ function Home() {
         <div class="card-head">
           <h2>Studies</h2>
           <div class="actions">
+            <a class="button secondary" href="#/storm">
+              Storm
+            </a>
             <a class="button secondary" href="#/analysis">
               Analysis board
             </a>

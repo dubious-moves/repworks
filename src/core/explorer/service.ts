@@ -12,6 +12,7 @@ import { Chess } from 'chessops/chess';
 import { makeFen, parseFen } from 'chessops/fen';
 import { parseSan } from 'chessops/san';
 import { standardUci } from '../chess/uci.ts';
+import { STORM } from '../storm/config.ts';
 import { LICHESS_RATE, OWN_BURST, type LimiterSnapshot, type Now, type Sleep } from './limiter.ts';
 import { createProviders, localAddress, type CompactExplorer, type ExplorerCache, type ExplorerFilter, type Http, type ProviderStats } from './providers.ts';
 import { createPreviewedSearch, type Budget, type RootSearch } from './rounds.ts';
@@ -57,7 +58,16 @@ export type ToWorker =
    * requests go at once. `shares` (the rows' shares of the games) order the requests.
    */
   | { type: 'search'; gen: number; rootFen: string; rows: string[]; remove?: string[]; shares: Record<string, number> }
-  | { type: 'stats' };
+  | { type: 'stats' }
+  /**
+   * The storm's gather (§5.42): a position's games at the storm's relaxed filter (every speed,
+   * ratings 1000–2500) with the games it names; Lichess's explorer always, under the panel.
+   */
+  | { type: 'stormGames'; id: number; fen: string }
+  /** The storm's games as PGN: Lichess ids in one export, or one masters game. */
+  | { type: 'gamePgns'; id: number; ids: string[]; masters?: boolean }
+  /** ChessDB's scored moves for the storm's walk, under every other lookup. */
+  | { type: 'scores'; id: number; fen: string };
 
 export interface LookupError {
   message: string;
@@ -75,7 +85,13 @@ export type FromWorker =
   /** Lichess asked to slow down: every queued explorer request waits this long. */
   | { type: 'paused'; ms: number }
   | { type: 'stats'; stats: ProviderStats; pausedFor: number; cache: Record<string, number> | null }
-  | { type: 'limiter'; snapshot: LimiterSnapshot };
+  | { type: 'limiter'; snapshot: LimiterSnapshot }
+  | { type: 'stormGames'; id: number; games: CompactExplorer }
+  | { type: 'stormGames'; id: number; error: LookupError }
+  | { type: 'gamePgns'; id: number; text: string }
+  | { type: 'gamePgns'; id: number; error: LookupError }
+  | { type: 'scores'; id: number; evals: ChessdbAnswer }
+  | { type: 'scores'; id: number; error: LookupError };
 
 export interface ServiceOptions {
   http: Http;
@@ -213,6 +229,31 @@ export function createExplorerService(o: ServiceOptions): ExplorerService {
         live.delete(id);
         dropped.delete(id);
       });
+  }
+
+  /* ---------------------------------------------------------------- the storm's gather (§5.42) */
+
+  function stormGames(id: number, fen: string) {
+    const filter: ExplorerFilter = { speeds: [...STORM.speeds], ratings: [...STORM.ratings], db: 'lichess', games: STORM.gatherGamesPerFrontier };
+    providers.explorer(fen, filter, undefined, { priority: 300 }).then(
+      (games) => o.post({ type: 'stormGames', id, games }),
+      (e: PeError) => o.post({ type: 'stormGames', id, error: reasonOf(e, 'Lichess') }),
+    );
+  }
+
+  function gamePgns(id: number, ids: string[], masters: boolean) {
+    const text = masters ? Promise.all(ids.map((g) => providers.mastersGame(g).catch(() => ''))).then((t) => t.filter(Boolean).join('\n\n')) : providers.games(ids);
+    text.then(
+      (t) => o.post({ type: 'gamePgns', id, text: t }),
+      (e: PeError) => o.post({ type: 'gamePgns', id, error: reasonOf(e, 'Lichess') }),
+    );
+  }
+
+  function scores(id: number, fen: string) {
+    providers.chessdb(fen, undefined, 1).then(
+      (evals) => o.post({ type: 'scores', id, evals }),
+      (e: PeError) => o.post({ type: 'scores', id, error: reasonOf(e, 'ChessDB') }),
+    );
   }
 
   function drop(id: number) {
@@ -380,6 +421,12 @@ export function createExplorerService(o: ServiceOptions): ExplorerService {
           return counts(msg.id, msg.fen);
         case 'search':
           return searchRows(msg);
+        case 'stormGames':
+          return stormGames(msg.id, msg.fen);
+        case 'gamePgns':
+          return gamePgns(msg.id, msg.ids, !!msg.masters);
+        case 'scores':
+          return scores(msg.id, msg.fen);
         case 'stats':
           void (o.cache.count ? o.cache.count() : Promise.resolve(null)).then((cache) => o.post({ type: 'stats', stats: { ...stats }, pausedFor: providers.pausedFor(), cache }));
           return;

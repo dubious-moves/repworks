@@ -138,6 +138,29 @@ couldn't be tested then (the day's limit was used up), so the training items bel
   Lichess login (log out and in again), a sync, the explorer and Maia, all as before; the
   installed app on the phone with 2 threads (whether Android keeps it isolated after a reload).
 
+## Phase 4
+
+- §5.42: a gather on the real repertoire (Storm on the home screen → Gather positions), desktop
+  then phone: positions stored per minute, the requests per position (the line under the buttons),
+  how many line ends had no games, and on the phone how long it takes (Stockfish scores what
+  ChessDB doesn't know). Whether the game exports ever fail (lichess.org) and what the page says.
+- §5.43: a three-minute storm on each device: whether the positions are worth answering (real
+  middlegames a few moves past your lines, not one-move tactics or flat positions), whether the
+  verdicts feel right against your own judgement or Qchess's Intuition Storm, the waits while a
+  move is graded, the review (Best move, Try again, Analyse). A storm from a chapter's move
+  ("Storm from here") and from a study's settings.
+- §5.41, §5.43: a position answered well on the phone not dealt on the desktop after a sync, and the
+  record the same on both.
+- §5.44: a set of six on the phone: a held position, Try again, Show the move, the second pass.
+- §5.45: Stockfish re-scoring the kept positions on the desktop (the home's "Stockfish: n of m
+  scored to depth 20"): how long a position takes; whether the phone should do it at all (off there
+  by default).
+- §5.47, §5.48: Collect puzzles on the desktop on the real repertoire (its estimate against what was
+  downloaded, the time, how many puzzles), then on the phone over Wi-Fi; the dataset read
+  cross-origin from the deployed site (D12); puzzles in a real storm and set at 25%: whether the
+  disguise holds, whether the puzzles feel related to your lines, the share that feels right.
+- §5.49: Phase 4's acceptance test (desktop and Android phone), then a week of daily storms.
+
 ### The change to q_extension for §5.25 (Repworks sessions can't push there)
 
 `explorerdb serve` answers the extension, whose requests carry no page origin; a web page's need

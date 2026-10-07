@@ -1169,3 +1169,25 @@ building, each with its reason:
   file's header names: a port that only passes proves less than one whose tests are seen to fail.
 - **`storm` stops being the tests' example of an unknown kind** (`future` instead, in the fixture
   data repo too), since the log now knows it.
+
+## Revision of 2026-10-07 (the storm and puzzles built, §5.42–§5.48)
+Calls made while building, each with its reason:
+- **One game export per line end, not one per gather pass.** A line end's games are walked as soon
+  as they arrive, so a gather stopped early has kept what it found; the export is still one
+  request for all of a line end's games, sent with no token. Batching a whole pass would hold every
+  position back until the last explorer answer (minutes, at the explorer's rate).
+- **"Storm from here" names a chapter's move** (`#/storm/<sid>/<cid>?at=…`) rather than a FEN: the
+  lines through it are then the chapter index's, found with no search.
+- **The storm has its own Stockfish client** over the same worker build and search lifecycle: its
+  screen shows no engine panel, and it asks one position at a time and waits for the answer.
+- **Stockfish's re-scoring is on by default on a wide screen, off on a narrow one** (a minute per
+  position at depth 20 is the desktop's job; the phone's grade then keeps ChessDB's one-request
+  child tier).
+- **An answer's chapter is its position's first line's**, for the record by chapter: a position past
+  converging lines belongs to several chapters, and one is enough to place it.
+- **Puzzles: Collect asks twice and says the size on the first press** (lichessable §12.7's two
+  presses): it is the one control that can spend hundreds of megabytes. The share defaults to 25%
+  once puzzles are ready (lichessable's 0 was a guess, and a feature collected on purpose is meant
+  to be met); nothing is asked of the dataset before Collect.
+- **A puzzle accepts any mate as well as the solution's move** (Lichess's own rule for puzzles
+  ending in mate), and its opponent's replies are played after 0.4 s with the clock stopped.

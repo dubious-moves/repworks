@@ -23,6 +23,16 @@ import type { Budget, CacheCounts } from './rounds.ts';
 export const EXPLORER_BASE = 'https://explorer.lichess.org';
 export const EXPLORER_URL = EXPLORER_BASE + '/lichess';
 export const CHESSDB_URL = 'https://www.chessdb.cn/cdb.php';
+/**
+ * Games by id, as PGN (§5.42): a simple request only. Lichess answers it with
+ * `Access-Control-Allow-Origin: *`, but `/game/export`'s preflight answers 404, so no token or
+ * non-safelisted header may go with these (checked live, 2026-10-06; PLAN.md §5.42).
+ */
+export const GAMES_EXPORT_URL = 'https://lichess.org/api/games/export/_ids?moves=true&tags=true&clocks=false&evals=false&opening=false&literate=false';
+export const MASTERS_PGN_URL = EXPLORER_BASE + '/masters/pgn/';
+/** At most this many ids in one export (Lichess's limit is 300). */
+export const GAMES_EXPORT_MAX = 300;
+const GAMES_PAUSE_MS = 60000;
 const CDB_RETRIES = 2; // a lookup that fails on the network is tried twice more,
 const CDB_RETRY_MS = 1500; // after 1.5 s and then 3 s
 
@@ -54,10 +64,12 @@ export interface HttpResponse {
   status: number;
   ok: boolean;
   json(): Promise<unknown>;
+  /** The body as text (the game exports' PGN). */
+  text?(): Promise<string>;
   headers?: { forEach(callback: (value: string, key: string) => void): void };
 }
 
-export type Http = (url: string, init?: { headers?: Record<string, string>; cache?: 'no-store' }) => Promise<HttpResponse>;
+export type Http = (url: string, init?: { headers?: Record<string, string>; cache?: 'no-store'; method?: 'GET' | 'POST'; body?: string }) => Promise<HttpResponse>;
 
 /** Records are kept with the time they were stored; expiry is checked on read (the TTL is the caller's). */
 export interface ExplorerCache {
@@ -75,6 +87,8 @@ export interface ExplorerFilter {
   /** `YYYY-MM`: games from then on. */
   since?: string;
   db?: ExplorerDb;
+  /** Also name this many top and recent games (the storm's walks, §5.42); never the local explorer's. */
+  games?: number;
 }
 
 export function filterHash(f: ExplorerFilter | undefined): string {
@@ -88,16 +102,18 @@ export function filterHash(f: ExplorerFilter | undefined): string {
     g.since || '',
   ];
   // Masters answers are another database's: their own key. Lichess's keep q_extension's.
-  if (g.db === 'masters') return 'masters';
-  return parts.join('|');
+  const games = g.games ? '|g' + g.games : '';
+  if (g.db === 'masters') return 'masters' + games;
+  return parts.join('|') + games;
 }
 
 // `base` is the explorer to ask: Lichess's unless a local one (localExplorerUrl) is given.
 export function explorerUrl(fen: string, f: ExplorerFilter, base?: string): string {
   if (f.db === 'masters' && !base) {
-    return EXPLORER_BASE + '/masters?fen=' + encodeURIComponent(fenKey(fen)) + '&moves=30&topGames=0';
+    return EXPLORER_BASE + '/masters?fen=' + encodeURIComponent(fenKey(fen)) + '&moves=30&topGames=' + (f.games || 0);
   }
-  let q = 'variant=standard&fen=' + encodeURIComponent(fenKey(fen)) + '&speeds=' + (f.speeds || []).join(',') + '&ratings=' + (f.ratings || []).join(',') + '&moves=30&topGames=0&recentGames=0';
+  const n = f.games || 0;
+  let q = 'variant=standard&fen=' + encodeURIComponent(fenKey(fen)) + '&speeds=' + (f.speeds || []).join(',') + '&ratings=' + (f.ratings || []).join(',') + '&moves=30&topGames=' + n + '&recentGames=' + n;
   if (f.since) q += '&since=' + f.since;
   return (base || EXPLORER_URL) + '?' + q;
 }
@@ -153,15 +169,18 @@ interface RawExplorer {
 
 export type CompactExplorer = Required<Pick<ExplorerAnswer, 'total' | 'white' | 'draws' | 'black'>> & {
   moves: (ExplorerAnswer['moves'][number] & { rating?: number })[];
+  /** The ids of the games named (top games, then recent ones), when asked for. */
+  gameIds?: string[];
 };
 
 // Only what the search needs: the counts per move and for the position also feed the prepared
 // score (search.ts). The panel also shows a move's average rating (§5.23), so it is kept when the
 // answer has one.
 export function compactExplorer(json: unknown): CompactExplorer {
-  const j = (json || {}) as RawExplorer;
+  const j = (json || {}) as RawExplorer & { topGames?: { id?: unknown }[]; recentGames?: { id?: unknown }[] };
   const total = (j.white || 0) + (j.draws || 0) + (j.black || 0);
-  return {
+  const named = [...(j.topGames || []), ...(j.recentGames || [])].map((g) => g?.id).filter((id): id is string => typeof id === 'string' && /^[A-Za-z0-9]{8}$/.test(id));
+  const out: CompactExplorer = {
     total,
     white: j.white || 0,
     draws: j.draws || 0,
@@ -179,6 +198,8 @@ export function compactExplorer(json: unknown): CompactExplorer {
       return out;
     }),
   };
+  if (j.topGames || j.recentGames) out.gameIds = [...new Set(named)];
+  return out;
 }
 
 export function compactChessdb(json: unknown): ChessdbAnswer & { moves: NonNullable<ChessdbAnswer['moves']> } {
@@ -233,6 +254,10 @@ export interface ProvidersOptions {
 
 export interface Providers {
   explorer(fen: string, filter: ExplorerFilter, isStale?: () => boolean, ctx?: ExplorerContext): Promise<CompactExplorer>;
+  /** Games by Lichess id as one PGN text: one export at a time, no token (§5.42). */
+  games(ids: readonly string[]): Promise<string>;
+  /** A masters game's PGN. */
+  mastersGame(id: string): Promise<string>;
   chessdb(fen: string, isStale?: () => boolean, priority?: number): Promise<ChessdbAnswer>;
   analyse(fen: string, uci?: string | null): Promise<boolean>;
   testToken(token: string): Promise<{ ok: boolean; status: number }>;
@@ -290,7 +315,7 @@ export function createProviders(o: ProvidersOptions): Providers {
   function explorer(fen: string, filter: ExplorerFilter, isStale?: () => boolean, context?: ExplorerContext): Promise<CompactExplorer> {
     const ctx = context || {};
     // Masters is Lichess's even with a local explorer: the local index is a month of Lichess games.
-    const local = filter.db === 'masters' ? '' : localAddress(typeof o.localExplorer === 'function' ? o.localExplorer() : o.localExplorer);
+    const local = filter.db === 'masters' || filter.games ? '' : localAddress(typeof o.localExplorer === 'function' ? o.localExplorer() : o.localExplorer);
     if (local) return localExplorer(local, fen, filter, ctx);
     const key = fenKey(fen) + '#' + filterHash(filter);
     const counts = ctx.counts || {};
@@ -500,8 +525,40 @@ export function createProviders(o: ProvidersOptions): Providers {
       });
   }
 
+  // The game exports: one at a time; a 429 pauses them a minute and the export is tried once more.
+  const gameLane = createLimiter(1);
+  let gamesPausedUntil = 0;
+  function gameText(url: string, init?: Parameters<Http>[1], tried = 0): Promise<string> {
+    return gameLane(() => {
+      const wait = gamesPausedUntil - now();
+      return (wait > 0 ? sleep(wait) : Promise.resolve()).then(() => {
+        bump('gameRequests');
+        return o.http(url, init);
+      });
+    }).then((res) => {
+      if (res.status === 429) {
+        gamesPausedUntil = now() + GAMES_PAUSE_MS;
+        if (tried < 1) return gameText(url, init, tried + 1);
+      }
+      if (!res.ok || !res.text) throw HttpError(res.status);
+      return res.text();
+    });
+  }
+  function games(ids: readonly string[]): Promise<string> {
+    const list = [...new Set(ids.filter((id) => /^[A-Za-z0-9]{8}$/.test(id)))].slice(0, GAMES_EXPORT_MAX);
+    if (!list.length) return Promise.resolve('');
+    // text/plain keeps it a simple request: no preflight, which this endpoint's sibling refuses.
+    return gameText(GAMES_EXPORT_URL, { method: 'POST', body: list.join(','), headers: { 'Content-Type': 'text/plain' } });
+  }
+  function mastersGame(id: string): Promise<string> {
+    if (!/^[A-Za-z0-9]{8}$/.test(id)) return Promise.reject(HttpError(0, 'not a game id'));
+    return gameText(MASTERS_PGN_URL + id);
+  }
+
   return {
     explorer,
+    games,
+    mastersGame,
     chessdb,
     analyse,
     testToken,
