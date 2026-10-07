@@ -26,6 +26,8 @@ export interface CardState {
   taught?: number;
   /** Set when a migrated state (§5.64) was taken. */
   snapshot?: true;
+  /** The games whose relapse (§5.59) was folded, so each counts once. */
+  relapses?: Set<string>;
 }
 
 const DAY_MS = 86_400_000;
@@ -42,7 +44,6 @@ export function toDeviceEvents(device: string, lines: readonly LogLine[]): Devic
 
 export function foldCard(events: readonly DeviceEvent[], params: FsrsParams = DEFAULT_PARAMS): CardState {
   const state: CardState = { card: newCard(), suspended: false, reviews: 0 };
-  let relapses: Set<string> | undefined;
   for (const { event, t } of events) {
     if (!event) continue;
     switch (event.k) {
@@ -66,29 +67,12 @@ export function foldCard(events: readonly DeviceEvent[], params: FsrsParams = DE
       case 'taught':
         state.taught ??= t;
         break;
-      // Phase 5 (§5.53): kept out of line, so this loop stays small enough to inline `review`.
-      case 'snapshot':
-        takeSnapshot(state, event);
-        break;
-      case 'relapse':
-        relapses = applyRelapse(state, event, relapses, params);
-        break;
       // Pins and drills (§5.8) never change a card's schedule: core/train/pins.ts reads them.
-      // Nor do alternatives (§5.18): core/train/alternatives.ts reads them.
-      case 'pin':
-      case 'unpin':
-      case 'drill':
-      case 'alt':
-      // Storm answers (§5.41) neither: core/storm/store.ts reads them.
-      case 'storm':
-      // Nor Phase 5's marks (§5.53): core/games reads them.
-      case 'drop':
-      case 'plan':
-      case 'dismiss':
-      case 'saved':
-      case 'played':
-      case 'practice':
-        break;
+      // Nor do alternatives (§5.18): core/train/alternatives.ts reads them; nor storm answers
+      // (§5.41): core/storm/store.ts. Phase 5's kinds (§5.53) go to one function kept out of line,
+      // so this loop stays as small as it was (the replay's timing test).
+      default:
+        if (event.k === 'snapshot' || event.k === 'relapse') foldPhase5(state, event, params);
     }
   }
   return state;
@@ -116,16 +100,20 @@ function takeSnapshot(state: CardState, event: SnapshotEvent): void {
  * An Again at the game's time (§5.59), once per game, and never before the card's last review
  * or on a card never reviewed (mistake-lab's guards).
  */
-function applyRelapse(state: CardState, event: RelapseEvent, seen: Set<string> | undefined, params: FsrsParams): Set<string> {
-  const games = seen ?? new Set<string>();
-  if (games.has(event.g)) return games;
+function applyRelapse(state: CardState, event: RelapseEvent, params: FsrsParams): void {
+  const games = (state.relapses ??= new Set<string>());
+  if (games.has(event.g)) return;
   games.add(event.g);
   const at = Date.parse(event.at);
   const lastReview = state.card.lastReview;
-  if (state.card.state === 0 || lastReview === undefined || lastReview >= at) return games;
+  if (state.card.state === 0 || lastReview === undefined || lastReview >= at) return;
   state.card = review(state.card, 1, at, params);
   state.lastGrade = 1;
-  return games;
+}
+
+function foldPhase5(state: CardState, event: SnapshotEvent | RelapseEvent, params: FsrsParams): void {
+  if (event.k === 'snapshot') takeSnapshot(state, event);
+  else applyRelapse(state, event, params);
 }
 
 export interface DuplicateClash {
