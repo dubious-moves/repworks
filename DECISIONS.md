@@ -1324,3 +1324,11 @@ The technical calls, each with its reason:
 - **§6's list of what was left of mistake-lab is built**: mistake-lab can retire once the owner's
   checks pass (§5.65), its analyzer staying until §5.66's answer (D8).
 
+
+## Revision of 2026-10-07 (GitHub's GraphQL failure)
+- **A GraphQL request GitHub fails on is made again through REST at once** (D4): its untyped
+  "Something went wrong while executing your query" (the owner's phone, after a while of editing a
+  study) is most often its GraphQL time limit, which the same large commit meets again on every
+  retry. The commit goes through REST's tree, commit and fast-forward-only ref update from the same
+  parent, so a GraphQL commit that landed after all refuses it as stale and the next pull adopts
+  the first; a blob query that failed is read through REST. GraphQL stays the default write.

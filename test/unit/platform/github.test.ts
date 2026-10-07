@@ -116,3 +116,44 @@ test('a GraphQL blob whose text is not its content is read through REST instead'
   assert.equal(blobs.get(sha), '# data\n');
   assert.deepEqual(seen.map((s) => s.route), ['/graphql', '/repos/{repo}/git/blobs/' + sha]);
 });
+
+// GitHub's own GraphQL failure, as the owner's phone got it on 2026-10-07 (no type).
+const SOMETHING_WRONG = { data: null, errors: [{ message: 'Something went wrong while executing your query on 2026-10-07T15:08:22Z. Please include `59C6:2C2DCC:2A5596:2F193B:6AC66063` when reporting this issue.' }] };
+
+/** The fake GitHub, with its GraphQL answering GitHub's failure; `land` lets a mutation land first. */
+function failingGraphql(fetch: typeof globalThis.fetch, land = false): typeof globalThis.fetch {
+  return async (input, init) => {
+    if (!String(input).endsWith('/graphql')) return fetch(input, init);
+    if (land) await fetch(input, init);
+    return new Response(JSON.stringify(SOMETHING_WRONG), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+}
+
+test("a GraphQL commit GitHub failed on is made through REST at once", async () => {
+  const { git, github, config: c, seen } = setup();
+  const parent = git.head;
+  const made = await graphqlRemote({ ...c, fetch: failingGraphql(github.fetch) }).commit({ parent: { commit: parent, tree: git.commits.get(parent)!.tree }, message: 'x\n\nrepworks-sync: DeskTest:1', add: new Map([['a.txt', 'a\n']]), remove: [] });
+  assert.ok(made.ok);
+  assert.equal(git.head, made.commit);
+  assert.equal(git.commits.get(git.head)!.parent, parent);
+  assert.deepEqual([...git.filesOf(git.head).keys()].sort(), ['README.md', 'a.txt', 'bom.pgn']);
+  assert.equal(seen[0]!.route, '/graphql');
+  assert.ok(seen.slice(1).every((s) => s.route !== '/graphql'));
+});
+
+test('a GraphQL commit that landed although GitHub answered a failure is not made twice', async () => {
+  const { git, github, config: c } = setup();
+  const parent = git.head;
+  const made = await graphqlRemote({ ...c, fetch: failingGraphql(github.fetch, true) }).commit({ parent: { commit: parent, tree: git.commits.get(parent)!.tree }, message: 'x\n\nrepworks-sync: DeskTest:1', add: new Map([['a.txt', 'a\n']]), remove: [] });
+  assert.deepEqual(made, { ok: false, reason: 'stale' });
+  // One commit on the branch past the parent: the GraphQL one, which the next pull adopts.
+  assert.notEqual(git.head, parent);
+  assert.equal(git.commits.get(git.head)!.message, 'x\n\nrepworks-sync: DeskTest:1');
+});
+
+test('blobs GitHub failed to give through GraphQL are read through REST', async () => {
+  const { git, github, config: c } = setup();
+  const shas = [...git.filesOf(git.head).values()];
+  const blobs = await graphqlRemote({ ...c, fetch: failingGraphql(github.fetch) }).blobs(shas);
+  assert.deepEqual([...blobs.values()].sort(), ['# data\n', '﻿[Event "x"]\n\n*\n']);
+});

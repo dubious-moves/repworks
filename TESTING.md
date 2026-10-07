@@ -15,6 +15,9 @@ confirmed that this is the phone's own cause: its data can't be read from here.
 
 - The home screen on the phone again. If any part of a screen still fails, it now shows
   "… failed to show" with the error in its place (Details has the stack): report that text.
+- The sync after a long editing session on the phone: GitHub's "Something went wrong while
+  executing your query" (2026-10-07) should no longer show; the commit goes through REST instead.
+  The chip's request counts (Settings and debug) show REST writes when it happened.
 
 ## Phase 0
 

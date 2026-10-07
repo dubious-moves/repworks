@@ -4,6 +4,13 @@
 // - blobs: up to 100 in one query, each checked against its SHA (anything truncated, binary
 //   or not matching is read through REST instead);
 // - head, files and commitsSince: REST, as in githubRest.ts (the head's 304 is free).
+//
+// GitHub's own failure ("Something went wrong while executing your query", no type; a 5xx) is
+// most often its GraphQL time limit, met again by the same large commit or query on every retry
+// (the owner's phone, 2026-10-07, after a while of editing a study): that request is made again
+// through REST at once. A commit that did land after all can't land twice: REST moves the branch
+// only forward from the same parent, so the second one is refused as stale and the next pull finds
+// the first by its sync id.
 import { gitBlobSha } from '../core/sync/gitHash.ts';
 import { RemoteError, type CommitRequest, type CommitResult, type Remote } from '../core/sync/ports.ts';
 import { base64, call, type GithubConfig } from './github.ts';
@@ -19,6 +26,9 @@ interface GraphqlError {
 }
 
 const BATCH = 100;
+
+/** GitHub's side failed (not a refusal, a limit or the network): worth the same request through REST. */
+const githubFailed = (error: unknown) => error instanceof RemoteError && error.reason === 'server';
 
 export function graphqlRemote(config: GithubConfig): Remote {
   const rest = restRemote(config);
@@ -52,9 +62,16 @@ export function graphqlRemote(config: GithubConfig): Remote {
     for (let i = 0; i < shas.length; i += BATCH) {
       const batch = shas.slice(i, i + BATCH);
       const fields = batch.map((sha, k) => `b${k}: object(oid: "${sha}") { ... on Blob { text isTruncated isBinary } }`).join('\n');
-      const { data, errors } = await graphql(`query ($owner: String!, $name: String!) { repository(owner: $owner, name: $name) {\n${fields}\n} }`, { owner, name });
-      const repository = (data as { repository?: Record<string, { text?: unknown; isTruncated?: unknown; isBinary?: unknown } | null> | null } | null | undefined)?.repository;
-      if (!repository) throw failure(errors);
+      let repository: Record<string, { text?: unknown; isTruncated?: unknown; isBinary?: unknown } | null> | undefined;
+      try {
+        const { data, errors } = await graphql(`query ($owner: String!, $name: String!) { repository(owner: $owner, name: $name) {\n${fields}\n} }`, { owner, name });
+        repository = (data as { repository?: typeof repository | null } | null | undefined)?.repository ?? undefined;
+        if (!repository) throw failure(errors);
+      } catch (error) {
+        if (!githubFailed(error)) throw error;
+        fallback.push(...batch);
+        continue;
+      }
       batch.forEach((sha, k) => {
         const blob = repository[`b${k}`];
         const text = blob?.text;
@@ -67,8 +84,17 @@ export function graphqlRemote(config: GithubConfig): Remote {
   }
 
   async function commit(request: CommitRequest): Promise<CommitResult> {
-    const [headline, ...rest] = request.message.split('\n');
-    const body = rest.join('\n').replace(/^\n+/, '');
+    try {
+      return await graphqlCommit(request);
+    } catch (error) {
+      if (!githubFailed(error)) throw error;
+      return rest.commit(request);
+    }
+  }
+
+  async function graphqlCommit(request: CommitRequest): Promise<CommitResult> {
+    const [headline, ...lines] = request.message.split('\n');
+    const body = lines.join('\n').replace(/^\n+/, '');
     const { data, errors } = await graphql(COMMIT, {
       input: {
         branch: { repositoryNameWithOwner: config.repo, branchName: config.branch },
