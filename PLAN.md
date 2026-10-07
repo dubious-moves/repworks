@@ -7,7 +7,7 @@ where the build differed). What remains is live: the spike's re-run (§4.2), the
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
 with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
-for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Read with `DECISIONS.md`, which this plan updates (its
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are planned, not built. Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -2339,6 +2339,135 @@ desktop checks beside it.
   alternative" does, with the card panel's list showing it. The repertoire's own move and one
   saved already are refused with the reason; Cancel, Escape or moving to another move ends it
   with nothing saved. One alternative per press. Test: `alternatives.spec.ts` (both viewports).
+
+#### 5.70 Prioritize a study, and paused lines (planned 2026-10-07, not built)
+
+The owner's request: a study's lines (or one chapter's) ranked by how likely the owner is to face
+them and how much knowing them matters. Lines outside the chosen set are **paused**: kept in the
+study and visible, but left out of learning and review. Until now the owner did this with a
+script (`prioritize_repertoire.py`, a port of mistake-lab's checklist generator, the same
+algorithm as §5.62) that wrote a smaller PGN to import. The owner's answers (2026-10-07): a whole
+line is paused, not a move, from the training screen's line list, with a pause symbol in place of
+the state dot. Pauses go in the progress log. "Critical" means hard-to-find moves plus a
+must-learn mark of the owner's own, and not their games, since they learn a repertoire before
+playing it. Further lines come in by hand ("Add the next 10"), and prioritizing keeps lines
+already learned. A paused line is not a suspended card (§5.2): a suspended move is played for the
+user, while a paused line is not trained at all.
+
+Build order: (a), then (b), (c) and (d); each part is pushed when its tests pass.
+
+**(a) Paused lines** (`src/core/train/paused.ts`, events, queue, plan, the line list)
+- **A line's mark** is a progress event,
+  `{"k":"line","card":"l|<sid>|<cid>|<SANs joined by spaces>","mark":"paused"|"must"|"none"}`. The
+  last event by replay order wins, as with every toggle in the log. The path is the line's leaf
+  path when it was marked. **The mark covers every line of that chapter whose path starts with
+  it**, so a line extended later stays paused, as do branches added after its old end. A branch
+  added earlier along the line is a new line and is active. A mark that matches no line is kept,
+  counted in the debug panel and otherwise ignored, like an orphaned card. A re-imported study
+  has a new sid, so it starts unpaused.
+- **A card is held back only when every line it lies on, in every study, is paused.** Shared
+  prefixes and transpositions into an active line keep a card active. The queue (§5.3) leaves
+  held cards out of `due`, `later`, the new lines and the known pool. A wholly paused line is
+  never a new or known line. The planner (§5.4) picks review lines among active lines only, and
+  every due card lies on one, since a held card is never due. `DailyQueue` gains `pausedLines`.
+- A reviewed card that is held keeps its FSRS state. Its reviews stop, and when its line is
+  unpaused it comes back due (overdue), as any late review does.
+- **Paused lines still count everywhere except training**: the study views, the editor, Read,
+  Quiz from here, the deviations (a move of a paused line is still the repertoire), coverage and
+  the checklist. The storm's repertoire sources (§5.40) leave paused lines out, as untrained
+  material.
+- **The line list** (§5.16): ⏸ in place of the state dot, labelled "Paused"; ★ beside a
+  must-learn line. Each row's menu (⋯, or a right-click) has Pause or Unpause, and Must learn or
+  Not must-learn. The chapter header gets Pause all and Unpause all, and its "Learn k/n" counts
+  active lines only. Clicking a paused line opens it as practice (nothing recorded, like the
+  Interactive view), with "Paused: practice only · Unpause" above the board. The home screen
+  reads "Train: 23 due · 18 new · 140 paused".
+
+**(b) The ranking** (`src/core/repertoire/priority.ts`, pure: the explorer and Maia come in as
+functions, as the checklist's `Probs` does)
+- **Scope**: a study's lines for one side (a study holding both sides is ranked per side) or one
+  chapter's lines. A variation is a whole line of the index (§5.1), the unit the owner pauses.
+  The script's depth cut (`--ply`) is dropped.
+- **Reach**: walk each line from its chapter's start. At an opponent's move, take that move's
+  share among the replies the scope covers at that position. Coverage is gathered by position
+  key across the scope's chapters, so a transposition gets the same shares wherever it is
+  reached. The shares come from the explorer at the chosen ratings and speeds; the defaults are
+  the checklist's (1600–2500, blitz to correspondence). A covered reply the explorer doesn't know
+  gets the script's floor, 0.0002. An own move passes the reach on unchanged; two own moves in
+  one position (a conflict, D3) each keep the full reach. A chapter starting from a FEN hangs
+  where another line of the scope reaches its start, and otherwise starts at reach 1, shown as
+  its own group.
+- **How hard each own move is to find**: `p`, the share of explorer games at those ratings in
+  which the side to move played the repertoire move. This needs the explorer at own positions
+  too, so a first run makes about twice the script's calls, through the same cache. Where the
+  explorer has fewer than 20 games there, Maia's probability at the rating is used if Maia is
+  downloaded (§5.32). Otherwise `p` is unknown and counted as 0 ("wouldn't find it"), so with no
+  data the ranking falls back to likelihood alone.
+- **The order** is greedy by marginal value. A line's value is its reach × the chance of leaving
+  the repertoire somewhere along it without having studied it:
+  `1 − Π p` over its own moves not already covered by a line taken earlier or learned already.
+  The line with the highest value is taken next; ties go to the index's order. A line with
+  nothing left to learn has value 0 and goes last. Must-learn lines are taken first. One setting,
+  "Natural moves count less" (on by default), switches the `Π p` term off for a ranking by
+  likelihood alone.
+- **Why not the script's d'Hondt slots**: d'Hondt hands out a fixed number of slots down the
+  tree in proportion to the shares, but it knows nothing of moves already covered or how hard a
+  move is. The greedy order gives "the next N" directly, which (d) needs. On likelihood alone it
+  takes the most likely lines first, as the script does. The checklist (§5.62) keeps d'Hondt
+  unchanged.
+- **Gaps**: replies the scope doesn't cover, played at least 8% of the time at a position the
+  scope reaches (the checklist's rule), ordered by reach. Each one opens the chapter at the
+  position, so a reply can be added.
+
+**(c) The Prioritize panel** (`src/app/priority.ts`, `src/ui/Priority.tsx`), opened by a
+"Prioritize…" button on the line list for the study or the chapter in view.
+- **Settings**: ratings and speeds (from the explorer settings); the number of lines to keep (a
+  slider, with the share of the scope's covered games that the kept lines reach, live: "25 lines
+  · 82% of your games here"); Keep lines already learned (on; lines with every move taught or
+  reviewed stay active and don't use the number); Natural moves count less (on).
+- **The table**: the rank, the line (its name and its moves from where it branches, as in the
+  line list), its reach, its hard moves (own moves with `p` < 0.3), its state, and whether
+  Apply pauses it. Below the table come the gaps.
+- **Scoring**: the explorer goes through the worker, its limiter and its IndexedDB cache
+  (§5.22), with a count and an estimate ("Scoring: 214/380 positions, about 4 min") and Stop. A
+  second run comes from the cache. Without the Lichess login the panel says the explorer needs
+  it.
+- **Apply** writes one `line` event per line whose mark changes, and nothing for the rest. About
+  400 lines of the owner's size make about 50 KB, once, in the day's file. "Unpause all" on the
+  line list undoes it.
+
+**(d) Add the next N**
+- Shown on the line list of a scope that has paused lines: "Add the next 10 by priority". It
+  re-ranks from the cache, with the active lines counted as taken, and unpauses the top N paused
+  lines. The ranking is computed again each time rather than stored, so a study edited since
+  ranks as it is now.
+- When a scope's active lines have no new move left and some lines are paused, the home screen
+  and the line list say so: "No new lines · 140 paused · Add the next 10".
+
+Tests:
+- `test/unit/core/train/paused.test.ts`: a mark covers its line and the line's later extension
+  but not a branch added earlier along it; a card shared with an active line (another chapter, a
+  transposition, another study) stays active; with marks from two devices interleaved, the last
+  wins; orphaned marks are counted. Queue and plan: a paused line gives no new or known line; a
+  held card is never due and comes back overdue when unpaused. Over 150 random repertoires with
+  random marks, no held card is asked or taught and every due card is still asked once.
+- `test/unit/core/repertoire/priority.test.ts` on hand-built chapters and a fake explorer: reach
+  products renormalized over the covered replies; the floor; one position's shares the same
+  through a transposition; a conflict; a FEN chapter; the greedy order, with shared prefixes
+  counted once; the discount for natural moves, and Maia filling a thin explorer; must-learn
+  first; learned lines kept; the gaps; the same ranking twice.
+- `test/e2e/priority.spec.ts` (desktop and phone): pausing from the line list (the symbol, the
+  counts, a paused line practised with nothing recorded); Prioritize with the fake explorer; the
+  table; Apply; Add the next 10; the marks synced.
+
+Live (TESTING.md): (desktop) Prioritize on a real study with the Lichess login, the order read
+beside `prioritize_repertoire.py`'s for the same study; (phone) the paused lines and the queue's
+counts after a sync.
+
+Not planned, and why: the owner's own games as a signal (they learn a repertoire before playing
+it; the games are read for §5.58 already, so this can be a weight later); engine sharpness (a
+Stockfish search per position); a chapter imported with Qchess's `[QchessTrain "false"]` arriving
+paused instead of in a reference study (a possible follow-up, which would change §4.10).
 
 #### 5.14 Phase 1 acceptance test, and exit
 

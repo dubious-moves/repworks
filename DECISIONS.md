@@ -1338,3 +1338,21 @@ The technical calls, each with its reason:
   database or an engine; the view asks the line's moves. "Practise from here" is the game.
 - **Collect has an all-at-once button.** The 100-shard bound was a phone-driven default, not a
   desktop limit; both buttons are on both devices, the plain one still the cautious default.
+
+## Revision of 2026-10-07 (prioritize a study and paused lines, planned)
+- **A line is paused, not a move or a position** (the owner's answer): the unit the owner sees in
+  the line list. The mark is a `line` event in the progress log (the owner's answer), naming the
+  line's path. It also covers the line's later extensions, so editing a paused line doesn't revive
+  it.
+- **A card is held back only when every line through it is paused**, in every study. Cards are
+  per position and move (D3), so a move shared with an active line has to stay trained. Pausing
+  is not suspending: a suspended move is played for the user, while a paused line is not trained.
+- **"Critical" is how hard the moves are to find, plus the owner's must-learn mark.** The owner's
+  own games are left out, since the owner learns a repertoire before playing it.
+- **The ranking is greedy by marginal value, not the script's d'Hondt slots.** A line's value is
+  its reach times the chance of leaving the repertoire along it, counting only moves not covered
+  by a line taken before it. Unlike d'Hondt, this accounts for moves already known and how hard a
+  move is, and it gives "the next N" directly. The checklist (§5.62) keeps d'Hondt.
+- **Prioritizing keeps lines already learned, and further lines come in by hand** (the owner's
+  answers): a ranking never stops reviews the owner didn't give up, and nothing is unpaused
+  without a press.
