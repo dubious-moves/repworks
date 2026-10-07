@@ -12,7 +12,7 @@ import { standardUci } from '../core/chess/uci.ts';
 import { open } from '../app/mode.ts';
 import { recordEvent } from '../app/state.ts';
 import { trainData } from '../app/train.ts';
-import { forgetGames, gameById, gameDeck, gameQueueNow, gameRows, gamesPrefs, practiceHistory, refreshGames, refreshState, setGamesPrefs, startGames, type GameFilters, type GameRow, type Since } from '../app/games.ts';
+import { explorerAt, historyReaches, openingNameOf, openings, forgetGames, gameById, gameDeck, gameQueueNow, gameRows, gamesPrefs, practiceHistory, refreshGames, refreshState, setGamesPrefs, startGames, type GameFilters, type GameRow, type Since } from '../app/games.ts';
 import type { HistoryEntry } from '../core/games/practice.ts';
 import { recid } from '../app/repertoireCheck.ts';
 import { badgeOf } from '../core/games/recidivism.ts';
@@ -27,7 +27,10 @@ import { resultFor, type GameRecord } from '../core/games/record.ts';
 import { gameCard } from '../core/progress/cards.ts';
 import { positionOf } from '../core/storm/walk.ts';
 import { Board } from './Board.tsx';
-import { PracticeBoard, ResumeBanner } from './Practice.tsx';
+import { MoveBoard, PracticeBoard, ResumeBanner } from './Practice.tsx';
+import { explorerRows, openingNameAt, reaches } from '../core/games/openings.ts';
+import { keyFen } from '../core/chess/positionKey.ts';
+import { fenAfterUci, START_FEN, uciToSan } from '../core/storm/walk.ts';
 import { discardSaved, resumePractice, savedPractice } from '../app/practice.ts';
 import { useWakeLock } from './Train.tsx';
 
@@ -85,8 +88,11 @@ function Home() {
   }, [deck]);
   // The practice games merged into the list by date (mistake-lab's review history): colour and
   // speed filters only, every one in the correspondence bucket.
-  const hist = practiceHistory.value.filter((h) => (!f.color || h.playerColor === f.color) && (!f.speed.length || f.speed.includes('correspondence')));
-  const shown: ({ at: number; row: GameRow } | { at: number; h: HistoryEntry })[] = [...(rows ?? []).filter((r) => passes(r, f)).map((row) => ({ at: row.game.createdAt, row })), ...hist.map((h) => ({ at: h.ts, h }))].sort((a, b) => b.at - a.at);
+  // The explorer's position (§6, item 4): only the games, and practice games, that reach it.
+  const at = explorerAt.value;
+  const idx = at ? openings.value : undefined;
+  const hist = practiceHistory.value.filter((h) => (!f.color || h.playerColor === f.color) && (!f.speed.length || f.speed.includes('correspondence')) && (!at || historyReaches(h, at.key)));
+  const shown: ({ at: number; row: GameRow } | { at: number; h: HistoryEntry })[] = [...(rows ?? []).filter((r) => passes(r, f) && (!at || !idx || reaches(idx, r.game.id, at.key))).map((row) => ({ at: row.game.createdAt, row })), ...hist.map((h) => ({ at: h.ts, h }))].sort((a, b) => b.at - a.at);
   const filter = (patch: Partial<GameFilters>) => setGamesPrefs({ filters: { ...f, ...patch } });
   const [saved, setSaved] = useState(savedPractice);
   return (
@@ -127,11 +133,12 @@ function Home() {
         </p>
       </section>
       <Sources />
+      <GamesExplorer />
       <section class="card">
         <div class="card-head">
           <h2>Games</h2>
           <span class="muted" data-testid="games-count">
-            {rows ? `${shown.length - hist.length} of ${rows.length}${hist.length ? ` · ${hist.length} practice` : ''}` : 'Reading…'}
+            {rows ? `${shown.length - hist.length} of ${rows.length}${hist.length ? ` · ${hist.length} practice` : ''}${at ? ' reaching the explorer’s position' : ''}` : 'Reading…'}
           </span>
         </div>
         <div class="games-filters">
@@ -655,7 +662,7 @@ function Card(props: { s: GameSession; r: CardRun }) {
       <div class="train-panel">
         <p class="train-counters">
           {s.index + 1} of {s.cards.length} · {KIND_WORD[item.kind]}
-          {game ? ` · ${game.speed} against ${opponentOf(game).name}` : ''}
+          {game ? ` · ${game.speed} against ${opponentOf(game).name}` : ` · ${openingNameOf(item.fenBefore) || 'from practice'}`}
           <RecidBadge pid={item.pid} />
         </p>
         <p class="train-line">
@@ -825,5 +832,97 @@ function LinePanel(props: { line: EngineLine; busy: boolean; wrong: boolean }) {
         <span class="muted line-hint">← → to step{props.wrong ? ', back before your move to try again' : ''} · a move on the board branches</span>
       </div>
     </div>
+  );
+}
+
+/**
+ * The games' own explorer (§6, item 4; mistake-lab's OPENING EXPLORER): a board whose position
+ * filters the games list (transpositions included), each move's games and results there (White's
+ * wins first, of the colour chosen in the filters), and the opening name most of them carry.
+ */
+function GamesExplorer() {
+  const at = explorerAt.value;
+  const f = gamesPrefs.value.filters;
+  const fen = at?.fen ?? START_FEN;
+  const moves = at?.moves ?? [];
+  // The index is built when the explorer is first opened (every game replayed once).
+  const [show, setShow] = useState(!!at);
+  const idx = show ? openings.value : undefined;
+  const key = keyFen(fen)!.key;
+  const rows = idx ? explorerRows(idx, key, f.color || undefined) : [];
+  const name = idx ? openingNameAt(idx, key) : '';
+  const go = (list: string[]) => {
+    let p = START_FEN;
+    for (const u of list) p = fenAfterUci(p, u) ?? p;
+    explorerAt.value = list.length ? { fen: p, key: keyFen(p)!.key, moves: list } : undefined;
+  };
+  const sans: string[] = [];
+  let p = START_FEN;
+  for (const u of moves) {
+    sans.push(uciToSan(positionOf(p)!, u));
+    p = fenAfterUci(p, u) ?? p;
+  }
+  return (
+    <details class="card games-explorer" data-testid="games-explorer" open={show} onToggle={(e) => setShow((e.currentTarget as HTMLDetailsElement).open)}>
+      <summary>
+        <h2>Explorer</h2> <span class="muted">{at ? `${sans.join(' ')}${name ? ` · ${name}` : ''}` : 'your games by position'}</span>
+      </summary>
+      {show && (
+        <div class="train-grid">
+          <MoveBoard fen={fen} orientation={f.color || 'white'} movable lastUci={moves.at(-1)} onMove={(u) => go([...moves, u])} />
+          <div class="train-panel">
+            <p data-testid="explorer-name">{name || (at ? 'No opening name here' : 'The start')}</p>
+            {rows.length ? (
+              <table class="explorer-games" data-testid="explorer-rows">
+                <thead>
+                  <tr>
+                    <th>Move</th>
+                    <th>Games</th>
+                    <th>White · draw · Black</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r) => (
+                    <tr key={r.san} onClick={() => go([...moves, r.uci])}>
+                      <td>
+                        <button type="button" class="link">
+                          {r.san}
+                        </button>
+                      </td>
+                      <td>{r.count}</td>
+                      <td>
+                        <span class="result-bar" title={`${r.whiteWins} · ${r.draws} · ${r.blackWins}`}>
+                          <span class="w" style={{ flexGrow: r.whiteWins }} />
+                          <span class="d" style={{ flexGrow: r.draws }} />
+                          <span class="b" style={{ flexGrow: r.blackWins }} />
+                        </span>{' '}
+                        <span class="muted">
+                          {r.whiteWins} · {r.draws} · {r.blackWins}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p class="muted">No games in this position.</p>
+            )}
+            <div class="actions">
+              <button type="button" class="secondary" disabled={!moves.length} onClick={() => go(moves.slice(0, -1))}>
+                Back
+              </button>
+              <button type="button" class="secondary" disabled={!moves.length} onClick={() => go([])}>
+                Start
+              </button>
+              {at && (
+                <button type="button" class="secondary" onClick={() => open({ name: 'playOn', fen, side: f.color || positionOf(fen)!.turn })}>
+                  Practise from here
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </details>
   );
 }

@@ -69,3 +69,9 @@ mistake-lab's own `applySilentEvalToMove` (the opponent's moves judged, `detectT
 chess.js@0.10.3>`). Stockfish and Maia are stand-ins (lines from a hash of the position, four score
 patterns), their answers in `engine` and `maia`, keyed by board, side and castling.
 
+`openings.json` holds the games' own explorer's cases (PLAN.md §6, item 4): nine games (a transposition,
+one from a position, one cut by an illegal move, an en passant, an empty one) and positions to name;
+`expected` is mistake-lab's own `doBuildOpeningIndex` (its position → move index and game → positions
+index) and `lookupOpeningName`, run at `c525403` by `mistake-lab-openings.cjs` (`node
+mistake-lab-openings.cjs <index.html> openings.json <dir with chess.js@0.10.3>`).
+

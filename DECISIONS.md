@@ -1310,3 +1310,11 @@ The technical calls, each with its reason:
 - **Detected tactics live with the game just ended**, as mistake-lab's do (its candidates are on the
   live line, not in the history); a saved one is a `saved` event, drilled in the game cards.
 
+## Revision of 2026-10-07 (the games' own explorer; §6 item 4)
+- **The opening index is built when first needed** (the explorer opened, or a practice game titled),
+  from the games in the date filter, and kept until they change; mistake-lab builds it in timed batches
+  in the background. A thousand games replay in well under a second on a desktop; the phone pays it
+  once a session, only if the explorer is used.
+- **The explorer filters the Games list** while it is off the start, practice games included (they are
+  in the list too); the colour filter is the list's.
+

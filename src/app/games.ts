@@ -9,7 +9,9 @@ import { deckOf, gameQueue, type DeckCard } from '../core/games/deck.ts';
 import { extractGame, type GameItem } from '../core/games/extract.ts';
 import { savedItems, type SavedItem } from '../core/games/saved.ts';
 import { historyOf, type HistoryEntry } from '../core/games/practice.ts';
-import { readGame, readGamesFile, type GameRecord } from '../core/games/record.ts';
+import { readGame, readGamesFile, resultFor, type GameRecord } from '../core/games/record.ts';
+import { openingIndex, openingNameAt, type OpeningIndex } from '../core/games/openings.ts';
+import { keyFen } from '../core/chess/positionKey.ts';
 import { replay, type Replayed } from '../core/games/positions.ts';
 import type { PositionKey } from '../core/chess/positionKey.ts';
 import type { RepertoireIndex } from '../core/repertoire/index.ts';
@@ -163,6 +165,25 @@ export const savedDeck = computed<SavedItem[]>(() => {
 });
 
 /** The practice games kept (§5.57), newest first, from their `played` events. */
+/** The games' own explorer (§6, item 4): the games kept, indexed by position, built when first read. */
+export const openings = computed<OpeningIndex>(() => openingIndex((gameRows.value ?? []).map((r) => ({ id: r.game.id, color: r.game.color, result: resultFor(r.game), opening: r.game.opening, played: playedOf(r.game) }))));
+
+/** The opening name most of the games reaching this position carry (mistake-lab's `lookupOpeningName`), or ''. */
+export function openingNameOf(fen: string): string {
+  const k = keyFen(fen);
+  return k && gameRows.peek() ? openingNameAt(openings.peek(), k.key) : '';
+}
+
+/** The explorer's position on the Games screen: the list shows only the games reaching it (none: every game). */
+export const explorerAt = signal<{ fen: string; key: PositionKey; moves: string[] } | undefined>(undefined);
+
+/** Whether a practice game passes through a position (its start or after any of its moves). */
+export function historyReaches(h: HistoryEntry, key: PositionKey): boolean {
+  if (keyFen(h.baseFen)?.key === key) return true;
+  const r = replay({ initialFen: h.baseFen, moves: h.moves.map((m) => m.san) });
+  return !!r && (r.finalKey === key || r.plies.some((p) => p.keyBefore === key));
+}
+
 export const practiceHistory = computed<HistoryEntry[]>(() => {
   const data = trainData.value;
   return data ? historyOf(data.states.keys(), data.eventsOf) : [];

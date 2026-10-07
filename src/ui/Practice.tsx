@@ -10,7 +10,7 @@ import { isNormal, type Role, type SquareName } from 'chessops/types';
 import type { Key } from '@lichess-org/chessground/types';
 import { open } from '../app/mode.ts';
 import { recordEvent } from '../app/state.ts';
-import { practiceHistory, savedDeck } from '../app/games.ts';
+import { openingNameOf, practiceHistory, savedDeck } from '../app/games.ts';
 import { claimVictory, clearPremove, detection, setFoundState, type FoundTactic, discardSaved, gameOfHistory, ignoreRepertoire, loadOpponent, practiceHint, resumePractice, savedPractice, saveOpponent, judge, leavePractice, practice, practiceMove, practiceReview, setPremove, startPractice, stopPractice, type Opponent, type PracticeGame, type PracticeMove } from '../app/practice.ts';
 import { parseUciMove, standardUci } from '../core/chess/uci.ts';
 import { makeFen } from 'chessops/fen';
@@ -492,7 +492,8 @@ export function PracticeScreen(props: { fen: string; side?: 'white' | 'black' | 
   const [saved, setSaved] = useState(() => (practice.peek()?.phase !== 'over' && practice.peek()?.setup.fen === props.fen ? undefined : savedPractice()));
   const start = () => {
     const pos = positionOf(props.fen);
-    if (pos) startPractice({ kind: 'practice', fen: props.fen, color: props.side ?? pos.turn, silent: false, title: 'From a position', opponent });
+    // Titled by the opening most of the user's games reaching it carry (mistake-lab's `lookupOpeningName`).
+    if (pos) startPractice({ kind: 'practice', fen: props.fen, color: props.side ?? pos.turn, silent: false, title: openingNameOf(props.fen) || 'From a position', opponent });
   };
   useEffect(() => {
     const live = practice.peek();

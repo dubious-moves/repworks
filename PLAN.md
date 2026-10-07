@@ -4626,6 +4626,24 @@ answers are recorded; two controls), and `test/e2e/practice.spec.ts` (desktop an
 5.Ng5+ played, found by the scan on the fake engine, tried with a wrong move first, discarded and
 back, saved and synced).
 
+**As built, item 4** (2026-10-07): `src/core/games/openings.ts` (`openingIndex`: mistake-lab's
+`doBuildOpeningIndex`, each game's positions before its moves and the last, each position's moves
+with their games and results; `explorerRows`: `renderExplorerStats`'s rows, a colour's games only,
+most played first; `reaches`: the opening filter, transpositions included; `openingNameAt`:
+`lookupOpeningName`, the name most games reaching the position carry, the first met on a tie), the
+index in `src/app/games.ts` (built from the games in the date filter when first read), and on the
+Games screen an Explorer card: a board, each move's games and results there (White · draw · Black),
+the opening name, Back, Start, Practise from here; while it is off the start the games list (and the
+practice games in it) shows only those reaching its position. A practice game from a position is
+titled by the opening name there (so its history entry is), and a saved item's card in the game
+cards names it. Not as mistake-lab: the index is built when the explorer is first opened or a name
+is first asked, in one go rather than in timed batches; ties for a name go to the newest game.
+Tests: `test/unit/core/games/openings.test.ts`, **the same indexes and names as mistake-lab's own
+code** on `test/fixtures/games/openings.json` (`mistake-lab-openings.cjs`; nine games: a
+transposition, a game from a position, one cut by an illegal move, an en passant, an empty one; two
+controls), and `test/e2e/games.spec.ts` (desktop and phone: the rows, the list filtered, Back, the
+name, a practice game titled by it).
+
 Side tasks, outside this repo:
 - **Chessable courses**: the owner's own export script (D14). Its PGN imports like any other
   file; bought courses become reference studies, in the private data repo only. It doesn't

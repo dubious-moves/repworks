@@ -3211,3 +3211,34 @@ a.button.disabled {
 .resume-banner .train-board {
   max-width: 16rem;
 }
+.games-explorer summary h2 {
+  display: inline;
+}
+.explorer-games {
+  width: 100%;
+  border-collapse: collapse;
+}
+.explorer-games td,
+.explorer-games th {
+  padding: 0.15rem 0.3rem;
+  text-align: left;
+}
+.explorer-games tbody tr {
+  cursor: pointer;
+}
+.result-bar {
+  display: inline-flex;
+  width: 6rem;
+  height: 0.7rem;
+  vertical-align: middle;
+  border: 1px solid var(--muted);
+}
+.result-bar .w {
+  background: #eee;
+}
+.result-bar .d {
+  background: #888;
+}
+.result-bar .b {
+  background: #222;
+}

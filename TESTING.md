@@ -221,6 +221,9 @@ couldn't be tested then (the day's limit was used up), so the training items bel
   punish, or miss): after Stop & review, "Scanning for tactics…" then the list; Try, Save (then the
   tactic in the game cards), Discard. Whether it finds what mistake-lab's would, and how long the scan
   takes on the phone.
+- §6 item 4 (desktop, then phone): Games → Explorer on the real games beside mistake-lab's Opening
+  explorer: the moves and results at a few positions, the list filtered, the opening names; how long
+  the first opening takes on the phone; a practice game from there titled by the opening.
 - §5.66: the owner's answer on where the analyzer's output lives (PLAN.md, Phase 5, "The owner's
   choice"): (a) the data repo through a converter, recommended, or (b) the Gist, read-only.
 

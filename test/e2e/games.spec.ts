@@ -6,7 +6,8 @@
 // lines (Easy); the reviews synced. The engine's line after a move (PLAN.md §6, item 1): shown after
 // the right move at a press and hidden; after the blunder at once, at the reply, stepped, extended
 // past its end, branched by a move on the board, and stepped back before the move to try again.
-// Then (§5.56) a mistake made into a sequence on the analysis
+// The games' own explorer (§6, item 4): the games by position, filtering the list, and the opening
+// name titling a practice game from there. Then (§5.56) a mistake made into a sequence on the analysis
 // board, checked against the fake engine's lines, saved in the mistake's place and drilled.
 import { test, expect, type Page } from '@playwright/test';
 import { Chess } from 'chessops/chess';
@@ -287,4 +288,33 @@ test('a mistake made into a sequence on the analysis board, checked, saved in it
   const log = [...w.git.textsOf()].filter(([p]) => p.startsWith('progress/')).map(([, t]) => t).join('');
   expect(log).toContain('"k":"drop","card":"m|GameOne1_7","on":true');
   expect(log).toMatch(/"k":"saved","card":"m\|_practice_tactic_[^"]+","item":\{"kind":"tactic"/);
+});
+
+test('the games’ own explorer: moves and results by position, the list filtered, the opening name (§6)', async ({ page }) => {
+  await setUp(page);
+  await page.getByRole('link', { name: 'Games' }).click();
+  await page.getByRole('button', { name: 'Refresh' }).click();
+  await expect(page.getByTestId('games-count')).toHaveText('4 of 4');
+  const ex = page.getByTestId('games-explorer');
+  await ex.locator('summary').click();
+  const rows = ex.getByTestId('explorer-rows');
+  await expect(rows.locator('tbody tr')).toHaveCount(2);
+  await expect(rows.locator('tbody tr').first()).toContainText('e4');
+  await expect(rows.locator('tbody tr').first()).toContainText('3');
+  await rows.getByRole('button', { name: 'e4' }).click();
+  await expect(page.getByTestId('games-count')).toHaveText('3 of 4 reaching the explorer’s position');
+  await rows.getByRole('button', { name: 'e5' }).click();
+  await expect(page.getByTestId('games-count')).toHaveText('2 of 4 reaching the explorer’s position');
+  // Of the two games here, one carries an opening name.
+  await expect(ex.getByTestId('explorer-name')).toHaveText('Blackburne Shilling Gambit');
+  await expect(rows.locator('tbody tr')).toHaveCount(2);
+  await ex.getByRole('button', { name: 'Back' }).click();
+  await expect(page.getByTestId('games-count')).toHaveText('3 of 4 reaching the explorer’s position');
+  await rows.getByRole('button', { name: 'e5' }).click();
+  await ex.getByRole('button', { name: 'Practise from here' }).click();
+  await expect(page.locator('.practice-game .train-counters')).toContainText('Practice · Blackburne Shilling Gambit');
+  // Nothing wider than the phone.
+  await page.goBack();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
 });
