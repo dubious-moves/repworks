@@ -24,6 +24,7 @@ import { positionOf } from '../core/storm/walk.ts';
 import { Board, type BoardProps } from './Board.tsx';
 import { answerPending, repeatOpponent, setVoiceConfirm, voice, voiceConfirm, voiceOff, voiceOn } from '../app/voice.ts';
 import { useWakeLock } from './Train.tsx';
+import { isoDay } from './day.ts';
 
 const sq = (u: string, i: number) => u.slice(i, i + 2) as Key;
 
@@ -545,7 +546,7 @@ export function HistoryScreen(props: { id: string }) {
         </a>
         <div class="titles">
           <span class="study-title">Practice game</span>
-          {entry && <span class="muted"> · {new Date(entry.ts).toISOString().slice(0, 10)} · {entry.openingName || entry.source}</span>}
+          {entry && <span class="muted"> · {isoDay(entry.ts)} · {entry.openingName || entry.source}</span>}
         </div>
       </div>
       {game ? <PracticeReview game={game} /> : <p class="warn">That practice game isn’t in the history on this device.</p>}

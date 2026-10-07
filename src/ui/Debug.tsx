@@ -12,6 +12,7 @@ import { trainData } from '../app/train.ts';
 import { conflicts } from '../core/repertoire/index.ts';
 import { TimeControl } from './TimeTravel.tsx';
 import { EngineFiles } from './Engines.tsx';
+import { isoDay } from './day.ts';
 
 /** The repertoire index (§5.1, §5.7): its size and build time, positions with more than one own move, chapters left out. */
 function Repertoire() {
@@ -145,7 +146,7 @@ export function Debug() {
                     {c.suspended && ' (suspended)'}
                   </td>
                   <td>{c.reviews}</td>
-                  <td>{c.due === undefined ? 'new' : new Date(c.due).toISOString().slice(0, 16).replace('T', ' ')}</td>
+                  <td>{c.due === undefined ? 'new' : isoDay(c.due, 16)}</td>
                   <td>{c.stability.toFixed(4)}</td>
                   <td>{c.difficulty.toFixed(4)}</td>
                 </tr>

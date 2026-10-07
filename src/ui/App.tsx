@@ -1,6 +1,7 @@
 import { decidingNow } from '../app/time.ts';
 import { useEffect, useState } from 'preact/hooks';
 import { mode } from '../app/mode.ts';
+import { modeHash } from '../core/app/fsm.ts';
 import { findConflicts } from '../app/overview.ts';
 import { online, shellVersion, updateReady } from '../app/shell.ts';
 import { device, fatal, localStore, ready, studies, type StudyRow } from '../app/state.ts';
@@ -16,6 +17,7 @@ import { HistoryScreen, PracticeScreen } from './Practice.tsx';
 import { RepertoireCheckScreen } from './RepertoireCheck.tsx';
 import { ChecklistDrill } from './Checklist.tsx';
 import { Debug } from './Debug.tsx';
+import { Guard } from './Guard.tsx';
 import { ImportScreen } from './Import.tsx';
 import { SetupForm } from './Setup.tsx';
 import { SyncBanners, SyncChip } from './Sync.tsx';
@@ -36,7 +38,11 @@ export function App() {
       <header class="topbar">
         <img class="topbar-icon" src={`${import.meta.env.BASE_URL}icons/icon.svg`} alt="" width={28} height={28} />
         <h1>Repworks</h1>
-        {device.value ? <SyncChip /> : !online.value && <span class="status status-offline">offline</span>}
+        {device.value ? (
+          <Guard name="The sync status">
+            <SyncChip />
+          </Guard>
+        ) : !online.value && <span class="status status-offline">offline</span>}
       </header>
       {updateReady.value && (
         <div class="banner" role="status">
@@ -51,14 +57,22 @@ export function App() {
           {fatal.value}
         </div>
       )}
-      <SyncBanners />
-      <TimeBanner />
-      <main class="content">{ready.value && (!device.value ? <SetupForm /> : <Screen />)}</main>
-      <StudyDialogs />
-      <TrainSettingsDialog />
-      <ExplorerSettingsDialog />
-      <EngineSettingsDialog />
-      <MaiaDialog />
+      <Guard name="The banners">
+        <SyncBanners />
+        <TimeBanner />
+      </Guard>
+      <main class="content">
+        <Guard name="This screen" retry={modeHash(mode.value)}>
+          {ready.value && (!device.value ? <SetupForm /> : <Screen />)}
+        </Guard>
+      </main>
+      <Guard name="A dialog">
+        <StudyDialogs />
+        <TrainSettingsDialog />
+        <ExplorerSettingsDialog />
+        <EngineSettingsDialog />
+        <MaiaDialog />
+      </Guard>
       <footer class="footer">
         build {__BUILD_ID__}
         {shellVersion.value && <> · shell {shellVersion.value.slice(0, 8)}</>} · <a href={`${import.meta.env.BASE_URL}spike.html`}>remote spike</a>
@@ -131,7 +145,9 @@ function Home() {
   }, [version]);
   return (
     <>
-      <TrainCard />
+      <Guard name="The training card">
+        <TrainCard />
+      </Guard>
       <section class="card">
         <div class="card-head">
           <h2>Studies</h2>
@@ -158,7 +174,9 @@ function Home() {
         ) : (
           <ul class="studies">
             {studies.value.map((s) => (
-              <StudyCard key={s.id} study={s} />
+              <Guard key={s.id} name={`The card of ${s.name}`}>
+                <StudyCard study={s} />
+              </Guard>
             ))}
           </ul>
         )}
@@ -170,7 +188,9 @@ function Home() {
           </p>
         )}
       </section>
-      <Debug />
+      <Guard name="Settings and debug">
+        <Debug />
+      </Guard>
     </>
   );
 }

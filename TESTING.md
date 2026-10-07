@@ -5,6 +5,17 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## The blank page on the phone (2026-10-07)
+
+Reported by the owner on 2026-10-07 (build `60622b0`): after the update the page was empty on the
+phone, in the browser and the installed app. Reproduced by an e2e test (`test/e2e/guard.spec.ts`)
+with a card whose due time is past what a JavaScript Date holds (a migrated state with a huge
+`sched`): the debug panel's card table threw while drawing, and Preact left the page blank. Not
+confirmed that this is the phone's own cause: its data can't be read from here.
+
+- The home screen on the phone again. If any part of a screen still fails, it now shows
+  "… failed to show" with the error in its place (Details has the stack): report that text.
+
 ## Phase 0
 
 Reported by the owner on 2026-10-06: the spike's desktop run (all steps passed, §4.2), the

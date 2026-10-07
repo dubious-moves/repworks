@@ -17,6 +17,7 @@ import { makeFen } from 'chessops/fen';
 import { makeSanAndPlay } from 'chessops/san';
 import { MoveBoard, PracticeBoard } from './Practice.tsx';
 import { winRateColor } from './RepertoireCheck.tsx';
+import { isoDay } from './day.ts';
 
 const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
@@ -74,7 +75,7 @@ export function ChecklistSection() {
           {list && (
             <>
               <p class="muted">
-                {list.variations.length} line{list.variations.length === 1 ? '' : 's'}, made {new Date(list.createdAt).toISOString().slice(0, 10)} ({list.calls} positions asked{list.truncated ? ', cut short' : ''}). Win a line at each difficulty to check it off.
+                {list.variations.length} line{list.variations.length === 1 ? '' : 's'}, made {isoDay(list.createdAt)} ({list.calls} positions asked{list.truncated ? ', cut short' : ''}). Win a line at each difficulty to check it off.
               </p>
               <ol class="checklist-lines">
                 {list.variations.map((v, i) => (

@@ -3242,3 +3242,15 @@ a.button.disabled {
 .result-bar .b {
   background: #222;
 }
+
+/* A part of the page that failed to draw (src/ui/Guard.tsx). */
+.guard {
+  border-left: 4px solid var(--warn);
+}
+
+.guard-stack {
+  overflow-x: auto;
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

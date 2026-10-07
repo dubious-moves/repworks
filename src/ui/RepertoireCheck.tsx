@@ -16,6 +16,7 @@ import { repertoireCard } from '../core/progress/cards.ts';
 import { positionOf } from '../core/storm/walk.ts';
 import { makeFen } from 'chessops/fen';
 import { parseUciMove } from '../core/chess/uci.ts';
+import { isoDay } from './day.ts';
 
 const SPEEDS = ['bullet', 'blitz', 'rapid', 'classical', 'correspondence'];
 
@@ -226,7 +227,7 @@ function DeviationRow(props: { d: Deviation }) {
   const pinned = !!data?.pins.get(card)?.pinned;
   return (
     <li data-testid="deviation">
-      <strong>{moveLabel(d.fenBefore, g.played.san)}</strong> <span class="muted">({d.games.length} game{d.games.length === 1 ? '' : 's'}, the last {new Date(g.createdAt).toISOString().slice(0, 10)})</span> · your repertoire: <strong>{d.repertoire.san}</strong>
+      <strong>{moveLabel(d.fenBefore, g.played.san)}</strong> <span class="muted">({d.games.length} game{d.games.length === 1 ? '' : 's'}, the last {isoDay(g.createdAt)})</span> · your repertoire: <strong>{d.repertoire.san}</strong>
       <span class="muted"> · as {d.color}</span>
       <span class="actions">
         <button type="button" class="link" onClick={() => open({ name: 'chapter', sid: at.sid, cid: at.cid, at: [...at.path.slice(0, -1)] })}>

@@ -33,6 +33,7 @@ import { keyFen } from '../core/chess/positionKey.ts';
 import { fenAfterUci, START_FEN, uciToSan } from '../core/storm/walk.ts';
 import { discardSaved, resumePractice, savedPractice } from '../app/practice.ts';
 import { useWakeLock } from './Train.tsx';
+import { isoDay } from './day.ts';
 
 const sq = (u: string, i: number) => u.slice(i, i + 2) as SquareName;
 const KIND_WORD: Record<GameItem['kind'] | 'plan', string> = { mistake: 'Mistake', tactic: 'Tactic', advantage: 'Advantage', plan: 'Plan' };
@@ -226,7 +227,7 @@ function GameRowView(props: { row: GameRow; cards: number }) {
   return (
     <li class={`games-row result-${result}`}>
       <a href={`#/games/${g.id}`} data-testid="game-row">
-        <span class="games-date">{new Date(g.createdAt).toISOString().slice(0, 10)}</span>
+        <span class="games-date">{isoDay(g.createdAt)}</span>
         <span class={`games-side side-${g.color}`} title={g.color === 'white' ? 'You played White' : 'You played Black'} />
         <span class="games-opp">
           {opp.name}
@@ -251,7 +252,7 @@ function HistoryRow(props: { h: HistoryEntry }) {
   return (
     <li class={`games-row history-row result-${h.outcome}`}>
       <a href={`#/games/history/${h.id}`} data-testid="history-row">
-        <span class="games-date">{new Date(h.ts).toISOString().slice(0, 10)}</span>
+        <span class="games-date">{isoDay(h.ts)}</span>
         <span class={`games-side side-${h.playerColor}`} title={h.playerColor === 'white' ? 'You played White' : 'You played Black'} />
         <span class="games-opp">{SOURCE_WORD[h.source] ?? 'Practice'}</span>
         <span class="games-result">{OUTCOME_WORD[h.outcome] ?? h.outcome}</span>
@@ -419,7 +420,7 @@ function GameView(props: { id: string; ply?: number }) {
             {g.black.rating ? ` (${g.black.rating})` : ''}
           </strong>{' '}
           <span class="muted">
-            · {RESULT_WORD[resultFor(g)]} · {g.speed} · {new Date(g.createdAt).toISOString().slice(0, 10)} · against {opp.name}
+            · {RESULT_WORD[resultFor(g)]} · {g.speed} · {isoDay(g.createdAt)} · against {opp.name}
           </span>
         </p>
         {g.opening && <p class="muted">{g.opening}</p>}
