@@ -217,6 +217,10 @@ couldn't be tested then (the day's limit was used up), so the training items bel
   named), the Hint, Ignore for this game; a premove while the opponent thinks; on the phone, switch to
   another app for a while and come back (or reload): "Game in progress", Resume; Stop & review: the
   corrected deviation in the key moves.
+- §6 item 3 (desktop, then phone): a practice game with a tactic in it (an opponent's blunder you
+  punish, or miss): after Stop & review, "Scanning for tactics…" then the list; Try, Save (then the
+  tactic in the game cards), Discard. Whether it finds what mistake-lab's would, and how long the scan
+  takes on the phone.
 - §5.66: the owner's answer on where the analyzer's output lives (PLAN.md, Phase 5, "The owner's
   choice"): (a) the data repo through a converter, recommended, or (b) the Gist, read-only.
 

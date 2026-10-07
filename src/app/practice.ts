@@ -28,12 +28,13 @@ import type { FromWorker, ToWorker } from '../core/explorer/service.ts';
 import { judgeMove, moverScore, type MoverLine } from '../core/games/grade.ts';
 import { advantageGrade, historyEntry, maiaPick, pickExplorerMove, PRACTICE, repertoireCheck, repertoireVerdict, resultOf, reviewOf, startTrack, trackAdvantage, type AdvantageOutcome, type AdvantageTrack, type HistoryEntry, type HistorySource, type PlayedMove, type RepertoireVerdict, type Review } from '../core/games/practice.ts';
 import { readSaved, resumable, type Saved } from '../core/games/resume.ts';
+import { covered, scanCandidate, tacticCandidates, TACTIC, type DetectedTactic, type Pv } from '../core/games/detect.ts';
 import type { Color } from '../core/games/record.ts';
 import { historyCard, practiceCard } from '../core/progress/cards.ts';
 import type { Grade } from '../core/progress/events.ts';
 import { positionOf } from '../core/storm/walk.ts';
 import { onWorker, postToWorker } from './explorer.ts';
-import { maiaPolicy } from './maia.ts';
+import { maiaPolicy, maiaPrefs } from './maia.ts';
 import { recordEvent } from './state.ts';
 import { analyseForStorm } from './stormEngine.ts';
 import { trainData } from './train.ts';
@@ -90,6 +91,8 @@ export interface PracticeMove extends PlayedMove {
   source?: string;
   /** The best line from the position before (SAN), for Show the line. */
   bestLine?: string[];
+  /** The position's lines before the user's move (first move, score for the mover), for the tactic scan. */
+  pvs?: Pv[];
   judging?: boolean;
 }
 
@@ -249,7 +252,7 @@ export async function judge(fenBefore: string, uci: string, fenAfter: string): P
   const j = judgeMove(lines, uci, afterCp);
   if (!j) return undefined;
   const best = a!.lines[0]!;
-  return { classification: j.classification, wpDrop: j.wpDrop, cpLoss: j.cpLoss, bestCp: j.bestCp, afterCp: afterCp ?? j.bestCp - j.cpLoss, bestMoveUci: j.bestMove ?? '', bestLine: sanLine(fenBefore, best.pv) };
+  return { classification: j.classification, wpDrop: j.wpDrop, cpLoss: j.cpLoss, bestCp: j.bestCp, afterCp: afterCp ?? j.bestCp - j.cpLoss, bestMoveUci: j.bestMove ?? '', bestLine: sanLine(fenBefore, best.pv), pvs: lines.map((l) => ({ cp: l.cp, firstMove: l.move })) };
 }
 
 let pending = 0;
@@ -569,8 +572,11 @@ function finish(g: number, reason: EndReason): void {
     const key = p.setup.leaf ?? keyFen(p.setup.fen)?.key;
     if (key) void recordEvent({ t, k: 'practice', card: practiceCard(key), res: result, ...(p.setup.preset ? { preset: p.setup.preset } : {}), ...(finalCp !== null ? { cp: Math.round(finalCp) } : {}), mv: userMoves });
   }
-  // The history entry, once the judges are in (the review's words final).
-  if (userMoves >= PRACTICE.reviewMinMoves) void Promise.all([...judging]).then(() => writeHistory(g, reason, result, finalCp));
+  // The history entry, once the judges are in (the review's words final); then the tactic scan.
+  void Promise.all([...judging]).then(async () => {
+    if (userMoves >= PRACTICE.reviewMinMoves) await writeHistory(g, reason, result, finalCp);
+    void scanTactics(g);
+  });
 }
 
 const OUTCOME: Record<EndReason, 'win' | 'draw' | 'loss' | 'stopped' | 'ended'> = { mate: 'win', claim: 'win', mated: 'loss', collapse: 'loss', stalemate: 'draw', draw: 'draw', stopped: 'stopped', interrupted: 'ended' };
@@ -619,4 +625,66 @@ export function gameOfHistory(h: HistoryEntry): PracticeGame | undefined {
   }
   const result = h.outcome === 'win' || h.outcome === 'loss' || h.outcome === 'draw' ? h.outcome : resultOf(h.finalCp === null ? null : h.playerColor === 'white' ? h.finalCp : -h.finalCp);
   return { gen: -1, setup: { kind: 'practice', fen: h.baseFen, color: h.playerColor, silent: true, title: h.openingName, opponent: DEFAULT_OPPONENT }, moves, phase: 'over', track: startTrack(), claim: false, end: { reason: 'stopped', result }, historyId: h.id, judged: true };
+}
+
+/* ------------------------------------------------------------------ tactics detected after the game */
+
+export interface FoundTactic {
+  t: DetectedTactic;
+  state: 'new' | 'saved' | 'discarded';
+}
+
+/** The scan of the game just ended (mistake-lab's DETECTED TACTICS): its progress and what it found. */
+export interface Detection {
+  gen: number;
+  total: number;
+  done: number;
+  scanning: boolean;
+  found: FoundTactic[];
+}
+
+export const detection = signal<Detection | undefined>(undefined);
+
+/** Stockfish's lines for the scan: mistake-lab's depth 20 (one less on a phone), five seconds a search at most. */
+async function scanLines(fen: string, lines: number): Promise<Pv[] | null> {
+  const pos = positionOf(fen);
+  if (!pos) return null;
+  const a = await analyseForStorm(fen, lines, narrow() ? TACTIC.scanDepth - 1 : TACTIC.scanDepth, 5000);
+  if (!a) return null;
+  return a.lines.filter((l) => l.pv.length).map((l) => ({ cp: moverScore(l.score, pos.turn), firstMove: l.pv[0]! }));
+}
+
+/** Maia's move for the opponent's side in the scan's human-like line, when Maia is on. */
+async function scanMaia(fen: string, o: Opponent): Promise<string | null> {
+  const policy = await maiaPolicy(fen, o.maiaElo);
+  return (policy && maiaPick(policy, o.precision, Math.random)?.uci) ?? null;
+}
+
+async function scanTactics(g: number): Promise<void> {
+  const p = practice.peek();
+  if (!p || p.gen !== g) return;
+  const moves = p.moves.map((m) => ({ uci: m.uci, isUser: m.isUser, fenBefore: m.fenBefore, ...(m.pvs ? { pvs: m.pvs } : {}), ...(m.afterCp !== undefined ? { afterCp: m.afterCp } : {}) }));
+  const cands = tacticCandidates(moves, p.setup.color);
+  detection.value = { gen: g, total: cands.length, done: 0, scanning: cands.length > 0, found: [] };
+  const live = () => practice.peek()?.gen === g && detection.peek()?.gen === g;
+  const skip = new Set<number>();
+  const maia = maiaPrefs.peek().on ? (fen: string) => scanMaia(fen, p.setup.opponent) : null;
+  for (const cand of cands) {
+    if (!live()) return;
+    let t: DetectedTactic | null = null;
+    if (!skip.has(cand.moveIdx)) t = await scanCandidate(scanLines, maia, cand, p.moves[cand.moveIdx]?.uci, () => !live());
+    if (!live()) return;
+    if (t) for (const k of covered(t)) skip.add(k);
+    const d = detection.peek()!;
+    detection.value = { ...d, done: d.done + 1, found: t ? [...d.found, { t, state: 'new' }] : d.found };
+  }
+  if (live()) detection.value = { ...detection.peek()!, scanning: false };
+}
+
+
+/** A detected tactic's state: saved (its `saved` event written by the screen) or discarded. */
+export function setFoundState(i: number, state: FoundTactic['state']): void {
+  const d = detection.peek();
+  if (!d?.found[i]) return;
+  detection.value = { ...d, found: d.found.map((f, k) => (k === i ? { ...f, state } : f)) };
 }

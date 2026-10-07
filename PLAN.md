@@ -4605,6 +4605,27 @@ mistake-lab's own `buildContLineReviewData`** on two new cases of `practice.json
 matching; two controls), `test/e2e/practice.spec.ts` (desktop and phone: e6 taken back, the hint,
 d6, a premove played after a slow opponent, a reload and Resume, the review's corrected deviation).
 
+**As built, item 3** (2026-10-07): `src/core/games/detect.ts` (`tacticCandidates`: mistake-lab's
+`detectTacticCandidate` with the opponent's loss read back as `applySilentEvalToMove` does,
+`opponentLoss`; `buildChain`, `uniqueness`, `dedupeLines`, `maiaLine`, `scanCandidate`, `covered`:
+its `tacticWalkTree`, `tacticBuildBestChain`, `tacticDedupeAltLines`, `tacticGenerateMaiaLine` and the
+scan's loop; `practiceTacticItem` and `tacticSaved`: `savePracticeTactic`'s record and `_chainSig`
+dedup), and in practice: each user move's judge keeps its position's lines; when a game ends and the
+judges are in, the scan walks each candidate on the device's Stockfish (depth 20, 19 on a phone as
+mistake-lab's offset, five seconds a search at most), Maia's line added when Maia is on; the review
+lists what it found ("⚡ 4. Bxf7+ ✓ Found · 1 line", or "Scanning for tactics… 1/3", or none found)
+with Try (the lines played on the board, ungraded), Save (a `saved` event: the tactic in the game
+cards) and Discard (and Undo). Not as mistake-lab: the scan runs after every practice game, where
+mistake-lab's runs only after its silent games (its detection rides its silent evaluation queue); the
+opponent's loss is read from the judged score after the user's previous move (mistake-lab's from the
+live one), and the two moves left are counted on the finished game. Tests:
+`test/unit/core/games/detect.test.ts`, **the same candidates, opponent losses, walked lines,
+deduplicated lines and Maia lines as mistake-lab's own code** on four games of
+`test/fixtures/games/tactics.json` (`mistake-lab-tactics.cjs`, a stand-in Stockfish and Maia whose
+answers are recorded; two controls), and `test/e2e/practice.spec.ts` (desktop and phone: 4.Bxf7+ Kxf7
+5.Ng5+ played, found by the scan on the fake engine, tried with a wrong move first, discarded and
+back, saved and synced).
+
 Side tasks, outside this repo:
 - **Chessable courses**: the owner's own export script (D14). Its PGN imports like any other
   file; bought courses become reference studies, in the private data repo only. It doesn't

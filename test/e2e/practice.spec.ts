@@ -7,10 +7,12 @@
 // Then (PLAN.md §6, item 2) a game as Black from 1.e4 against the test repertoire (1...c5 2.Nf3 d6
 // 3.d4 cxd4): 2...e6 taken back ("isn't your repertoire"), the hint, 2...d6 played; a premove
 // (3...cxd4) set while the opponent thinks and played after its move; the page reloaded and the game
-// resumed; its review showing the corrected deviation.
+// resumed; its review showing the corrected deviation. Then (§6, item 3) a game from an Italian
+// position where 4.Bxf7+ Kxf7 5.Ng5+ is a tactic: played and stopped, the tactic detected by the
+// scan on the fake engine, tried on the board, discarded and back, saved and synced.
 import { test, expect, type Page } from '@playwright/test';
 import { Chess } from 'chessops/chess';
-import { makeFen } from 'chessops/fen';
+import { makeFen, parseFen } from 'chessops/fen';
 import { parseSan } from 'chessops/san';
 import { makeUci } from 'chessops/util';
 import type { FakeGit } from '../support/fakeGit.ts';
@@ -34,6 +36,18 @@ const BEFORE_D4 = after(GAME.slice(0, 4));
 const AFTER_D4 = after(GAME.slice(0, 5));
 const ADV = 'e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O Be7 Re1 b5 Bb3 d6 c3 O-O h3 Nb8 d4 Nbd7'.split(' ');
 const PEAK = after(ADV.slice(0, 18));
+const ITALIAN = 'r1bqk1nr/pppp1ppp/2n5/2b1p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4';
+const fenKey = (fen: string) => fen.split(' ').slice(0, 4).join(' ');
+function from(fen: string, sans: string[]): { fen: string; key: string } {
+  const pos = Chess.fromSetup(parseFen(fen).unwrap()).unwrap();
+  for (const san of sans) pos.play(parseSan(pos, san)!);
+  const f = makeFen(pos.toSetup());
+  return { fen: f, key: fenKey(f) };
+}
+const T1 = from(ITALIAN, ['Bxf7+']);
+const T2 = from(ITALIAN, ['Bxf7+', 'Kxf7']);
+const T3 = from(ITALIAN, ['Bxf7+', 'Kxf7', 'Ng5+']);
+const T4 = from(ITALIAN, ['Bxf7+', 'Kxf7', 'Ng5+', 'Ke8']);
 
 let site: SiteServer;
 test.beforeAll(async () => {
@@ -46,6 +60,32 @@ test.beforeAll(async () => {
       ],
       // Black to move after 3.d4: +1.5 for Black.
       [AFTER_D4.key]: [[1, 150, 'c5d4 f3d4']],
+      // The tactic: 4.Bxf7+ the only good move, Kxf7 forced, 5.Ng5+ the only good move again, then nothing unique.
+      [fenKey(ITALIAN)]: [
+        [1, 700, 'c4f7 e8f7 f3g5'],
+        [2, 0, 'd2d3 g8f6'],
+        [3, -50, 'e1g1 g8f6'],
+      ],
+      [T1.key]: [
+        [1, -600, 'e8f7 f3g5'],
+        [2, -900, 'e8f8 d2d4'],
+        [3, -950, 'e8e7 d2d4'],
+      ],
+      [T2.key]: [
+        [1, 650, 'f3g5 f7e8'],
+        [2, 100, 'd2d4 c5d4'],
+        [3, 50, 'd1e2 d7d6'],
+      ],
+      [T3.key]: [
+        [1, -650, 'f7e8 d1h5'],
+        [2, -2000, 'f7f8 d1f3'],
+        [3, -2000, 'f7g6 d1g4'],
+      ],
+      [T4.key]: [
+        [1, 300, 'd1f3 g8f6'],
+        [2, 290, 'd1h5 g7g6'],
+        [3, 280, 'b1c3 g8f6'],
+      ],
       [PEAK.key]: [
         [1, 60, 'd2d4 b8d7'],
         [2, 50, 'd2d3 b8d7'],
@@ -277,4 +317,54 @@ test('practising from a position: the repertoire check, the hint, a premove, and
   // Ended: nothing is offered again.
   await page.reload();
   await expect(page.getByTestId('practice-resume')).toHaveCount(0);
+});
+
+test('tactics detected after a practice game: found by the scan, tried, discarded and back, saved and synced', async ({ page }) => {
+  const { git } = await setUp(page);
+  const ex = fakeExplorer();
+  ex.games.set(T1.key, [{ san: 'Kxf7', uci: 'e8f7', white: 40, draws: 20, black: 40 }]);
+  ex.games.set(T3.key, [{ san: 'Ke8', uci: 'f7e8', white: 40, draws: 20, black: 40 }]);
+  await serveExplorer(page, ex);
+  await page.evaluate((fen) => (location.hash = '#/practice?fen=' + encodeURIComponent(fen)), ITALIAN);
+  const game = page.locator('.practice-game');
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  const move = async (uci: string) => {
+    await clickSquare(page, uci.slice(0, 2), 'white');
+    await clickSquare(page, uci.slice(2, 4), 'white');
+  };
+  await move('c4f7');
+  await expect(game).toHaveAttribute('data-moves', '2');
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  await move('f3g5');
+  await expect(game).toHaveAttribute('data-moves', '4');
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  await page.getByRole('button', { name: 'Stop', exact: true }).click();
+
+  const found = page.getByTestId('detected-tactic');
+  await expect(found).toHaveCount(1, { timeout: 20_000 });
+  await expect(found).toContainText('4. Bxf7+');
+  await expect(found).toContainText('✓ Found');
+  await expect(found).toContainText('1 line');
+
+  // Tried on the board: a wrong move, then the line through the opponent's reply.
+  await found.getByRole('button', { name: 'Try' }).click();
+  const solver = page.getByTestId('tactic-solver');
+  await move('d2d3');
+  await expect(page.getByTestId('tactic-feedback')).toHaveText('Not this one');
+  await solver.getByRole('button', { name: 'Try again' }).click();
+  await move('c4f7');
+  await expect(solver).toHaveAttribute('data-step', '2');
+  await expect(solver).toHaveAttribute('data-phase', 'asking');
+  await move('f3g5');
+  await expect(page.getByTestId('tactic-feedback')).toHaveText('Solved');
+  await solver.getByRole('button', { name: 'Back to the review' }).click();
+
+  await found.getByRole('button', { name: 'Discard' }).click();
+  await found.getByRole('button', { name: 'Undo discard' }).click();
+  await found.getByRole('button', { name: 'Save' }).click();
+  await expect(found).toContainText('✓ Saved');
+
+  await page.locator('button.chip').click();
+  await expect.poll(() => progressLog(git), { timeout: 15_000 }).toMatch(/"k":"saved","card":"m\|_practice_tactic_\d+_[a-z0-9]+_t6","item":\{"kind":"tactic"/);
+  expect(progressLog(git)).toContain('"lines":[[{"uci":"c4f7","san":"Bxf7+","user":true},{"uci":"e8f7","san":"Kxf7","user":false},{"uci":"f3g5","san":"Ng5+","user":true}]]');
 });

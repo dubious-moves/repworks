@@ -61,3 +61,11 @@ mistake-lab's own `buildEngineLine`, `lineStep`, `goToMainLineMove`, `goToAltLin
 (`node mistake-lab-engineline.cjs <index.html> engineline.json <dir with chess.js@0.10.3>`). Its engine is
 a stand-in (a legal line chosen by a hash of the FEN), and every answer it gave is in `engine`.
 
+`tactics.json` holds the detected tactics' cases (PLAN.md §6, item 3): four practice games (moves, and
+for each judged user move its position's lines and the score it gave up); `expected` is what
+mistake-lab's own `applySilentEvalToMove` (the opponent's moves judged, `detectTacticCandidate`),
+`tacticBuildBestChain`, `tacticDedupeAltLines` and `tacticGenerateMaiaLine` give, run at `c525403` by
+`mistake-lab-tactics.cjs` (`node mistake-lab-tactics.cjs <index.html> tactics.json <dir with
+chess.js@0.10.3>`). Stockfish and Maia are stand-ins (lines from a hash of the position, four score
+patterns), their answers in `engine` and `maia`, keyed by board, side and castling.
+

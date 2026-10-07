@@ -11,12 +11,14 @@ import type { Key } from '@lichess-org/chessground/types';
 import { open } from '../app/mode.ts';
 import { recordEvent } from '../app/state.ts';
 import { practiceHistory, savedDeck } from '../app/games.ts';
-import { claimVictory, clearPremove, discardSaved, gameOfHistory, ignoreRepertoire, loadOpponent, practiceHint, resumePractice, savedPractice, saveOpponent, judge, leavePractice, practice, practiceMove, practiceReview, setPremove, startPractice, stopPractice, type Opponent, type PracticeGame, type PracticeMove } from '../app/practice.ts';
+import { claimVictory, clearPremove, detection, setFoundState, type FoundTactic, discardSaved, gameOfHistory, ignoreRepertoire, loadOpponent, practiceHint, resumePractice, savedPractice, saveOpponent, judge, leavePractice, practice, practiceMove, practiceReview, setPremove, startPractice, stopPractice, type Opponent, type PracticeGame, type PracticeMove } from '../app/practice.ts';
 import { parseUciMove, standardUci } from '../core/chess/uci.ts';
 import { makeFen } from 'chessops/fen';
 import { CLASSIFICATION } from '../core/games/grade.ts';
 import { PRACTICE } from '../core/games/practice.ts';
 import { practiceMistakeItem, practiceMistakeSaved } from '../core/games/saved.ts';
+import { practiceTacticItem, tacticSaved, type DetectedTactic } from '../core/games/detect.ts';
+import { nextLine, playReply, playUser, repliesDue, startTactic, type TacticRun } from '../core/games/tactic.ts';
 import { gameCard } from '../core/progress/cards.ts';
 import { positionOf } from '../core/storm/walk.ts';
 import { Board, type BoardProps } from './Board.tsx';
@@ -305,6 +307,8 @@ export function PracticeReview(props: { game: PracticeGame; onNext?: (() => void
   const [retry, setRetry] = useState<{ i: number; tried?: string; word?: string; fen?: string } | undefined>(undefined);
   const [line, setLine] = useState<number | undefined>(undefined);
   const [savedNote, setSavedNote] = useState<string | undefined>(undefined);
+  const [solving, setSolving] = useState<DetectedTactic | undefined>(undefined);
+  const det = detection.value?.gen === g.gen && g.gen >= 0 ? detection.value : undefined;
   const s = g.setup;
   const fenAt = (i: number) => (i < 0 ? s.fen : g.moves[i]!.fen);
   const keys = new Set(review.keyMoves);
@@ -335,6 +339,14 @@ export function PracticeReview(props: { game: PracticeGame; onNext?: (() => void
     void recordEvent({ t: new Date().toISOString(), k: 'saved', card: gameCard(item.pid), item: { ...item } });
     setSavedNote('Saved: it is in your game cards.');
   };
+  const saveTactic = (i: number, f: FoundTactic) => {
+    if (tacticSaved(savedDeck.value, f.t)) return setFoundState(i, 'saved');
+    const item = practiceTacticItem(f.t, { now: Date.now(), rand: Math.random().toString(36).slice(2, 7), ...(g.historyId ? { from: `h|${g.historyId}` } : {}) });
+    if (!item) return;
+    void recordEvent({ t: new Date().toISOString(), k: 'saved', card: gameCard(item.pid), item: { ...item } });
+    setFoundState(i, 'saved');
+  };
+  if (solving) return <TacticSolver t={solving} onClose={() => setSolving(undefined)} />;
   return (
     <div class="train-grid practice-review" data-testid="practice-review">
       <MoveBoard fen={board} orientation={s.color} movable={!!retry && !retry.tried} lastUci={lastUci} arrows={arrows} onMove={(u) => void tryMove(u)} />
@@ -400,6 +412,55 @@ export function PracticeReview(props: { game: PracticeGame; onNext?: (() => void
               );
             })}
           </ul>
+        )}
+        {det && (
+          <div class="practice-tactics" data-testid="practice-tactics">
+            {det.scanning ? (
+              <p class="muted">
+                ⚡ Scanning for tactics… {det.done}/{det.total}
+              </p>
+            ) : (
+              !det.found.length && <p class="muted">{det.total ? 'No tactic found in this game.' : 'No tactic to look for in this game.'}</p>
+            )}
+            {det.found.length > 0 && (
+              <ul class="game-items">
+                {det.found.map((f, i) => (
+                  <li key={i} data-testid="detected-tactic" class={f.state === 'discarded' ? 'dropped' : ''}>
+                    ⚡ {moveLabel(f.t)} <span style={{ color: f.t.found ? '#62cf8e' : '#e04040' }}>{f.t.found ? '✓ Found' : '✕ Missed'}</span>
+                    <span class="muted">
+                      {' '}
+                      · {f.t.lines.length} line{f.t.lines.length === 1 ? '' : 's'}
+                    </span>
+                    <div class="actions">
+                      {f.state === 'discarded' ? (
+                        <button type="button" class="secondary" onClick={() => setFoundState(i, 'new')}>
+                          Undo discard
+                        </button>
+                      ) : (
+                        <>
+                          <button type="button" class="secondary" onClick={() => setSolving(f.t)}>
+                            Try
+                          </button>
+                          {f.state === 'saved' ? (
+                            <span class="muted">✓ Saved</span>
+                          ) : (
+                            <button type="button" class="secondary" onClick={() => saveTactic(i, f)}>
+                              Save
+                            </button>
+                          )}
+                          {f.state !== 'saved' && (
+                            <button type="button" class="secondary" onClick={() => setFoundState(i, 'discarded')}>
+                              Discard
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         )}
         <div class="actions">
           {props.onNext ? (
@@ -511,5 +572,84 @@ export function ResumeBanner(props: { saved: NonNullable<ReturnType<typeof saved
         </button>
       </div>
     </section>
+  );
+}
+
+/** A detected tactic's first move with its number ("12. Bxf7+", "12… Nxe4"). */
+function moveLabel(t: DetectedTactic): string {
+  const [, turn, , , , n] = t.cand.preFen.split(' ');
+  return `${n ?? '1'}${turn === 'w' ? '.' : '…'} ${t.lines[0]![0]!.san}`;
+}
+
+/** Try: a detected tactic played through on the board, its lines in turn (mistake-lab's tactic mode, ungraded). */
+function TacticSolver(props: { t: DetectedTactic; onClose(): void }) {
+  const t = props.t;
+  const lines = useMemo(() => t.lines.map((l) => l.map((m) => ({ uci: m.uci, san: m.san, user: m.isUser }))), [t]);
+  const [st, setSt] = useState<{ run: TacticRun; fen: string; last?: string; phase: 'asking' | 'reply' | 'wrong' | 'done'; note?: string }>(() => ({ run: startTactic(lines), fen: t.cand.preFen, phase: 'asking' }));
+  const fenAfter = (fen: string, uci: string) => {
+    const pos = positionOf(fen);
+    const move = pos && parseUciMove(pos, uci);
+    if (!pos || !move) return fen;
+    pos.play(move);
+    return makeFen(pos.toSetup());
+  };
+  const replies = (run: TacticRun, fen: string) => {
+    const due = repliesDue(run);
+    if (!due.length) return void setSt({ run, fen, phase: 'asking' });
+    setSt((x) => ({ ...x, run, fen, phase: 'reply' }));
+    let r = run;
+    let f = fen;
+    due.forEach((uci, i) =>
+      setTimeout(() => {
+        f = fenAfter(f, uci);
+        r = playReply(r, uci);
+        const end = i === due.length - 1;
+        if (end && r.played.length >= r.lines[r.active]!.length) return lineDone(r, f, uci);
+        setSt({ run: r, fen: f, last: uci, phase: end ? 'asking' : 'reply' });
+      }, 400 * (i + 1)),
+    );
+  };
+  const lineDone = (run: TacticRun, fen: string, last: string) => {
+    const next = nextLine(run);
+    if (!next) return setSt({ run, fen, last, phase: 'done', note: 'Solved' });
+    let f = t.cand.preFen;
+    for (const u of next.prefix) f = fenAfter(f, u);
+    setSt({ run: next.run, fen: f, ...(next.prefix.length ? { last: next.prefix[next.prefix.length - 1]! } : {}), phase: 'asking', note: 'Another line: the opponent answers differently.' });
+  };
+  const onMove = (uci: string) => {
+    if (st.phase !== 'asking') return;
+    const a = playUser(st.run, uci);
+    if (!a.ok) return setSt({ ...st, fen: fenAfter(st.fen, uci), last: uci, phase: 'wrong', note: 'Not this one' });
+    const fen = fenAfter(st.fen, uci);
+    if (a.lineDone) return lineDone(a.run, fen, uci);
+    setSt({ run: a.run, fen, last: uci, phase: 'reply' });
+    replies(a.run, fen);
+  };
+  const retry = () => {
+    let f = t.cand.preFen;
+    for (const u of st.run.played) f = fenAfter(f, u);
+    const last = st.run.played[st.run.played.length - 1];
+    setSt({ run: st.run, fen: f, ...(last ? { last } : {}), phase: 'asking' });
+  };
+  return (
+    <div class="train-grid practice-review" data-testid="tactic-solver" data-phase={st.phase} data-step={st.run.played.length}>
+      <MoveBoard fen={st.fen} orientation={t.cand.color} movable={st.phase === 'asking'} lastUci={st.last} onMove={onMove} />
+      <div class="train-panel">
+        <p class="train-counters">Detected tactic · {moveLabel(t)}</p>
+        <p class="feedback train-feedback" role="status" data-testid="tactic-feedback">
+          {st.phase === 'reply' ? 'The opponent answers…' : (st.note ?? 'Find the tactic')}
+        </p>
+        <div class="actions">
+          {st.phase === 'wrong' && (
+            <button type="button" onClick={retry}>
+              Try again
+            </button>
+          )}
+          <button type="button" class="secondary" onClick={props.onClose}>
+            Back to the review
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

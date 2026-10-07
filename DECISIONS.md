@@ -1301,3 +1301,12 @@ The technical calls, each with its reason:
 - **The game in play is kept in this device's storage** (`repworks-practice-game`), not synced: it is
   a game in progress on one device, as mistake-lab's is; four hours, two moves, as mistake-lab's.
 
+## Revision of 2026-10-07 (tactics detected after a practice game; §6 item 3)
+- **The scan runs after every practice game**, not only after mistake-lab's silent ones: every move
+  here is judged in the background already, which is what mistake-lab's detection rides on.
+- **The scan uses mistake-lab's depth (20, one less on a phone) with five seconds a search at most**,
+  on the same Stockfish client as the judges, one search at a time; a tactic walk is a few dozen
+  searches, so a phone gives it a minute or two in the background while the review is read.
+- **Detected tactics live with the game just ended**, as mistake-lab's do (its candidates are on the
+  live line, not in the history); a saved one is a `saved` event, drilled in the game cards.
+
