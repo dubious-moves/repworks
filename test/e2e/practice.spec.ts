@@ -155,3 +155,53 @@ test('an advantage card drilled in the game cards’ session: a collapse, graded
   await page.locator('.chip').click();
   await expect.poll(() => progressLog(git), { timeout: 15_000 }).toContain('"k":"review","card":"m|GameAdv1_a19","g":1');
 });
+
+test('voice input (§5.63): a move said and played, the opponent’s spoken, a move confirmed by yes', async ({ page }) => {
+  // A recognizer the test speaks into, and speech that is only written down.
+  await page.addInitScript(() => {
+    const w = window as unknown as Record<string, unknown>;
+    w['__spoken'] = [];
+    w['SpeechRecognition'] = class {
+      onresult: ((e: unknown) => void) | null = null;
+      constructor() {
+        w['__rec'] = this;
+      }
+      start() {}
+      stop() {}
+    };
+    w['__say'] = (alts: string[]) => {
+      const result = Object.assign(alts.map((t) => ({ transcript: t })), { isFinal: true });
+      (w['__rec'] as { onresult(e: unknown): void }).onresult({ resultIndex: 0, results: { length: 1, 0: result } });
+    };
+    w['SpeechSynthesisUtterance'] = function (this: { text: string }, t: string) {
+      this.text = t;
+    };
+    Object.defineProperty(window, 'speechSynthesis', {
+      value: {
+        speak(u: { text: string; onend?: () => void }) {
+          (w['__spoken'] as string[]).push(u.text);
+          setTimeout(() => u.onend?.(), 0);
+        },
+        cancel() {},
+      },
+    });
+  });
+  await setUp(page);
+  await page.evaluate(() => (location.hash = '#/practice?fen=' + encodeURIComponent('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1')));
+  const game = page.locator('.practice-game');
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  await page.getByTestId('voice').getByRole('button', { name: /Voice/ }).click();
+  await expect(page.getByTestId('voice-note')).toHaveText('Listening');
+  await page.evaluate(() => (window as unknown as { __say(a: string[]): void }).__say(['egg four', 'egg for']));
+  await expect(game).toHaveAttribute('data-moves', '2');
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __spoken: string[] }).__spoken)).toContain('c, 5');
+
+  await page.getByLabel('Confirm moves').check();
+  await page.evaluate(() => (window as unknown as { __say(a: string[]): void }).__say(['night of three']));
+  await expect(page.getByTestId('voice-note')).toHaveText('Nf3?');
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __spoken: string[] }).__spoken)).toContain('Knight f, 3?');
+  await expect(game).toHaveAttribute('data-moves', '2');
+  await page.evaluate(() => (window as unknown as { __say(a: string[]): void }).__say(['yes']));
+  await expect(game).toHaveAttribute('data-moves', '4');
+  await expect(page.getByTestId('practice-moves')).toContainText('2. Nf3');
+});

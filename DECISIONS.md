@@ -1250,3 +1250,31 @@ The technical calls, each with its reason:
   often as this one; the least of more runs is what the code costs. The limits are unchanged, and
   Phase 5's replay kinds are folded out of the loop's line so it is as small as before.
 
+
+## Revision of 2026-10-07 (Phase 5 built through §5.63)
+`PLAN.md` §5.56–§5.63 are built (§5.66 waits for the owner's answer; §5.65's acceptance test is in
+`TESTING.md`). Calls made while building, each with its reason:
+- **mistake-lab's own code is each part's test**: its functions are cut out of `index.html` and run
+  in Node in a sandbox that turns its UI into no-ops (`test/fixtures/games/mistake-lab-sandbox.cjs`),
+  on cases made for each rule; their answers are recorded in the fixtures and the port must give the
+  same (the sequence check, the opponent's picks, the advantage drill, the review, deviations, gaps,
+  recidivism, weak spots, the checklist's generator, the voice matcher). A reading of 30,000 lines
+  misses details a run doesn't.
+- **Deviations and weak spots walk every game**, where mistake-lab walks only the games that gave it
+  an item (its games list drops the rest first): a game played without a mistake is still a game
+  played. The counts beside mistake-lab's differ by those games (TESTING.md says so).
+- **Practice judges each move at the game trainer's depth** (18, 16 on a narrow screen), not
+  mistake-lab's silent depth 22: one search a move, in the background, so the phone isn't kept
+  busy; an advantage drill waits for each judge, as mistake-lab's does, so a collapse ends it.
+- **Plan cards are new cards like the others**: the daily limit of new game cards counts them
+  (mistake-lab had no limit at all); their content is every study's comments at the position,
+  so the migration's Notes study is read too.
+- **Checklists are kept on the device that made them**, as regenerable definitions (mistake-lab's
+  are too); the exclusions (`drop` on `c|<leafKey>`) and the results (`practice` with the preset)
+  are synced, so a checklist made again on the other device shows the same progress. A checklist
+  drill stopped counts nothing.
+- **Two small fixes over mistake-lab, on purpose**: a castle that gives check is matched and spoken
+  as a castle by voice input; the game trainer's board sends castling as standard UCI, as the
+  analyzer's lines and Stockfish write it.
+- **What is left of mistake-lab** (an audit of its reference against what was built) is in `PLAN.md`
+  §6, built before it retires: none of it needs the owner.

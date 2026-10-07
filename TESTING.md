@@ -198,6 +198,10 @@ couldn't be tested then (the day's limit was used up), so the training items bel
   explorer's numbers move a little with time), the time it takes; a line drilled at Easy (the
   lead-up, the game, Claim victory) and checked off, on the other device after a sync (the list is
   made on each device; the results and the lines taken out are synced).
+- §5.63 (phone): voice in a practice game (🎙 Voice under the moves; Chrome asks for the
+  microphone once): moves said as mistake-lab taught them ("knight f3", "egg four", "castle"), the
+  opponent's moves spoken, Confirm moves with yes and no; with a Bluetooth headset, whether it
+  stays awake between moves; how often a move is misheard beside mistake-lab.
 - §5.64 (desktop): Games → Set up → "Move mistake-lab's progress here": the gist, Dry run (a
   token only if the gist won't read without one; it isn't kept), and read the report: the cards'
   counts against mistake-lab, the re-made keys, what is left behind. If it looks right, Run, then
@@ -205,6 +209,16 @@ couldn't be tested then (the day's limit was used up), so the training items bel
   session from §5.56 and §5.61), and only once: a second run is refused.
 - §5.66: the owner's answer on where the analyzer's output lives (PLAN.md, Phase 5, "The owner's
   choice"): (a) the data repo through a converter, recommended, or (b) the Gist, read-only.
+
+- §5.65: Phase 5's acceptance test (desktop and Android phone), once the items above look right:
+  1. Desktop: the migration's dry run (Games → Set up → Move mistake-lab's progress here), its
+     report read; the run; the game cards' queue beside mistake-lab's for the same day.
+  2. Desktop: a day's game cards (mistakes, tactics, advantages, plan cards, saved sequences); a
+     practice game and its review; the repertoire check (deviations, weak spots, a checklist) beside
+     mistake-lab's Repertoire tab.
+  3. Phone: the game cards after a sync; a practice game with voice; a plan card.
+  4. A week with mistake-lab closed. Then mistake-lab retires (D20); its analyzer keeps running from
+     its repo (D8) until §5.66's answer.
 
 ### The change to q_extension for §5.25 (Repworks sessions can't push there)
 

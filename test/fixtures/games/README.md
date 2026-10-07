@@ -47,3 +47,8 @@ and mistake-lab's per-study trie of it: the first own move at each position), th
 at its opponent's positions, and six settings (slots, plies, an exclusion); `expected` is what
 mistake-lab's own `generateTodoVariations` gives, run at `c525403` by `mistake-lab-checklist.cjs`
 (its study fetch, PGN parser and explorer stubbed from the fixture; chess.js 0.10.3 walks the moves).
+
+`voice.json` holds voice input's cases (PLAN.md §5.63): positions and what was heard (a pending move
+marked), and the moves to speak; `expected` and `speechExpected` are what mistake-lab's own
+`voiceHeardToValues`, `voiceMatchMove` and `voiceMoveToSpeech` give, run at `c525403` by
+`mistake-lab-voice.cjs` (chess.js 0.10.3 for its moves).

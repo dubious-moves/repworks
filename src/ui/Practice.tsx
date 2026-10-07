@@ -20,6 +20,7 @@ import { practiceMistakeItem, practiceMistakeSaved } from '../core/games/saved.t
 import { gameCard } from '../core/progress/cards.ts';
 import { positionOf } from '../core/storm/walk.ts';
 import { Board } from './Board.tsx';
+import { answerPending, repeatOpponent, setVoiceConfirm, voice, voiceConfirm, voiceOff, voiceOn } from '../app/voice.ts';
 import { useWakeLock } from './Train.tsx';
 
 const sq = (u: string, i: number) => u.slice(i, i + 2) as Key;
@@ -142,6 +143,7 @@ export function PracticeBoard(props: { onNext?: () => void }) {
         {p.source && !s.silent && <p class="muted">Opponent: {p.source}</p>}
         {p.note && <p class="muted">{p.note}</p>}
         <MoveList moves={p.moves} baseFen={s.fen} />
+        <VoiceControls />
         <div class="actions train-actions">
           {p.claim && (
             <button type="button" onClick={claimVictory}>
@@ -153,6 +155,53 @@ export function PracticeBoard(props: { onNext?: () => void }) {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Voice input (§5.63): on and off, its last word, and whether a move waits for yes or no. */
+function VoiceControls() {
+  const v = voice.value;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = (e.target as HTMLElement | null)?.tagName;
+      if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT' || t === 'BUTTON') return;
+      if (e.key === ' ') (voice.peek().on ? voiceOff : voiceOn)();
+      else if (!voice.peek().on) return;
+      else if (e.key === '1') repeatOpponent();
+      else if (voice.peek().pending && (e.key === '2' || e.key === 'Enter')) answerPending(true);
+      else if (voice.peek().pending && (e.key === '4' || e.key === 'Backspace')) answerPending(false);
+      else return;
+      e.preventDefault();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+  return (
+    <div class="voice-controls" data-testid="voice">
+      <button type="button" class={v.on ? '' : 'secondary'} aria-pressed={v.on} title="Say your moves (Space): “knight f3”, “egg four”, “castle”" onClick={() => (v.on ? voiceOff() : voiceOn())}>
+        🎙 {v.on ? 'Listening' : 'Voice'}
+      </button>
+      {v.on && (
+        <label class="check">
+          <input type="checkbox" checked={voiceConfirm.value} onChange={(e) => setVoiceConfirm((e.target as HTMLInputElement).checked)} /> Confirm moves
+        </label>
+      )}
+      {v.pending && (
+        <>
+          <button type="button" onClick={() => answerPending(true)}>
+            Yes
+          </button>
+          <button type="button" class="secondary" onClick={() => answerPending(false)}>
+            No
+          </button>
+        </>
+      )}
+      {v.note && (
+        <span class="muted" role="status" data-testid="voice-note">
+          {v.note}
+        </span>
+      )}
     </div>
   );
 }

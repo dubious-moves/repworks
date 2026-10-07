@@ -25,3 +25,19 @@ export function stopSpeaking(): void {
     // Nothing to stop.
   }
 }
+
+/** Says the text and resolves when it is said (or can't be): voice input waits on it (§5.63). */
+export function speak(text: string, rate = 1.3): Promise<void> {
+  return new Promise((resolve) => {
+    if (!canSpeak() || !text) return resolve();
+    try {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = rate;
+      utterance.onend = () => resolve();
+      utterance.onerror = () => resolve();
+      speechSynthesis.speak(utterance);
+    } catch {
+      resolve();
+    }
+  });
+}

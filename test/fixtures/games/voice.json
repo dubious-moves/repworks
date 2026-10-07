@@ -1,0 +1,658 @@
+{
+ "cases": [
+  {
+   "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+   "heard": "e4",
+   "expected": {
+    "values": [
+     "e",
+     "4"
+    ],
+    "result": {
+     "type": "move",
+     "san": "e4"
+    }
+   }
+  },
+  {
+   "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+   "heard": "egg four",
+   "expected": {
+    "values": [
+     "e",
+     "4"
+    ],
+    "result": {
+     "type": "move",
+     "san": "e4"
+    }
+   }
+  },
+  {
+   "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+   "heard": "knight f3",
+   "expected": {
+    "values": [
+     "N",
+     "f",
+     "3"
+    ],
+    "result": {
+     "type": "move",
+     "san": "Nf3"
+    }
+   }
+  },
+  {
+   "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+   "heard": "night of three",
+   "expected": {
+    "values": [
+     "N",
+     "f",
+     "3"
+    ],
+    "result": {
+     "type": "move",
+     "san": "Nf3"
+    }
+   }
+  },
+  {
+   "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+   "heard": "height fox tree",
+   "expected": {
+    "values": [
+     "N",
+     "f",
+     "3"
+    ],
+    "result": {
+     "type": "move",
+     "san": "Nf3"
+    }
+   }
+  },
+  {
+   "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+   "heard": "the weather is nice",
+   "expected": {
+    "values": [
+     "N"
+    ],
+    "result": {
+     "type": "ambiguous",
+     "moves": [
+      "Na3",
+      "Nc3",
+      "Nf3",
+      "Nh3"
+     ]
+    }
+   }
+  },
+  {
+   "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+   "heard": "three",
+   "expected": {
+    "values": [
+     "3"
+    ],
+    "result": {
+     "type": "ambiguous",
+     "moves": [
+      "a3",
+      "b3",
+      "c3",
+      "d3",
+      "e3",
+      "f3",
+      "g3",
+      "h3"
+     ]
+    }
+   }
+  },
+  {
+   "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+   "heard": "d",
+   "expected": {
+    "values": [
+     "d"
+    ],
+    "result": {
+     "type": "ambiguous",
+     "moves": [
+      "d3",
+      "d4"
+     ]
+    }
+   }
+  },
+  {
+   "fen": "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3",
+   "heard": "bishop b5",
+   "expected": {
+    "values": [
+     "B",
+     "b",
+     "5"
+    ],
+    "result": {
+     "type": "move",
+     "san": "Bb5"
+    }
+   }
+  },
+  {
+   "fen": "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3",
+   "heard": "dish up boy five",
+   "expected": {
+    "values": [
+     "b",
+     "5"
+    ],
+    "result": {
+     "type": "move",
+     "san": "Bb5"
+    }
+   }
+  },
+  {
+   "fen": "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3",
+   "heard": "knight takes e5",
+   "expected": {
+    "values": [
+     "N",
+     "x",
+     "e",
+     "5"
+    ],
+    "result": {
+     "type": "move",
+     "san": "Nxe5"
+    }
+   }
+  },
+  {
+   "fen": "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3",
+   "heard": "ninety five",
+   "expected": {
+    "values": [
+     "N",
+     "e",
+     "5"
+    ],
+    "result": {
+     "type": "move",
+     "san": "Nxe5"
+    }
+   }
+  },
+  {
+   "fen": "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3",
+   "heard": "95",
+   "expected": {
+    "values": [
+     "N",
+     "e",
+     "5"
+    ],
+    "result": {
+     "type": "move",
+     "san": "Nxe5"
+    }
+   }
+  },
+  {
+   "fen": "r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 5",
+   "heard": "castle",
+   "expected": {
+    "values": [
+     "O"
+    ],
+    "result": {
+     "type": "move",
+     "san": "O-O"
+    }
+   }
+  },
+  {
+   "fen": "r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 5",
+   "heard": "castles short",
+   "expected": {
+    "values": [
+     "O",
+     "O-O"
+    ],
+    "result": {
+     "type": "move",
+     "san": "O-O"
+    }
+   }
+  },
+  {
+   "fen": "r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 5",
+   "heard": "castles long",
+   "expected": {
+    "values": [
+     "O",
+     "O-O-O"
+    ],
+    "result": {
+     "type": "move",
+     "san": "O-O"
+    }
+   }
+  },
+  {
+   "fen": "r3k2r/pppqbppp/2np1n2/4p3/4P3/2NP1N2/PPPQBPPP/R3K2R w KQkq - 0 9",
+   "heard": "castles long",
+   "expected": {
+    "values": [
+     "O",
+     "O-O-O"
+    ],
+    "result": {
+     "type": "move",
+     "san": "O-O-O"
+    }
+   }
+  },
+  {
+   "fen": "r3k2r/pppqbppp/2np1n2/4p3/4P3/2NP1N2/PPPQBPPP/R3K2R w KQkq - 0 9",
+   "heard": "castle",
+   "expected": {
+    "values": [
+     "O"
+    ],
+    "result": {
+     "type": "move",
+     "san": "O-O"
+    }
+   }
+  },
+  {
+   "fen": "r3k2r/pppqbppp/2np1n2/4p3/4P3/2NP1N2/PPPQBPPP/R3K2R w KQkq - 0 9",
+   "heard": "knight d5",
+   "expected": {
+    "values": [
+     "N",
+     "d",
+     "5"
+    ],
+    "result": {
+     "type": "move",
+     "san": "Nd5"
+    }
+   }
+  },
+  {
+   "fen": "r3k2r/pppqbppp/2np1n2/4p3/4P3/2NP1N2/PPPQBPPP/R3K2R w KQkq - 0 9",
+   "heard": "knight b5",
+   "expected": {
+    "values": [
+     "N",
+     "b",
+     "5"
+    ],
+    "result": {
+     "type": "move",
+     "san": "Nb5"
+    }
+   }
+  },
+  {
+   "fen": "r3k2r/pppqbppp/2np1n2/4p3/4P3/2NP1N2/PPPQBPPP/R3K2R w KQkq - 0 9",
+   "heard": "rook d1",
+   "expected": {
+    "values": [
+     "R",
+     "d",
+     "1"
+    ],
+    "result": {
+     "type": "move",
+     "san": "Rd1"
+    }
+   }
+  },
+  {
+   "fen": "r3k2r/pppqbppp/2np1n2/4p3/4P3/2NP1N2/PPPQBPPP/R3K2R w KQkq - 0 9",
+   "heard": "rook a d1",
+   "expected": {
+    "values": [
+     "R",
+     "a",
+     "d",
+     "1"
+    ],
+    "result": {
+     "type": "move",
+     "san": "Rd1"
+    }
+   }
+  },
+  {
+   "fen": "r3k2r/pppqbppp/2np1n2/4p3/4P3/2NP1N2/PPPQBPPP/R3K2R w KQkq - 0 9",
+   "heard": "rook b1",
+   "expected": {
+    "values": [
+     "R",
+     "b",
+     "1"
+    ],
+    "result": {
+     "type": "move",
+     "san": "Rb1"
+    }
+   }
+  },
+  {
+   "fen": "r3k2r/pppqbppp/2np1n2/4p3/4P3/2NP1N2/PPPQBPPP/R3K2R w KQkq - 0 9",
+   "heard": "knight e1",
+   "expected": {
+    "values": [
+     "N",
+     "e",
+     "1"
+    ],
+    "result": {
+     "type": "ambiguous",
+     "moves": [
+      "Nd1",
+      "Nb1",
+      "Nxe5",
+      "Ng1"
+     ]
+    }
+   }
+  },
+  {
+   "fen": "r3k2r/pppqbppp/2np1n2/4p3/4P3/2NP1N2/PPPQBPPP/R3K2R w KQkq - 0 9",
+   "heard": "a3",
+   "expected": {
+    "values": [
+     "a",
+     "3"
+    ],
+    "result": {
+     "type": "move",
+     "san": "a3"
+    }
+   }
+  },
+  {
+   "fen": "r3k2r/pppqbppp/2np1n2/4p3/4P3/2NP1N2/PPPQBPPP/R3K2R w KQkq - 0 9",
+   "heard": "h four",
+   "expected": {
+    "values": [
+     "h",
+     "4"
+    ],
+    "result": {
+     "type": "move",
+     "san": "h4"
+    }
+   }
+  },
+  {
+   "fen": "4k3/1P6/8/8/8/8/8/4K3 w - - 0 1",
+   "heard": "b8 queen",
+   "expected": {
+    "values": [
+     "b",
+     "8",
+     "Q"
+    ],
+    "result": {
+     "type": "move",
+     "san": "b8=Q+"
+    }
+   }
+  },
+  {
+   "fen": "4k3/1P6/8/8/8/8/8/4K3 w - - 0 1",
+   "heard": "b8 promote knight",
+   "expected": {
+    "values": [
+     "b",
+     "8",
+     "=",
+     "N"
+    ],
+    "result": {
+     "type": "move",
+     "san": "b8=N"
+    }
+   }
+  },
+  {
+   "fen": "4k3/1P6/8/8/8/8/8/4K3 w - - 0 1",
+   "heard": "b8",
+   "expected": {
+    "values": [
+     "b",
+     "8"
+    ],
+    "result": {
+     "type": "ambiguous",
+     "moves": [
+      "b8=Q+",
+      "b8=R+",
+      "b8=B",
+      "b8=N"
+     ]
+    }
+   }
+  },
+  {
+   "fen": "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 2",
+   "heard": "takes d5",
+   "expected": {
+    "values": [
+     "x",
+     "d",
+     "5"
+    ],
+    "result": {
+     "type": "move",
+     "san": "exd5"
+    }
+   }
+  },
+  {
+   "fen": "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 2",
+   "heard": "e takes d5",
+   "expected": {
+    "values": [
+     "e",
+     "x",
+     "d",
+     "5"
+    ],
+    "result": {
+     "type": "move",
+     "san": "exd5"
+    }
+   }
+  },
+  {
+   "fen": "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 2",
+   "heard": "yes",
+   "pending": true,
+   "expected": {
+    "values": [
+     "YES"
+    ],
+    "result": {
+     "type": "confirm",
+     "value": true
+    }
+   }
+  },
+  {
+   "fen": "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 2",
+   "heard": "no thanks",
+   "pending": true,
+   "expected": {
+    "values": [
+     "NO"
+    ],
+    "result": {
+     "type": "confirm",
+     "value": false
+    }
+   }
+  },
+  {
+   "fen": "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 2",
+   "heard": "yes",
+   "expected": {
+    "values": [
+     "YES"
+    ],
+    "result": null
+   }
+  },
+  {
+   "fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
+   "heard": "queen h5",
+   "expected": {
+    "values": [
+     "Q",
+     "h",
+     "5"
+    ],
+    "result": {
+     "type": "move",
+     "san": "Qh5"
+    }
+   }
+  },
+  {
+   "fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
+   "heard": "clean hotel five",
+   "expected": {
+    "values": [
+     "Q",
+     "h",
+     "5"
+    ],
+    "result": {
+     "type": "move",
+     "san": "Qh5"
+    }
+   }
+  },
+  {
+   "fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
+   "heard": "king e2",
+   "expected": {
+    "values": [
+     "K",
+     "e",
+     "2"
+    ],
+    "result": {
+     "type": "move",
+     "san": "Ke2"
+    }
+   }
+  },
+  {
+   "fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 1 2",
+   "heard": "knight c6",
+   "expected": {
+    "values": [
+     "N",
+     "c",
+     "6"
+    ],
+    "result": {
+     "type": "move",
+     "san": "Nc6"
+    }
+   }
+  },
+  {
+   "fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 1 2",
+   "heard": "pawn d6",
+   "expected": {
+    "values": [
+     "P",
+     "d",
+     "6"
+    ],
+    "result": {
+     "type": "move",
+     "san": "d6"
+    }
+   }
+  },
+  {
+   "fen": "rnbqkb1r/pppppppp/8/8/4n3/2NP4/PPP1PPPP/R1BQKBNR w KQkq - 1 3",
+   "heard": "takes e4",
+   "expected": {
+    "values": [
+     "x",
+     "e",
+     "4"
+    ],
+    "result": {
+     "type": "move",
+     "san": "dxe4"
+    }
+   }
+  },
+  {
+   "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+   "heard": "king king king",
+   "expected": {
+    "values": [
+     "K",
+     "K",
+     "K"
+    ],
+    "result": null
+   }
+  },
+  {
+   "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+   "heard": "rook takes h eight",
+   "expected": {
+    "values": [
+     "R",
+     "x",
+     "h",
+     "8"
+    ],
+    "result": null
+   }
+  }
+ ],
+ "speech": [
+  "e4",
+  "Nf3",
+  "Bxf7+",
+  "exd5",
+  "O-O",
+  "O-O-O+",
+  "b8=Q",
+  "Raxd1",
+  "Nbd7",
+  "Qh5#"
+ ],
+ "speechExpected": [
+  "e, 4",
+  "Knight f, 3",
+  "Bishop takes f, 7",
+  "e takes d, 5",
+  "castles short",
+  "O, -, O, -, O",
+  "b, 8 promotes to Queen",
+  "Rook a takes d, 1",
+  "Knight b, d, 7",
+  "Queen h, 5"
+ ]
+}

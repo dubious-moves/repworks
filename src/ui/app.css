@@ -3174,3 +3174,12 @@ a.button.disabled {
 .preset-chip.done {
   font-weight: 600;
 }
+
+/* Voice input (§5.63). */
+.voice-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}

@@ -4436,6 +4436,23 @@ Tests: unit (the lexicon's cases, ambiguity refused); Playwright: a faked recogn
 
 Live: (phone) voice in a practice game, with and without Bluetooth.
 
+**As built** (2026-10-07): `src/core/games/voice.ts` (mistake-lab's `VOICE_LEX` as it is,
+`heardToValues`, `movePhrasings`, `tokenDistance`, `matchMove`, `moveToSpeech`, the phrase hints;
+one difference on purpose: a castle that gives check is found and said as a castle, where
+mistake-lab compares the SAN without its `+`), `src/platform/voice.ts` (the Web Speech recognizer:
+continuous, final results, five alternatives, en-US, the hints where the browser takes them,
+restarted when the browser ends a session; the silent tone that keeps a Bluetooth headset awake),
+`speak` in `src/platform/speech.ts`, and `src/app/voice.ts` with the 🎙 button in every practice
+game (§5.57's, the advantage drill's, the checklist's): the first alternative that names something
+wins, a move is played or, with "Confirm moves", asked ("Knight f, 3?") and played on yes; an
+ambiguous one is read out; the opponent's moves are spoken; nothing is heard while the app speaks;
+Space turns voice on and off, 1 repeats the opponent's move, 2/Enter and 4/Backspace answer a
+pending move; off at every start and when the game ends, as mistake-lab's. Tests:
+`test/unit/core/games/voice.test.ts`, **the same tokens and moves as mistake-lab's own matcher** on
+42 cases of `test/fixtures/games/voice.json` (`mistake-lab-voice.cjs`; two controls), and
+`test/e2e/practice.spec.ts`'s voice test (desktop and phone, a faked recognizer and speech: a move
+said and played, the opponent's spoken, a move confirmed by yes).
+
 #### 5.64 The migration (dry run, then the run)
 
 - `migrate.ts` (pure): mistake-lab's progress, games and review history in, a report and the events
@@ -4509,6 +4526,11 @@ Risks:
 Checks: the same per-game counts as mistake-lab (§5.52); the migration's dry-run report and the
 queue sizes before and after (§5.64); the live comparisons beside mistake-lab (TESTING.md).
 
+**Phase 5 built** (2026-10-07, §5.50–§5.64 but §5.66): each part's "As built" says what was built
+and how it differs. Every rule ported is tested against mistake-lab's own code run in Node
+(`test/fixtures/games/*.cjs`, `mistake-lab-sandbox.cjs`), with the cases and answers recorded in
+fixtures. What is left of mistake-lab is listed in §6; §5.65's acceptance test is in TESTING.md.
+
 ---
 
 ## 6. Phase order and retirement
@@ -4521,6 +4543,25 @@ queue sizes before and after (§5.64); the live comparisons beside mistake-lab (
 | 3 | Analysis, Stockfish, Maia | |
 | 4 | Storm and puzzles | lichessable's storm, if it was still used on Chessable courses until then |
 | 5 | Mistake review and migration | **mistake-lab** (the PWA; its analyzer keeps running from its repo until the tools move) |
+
+**Left of mistake-lab after Phase 5's build** (an audit of its architecture reference against
+what was built, 2026-10-07; built in this order before it retires, none needing the owner):
+1. The game trainer's engine line after a wrong move (§5.55's "not built yet"): mistake-lab shows the
+   refutation and lets the line be stepped through (its ENGINE LINES, BAD MOVE BEHAVIOR).
+2. Practice: a game resumed after a reload or a switch of app within 4 hours (its CONTINUATION
+   SESSION PERSISTENCE); premoves during the opponent's turn (PREMOVE); the repertoire check
+   while practising from a position ("Ignore for this game?" on a move off the repertoire before
+   ply 20, the corrected deviation kept with the move and shown in the review, FILTER PRACTICE and
+   GAME REVIEW HISTORY); the hint in a practice game from a position (the repertoire's move, else
+   Stockfish's: HINT SYSTEM).
+3. Detected tactics after a practice game (DETECTED TACTICS: the candidates from each judged user
+   move, the tactic tree walked in the background, Try / Save / Discard, saved as a practice tactic
+   with `saved`), which needs a port of the tactic tree walk (`walkTacticTree`, the analyzer's
+   scanner) on the device's Stockfish.
+4. The games' own explorer (OPENING EXPLORER): the games filtered to those reaching a position on a
+   board, each move's results from the user's games there, the opening name a position is most
+   often reached in (used to title practice games and saved items, `lookupOpeningName`).
+5. "Hide time trouble" in the games list and the game cards (TIME TROUBLE: the setting exists).
 
 Side tasks, outside this repo:
 - **Chessable courses**: the owner's own export script (D14). Its PGN imports like any other
