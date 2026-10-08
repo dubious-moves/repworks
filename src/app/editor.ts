@@ -6,6 +6,7 @@
 import { computed, effect, signal } from '@preact/signals';
 import { record, redo, startHistory, undo, type History } from '../core/app/history.ts';
 import { chapterPath, classifyPath, studyMetaPath } from '../core/data/layout.ts';
+import { chaptersFromPgn, type NewChapters } from '../core/import/plan.ts';
 import { openConflicts, type OpenConflict } from '../core/merge/markers.ts';
 import { resolveConflict, type Resolution } from '../core/merge/resolve.ts';
 import { parseChapterFile } from '../core/pgn/parse.ts';
@@ -333,19 +334,42 @@ export function renameOpenChapter(name: string): void {
   if (s) edit((c) => renameChapter(c, s.meta.name, name));
 }
 
-export async function addChapter(name: string, side: 'white' | 'black'): Promise<string | undefined> {
+/** How a new chapter starts: empty, at a position, or with the games of a PGN (a chapter each). */
+export type ChapterStart = { from: 'empty' } | { from: 'fen'; fen: string } | { from: 'pgn'; pgn: string };
+
+/** Adds chapters to the open study and opens the first; refused, it says why and saves nothing. */
+export async function addChapter(name: string, side: 'white' | 'black', start: ChapterStart = { from: 'empty' }): Promise<Edit<string>> {
   const s = study.peek();
-  if (!s) return undefined;
-  const cid = freshId(cryptoRandom, new Set(s.chapters.map((c) => c.id)));
-  const made = newChapter(cid, s.meta.name, name.trim() || `Chapter ${s.chapters.length + 1}`, side);
-  if (!made.ok) {
-    feedback.value = made.error;
-    return undefined;
+  if (!s) return { ok: false, error: 'no study is open' };
+  const taken = new Set(s.chapters.map((c) => c.id));
+  const newId = () => {
+    const id = freshId(cryptoRandom, taken);
+    taken.add(id);
+    return id;
+  };
+  const unnamed = (i: number) => `Chapter ${s.chapters.length + 1 + i}`;
+  let made: NewChapters;
+  if (start.from === 'pgn') made = chaptersFromPgn(start.pgn, { studyName: s.meta.name, name, unnamed, side, newId });
+  else {
+    const fen = start.from === 'fen' ? start.fen.trim() : undefined;
+    if (fen === '') return { ok: false, error: 'enter a FEN' };
+    const one = newChapter(newId(), s.meta.name, name.trim() || unnamed(0), side, fen === START_FEN ? undefined : fen);
+    made = one.ok ? { ok: true, chapters: [one.value], notes: [] } : one;
   }
-  const meta = addChapterToStudy({ ...s.meta, chapters: s.chapters.map((c) => c.id) }, cid);
-  await afterEdits(() => saveFiles(new Map([[chapterPath(s.sid, cid), chapterFileText(made.value)], [studyMetaPath(s.sid), writeStudyMeta(meta)]])));
+  if (!made.ok) return made;
+  let meta: StudyMeta = { ...s.meta, chapters: s.chapters.map((c) => c.id) };
+  const files = new Map<string, string>();
+  for (const c of made.chapters) {
+    meta = addChapterToStudy(meta, c.id);
+    files.set(chapterPath(s.sid, c.id), chapterFileText(c));
+  }
+  files.set(studyMetaPath(s.sid), writeStudyMeta(meta));
+  await afterEdits(() => saveFiles(files));
+  const cid = made.chapters[0]!.id;
   dispatch({ type: 'open', mode: { name: 'chapter', sid: s.sid, cid } });
-  return cid;
+  const { notes } = made;
+  if (notes.length) feedback.value = `From the PGN: ${notes.slice(0, 3).join('; ')}${notes.length > 3 ? `; and ${notes.length - 3} more` : ''}.`;
+  return { ok: true, value: cid };
 }
 
 export async function deleteOpenChapter(): Promise<void> {

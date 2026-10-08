@@ -145,6 +145,63 @@ test('a study made with no import, managed where Qchess has it, and deleted from
   expect(files().has('studies/Rep0Najd/study.json')).toBe(true);
 });
 
+test('a new chapter from a FEN, from pasted PGN and from a PGN file', async ({ page }) => {
+  const git = await setUp(page);
+  await card(page, 'Test repertoire').getByRole('link', { name: 'Test repertoire', exact: true }).click();
+  await expect(page.locator('.notation')).toContainText('1. e4');
+  const options = page.getByLabel('Chapter', { exact: true }).locator('option');
+  const before = await options.allTextContents();
+  const start = async () => {
+    await page.getByRole('button', { name: 'New chapter' }).click();
+    return page.getByRole('dialog', { name: 'New chapter' });
+  };
+
+  // From FEN: a bad one is refused in the dialog, which stays open.
+  let dialog = await start();
+  await dialog.getByLabel('From FEN').check();
+  await dialog.getByLabel('FEN', { exact: true }).fill('not a fen');
+  await dialog.getByRole('button', { name: 'Create chapter' }).click();
+  await expect(dialog.getByRole('alert')).toHaveText('That FEN is not a legal position.');
+  const fen = '4k3/8/8/8/8/8/4P3/4K3 w - - 0 1';
+  await dialog.getByLabel('FEN', { exact: true }).fill(fen);
+  await dialog.getByLabel('Chapter name').fill('Pawn ending');
+  await dialog.getByLabel('White').check();
+  await dialog.getByRole('button', { name: 'Create chapter' }).click();
+  await dialog.waitFor({ state: 'detached' });
+  await expect(page.locator('.cg-wrap')).toHaveClass(/orientation-white/);
+  await expect(options).toHaveText([...before, 'Pawn ending']);
+
+  // From pasted PGN: a chapter per game, named by its headers.
+  dialog = await start();
+  await dialog.getByLabel('From PGN').check();
+  await dialog.getByLabel('PGN', { exact: true }).fill('[ChapterName "London"]\n\n1. d4 d5 2. Bf4 *\n\n[ChapterName "English"]\n\n1. c4 e5 *\n');
+  await dialog.getByRole('button', { name: 'Create chapter' }).click();
+  await dialog.waitFor({ state: 'detached' });
+  await expect(options).toHaveText([...before, 'Pawn ending', 'London', 'English']);
+  await expect(page.locator('.notation')).toContainText('2. Bf4');
+
+  // From a PGN file: read into the box, and the typed name wins for its one game.
+  dialog = await start();
+  await dialog.getByLabel('From PGN').check();
+  await dialog.getByLabel('PGN file').setInputFiles({ name: 'scandi.pgn', mimeType: 'application/x-chess-pgn', buffer: Buffer.from('[Event "Casual"]\n\n1. e4 d5 2. exd5 Qxd5 *\n') });
+  await expect(dialog.getByLabel('PGN', { exact: true })).toHaveValue(/exd5 Qxd5/);
+  await dialog.getByLabel('Chapter name').fill('Scandinavian');
+  await dialog.getByRole('button', { name: 'Create chapter' }).click();
+  await dialog.waitFor({ state: 'detached' });
+  await expect(options).toHaveText([...before, 'Pawn ending', 'London', 'English', 'Scandinavian']);
+
+  await sync(page);
+  const files = git.textsOf();
+  const meta = JSON.parse(files.get('studies/Rep0Najd/study.json')!) as { chapters: string[] };
+  const added = meta.chapters.slice(before.length).map((cid) => files.get(`studies/Rep0Najd/${cid}.pgn`)!);
+  expect(added).toHaveLength(4);
+  expect(added[0]).toContain(`[FEN "${fen}"]\n[SetUp "1"]\n[Orientation "white"]`);
+  expect(added[1]).toContain('[ChapterName "London"]');
+  expect(added[1]).toContain('1. d4 d5 2. Bf4 *');
+  expect(added[3]).toContain('[ChapterName "Scandinavian"]');
+  expect(added[3]).toContain('1. e4 d5 2. exd5 Qxd5 *');
+});
+
 test('a study renamed from its card, and deleted from its settings in the chapter view', async ({ page }) => {
   const git = await setUp(page);
   await card(page, 'Test repertoire').getByRole('button', { name: 'Settings of Test repertoire' }).click();

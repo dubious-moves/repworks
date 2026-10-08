@@ -5,6 +5,12 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## A new chapter from a FEN or from PGN (§5.76)
+
+- Phone and desktop: in a study, + New chapter → From PGN → pick a `.pgn` file (one of the
+  owner's exports with several games): a chapter per game, named as expected? Then paste a PGN,
+  and From FEN with a position copied from Lichess. Does the file picker open the phone's files?
+
 ## Stockfish 19 as an option (§5.75)
 
 - Phone, then desktop: Engine settings → Version → Stockfish 19, Save; the bar reads SF19 and the

@@ -1,11 +1,12 @@
 // Making and managing studies and chapters where Qchess has it (PLAN.md §5.15): "New study" on the
 // study list; a study's settings (name, kind, delete) from its card's ⚙ or the ⚙ by its name in
 // the chapter view; a chapter's settings (name, side, order, delete) from the ⚙ by it in the
-// chapter list; and a new chapter from "+ New". Each is a modal dialog, as Qchess's are.
+// chapter list; and a new chapter from "+ New": empty, from a FEN, or from PGN pasted or read
+// from a file (a chapter per game). Each is a modal dialog, as Qchess's are.
 import { signal } from '@preact/signals';
 import type { ComponentChildren } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { addChapter, chapter, deleteOpenChapter, doc, moveOpenChapter, renameOpenChapter, setSide, side, study } from '../app/editor.ts';
+import { addChapter, chapter, type ChapterStart, deleteOpenChapter, doc, moveOpenChapter, renameOpenChapter, setSide, side, study } from '../app/editor.ts';
 import { mode, open } from '../app/mode.ts';
 import { changeStudy, newStudy, removeStudy } from '../app/studies.ts';
 import { header, type StudyKind } from '../core/study/model.ts';
@@ -275,11 +276,28 @@ function NewChapter() {
   const s = study.value;
   const [name, setName] = useState('');
   const [forSide, setForSide] = useState<Side>(side.peek());
+  const [from, setFrom] = useState<ChapterStart['from']>('empty');
+  const [fen, setFen] = useState('');
+  const [pgn, setPgn] = useState('');
+  const [error, setError] = useState<string | undefined>(undefined);
+  const [busy, setBusy] = useState(false);
   if (!s) return null;
   const create = async () => {
+    setBusy(true);
+    const made = await addChapter(name, forSide, from === 'fen' ? { from, fen } : from === 'pgn' ? { from, pgn } : { from });
+    setBusy(false);
+    if (!made.ok) return setError(`${made.error[0]!.toUpperCase()}${made.error.slice(1)}.`);
     close();
-    await addChapter(name, forSide);
   };
+  const pick = async (e: Event) => {
+    const file = (e.currentTarget as HTMLInputElement).files?.[0];
+    if (file) setPgn(await file.text());
+  };
+  const starts = [
+    ['empty', 'Empty'],
+    ['fen', 'From FEN'],
+    ['pgn', 'From PGN'],
+  ] as const;
   return (
     <Modal title="New chapter" onSubmit={() => void create()}>
       <label>
@@ -287,7 +305,39 @@ function NewChapter() {
         <input type="text" name="new-chapter" placeholder={`Chapter ${s.chapters.length + 1}`} maxLength={100} value={name} onInput={(e) => setName(e.currentTarget.value)} />
       </label>
       <SideChoice name="new-side" legend="For" value={forSide} onChange={setForSide} />
-      <Buttons submit="Create chapter" />
+      <fieldset class="choice">
+        <legend>Start</legend>
+        {starts.map(([value, label]) => (
+          <label key={value}>
+            <input type="radio" name="new-start" checked={from === value} onChange={() => (setFrom(value), setError(undefined))} /> {label}
+          </label>
+        ))}
+      </fieldset>
+      {from === 'fen' && (
+        <label>
+          FEN
+          <input type="text" name="new-fen" placeholder="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" spellcheck={false} value={fen} onInput={(e) => setFen(e.currentTarget.value)} />
+        </label>
+      )}
+      {from === 'pgn' && (
+        <>
+          <label>
+            PGN file
+            <input type="file" name="new-pgn-file" accept=".pgn,application/x-chess-pgn,text/plain" onChange={(e) => void pick(e)} />
+          </label>
+          <label>
+            PGN
+            <textarea name="new-pgn" rows={5} spellcheck={false} value={pgn} onInput={(e) => setPgn(e.currentTarget.value)} />
+          </label>
+          <p class="muted">Each game becomes a chapter.</p>
+        </>
+      )}
+      {error && (
+        <p class="warn" role="alert">
+          {error}
+        </p>
+      )}
+      <Buttons submit="Create chapter" busy={busy} />
     </Modal>
   );
 }

@@ -5,9 +5,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { validateDataRepo } from '../../../../src/core/data/validate.ts';
-import { buildImport, chapterName, describeNote, headerCounts, readImport, sidesMissing, type ImportChoices, type ImportReading, type Side } from '../../../../src/core/import/plan.ts';
+import { buildImport, chapterName, chaptersFromPgn, describeNote, headerCounts, readImport, sidesMissing, type ImportChoices, type ImportReading, type Side } from '../../../../src/core/import/plan.ts';
 import { extractStudyId, parseStudyList, studyExportPath } from '../../../../src/core/import/lichess.ts';
 import { parseStudyMeta } from '../../../../src/core/study/studyMeta.ts';
+import { chapterFileText } from '../../../../src/core/pgn/write.ts';
 import { header } from '../../../../src/core/study/model.ts';
 import { mulberry32 } from '../../../support/random.ts';
 
@@ -166,4 +167,61 @@ test('Lichess study IDs from URLs, slugs and bare IDs', () => {
 test('the study list is read line by line, skipping what it cannot read', () => {
   const list = parseStudyList('{"id":"AbCd1234","name":"Rep","updatedAt":5}\n\nnot json\n{"id":"WxYz5678","name":"Other"}\n{"name":"no id"}\n');
   assert.deepEqual(list, [{ id: 'AbCd1234', name: 'Rep', updatedAt: 5 }, { id: 'WxYz5678', name: 'Other' }]);
+});
+
+// "New chapter" from PGN (§5.15): a chapter per game, for the chosen side, in the open study.
+const ids = () => {
+  let n = 0;
+  return () => `Chapter${++n}`;
+};
+const choice = (name = '') => ({ studyName: 'My rep', name, unnamed: (i: number) => `Chapter ${3 + i}`, side: 'black' as const, newId: ids() });
+
+test('chaptersFromPgn: one game takes the typed name, the study and the side', () => {
+  const made = chaptersFromPgn('[Event "Casual"]\n[ChapterName "Old"]\n[Orientation "white"]\n\n1. e4 c5 2. Nf3 *', choice('Najdorf'));
+  assert.ok(made.ok);
+  assert.equal(made.chapters.length, 1);
+  const [c] = made.chapters;
+  assert.equal(c!.id, 'Chapter1');
+  assert.equal(header(c!, 'ChapterName'), 'Najdorf');
+  assert.equal(header(c!, 'StudyName'), 'My rep');
+  assert.equal(header(c!, 'Orientation'), 'black');
+  assert.deepEqual(c!.root.children.map((m) => m.san), ['e4']);
+});
+
+test('chaptersFromPgn: bare movetext with no name is named by the study’s next number', () => {
+  const made = chaptersFromPgn('1. d4 d5 2. c4', choice());
+  assert.ok(made.ok);
+  assert.equal(header(made.chapters[0]!, 'ChapterName'), 'Chapter 3');
+});
+
+test('chaptersFromPgn: several games make a chapter each, named by their headers, with fresh IDs', () => {
+  const made = chaptersFromPgn('[ChapterName "A"]\n\n1. e4 *\n\n[White "X"]\n[Black "Y"]\n\n1. d4 *\n\n1. c4 *', choice('ignored'));
+  assert.ok(made.ok);
+  assert.deepEqual(
+    made.chapters.map((c) => [c.id, header(c, 'ChapterName')]),
+    [
+      ['Chapter1', 'A'],
+      ['Chapter2', 'X - Y'],
+      ['Chapter3', 'Chapter 5'],
+    ],
+  );
+});
+
+test('chaptersFromPgn: a start position is kept; an unreadable game refuses the text; notes are sentences', () => {
+  const fen = '8/8/8/4k3/8/8/4P3/4K3 w - - 0 1';
+  const made = chaptersFromPgn(`[FEN "${fen}"]\n[SetUp "1"]\n\n1. e4 Kd6 2. Qh5 *`, choice());
+  assert.ok(made.ok);
+  assert.equal(header(made.chapters[0]!, 'FEN'), fen);
+  assert.equal(made.notes.length, 1);
+  assert.match(made.notes[0]!, /Qh5 after 1\. e4 Kd6 is not a legal move/);
+  const bad = chaptersFromPgn('[Variant "Atomic"]\n\n1. e4 *', choice());
+  assert.ok(!bad.ok);
+  assert.match(bad.error, /only standard chess/);
+  assert.deepEqual(chaptersFromPgn('  ', choice()), { ok: false, error: 'there is no game in that PGN' });
+});
+
+test('chaptersFromPgn: bare movetext gets the Event and Result of an empty new chapter', () => {
+  const made = chaptersFromPgn('1. e4 e5', choice('Open'));
+  assert.ok(made.ok);
+  assert.equal(chapterFileText(made.chapters[0]!), '[Event "My rep: Open"]\n[Result "*"]\n[ChapterName "Open"]\n[Orientation "black"]\n[StudyName "My rep"]\n\n1. e4 e5 *\n');
 });

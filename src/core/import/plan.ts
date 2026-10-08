@@ -53,13 +53,13 @@ const sideOf = (value: string | undefined): Side | undefined => {
 const QCHESS_HEADERS = ['QchessFolder', 'QchessTrain', 'ChapterPerspective'];
 
 /** A name for a chapter: its ChapterName, else its Event, else its players, else its number. */
-export function chapterName(headers: readonly [string, string][], index: number): string {
+export function chapterName(headers: readonly [string, string][], index: number, fallback = `Chapter ${index + 1}`): string {
   const get = (name: string) => {
     const v = headers.find(([k]) => k === name)?.[1].trim();
     return v && v !== '?' ? v : undefined;
   };
   const players = get('White') && get('Black') ? `${get('White')} - ${get('Black')}` : undefined;
-  return get('ChapterName') ?? get('Event') ?? players ?? `Chapter ${index + 1}`;
+  return get('ChapterName') ?? get('Event') ?? players ?? fallback;
 }
 
 export function readImport(text: string): ImportReading {
@@ -183,4 +183,36 @@ export function headerCounts(reading: ImportReading): [string, number][] {
   const counts = new Map<string, number>();
   for (const c of reading.chapters) for (const [k] of c.chapter.headers) counts.set(k, (counts.get(k) ?? 0) + 1);
   return [...counts];
+}
+
+export type NewChapters = { ok: true; chapters: Chapter[]; notes: string[] } | { ok: false; error: string };
+
+/**
+ * Chapters for an open study from PGN (PLAN.md §5.15, "New chapter" from PGN): one per game of
+ * the text, as Lichess's dialog makes them. With one game a typed name wins over the game's;
+ * a game with no name of its own takes `unnamed(i)`; every chapter is for the side chosen in the
+ * dialog. A game that can't be read refuses the
+ * whole text, so nothing is left out unseen; the parser's notes come back as sentences.
+ */
+export function chaptersFromPgn(text: string, choice: { studyName: string; name: string; unnamed: (i: number) => string; side: Side; newId: () => string }): NewChapters {
+  const reading = readImport(text);
+  const [refused] = reading.refused;
+  if (refused) return { ok: false, error: `${refused.name}: ${refused.reason}` };
+  if (reading.chapters.length === 0) return { ok: false, error: 'there is no game in that PGN' };
+  const typed = choice.name.trim();
+  const chapters: Chapter[] = [];
+  const notes: string[] = [];
+  for (const item of reading.chapters) {
+    const name = typed && reading.chapters.length === 1 ? typed : chapterName(item.chapter.headers, item.index, choice.unnamed(item.index));
+    // Headers an empty new chapter has, when the game lacks them (bare movetext, say).
+    let named = setHeader(item.chapter, 'ChapterName', name);
+    if (named.ok && header(named.value, 'Event') === undefined) named = setHeader(named.value, 'Event', `${choice.studyName}: ${name}`);
+    if (named.ok && header(named.value, 'Result') === undefined) named = setHeader(named.value, 'Result', '*');
+    if (!named.ok) return named;
+    const chapter = prepare({ ...named.value, id: choice.newId() }, item, choice.studyName, choice.side);
+    if (!chapter.ok) return { ok: false, error: `${item.name}: ${chapter.error}` };
+    chapters.push(chapter.value);
+    notes.push(...item.notes.map((n) => describeNote(item.chapter, n)));
+  }
+  return { ok: true, chapters, notes };
 }

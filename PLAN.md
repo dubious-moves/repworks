@@ -2668,6 +2668,32 @@ checks both built workers in Chromium (mate in one, `stop`, the next search); `v
 
 Live: TESTING.md.
 
+#### 5.76 A new chapter from a FEN or from PGN (the owner's request, 2026-10-08)
+
+The New chapter dialog (§5.15) has a **Start** choice: Empty (as before), From FEN, From PGN.
+- **From FEN**: a FEN box; the chapter starts there (`[FEN]`, `[SetUp "1"]`; the start position
+  is written as an empty chapter). A FEN that isn't a legal position is refused in the dialog,
+  which stays open.
+- **From PGN**: a file picker, which reads the file into a PGN box, and the box itself to paste
+  into or edit. Each game becomes a chapter, as Lichess's dialog makes them, in the order of the
+  text, and the first opens. With one game the typed name wins; otherwise each is named as the
+  import names it (`ChapterName`, `Event`, the players), and a game with none takes the study's
+  next "Chapter N". Every chapter is for the side chosen in the dialog. The game's headers are
+  kept, with `StudyName` set and, where missing, the `Event` and `Result` an empty chapter has. A
+  game that can't be read (another variant, a bad start position) refuses the whole text, so
+  nothing is left out unseen; the parser's notes (an illegal move cut, a merged duplicate) show
+  in the feedback line under the board.
+- Core: `chaptersFromPgn` in `core/import/plan.ts`, sharing the import's reading and `prepare`;
+  `addChapter(name, side, start)` in `app/editor.ts` writes every new chapter and study.json in
+  one change.
+
+Tests: `plan.test.ts` (one game, bare movetext, several games, a start FEN with an illegal move,
+an unreadable game, the headers written); `studies.spec.ts` (desktop and phone: a bad FEN
+refused then a good one, two pasted games, a file with the typed name, each checked in the fake
+data repo).
+
+Live: TESTING.md.
+
 #### 5.14 Phase 1 acceptance test, and exit
 
 **Acceptance test (live, desktop + Android phone)**, after Phase 0's (§4.11) and once §5.15 is
