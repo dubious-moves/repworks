@@ -90,3 +90,26 @@ test('from a chapter’s move: a line played there and added back to the chapter
   await page.locator('.chip').click();
   await expect.poll(() => git.textsOf().get('studies/Rep0Najd/Ch1Najdf.pgn') ?? '').toContain('(2... e6 3. d4)');
 });
+
+test('any analysis saved as a sequence: the lines from the board’s start, the side to move asked (§5.74)', async ({ page }) => {
+  await setUp(page);
+  await page.getByRole('link', { name: 'Analysis board' }).click();
+  await page.getByRole('button', { name: 'New' }).click();
+  // Nothing on the board, nothing to save.
+  await expect(page.getByRole('button', { name: 'Save as a sequence…' })).toBeDisabled();
+  for (const [from, to] of [['e2', 'e4'], ['e7', 'e5'], ['g1', 'f3']] as const) {
+    await clickSquare(page, from, 'white');
+    await clickSquare(page, to, 'white');
+  }
+  await page.getByRole('button', { name: 'Save as a sequence…' }).click();
+  const dialog = page.getByTestId('sequence-dialog');
+  await expect(dialog.getByTestId('sequence-main')).toHaveText('e4 e5 Nf3');
+  await expect(dialog).toContainText('2 moves to find');
+  await dialog.getByRole('button', { name: /^Save/ }).click();
+  await expect(dialog.getByTestId('sequence-saved')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Close' }).click();
+  await expect(dialog).toHaveCount(0);
+  // Saved once: asked again, it says so.
+  await page.getByRole('button', { name: 'Save as a sequence…' }).click();
+  await expect(dialog).toContainText('already saved');
+});

@@ -29,6 +29,7 @@ import {
   recordOf,
   refreshHome,
   retryFromReview,
+  saveStormMistake,
   scopeData,
   setStormPrefs,
   showMove,
@@ -36,6 +37,7 @@ import {
   stopGathering,
   stormHome,
   stormPrefs,
+  stormMistakeSaved,
   stormSession,
   suspendStorm,
   toggleShown,
@@ -833,6 +835,7 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
               Analyse <kbd>A</kbd>
             </button>
           )}
+          {v && (held || phase === 'verdict') && <SaveMistake item={item} />}
           <button type="button" aria-pressed={draw} aria-label="Draw mode" title="Draw arrows and circles to think with" class={`secondary touch-only storm-draw${draw ? ' on' : ''}`} onClick={() => setDraw(!draw)}>
             ✎
           </button>
@@ -843,6 +846,23 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
         {phase === 'verdict' && s.mode === 'storm' && s.nextAt === undefined && <p class="muted storm-hint">Paused: the clock is stopped until the next position.</p>}
       </div>
     </div>
+  );
+}
+
+/** "Save as a mistake" (§5.74): the position into the game cards, whether or not it was answered well. */
+function SaveMistake(props: { item: StormItem }) {
+  const saved = stormMistakeSaved(props.item);
+  return (
+    <button
+      type="button"
+      class="secondary"
+      disabled={saved}
+      data-testid="storm-save-mistake"
+      title={saved ? 'In your game cards' : 'Into the game cards, to find the move again on another day (with the move you played when it went wrong); nothing is scored'}
+      onClick={() => void saveStormMistake(props.item)}
+    >
+      {saved ? 'Saved as a mistake' : 'Save as a mistake'}
+    </button>
   );
 }
 
@@ -1015,6 +1035,7 @@ function Review(props: { s: StormSession; scope: StormScopeData }) {
               <button type="button" class="secondary" title="The analysis board, with the engine and the explorer; “Back to the storm” comes back here" onClick={() => analyse(item, props.scope.route, at)}>
                 Analyse <kbd>A</kbd>
               </button>
+              <SaveMistake item={item} />
             </div>
             <div class="storm-list-wrap">
               <div class="storm-list-head">

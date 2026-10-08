@@ -9,7 +9,8 @@ import { sequenceItem, sequenceLines, sequenceSaved, validateSequence, type Sequ
 import { positionOf } from '../core/storm/walk.ts';
 import { makeFen } from 'chessops/fen';
 import { startPosition } from '../core/study/tree.ts';
-import type { Chapter } from '../core/study/model.ts';
+import { header, type Chapter, type MoveNode } from '../core/study/model.ts';
+import { parseSan } from 'chessops/san';
 import { gameDeck, savedDeck } from './games.ts';
 import { recordEvent } from './state.ts';
 import { analyseForStorm } from './stormEngine.ts';
@@ -32,13 +33,25 @@ const narrow = () => typeof matchMedia !== 'undefined' && matchMedia('(max-width
 
 /** The board's lines, checked by Stockfish; `progress` hears each position as it is asked. */
 export async function checkSequence(c: Chapter, progress: (done: number, of: number) => void = () => undefined): Promise<CheckResult> {
-  const start = startPosition(c);
+  const start = startPosition(c)?.clone();
   if (!start) return { ok: false, error: 'the board’s start position can’t be read' };
+  // The drill asks the first move: it starts where the board's side is to move (mistake-lab's
+  // rule). A board that starts a move earlier (the storm's: the move that led there) starts after
+  // it, when it is the only one.
+  const color = header(c, 'Orientation') === 'black' ? 'black' : header(c, 'Orientation') === 'white' ? 'white' : start.turn;
+  let root: { children: readonly MoveNode[] } = c.root;
+  let lead: string[] = [];
+  if (start.turn !== color) {
+    const only = root.children.length === 1 ? root.children[0]! : undefined;
+    const move = only && parseSan(start, only.san);
+    if (!only || !move) return { ok: false, error: `A sequence starts with your move (${color}): the board starts with ${start.turn} to move, so play a single ${start.turn} move first, then the lines from there.` };
+    start.play(move);
+    root = only;
+    lead = [only.san];
+  }
   const startFen = makeFen(start.toSetup());
-  // The drill asks the first move: the start must be the user's move (mistake-lab's rule).
-  const color = start.turn;
-  const lines = sequenceLines(startFen, c.root, color);
-  if (!lines.length) return { ok: false, error: 'Play the sequence on the board first: the lines you build become the drill (branches become its other lines).' };
+  const lines = sequenceLines(startFen, root, color).map((l) => l.map((m) => ({ ...m, path: [...lead, ...m.path] })));
+  if (!lines.length || !lines[0]![0]?.user) return { ok: false, error: 'Play the sequence on the board first: the lines you build become the drill (branches become its other lines).' };
   const fens = [...new Set(lines.flatMap((l) => l.filter((m) => m.user).map((m) => m.before)))];
   const pvs = new Map<string, MoverLine[]>();
   for (const [i, fen] of fens.slice(0, MAX_CHECKED).entries()) {

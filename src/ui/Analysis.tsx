@@ -77,11 +77,9 @@ export function AnalysisHead() {
       >
         Practise
       </button>
-      {seq && (
-        <button type="button" class="secondary" title="Save the lines on the board as a drill: the main line first, each branch another line" onClick={() => setSaving(true)}>
-          Save as a sequence…
-        </button>
-      )}
+      <button type="button" class="secondary" disabled={!c?.root.children.length} title={c?.root.children.length ? 'Save the lines on the board as a drill: the main line first, each branch another line' : 'Play the sequence on the board first'} onClick={() => setSaving(true)}>
+        Save as a sequence…
+      </button>
       {adding && c && <AddDialog targets={targetsFor(c)} sans={line} onClose={() => setAdding(false)} />}
       {saving && c && <SequenceDialog chapter={c} seq={seq} onClose={() => setSaving(false)} />}
     </div>
@@ -213,9 +211,14 @@ function SequenceDialog(props: { chapter: Chapter; seq: string | undefined; onCl
         <div class="dialog-buttons">
           <span class="spacer" />
           {saved ? (
-            <a class="button" href="#/games">
-              Back to the games
-            </a>
+            <>
+              <button type="button" class="secondary" onClick={props.onClose}>
+                Close
+              </button>
+              <a class="button" href="#/games">
+                {props.seq ? 'Back to the games' : 'To the games'}
+              </a>
+            </>
           ) : (
             <>
               <button type="button" class="secondary" onClick={props.onClose}>

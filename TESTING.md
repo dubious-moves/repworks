@@ -247,6 +247,10 @@ explorer's Eval column too far from the move (§5.67).
   answers only. On the desktop the position list sits beside the board under Try again and
   Analyse, scrolling itself; "Show lines" puts each position's line under its row and is
   remembered.
+- §5.74 (desktop, then phone): in the storm's review, "Save as a mistake" on a mistake and on a
+  great answer, then both in Games → Review ("Find a better move than …" and "Find the best
+  move"). Analyse a storm card and "Save as a sequence…": the drill starts at your move. On the
+  analysis board from the home screen, a few moves and "Save as a sequence…", then drilled.
 
 ## Phase 5
 

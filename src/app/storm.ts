@@ -15,6 +15,9 @@ import { setHeld, setOutcome, type SetOutcome } from '../core/storm/set.ts';
 import { decisions, frontiers, inScope, lineInScope, stormLines, type DecisionPoint, type Frontier, type StormLine, type StormScope } from '../core/storm/sources.ts';
 import { drawOrder, noteRecent, stormAnswer, stormHistories, takeSpread, type StormHistory } from '../core/storm/store.ts';
 import type { Verdict } from '../core/storm/verdict.ts';
+import { gameCard } from '../core/progress/cards.ts';
+import { practiceMistakeSaved, stormMistakeItem } from '../core/games/saved.ts';
+import { savedDeck } from './games.ts';
 import { drawFrontier, fenAfterUci, positionOf, uciToSan } from '../core/storm/walk.ts';
 import type { Chapter } from '../core/study/model.ts';
 import { positionAt } from '../core/study/tree.ts';
@@ -864,6 +867,32 @@ export function retryFromReview(index: number | undefined): void {
     const { retry: _gone, ...rest } = s;
     stormSession.value = rest;
   }
+}
+
+/* ------------------------------------------------------------------ save as a mistake (§5.74) */
+
+/** What a storm card saves as a mistake: its position, and the move played when it went wrong (not a puzzle's). */
+function stormMistake(item: StormItem) {
+  const fen = item.puzzle ? item.puzzle.fen : item.card.fen;
+  const color = item.puzzle ? item.puzzle.solver : (positionOf(fen)?.turn ?? item.card.side);
+  const v = item.answer;
+  const wrong = !item.puzzle && v && (v.band === 'ok' || v.band === 'bad' || v.band === 'blunder') && v.userUci && v.userSan;
+  const move = wrong ? { san: v.userSan!, uci: v.userUci!, wpDrop: v.wp ?? 0, cpLoss: v.loss ?? 0 } : undefined;
+  return { fen, color, move, item: stormMistakeItem({ fen, color, ...(move ? { move } : {}), now: Date.now(), from: item.card.card }) };
+}
+
+/** Whether the card is in the game cards already (its position, and the same move or none). */
+export function stormMistakeSaved(item: StormItem): boolean {
+  const m = stormMistake(item);
+  return !!m.item && practiceMistakeSaved(savedDeck.value, m.fen, m.item.san);
+}
+
+/** Saves a storm card as a mistake in the game cards, answered well or not; nothing is scored. */
+export async function saveStormMistake(item: StormItem): Promise<boolean> {
+  const m = stormMistake(item);
+  if (!m.item || practiceMistakeSaved(savedDeck.value, m.fen, m.item.san)) return false;
+  await recordEvent({ t: new Date().toISOString(), k: 'saved', card: gameCard(m.item.pid), item: { ...m.item } });
+  return true;
 }
 
 const chapterOf = (p: StoredPosition): string | undefined => (p.lines[0] ? `${p.lines[0].sid}/${p.lines[0].cid}` : undefined);

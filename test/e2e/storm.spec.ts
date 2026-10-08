@@ -234,6 +234,23 @@ test('the storm: positions gathered, a great move and a mistake scored, the revi
   await page.goBack();
   await expect(page.getByTestId('storm-summary')).toContainText('1 point from 2 answered');
 
+  // The analysis board saves a sequence from the user's move, past the move that led there (§5.74).
+  const mine = (await rows.nth(1).locator(':scope > span').nth(1).textContent())!;
+  await page.getByRole('button', { name: /^Analyse/ }).click();
+  await page.getByRole('button', { name: 'Save as a sequence…' }).click();
+  await expect(page.getByTestId('sequence-main')).toHaveText(mine);
+  await page.getByTestId('sequence-dialog').getByRole('button', { name: 'Cancel' }).click();
+  await page.getByRole('button', { name: '← Back to the storm' }).click();
+
+  // Save as a mistake (§5.74): the mistake with its move, the great answer with none.
+  await expect(page.locator('.storm-row.current')).toContainText('Mistake');
+  await page.getByTestId('storm-save-mistake').click();
+  await expect(page.getByTestId('storm-save-mistake')).toHaveText('Saved as a mistake');
+  await rows.nth(0).click();
+  await expect(page.getByTestId('storm-save-mistake')).toHaveText('Save as a mistake');
+  await page.getByTestId('storm-save-mistake').click();
+  await expect(page.getByTestId('storm-save-mistake')).toBeDisabled();
+
   // Two answers in the log, synced.
   await page.getByRole('button', { name: 'Done' }).click();
   await expect(page.getByTestId('storm-count')).toContainText(`${ready - 1} positions ready`);
@@ -248,6 +265,9 @@ test('the storm: positions gathered, a great move and a mistake scored, the revi
   const log = [...w.git.textsOf()].filter(([p]) => p.startsWith('progress/')).map(([, t]) => t).join('');
   expect(log).toContain('"b":"great"');
   expect(log).toContain('"b":"bad"');
+  expect(log).toContain(`"san":"${mine}"`);
+  expect((log.match(/"k":"saved","card":"m\|_storm_\d+_\d+","item":\{"kind":"mistake"/g) ?? []).length).toBe(2);
+  expect(log).toContain('"san":"","uci":""');
   // The record on the home.
   await expect(page.locator('.storm-record').first()).toContainText('2 answered · 50% found');
   // …and by study: the answers' chapters, from the positions' lines.

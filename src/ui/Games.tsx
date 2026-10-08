@@ -665,14 +665,14 @@ function Card(props: { s: GameSession; r: CardRun }) {
   const j = r.judged;
   const cls = j ? CLASSIFICATION[j.classification] : undefined;
   const graded = s.results.get(r.card.card);
-  const prompt = item.kind === 'tactic' ? 'Find the tactic' : item.kind === 'mistake' ? `Find a better move than ${item.san}` : '';
+  const prompt = item.kind === 'tactic' ? 'Find the tactic' : item.kind === 'mistake' ? (item.san ? `Find a better move than ${item.san}` : 'Find the best move') : '';
   return (
     <div class="train-grid game-card" data-phase={s.phase} data-card={r.card.card} data-kind={item.kind} data-step={r.tactic?.played.length ?? (r.lastUci ? 1 : 0)}>
       <PlayBoard run={r} asking={asking} arrows={arrows} />
       <div class="train-panel">
         <p class="train-counters">
           {s.index + 1} of {s.cards.length} · {KIND_WORD[item.kind]}
-          {game ? ` · ${game.speed} against ${opponentOf(game).name}` : ` · ${openingNameOf(item.fenBefore) || 'from practice'}`}
+          {game ? ` · ${game.speed} against ${opponentOf(game).name}` : ` · ${openingNameOf(item.fenBefore) || (item.gameId.startsWith('_storm_') ? 'from the storm' : 'from practice')}`}
           {item.kind === 'mistake' && item.timeTrouble && <span title="Time trouble: under 45 s left and under 10 s spent"> · ⏱ time trouble</span>}
           <RecidBadge pid={item.pid} />
         </p>
@@ -703,7 +703,8 @@ function Card(props: { s: GameSession; r: CardRun }) {
         {(r.revealed || s.phase === 'right') && r.bestSan && item.kind === 'mistake' && (
           <p class="muted" data-testid="game-best">
             Best: {r.bestSan}
-            {r.bestLine && r.bestLine.length > 1 ? ` (${r.bestLine.join(' ')})` : ''} · played in the game: {item.san}
+            {r.bestLine && r.bestLine.length > 1 ? ` (${r.bestLine.join(' ')})` : ''}
+            {item.san ? ` · played ${item.gameId.startsWith('_storm_') ? 'in the storm' : 'in the game'}: ${item.san}` : ''}
           </p>
         )}
         {r.line && <LinePanel line={r.line} busy={!!r.lineBusy} wrong={s.phase === 'wrong'} />}

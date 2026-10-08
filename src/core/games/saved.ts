@@ -5,7 +5,8 @@
 //   alternative; each user move checked against the engine's lines within 5 points of win%,
 //   `validateSequenceLines`; deduplicated by the start and the main line, `_chainSig`);
 // - a practice mistake: a move given up more than 2 points in a practice game's review
-//   (`savePracticeMistake`, deduplicated by the position and the move).
+//   (`savePracticeMistake`, deduplicated by the position and the move); a storm position saved
+//   the same way (§5.74), with no move when it was answered well.
 // Pure: the time and the random part of an id come in.
 import { Chess, type Position } from 'chessops/chess';
 import { makeFen, parseFen } from 'chessops/fen';
@@ -14,7 +15,7 @@ import { isNormal } from 'chessops/types';
 import { keyFen } from '../chess/positionKey.ts';
 import { parseUciMove, standardUci } from '../chess/uci.ts';
 import { gameCard } from '../progress/cards.ts';
-import type { RootNode, MoveNode } from '../study/model.ts';
+import type { MoveNode } from '../study/model.ts';
 import type { DeviceEvent } from '../progress/replay.ts';
 import { winPct, type MistakeItem, type TacticItem } from './extract.ts';
 import type { MoverLine } from './grade.ts';
@@ -47,9 +48,10 @@ export function readSavedItem(o: unknown): SavedItem | undefined {
   if (num(o['savedAt']) !== undefined) extra.savedAt = num(o['savedAt'])!;
   if (str(o['from'])) extra.from = str(o['from'])!;
   if (o['kind'] === 'mistake') {
-    const san = str(o['san']);
-    const uci = str(o['uci']);
-    if (!san || !uci || !UCI.test(uci)) return undefined;
+    // A storm position saved with no move to beat (§5.74) has neither.
+    const san = str(o['san']) ?? '';
+    const uci = str(o['uci']) ?? '';
+    if (!san !== !uci || (uci && !UCI.test(uci))) return undefined;
     const item: MistakeItem = {
       kind: 'mistake',
       pid,
@@ -130,7 +132,7 @@ function positionFrom(fen: string): Position | undefined {
  * The tree's lines (mistake-lab's `analysisTreeToSequenceLines`): the first-child chain first,
  * then every other root-to-leaf path, depth first. A move is the user's where `color` is to move.
  */
-export function sequenceLines(startFen: string, root: RootNode, color: Color): SequenceMove[][] {
+export function sequenceLines(startFen: string, root: { readonly children: readonly MoveNode[] }, color: Color): SequenceMove[][] {
   const start = positionFrom(startFen);
   if (!start) return [];
   const lines: SequenceMove[][] = [];
@@ -286,6 +288,39 @@ export function practiceMistakeItem(a: { move: JudgedMove; color: Color; now: nu
     cpAfter: Math.round(m.bestCp - m.cpLoss),
     cpLoss: Math.round(m.cpLoss),
     wpDrop: m.wpDrop,
+    timeTrouble: false,
+    savedAt: a.now,
+  };
+  if (a.from) item.from = a.from;
+  return item;
+}
+
+/**
+ * A storm position saved as a mistake (§5.74), whatever its answer: the move played when it gave
+ * up more than 2 points (the practice rule), otherwise none (`san` and `uci` ''), and the drill
+ * asks for the best move.
+ */
+export function stormMistakeItem(a: { fen: string; color: Color; move?: { san: string; uci: string; wpDrop: number; cpLoss: number }; now: number; from?: string }): MistakeItem | undefined {
+  const k = keyFen(a.fen);
+  if (!k) return undefined;
+  const m = a.move && a.move.wpDrop > PRACTICE_MISTAKE_WP && UCI.test(a.move.uci) && a.move.san ? a.move : undefined;
+  const gameId = `_storm_${a.now}`;
+  const before = plyBefore(a.fen);
+  const cpLoss = m ? Math.round(m.cpLoss) : 0;
+  const item: MistakeItem = {
+    kind: 'mistake',
+    pid: `${gameId}_${before}`,
+    gameId,
+    ply: before + 1,
+    fenBefore: a.fen,
+    key: k.key,
+    color: a.color,
+    san: m?.san ?? '',
+    uci: m?.uci ?? '',
+    cpBefore: 0,
+    cpAfter: cpLoss ? -cpLoss : 0,
+    cpLoss,
+    wpDrop: m ? Math.round(m.wpDrop * 10) / 10 : 0,
     timeTrouble: false,
     savedAt: a.now,
   };

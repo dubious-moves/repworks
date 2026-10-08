@@ -13,7 +13,7 @@ import { addLine, newChapter } from '../../../../src/core/study/ops.ts';
 import type { Chapter } from '../../../../src/core/study/model.ts';
 import { parseLog } from '../../../../src/core/progress/events.ts';
 import { toDeviceEvents, type DeviceEvent } from '../../../../src/core/progress/replay.ts';
-import { practiceMistakeItem, practiceMistakeSaved, readSavedItem, savedItems, sequenceItem, sequenceLines, sequenceSaved, validateSequence } from '../../../../src/core/games/saved.ts';
+import { practiceMistakeItem, practiceMistakeSaved, readSavedItem, savedItems, sequenceItem, stormMistakeItem, sequenceLines, sequenceSaved, validateSequence } from '../../../../src/core/games/saved.ts';
 import { deckOf } from '../../../../src/core/games/deck.ts';
 
 interface Case {
@@ -108,6 +108,26 @@ test('a practice mistake: past 2 points only, deduplicated by position and move'
   assert.equal(item.cpAfter, -40);
   assert.equal(practiceMistakeSaved([item], F, 'd3'), true);
   assert.equal(practiceMistakeSaved([item], F, 'c3'), false);
+});
+
+test('a storm position saved as a mistake: its move past 2 points, otherwise none; read back either way (§5.74)', () => {
+  const bad = stormMistakeItem({ fen: F, color: 'white', move: { san: 'd3', uci: 'd2d3', wpDrop: 6.44, cpLoss: 90 }, now: 7, from: 's|k' })!;
+  assert.equal(bad.pid, '_storm_7_6');
+  assert.deepEqual([bad.san, bad.uci, bad.wpDrop, bad.cpLoss, bad.from], ['d3', 'd2d3', 6.4, 90, 's|k']);
+  // Answered well (or not at all): the position only.
+  const good = stormMistakeItem({ fen: F, color: 'white', move: { san: 'O-O', uci: 'e1g1', wpDrop: 0.5, cpLoss: 5 }, now: 8 })!;
+  assert.deepEqual([good.san, good.uci, good.wpDrop], ['', '', 0]);
+  assert.deepEqual(stormMistakeItem({ fen: F, color: 'white', now: 9 })!.san, '');
+  assert.equal(stormMistakeItem({ fen: 'not a fen', color: 'white', now: 9 }), undefined);
+  // Through JSON, as the event holds it.
+  const back = (i: object) => readSavedItem(JSON.parse(JSON.stringify(i)));
+  assert.deepEqual(back(bad), bad);
+  assert.deepEqual(back(good), good);
+  assert.deepEqual(back({ ...good, san: undefined, uci: undefined }), good);
+  // A move half there is no item.
+  assert.equal(back({ ...good, san: 'd3' }), undefined);
+  assert.equal(practiceMistakeSaved([good], F, ''), true);
+  assert.equal(practiceMistakeSaved([good], F, 'd3'), false);
 });
 
 let n = 0;
