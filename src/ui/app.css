@@ -2797,7 +2797,7 @@ a.button.secondary {
 }
 
 /* The storm (PLAN.md §5.43, §5.46): one five-step ramp for the bands (green, dim green, neutral,
-   amber, red), the clock, the review's rows and the record's bar. */
+   amber, red), carried as --band-color by a band-* class, so a row, a mark and a bar read it alike. */
 
 .storm {
   --band-great: #5fbf55;
@@ -2805,91 +2805,508 @@ a.button.secondary {
   --band-ok: #9a9a9a;
   --band-bad: #d6a13a;
   --band-blunder: #d9604a;
+  --storm-cell: rgb(255 255 255 / 4%);
 }
 
-.storm-verdict.band-great,
-.storm-row.band-great {
-  color: var(--band-great);
+.storm .band-great {
+  --band-color: var(--band-great);
 }
 
-.storm-verdict.band-good,
-.storm-row.band-good {
-  color: var(--band-good);
+.storm .band-good {
+  --band-color: var(--band-good);
 }
 
-.storm-verdict.band-bad,
-.storm-row.band-bad {
-  color: var(--band-bad);
+.storm .band-ok {
+  --band-color: var(--band-ok);
 }
 
-.storm-verdict.band-blunder,
-.storm-row.band-blunder {
-  color: var(--band-blunder);
+.storm .band-bad {
+  --band-color: var(--band-bad);
 }
 
-.storm-clock {
+.storm .band-blunder {
+  --band-color: var(--band-blunder);
+}
+
+.storm .band-unknown,
+.storm .band-unanswered,
+.storm .band-checking {
+  --band-color: var(--muted);
+}
+
+.storm button.primary,
+.analysis-head .storm-back {
+  background: #2f6b3e;
+  border-color: #4c9a5c;
+  font-weight: 600;
+}
+
+.storm kbd {
+  margin-left: 6px;
+  padding: 1px 4px;
+  border: 1px solid rgb(255 255 255 / 22%);
+  border-radius: 3px;
+  color: var(--muted);
+  font: 600 0.68rem/1.2 ui-monospace, monospace;
+  vertical-align: 1px;
+}
+
+@media (pointer: coarse) {
+  .storm kbd {
+    display: none;
+  }
+}
+
+/* The home: the count and Start first, then gathering, puzzles and the record. */
+
+.storm-home {
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.storm-scope {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  margin-bottom: 4px;
+}
+
+.storm-scope select {
+  max-width: 100%;
+}
+
+.storm-ready {
+  margin: 10px 0 4px;
+}
+
+.storm-count {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.storm-count strong {
+  margin-right: 4px;
+  font-size: 2.2rem;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
+}
+
+.storm-spread {
+  margin: 2px 0 0;
+}
+
+.storm-start button {
+  min-width: 140px;
+}
+
+.storm-about {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+}
+
+.storm-gather-card > p {
+  margin: 4px 0;
+}
+
+.storm-progress {
+  height: 6px;
+  margin: 10px 0 4px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: rgb(255 255 255 / 8%);
+}
+
+.storm-progress span {
+  display: block;
+  height: 100%;
+  background: var(--band-great);
+  transition: width 0.3s;
+}
+
+.storm-settings {
+  margin-top: 8px;
+}
+
+.storm-settings summary,
+.storm-puzzles summary {
+  min-height: 32px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.storm-settings-grid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+  margin-top: 6px;
+}
+
+.storm-settings-grid label.check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.storm-share {
+  color: var(--muted);
+}
+
+.storm-puzzles input[type='url'] {
+  width: 100%;
+  margin-top: 6px;
+}
+
+/* A card: the head (clock, points, streak), the session's marks, where the card is, the status. */
+
+.storm-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.storm-hud {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.storm-hud-set {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.storm-hud-cell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.storm-hud-label {
+  color: var(--muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.storm-hud-value,
+.storm-clock {
+  font-size: 1.7rem;
   font-weight: 700;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+
+.storm-clock.stopped {
+  opacity: 0.6;
 }
 
 .storm-clock.low {
   color: var(--band-bad);
 }
 
-.storm-best {
+.storm-combo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 1.95rem;
+}
+
+.storm-combo-bar {
+  flex: 1;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: rgb(255 255 255 / 10%);
+}
+
+.storm-combo-bar span {
+  display: block;
+  height: 100%;
+  background: var(--band-great);
+  transition: width 0.25s;
+}
+
+.storm-mult {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.storm-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.storm-strip li {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--band-color, rgb(255 255 255 / 15%));
+}
+
+.storm-strip li.current {
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--text);
+}
+
+.storm-where {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  margin: 0;
+}
+
+.storm-moves {
+  font-variant-numeric: tabular-nums;
+}
+
+.storm-past {
+  font-size: 0.9rem;
+}
+
+.storm-status {
+  min-height: 78px;
+  padding: 8px 12px;
+  border-left: 4px solid var(--band-color, rgb(255 255 255 / 25%));
+  border-radius: 0 8px 8px 0;
+  background: var(--surface);
+}
+
+.storm-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--band-color, var(--text));
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.storm-line {
+  margin: 2px 0 0;
   overflow-wrap: anywhere;
 }
 
-.storm-settings label {
-  display: inline-block;
-  margin: 2px 0;
+.storm-side {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border: 1px solid #8a8a8a;
+  border-radius: 50%;
+}
+
+.storm-side.side-white {
+  background: #f2f2f2;
+}
+
+.storm-side.side-black {
+  background: #1b1b1b;
+}
+
+.storm-delta {
+  padding: 0 8px;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 10%);
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.storm-delta.up {
+  color: var(--band-great);
+}
+
+.storm-delta.down {
+  color: var(--band-blunder);
+}
+
+.storm-best {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.storm-best.est {
+  font-style: italic;
+}
+
+.storm-hint {
+  margin: 0;
+}
+
+/* The time left before the next card comes by itself. */
+.storm-next {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgb(255 255 255 / 8%);
+}
+
+.storm-next span {
+  display: block;
+  height: 100%;
+  background: var(--muted);
+  transform-origin: left;
+  animation: storm-next linear forwards;
+}
+
+@keyframes storm-next {
+  from {
+    transform: scaleX(1);
+  }
+
+  to {
+    transform: scaleX(0);
+  }
+}
+
+.storm .train-actions {
+  margin: 0;
+}
+
+.storm-end {
+  margin-left: auto;
+}
+
+.storm-draw.on {
+  background: var(--warn);
+  color: #1b1b1b;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .storm .touch-only {
+    display: none;
+  }
+}
+
+/* On a narrow screen the head goes above the board, where the eye is. */
+@media (max-width: 899px) {
+  .storm-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .storm-card > .storm-panel {
+    display: contents;
+  }
+
+  .storm-card .storm-hud {
+    order: -1;
+    padding: 6px 10px;
+  }
+
+  .storm-card .storm-hud-value,
+  .storm-card .storm-clock {
+    font-size: 1.35rem;
+  }
+
+  .storm-card .storm-status {
+    min-height: 64px;
+  }
+}
+
+/* The review: the session's result, the position picked, every position. */
+
+.storm-review {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.storm-result-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+}
+
+.storm-result-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 96px;
+}
+
+.storm-result-score strong {
+  font-size: 2.5rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.storm-result-score span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.storm-result-facts {
+  flex: 1;
+  min-width: 200px;
+}
+
+.storm-result-facts p {
+  margin: 2px 0 6px;
+}
+
+.storm-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.storm-nav button {
+  min-width: 44px;
+  padding: 0;
+  font-size: 1.3rem;
+}
+
+.storm-nav-count {
+  flex: 1;
+  color: var(--muted);
+  text-align: center;
 }
 
 .storm-bar {
   display: flex;
   height: 10px;
-  border-radius: 5px;
   overflow: hidden;
-  background: var(--surface);
+  border-radius: 5px;
+  background: rgb(255 255 255 / 6%);
 }
 
-.storm-bar .band-great {
-  background: var(--band-great);
-}
-
-.storm-bar .band-good {
-  background: var(--band-good);
-}
-
-.storm-bar .band-ok {
-  background: var(--band-ok);
-}
-
-.storm-bar .band-bad {
-  background: var(--band-bad);
-}
-
-.storm-bar .band-blunder {
-  background: var(--band-blunder);
+.storm-bar span {
+  background: var(--band-color);
 }
 
 .storm-list {
-  list-style: none;
-  padding: 0;
   margin: 12px 0;
+  padding: 0;
+  list-style: none;
 }
 
 .storm-row {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) 4em 6.5em 3.5em 4em;
+  grid-template-columns: minmax(0, 2fr) 4em 7.5em 3.5em 4em;
   gap: 6px;
   width: 100%;
-  text-align: left;
-  background: none;
-  border: 0;
-  border-left: 3px solid transparent;
-  padding: 6px 8px;
   min-height: 36px;
+  padding: 6px 8px;
+  border: 0;
+  border-left: 3px solid var(--band-color, transparent);
+  border-radius: 0;
+  background: none;
+  color: var(--text);
+  text-align: left;
+}
+
+.storm-row:hover {
+  background: var(--storm-cell);
 }
 
 .storm-row > span {
@@ -2898,14 +3315,24 @@ a.button.secondary {
   white-space: nowrap;
 }
 
+.storm-row > span:nth-child(3) {
+  color: var(--band-color, var(--muted));
+}
+
+.storm-row-n {
+  display: inline-block;
+  min-width: 1.6em;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .storm-row.current {
-  background: rgb(255 255 255 / 8%);
-  border-left-color: currentcolor;
+  background: rgb(255 255 255 / 9%);
 }
 
 @media (max-width: 480px) {
   .storm-row {
-    grid-template-columns: minmax(0, 1fr) 3.5em 5.5em 3em;
+    grid-template-columns: minmax(0, 1fr) 3.5em 7em 3em;
   }
 
   .storm-row > span:last-child {
@@ -2921,8 +3348,8 @@ a.button.secondary {
 
 .storm-chapters th,
 .storm-chapters td {
-  text-align: left;
   padding: 4px 6px;
+  text-align: left;
 }
 
 .storm-chapters .bar-cell {
@@ -2935,22 +3362,10 @@ a.button.secondary {
   padding: 0;
   border: 0;
   background: none;
+  color: #8fb4f0;
   font: inherit;
   text-align: left;
-  color: #8fb4f0;
   cursor: pointer;
-}
-
-.storm-scope {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 14px;
-  margin-bottom: 8px;
-}
-
-.storm-scope select {
-  max-width: 100%;
 }
 
 @media (max-width: 480px) {
@@ -2958,11 +3373,6 @@ a.button.secondary {
   .storm-chapters .bar-cell {
     display: none;
   }
-}
-
-.storm-puzzles input[type='url'] {
-  width: 100%;
-  margin-top: 6px;
 }
 
 /* The games (PLAN.md §5.54, §5.55). */

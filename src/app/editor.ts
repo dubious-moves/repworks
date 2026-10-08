@@ -91,7 +91,7 @@ const SCRATCH_KEY = 'repworks-analysis';
 const SCRATCH_META: StudyMeta = { format: 1, id: SCRATCH, name: 'Analysis board', kind: 'reference', chapters: [] };
 
 /** A chapter for the board from `fen` (the start when none), or the board as last left. */
-function scratchChapter(fen: string | undefined): { chapter: Chapter } | { error: string } {
+function scratchChapter(fen: string | undefined, side?: 'white' | 'black'): { chapter: Chapter } | { error: string } {
   if (!fen) {
     try {
       const saved = localStorage.getItem(SCRATCH_KEY);
@@ -101,7 +101,7 @@ function scratchChapter(fen: string | undefined): { chapter: Chapter } | { error
       // a new board, then
     }
   }
-  const turn = fen?.split(/\s+/)[1] === 'b' ? 'black' : 'white';
+  const turn = side ?? (fen?.split(/\s+/)[1] === 'b' ? 'black' : 'white');
   const made = newChapter(SCRATCH, 'Analysis board', 'Analysis board', turn, fen && fen.trim() !== START_FEN ? fen.trim() : undefined);
   return made.ok ? { chapter: made.value } : { error: made.error };
 }
@@ -114,26 +114,37 @@ effect(() => {
     scratchKey = '';
     return;
   }
-  const key = `${m.fen ?? ''}|${m.from ? `${m.from.sid}/${m.from.cid}` : ''}`;
+  const key = `${m.fen ?? ''}|${m.from ? `${m.from.sid}/${m.from.cid}` : ''}|${(m.line ?? []).join(',')}`;
   if (key === scratchKey) return;
   scratchKey = key;
-  openScratch(m.fen);
+  openScratch(m.fen, m.line, m.show, m.side);
 });
 
-/** Opens the analysis board from `fen` (the board as last left when none). */
-export function openScratch(fen: string | undefined): boolean {
-  const made = scratchChapter(fen);
+/**
+ * Opens the analysis board from `fen` (the board as last left when none); `line`, when given, is
+ * its main line from there (moves that don't play are left off), shown after `show` moves (all).
+ */
+export function openScratch(fen: string | undefined, line?: readonly string[], show?: number, side?: 'white' | 'black'): boolean {
+  const made = scratchChapter(fen, side);
   if ('error' in made) {
     feedback.value = made.error;
     return false;
   }
+  let chapter = made.chapter;
+  let path: string[] = [];
+  for (const san of line ?? []) {
+    const added = addLine(chapter, path, [san]);
+    if (!added.ok) break;
+    chapter = added.value.chapter;
+    path = [...added.value.path];
+  }
   fileText = undefined;
   study.value = { sid: SCRATCH, cid: SCRATCH, meta: SCRATCH_META, chapters: [] };
-  doc.value = startHistory(made.chapter);
+  doc.value = startHistory(chapter);
   problem.value = undefined;
   feedback.value = undefined;
-  at.value = [];
-  persist(made.chapter);
+  at.value = show === undefined ? path : path.slice(0, show);
+  persist(chapter);
   return true;
 }
 

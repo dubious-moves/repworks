@@ -132,7 +132,7 @@ test('puzzles: the size asked first, collected, dealt with the disguise, solved 
   await page.getByRole('button', { name: 'Start storm' }).click();
   await expect(page.locator('.storm-card')).toBeVisible();
   // The disguise: no rating, no depth, the same words as a position's.
-  await expect(page.getByTestId('storm-verdict')).toHaveText('Find a good move');
+  await expect(page.getByTestId('storm-verdict')).toContainText('Find a good move');
   await expect(page.locator('.storm-card .train-line')).not.toContainText('past the line');
   await expect(page.locator('.storm-card')).not.toContainText('rated');
 
@@ -150,7 +150,7 @@ test('puzzles: the size asked first, collected, dealt with the disguise, solved 
   await expect(page.getByTestId('storm-verdict')).toContainText('Not the solution');
   await expect(page.getByTestId('storm-points')).toHaveText('0');
 
-  await page.getByRole('button', { name: 'End' }).click();
+  await page.getByRole('button', { name: /^End/ }).click();
   const rows = page.locator('.storm-row');
   await expect(rows.nth(0)).toContainText('Solved');
   await expect(rows.nth(1)).toContainText('Not the solution');

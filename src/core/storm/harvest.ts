@@ -17,7 +17,7 @@ import type { StormConfig } from './config.ts';
 import { moverCp, userEval, type ScoredList, type ScoredMove } from './grade.ts';
 import { gamesFromPgn } from './games.ts';
 import type { Coverage, DecisionPoint, ExplorerReply, Frontier, LineRef } from './sources.ts';
-import { uncoveredMoves } from './sources.ts';
+import { lineRefKey, lineTail, uncoveredMoves } from './sources.ts';
 import { candidate, fenAfterUci, pickGames, positionOf, randomLine, walkGame, type Arrival, type Ask, type Candidate } from './walk.ts';
 import { positionKeyOf } from '../chess/positionKey.ts';
 
@@ -64,6 +64,9 @@ export interface Harvest {
   refused?: string;
   /** The explorer's games at the frontier: how often the line is reached (§14.19). */
   games?: number;
+  /** The games the explorer named there, and those walked this time. */
+  gameIds?: string[];
+  walked?: string[];
 }
 
 /**
@@ -83,13 +86,23 @@ export function scorer(io: HarvestIo, c: StormConfig, engineOnly: boolean): Ask 
 
 const bump = (stops: Record<string, number>, why: string) => (stops[why] = (stops[why] || 0) + 1);
 
-/** A frontier's positions (§4 stages 0–3). `games`: how many to walk (2 in a session, 4 in a gather). */
-export async function harvestFrontier(f: Frontier, cont: Coverage, io: HarvestIo, c: StormConfig, games: number): Promise<Harvest> {
+/**
+ * A frontier's positions (§4 stages 0–3). `games`: how many to walk. `skip`: games walked before
+ * (a gather's second pass, after one game at every line end): those are left out, and a frontier
+ * with no game left, or none at all, is passed for no request beyond the explorer's.
+ */
+export async function harvestFrontier(f: Frontier, cont: Coverage, io: HarvestIo, c: StormConfig, games: number, skip?: ReadonlySet<string>): Promise<Harvest> {
   const out: Harvest = { candidates: [], stops: {} };
   const covered = cont[f.side];
   const found = await io.explorer(f.fen);
   if (found) out.games = found.total;
   const ids = found?.gameIds || [];
+  out.gameIds = ids;
+  const fresh = skip ? ids.filter((id) => !skip.has(id)) : ids;
+  if (skip && !fresh.length) {
+    out.refused = 'no game left to walk';
+    return out;
+  }
   const ask = scorer(io, c, ids.length === 0);
   // Stage 0: the band, one request for the whole line.
   const first = await ask(f.fen);
@@ -110,7 +123,8 @@ export async function harvestFrontier(f: Frontier, cont: Coverage, io: HarvestIo
     out.candidates.push(...w.out);
     return out;
   }
-  const picked = pickGames(ids, games, io.rnd);
+  const picked = pickGames(fresh, games, io.rnd);
+  out.walked = picked;
   const text = await io.pgns(picked);
   for (const g of gamesFromPgn(text)) {
     const w = await walkGame(f.fen, f.side, g.sans, ask, c, covered);
@@ -194,6 +208,35 @@ export function storedPosition(cand: Candidate & { unc?: StoredPosition['unc'] }
     games: from.games ?? null,
     at,
   };
+}
+
+/** The line a position is from (its first line), as the spread keys it (lichessable §30); '' for none. */
+export function positionLineKey(p: Pick<StoredPosition, 'lines'>): string {
+  const r = p.lines[0];
+  return r ? lineRefKey(r) : '';
+}
+
+/** A FEN's ply from the start, by its move number and side; null when it has none. */
+function plyOf(fen: string): number | null {
+  const parts = fen.trim().split(/\s+/);
+  const full = Number(parts[5]);
+  if (!Number.isInteger(full) || full < 1 || (parts[1] !== 'w' && parts[1] !== 'b')) return null;
+  return 2 * (full - 1) + (parts[1] === 'b' ? 1 : 0);
+}
+
+/**
+ * Where on its line a card is, in moves: a line end's last moves ("…6. Be2 e5 7. Nb3"), or for an
+ * uncovered reply (§19) the moves up to where it was played. A chapter holds many lines, so its
+ * name alone can't tell two cards' line ends apart.
+ */
+export function positionLineLabel(p: Pick<StoredPosition, 'lines' | 'unc' | 'arrived'>): string {
+  const r = p.lines[0];
+  if (!r || !r.path.length) return '';
+  if (p.unc && p.arrived) {
+    const ply = plyOf(p.arrived.before);
+    if (ply !== null && ply <= r.path.length) return ply ? lineTail(r.path, 4, ply) : 'the start';
+  }
+  return lineTail(r.path);
 }
 
 /** A stored position's list back as a scored list. */

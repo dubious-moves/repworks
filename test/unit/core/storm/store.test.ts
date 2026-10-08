@@ -5,6 +5,10 @@
 // Controls re-run on this port (2026-10-07), each failing exactly the named assertions:
 // - the draw sorting misses first (hardest first, the rule §14.15 reversed) → "the deal order";
 // - `unknown` counted as graded → "the record's denominators".
+// Controls for the spread (2026-10-08), each failing exactly the named assertions:
+// - `drawOrder` on the raw count instead of the bucket → "reach is a bucket";
+// - `takeSpread` reduced to `queue.shift()` → both "the spread" tests;
+// - the recent window unioned into `dealt` (one tier) → "the spread: recent is a preference".
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { formatEvent, parseLog, type KnownEvent } from '../../../../src/core/progress/events.ts';
@@ -12,7 +16,7 @@ import { toDeviceEvents, type DeviceEvent } from '../../../../src/core/progress/
 import { stormCard, puzzleCard } from '../../../../src/core/progress/cards.ts';
 import type { PositionKey } from '../../../../src/core/chess/positionKey.ts';
 import { STORM as C } from '../../../../src/core/storm/config.ts';
-import { drawOrder, stormAnswer, stormHistories, stormHistory } from '../../../../src/core/storm/store.ts';
+import { drawOrder, noteRecent, reachBucket, stormAnswer, stormHistories, stormHistory, takeSpread } from '../../../../src/core/storm/store.ts';
 import { averageWp, foundShare, recordOver, stormRecord } from '../../../../src/core/storm/record.ts';
 
 const DAY = 86_400_000;
@@ -70,11 +74,65 @@ test('the deal order: done left out, unseen first, misses to the back, then deep
     ['s|missed2', { done: false, misses: 2, answers: 2 }],
     ['s|missed1', { done: false, misses: 1, answers: 1 }],
   ]);
-  const items = [{ card: 's|done' }, { card: 's|missed2' }, { card: 's|missed1' }, { card: 's|new' }, { card: 's|newdeep', deep: true }, { card: 's|newreach', games: 5000 }];
+  const items = [{ card: 's|done' }, { card: 's|missed2' }, { card: 's|missed1' }, { card: 's|new', games: 40 }, { card: 's|newdeep', deep: true }, { card: 's|newreach', games: 5000 }];
   assert.deepEqual(
     drawOrder(items, h, () => 0.5).map((i) => i.card),
     ['s|newdeep', 's|newreach', 's|new', 's|missed1', 's|missed2'],
   );
+});
+
+test('reach is a bucket: one line end’s exact count no longer deals its positions in a row', () => {
+  assert.deepEqual([reachBucket(0, 4), reachBucket(9, 4), reachBucket(10, 4), reachBucket(999, 4), reachBucket(1e6, 4), reachBucket(null, 4), reachBucket(undefined, 4)], [0, 0, 1, 2, 4, 4, 4]);
+  // Two line ends of 1,234 and 1,567 games: one bucket, so the random term mixes their positions.
+  const items = [
+    { card: 's|a1', games: 1567 },
+    { card: 's|a2', games: 1567 },
+    { card: 's|a3', games: 1567 },
+    { card: 's|b1', games: 1234 },
+    { card: 's|b2', games: 1234 },
+  ];
+  const dice = [0.9, 0.7, 0.5, 0.1, 0.3];
+  let i = 0;
+  assert.deepEqual(
+    drawOrder(items, new Map(), () => dice[i++]!).map((x) => x.card),
+    ['s|b1', 's|b2', 's|a3', 's|a2', 's|a1'],
+  );
+  // Unknown is the top bucket (lichessable §14.19): not recorded is never "no games".
+  assert.deepEqual(drawOrder([{ card: 's|few', games: 3 }, { card: 's|unknown' }], new Map(), () => 0.5).map((x) => x.card), ['s|unknown', 's|few']);
+});
+
+test('the spread: one card per line end before any comes round again, the head when nothing else', () => {
+  const key = (t: { line: string }) => t.line;
+  const q = [{ id: 1, line: 'A' }, { id: 2, line: 'A' }, { id: 3, line: 'B' }, { id: 4, line: '' }, { id: 5, line: 'C' }];
+  const dealt = new Set<string>();
+  const order: number[] = [];
+  for (let t = takeSpread(q, key, dealt, new Set()); t; t = takeSpread(q, key, dealt, new Set())) {
+    order.push(t.id);
+    dealt.add(t.line);
+  }
+  // A, then B, then the unattributed card (an empty key never blocks), then C; A's second last.
+  assert.deepEqual(order, [1, 3, 4, 5, 2]);
+  assert.equal(takeSpread([], key, dealt, new Set()), undefined);
+  // Every line dealt: the head, never withheld.
+  const all = [{ id: 7, line: 'A' }, { id: 8, line: 'B' }];
+  assert.equal(takeSpread(all, key, new Set(['A', 'B']), new Set())!.id, 7);
+  assert.equal(all.length, 1);
+});
+
+test('the spread: recent is a preference behind this session’s rule, never a filter', () => {
+  const key = (t: { line: string }) => t.line;
+  // B was dealt in a recent session, A in this one: C first, then B (recent beats a repeat), then A.
+  const q = () => [{ id: 1, line: 'A' }, { id: 2, line: 'B' }, { id: 3, line: 'C' }];
+  const dealt = new Set(['A']);
+  const recent = new Set(['B']);
+  const a = q();
+  assert.deepEqual([takeSpread(a, key, dealt, recent)!.id, takeSpread(a, key, dealt, recent)!.id, takeSpread(a, key, dealt, recent)!.id], [3, 2, 1]);
+  // Everything recent: still dealt, in order.
+  assert.equal(takeSpread(q(), key, new Set(), new Set(['A', 'B', 'C']))!.id, 1);
+  // The window: an entry moved, not duplicated, the oldest out.
+  assert.deepEqual(noteRecent(['a', 'b', 'c'], 'a', 3), ['b', 'c', 'a']);
+  assert.deepEqual(noteRecent(['a', 'b', 'c'], 'd', 3), ['b', 'c', 'd']);
+  assert.deepEqual(noteRecent(['a'], '', 3), ['a']);
 });
 
 test('the record’s denominators: positions and puzzles apart, unknown out, by chapter, sets marked', () => {

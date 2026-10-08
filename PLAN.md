@@ -7,7 +7,7 @@ where the build differed). What remains is live: the spike's re-run (§4.2), the
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
 with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
-for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. Read with `DECISIONS.md`, which this plan updates (its
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -2520,6 +2520,61 @@ lines and coverage, a transposition's shares and its gap, a conflict, FEN chapte
 own, Maia filling in, one lookup per position, the same ranking twice) and
 `test/e2e/priority.spec.ts` (desktop and phone: ranked from the fake explorer, the gap, two lines
 kept at 82%, Apply pausing the third, Add the next 10 unpausing it, the events synced).
+
+#### 5.71 The storm reworked after the owner's first test (2026-10-08)
+
+The owner's report, measured against lichessable (`b435906`): every position of a storm seemed to
+come from one game or one line end; a move played was taken back at once; an arrow drawn went at
+release; Analyse lost the storm; the screens felt low effort. What was found, and built:
+
+- **One line end dealt in a row** had two causes. `drawOrder` sorted on the raw game count, and
+  every position of one walk shares its frontier's exact count, so the most-played line end's
+  positions all came first; lichessable sorts on a bucket (`stormReachBucket`, §14.19: an order of
+  magnitude, unknown at the top), so the random term mixes line ends of the same order. And the
+  port had none of lichessable's spread (§30, §30a, §30b). Now `reachBucket` and `takeSpread`
+  (`core/storm/store.ts`): a card is taken from a line end neither dealt this session nor among
+  the last 24 dealt (`recentLines`, kept per device in `repworks-storm-recent`), else from one not
+  dealt this session, else the head; never withheld, an empty key never blocking. A set's six are
+  picked the same way. A position's line is its first line (`positionLineKey`, `sid/cid/path`); a
+  puzzle's is its anchor (`ReadyPuzzle.anchor`, kept from now on). The deepening pass takes the
+  kept positions at random, since deepened ones are dealt first among equals (§23.8).
+- **The gather is breadth-first**: one game at every line end first, then each line end's other
+  games (`harvestFrontier`'s `skip`), so a gather stopped early has positions from every line end
+  it reached rather than four games' worth from a few. The home says how many line ends the ready
+  positions come from, and asks for more gathering when they are few.
+- **The move stays on the board** through the grade and the verdict (`StormItem.played`); a held
+  set card keeps it until Try again. The verdict waits 1.2 s after a scoring move and 2.6 s after
+  any other (§18.1), with a bar for it; Next (Space) goes on at once, Pause (P) keeps the position
+  for as long as wanted (the clock is stopped then anyway).
+- **Arrows drawn on a card stay** until the next card: the board keeps them itself (`Board`'s
+  `sketchKey`), since the clock's re-render every 200 ms set them back to none. On a touch screen
+  ✎ draws, as in the study.
+- **Analyse keeps the storm.** It opens the analysis board (engine, explorer, Add to a chapter)
+  with the session kept (`suspendStorm`): from the position before the move that reached the card,
+  that move and the one played as its line, shown at the card, from the user's side (`#/analysis`
+  gains `line`, `show`, `side` and `back`). "← Back to the storm" (or the browser's Back) returns to
+  the review at the same position, or to the set where it was; anywhere else ends the session. From
+  a held set card it shows the move first (lichessable §18.4: it counts as shown). Not during a
+  timed card.
+- **The screens**: a card has a head (clock, points, the streak's bar to its next multiplier), a
+  mark per answer so far, where the card is (the chapter and the line's last moves, "…6. Be2 e5
+  7. Nb3", since a chapter holds many lines), and one status block (the band's word in its colour,
+  the points, the verdict line, the best line). On a narrow screen the head sits above the board.
+  The review opens on the session's result (points or the set's tally, found, the average given
+  up, the bands), steps through the positions with ‹ › (and ← → ↑ ↓), shows the position before
+  the move with the best (green) and the played (red) arrows, and lists every position with its
+  line. The home puts the count and Start first, then Positions (Gather, its progress, the settings
+  folded), then Puzzles and the record. Keys are shown where there is a keyboard.
+
+Tests: `store.test.ts` (the bucket; the spread's three tiers, an empty key, the head; the window),
+`harvest.test.ts` (line keys and labels; the second pass), `fsm.test.ts` (the analysis address),
+`storm.spec.ts` (desktop and phone: an arrow kept through the clock's ticks and gone at the next
+card, the move on the board through the verdict, Pause, three cards from three line ends, Analyse
+and back by the button and by Back, a held set card analysed and back, two exports a line end).
+Controls: each named in the test files' headers; the two e2e ones (the board set back to the
+card's position; the sketch removed) fail the storm test.
+
+Live: TESTING.md.
 
 #### 5.14 Phase 1 acceptance test, and exit
 

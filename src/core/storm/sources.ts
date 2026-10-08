@@ -52,6 +52,32 @@ export interface LineRef {
   path: readonly string[];
 }
 
+/** A line's key, `sid/cid/path`: what the spread (lichessable §30) counts as one line end. */
+export const lineRefKey = (r: LineRef): string => `${r.sid}/${r.cid}/${r.path.join(' ')}`;
+
+/**
+ * The plies `from`…`to` of a line from the start, numbered: "6. Be2 e5 7. Nb3", or "6... e5 7. Nb3"
+ * when it starts on Black's move. What tells two line ends of one chapter apart on a card.
+ */
+export function numberedMoves(path: readonly string[], from = 0, to = path.length): string {
+  const out: string[] = [];
+  for (let i = Math.max(0, from); i < Math.min(to, path.length); i++) {
+    const n = Math.floor(i / 2) + 1;
+    if (i % 2 === 0) out.push(`${n}. ${path[i]}`);
+    else out.push(i === from ? `${n}... ${path[i]}` : path[i]!);
+  }
+  return out.join(' ');
+}
+
+/** A line's last `plies` moves (one more to start on White's), numbered, with "…" when the line is longer. */
+export function lineTail(path: readonly string[], plies = 4, to = path.length): string {
+  const end = Math.min(to, path.length);
+  let from = Math.max(0, end - plies);
+  if (from % 2 === 1) from--;
+  const moves = numberedMoves(path, from, end);
+  return from > 0 ? `…${moves}` : moves;
+}
+
 const sideOf = (c: Chapter): Color | undefined => {
   const o = header(c, 'Orientation');
   return o === 'white' || o === 'black' ? o : undefined;

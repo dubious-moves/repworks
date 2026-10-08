@@ -6,8 +6,8 @@ import assert from 'node:assert/strict';
 import { parseChapterFile } from '../../../../src/core/pgn/parse.ts';
 import { STORM as C } from '../../../../src/core/storm/config.ts';
 import type { ScoredList, ScoredMove } from '../../../../src/core/storm/grade.ts';
-import { cdbList, deepenedPosition, engineList, harvestDecision, harvestFrontier, needsDeepening, storedList, storedPosition, type HarvestIo } from '../../../../src/core/storm/harvest.ts';
-import { decisions, frontiers, stormLines } from '../../../../src/core/storm/sources.ts';
+import { cdbList, deepenedPosition, engineList, harvestDecision, harvestFrontier, needsDeepening, positionLineKey, positionLineLabel, storedList, storedPosition, type HarvestIo } from '../../../../src/core/storm/harvest.ts';
+import { decisions, frontiers, lineTail, numberedMoves, stormLines } from '../../../../src/core/storm/sources.ts';
 import { positionOf, uciToSan } from '../../../../src/core/storm/walk.ts';
 import { standardUci } from '../../../../src/core/chess/uci.ts';
 import { positionKey } from '../../../../src/core/chess/positionKey.ts';
@@ -160,4 +160,50 @@ test('the deepened standard: a list below depth 20 doesn’t count; a deep one r
   assert.deepEqual([d.src, d.depth, d.scored[0]!.s], ['sf', 21, 30]);
   assert.equal(needsDeepening(d, C), false);
   assert.equal(deepenedPosition(p, cdbList({ status: 'ok', moves: [{ uci: 'a2a3', san: 'a3', score: 1 }] }), C), null);
+});
+
+test('a card’s line: keyed by its first line, labelled by the line end’s last moves or the moves to the reply', async () => {
+  assert.equal(numberedMoves(['e4', 'e5', 'Nf3', 'Nc6', 'Bb5']), '1. e4 e5 2. Nf3 Nc6 3. Bb5');
+  assert.equal(numberedMoves(['e4', 'e5', 'Nf3', 'Nc6', 'Bb5'], 1, 4), '1... e5 2. Nf3 Nc6');
+  assert.equal(lineTail(['e4', 'e5', 'Nf3', 'Nc6', 'Bb5', 'a6']), '…2. Nf3 Nc6 3. Bb5 a6');
+  assert.equal(lineTail(['e4', 'e5']), '1. e4 e5');
+  assert.equal(lineTail(['e4', 'e5', 'Nf3', 'Nc6', 'Bb5', 'a6', 'Ba4']), '…2. Nf3 Nc6 3. Bb5 a6 4. Ba4');
+  const lines = chapterLines('1. e4 e5 2. Nf3 Nc6 3. Bb5 (3. Bc4 Bc5 4. c3)');
+  const { frontiers: fs, cont } = frontiers(lines, C);
+  const ruy = fs.find((f) => f.lines[0]!.path.join(' ') === 'e4 e5 Nf3 Nc6 Bb5')!;
+  const h = await harvestFrontier(ruy, cont, io(), C, 2);
+  const ps = h.candidates.filter((c) => !c.reject).map((c) => storedPosition(c, { lines: ruy.lines, names: ruy.names }, 1)!);
+  assert.ok(ps.length > 1);
+  // Every position of one walk is one line end.
+  assert.deepEqual(new Set(ps.map(positionLineKey)), new Set(['S1/c1/e4 e5 Nf3 Nc6 Bb5']));
+  assert.equal(positionLineLabel(ps[0]!), '1. e4 e5 2. Nf3 Nc6 3. Bb5');
+  // An uncovered reply: the moves up to where it was played.
+  const { points } = decisions(lines);
+  const afterNf3 = points.find((p) => p.key === positionKey('rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2'))!;
+  const reply = (san: string, games: number) => ({ san, white: games, draws: 0, black: 0 });
+  const d = await harvestDecision(afterNf3, io({ explorer: async () => ({ total: 10000, moves: [reply('Nc6', 6000), reply('Nf6', 3000)], gameIds: [] }) }), C);
+  const u = storedPosition(d.candidates[0]!, { lines: afterNf3.lines, names: afterNf3.names }, 1)!;
+  assert.equal(u.unc!.san, 'Nf6');
+  assert.equal(positionLineLabel(u), '1. e4 e5 2. Nf3');
+  assert.equal(positionLineKey({ lines: [] }), '');
+});
+
+test('a gather’s second pass: the games walked before left out, nothing asked once none is left', async () => {
+  const lines = chapterLines('1. e4 e5 2. Nf3 Nc6 3. Bb5');
+  const { frontiers: fs, cont } = frontiers(lines, C);
+  const log: string[] = [];
+  const first = await harvestFrontier(fs[0]!, cont, io({}, log), C, 1);
+  assert.deepEqual(first.gameIds, ['AAAAAAAA', 'BBBBBBBB']);
+  assert.equal(first.walked!.length, 1);
+  const second = await harvestFrontier(fs[0]!, cont, io({}, log), C, 3, new Set(first.walked));
+  assert.deepEqual(second.walked, ['AAAAAAAA', 'BBBBBBBB'].filter((id) => id !== first.walked![0]));
+  assert.ok(log.includes('pgns ' + second.walked![0]));
+  // Every game walked: refused after the explorer's answer alone (no ChessDB, no export).
+  const quiet: string[] = [];
+  const third = await harvestFrontier(fs[0]!, cont, io({}, quiet), C, 3, new Set(['AAAAAAAA', 'BBBBBBBB']));
+  assert.equal(third.refused, 'no game left to walk');
+  assert.deepEqual(quiet.map((l) => l.split(' ')[0]), ['explorer']);
+  // No games at all: the invented line is the first pass's, not walked twice.
+  const none = await harvestFrontier(fs[0]!, cont, io({ explorer: async () => null }, []), C, 3, new Set());
+  assert.equal(none.refused, 'no game left to walk');
 });

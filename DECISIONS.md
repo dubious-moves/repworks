@@ -1364,3 +1364,19 @@ The technical calls, each with its reason:
   design, so listing them would bury the real holes.
 - **A paused line picked from the list shows its never-learned moves as new moves** (nothing
   recorded), rather than asking moves the owner has never seen.
+
+## Revision of 2026-10-08 (the storm after the owner's first test, PLAN.md §5.71)
+- **The deal is spread over line ends, as lichessable's is (§30, §30b)**: the port had left the
+  spread out and sorted on the raw reach, which dealt one line end's positions in a row. The reach
+  is a bucket again, and the recent window is kept per device (localStorage), not synced: which
+  lines this device dealt last is neither expensive nor useful to another device (lichessable kept
+  it local for the same reason).
+- **The gather walks one game at every line end before the rest** (a departure from lichessable,
+  whose gather walked four games at a time): what a gather costs is the same, and one stopped early
+  covers the repertoire rather than a corner of it.
+- **Analyse goes to the analysis board with the session kept**, rather than a board inside the
+  storm as lichessable's: repworks' analysis board already has the engine, the explorer, Add to a
+  chapter and practice, and a second board would drift from it. The session is let go as soon as
+  the page goes anywhere but the storm and that board.
+- **A storm's verdict can be paused** (not in lichessable): the clock is stopped between cards
+  anyway, so a position looked at for longer costs nothing.

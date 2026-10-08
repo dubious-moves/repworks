@@ -157,6 +157,8 @@ export interface ReadyPuzzle {
   gamePly: number | null;
   chapter: string;
   name: string;
+  /** The anchor's key: puzzles of one anchor are one place in the repertoire (the spread, §30). Absent on bodies kept before 2026-10-08. */
+  anchor?: string;
 }
 
 export function readyPuzzle(body: PuzzleBody, cand: PuzzleCandidate): ReadyPuzzle | null {
@@ -177,5 +179,6 @@ export function readyPuzzle(body: PuzzleBody, cand: PuzzleCandidate): ReadyPuzzl
     gamePly: cand.ply,
     chapter: cand.chapter,
     name: cand.name,
+    ...(cand.anchor ? { anchor: cand.anchor } : {}),
   };
 }

@@ -47,7 +47,10 @@ export interface StormConfig {
   randomTopN: number;
   randomTopCp: number;
   randomMinPlies: number;
-  /** Games walked from a frontier: in a session, and in a gather (§14.17.3). */
+  /**
+   * Games walked from a frontier: in a session, and in a gather (§14.17.3) — there one at every
+   * line end first, the rest in a second pass, so a gather stopped early has every line end's.
+   */
   gamesPerFrontier: number;
   gatherGamesPerFrontier: number;
   /** The relaxed explorer filter (§6.4): any human game rather than one at the user's rating. */
@@ -72,6 +75,10 @@ export interface StormConfig {
   storeMax: number;
   /** Cards kept ready while the user thinks (§8.3). */
   queueTarget: number;
+  /** The reach buckets' top (§14.19): 10^top games and more, and unknown. */
+  reachTop: number;
+  /** Line ends dealt recently, preferred against in the next sessions (§30b). */
+  recentLines: number;
   /** Stockfish in the walk, the deepened standard and the grade (§23, §26, §14.23). */
   walkDepth: number;
   walkMultipv: number;
@@ -140,6 +147,8 @@ export const STORM: StormConfig = {
   goneDays: 60,
   storeMax: 900,
   queueTarget: 3,
+  reachTop: 4,
+  recentLines: 24,
   walkDepth: 14,
   walkMultipv: 6,
   deepenDepth: 20,

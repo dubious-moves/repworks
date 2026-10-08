@@ -26,6 +26,12 @@ test('hashes parse to modes, and modes write back to the same hash', () => {
     ],
     ['#/analysis?fen=8%2F8%2F8%2F8%2F8%2F8%2F8%2FK6k%20w%20-%20-%200%201&seq=abc123XY_17', { name: 'analysis', fen: '8/8/8/8/8/8/8/K6k w - - 0 1', seq: 'abc123XY_17' }],
     ['#/analysis?fen=8%2F8%2F8%2F8%2F8%2F8%2F8%2FK6k%20w%20-%20-%200%201&seq=*', { name: 'analysis', fen: '8/8/8/8/8/8/8/K6k w - - 0 1', seq: '*' }],
+    // From a storm: the move that reached the card as the board's line, shown after it, and the way back.
+    [
+      '#/analysis?fen=8%2F8%2F8%2F8%2F8%2F8%2F8%2FK6k%20w%20-%20-%200%201&line=Ka2,Kg2&show=1&side=black&back=%23%2Fstorm%2FRep0Najd%2FCh1Najdf%3Fat%3De4%2Cc5',
+      { name: 'analysis', fen: '8/8/8/8/8/8/8/K6k w - - 0 1', line: ['Ka2', 'Kg2'], show: 1, side: 'black', back: { name: 'storm', sid: 'Rep0Najd', cid: 'Ch1Najdf', at: ['e4', 'c5'] } },
+    ],
+    ['#/analysis?fen=8%2F8%2F8%2F8%2F8%2F8%2F8%2FK6k%20w%20-%20-%200%201&line=Ka2&back=%23%2Fstorm', { name: 'analysis', fen: '8/8/8/8/8/8/8/K6k w - - 0 1', line: ['Ka2'], back: { name: 'storm' } }],
     ['#/practice?fen=8%2F8%2F8%2F8%2F8%2F8%2F8%2FK6k%20w%20-%20-%200%201&side=black', { name: 'playOn', fen: '8/8/8/8/8/8/8/K6k w - - 0 1', side: 'black' }],
     ['#/practice?fen=8%2F8%2F8%2F8%2F8%2F8%2F8%2FK6k%20w%20-%20-%200%201', { name: 'playOn', fen: '8/8/8/8/8/8/8/K6k w - - 0 1' }],
     ['#/games/history/rev_1790000000000_ab12cd', { name: 'history', id: 'rev_1790000000000_ab12cd' }],
@@ -56,6 +62,10 @@ test('hashes parse to modes, and modes write back to the same hash', () => {
   // Anything else is the list: unknown pages, malformed IDs, a path with a stray character.
   for (const hash of ['#/mistakes/other', '#/pinned/x', '#/train/short', '#/train/Rep0Najd/x', '#/train/Rep0Najd/Ch1Najdf', '#/learn/Rep0Najd', '#/coverage', '#/coverage/bad', '#/nope', '#/study/short', '#/study/Rep0Najd/bad', '#/study/Rep0Najd/Ch1Najdf/x', '#/read/Rep0Najd', '#/play/Rep0Najd/bad']) assert.deepEqual(parseHash(hash), { name: 'list' }, hash);
   assert.deepEqual(parseHash('#/study/Rep0Najd/Ch1Najdf?at=e4,<script>'), { name: 'chapter', sid: 'Rep0Najd', cid: 'Ch1Najdf' });
+  // `back` names a storm and nothing else; a bad line is left out whole.
+  assert.deepEqual(parseHash('#/analysis?back=%23%2Fstudy%2FRep0Najd'), { name: 'analysis' });
+  assert.deepEqual(parseHash('#/analysis?line=e4,<x>&show=1'), { name: 'analysis' });
+  assert.deepEqual(parseHash('#/analysis?line=e4,e5&show=2'), { name: 'analysis', line: ['e4', 'e5'] });
 });
 
 test('transitions: open, back, a missing chapter, the move shown', () => {

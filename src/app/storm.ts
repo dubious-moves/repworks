@@ -2,17 +2,18 @@
 // the gather that finds positions and keeps them on this device, and the timed storm and the
 // untimed set over them. Every answer is a `storm` progress event, so what is done and the record
 // follow the owner across devices (§5.41); the positions themselves stay here (D5's cache tier).
-import { signal } from '@preact/signals';
+import { effect, signal } from '@preact/signals';
+import type { Mode, StormMode } from '../core/app/fsm.ts';
 import { positionKeyOf } from '../core/chess/positionKey.ts';
 import type { FromWorker, ToWorker } from '../core/explorer/service.ts';
 import type { DeviceEvent } from '../core/progress/replay.ts';
 import { STORM, withPlyRange, type Band, type StormConfig } from '../core/storm/config.ts';
 import { engineLoss, grade, moveLoss, moverCp, nextStreak, points, type ScoredList } from '../core/storm/grade.ts';
-import { cdbList, deepenedPosition, engineList, harvestDecision, harvestFrontier, needsDeepening, storedList, storedPosition, type HarvestIo, type StoredPosition } from '../core/storm/harvest.ts';
+import { cdbList, deepenedPosition, engineList, harvestDecision, harvestFrontier, needsDeepening, positionLineKey, storedList, storedPosition, type HarvestIo, type StoredPosition } from '../core/storm/harvest.ts';
 import { stormRecord, type StormRecord } from '../core/storm/record.ts';
 import { setHeld, setOutcome, type SetOutcome } from '../core/storm/set.ts';
 import { decisions, frontiers, inScope, lineInScope, stormLines, type DecisionPoint, type Frontier, type StormLine, type StormScope } from '../core/storm/sources.ts';
-import { drawOrder, stormAnswer, stormHistories, type StormHistory } from '../core/storm/store.ts';
+import { drawOrder, noteRecent, stormAnswer, stormHistories, takeSpread, type StormHistory } from '../core/storm/store.ts';
 import type { Verdict } from '../core/storm/verdict.ts';
 import { drawFrontier, fenAfterUci, positionOf, uciToSan } from '../core/storm/walk.ts';
 import type { Chapter } from '../core/study/model.ts';
@@ -20,6 +21,7 @@ import { positionAt } from '../core/study/tree.ts';
 import type { Score } from '../core/engine/uci.ts';
 import { openStormStore, type StormStore } from '../platform/stormStore.ts';
 import { onWorker, postToWorker } from './explorer.ts';
+import { mode, open } from './mode.ts';
 import { recordEvent } from './state.ts';
 import { analyseForStorm, cancelStormEngine, endStormEngine } from './stormEngine.ts';
 import { trainData, type TrainData } from './train.ts';
@@ -141,6 +143,10 @@ export interface StormWhere {
 }
 
 export interface StormScopeData {
+  /** The address's scope, as a key: a session belongs to the scope it was started in. */
+  key: string;
+  /** The storm's own address, where the analysis board comes back to. */
+  route: StormMode;
   scope: StormScope;
   title: string;
   lines: StormLine[];
@@ -175,7 +181,8 @@ export function scopeData(data: TrainData, where: StormWhere): StormScopeData | 
   }
   const f = frontiers(lines, config());
   const d = decisions(lines);
-  const out: StormScopeData = { scope, title, lines, frontiers: inScope(f.frontiers, lines, scope), decisions: inScope(d.points, lines, scope), cont: f.cont };
+  const route: StormMode = { name: 'storm', ...(where.sid ? { sid: where.sid } : {}), ...(where.sid && where.cid ? { cid: where.cid } : {}), ...(where.sid && where.cid && where.at ? { at: where.at } : {}) };
+  const out: StormScopeData = { key: JSON.stringify(where), route, scope, title, lines, frontiers: inScope(f.frontiers, lines, scope), decisions: inScope(d.points, lines, scope), cont: f.cont };
   if (pausedKeys.size > 0) out.paused = true;
   return out;
 }
@@ -203,6 +210,8 @@ export interface StormHome {
   ready: number;
   /** Scored by Stockfish to the standard (§5.45). */
   deep: number;
+  /** The line ends the ready positions come from (the spread deals one per line end first, §30). */
+  lines: number;
 }
 export const stormHome = signal<StormHome | undefined>(undefined);
 
@@ -213,7 +222,8 @@ export async function refreshHome(s: StormScopeData): Promise<void> {
   const h = histories(data);
   const done = all.filter((p) => h.get(p.card)?.done).length;
   const deep = all.filter((p) => !needsDeepening(p, STORM)).length;
-  stormHome.value = { stored: all.length, done, ready: all.length - done, deep };
+  const lines = new Set(all.filter((p) => !h.get(p.card)?.done).map(positionLineKey).filter(Boolean)).size;
+  stormHome.value = { stored: all.length, done, ready: all.length - done, deep, lines };
 }
 
 /* ------------------------------------------------------------------ the gather (§5.42) */
@@ -254,6 +264,9 @@ export async function gather(s: StormScopeData): Promise<void> {
   const source = stormPrefs.value.source;
   const ends = source === 'replies' ? [] : s.frontiers.slice();
   const points = source === 'ends' ? [] : s.decisions.slice().sort((a, b) => b.n - a.n);
+  // Breadth first: one game at every line end, then (a second pass) the rest of each one's games.
+  const again: { f: Frontier; walked: Set<string> }[] = [];
+  const more = Math.max(0, STORM.gatherGamesPerFrontier - 1);
   const of = ends.length + points.length;
   const g: Gathering = { running: true, frontiers: 0, of, stored: 0, spent, note: of ? '' : 'Nothing to walk: no line in this scope ends past 4 plies.' };
   const show = () => (gathering.value = { ...g, spent: { ...spent } });
@@ -263,11 +276,20 @@ export async function gather(s: StormScopeData): Promise<void> {
     g.stored += await stormStore().addPositions(fresh, STORM.storeMax);
   };
   try {
-    while (!stopGather && (ends.length || points.length)) {
-      // Line ends and replies taken in turn, so a gather stopped early has some of each.
+    while (!stopGather && (ends.length || points.length || again.length)) {
+      // Line ends and replies taken in turn, so a gather stopped early has some of each; the
+      // second pass over the line ends once the first is done.
       if (ends.length && (!points.length || g.frontiers % 2 === 0)) {
         const f = drawFrontier(ends, Math.random)!;
-        const h = await harvestFrontier(f, s.cont, io, c, STORM.gatherGamesPerFrontier);
+        const h = await harvestFrontier(f, s.cont, io, c, more ? 1 : STORM.gatherGamesPerFrontier);
+        await keep(h.candidates, { lines: f.lines, names: f.names, games: h.games ?? null });
+        if (more && h.walked?.length && (h.gameIds?.length ?? 0) > h.walked.length) {
+          again.push({ f, walked: new Set(h.walked) });
+          g.of++;
+        }
+      } else if (!points.length) {
+        const { f, walked } = again.splice(Math.floor(Math.random() * again.length), 1)[0]!;
+        const h = await harvestFrontier(f, s.cont, io, c, more, walked);
         await keep(h.candidates, { lines: f.lines, names: f.names, games: h.games ?? null });
       } else {
         const d = points.shift()!;
@@ -315,7 +337,13 @@ export async function deepen(s: StormScopeData): Promise<void> {
   try {
     const data = trainData.value;
     const h = data ? histories(data) : new Map<string, StormHistory>();
+    // At random: the deepened are dealt first among equals (§23.8), so a pass taken in the store's
+    // order would put one corner of the repertoire at the front of every session.
     const todo = storedInScope(await stormStore().positions(), s).filter((p) => needsDeepening(p, STORM) && !h.get(p.card)?.done);
+    for (let i = todo.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [todo[i], todo[j]] = [todo[j]!, todo[i]!];
+    }
     for (const p of todo) {
       if (busy()) return;
       const a = await analyseForStorm(p.fen, STORM.deepenMultipv, STORM.deepenDepth, 60_000);
@@ -340,7 +368,7 @@ export function stopDeepening(): void {
 
 /* ------------------------------------------------------------------ a session (§5.43, §5.44) */
 
-export type StormMode = 'storm' | 'set';
+export type SessionMode = 'storm' | 'set';
 type Phase = 'solving' | 'grading' | 'verdict' | 'held' | 'done';
 
 export interface StormAnswer extends Verdict {
@@ -354,6 +382,8 @@ export interface StormItem {
   puzzle?: ReadyPuzzle;
   /** A puzzle's plies played so far (the solver's and the replies). */
   step?: number;
+  /** The move just played on the card, kept on the board through the grade and the verdict (UCI). */
+  played?: string;
   answer?: StormAnswer;
   /** The best move is shown in the review (asked for, `b`). */
   shown?: boolean;
@@ -364,7 +394,9 @@ export interface StormItem {
 }
 
 export interface StormSession {
-  mode: StormMode;
+  mode: SessionMode;
+  /** The scope's key (`StormScopeData.key`). */
+  scopeKey: string;
   title: string;
   phase: Phase;
   item: StormItem | undefined;
@@ -388,9 +420,54 @@ export interface StormSession {
   retry?: StormItem;
   /** Puzzles are in play: before a move, a puzzle and a position read the same (§13). */
   disguise: boolean;
+  /** The next card comes by itself at this time (a storm's verdict, §18.1), unless paused. */
+  nextAt?: number;
+  /** …after this long, for the bar that shows it. */
+  nextIn?: number;
+  /** Where the review was (its row), kept across a visit to the analysis board. */
+  reviewAt?: number;
 }
 
 export const stormSession = signal<StormSession | undefined>(undefined);
+
+/* The spread (lichessable §30, §30b): one card per line end before any line end comes round
+   again, and the line ends of the last sessions after the others. `recent` is read once per page
+   and kept in memory from then on (written as cards are dealt). */
+const RECENT_KEY = 'repworks-storm-recent';
+function loadRecent(): string[] {
+  try {
+    const v: unknown = JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]');
+    return Array.isArray(v) ? v.filter((k): k is string => typeof k === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+let recent: string[] | undefined;
+let recentAtStart = new Set<string>();
+let dealtLines = new Set<string>();
+const puzzleLineKey = (p: ReadyPuzzle): string => (p.anchor ? `a|${p.anchor}` : p.chapter ? `p|${p.chapter}|${p.name}` : '');
+function noteDealt(key: string): void {
+  if (!key) return;
+  dealtLines.add(key);
+  recent = noteRecent(recent ?? loadRecent(), key, STORM.recentLines);
+  try {
+    localStorage.setItem(RECENT_KEY, JSON.stringify(recent));
+  } catch {
+    // this page only
+  }
+}
+/** `n` cards out of `q`, one per line end as far as they go (a set's six, §30). */
+function spreadPick<T>(q: T[], keyOf: (t: T) => string, n: number): T[] {
+  const out: T[] = [];
+  const used = new Set<string>();
+  while (out.length < n && q.length) {
+    const t = takeSpread(q, keyOf, used, recentAtStart)!;
+    used.add(keyOf(t));
+    out.push(t);
+  }
+  return out;
+}
+
 let queue: StoredPosition[] = [];
 let puzzleQueue: ReadyPuzzle[] = [];
 let share = 0;
@@ -411,29 +488,33 @@ async function dealt(s: StormScopeData): Promise<StoredPosition[]> {
   if (!data) return [];
   const all = storedInScope(await stormStore().positions(), s);
   const items = all.map((p) => ({ ...p, deep: p.src === 'sf' && p.depth >= STORM.deepenDepth }));
-  return drawOrder(items, histories(data), Math.random);
+  return drawOrder(items, histories(data), Math.random, STORM.reachTop);
 }
 
-export async function startStorm(s: StormScopeData, mode: StormMode): Promise<void> {
+export async function startStorm(s: StormScopeData, mode: SessionMode): Promise<void> {
   endStormSession();
   stopDeepening();
   scopeNow = s;
+  recent ??= loadRecent();
+  recentAtStart = new Set(recent);
+  dealtLines = new Set();
   queue = await dealt(s);
   share = puzzlePrefs.value.share;
   const data = trainData.value;
   const ready = share > 0 ? await readyPuzzles(s) : [];
-  puzzleQueue = data ? drawOrder(ready.map((p) => ({ card: 'z|' + p.id, p })), histories(data), Math.random).map((x) => x.p) : [];
+  puzzleQueue = data ? drawOrder(ready.map((p) => ({ card: 'z|' + p.id, p })), histories(data), Math.random, STORM.reachTop).map((x) => x.p) : [];
   let total = queue.length + puzzleQueue.length;
   if (mode === 'set') {
     // A set of six, the puzzles' share of it decided once (more if positions run short).
     let n = Math.min(puzzleQueue.length, Math.round((STORM.setSize * share) / 100));
     if (queue.length < STORM.setSize - n) n = Math.min(puzzleQueue.length, STORM.setSize - queue.length);
-    queue = queue.slice(0, STORM.setSize - n);
-    puzzleQueue = puzzleQueue.slice(0, n);
+    // Six cards, six line ends as far as the store goes (§30).
+    queue = spreadPick(queue, positionLineKey, STORM.setSize - n);
+    puzzleQueue = spreadPick(puzzleQueue, puzzleLineKey, n);
     total = queue.length + n;
   }
   secondPass = [];
-  stormSession.value = { mode, title: s.title, phase: 'solving', item: undefined, history: [], points: 0, streak: 0, left: STORM.sessionMs, endsAt: undefined, pass: 1, revealed: false, note: '', total, disguise: puzzleQueue.length > 0 };
+  stormSession.value = { mode, scopeKey: s.key, title: s.title, phase: 'solving', item: undefined, history: [], points: 0, streak: 0, left: STORM.sessionMs, endsAt: undefined, pass: 1, revealed: false, note: '', total, disguise: puzzleQueue.length > 0 };
   if (mode === 'storm') {
     tick = setInterval(() => {
       const st = stormSession.value;
@@ -469,11 +550,16 @@ function deal(): void {
     // A puzzle at the share chosen, or whatever is left (§5.48).
     // In a set the puzzles drawn are spread among the positions; in a storm, each card is one at the share.
     const odds = s.mode === 'set' ? (100 * puzzleQueue.length) / (puzzleQueue.length + queue.length || 1) : share;
-    const puzzle = puzzleQueue.length && (!queue.length || Math.random() * 100 < odds) ? puzzleQueue.shift() : undefined;
-    if (puzzle) item = { card: puzzleAsCard(puzzle), puzzle, step: 0, attempts: 0 };
-    else {
-      card = queue.shift();
-      if (card) item = { card, attempts: 0 };
+    const puzzle = puzzleQueue.length && (!queue.length || Math.random() * 100 < odds) ? takeSpread(puzzleQueue, puzzleLineKey, dealtLines, recentAtStart) : undefined;
+    if (puzzle) {
+      item = { card: puzzleAsCard(puzzle), puzzle, step: 0, attempts: 0 };
+      noteDealt(puzzleLineKey(puzzle));
+    } else {
+      card = takeSpread(queue, positionLineKey, dealtLines, recentAtStart);
+      if (card) {
+        item = { card, attempts: 0 };
+        noteDealt(positionLineKey(card));
+      }
     }
   }
   if (!item && s.mode === 'set' && s.pass === 1 && secondPass.length) {
@@ -481,7 +567,8 @@ function deal(): void {
     return deal();
   }
   if (!item) return endStorm(s.history.length ? 'out' : 'empty');
-  update({ item, revealed: false, history: s.pass === 1 ? [...s.history, item] : s.history });
+  const { nextAt: _a, nextIn: _b, ...rest } = stormSession.value!;
+  stormSession.value = { ...rest, item, revealed: false, history: s.pass === 1 ? [...s.history, item] : s.history };
   setPhase('solving');
 }
 
@@ -493,13 +580,18 @@ export async function answerMove(uci: string): Promise<void> {
   const seq = ++gradeSeq;
   const retry = !!s.retry;
   if (item.puzzle) return answerPuzzle(item, uci, retry, seq);
-  if (!retry) setPhase('grading');
-  else update({ retry: { ...item, answer: { verdict: 'unknown', band: 'unknown', userUci: uci, userSan: uciToSan(positionOf(item.card.fen)!, uci) } } });
+  // The move stays on the board while it is graded and while the verdict is read.
+  const played: StormItem = { ...item, played: uci };
+  if (retry) update({ retry: played });
+  else {
+    update({ item: played });
+    setPhase('grading');
+  }
   const v = await gradeMove(item.card, uci);
   const now = stormSession.value;
   if (!now || seq !== gradeSeq) return;
-  if (retry) return update({ retry: { ...item, answer: v } });
-  settle(item, uci, v);
+  if (retry) return update({ retry: { ...played, answer: v } });
+  settle(played, uci, v);
 }
 
 /** A verdict reached: scored and written (the storm), or resolved or held (the set). */
@@ -515,7 +607,11 @@ function settle(item: StormItem, uci: string, v: StormAnswer): void {
     const done: StormItem = { ...item, answer: v };
     update({ item: done, history: now.history.map((h) => (h.card === item.card ? done : h)), points: now.points + pts, streak: nextStreak(now.streak, pts) });
     setPhase('verdict');
-    verdictTimer = setTimeout(() => deal(), band === 'great' || band === 'good' ? STORM.verdictFastMs : STORM.verdictMs);
+    // A beat to read the verdict (shorter when the move scored, §18.1), then the next card by
+    // itself; the clock is stopped meanwhile, and Pause keeps the card for as long as wanted.
+    const wait = pts > 0 ? STORM.verdictFastMs : STORM.verdictMs;
+    update({ nextAt: Date.now() + wait, nextIn: wait });
+    verdictTimer = setTimeout(() => deal(), wait);
     return;
   }
   // The set (§17): a clean answer resolves, a worse one holds the card.
@@ -558,7 +654,8 @@ async function answerPuzzle(item: StormItem, uci: string, retry: boolean, seq: n
   const put = (next: StormItem) => (retry ? update({ retry: next }) : update({ item: next }));
   const solved = (band: Band) => {
     const v: StormAnswer = { verdict: band, band, userSan, userUci: uci, puzzle: true };
-    const next: StormItem = { ...item, step: right ? step + 1 : step, answer: v };
+    // A wrong move stays on the board, as a position's does.
+    const next: StormItem = right ? { ...item, step: step + 1, answer: v } : { ...item, played: uci, answer: v };
     if (retry) return update({ retry: next });
     const now = stormSession.value;
     if (now) update({ history: now.history.map((h) => (h === item ? next : h)) });
@@ -613,7 +710,7 @@ export function tryAgain(): void {
   const s = stormSession.value;
   if (!s?.item || s.phase !== 'held') return;
   if ((s.item.attempts ?? 0) >= STORM.setRetryMax) return;
-  const { answer: _gone, ...rest } = s.item;
+  const { answer: _gone, played: _move, ...rest } = s.item;
   update({ item: s.item.puzzle ? { ...rest, step: 0 } : rest });
   setPhase('solving');
 }
@@ -627,6 +724,15 @@ export function showMove(): void {
   if (s.pass === 1) secondPass.push(again(s.item));
   update({ item, revealed: true, history: s.history.map((h) => (h.card === item.card ? { ...h, ...item } : h)) });
   setPhase('verdict');
+}
+
+/** A storm's verdict kept on the board: the next card waits for Next. */
+export function pauseVerdict(): void {
+  const s = stormSession.value;
+  if (!s || s.phase !== 'verdict' || s.nextAt === undefined) return;
+  clearTimeout(verdictTimer);
+  const { nextAt: _a, nextIn: _b, ...rest } = s;
+  stormSession.value = rest;
 }
 
 /** Next position (after a verdict in a set, or a storm's verdict at once). */
@@ -673,6 +779,53 @@ export function leaveStorm(): void {
   endStormEngine();
 }
 
+/**
+ * Off to the analysis board and back (lichessable §18.4): the session is kept as it is (the clock
+ * runs only while a card asks for a move, and no card asks from here), the gather, the deepening
+ * and the storm's engine stop.
+ */
+export function suspendStorm(): void {
+  stopGathering();
+  stopDeepening();
+  endStormEngine();
+}
+
+// A session kept for the analysis board is let go once the page goes anywhere else.
+effect(() => {
+  const m = mode.value;
+  if (m.name === 'storm' || (m.name === 'analysis' && m.back)) return;
+  if (stormSession.peek()) endStormSession();
+});
+
+/**
+ * The analysis board for a card (§20's lead-in): from the position before the move that reached
+ * it, that move and the one played (a puzzle's solution) as its line, shown at the card.
+ */
+export function analysisFor(item: StormItem, back: StormMode): Extract<Mode, { name: 'analysis' }> {
+  const puzzle = item.puzzle;
+  if (puzzle) {
+    const before = puzzle.previousFen && positionOf(puzzle.previousFen);
+    const prev = before && puzzle.previousMove ? uciToSan(before, puzzle.previousMove) : '';
+    const line = puzzle.plies.map((p) => p.san);
+    const side = puzzle.solver;
+    return prev ? { name: 'analysis', fen: puzzle.previousFen, line: [prev, ...line], show: 1, side, back } : { name: 'analysis', fen: puzzle.fen, line, show: 0, side, back };
+  }
+  const p = item.card;
+  const at = positionOf(p.fen);
+  const mine = item.answer?.userSan || (item.played && at ? uciToSan(at, item.played) : '');
+  const a = p.arrived;
+  if (a && positionOf(a.before)) return { name: 'analysis', fen: a.before, line: mine ? [a.san, mine] : [a.san], show: 1, side: p.side, back };
+  return { name: 'analysis', fen: p.fen, ...(mine ? { line: [mine], show: 0 } : {}), side: p.side, back };
+}
+
+/** Analyses a card, the session kept; a held set card is shown first (it counts as shown, §18.4). */
+export function analyse(item: StormItem, back: StormMode, reviewAt?: number): void {
+  const s = stormSession.value;
+  if (s?.phase === 'held' && s.item === item) showMove();
+  if (reviewAt !== undefined) update({ reviewAt });
+  open(analysisFor(item, back));
+}
+
 /** The review: the best move shown or hidden for a position (§14.10a). */
 export function toggleShown(index: number): void {
   const s = stormSession.value;
@@ -685,7 +838,7 @@ export function retryFromReview(index: number | undefined): void {
   const s = stormSession.value;
   if (!s) return;
   const item = index === undefined ? undefined : s.history[index];
-  if (item) update({ retry: again(item) });
+  if (item) update({ retry: again(item), reviewAt: index! });
   else {
     const { retry: _gone, ...rest } = s;
     stormSession.value = rest;

@@ -3,6 +3,10 @@
 // with a fake explorer naming one game at each line end, a fake game export and a fake ChessDB
 // that scores every legal move (the sorted first best, a ladder down from it that never reaches
 // the blunder stop), so the walks run without Stockfish.
+//
+// Controls run on §5.71 (2026-10-08), each failing the storm test at its own assertion: the card's
+// board set back to the card's position after a move ("the move stays"), and the board's sketch
+// removed (the arrow gone at the clock's next tick).
 import { test, expect, type Page } from '@playwright/test';
 import { Chess } from 'chessops/chess';
 import { makeFen, parseFen } from 'chessops/fen';
@@ -11,7 +15,7 @@ import { castlingSide } from 'chessops/chess';
 import { kingCastlesTo } from 'chessops/util';
 import type { FakeGit } from '../support/fakeGit.ts';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
-import { clickSquare } from './board.ts';
+import { clickSquare, square } from './board.ts';
 import { commands, fakeEngine } from './engine.ts';
 import { fakeExplorer, lichessLogin, serveExplorer } from './explorer.ts';
 import { serveGithub, world } from './github.ts';
@@ -26,6 +30,8 @@ test.afterAll(async () => {
 });
 
 const LADDER = [20, 5, -25, -40, -60, -80, -100, -120];
+/** The verdict's pause after a mistake (STORM.verdictMs). */
+const STORM_VERDICT_MS = 2600;
 
 /** Every legal move in standard UCI, sorted: the fake ChessDB's order, best first. */
 function ranked(fen: string): string[] {
@@ -95,6 +101,28 @@ async function play(page: Page, uci: string) {
   await clickSquare(page, uci.slice(2, 4), side);
 }
 const cardFen = async (page: Page) => (await page.locator('.storm-card').getAttribute('data-fen'))!;
+/** An arrow drawn on the card: a right-drag with a mouse, the ✎ draw mode on a touch screen. */
+async function drawArrow(page: Page, from: string, to: string, side: 'white' | 'black') {
+  const toggle = page.getByRole('button', { name: 'Draw mode' });
+  const touch = await toggle.isVisible();
+  if (touch) await toggle.click();
+  const a = await square(page, from, side);
+  const b = await square(page, to, side);
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down({ button: touch ? 'left' : 'right' });
+  await page.mouse.move(b.x, b.y, { steps: 4 });
+  await page.mouse.up({ button: touch ? 'left' : 'right' });
+  if (touch) await toggle.click();
+}
+const cardLine = async (page: Page) => (await page.locator('.storm-card').getAttribute('data-line'))!;
+/** The piece chessground shows on a square ('' for none), e.g. "white knight". */
+const pieceOn = (page: Page, key: string) =>
+  page.evaluate((k) => {
+    const el = [...document.querySelectorAll('cg-board piece')].find((p) => (p as unknown as { cgKey?: string }).cgKey === k && !p.classList.contains('ghost'));
+    return el ? [...el.classList].filter((c) => c !== 'anim' && c !== 'fading' && c !== 'dragging').join(' ') : '';
+  }, key);
+/** The arrows and circles on the board (chessground draws each as a `g` with a hash). */
+const shapes = (page: Page) => page.evaluate(() => document.querySelectorAll('cg-container svg.cg-shapes g, cg-container svg.cg-shapes-below g').length && [...document.querySelectorAll('cg-container svg.cg-shapes g, cg-container svg.cg-shapes-below g')].filter((g) => g.hasAttribute('cgHash')).length);
 
 async function gathered(page: Page, w: World) {
   await page.getByRole('link', { name: 'Storm' }).click();
@@ -104,9 +132,13 @@ async function gathered(page: Page, w: World) {
   await expect(page.getByRole('button', { name: 'Start storm' })).toBeDisabled();
   await page.getByRole('button', { name: 'Gather positions' }).click();
   await expect(page.locator('.storm-gather')).toContainText('Every line end and reply walked', { timeout: 30_000 });
-  // One export per line end with games, a simple request: POST, text/plain, no token.
+  // Two exports per line end with games (one game at each first, then the rest), each a simple
+  // request: POST, text/plain, no token.
   const exports = w.requests.filter((r) => r.startsWith('export'));
-  expect(exports.length).toBe(3);
+  expect(exports.length).toBe(6);
+  // The first pass named one game per line end, the second the other two.
+  expect(exports.slice(0, 3).every((r) => r.split(' ')[2]!.split(',').length === 1)).toBe(true);
+  expect(exports.slice(3).every((r) => r.split(' ')[2]!.split(',').length === 2)).toBe(true);
   expect(exports.every((r) => r.startsWith('export POST ') && r.includes('no-token') && r.endsWith('text/plain'))).toBe(true);
   expect(w.requests.filter((r) => r.startsWith('explorer')).every((r) => r === 'explorer 4')).toBe(true);
   const ready = Number((await page.getByTestId('storm-count').locator('strong').textContent()) ?? '0');
@@ -121,39 +153,78 @@ test('the storm: positions gathered, a great move and a mistake scored, the revi
   await page.getByRole('button', { name: 'Start storm' }).click();
   await expect(page.locator('.storm-card')).toBeVisible();
   await expect(page.getByTestId('storm-clock')).toHaveText(/^[23]:\d\d$/);
-  await expect(page.getByTestId('storm-verdict')).toHaveText('Your move');
+  await expect(page.getByTestId('storm-verdict')).toContainText('Find a good move');
   // Neither the engine panel nor the explorer is on the screen.
   await expect(page.locator('.engine, .explorer')).toHaveCount(0);
+  // Where the card is: its chapter, and its line's last moves.
+  await expect(page.locator('.storm-card .storm-where')).toContainText(/\d\. \S+/);
 
-  // The best move: great, +2.
+  // An arrow drawn to think with stays while the clock ticks (it re-renders the card).
   const first = await cardFen(page);
-  await play(page, ranked(first)[0]!);
+  const side = (await page.locator('.storm-card').getAttribute('data-side')) as 'white' | 'black';
+  await drawArrow(page, 'a2', 'a4', side);
+  await page.waitForTimeout(700);
+  expect(await shapes(page)).toBeGreaterThan(0);
+
+  // The best move: great, +2; the move stays on the board through the verdict.
+  const best = ranked(first)[0]!;
+  const mover = await pieceOn(page, best.slice(0, 2));
+  await play(page, best);
   await expect(page.getByTestId('storm-verdict')).toContainText('Great');
   await expect(page.getByTestId('storm-verdict')).toContainText('the top move');
   await expect(page.getByTestId('storm-points')).toHaveText('2');
+  expect(await pieceOn(page, best.slice(2, 4))).toBe(mover);
+  expect(await pieceOn(page, best.slice(0, 2))).toBe('');
+  const lines = [await cardLine(page)];
 
-  // The next card comes by itself; the worst move scored: 140 cp behind at +0.20, a mistake.
+  // The next card comes by itself, from another line end (the spread); the worst move scored:
+  // 140 cp behind at +0.20, a mistake. Pause keeps it on the board until Next.
   await expect.poll(() => cardFen(page)).not.toBe(first);
-  await expect(page.getByTestId('storm-verdict')).toHaveText('Your move');
+  await expect(page.getByTestId('storm-verdict')).toContainText('Find a good move');
+  // The arrow was the last card's.
+  expect(await shapes(page)).toBe(0);
+  lines.push(await cardLine(page));
   const second = await cardFen(page);
   const moves = ranked(second);
   await play(page, moves[Math.min(moves.length, LADDER.length) - 1]!);
   await expect(page.getByTestId('storm-verdict')).toContainText('Mistake');
   await expect(page.getByTestId('storm-points')).toHaveText('1');
+  await page.getByRole('button', { name: /^Pause/ }).click();
+  await page.waitForTimeout(STORM_VERDICT_MS + 500);
+  expect(await cardFen(page)).toBe(second);
+  await page.getByRole('button', { name: /^Next/ }).click();
 
   // The third card, left unanswered: the review keeps it (§14.10c).
   await expect.poll(() => cardFen(page)).not.toBe(second);
-  await expect(page.getByTestId('storm-verdict')).toHaveText('Your move');
-  await page.getByRole('button', { name: 'End' }).click();
+  await expect(page.getByTestId('storm-verdict')).toContainText('Find a good move');
+  lines.push(await cardLine(page));
+  // Three cards, three line ends: the fixture has three, and the spread deals each once first.
+  expect(new Set(lines).size).toBe(3);
+  await page.getByRole('button', { name: /^End/ }).click();
   await expect(page.getByTestId('storm-summary')).toContainText('1 point from 2 answered');
   const rows = page.locator('.storm-row');
   await expect(rows).toHaveCount(3);
   // The best move hidden until asked for.
-  await expect(rows.nth(0).locator('span').nth(4)).toHaveText('…');
+  await expect(rows.nth(0).locator(':scope > span').nth(4)).toHaveText('…');
   await page.getByRole('button', { name: /^Best move/ }).click();
-  await expect(rows.nth(0).locator('span').nth(4)).not.toHaveText('…');
+  await expect(rows.nth(0).locator(':scope > span').nth(4)).not.toHaveText('…');
   await expect(page.locator('.storm-best')).toContainText('best');
   await expect(rows.nth(2)).toContainText('Not answered');
+
+  // Analyse: the analysis board, the session kept, and back to the review where it was.
+  await rows.nth(1).click();
+  await page.getByRole('button', { name: /^Analyse/ }).click();
+  await expect(page).toHaveURL(/#\/analysis\?.*back=/);
+  await page.getByRole('button', { name: '← Back to the storm' }).click();
+  await expect(page).toHaveURL(/#\/storm$/);
+  await expect(page.getByTestId('storm-summary')).toContainText('1 point from 2 answered');
+  await expect(page.locator('.storm-row.current')).toContainText('Mistake');
+  await expect(page.locator('.storm-nav-count')).toHaveText('Position 2 of 3');
+  // …and the browser's own back and forward do the same.
+  await page.getByRole('button', { name: /^Analyse/ }).click();
+  await expect(page).toHaveURL(/#\/analysis\?/);
+  await page.goBack();
+  await expect(page.getByTestId('storm-summary')).toContainText('1 point from 2 answered');
 
   // Two answers in the log, synced.
   await page.getByRole('button', { name: 'Done' }).click();
@@ -215,28 +286,34 @@ test('the set: a mistake held, tried again, shown, and the second pass', async (
   await gathered(page, w);
   await page.getByRole('button', { name: /^Set of/ }).click();
   await expect(page.locator('.storm-card')).toBeVisible();
-  await expect(page.locator('.train-counters')).toContainText('Set · 1 of 6');
+  await expect(page.getByTestId('storm-set')).toContainText('1 of 6');
   // No clock in a set.
   await expect(page.getByTestId('storm-clock')).toHaveCount(0);
   const fen = await cardFen(page);
   const moves = ranked(fen);
   await play(page, moves[Math.min(moves.length, LADDER.length) - 1]!);
   await expect(page.getByTestId('storm-verdict')).toContainText('Mistake');
-  // Held: the best move not shown; Try again sets the board back.
+  // Held: the best move not shown, the move played still on the board; Try again sets it back.
   await expect(page.locator('.storm-best')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Try again' }).click();
-  await expect(page.getByTestId('storm-verdict')).toHaveText('Your move');
-  await play(page, moves[Math.min(moves.length, LADDER.length) - 1]!);
-  await page.getByRole('button', { name: 'Show the move' }).click();
+  const worst = moves[Math.min(moves.length, LADDER.length) - 1]!;
+  expect(await pieceOn(page, worst.slice(0, 2))).toBe('');
+  await page.getByRole('button', { name: /^Try again/ }).click();
+  await expect(page.getByTestId('storm-verdict')).toContainText('Find a good move');
+  expect(await pieceOn(page, worst.slice(0, 2))).not.toBe('');
+  await play(page, worst);
+  // Analyse from a held card shows the move (it counts as shown); back, the set goes on.
+  await page.getByRole('button', { name: /^Analyse/ }).click();
+  await expect(page).toHaveURL(/#\/analysis\?.*back=/);
+  await page.getByRole('button', { name: '← Back to the storm' }).click();
   await expect(page.locator('.storm-best')).toContainText('best');
-  await page.getByRole('button', { name: 'Next position' }).click();
+  await page.getByRole('button', { name: /^Next position/ }).click();
   // The rest found at once.
   for (let i = 0; i < 12; i++) {
     if (await page.getByTestId('storm-summary').isVisible()) break;
     const f = await cardFen(page);
     await play(page, ranked(f)[0]!);
     await expect(page.getByTestId('storm-verdict')).toContainText('Great');
-    await page.getByRole('button', { name: 'Next position' }).click();
+    await page.getByRole('button', { name: /^Next position/ }).click();
   }
   await expect(page.getByTestId('storm-summary')).toContainText('5 of 6 found first time · 1 of 1 in the second pass');
   // Only each position's first answer was written (the set's own), marked.

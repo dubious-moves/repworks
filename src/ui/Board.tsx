@@ -35,6 +35,12 @@ export interface BoardProps {
   badge?: { square: string; symbol: string; colour: string; word: string } | undefined;
   /** Premoves for `color` while the other side is to move (a practice game): the one set, and its events. */
   premove?: { color: 'white' | 'black'; current: [Key, Key] | undefined; onSet(orig: Key, dest: Key): void; onUnset(): void };
+  /**
+   * Arrows and circles drawn to think with, kept by the board itself until this key changes (a
+   * storm's card): `shapes` and `onShapes` are then not used. Without it, what is drawn is the
+   * owner's to keep through `onShapes`, and is gone at the next render if it doesn't.
+   */
+  sketchKey?: string;
 }
 
 const BRUSHES: readonly string[] = ['green', 'red', 'blue', 'yellow'];
@@ -43,7 +49,7 @@ const toDraw = (shapes: readonly Shape[]): DrawShape[] => shapes.map((s) => ({ o
 const fromDraw = (shapes: readonly DrawShape[]): Shape[] =>
   shapes.filter((s) => s.brush && BRUSHES.includes(s.brush)).map((s) => ({ brush: s.brush as Brush, orig: s.orig as SquareName, ...(s.dest ? { dest: s.dest as SquareName } : {}) }));
 
-function config(p: BoardProps): Config {
+function config(p: BoardProps, drawn: DrawShape[]): Config {
   return {
     fen: p.fen,
     orientation: p.orientation,
@@ -55,7 +61,7 @@ function config(p: BoardProps): Config {
     draggable: { enabled: !p.drawMode },
     selectable: { enabled: !p.drawMode },
     drawable: {
-      shapes: toDraw(p.shapes),
+      shapes: drawn,
       autoShapes: (p.autoShapes ?? []).map((a) => ({ orig: a.orig as Key, ...(a.dest ? { dest: a.dest as Key } : {}), brush: a.brush, ...(a.lineWidth ? { modifiers: { lineWidth: a.lineWidth } } : {}) })),
     },
   };
@@ -76,28 +82,38 @@ export function Board(p: BoardProps) {
   const api = useRef<Api | undefined>(undefined);
   const props = useRef(p);
   props.current = p;
+  // The sketch (`sketchKey`): what was drawn on this key, dropped when the key changes.
+  const sketch = useRef<{ key: string | undefined; shapes: Shape[] }>({ key: p.sketchKey, shapes: [] });
+  if (sketch.current.key !== p.sketchKey) sketch.current = { key: p.sketchKey, shapes: [] };
+  const own = (q: BoardProps): readonly Shape[] => (q.sketchKey !== undefined ? sketch.current.shapes : q.shapes);
+  const shapesChanged = (next: Shape[]) => {
+    if (props.current.sketchKey !== undefined) {
+      sketch.current.shapes = next;
+      api.current?.set({ drawable: { shapes: toDraw(next) } });
+    } else props.current.onShapes(next);
+  };
 
   useEffect(() => {
     // Whether the gesture in progress draws: chessground draws on a right button, or with Shift.
     let drawing = false;
     const board: Api = Chessground(el.current!, {
-      ...config(props.current),
+      ...config(props.current, toDraw(own(props.current))),
       animation: { duration: 150 },
       highlight: { lastMove: true, check: true },
       drawable: {
         enabled: true,
         eraseOnMovablePieceClick: false,
-        shapes: toDraw(props.current.shapes),
+        shapes: toDraw(own(props.current)),
         onChange: (shapes) => {
           // chessground also clears the shapes on a left click; here only drawing changes them,
           // so a click to move a piece never deletes a move's arrows.
-          if (!drawing) return void board.set({ drawable: { shapes: toDraw(props.current.shapes) } });
+          if (!drawing) return void board.set({ drawable: { shapes: toDraw(own(props.current)) } });
           drawing = false;
-          props.current.onShapes(fromDraw(shapes));
+          shapesChanged(fromDraw(shapes));
         },
       },
-      movable: { ...config(props.current).movable, events: { after: (orig, dest) => props.current.onMove(orig, dest) } },
-      premovable: { ...config(props.current).premovable, events: { set: (orig, dest) => props.current.premove?.onSet(orig, dest), unset: () => props.current.premove?.onUnset() } },
+      movable: { ...config(props.current, []).movable, events: { after: (orig, dest) => props.current.onMove(orig, dest) } },
+      premovable: { ...config(props.current, []).premovable, events: { set: (orig, dest) => props.current.premove?.onSet(orig, dest), unset: () => props.current.premove?.onUnset() } },
     });
     api.current = board;
 
@@ -130,7 +146,7 @@ export function Board(p: BoardProps) {
         board.setAutoShapes([]);
         // getKeyAtDomPos only gives squares on the board.
         const shape: Shape = { brush, orig: orig as SquareName, ...(dest && dest !== orig ? { dest: dest as SquareName } : {}) };
-        props.current.onShapes(toggleShape(props.current.shapes, shape));
+        shapesChanged(toggleShape(own(props.current), shape));
       };
       const listeners: [string, (m: Mouch) => void][] = [
         ['mousemove', moved],
@@ -153,7 +169,7 @@ export function Board(p: BoardProps) {
   // In the same commit as the rest of the view, so the board never shows a position the
   // notation has already left.
   useLayoutEffect(() => {
-    api.current?.set(config(p));
+    api.current?.set(config(p, toDraw(own(p))));
     // A premove played or dropped by the game is taken off the board too.
     if (api.current?.state.premovable.current && !p.premove?.current) api.current.cancelPremove();
   });

@@ -231,6 +231,14 @@ explorer's Eval column too far from the move (§5.67).
   while you look at another screen; "Practise from here" in a study's move menu starts a game as the
   chapter's side from that position.
 - §5.49: Phase 4's acceptance test (desktop and Android phone), then a week of daily storms.
+- §5.71 (the storm reworked, desktop then phone): a storm on the real repertoire after a fresh
+  gather: the cards from many line ends (the line under the chapter name changes from card to card,
+  and a second storm starts on other line ends); the gather stopped after a minute still covering
+  many line ends ("from n line ends" on the home); the move staying on the board through the
+  verdict, Pause and Next (Space); an arrow (right-drag, or ✎ on the phone) staying until the next
+  card; Analyse from the review and from a held set card, then "← Back to the storm" and the
+  browser's Back, the review at the same position; the analysis board from your side with the move
+  that reached the card one step back. Whether 1.2 s after a good move is long enough.
 
 ## Phase 5
 

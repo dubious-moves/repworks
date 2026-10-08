@@ -14,9 +14,12 @@
 //   #/read/<sid>/<cid>[?at=e4,e5][&from=1]  a chapter's line read through, from a move (§5.10)
 //   #/play/<sid>/<cid>[?at=e4,e5][&from=1]  the same line played, every own move asked (§5.10)
 //   #/coverage/<sid>                    a study's coverage against the repertoire, or a reference study's against it (§5.26)
-//   #/analysis[?fen=…][&from=<sid>/<cid>&at=e4,e5][&seq=<pid>|*]  the analysis board: a scratch
-//                                       chapter, from a FEN or a chapter's move (§5.35); `seq`
-//                                       saves its lines as a sequence (§5.56)
+//   #/analysis[?fen=…][&from=<sid>/<cid>&at=e4,e5][&seq=<pid>|*][&line=e5,Nf3&show=1][&back=…]
+//                                       the analysis board: a scratch chapter, from a FEN or a
+//                                       chapter's move (§5.35); `seq` saves its lines as a sequence
+//                                       (§5.56); `line` its main line from the FEN, shown after
+//                                       `show` moves; `side` the board's side (the FEN's side to
+//                                       move when none); `back` the storm it was opened from (its hash)
 //   #/storm[/<sid>[/<cid>[?at=e4,e5]]]  the storm (§5.43): the repertoire, a study, a chapter, or
 //                                       the lines through a chapter's move
 //   #/games                             the games and their cards (§5.54)
@@ -30,6 +33,9 @@
 //   #/migrate                           the migration from mistake-lab (§5.64)
 // A setup link (#setup?…) is read and removed before any of this (src/app/setup.ts).
 import { isId } from '../study/ids.ts';
+
+/** The storm (§5.43): over the repertoire, a study, a chapter, or the lines through `at`. */
+export type StormMode = { name: 'storm'; sid?: string; cid?: string; at?: string[] };
 
 export type Mode =
   | { name: 'list' }
@@ -63,9 +69,9 @@ export type Mode =
    * `seq`, its lines can be saved as a sequence (§5.56): `seq` the mistake card's pid it replaces,
    * or `*` for none.
    */
-  | { name: 'analysis'; fen?: string; from?: { sid: string; cid: string; at: string[] }; seq?: string }
+  | { name: 'analysis'; fen?: string; from?: { sid: string; cid: string; at: string[] }; seq?: string; line?: string[]; show?: number; side?: 'white' | 'black'; back?: StormMode }
   /** The storm (§5.43): over the repertoire, a study, a chapter, or the lines through `at`. */
-  | { name: 'storm'; sid?: string; cid?: string; at?: string[] }
+  | StormMode
   /** The games (§5.54); with `id`, one game, at `ply` (0 the start). */
   | { name: 'games'; id?: string; ply?: number }
   /** The game cards due, as a session (§5.55). */
@@ -196,6 +202,19 @@ export function parseHash(hash: string): Mode {
     if (from?.length === 2 && isId(from[0]) && isId(from[1])) mode.from = { sid: from[0], cid: from[1], at: atOf(query) ?? [] };
     const seq = query.split('&').find((q) => q.startsWith('seq='))?.slice(4);
     if (seq && (seq === '*' || GAME_ID.test(seq))) mode.seq = seq;
+    const line = query.split('&').find((q) => q.startsWith('line='))?.slice(5);
+    const sans = line ? line.split(',').map(decode) : undefined;
+    if (sans && sans.length <= 40 && sans.every((san) => san !== undefined && SAN.test(san))) {
+      mode.line = sans as string[];
+      const show = /(?:^|&)show=(\d{1,2})(?:&|$)/.exec(query)?.[1];
+      if (show !== undefined && Number(show) < sans.length) mode.show = Number(show);
+    }
+    const side = /(?:^|&)side=(white|black)(?:&|$)/.exec(query)?.[1];
+    if (side === 'white' || side === 'black') mode.side = side;
+    const back = query.split('&').find((q) => q.startsWith('back='))?.slice(5);
+    const to = back === undefined ? undefined : decode(back);
+    const parsed = to?.startsWith('#/storm') ? parseHash(to) : undefined;
+    if (parsed?.name === 'storm') mode.back = parsed;
     return mode;
   }
   if (parts[0] === 'learn' && parts.length === 3 && isId(parts[1]) && isId(parts[2])) return { name: 'learn', sid: parts[1], cid: parts[2] };
@@ -262,6 +281,9 @@ export function modeHash(mode: Mode): string {
         ...(mode.fen ? [`fen=${encodeURIComponent(mode.fen)}`] : []),
         ...(mode.from ? [`from=${mode.from.sid}/${mode.from.cid}`, ...(mode.from.at.length ? [`at=${mode.from.at.map(encodeURIComponent).join(',')}`] : [])] : []),
         ...(mode.seq ? [`seq=${mode.seq}`] : []),
+        ...(mode.line?.length ? [`line=${mode.line.map(encodeURIComponent).join(',')}`, ...(mode.show !== undefined && mode.show < mode.line.length ? [`show=${mode.show}`] : [])] : []),
+        ...(mode.side ? [`side=${mode.side}`] : []),
+        ...(mode.back ? [`back=${encodeURIComponent(modeHash(mode.back))}`] : []),
       ];
       return `#/analysis${q.length ? `?${q.join('&')}` : ''}`;
     }

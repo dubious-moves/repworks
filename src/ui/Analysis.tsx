@@ -10,10 +10,11 @@ import type { Chapter } from '../core/study/model.ts';
 import { mode, open } from '../app/mode.ts';
 import { positionAt } from '../core/study/tree.ts';
 
-/** Back where the board came from: the chapter's move, or the list. */
+/** Back where the board came from: the storm, the chapter's move, or the list. */
 function back(): void {
   const m = mode.peek();
-  if (m.name === 'analysis' && m.from) open({ name: 'chapter', sid: m.from.sid, cid: m.from.cid, at: m.from.at });
+  if (m.name === 'analysis' && m.back) open(m.back);
+  else if (m.name === 'analysis' && m.from) open({ name: 'chapter', sid: m.from.sid, cid: m.from.cid, at: m.from.at });
   else open({ name: 'list' });
 }
 
@@ -56,6 +57,11 @@ export function AnalysisHead() {
       <div class="titles">
         <span class="study-title">Analysis board</span>
       </div>
+      {m.name === 'analysis' && m.back && (
+        <button type="button" class="primary storm-back" title="Back to the storm, where you left it" onClick={back}>
+          ← Back to the storm
+        </button>
+      )}
       <button type="button" disabled={!line.length} title={line.length ? 'Add the line to the move shown to a chapter' : 'Play a move first'} onClick={() => setAdding(true)}>
         Add to a chapter…
       </button>
