@@ -15,6 +15,7 @@ import { trainData } from '../app/train.ts';
 import {
   analyse,
   answerMove,
+  clearGathered,
   clockLeft,
   endStorm,
   endStormSession,
@@ -241,6 +242,7 @@ function Home(props: { scope: StormScopeData; where: StormWhere }) {
             {deepening.value ? ' · scoring…' : ''}
           </p>
         )}
+        {home && <ClearPositions scope={scope} stored={home.stored} whole={!where.sid} disabled={!!g?.running} />}
         <details class="storm-settings">
           <summary>Settings</summary>
           <div class="storm-settings-grid">
@@ -284,6 +286,54 @@ function Home(props: { scope: StormScopeData; where: StormWhere }) {
       {record && data && !where.sid && <Breakdown title="By study" head="Study" rows={byStudy(data, record)} />}
       {record && data && where.sid && !where.cid && <Breakdown title="By chapter" head="Chapter" rows={byChapter(data, record, where.sid)} />}
       {shown && shown.puzzles.answered > 0 && <Record r={shown.puzzles} title="Puzzles" />}
+    </div>
+  );
+}
+
+/**
+ * Clears the scope's gathered positions from this device, on a second press: a gather spends
+ * many requests, so the first press only says what goes and what stays.
+ */
+function ClearPositions(props: { scope: StormScopeData; stored: number; whole: boolean; disabled: boolean }) {
+  const [armed, setArmed] = useState(false);
+  const [note, setNote] = useState('');
+  useEffect(() => (setArmed(false), setNote('')), [props.scope.key]);
+  if (props.stored === 0 && !note) return null;
+  const what = props.whole ? `all ${plural(props.stored, 'gathered position')}` : `the ${plural(props.stored, 'gathered position')} of ${props.scope.title}`;
+  const clear = () => {
+    setArmed(false);
+    void clearGathered(props.scope).then((n) => setNote(`${plural(n, 'position')} cleared.`));
+  };
+  return (
+    <div class="storm-clear">
+      {armed ? (
+        <>
+          <p class="muted" role="status">
+            Removes {what} from this device. Your answers and the record stay; gathering again finds positions anew.
+          </p>
+          <div class="actions">
+            <button type="button" class="danger" disabled={props.disabled} onClick={clear}>
+              Clear {plural(props.stored, 'position')}
+            </button>
+            <button type="button" class="secondary" onClick={() => setArmed(false)}>
+              Cancel
+            </button>
+          </div>
+        </>
+      ) : (
+        props.stored > 0 && (
+          <div class="actions">
+            <button type="button" class="secondary" disabled={props.disabled} onClick={() => (setNote(''), setArmed(true))}>
+              Clear positions…
+            </button>
+          </div>
+        )
+      )}
+      {note && !armed && (
+        <p class="muted" role="status">
+          {note}
+        </p>
+      )}
     </div>
   );
 }

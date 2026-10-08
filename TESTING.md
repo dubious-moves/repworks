@@ -239,6 +239,8 @@ explorer's Eval column too far from the move (§5.67).
   card; Analyse from the review and from a held set card, then "← Back to the storm" and the
   browser's Back, the review at the same position; the analysis board from your side with the move
   that reached the card one step back. Whether 1.2 s after a good move is long enough.
+- §5.72: "Clear positions…" on the storm's home, for a chapter, then the whole repertoire: the
+  count goes to 0 for that scope only, the record stays, and a new gather fills it again.
 
 ## Phase 5
 

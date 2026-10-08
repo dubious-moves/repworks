@@ -281,6 +281,24 @@ test('the gather: its requests counted as they go out, and Stop at once while on
   await expect(page.getByRole('button', { name: 'Gather positions' })).toBeEnabled();
 });
 
+test('Clear positions: asked once, then the gathered positions gone from this device', async ({ page }) => {
+  const w = await setUp(page);
+  const ready = await gathered(page, w);
+  await page.getByRole('button', { name: 'Clear positions…' }).click();
+  await expect(page.locator('.storm-clear')).toContainText(`Removes all ${ready} gathered positions from this device`);
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await expect(page.getByTestId('storm-count')).toContainText(`${ready} positions ready`);
+  await page.getByRole('button', { name: 'Clear positions…' }).click();
+  await page.getByRole('button', { name: `Clear ${ready} positions` }).click();
+  await expect(page.locator('.storm-clear')).toContainText(`${ready} positions cleared.`);
+  await expect(page.getByTestId('storm-count')).toContainText('0 positions ready');
+  await expect(page.getByRole('button', { name: 'Start storm' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Clear positions…' })).toHaveCount(0);
+  // Kept cleared across a reload.
+  await page.reload();
+  await expect(page.getByTestId('storm-count')).toContainText('0 positions ready');
+});
+
 test('the set: a mistake held, tried again, shown, and the second pass', async ({ page }) => {
   const w = await setUp(page);
   await gathered(page, w);

@@ -319,6 +319,24 @@ export function stopGathering(): void {
   cancelStormEngine();
 }
 
+/**
+ * Clears the gathered positions of the scope from this device (all of them for the whole
+ * repertoire). The answers stay: they are progress events, and the record is made of them.
+ * Returns how many were removed.
+ */
+export async function clearGathered(s: StormScopeData): Promise<number> {
+  if (gathering.value?.running) return 0;
+  stopDeepening();
+  const store = stormStore();
+  const all = await store.positions();
+  const gone = storedInScope(all, s);
+  if (gone.length === all.length) await store.clearPositions();
+  else await store.removePositions(gone.map((p) => p.card));
+  gathering.value = undefined;
+  await refreshHome(s);
+  return gone.length;
+}
+
 /* ------------------------------------------------------------------ the deepened standard (§5.45) */
 
 export const deepening = signal(false);
