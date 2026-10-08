@@ -1391,3 +1391,10 @@ The technical calls, each with its reason:
   and the engine's stay, being content rather than drawing. Where no move can be made, a press on
   any piece clears too. Draw mode on a touch screen
   keeps a tap for circles.
+
+## Revision of 2026-10-08 (Stockfish 19 as an option, PLAN.md §5.75)
+- **Stockfish 19 (npm `stockfish@19.0.0`, lite) is an option beside 18, chosen per device in the
+  engine settings; 18 stays the default** (the owner's request). 2026-10-06 kept 18 alone because
+  it was proven on the owner's phone in mistake-lab; that still holds for 18, and 19 is not yet
+  checked there, so it is offered rather than swapped in. The choice is a device setting, as the
+  threads are, and the other engine client (the storm, practice, reviews) follows it.

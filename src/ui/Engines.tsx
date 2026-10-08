@@ -7,6 +7,8 @@ import { deleteMaia, maiaPrefs } from '../app/maia.ts';
 const GROUPS: { name: string; files: EngineFile[] }[] = [
   { name: 'Stockfish 18', files: [ENGINES.stockfishJs, ENGINES.stockfishWasm] },
   { name: 'Stockfish 18 threads', files: [ENGINES.stockfishMtJs, ENGINES.stockfishMtWasm] },
+  { name: 'Stockfish 19', files: [ENGINES.stockfish19Js, ENGINES.stockfish19Wasm] },
+  { name: 'Stockfish 19 threads', files: [ENGINES.stockfish19MtJs, ENGINES.stockfish19MtWasm] },
   { name: 'Maia 3', files: [ENGINES.maiaModel, ENGINES.ortWasm, ENGINES.ortMjs] },
 ];
 

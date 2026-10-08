@@ -8,6 +8,7 @@ import { createSearch, type Analysis, type EngineLine, type Search } from '../co
 import { positionOf } from '../core/storm/walk.ts';
 import { ensure } from '../platform/blobs.ts';
 import { startStockfish, stockfishFiles, type EngineProcess } from '../platform/stockfish.ts';
+import { enginePrefs } from './engine.ts';
 
 export interface EngineAnswer {
   lines: EngineLine[];
@@ -35,10 +36,12 @@ async function start(): Promise<boolean> {
   if (failed) return false;
   starting ??= (async () => {
     try {
-      const files = stockfishFiles(1);
+      // The device's version (§5.75), as the study page's engine.
+      const version = enginePrefs.peek().version;
+      const files = stockfishFiles(1, version);
       await ensure(files);
       search = createSearch({ send: (c) => proc?.send(c), now: () => performance.now(), onUpdate });
-      proc = startStockfish({ line: (l) => search?.receive(l), crashed: () => crash() }, matchMedia('(max-width: 768px)').matches ? 16 : 32, 1);
+      proc = startStockfish({ line: (l) => search?.receive(l), crashed: () => crash() }, matchMedia('(max-width: 768px)').matches ? 16 : 32, 1, version);
       return true;
     } catch {
       failed = true;

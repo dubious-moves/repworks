@@ -4,6 +4,7 @@ import { signal } from '@preact/signals';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { DEFAULT_ENGINE_PREFS, DEPTHS, enginePrefs, MOVETIMES, runningThreads, updateEnginePrefs, type EnginePrefs } from '../app/engine.ts';
 import { isolated, wantIsolation } from '../platform/isolation.ts';
+import { STOCKFISH_VERSIONS } from '../platform/stockfish.ts';
 import { mode } from '../app/mode.ts';
 import { EngineFiles } from './Engines.tsx';
 import { maiaEloFor } from '../core/maia/encode.ts';
@@ -55,7 +56,8 @@ function Dialog() {
     <dialog ref={ref} class="study-dialog engine-settings" aria-labelledby="dialog-engine-settings" onCancel={(e) => (e.preventDefault(), close())}>
       <form class="form" method="dialog" noValidate onSubmit={(e) => (e.preventDefault(), save())}>
         <h2 id="dialog-engine-settings">Engine settings</h2>
-        <p class="muted">Stockfish 18 (lite), on this device. It stops at the depth or the time, whichever comes first; "+" searches on.</p>
+        <p class="muted">Stockfish {draft.version} (lite), on this device. It stops at the depth or the time, whichever comes first; "+" searches on.</p>
+        <Choice label="Version" values={STOCKFISH_VERSIONS} value={draft.version} format={(v) => `Stockfish ${v}`} onPick={(version) => setDraft({ ...draft, version })} />
         <Choice label="Depth" values={DEPTHS} value={draft.depth as (typeof DEPTHS)[number]} onPick={(depth) => setDraft({ ...draft, depth })} />
         <Choice label="Lines" values={[1, 2, 3, 4, 5] as const} value={draft.lines as 1} onPick={(lines) => setDraft({ ...draft, lines })} />
         <Choice label="Max time" values={MOVETIMES} value={draft.movetime as (typeof MOVETIMES)[number]} format={(s) => `${s} s`} onPick={(movetime) => setDraft({ ...draft, movetime })} />

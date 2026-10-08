@@ -10,7 +10,7 @@ import { makeFen } from 'chessops/fen';
 import { positionKeyOf } from '../core/chess/positionKey.ts';
 import { createSearch, type Analysis, type Search, type SearchRequest } from '../core/engine/search.ts';
 import { ensure } from '../platform/blobs.ts';
-import { startStockfish, stockfishFiles, type EngineProcess } from '../platform/stockfish.ts';
+import { startStockfish, stockfishFiles, STOCKFISH_VERSIONS, type EngineProcess, type StockfishVersion } from '../platform/stockfish.ts';
 import { isolated, wantIsolation } from '../platform/isolation.ts';
 
 export interface EnginePrefs {
@@ -22,10 +22,12 @@ export interface EnginePrefs {
   arrows: boolean;
   /** Engine threads (§5.36): more than one needs the page isolated, which the service worker does. */
   threads: number;
+  /** Stockfish's version (§5.75): 18 by default, 19 as an option. */
+  version: StockfishVersion;
 }
 
 // Qchess's defaults (depth 20, 8 s), with three lines for the outline's MultiPV arrows.
-export const DEFAULT_ENGINE_PREFS: EnginePrefs = { on: false, depth: 20, lines: 3, movetime: 8, arrows: true, threads: 1 };
+export const DEFAULT_ENGINE_PREFS: EnginePrefs = { on: false, depth: 20, lines: 3, movetime: 8, arrows: true, threads: 1, version: 18 };
 export const DEPTHS = [20, 30, 40] as const;
 export const MOVETIMES = [5, 8, 30] as const;
 
@@ -34,7 +36,9 @@ const PREFS_KEY = 'repworks-engine';
 function loadPrefs(): EnginePrefs {
   try {
     const raw = localStorage.getItem(PREFS_KEY);
-    return { ...DEFAULT_ENGINE_PREFS, ...(raw ? (JSON.parse(raw) as Partial<EnginePrefs>) : {}) };
+    const prefs = { ...DEFAULT_ENGINE_PREFS, ...(raw ? (JSON.parse(raw) as Partial<EnginePrefs>) : {}) };
+    if (!STOCKFISH_VERSIONS.includes(prefs.version)) prefs.version = DEFAULT_ENGINE_PREFS.version;
+    return prefs;
   } catch {
     return { ...DEFAULT_ENGINE_PREFS };
   }
@@ -71,6 +75,8 @@ export function updateEnginePrefs(patch: Partial<EnginePrefs>): void {
     void wantIsolation((patch.threads ?? 1) > 1);
     if (runningThreads() !== started) teardown();
   }
+  // The version (§5.75): the engine started again with the other build.
+  if ('version' in patch && patch.version !== startedVersion) teardown();
   refresh();
 }
 
@@ -102,6 +108,7 @@ const hashMb = (): number => (matchMedia('(max-width: 768px)').matches ? 16 : 32
 /** The threads the engine runs with: those chosen when the page is isolated, else one. */
 export const runningThreads = (): number => (isolated() ? Math.max(1, enginePrefs.peek().threads) : 1);
 let started = 1;
+let startedVersion: StockfishVersion = 18;
 
 // The lines come many times a second at low depths: shown at most every 100 ms.
 function show(a: Analysis): void {
@@ -139,6 +146,7 @@ function spawn(): void {
     },
     hashMb(),
     started,
+    startedVersion,
   );
 }
 
@@ -161,7 +169,8 @@ async function startEngine(): Promise<void> {
   starting = (async () => {
     try {
       started = runningThreads();
-      const files = stockfishFiles(started);
+      startedVersion = enginePrefs.peek().version;
+      const files = stockfishFiles(started, startedVersion);
       engineStatus.value = { kind: 'loading', received: 0, total: files.reduce((n, f) => n + f.bytes, 0) };
       await ensure(files, (p) => {
         engineStatus.value = { kind: 'loading', ...p };

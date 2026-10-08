@@ -5,6 +5,13 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## Stockfish 19 as an option (§5.75)
+
+- Phone, then desktop: Engine settings → Version → Stockfish 19, Save; the bar reads SF19 and the
+  lines come. Is it stable on the phone over a few minutes (no restarts, no "failed"), and are its
+  speed and lines comparable to 18's? With 2+ threads on the desktop: SF19 ×2.
+- A storm, a practice game and its review with 19 chosen run as with 18.
+
 ## Prioritize a study, and paused lines (§5.70)
 
 - Desktop, with the Lichess login: on the training screen of a real study, the line list's

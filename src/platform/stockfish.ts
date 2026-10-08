@@ -17,11 +17,18 @@ export interface EngineEvents {
 
 const HANDSHAKE_MS = 10_000;
 
-/** The build's files: the single-threaded one, or the threaded one (§5.36, isolated pages only). */
-export const stockfishFiles = (threads: number) => (threads > 1 ? [ENGINES.stockfishMtJs, ENGINES.stockfishMtWasm] : [ENGINES.stockfishJs, ENGINES.stockfishWasm]);
+/** The vendored versions (§5.75): 18, proven on the owner's phone, and 19, an option. */
+export const STOCKFISH_VERSIONS = [18, 19] as const;
+export type StockfishVersion = (typeof STOCKFISH_VERSIONS)[number];
 
-export function startStockfish(events: EngineEvents, hashMb: number, threads = 1): EngineProcess {
-  const [js, wasm] = stockfishFiles(threads);
+/** The build's files: the single-threaded one, or the threaded one (§5.36, isolated pages only). */
+export function stockfishFiles(threads: number, version: StockfishVersion = 18) {
+  if (version === 19) return threads > 1 ? [ENGINES.stockfish19MtJs, ENGINES.stockfish19MtWasm] : [ENGINES.stockfish19Js, ENGINES.stockfish19Wasm];
+  return threads > 1 ? [ENGINES.stockfishMtJs, ENGINES.stockfishMtWasm] : [ENGINES.stockfishJs, ENGINES.stockfishWasm];
+}
+
+export function startStockfish(events: EngineEvents, hashMb: number, threads = 1, version: StockfishVersion = 18): EngineProcess {
+  const [js, wasm] = stockfishFiles(threads, version);
   const url = `${js!.url}#${encodeURIComponent(new URL(wasm!.url, location.href).href)}`;
   const worker = new Worker(url);
   const queue: string[] = [];

@@ -7,7 +7,7 @@ where the build differed). What remains is live: the spike's re-run (§4.2), the
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
 with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
-for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Read with `DECISIONS.md`, which this plan updates (its
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -2638,6 +2638,32 @@ Tests: `saved.test.ts` (the item, with and without its move, read back through J
 `analysis.spec.ts` (a sequence from a plain board, then "already saved"); `storm.spec.ts` (the
 sequence from the storm's board starting at the user's move; the mistake and the great answer
 saved, in the log).
+
+#### 5.75 Stockfish 19 as an option (the owner's request, 2026-10-08)
+
+§5.29 kept Stockfish 18 (proven on the owner's phone in mistake-lab) and noted npm
+`stockfish@19.0.0` as a possible swap. The owner asked for 19 as an additional option, so 18 stays
+the default and 19 is chosen per device:
+- `vendor/stockfish/stockfish-19-lite-single.{js,wasm}` and `stockfish-19-lite.{js,wasm}` (the
+  threaded build), from npm `stockfish@19.0.0` unchanged (sha256 in the README). Its lite builds
+  carry the small net `nn-61e7af4bb97d` (1.8 MB single, 1.6 MB threaded, against 18's 7.3 MB); the
+  worker finds its wasm from the hash of its URL as 18's does (the same loader code).
+- Engine settings: a **Version** choice (Stockfish 18 / Stockfish 19), stored with the device's
+  other engine settings (`version` in `repworks-engine`; anything else read as 18). A change ends
+  the worker; the next position starts the chosen build, downloaded on first use like the others.
+  It applies with the threads too (SF19 ×2 on an isolated page). The bar reads SF18 or SF19.
+- The other engine client (`app/stormEngine.ts`: the storm, practice games, the game reviews and
+  sequences) starts with the device's version; one already running keeps its build until it ends.
+- The debug panel and the engine settings' file list have "Stockfish 19" and "Stockfish 19
+  threads", with Download and Delete.
+
+Checked in this container: the build under Node (`uci`, `stop` ends `go infinite` and the next
+search runs, mate in one at once).
+
+Tests: `stockfish.test.ts` runs every case on both versions under Node; `stockfish.spec.ts`
+checks both built workers in Chromium (mate in one, `stop`, the next search); `version.spec.ts`
+(desktop and phone: 19 chosen, only its build downloaded, searching, kept after a reload);
+`threads.spec.ts` (19 with two threads on the isolated page).
 
 Live: TESTING.md.
 

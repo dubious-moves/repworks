@@ -89,7 +89,7 @@ export function EnginePanel(props: { board: Position | undefined }) {
           <input type="checkbox" role="switch" aria-label="Engine" checked={on} onChange={(e) => updateEnginePrefs({ on: e.currentTarget.checked })} />
           <span class="slider" />
         </label>
-        <span class="engine-name">SF18{on && runningThreads() > 1 ? ` ×${runningThreads()}` : ''}</span>
+        <span class="engine-name">SF{enginePrefs.value.version}{on && runningThreads() > 1 ? ` ×${runningThreads()}` : ''}</span>
         <span class="engine-depth" aria-live="polite">
           {on ? statusText(props.board, shown) : ''}
         </span>
