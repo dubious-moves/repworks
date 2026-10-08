@@ -1405,3 +1405,25 @@ The technical calls, each with its reason:
   on by itself": with "go on" the queue goes on after two paces as before; with "wait" (the
   default) its lines end with "Line done · Next: …" and "Next line" (2 in show and grade). A line
   picked from the list is unchanged.
+
+## Revision of 2026-10-08 (the owner's notes: repetitions, mistakes asked again, ←, PLAN.md §5.77)
+- **A line learned is walked twice, and a mistake is asked again at the line's end until right
+  twice in a row, by default** (the owner's numbers), both per-device settings beside §5.17's.
+  Neither grades anything again: a card is still graded once a session (§5.6), so the later passes
+  and the retries are practice and FSRS sees one answer, as Chessable's repetitions don't count
+  either. Show and grade does neither: a move shown can't be found again.
+- **A drill's misses come back until right** (retry, drill, the pins); a pin's `drill` event still
+  records the first answer only, so its steps (§5.8) are unchanged.
+- **← goes back to where the page was opened from**, reversing each screen's fixed parent (the
+  studies, the games, the chapter): the browser's own history, stamped per entry, skipping the
+  page's own entries (a study's chapters, training's lines, the storm's scopes), so one press
+  leaves the page. A page opened from outside the app keeps its parent. Within the storm, ← still
+  ends a live session first: it is the storm's way out, and its review is the session's end.
+- **The storm's session is kept on any page while its clock is stopped**, for the entry it was
+  started on (revising §5.71's "let go as soon as the page goes anywhere but the storm and that
+  board", which lost it on Practise from the board, say). A storm opened anew starts afresh, as
+  before. The practice game and the game cards' session are kept the same way.
+- **The analysis board takes the side it was opened from** wherever a page opens it, and Practise
+  from it plays that side; a FEN set up on the board still turns it to the side to move.
+- **Maia's worker ended for being unused is `idle`, not `off`**: its columns stay and the next ask
+  starts it again (the owner's report: the columns vanished until Maia was switched off and on).

@@ -577,14 +577,30 @@ textarea.script {
   margin-bottom: 8px;
 }
 
+/* The app's ←, back to where the page was opened from: a button of its own, easy to find (the
+   owner's request, 2026-10-08). */
 .chapter-head .back {
   display: inline-flex;
+  flex: none;
   align-items: center;
   justify-content: center;
-  min-width: 44px;
+  min-width: 48px;
   min-height: 44px;
-  font-size: 1.3rem;
+  padding: 0 10px;
+  border: 1px solid #3f6b50;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1;
   text-decoration: none;
+}
+
+.chapter-head .back:hover,
+.chapter-head .back:focus-visible {
+  background: #2f5a3f;
+  border-color: #5f9a73;
 }
 
 .chapter-head .titles {
@@ -4205,4 +4221,11 @@ a.button.disabled {
 
 .storm-clear {
   margin-top: 0.5rem;
+}
+
+/* The study board's FEN under it, read-only, with Copy FEN (the owner's request, 2026-10-08). */
+.cv-board .fen-row input {
+  font-family: ui-monospace, monospace;
+  font-size: 0.75rem;
+  color: var(--muted);
 }

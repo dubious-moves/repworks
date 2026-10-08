@@ -68,9 +68,18 @@ test('from a chapter’s move: a line played there and added back to the chapter
   const git = await setUp(page);
   await page.getByRole('link', { name: 'Test repertoire', exact: true }).click();
   await expect(page.locator('.notation')).toContainText('A made-up comment');
+  // The board keeps the chapter's side (Black) even with White to move (the owner's request, 2026-10-08).
+  await openMoveMenu(page, 'e4 c5');
+  await page.getByRole('menuitem', { name: 'Analyse from here' }).click();
+  await expect(page).toHaveURL(/#\/analysis\?fen=.*&from=Rep0Najd\/Ch1Najdf&at=e4,c5&side=black$/);
+  await expect(page.locator('.cg-wrap')).toHaveClass(/orientation-black/);
+  // …and so does practising from it: Black is played, White moves first.
+  await page.getByRole('button', { name: 'Practise' }).click();
+  await expect(page).toHaveURL(/#\/practice\?fen=.*&side=black$/);
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf`);
   await openMoveMenu(page, 'e4 c5 Nf3');
   await page.getByRole('menuitem', { name: 'Analyse from here' }).click();
-  await expect(page).toHaveURL(/#\/analysis\?fen=.*&from=Rep0Najd\/Ch1Najdf&at=e4,c5,Nf3$/);
+  await expect(page).toHaveURL(/#\/analysis\?fen=.*&from=Rep0Najd\/Ch1Najdf&at=e4,c5,Nf3&side=black$/);
   // Black to move after 2. Nf3: the board from Black's side; 2... e6 3. d4 played.
   await expect(page.locator('.cg-wrap')).toHaveClass(/orientation-black/);
   await clickSquare(page, 'e7', 'black');

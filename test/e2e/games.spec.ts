@@ -251,7 +251,8 @@ test('a mistake made into a sequence on the analysis board, checked, saved in it
   await expect(page.getByTestId('games-queue')).toContainText('0 due · 3 new today');
   await page.getByTestId('game-row').filter({ hasText: 'Blackburne' }).click();
   await page.getByTestId('game-item').getByRole('button', { name: 'Make a sequence' }).click();
-  await expect(page).toHaveURL(/#\/analysis\?fen=.*&seq=GameOne1_7$/);
+  // The board from the player's side (the owner's request, 2026-10-08).
+  await expect(page).toHaveURL(/#\/analysis\?fen=.*&seq=GameOne1_7&side=white$/);
 
   // The refutation, and the castle that follows.
   for (const [from, to] of [['f3', 'd4'], ['e5', 'd4'], ['e1', 'g1']] as const) {

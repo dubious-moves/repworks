@@ -19,6 +19,7 @@ import { lineThrough, nodeAt, positionAt, startPosition } from '../core/study/tr
 import { pathKey } from '../core/study/notation.ts';
 import { Board } from './Board.tsx';
 import { CommentText, endPreviewOnBoard, PreviewBar, previewBoard } from './CommentText.tsx';
+import { Back } from './Back.tsx';
 
 type Loaded = { chapter: Chapter; line: string[] } | { problem: string };
 
@@ -132,9 +133,7 @@ export function ReadView(props: { sid: string; cid: string; at: string[]; from?:
   return (
     <div class="train read">
       <div class="chapter-head">
-        <a href="#/" class="back" aria-label="Back to the chapter" onClick={(e) => (e.preventDefault(), toChapter())}>
-          ←
-        </a>
+        <Back parent={{ name: 'chapter', sid, cid, at: path }} />
         <div class="titles">
           <span class="study-title">Read · {header(ok.chapter, 'ChapterName') ?? cid}</span>
         </div>

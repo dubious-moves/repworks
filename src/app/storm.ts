@@ -2,7 +2,7 @@
 // the gather that finds positions and keeps them on this device, and the timed storm and the
 // untimed set over them. Every answer is a `storm` progress event, so what is done and the record
 // follow the owner across devices (§5.41); the positions themselves stay here (D5's cache tier).
-import { effect, signal } from '@preact/signals';
+import { signal } from '@preact/signals';
 import type { Mode, StormMode } from '../core/app/fsm.ts';
 import { positionKeyOf } from '../core/chess/positionKey.ts';
 import type { FromWorker, ToWorker } from '../core/explorer/service.ts';
@@ -24,7 +24,7 @@ import { positionAt } from '../core/study/tree.ts';
 import type { Score } from '../core/engine/uci.ts';
 import { openStormStore, type StormStore } from '../platform/stormStore.ts';
 import { onWorker, postToWorker } from './explorer.ts';
-import { mode, open } from './mode.ts';
+import { entryKey, open } from './mode.ts';
 import { recordEvent } from './state.ts';
 import { analyseForStorm, cancelStormEngine, endStormEngine } from './stormEngine.ts';
 import { trainData, type TrainData } from './train.ts';
@@ -515,8 +515,13 @@ async function dealt(s: StormScopeData): Promise<StoredPosition[]> {
   return drawOrder(items, histories(data), Math.random, STORM.reachTop);
 }
 
+/** The history entry the session was started on (app/mode.ts): left for another page and come back to by ←, it is there. */
+let sessionEntry: string | undefined;
+export const stormEntry = (): string | undefined => sessionEntry;
+
 export async function startStorm(s: StormScopeData, mode: SessionMode): Promise<void> {
   endStormSession();
+  sessionEntry = entryKey();
   stopDeepening();
   scopeNow = s;
   recent ??= loadRecent();
@@ -804,22 +809,17 @@ export function leaveStorm(): void {
 }
 
 /**
- * Off to the analysis board and back (lichessable §18.4): the session is kept as it is (the clock
- * runs only while a card asks for a move, and no card asks from here), the gather, the deepening
- * and the storm's engine stop.
+ * Off to another page while the clock is stopped (the analysis board, lichessable §18.4, and
+ * anywhere from there): the session is kept as it is for the entry it was started on, its verdict
+ * waiting for Next; the gather, the deepening and the storm's engine stop. The storm's screen
+ * opened on another entry starts afresh (the owner's request, 2026-10-08: ← comes back to it).
  */
 export function suspendStorm(): void {
+  pauseVerdict();
   stopGathering();
   stopDeepening();
   endStormEngine();
 }
-
-// A session kept for the analysis board is let go once the page goes anywhere else.
-effect(() => {
-  const m = mode.value;
-  if (m.name === 'storm' || (m.name === 'analysis' && m.back)) return;
-  if (stormSession.peek()) endStormSession();
-});
 
 /**
  * The analysis board for a card (§20's lead-in): from the position before the move that reached

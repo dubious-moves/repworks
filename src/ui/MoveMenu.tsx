@@ -40,6 +40,16 @@ export function openMenu(path: Path, x: number, y: number, above = y): void {
 
 const close = () => (menu.value = undefined);
 
+/** Copies a FEN to the clipboard (the owner's request, 2026-10-08), saying so under the board. */
+export async function copyFen(fen: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(fen);
+    feedback.value = 'FEN copied';
+  } catch {
+    feedback.value = 'The browser did not allow copying';
+  }
+}
+
 async function copyLine(path: Path, how: 'line' | 'continuation') {
   const c = chapter.peek();
   if (!c) return;
@@ -99,6 +109,14 @@ export function MoveMenu() {
   if (isMove) items.push({ label: 'Copy line as PGN', run: () => void copyLine(m.path, 'line') });
   // From the branch's first move to the line's end, numbered from there (§5.11).
   if (isMove) items.push({ label: 'Copy continuation', run: () => void copyLine(m.path, 'continuation') });
+  // The position after the move (or the start), as on the board.
+  items.push({
+    label: 'Copy FEN',
+    run: () => {
+      const pos = positionAt(c, m.path);
+      if (pos) void copyFen(makeFen(pos.toSetup()));
+    },
+  });
   const s = study.value;
   if (s && s.sid !== SCRATCH) {
     // The analysis board from this move's position, its lines able to come back here (§5.35).
@@ -106,7 +124,8 @@ export function MoveMenu() {
       label: 'Analyse from here',
       run: () => {
         const pos = positionAt(c, m.path);
-        if (pos) open({ name: 'analysis', fen: makeFen(pos.toSetup()), from: { sid: s.sid, cid: s.cid, at: [...m.path] } });
+        // The board keeps its side: the chapter's, whoever is to move.
+        if (pos) open({ name: 'analysis', fen: makeFen(pos.toSetup()), from: { sid: s.sid, cid: s.cid, at: [...m.path] }, side: side.peek() });
       },
     });
     // The storm over the lines through this move (§5.43, lichessable §28), in a repertoire chapter.

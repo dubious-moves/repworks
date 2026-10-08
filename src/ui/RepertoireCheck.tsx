@@ -17,6 +17,7 @@ import { positionOf } from '../core/storm/walk.ts';
 import { makeFen } from 'chessops/fen';
 import { parseUciMove } from '../core/chess/uci.ts';
 import { isoDay } from './day.ts';
+import { Back } from './Back.tsx';
 
 const SPEEDS = ['bullet', 'blitz', 'rapid', 'classical', 'correspondence'];
 
@@ -60,9 +61,7 @@ export function RepertoireCheckScreen() {
   return (
     <div class="games repcheck">
       <div class="chapter-head">
-        <a href="#/games" class="back">
-          ←
-        </a>
+        <Back parent={{ name: 'games' }} />
         <div class="titles">
           <span class="study-title">Repertoire check</span>
         </div>
@@ -107,7 +106,7 @@ function WeakSpots() {
                     · {r.w}–{r.l}–{r.d} over {r.total} · you play {r.userColor}
                   </span>
                   <span class="actions">
-                    <button type="button" class="link" onClick={() => open({ name: 'analysis', fen: r.fen })}>
+                    <button type="button" class="link" onClick={() => open({ name: 'analysis', fen: r.fen, side: r.userColor })}>
                       Analyse
                     </button>{' '}
                     <button

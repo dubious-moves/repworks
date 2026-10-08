@@ -9,7 +9,7 @@ import { normalizeMove } from 'chessops/chess';
 import { makeUci, parseSquare } from 'chessops/util';
 import type { Key } from '@lichess-org/chessground/types';
 import type { Role, SquareName } from 'chessops/types';
-import { mode, open } from '../app/mode.ts';
+import { entryKey, goBack, open } from '../app/mode.ts';
 import { dataVersion } from '../app/sync.ts';
 import { trainData } from '../app/train.ts';
 import {
@@ -39,6 +39,7 @@ import {
   stormPrefs,
   stormMistakeSaved,
   stormSession,
+  stormEntry,
   suspendStorm,
   toggleShown,
   tryAgain,
@@ -59,6 +60,7 @@ import { themeLabel } from '../core/puzzles/dataset.ts';
 import { Board } from './Board.tsx';
 import { useWakeLock } from './Train.tsx';
 import { collect, fillBodies, puzzlePrefs, puzzleState, refreshPuzzles, setPuzzlePrefs, SHARD_MB, SHARES, SHARDS_PER_COLLECT, stopPuzzles, WORKING_SET } from '../app/puzzles.ts';
+import { Back } from './Back.tsx';
 
 const PUZZLE_WORD: Record<string, string> = { great: 'Solved', blunder: 'Not the solution', unanswered: 'Not answered' };
 const BAND_WORD: Record<string, string> = { great: 'Great', good: 'Good', ok: 'Inaccuracy', bad: 'Mistake', blunder: 'Blunder', unknown: 'No verdict', unanswered: 'Not answered' };
@@ -115,13 +117,15 @@ export function StormScreen(props: { where: StormWhere }) {
   const key = JSON.stringify(props.where);
   const scope = useMemo(() => (data ? scopeData(data, props.where) : undefined), [data, key]);
   useEffect(() => {
-    // A session from another scope (left on the analysis board, then another storm opened) isn't this one's.
+    // A session from another scope, or started on another entry (left, then the storm opened anew),
+    // isn't this one's; coming back to its entry by ← finds it (the owner's request, 2026-10-08).
     const s = stormSession.peek();
-    if (s && s.scopeKey !== key) endStormSession();
-    // Off to the analysis board from here: the session waits. Anywhere else: it ends.
+    if (s && (s.scopeKey !== key || stormEntry() !== entryKey())) endStormSession();
+    // Off to another page with the clock stopped (Analyse, and on from there): the session waits.
+    // With the clock running, it ends.
     return () => {
-      const m = mode.peek();
-      if (m.name === 'analysis' && m.back) suspendStorm();
+      const live = stormSession.peek();
+      if (live && live.endsAt === undefined) suspendStorm();
       else leaveStorm();
     };
   }, [key]);
@@ -136,14 +140,11 @@ export function StormScreen(props: { where: StormWhere }) {
   return (
     <div class="train storm">
       <div class="chapter-head">
-        <a
-          href="#/"
-          class="back"
-          title={live ? 'End the session' : s ? 'Back to the storm’s page' : 'Back to the studies'}
-          onClick={(e) => (e.preventDefault(), live ? endStorm('stop') : s ? (stormSession.value = undefined) : open({ name: 'list' }))}
-        >
-          ←
-        </a>
+        <Back
+          parent={{ name: 'list' }}
+          title={live ? 'End the session' : s ? 'Back to the storm’s page' : 'Back to where you came from'}
+          onBack={() => (live ? endStorm('stop') : s ? (stormSession.value = undefined) : goBack({ name: 'list' }))}
+        />
         <div class="titles">
           <span class="study-title">
             {s ? (s.mode === 'storm' ? 'Storm' : `Set of ${STORM.setSize}`) : 'Storm'} · {scope.title}

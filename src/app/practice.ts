@@ -293,8 +293,49 @@ export function startPractice(setup: PracticeSetup): void {
 
 export function leavePractice(): void {
   gen++;
+  parked = undefined;
   practice.value = undefined;
   clearSaved();
+}
+
+/** A game left for another page: the history entry it was played on (app/mode.ts), and the game. */
+let parked: { entry: string; gen: number } | undefined;
+
+/**
+ * The practice screen left for another page (Analyse, say): the game is kept for the entry it was
+ * played on, so coming back to it by ← finds it (the owner's request, 2026-10-08). A game over
+ * keeps its review as it is; a game in play stops the opponent's search and stays saved on the
+ * device, to be played on (`takeUpPractice`).
+ */
+export function parkPractice(entry: string): void {
+  const p = practice.peek();
+  if (!p) return leavePractice();
+  parked = { entry, gen: p.gen };
+  if (p.phase !== 'over') gen++;
+}
+
+/**
+ * The practice screen opened on `entry`: true when the game left there was taken up again (a game
+ * over shown as it was, a game in play played on); else the game left elsewhere is let go.
+ */
+export function takeUpPractice(entry: string): boolean {
+  const was = parked;
+  parked = undefined;
+  if (was === undefined) return false;
+  const p = practice.peek();
+  // Another entry's, or another game started since (a checklist's, a game card's): not this one.
+  if (was.entry !== entry || p?.gen !== was.gen) {
+    if (p?.gen === was.gen) leavePractice();
+    return false;
+  }
+  if (p.phase === 'over') return true;
+  const saved = savedPractice();
+  if (!saved) {
+    leavePractice();
+    return false;
+  }
+  resumePractice(saved);
+  return true;
 }
 
 /* ------------------------------------------------------------------ kept on the device, to resume */

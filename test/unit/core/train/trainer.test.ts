@@ -649,7 +649,7 @@ test('a line\'s end goes on after the paces asked', () => {
   assert.deepEqual(effects[i + 1], { type: 'wait', ms: 2400, id: (effects[i + 1] as { id: number }).id });
 });
 
-test('random repertoires under every auto-play mode and line start: every planned ask graded once, every teach taught once', () => {
+test('random repertoires under every auto-play mode, line start, repetitions and retries: every planned ask graded once, every teach taught once', () => {
   for (let seed = 1; seed <= 120; seed++) {
     const random = mulberry32(seed * 7919);
     const chapters = Array.from({ length: 1 + Math.floor(random() * 3) }, (_, i) => {
@@ -675,6 +675,8 @@ test('random repertoires under every auto-play mode and line start: every planne
       sequence: random() < 0.3 ? 1 + Math.floor(random() * 5) : 0,
       holdLineEnd: random() < 0.5,
       practice: random() < 0.3,
+      repetitions: 1 + (seed % 3),
+      retryMistakes: Math.floor(seed / 3) % 3,
     };
     const answers = Array.from({ length: 500 }, () => random());
     const answerer: Answerer = (view, n) => {
@@ -702,4 +704,167 @@ test('random repertoires under every auto-play mode and line start: every planne
     for (const c of reviewed_) assert.ok(plan.lines.some((l) => l.ask.includes(c)) || statusOf(states.get(c)) === 'fresh' || [...w.ix.positions.values()].some((p) => p.own.size > 1), `${what}: ${c} graded though not asked`);
     for (const e of a.effects) if (e.type === 'wait') assert.ok(e.ms >= MIN_PACE_MS, what);
   }
+});
+
+// ---- Repetitions, mistakes retried, missed moves again (the owner's requests, 2026-10-08) ----
+
+const answersOf = (effects: TrainerEffect[]) => effects.flatMap((e) => (e.type === 'answer' ? [e] : []));
+
+test('repetitions: a line on which moves were taught is walked again, the moves taught asked and nothing recorded twice', () => {
+  const w = world(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 Nc6 3. Bb5'));
+  const views: TrainerView[] = [];
+  const { effects, records } = run(trainer(w, planOf(w, new Map(), 20), new Map(), { repetitions: 2 }), (view, n) => (views.push(view), right(view, n)));
+  assert.deepEqual(views.map((v) => v.phase), ['teach', 'teach', 'teach', 'ask', 'ask', 'ask']);
+  assert.deepEqual(views.map((v) => v.pass?.n ?? 1), [1, 1, 1, 2, 2, 2]);
+  assert.deepEqual(views[3]!.pass, { n: 2, of: 2 });
+  assert.deepEqual(records.map((r) => r.k), ['taught', 'taught', 'taught']);
+  assert.deepEqual(plays(effects), ['user:e4', 'opponent:e5', 'user:Nf3', 'opponent:Nc6', 'user:Bb5', 'user:e4', 'opponent:e5', 'user:Nf3', 'opponent:Nc6', 'user:Bb5']);
+  assert.ok(notes(effects).some((n) => n.kind === 'repeat' && n.pass === 2 && n.of === 2));
+  // The second pass's answers are repeats, and no arrow shows them.
+  assert.deepEqual(answersOf(effects).map((a) => a.repeat ?? false), [true, true, true]);
+  const second = effects.findIndex((e) => e.type === 'takeback');
+  assert.deepEqual(effects[second], { type: 'takeback', path: [] });
+  assert.ok(!effects.slice(second).some((e) => e.type === 'arrow' && e.uci));
+  assert.equal(effects.filter((e) => e.type === 'line').length, 1);
+});
+
+test('repetitions: once by default, three when asked; a line with nothing taught is walked once; never in show and grade', () => {
+  const w = world(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3'));
+  const asks = (opts: TrainerOptions & { selfGrade?: boolean }, states = new Map<string, CardState>()) => {
+    let n = 0;
+    run(new Trainer({ index: w.ix, plan: planOf(w, states, 20), states, startOf: startOf(w), paceMs: 600, ...opts }), (view, k) => {
+      n++;
+      if (opts.selfGrade) return view.phase === 'shown' ? { type: 'tell', knew: true, now: 0 } : { type: 'show' };
+      return right(view, k);
+    });
+    return n;
+  };
+  assert.equal(asks({}), 2);
+  assert.equal(asks({ repetitions: 3 }), 6);
+  assert.equal(asks({ repetitions: 2 }, new Map([[card('e4'), dueNow], [card('e4 e5 Nf3'), dueNow]])), 2);
+  // Show and grade: each move shown, then told.
+  assert.equal(asks({ repetitions: 2, selfGrade: true }), 4);
+});
+
+test('repetitions: the next pass starts as a line does, at its first move taught with the opponent\'s move before it', () => {
+  const w = world(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 Nc6 3. Bb5'));
+  const states = new Map<string, CardState>([[card('e4'), notDue], [card('e4 e5 Nf3'), notDue]]);
+  const { effects } = run(trainer(w, planOf(w, states, 20), states, { repetitions: 2, lineStart: 'first' }), right);
+  const back = effects.find((e) => e.type === 'takeback');
+  assert.deepEqual(back, { type: 'takeback', path: ['e4', 'e5', 'Nf3'] });
+  assert.deepEqual(plays(effects), ['opponent:Nc6', 'user:Bb5', 'opponent:Nc6', 'user:Bb5']);
+});
+
+test('mistakes retried: at the line\'s end the missed move is asked again from the opponent\'s move, until right twice in a row; graded once', () => {
+  const w = world(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 Nc6 3. Bb5'));
+  const states = new Map<string, CardState>([[card('e4'), notDue], [card('e4 e5 Nf3'), dueNow], [card('e4 e5 Nf3 Nc6 Bb5'), dueNow]]);
+  const views: TrainerView[] = [];
+  // Nf3 missed, Bb5 right; then the retries: wrong (and right), right, right.
+  const moves: (string | undefined)[] = ['d2d4', undefined, undefined, 'd2d4', undefined, undefined, undefined];
+  const { effects, records } = run(trainer(w, planOf(w, states), states, { retryMistakes: 2 }), (view, n) => {
+    views.push(view);
+    const m = moves[n];
+    return m ? { type: 'move', uci: m, now: 0 } : right(view, n);
+  });
+  assert.deepEqual(records, [
+    { k: 'review', card: card('e4 e5 Nf3'), g: 1, ms: 2000, w: ['d2d4'] },
+    { k: 'review', card: card('e4 e5 Nf3 Nc6 Bb5'), g: 3, ms: 1000 },
+  ]);
+  assert.ok(notes(effects).some((n) => n.kind === 'retryMistakes' && n.count === 1 && n.need === 2));
+  // Each retry starts before the opponent's move: the board goes back to 1. e4, then e5 is played.
+  const retries = views.slice(3);
+  assert.deepEqual(retries.map((v) => v.retry?.streak), [0, 0, 0, 1]);
+  assert.deepEqual(retries.map((v) => v.path), [['e4', 'e5'], ['e4', 'e5'], ['e4', 'e5'], ['e4', 'e5']]);
+  assert.deepEqual(effects.filter((e) => e.type === 'takeback' && e.path.length === 1).length, 3);
+  assert.deepEqual(answersOf(effects).map((a) => [a.ok, a.repeat ?? false]), [[false, false], [true, false], [false, true], [true, true], [true, true]]);
+  // Back to the line's end when the retries are done.
+  assert.deepEqual(effects.slice(-3), [{ type: 'takeback', path: ['e4', 'e5', 'Nf3', 'Nc6', 'Bb5'] }, { type: 'lineDone' }, effects.at(-1)]);
+  assert.equal(effects.at(-1)!.type, 'done');
+  assert.ok(notes(effects).some((n) => n.kind === 'retry' && n.streak === 1 && n.need === 2));
+});
+
+test('mistakes retried take turns; a hint is a miss; a practice ask counts; not retried when off, nor in show and grade', () => {
+  const w = world(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 Nc6 3. Bb5'));
+  const states = new Map<string, CardState>([[card('e4'), notDue], [card('e4 e5 Nf3'), dueNow], [card('e4 e5 Nf3 Nc6 Bb5'), notDue]]);
+  const asked: string[] = [];
+  // A line picked: e4 right (a practice ask); Nf3 hinted; Bb5 (practice) wrong, then right.
+  const line = w.ix.lines[0]!;
+  const picked: SessionPlan = { lines: [{ kind: 'pick', line, end: line.path.length, ask: [card('e4 e5 Nf3')], teach: [] }] };
+  run(trainer(w, picked, states, { retryMistakes: 2, practice: true }), (view, n) => {
+    asked.push(`${view.phase}:${view.line!.line.path[view.path.length]}`);
+    if (n === 1) return { type: 'hint', now: 0 };
+    if (n === 3) return { type: 'move', uci: 'd2d4', now: 0 };
+    return right(view, n);
+  });
+  assert.deepEqual(asked, ['ask:e4', 'ask:Nf3', 'shown:Nf3', 'ask:Bb5', 'wrong:Bb5', 'ask:Nf3', 'ask:Bb5', 'ask:Nf3', 'ask:Bb5']);
+  const plain = (opts: TrainerOptions & { selfGrade?: boolean }) => {
+    let n = 0;
+    run(new Trainer({ index: w.ix, plan: planOf(w, states), states, startOf: startOf(w), paceMs: 600, ...opts }), (view, k) => {
+      n++;
+      if (opts.selfGrade) return view.phase === 'shown' ? { type: 'tell', knew: false, now: 0 } : { type: 'show' };
+      return view.phase === 'shown' ? right(view, k) : { type: 'hint', now: 0 };
+    });
+    return n;
+  };
+  assert.equal(plain({ retryMistakes: 0 }), 2);
+  assert.equal(plain({ retryMistakes: 2, selfGrade: true }), 2);
+});
+
+test('mistakes retried after a pass of repetitions: missed moves of the second pass are asked again before the next line', () => {
+  const w = world(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 (2. Nc3) *'));
+  const asked: string[] = [];
+  let missed = false;
+  run(trainer(w, planOf(w, new Map(), 20), new Map(), { repetitions: 2, retryMistakes: 1 }), (view, n) => {
+    const v = view.pass ? `p${view.pass.n}` : view.retry ? 'r' : 'p1';
+    asked.push(`${v}:${view.phase}:${view.line!.line.path[view.path.length]}`);
+    // Nf3 missed once on the second pass.
+    if (!missed && view.pass?.n === 2 && view.path.length === 2) {
+      missed = true;
+      return { type: 'move', uci: 'd2d4', now: 0 };
+    }
+    return right(view, n);
+  });
+  assert.deepEqual(asked, [
+    'p1:teach:e4', 'p1:teach:Nf3', 'p2:ask:e4', 'p2:ask:Nf3', 'p2:wrong:Nf3', 'p2:ask:Nf3',
+    // The second line: Nc3 taught (e4 already answered and played), then its own second pass.
+    'p1:teach:Nc3', 'p2:ask:Nc3',
+  ]);
+});
+
+test('missed again (drill): a move answered wrong is asked again after the others, until each is right', () => {
+  const w = world(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 Nc6 3. Bb5'));
+  const line = w.ix.lines[0]!;
+  const items = [
+    { card: card('e4 e5 Nf3'), line, ply: 2 },
+    { card: card('e4 e5 Nf3 Nc6 Bb5'), line, ply: 4 },
+  ];
+  const plan: SessionPlan = { lines: items.map((m) => ({ kind: 'review', line: m.line, end: m.ply + 1, ask: [m.card], teach: [], from: Math.max(0, m.ply - 1) })) };
+  const asked: string[] = [];
+  // Nf3 missed, Bb5 right, Nf3 missed again, then right.
+  const { effects, records } = run(new Trainer({ index: w.ix, plan, states: new Map(), startOf: startOf(w), paceMs: 450, record: false, askOnly: true, repeatMissed: true }), (view, n) => {
+    asked.push(`${view.phase}:${view.line!.line.path[view.path.length]}`);
+    return n === 0 || n === 3 ? { type: 'hint', now: 0 } : right(view, n);
+  });
+  assert.deepEqual(asked, ['ask:Nf3', 'shown:Nf3', 'ask:Bb5', 'ask:Nf3', 'shown:Nf3', 'ask:Nf3']);
+  assert.deepEqual(records, []);
+  assert.deepEqual(answersOf(effects).map((a) => [a.ok, a.repeat ?? false]), [[false, false], [true, false], [false, true], [true, true]]);
+  assert.ok(notes(effects).some((n) => n.kind === 'missedAgain'));
+  const lines = effects.flatMap((e) => (e.type === 'line' ? [[e.number, e.total]] : []));
+  assert.deepEqual(lines, [[1, 2], [2, 3], [3, 3], [4, 4]]);
+  const done = effects.at(-1);
+  assert.ok(done?.type === 'done' && done.summary.lines === 2);
+});
+
+test('repetitions on a line picked (every own move asked): the next pass plays the moves before the first move taught, as the first did', () => {
+  const w = world(chapter('Chapter1', 'black', '1. e4 c5 2. c3 Nf6'));
+  const states = new Map<string, CardState>([[card('e4 c5'), dueNow]]);
+  const line = w.ix.lines[0]!;
+  // A paused line picked: nothing asked or taught on record, every own move asked as practice.
+  const plan: SessionPlan = { lines: [{ kind: 'pick', line, end: line.path.length, ask: [], teach: [] }] };
+  const asked: string[] = [];
+  run(trainer(w, plan, states, { practice: true, record: false, lineStart: 'auto', repetitions: 2 }), (view, n) => {
+    asked.push(`${view.phase}:${view.line!.line.path[view.path.length]}`);
+    return right(view, n);
+  });
+  assert.deepEqual(asked, ['teach:Nf6', 'ask:Nf6']);
 });

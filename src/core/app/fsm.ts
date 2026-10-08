@@ -102,6 +102,34 @@ export type ModeEvent =
   /** The move shown changed: the address follows, so a reload comes back to it. */
   | { type: 'at'; path: readonly string[] };
 
+/**
+ * Which page a mode is, for the app's ← (the owner's request, 2026-10-08): it goes back to the page
+ * before, past the entries of this one. A study's chapters are one page, and so are training's
+ * sessions and lines, the storm's scopes, the analysis board's positions and a chapter's line read
+ * or played from any move.
+ */
+export function pageOf(mode: Mode): string {
+  switch (mode.name) {
+    case 'chapter':
+      return `study ${mode.sid}`;
+    case 'train':
+    case 'learn':
+    case 'show':
+      return 'train';
+    case 'read':
+    case 'play':
+      return `${mode.name} ${mode.sid}/${mode.cid}`;
+    case 'games':
+      return mode.id ? `game ${mode.id}` : 'games';
+    case 'history':
+      return `history ${mode.id}`;
+    case 'coverage':
+      return `coverage ${mode.sid}`;
+    default:
+      return mode.name;
+  }
+}
+
 export function transition(mode: Mode, event: ModeEvent): Mode {
   switch (event.type) {
     case 'open':

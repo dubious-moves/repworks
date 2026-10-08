@@ -1,8 +1,8 @@
 // Maia in the app (PLAN.md §5.32, §5.33): the device's Maia settings, its worker (started when
 // Maia is switched on, ended when it is switched off or after 90 s unused: an ORT session holds
-// hundreds of MB), the one-time download behind Qchess's dialog, and the explorer's asks: the
-// policy at the board's position and Qchess's Ms for the first rows. Answers are kept for the
-// session.
+// hundreds of MB; `idle` then, and started again by the next ask, its columns kept meanwhile), the
+// one-time download behind Qchess's dialog, and the explorer's asks: the policy at the board's
+// position and Qchess's Ms for the first rows. Answers are kept for the session.
 import { computed, signal } from '@preact/signals';
 import { maiaEloFor, type MaiaMove } from '../core/maia/encode.ts';
 import type { FromMaia, ToMaia } from '../core/maia/protocol.ts';
@@ -41,6 +41,8 @@ export type MaiaState =
   | { kind: 'missing' }
   | { kind: 'downloading'; received: number; total: number }
   | { kind: 'ready' }
+  /** On, its worker ended after a while unused (its memory freed): started again by the next ask. */
+  | { kind: 'idle' }
   | { kind: 'failed'; reason: string };
 
 export const maiaState = signal<MaiaState>({ kind: 'off' });
@@ -91,12 +93,19 @@ function stopWorker(): void {
   worker = undefined;
   for (const w of waiting.values()) w({ type: 'error', id: 0, reason: 'Maia was stopped' });
   waiting.clear();
-  if (maiaState.peek().kind === 'ready') maiaState.value = { kind: 'off' };
+  // Ended for being unused, not switched off: the explorer keeps its columns, and the next ask
+  // starts it again. (Set to `off` before, the columns went and nothing asked again: the owner
+  // had to switch Maia off and on, 2026-10-08.)
+  if (maiaState.peek().kind === 'ready') maiaState.value = { kind: 'idle' };
 }
+
+/** Whether the worker is ended and the next ask should start it: switched on, unused a while. */
+const asleep = () => !worker && maiaPrefs.peek().on && (maiaState.peek().kind === 'off' || maiaState.peek().kind === 'idle');
 
 function startWorker(): void {
   if (worker) return;
-  maiaState.value = { kind: 'loading' };
+  // Started again after a while unused: still `idle` (its columns kept) until it is ready.
+  if (maiaState.peek().kind !== 'idle') maiaState.value = { kind: 'loading' };
   worker = new Worker(new URL('../platform/maiaWorker.ts', import.meta.url), { type: 'module', name: 'maia' });
   worker.onmessage = (e: MessageEvent<FromMaia>) => {
     const m = e.data;
@@ -184,13 +193,13 @@ function ask<T extends FromMaia>(m: WithoutId<Asked>): Promise<T> {
 /** Maia's policy at `fen`, at the rating in use; once per position and rating this session. */
 export function requestPolicy(fen: string): void {
   if (!maiaPrefs.peek().on) return;
-  // Ended after a while unused: started again, and asked once it is ready.
-  if (!worker && maiaState.peek().kind === 'off') return startWorker();
-  if (maiaState.peek().kind !== 'ready') return;
   const elo = maiaElo.peek();
   const key = maiaKey(fen, elo);
   const seen = maiaSeen.peek().get(key);
   if (seen?.policy || seen?.error || seen?.asked.has('')) return;
+  // Ended after a while unused: started again, and asked once it is ready (the explorer asks again then).
+  if (asleep()) return startWorker();
+  if (maiaState.peek().kind !== 'ready') return;
   update(key, (s) => ({ ...s, asked: new Set([...s.asked, '']) }));
   void ask<Extract<FromMaia, { type: 'answer' } | { type: 'error' }>>({ type: 'ask', fen, elo }).then((r) =>
     update(key, (s) => (r.type === 'answer' ? { ...s, policy: r.policy } : { ...s, error: r.reason })),
@@ -203,8 +212,9 @@ export function requestPolicy(fen: string): void {
  */
 export async function maiaPolicy(fen: string, elo: number): Promise<MaiaMove[] | null> {
   if (!maiaPrefs.peek().on) return null;
-  if (!worker && maiaState.peek().kind === 'off') startWorker();
-  for (let waited = 0; maiaState.peek().kind === 'loading' && waited < 5000; waited += 100) await new Promise((r) => setTimeout(r, 100));
+  if (asleep()) startWorker();
+  const starting = () => maiaState.peek().kind === 'loading' || (maiaState.peek().kind === 'idle' && !!worker);
+  for (let waited = 0; starting() && waited < 5000; waited += 100) await new Promise((r) => setTimeout(r, 100));
   if (maiaState.peek().kind !== 'ready') return null;
   const r = await ask<Extract<FromMaia, { type: 'answer' } | { type: 'error' }>>({ type: 'ask', fen, elo });
   return r.type === 'answer' ? r.policy : null;
@@ -212,12 +222,14 @@ export async function maiaPolicy(fen: string, elo: number): Promise<MaiaMove[] |
 
 /** Qchess's Ms for `sans` at `fen` (those not asked yet). */
 export function requestScores(fen: string, sans: readonly string[]): void {
-  if (!maiaPrefs.peek().on || maiaState.peek().kind !== 'ready') return;
+  if (!maiaPrefs.peek().on) return;
   const elo = maiaElo.peek();
   const key = maiaKey(fen, elo);
   const seen = maiaSeen.peek().get(key);
   const fresh = sans.filter((s) => !seen?.asked.has(s));
   if (!fresh.length) return;
+  if (asleep()) return startWorker();
+  if (maiaState.peek().kind !== 'ready') return;
   update(key, (s) => ({ ...s, asked: new Set([...s.asked, ...fresh]) }));
   void ask<Extract<FromMaia, { type: 'scores' } | { type: 'error' }>>({ type: 'scores', fen, sans: [...fresh], elo }).then((r) => {
     if (r.type === 'scores') update(key, (s) => ({ ...s, scores: { ...s.scores, ...r.scores } }));

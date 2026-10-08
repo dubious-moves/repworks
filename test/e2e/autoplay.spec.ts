@@ -10,6 +10,7 @@ import { REPO, TOKEN } from '../support/syncWorld.ts';
 import { clickSquare } from './board.ts';
 import { serveGithub, world } from './github.ts';
 import { serveSite, type SiteServer } from './server.ts';
+import { walkOnce } from './prefs.ts';
 
 let site: SiteServer;
 test.beforeAll(async () => {
@@ -73,6 +74,7 @@ async function watch(page: Page) {
 const seen = (page: Page) => page.evaluate(() => (window as unknown as { seen: { feedback: string[]; moves: string[] } }).seen);
 
 test('a picked line ends with the board kept and goes on to the next line, which starts auto-played; the feedback stays quiet', async ({ page }) => {
+  await walkOnce(page);
   await setUp(page);
   await trainingSettings(page, (d) => d.getByLabel('At a line\'s end').selectOption('go'));
   await page.goto(`${site.url}#/train/Rep0Najd/Ch1Najdf?at=e4,c5,Nf3,d6,d4,cxd4`);
@@ -114,6 +116,7 @@ test('a picked line ends with the board kept and goes on to the next line, which
 });
 
 test('time travel: a new move tried first, then due at +4 hours, its review recorded at the real time; back to now', async ({ page }) => {
+  await walkOnce(page);
   const git = await setUp(page);
   await trainingSettings(page, (d) => d.locator('select[name="new-moves"]').selectOption('try'));
   await page.goto(`${site.url}#/train/Rep0Najd/Ch1Najdf?at=e4,c5,Nf3,d6,d4,cxd4`);
@@ -153,6 +156,7 @@ test('time travel: a new move tried first, then due at +4 hours, its review reco
 });
 
 test('Learn waits at each line\'s end with the board kept, and "Next line" goes on', async ({ page }) => {
+  await walkOnce(page);
   await setUp(page);
   await page.goto(`${site.url}#/learn/Rep0Najd/Ch1Najdf`);
   // Learn teaches: the moves up to the first new one are played from the chapter's start.

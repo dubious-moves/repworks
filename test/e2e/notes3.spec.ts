@@ -7,6 +7,7 @@ import { REPO, TOKEN } from '../support/syncWorld.ts';
 import { clickSquare } from './board.ts';
 import { serveGithub, world } from './github.ts';
 import { serveSite, type SiteServer } from './server.ts';
+import { walkOnce } from './prefs.ts';
 
 let site: SiteServer;
 test.beforeAll(async () => {
@@ -33,6 +34,7 @@ async function play(page: Page, from: string, to: string) {
 }
 
 test('show sequence: the new move is played to watch, stepped back and forth, then found with no arrow', async ({ page }) => {
+  await walkOnce(page);
   await setUp(page);
   await page.locator('.train-card').getByRole('button', { name: 'Training settings' }).click();
   const dialog = page.getByRole('dialog', { name: 'Training settings' });

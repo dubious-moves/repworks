@@ -29,6 +29,14 @@
 //   moves up to the n-th new own move (or a due one) are played for the user to watch, at twice
 //   the pace; the user steps within them (`seek`) and, when ready, replays them from their start,
 //   each new move asked with no arrow, as with `tryNew`.
+// - Repetitions (the owner's request, 2026-10-08): a line on which a move was taught is walked
+//   again, `repetitions` times in all, before the next line; the moves taught are asked on the
+//   later passes (never graded: a card is graded once a session).
+// - Mistakes retried (the owner's request, 2026-10-08): at the end of a walk, each own move asked on
+//   it and not answered right first time is asked again, from the opponent's move before it, until
+//   it is answered right `retryMistakes` times in a row; the mistakes take turns. Nothing is graded.
+// - Missed again (`repeatMissed`: retry, drill and the pins): a move answered wrong has its line
+//   walked again after the plan's lines, until every one is answered right.
 import type { Position } from 'chessops/chess';
 import { makeSan, parseSan } from 'chessops/san';
 import { isNormal, type NormalMove } from 'chessops/types';
@@ -91,6 +99,8 @@ export type Phase =
   | 'wrong'
   /** The move is shown (a second wrong move, or Hint); the user plays it. */
   | 'shown'
+  /** A pause at a walk's end before its mistakes are asked again, or before the line's next pass. */
+  | 'again'
   | 'lineDone'
   | 'sessionDone';
 
@@ -115,7 +125,15 @@ export type Note =
   | { kind: 'alternative'; san: string }
   /** The last wrong move was saved as an alternative (§5.18). */
   | { kind: 'altSaved'; san: string }
-  | { kind: 'suspended'; san: string };
+  | { kind: 'suspended'; san: string }
+  /** At a walk's end: `count` moves missed on it are asked again, each until right `need` times in a row. */
+  | { kind: 'retryMistakes'; count: number; need: number }
+  /** A missed move asked again, right `streak` times in a row so far. */
+  | { kind: 'retry'; streak: number; need: number }
+  /** At a line's end: it is walked again, pass `pass` of `of` (`repetitions`). */
+  | { kind: 'repeat'; pass: number; of: number }
+  /** A move missed in retry, drill or the pins, asked again (`repeatMissed`). */
+  | { kind: 'missedAgain' };
 
 export type TrainerRecord =
   | { k: 'review'; card: CardId; g: Grade; ms: number; w?: string[]; h?: 1 }
@@ -144,8 +162,11 @@ export type TrainerEffect =
   | { type: 'arrow'; uci?: string }
   | { type: 'note'; note: Note }
   | { type: 'record'; event: TrainerRecord }
-  /** A move asked was answered: right first time or not. Given with recording on or off. */
-  | { type: 'answer'; card: CardId; ok: boolean }
+  /**
+   * A move asked was answered: right first time or not. Given with recording on or off; `repeat`
+   * when it was asked again (a mistake retried, a line's later pass, a missed line walked again).
+   */
+  | { type: 'answer'; card: CardId; ok: boolean; repeat?: true }
   /** Send `{ type: 'tick', id }` after `ms`; a tick with another id is ignored. */
   | { type: 'wait'; ms: number; id: number }
   | { type: 'lineDone' }
@@ -215,10 +236,16 @@ export interface TrainerSetup {
   holdLineEnd?: boolean;
   /** The pause at a line's end before the next, in paces (default 2). */
   lineEndPaces?: number;
+  /** How many times a line on which a move was taught is walked (default 1); not in show and grade. */
+  repetitions?: number;
+  /** At a walk's end, each move missed on it is asked until right this many times in a row (default 0: not). */
+  retryMistakes?: number;
+  /** Retry, drill, the pins: a move answered wrong has its line walked again at the end, until answered right. */
+  repeatMissed?: boolean;
 }
 
 /** The options a running session can change (the training settings, §5.17). */
-export type TrainerOptions = Pick<TrainerSetup, 'autoPlay' | 'tryNew' | 'sequence' | 'lineStart' | 'holdLineEnd' | 'lineEndPaces'>;
+export type TrainerOptions = Pick<TrainerSetup, 'autoPlay' | 'tryNew' | 'sequence' | 'lineStart' | 'holdLineEnd' | 'lineEndPaces' | 'repetitions' | 'retryMistakes'>;
 
 interface Ply {
   san: string;
@@ -266,7 +293,18 @@ export interface TrainerView {
   savedAlt?: { uci: string; san: string };
   /** Show sequence, while shown: the plies it spans (the board's path between `from` and `to`). */
   sequence?: { from: number; to: number };
+  /** A line walked again (`repetitions`): this pass, from 2, of how many. */
+  pass?: { n: number; of: number };
+  /** Mistakes retried at a walk's end: how many are left, and the one asked's streak of `need`. */
+  retry?: { left: number; streak: number; need: number };
   summary: Summary;
+}
+
+/** A move missed on a walk, asked again at its end until right `need` times in a row. */
+interface Retry {
+  ply: number;
+  card: CardId;
+  streak: number;
 }
 
 type Kind = 'ask' | 'teach' | 'auto';
@@ -310,11 +348,23 @@ export class Trainer {
   private walked = 0;
   private readonly counts = { reviews: 0, good: 0, taught: 0, suspended: 0 };
   private readonly alternatives: Set<CardId>;
+  /** The line's walk: its pass (`repetitions`), the moves taught on its first, and the moves missed on this one by ply. */
+  private pass = 1;
+  private taughtOnLine: CardId[] = [];
+  private readonly missedOnLine = new Map<number, CardId>();
+  /** Moves asked whatever else says: a later pass's moves taught, or the mistake retried. */
+  private askAgain = new Set<CardId>();
+  /** The mistakes retried at a walk's end, and which one is asked. */
+  private retrying: { items: Retry[]; at: number } | undefined;
+  /** What the pause at a walk's end (`again`) leads to. */
+  private afterPause: 'retry' | 'pass' = 'retry';
+  /** Planned lines added for moves missed in retry, drill or the pins (`repeatMissed`). */
+  private readonly redo = new Set<PlannedLine>();
 
   constructor(setup: TrainerSetup) {
     this.setup = setup;
-    const { autoPlay, tryNew, sequence, lineStart, holdLineEnd, lineEndPaces } = setup;
-    this.options = { autoPlay, tryNew, sequence, lineStart, holdLineEnd, lineEndPaces };
+    const { autoPlay, tryNew, sequence, lineStart, holdLineEnd, lineEndPaces, repetitions, retryMistakes } = setup;
+    this.options = { autoPlay, tryNew, sequence, lineStart, holdLineEnd, lineEndPaces, repetitions, retryMistakes };
     this.pace = Math.max(MIN_PACE_MS, setup.paceMs);
     this.record = setup.record ?? true;
     this.lines = [...setup.plan.lines];
@@ -366,6 +416,12 @@ export class Trainer {
     if (p?.saved) v.savedAlt = { uci: p.saved.uci, san: p.saved.san };
     if (p?.shown) v.shown = { uci: p.uci, san: p.san };
     else if (this.waiting) v.shown = { uci: '', san: this.waiting.san };
+    if (this.pass > 1) v.pass = { n: this.pass, of: Math.max(this.pass, this.options.repetitions ?? 1) };
+    const r = this.retrying;
+    if (r) {
+      const need = this.need();
+      v.retry = { left: r.items.filter((i) => i.streak < need).length, streak: r.items[r.at]?.streak ?? 0, need };
+    }
     return v;
   }
 
@@ -468,6 +524,7 @@ export class Trainer {
 
   /** How an own move is met: asked, taught or played; `prefix` for a move before the line's first need. */
   private kindOf(card: CardId, prefix = false): Kind {
+    if (this.askAgain.has(card) && !this.suspended(card)) return 'ask';
     if (this.setup.askOnly) return !this.answered.has(card) && this.toAsk.has(card) ? 'ask' : 'auto';
     if (this.suspended(card)) return 'auto';
     const need = this.needs(card);
@@ -491,7 +548,7 @@ export class Trainer {
 
   /** Whether a planned line still has something to ask or teach on its walked part. */
   private needed(planned: PlannedLine, plies: readonly Ply[]): boolean {
-    if (planned.ask.length + planned.teach.length === 0) return true;
+    if (planned.ask.length + planned.teach.length === 0 || this.redo.has(planned)) return true;
     return plies.some((p, i) => i < planned.end && p.card !== undefined && (this.setup.askOnly ? this.kindOf(p.card) !== 'auto' : this.needs(p.card) !== undefined));
   }
 
@@ -515,6 +572,11 @@ export class Trainer {
     const found = this.upcoming ?? this.findNext();
     this.upcoming = undefined;
     this.seq = undefined;
+    this.pass = 1;
+    this.taughtOnLine = [];
+    this.missedOnLine.clear();
+    this.retrying = undefined;
+    this.askAgain = new Set();
     // The last line's end is the session's: the board stays on it (§5.17).
     if (!found) return this.finish(out);
     const lines = this.lines;
@@ -522,6 +584,8 @@ export class Trainer {
     const boardPath = board ? board.line.path.slice(0, this.ply) : [];
     this.at = found.at;
     const planned = lines[this.at]!;
+    // A missed move's line walked again asks that move, though it was answered.
+    if (this.redo.has(planned)) this.askAgain = new Set(planned.ask);
     this.plies = found.plies;
     this.positions = found.positions;
     this.end = Math.min(planned.end, found.plies.length);
@@ -542,7 +606,7 @@ export class Trainer {
     let ply = start === undefined ? shared : start === 'first' ? Math.max(Math.min(shared, this.prefix), this.prefix - 1, 0) : 0;
     ply = Math.max(ply, Math.min(planned.from ?? 0, this.end));
     this.ply = ply;
-    this.walked++;
+    if (!this.redo.has(planned)) this.walked++;
     out.push({ type: 'line', line: planned.line, number: this.at + 1, total: lines.length, kind: planned.kind, path: planned.line.path.slice(0, this.ply) });
     this.advance(now, out);
   }
@@ -578,6 +642,9 @@ export class Trainer {
     this.pending = undefined;
     this.waiting = undefined;
     if (this.ply >= this.end) {
+      // Its mistakes asked again, then the line walked again, before the line is done.
+      if (this.walkEnd(out)) return;
+      this.askAgain = new Set();
       this.phase = 'lineDone';
       out.push({ type: 'lineDone' });
       this.upcoming = this.findNext();
@@ -609,7 +676,121 @@ export class Trainer {
     if (shown) {
       out.push({ type: 'arrow', uci: p.uci });
       out.push({ type: 'note', note: { kind: 'newMove', san: p.san } });
-    } else out.push({ type: 'note', note: kind === 'teach' ? { kind: 'newTry' } : { kind: 'yourMove' } });
+    } else out.push({ type: 'note', note: kind === 'teach' ? { kind: 'newTry' } : this.askNote() });
+  }
+
+  /** What the feedback line says at an ask: a retry's streak, a missed line again, or nothing. */
+  private askNote(): Note {
+    const r = this.retrying;
+    if (r) return { kind: 'retry', streak: r.items[r.at]!.streak, need: this.need() };
+    if (this.redo.has(this.lines[this.at]!)) return { kind: 'missedAgain' };
+    return { kind: 'yourMove' };
+  }
+
+  /** Right answers in a row a mistake retried needs. */
+  private need(): number {
+    return Math.max(0, Math.round(this.options.retryMistakes ?? 0));
+  }
+
+  /** Whether the move asked is asked again: a mistake retried, a later pass, a missed line again. */
+  private repeating(): boolean {
+    return this.retrying !== undefined || this.pass > 1 || this.redo.has(this.lines[this.at]!);
+  }
+
+  /**
+   * At a walk's end: a pause before its mistakes are asked again (each until right `need` times in
+   * a row), or before the line's next pass when a move was taught on it. False when the line is done.
+   */
+  private walkEnd(out: TrainerEffect[]): boolean {
+    if (this.selfGrading) return false;
+    const need = this.need();
+    if (need > 0 && this.missedOnLine.size > 0) {
+      const items = [...this.missedOnLine].sort((a, b) => a[0] - b[0]).map(([ply, card]): Retry => ({ ply, card, streak: 0 }));
+      this.missedOnLine.clear();
+      this.retrying = { items, at: -1 };
+      out.push({ type: 'note', note: { kind: 'retryMistakes', count: items.length, need } });
+      return this.pause('retry', out);
+    }
+    const passes = Math.max(1, Math.round(this.options.repetitions ?? 1));
+    if (this.pass < passes && this.taughtOnLine.length > 0) {
+      this.pass++;
+      out.push({ type: 'note', note: { kind: 'repeat', pass: this.pass, of: passes } });
+      return this.pause('pass', out);
+    }
+    return false;
+  }
+
+  private pause(then: 'retry' | 'pass', out: TrainerEffect[]): true {
+    this.phase = 'again';
+    this.afterPause = then;
+    out.push({ type: 'arrow' });
+    this.wait(this.pace * 2, out);
+    return true;
+  }
+
+  /** The next mistake to ask again (taking turns), from the opponent's move before it; else back to the line's end. */
+  private nextRetry(now: number, out: TrainerEffect[]) {
+    const r = this.retrying!;
+    const need = this.need();
+    out.push({ type: 'arrow' });
+    if (!r.items.some((i) => i.streak < need)) {
+      this.retrying = undefined;
+      this.askAgain = new Set(this.pass > 1 ? this.taughtOnLine : []);
+      this.ply = this.end;
+      out.push({ type: 'takeback', path: this.path() });
+      return this.advance(now, out);
+    }
+    let at = r.at;
+    do at = (at + 1) % r.items.length;
+    while (r.items[at]!.streak >= need);
+    r.at = at;
+    const item = r.items[at]!;
+    this.askAgain = new Set([item.card]);
+    this.seq = undefined;
+    this.ply = Math.max(0, item.ply - 1);
+    out.push({ type: 'takeback', path: this.path() });
+    this.advance(now, out);
+  }
+
+  /**
+   * The line's next pass, its moves taught asked: from where a line starts (§5.17), the first move
+   * taught taking the place of the first move needed, so the moves before it go as they went.
+   */
+  private nextPass(now: number, out: TrainerEffect[]) {
+    this.askAgain = new Set(this.taughtOnLine);
+    this.missedOnLine.clear();
+    this.seq = undefined;
+    const start = this.options.lineStart;
+    const taught = this.plies.findIndex((p, i) => i < this.end && p.card !== undefined && this.askAgain.has(p.card));
+    const first = taught >= 0 ? taught : this.prefixEnd(this.plies, this.end);
+    this.prefix = start === undefined ? 0 : first;
+    this.ply = start === 'auto' || start === 'ask' ? 0 : Math.max(0, first - 1);
+    out.push({ type: 'arrow' });
+    out.push({ type: 'takeback', path: this.path() });
+    this.advance(now, out);
+  }
+
+  /** After a move asked is answered (`ok`: right first time): the line goes on, or the next mistake. */
+  private afterAnswer(card: CardId, ok: boolean, now: number, out: TrainerEffect[]) {
+    const r = this.retrying;
+    if (r) {
+      const item = r.items[r.at]!;
+      item.streak = ok ? item.streak + 1 : 0;
+      this.pending = undefined;
+      this.waiting = undefined;
+      // A look at the move played, then the next.
+      this.pause('retry', out);
+      return;
+    }
+    if (!ok) {
+      if (this.setup.repeatMissed) {
+        // Asked again after the plan's lines, as often as it is missed.
+        const again: PlannedLine = { ...this.lines[this.at]!, ask: [card] };
+        this.redo.add(again);
+        this.lines.push(again);
+      } else this.missedOnLine.set(this.ply - 1, card);
+    }
+    this.advance(now, out);
   }
 
   /**
@@ -659,6 +840,7 @@ export class Trainer {
 
   private tick(now: number, out: TrainerEffect[]) {
     if (this.phase === 'lineDone') return this.nextLine(now, out);
+    if (this.phase === 'again') return this.afterPause === 'retry' ? this.nextRetry(now, out) : this.nextPass(now, out);
     if (this.phase === 'preview') {
       const q = this.seq!;
       const p = this.plies[this.ply]!;
@@ -769,12 +951,15 @@ export class Trainer {
   /** A move asked was answered: right first time or not, for auto-play's `session` and `difficult`. */
   private answer(card: CardId, ok: boolean, out: TrainerEffect[]) {
     this.answered.add(card);
-    if (ok) this.right.add(card);
-    else {
-      this.right.delete(card);
-      this.missedNow.add(card);
+    // A mistake retried stays a mistake for auto-play.
+    if (!this.retrying) {
+      if (ok) this.right.add(card);
+      else {
+        this.right.delete(card);
+        this.missedNow.add(card);
+      }
     }
-    out.push({ type: 'answer', card, ok });
+    out.push(this.repeating() ? { type: 'answer', card, ok, repeat: true } : { type: 'answer', card, ok });
   }
 
   private review(card: CardId, p: Pending, now: number, out: TrainerEffect[]): Grade {
@@ -793,9 +978,11 @@ export class Trainer {
   }
 
   private accept(p: Pending, now: number, out: TrainerEffect[]) {
+    let ok = true;
     if (p.mode === 'teach') {
       this.answered.add(p.card);
       this.taughtNow.add(p.card);
+      this.taughtOnLine.push(p.card);
       if (this.record) {
         out.push({ type: 'record', event: { k: 'taught', card: p.card } });
         this.counts.taught++;
@@ -806,11 +993,12 @@ export class Trainer {
       out.push({ type: 'note', note: found ? { kind: 'taught', san: p.san, found } : { kind: 'taught', san: p.san } });
     } else {
       const g = this.review(p.card, p, now, out);
-      out.push({ type: 'note', note: { kind: g === 3 ? 'correct' : 'played' } });
+      ok = g === 3;
+      out.push({ type: 'note', note: { kind: ok ? 'correct' : 'played' } });
     }
     this.ply++;
     out.push({ type: 'play', uci: p.uci, san: p.san, path: this.path(), by: 'user' });
-    this.advance(now, out);
+    this.afterAnswer(p.card, ok, now, out);
   }
 
   /** Show and grade: the move asked is played, and the grade waits for `tell`. */
@@ -834,8 +1022,10 @@ export class Trainer {
     const w = this.waiting;
     if (!w) return;
     this.waiting = undefined;
+    let ok = true;
     if (w.mode === 'teach') {
       this.taughtNow.add(w.card);
+      this.taughtOnLine.push(w.card);
       if (this.record) {
         out.push({ type: 'record', event: { k: 'taught', card: w.card } });
         this.counts.taught++;
@@ -849,9 +1039,10 @@ export class Trainer {
         this.counts.reviews++;
         if (g === 3) this.counts.good++;
       }
-      out.push({ type: 'note', note: { kind: g === 3 ? 'correct' : 'played' } });
+      ok = g === 3;
+      out.push({ type: 'note', note: { kind: ok ? 'correct' : 'played' } });
     }
-    this.advance(now, out);
+    this.afterAnswer(w.card, ok, now, out);
     // The press plays the opponent's reply at once; what follows comes at the pace.
     if (this.phase === 'opponent' || this.phase === 'auto') this.tick(now, out);
   }
@@ -914,6 +1105,13 @@ export class Trainer {
     out.push({ type: 'note', note: { kind: 'suspended', san: p.san } });
     this.ply++;
     out.push({ type: 'play', uci: p.uci, san: p.san, path: this.path(), by: 'auto' });
+    const r = this.retrying;
+    // A mistake always played from now on isn't asked again.
+    if (r) {
+      r.items[r.at]!.streak = this.need();
+      this.pause('retry', out);
+      return;
+    }
     this.advance(now, out);
   }
 }

@@ -16,9 +16,13 @@ export interface TrainPrefs {
   startQueue: LineStart;
   startLearn: LineStart;
   autoPlay: AutoPlay;
+  /** How many times a line is walked when a move on it is learned (1–5): the owner's request, 2026-10-08. */
+  repetitions: number;
+  /** At a line's end, each move missed on it is asked until right this many times in a row (0–5; 0: not). */
+  mistakeRetries: number;
 }
 
-export const DEFAULT_PREFS: TrainPrefs = { newMoves: 'show', sequenceLength: 5, lineEnd: 'wait', startQueue: 'first', startLearn: 'auto', autoPlay: 'due' };
+export const DEFAULT_PREFS: TrainPrefs = { newMoves: 'show', sequenceLength: 5, lineEnd: 'wait', startQueue: 'first', startLearn: 'auto', autoPlay: 'due', repetitions: 2, mistakeRetries: 2 };
 
 const KEY = 'repworks.trainPrefs';
 
@@ -32,13 +36,16 @@ export function parsePrefs(raw: string | null): TrainPrefs {
     // The defaults.
   }
   const pick = <T extends string>(value: unknown, allowed: readonly T[], fallback: T): T => (allowed.includes(value as T) ? (value as T) : fallback);
+  const whole = (value: unknown, min: number, max: number, fallback: number) => (Number.isInteger(value) && (value as number) >= min && (value as number) <= max ? (value as number) : fallback);
   return {
     newMoves: pick(v.newMoves, ['show', 'try', 'sequence'], DEFAULT_PREFS.newMoves),
-    sequenceLength: Number.isInteger(v.sequenceLength) && (v.sequenceLength as number) >= 1 && (v.sequenceLength as number) <= 50 ? (v.sequenceLength as number) : DEFAULT_PREFS.sequenceLength,
+    sequenceLength: whole(v.sequenceLength, 1, 50, DEFAULT_PREFS.sequenceLength),
     lineEnd: pick(v.lineEnd, ['wait', 'go'], DEFAULT_PREFS.lineEnd),
     startQueue: pick(v.startQueue, LINE_STARTS, DEFAULT_PREFS.startQueue),
     startLearn: pick(v.startLearn, LINE_STARTS, DEFAULT_PREFS.startLearn),
     autoPlay: pick(v.autoPlay, AUTO_PLAYS, DEFAULT_PREFS.autoPlay),
+    repetitions: whole(v.repetitions, 1, 5, DEFAULT_PREFS.repetitions),
+    mistakeRetries: whole(v.mistakeRetries, 0, 5, DEFAULT_PREFS.mistakeRetries),
   };
 }
 

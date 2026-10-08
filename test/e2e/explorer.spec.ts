@@ -104,6 +104,24 @@ test('the panel: Qchess’s rows, sorted by eval, a row clicked plays its move, 
   await expect(page.getByRole('button', { name: 'Explorer', exact: true })).toHaveAttribute('aria-pressed', 'false');
 });
 
+test('no games here: ChessDB’s moves are the rows, said above them; with ChessDB not knowing it either, that is said', async ({ page }) => {
+  const fake = await setUp(page);
+  // After 1. e4 c5 2. Nf3: no games; ChessDB knows two moves.
+  const afterNf3 = 'rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq -';
+  fake.evals.set(afterNf3, [
+    ['d6', -30],
+    ['Nc6', -25],
+  ]);
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf?at=e4,c5,Nf3`);
+  await expect(rows(page)).toHaveText(['Nc6', 'd6']);
+  await expect(panel(page).locator('.explorer-note')).toHaveText('No games here: ChessDB’s moves.');
+  await expect(panel(page).locator('.ex-row.novelty')).toHaveCount(2);
+  // After 2... d6: neither has anything.
+  await page.locator('.move[data-path="e4 c5 Nf3 d6"]').click();
+  await expect(panel(page).locator('.explorer-note')).toHaveText('No games here, and ChessDB doesn’t know this position.');
+  await expect(rows(page)).toHaveCount(0);
+});
+
 test('tabs: Lichess and Masters, which asks Lichess’s masters with no filter; no ChessDB tab', async ({ page }) => {
   const fake = await setUp(page);
   await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf`);

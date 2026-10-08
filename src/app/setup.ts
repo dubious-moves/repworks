@@ -17,7 +17,8 @@ export interface Notice {
 /** Takes a setup link out of the address bar; what it asked for, if it was one. */
 export function takeSetupFromAddress(): SetupParse | undefined {
   const parsed = parseSetupHash(location.hash);
-  if (parsed) history.replaceState(null, '', location.pathname + location.search);
+  // The entry keeps its state: the app's ← counts its pages by it (app/mode.ts).
+  if (parsed) history.replaceState(history.state, '', location.pathname + location.search);
   return parsed;
 }
 

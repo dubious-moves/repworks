@@ -18,6 +18,7 @@ import { makeSanAndPlay } from 'chessops/san';
 import { MoveBoard, PracticeBoard } from './Practice.tsx';
 import { winRateColor } from './RepertoireCheck.tsx';
 import { isoDay } from './day.ts';
+import { Back } from './Back.tsx';
 
 const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
@@ -182,9 +183,7 @@ export function ChecklistDrill(props: { sid: string; i: number; preset: Preset }
   if (!list || !v) return <p class="warn">That checklist line isn’t on this device: make the checklist again.</p>;
   const back = (
     <div class="chapter-head">
-      <a href="#/repertoire-check" class="back">
-        ←
-      </a>
+      <Back parent={{ name: 'repCheck' }} />
       <div class="titles">
         <span class="study-title">Checklist · {PRESETS[props.preset].label}</span>
       </div>

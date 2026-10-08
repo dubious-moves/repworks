@@ -242,6 +242,29 @@ test('copy continuation: from the variation’s first move to the end of its lin
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('2... d6 3. d4 cxd4');
 });
 
+test('copy FEN: the board’s position from the row under it and from the move menu (the owner’s request, 2026-10-08)', async ({ page, context, browserName }) => {
+  test.skip(browserName !== 'chromium', 'clipboard permissions are Chromium-only here');
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await setUp(page);
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf?at=e4,c5`);
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5');
+  const after = 'rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2';
+  await expect(page.getByLabel('FEN of the position shown')).toHaveValue(after);
+  await page.getByRole('button', { name: 'Copy FEN' }).click();
+  await expect(page.locator('.cv-board .feedback')).toHaveText('FEN copied');
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(after);
+  await page.locator('.move[data-path="e4 c5 Nf3"]').click();
+  await openMoveMenu(page);
+  await page.getByRole('menuitem', { name: 'Copy FEN' }).click();
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2');
+  // The analysis board copies the position shown, not its start.
+  await page.goto(`${site.url}#/analysis?fen=${encodeURIComponent(after)}`);
+  await clickSquare(page, 'g1', 'white');
+  await clickSquare(page, 'f3', 'white');
+  await page.getByRole('button', { name: 'Copy FEN' }).click();
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2');
+});
+
 test('clickable lines: preview a comment’s line, step through its lines, and back out', async ({ page, isMobile }) => {
   await setUp(page);
   await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf?at=e4,c5,Nf3,d6`);

@@ -2,7 +2,7 @@
 // chapter.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { modeHash, parseHash, transition, type Mode } from '../../../../src/core/app/fsm.ts';
+import { modeHash, pageOf, parseHash, transition, type Mode } from '../../../../src/core/app/fsm.ts';
 import { record, redo, startHistory, undo, UNDO_LIMIT } from '../../../../src/core/app/history.ts';
 import { nearest, step } from '../../../../src/core/study/navigate.ts';
 import { parseChapterFile } from '../../../../src/core/pgn/parse.ts';
@@ -140,4 +140,19 @@ test('the games’ addresses (§5.54, §5.55): the list, a game at a ply, the re
   }
   assert.deepEqual(parseHash('#/games/a%2Fb'), { name: 'games' });
   assert.deepEqual(parseHash('#/games/a/b'), { name: 'games' });
+});
+
+test('pages for the app’s ← (the owner’s request, 2026-10-08): a study’s chapters, training, the storm and the analysis board are one page each', () => {
+  const page = (hash: string) => pageOf(parseHash(hash));
+  assert.equal(page('#/study/Rep0Najd/Ch1Najdf?at=e4'), page('#/study/Rep0Najd/Ch2Alapn'));
+  assert.notEqual(page('#/study/Rep0Najd'), page('#/study/Ref0Cour'));
+  assert.equal(page('#/train'), page('#/train/Rep0Najd/Ch1Najdf?at=e4,c5'));
+  assert.equal(page('#/learn/Rep0Najd/Ch1Najdf'), page('#/show'));
+  assert.equal(page('#/storm'), page('#/storm/Rep0Najd/Ch1Najdf'));
+  assert.equal(page('#/analysis?fen=8%2F8%2F8%2F8%2F8%2F8%2F8%2FK6k%20w%20-%20-%200%201'), page('#/analysis'));
+  assert.equal(page('#/read/Rep0Najd/Ch1Najdf?at=e4'), page('#/read/Rep0Najd/Ch1Najdf?at=e4,c5'));
+  assert.notEqual(page('#/read/Rep0Najd/Ch1Najdf'), page('#/play/Rep0Najd/Ch1Najdf'));
+  assert.notEqual(page('#/games'), page('#/games/GameOne1'));
+  assert.notEqual(page('#/games'), page('#/games/review'));
+  assert.notEqual(page('#/'), page('#/mistakes'));
 });

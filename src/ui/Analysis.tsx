@@ -4,25 +4,30 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { makeFen } from 'chessops/fen';
 import { addToChapter, targetsFor, type Target } from '../app/analysis.ts';
-import { at, chapter, feedback, goTo, openScratch } from '../app/editor.ts';
+import { at, chapter, feedback, goTo, openScratch, side } from '../app/editor.ts';
+import { copyFen } from './MoveMenu.tsx';
 import { checkSequence, saveSequence, sourceMistake, type CheckResult } from '../app/sequence.ts';
 import type { Chapter } from '../core/study/model.ts';
-import { mode, open } from '../app/mode.ts';
+import { goBack, mode, open } from '../app/mode.ts';
+import type { Mode } from '../core/app/fsm.ts';
 import { positionAt } from '../core/study/tree.ts';
+import { Back } from './Back.tsx';
 
-/** Back where the board came from: the storm, the chapter's move, or the list. */
-function back(): void {
+/** Where the board was opened from, when it can't go back to it (opened from a link): the storm, the chapter's move, or the list. */
+function parent(): Mode {
   const m = mode.peek();
-  if (m.name === 'analysis' && m.back) open(m.back);
-  else if (m.name === 'analysis' && m.from) open({ name: 'chapter', sid: m.from.sid, cid: m.from.cid, at: m.from.at });
-  else open({ name: 'list' });
+  if (m.name === 'analysis' && m.back) return m.back;
+  if (m.name === 'analysis' && m.from) return { name: 'chapter', sid: m.from.sid, cid: m.from.cid, at: m.from.at };
+  return { name: 'list' };
 }
+const back = () => goBack(parent());
 
-/** The FEN to start from, under the board: a long line of text has no place in the head. */
+/** The FEN to start from, under the board: a long line of text has no place in the head; and the position shown's, copied. */
 export function AnalysisFen() {
   const c = chapter.value;
   const [fen, setFen] = useState('');
   const start = c ? positionAt(c, []) : undefined;
+  const shown = c ? positionAt(c, at.value) : undefined;
   return (
     <form
       class="fen-form"
@@ -38,6 +43,9 @@ export function AnalysisFen() {
       <button type="button" class="secondary" title="A new board from the start position" onClick={() => openScratch('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1')}>
         New
       </button>
+      <button type="button" class="secondary" disabled={!shown} title="Copy the FEN of the position shown" onClick={() => shown && void copyFen(makeFen(shown.toSetup()))}>
+        Copy FEN
+      </button>
     </form>
   );
 }
@@ -51,9 +59,7 @@ export function AnalysisHead() {
   const line = at.value;
   return (
     <div class="chapter-head analysis-head">
-      <a href="#/" class="back" onClick={(e) => (e.preventDefault(), back())}>
-        ←
-      </a>
+      <Back parent={parent()} />
       <div class="titles">
         <span class="study-title">Analysis board</span>
       </div>
@@ -69,10 +75,10 @@ export function AnalysisHead() {
         type="button"
         class="secondary"
         disabled={!c}
-        title="Play the game on from the move shown against the database, Maia and Stockfish"
+        title="Play the game on from the move shown against the database, Maia and Stockfish, as the side the board is seen from"
         onClick={() => {
           const pos = c && positionAt(c, line);
-          if (pos) open({ name: 'playOn', fen: makeFen(pos.toSetup()), side: pos.turn });
+          if (pos) open({ name: 'playOn', fen: makeFen(pos.toSetup()), side: side.peek() });
         }}
       >
         Practise

@@ -25,7 +25,7 @@ import { pathKey } from '../core/study/notation.ts';
 import { nodeAt, positionAt, samePath, type Path } from '../core/study/tree.ts';
 import { Board } from './Board.tsx';
 import { addAlternative, altAdding, CardPanel } from './CardPanel.tsx';
-import { CommentDialog, MoveMenu, openMenu } from './MoveMenu.tsx';
+import { CommentDialog, copyFen, MoveMenu, openMenu } from './MoveMenu.tsx';
 import { BranchPicker, branchOpen, chooseBranch, closeBranches, stepOn } from './BranchPicker.tsx';
 import { Notation } from './Notation.tsx';
 import { endPreviewOnBoard, PreviewBar, previewBoard } from './CommentText.tsx';
@@ -35,6 +35,7 @@ import { TranspositionList } from './Transpositions.tsx';
 import { Explorer, ExplorerToggle } from './Explorer.tsx';
 import { EnginePanel, EvalBar, useEngineArrows } from './Engine.tsx';
 import { analysePosition, setThreat, threat } from '../app/engine.ts';
+import { Back } from './Back.tsx';
 
 const BRUSH_NAMES: Brush[] = ['green', 'red', 'blue', 'yellow'];
 
@@ -156,9 +157,7 @@ export function ChapterView() {
   return (
     <div class={`chapter-view${c && board ? ' has-frame' : ''}${waiting ? ' session-waiting' : ''}${scratch ? ' scratch' : ''}`}>
       {scratch ? <AnalysisHead /> : <div class="chapter-head">
-        <a href="#/" class="back" onClick={(e) => (e.preventDefault(), open({ name: 'list' }))}>
-          ←
-        </a>
+        <Back parent={{ name: 'list' }} />
         <div class="titles">
           <span class="study-title">
             {s.meta.name}
@@ -257,7 +256,7 @@ export function ChapterView() {
               <p class="feedback" role="status">
                 {feedback.value ?? ''}
               </p>
-              {scratch && <AnalysisFen />}
+              {scratch ? <AnalysisFen /> : <FenRow fen={shownLine?.fen ?? board.fen} />}
             </div>
             <div class="cv-panel">
               <EnginePanel board={board.pos} />
@@ -322,6 +321,18 @@ export function ChapterView() {
       <BranchPicker />
       <TranspositionList />
       <CommentDialog />
+    </div>
+  );
+}
+
+/** The board's FEN under it, to read, select or copy (the owner's request, 2026-10-08). */
+function FenRow(props: { fen: string }) {
+  return (
+    <div class="fen-form fen-row">
+      <input aria-label="FEN of the position shown" readOnly value={props.fen} onFocus={(e) => e.currentTarget.select()} />
+      <button type="button" class="secondary" title="Copy the FEN of the position shown" onClick={() => void copyFen(props.fen)}>
+        Copy FEN
+      </button>
     </div>
   );
 }

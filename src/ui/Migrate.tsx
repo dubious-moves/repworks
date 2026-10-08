@@ -1,9 +1,9 @@
 // The migration from mistake-lab (PLAN.md §5.64): the gist and a token entered once (kept on this
 // page only), Dry run with its report, then Run.
 import { useState } from 'preact/hooks';
-import { open } from '../app/mode.ts';
 import { dryRun, migration, runMigration } from '../app/migrate.ts';
 import type { MigrationReport } from '../core/games/migrate.ts';
+import { Back } from './Back.tsx';
 
 export function MigrateScreen() {
   const [gist, setGist] = useState('');
@@ -13,16 +13,7 @@ export function MigrateScreen() {
   return (
     <div class="migrate">
       <div class="chapter-head">
-        <a
-          href="#/games"
-          class="back"
-          onClick={(e) => {
-            e.preventDefault();
-            open({ name: 'games' });
-          }}
-        >
-          ←
-        </a>
+        <Back parent={{ name: 'games' }} />
         <div class="titles">
           <span class="study-title">Move from mistake-lab</span>
         </div>

@@ -8,14 +8,14 @@ import { makeUci, parseSquare } from 'chessops/util';
 import type { Key } from '@lichess-org/chessground/types';
 import { isNormal, type Role, type SquareName } from 'chessops/types';
 import { standardUci } from '../core/chess/uci.ts';
-import { open } from '../app/mode.ts';
+import { entryKey, goBack, open } from '../app/mode.ts';
 import { recordEvent } from '../app/state.ts';
 import { trainData } from '../app/train.ts';
 import { explorerAt, historyReaches, openingNameOf, openings, forgetGames, gameById, gameDeck, gameQueueNow, gameRows, gamesPrefs, practiceHistory, refreshGames, refreshState, setGamesPrefs, startGames, type GameFilters, type GameRow, type Since } from '../app/games.ts';
 import type { HistoryEntry } from '../core/games/practice.ts';
 import { recid } from '../app/repertoireCheck.ts';
 import { badgeOf } from '../core/games/recidivism.ts';
-import { closeLine, continueSession, dropCard, dropLine, endGameSession, gameSession, gradePlan, hint, hintMove, lineMove, lineStep, lineToAlt, lineToMain, MAX_TRIES, playMove, revealBest, showLine, showPlan, skipCard, startGameSession, tryAgain, type CardRun, type GameSession } from '../app/gameTrainer.ts';
+import { closeLine, continueSession, dropCard, dropLine, endGameSession, enterGameSession, gameSession, gradePlan, hint, hintMove, lineMove, lineStep, lineToAlt, lineToMain, MAX_TRIES, playMove, revealBest, showLine, showPlan, skipCard, tryAgain, type CardRun, type GameSession } from '../app/gameTrainer.ts';
 import { lineFen, moveAt, type EngineLine } from '../core/games/engineLine.ts';
 import { plansInDeck, setPlanCard } from '../app/plans.ts';
 import { cpFor, type GameItem } from '../core/games/extract.ts';
@@ -34,6 +34,7 @@ import { fenAfterUci, START_FEN, uciToSan } from '../core/storm/walk.ts';
 import { discardSaved, resumePractice, savedPractice } from '../app/practice.ts';
 import { useWakeLock } from './Train.tsx';
 import { isoDay } from './day.ts';
+import { Back } from './Back.tsx';
 
 const sq = (u: string, i: number) => u.slice(i, i + 2) as SquareName;
 const KIND_WORD: Record<GameItem['kind'] | 'plan', string> = { mistake: 'Mistake', tactic: 'Tactic', advantage: 'Advantage', plan: 'Plan' };
@@ -44,17 +45,14 @@ export function GamesScreen(props: { id?: string; ply?: number; review?: boolean
   return (
     <div class="games">
       <div class="chapter-head">
-        <a
-          href={props.id || props.review ? '#/games' : '#/'}
-          class="back"
-          onClick={(e) => {
-            e.preventDefault();
+        <Back
+          parent={props.id || props.review ? { name: 'games' } : { name: 'list' }}
+          onBack={() => {
+            // Leaving by ← ends the cards' session; another page and back keeps it.
             if (props.review) endGameSession();
-            open(props.id || props.review ? { name: 'games' } : { name: 'list' });
+            goBack(props.id || props.review ? { name: 'games' } : { name: 'list' });
           }}
-        >
-          ←
-        </a>
+        />
         <div class="titles">
           <span class="study-title">{props.review ? 'Game cards' : props.id ? 'Game' : 'Games'}</span>
         </div>
@@ -460,7 +458,7 @@ function GameView(props: { id: string; ply?: number }) {
                 {it.kind === 'mistake' && !dropped && (
                   <>
                     {' '}
-                    <button type="button" class="link" onClick={() => open({ name: 'analysis', fen: it.fenBefore, seq: it.pid })}>
+                    <button type="button" class="link" onClick={() => open({ name: 'analysis', fen: it.fenBefore, seq: it.pid, side: g.color })}>
                       Make a sequence
                     </button>
                   </>
@@ -473,7 +471,7 @@ function GameView(props: { id: string; ply?: number }) {
           <button type="button" onClick={() => open({ name: 'playOn', fen, side: g.color })}>
             Practise from here
           </button>
-          <button type="button" class="secondary" onClick={() => open({ name: 'analysis', fen })}>
+          <button type="button" class="secondary" onClick={() => open({ name: 'analysis', fen, side: g.color })}>
             Analyse this position
           </button>
           {g.platform === 'lichess' && !g.id.startsWith('_') && (
@@ -536,8 +534,8 @@ const GRADE_WORD = { 1: 'Again', 2: 'Hard', 3: 'Good', 4: 'Easy' } as const;
 function Review() {
   const s = gameSession.value;
   useEffect(() => {
-    if (!gameSession.value) startGameSession();
-    return () => endGameSession();
+    // Left for another page and come back to by ←, the session goes on; ← here ends it.
+    enterGameSession(entryKey());
   }, []);
   useWakeLock(!!s && s.phase !== 'done');
   useEffect(() => {
@@ -750,11 +748,11 @@ function Card(props: { s: GameSession; r: CardRun }) {
               View the game
             </a>
           )}
-          <button type="button" class="secondary" onClick={() => open({ name: 'analysis', fen: r.board })}>
+          <button type="button" class="secondary" onClick={() => open({ name: 'analysis', fen: r.board, side: item.color })}>
             Analyse
           </button>
           {item.kind === 'mistake' && (
-            <button type="button" class="secondary" title="Build the lines that refute it on the analysis board, and drill them as a sequence instead" onClick={() => open({ name: 'analysis', fen: item.fenBefore, seq: item.pid })}>
+            <button type="button" class="secondary" title="Build the lines that refute it on the analysis board, and drill them as a sequence instead" onClick={() => open({ name: 'analysis', fen: item.fenBefore, seq: item.pid, side: item.color })}>
               Make a sequence
             </button>
           )}

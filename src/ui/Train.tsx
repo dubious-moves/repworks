@@ -30,6 +30,7 @@ import { CommentText, endPreviewOnBoard, PreviewBar, previewBoard } from './Comm
 import { firstNewLine, LineList, nextLine } from './LineList.tsx';
 import { setMark } from '../app/lineMarks.ts';
 import { openTrainSettings } from './TrainSettings.tsx';
+import { Back } from './Back.tsx';
 
 const ASKING = new Set(['ask', 'teach', 'wrong', 'shown']);
 
@@ -65,6 +66,14 @@ export function noteText(note: Note | undefined): string {
       return `${note.san} saved as an alternative: try again`;
     case 'suspended':
       return `${note.san} will always be played for you`;
+    case 'retryMistakes':
+      return `${note.count === 1 ? 'Your mistake' : `Your ${note.count} mistakes`} again: each right ${note.need === 1 ? 'once' : `${note.need} times in a row`}`;
+    case 'retry':
+      return note.need === 1 ? 'Your mistake again: find it' : `Your mistake again: ${note.streak} of ${note.need} right in a row`;
+    case 'repeat':
+      return `The line again: ${note.pass} of ${note.of}`;
+    case 'missedAgain':
+      return 'Missed earlier: once more';
   }
 }
 
@@ -186,8 +195,8 @@ export function TrainScreen(props: { of: SessionKind }) {
         : of.kind === 'pinned' && of.all
           ? 'Drill all pins'
           : TITLES[of.kind];
-  // The Interactive view goes back to its chapter, at the move on the board.
-  const back = () => (of.kind === 'play' ? open({ name: 'chapter', sid: of.sid, cid: of.cid, at: s.path.length ? s.path : of.at }) : open({ name: 'list' }));
+  // Opened from a link: the Interactive view goes up to its chapter, at the move on the board.
+  const parent: Mode = of.kind === 'play' ? { name: 'chapter', sid: of.sid, cid: of.cid, at: s.path.length ? s.path : of.at } : { name: 'list' };
   // Qchess's switch: the line on the board, in its study, editable; "Train" there takes this up again.
   // With no line on the board, the study the screen is about (§5.16).
   const toStudy = () => {
@@ -199,9 +208,7 @@ export function TrainScreen(props: { of: SessionKind }) {
   return (
     <div class="train">
       <div class="chapter-head">
-        <a href="#/" class="back" onClick={(e) => (e.preventDefault(), back())}>
-          ←
-        </a>
+        <Back parent={parent} />
         <div class="titles">
           <span class="study-title">{title}</span>
         </div>
@@ -436,6 +443,8 @@ function Session(props: { s: SessionView }) {
           ) : isGraded(s.of) ? (
             <>
               <span>{s.dueLeft} due</span> · <span>{s.newLeft} new</span> · line {s.number} of {s.total}
+              {s.pass && <span class="train-pass"> · {s.pass.n} of {s.pass.of} times</span>}
+              {s.retry && <span class="train-retry"> · mistakes left {s.retry.left}</span>}
             </>
           ) : (
             <>

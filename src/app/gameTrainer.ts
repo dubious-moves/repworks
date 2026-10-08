@@ -143,9 +143,31 @@ export function sessionCards(): DeckCard[] {
   return [...q.due, ...q.fresh];
 }
 
-export function startGameSession(): void {
+/** The history entry the session runs on (app/mode.ts). */
+let sessionEntry: string | undefined;
+
+export function startGameSession(entry?: string): void {
+  sessionEntry = entry;
   gameSession.value = { cards: sessionCards(), index: -1, phase: 'done', results: new Map() };
   nextCard();
+}
+
+/**
+ * The cards' screen opened on `entry`: the session left there for another page (Analyse, View the
+ * game) goes on where it was (the owner's request, 2026-10-08); else a new one. A card whose
+ * practice game didn't wait for it (another game started meanwhile) starts again.
+ */
+export function enterGameSession(entry: string): void {
+  const s = gameSession.peek();
+  if (!s || sessionEntry !== entry) {
+    if (s) endGameSession();
+    return startGameSession(entry);
+  }
+  const r = s.run;
+  if (r && r.card.item.kind === 'advantage' && s.phase === 'asking' && practice.peek()?.setup.card !== r.card.card) {
+    gameSession.value = { ...s, index: s.index - 1 };
+    nextCard();
+  }
 }
 
 export function endGameSession(): void {

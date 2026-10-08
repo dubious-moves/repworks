@@ -11,10 +11,10 @@ import { normalizeMove } from 'chessops/chess';
 import { makeUci, parseSquare } from 'chessops/util';
 import { isNormal, type Role, type SquareName } from 'chessops/types';
 import type { Key } from '@lichess-org/chessground/types';
-import { open } from '../app/mode.ts';
+import { entryKey, open } from '../app/mode.ts';
 import { recordEvent } from '../app/state.ts';
 import { openingNameOf, practiceHistory, savedDeck } from '../app/games.ts';
-import { analyse, claimVictory, clearPremove, detection, setFoundState, type FoundTactic, discardSaved, gameOfHistory, ignoreRepertoire, loadOpponent, practiceHint, resumePractice, savedPractice, saveOpponent, judge, leavePractice, practice, practiceMove, practiceReview, setPremove, startPractice, stopPractice, type Opponent, type PracticeGame, type PracticeMove } from '../app/practice.ts';
+import { analyse, claimVictory, clearPremove, detection, setFoundState, type FoundTactic, discardSaved, gameOfHistory, ignoreRepertoire, loadOpponent, practiceHint, resumePractice, savedPractice, saveOpponent, judge, parkPractice, practice, practiceMove, takeUpPractice, practiceReview, setPremove, startPractice, stopPractice, type Opponent, type PracticeGame, type PracticeMove } from '../app/practice.ts';
 import { parseUciMove, standardUci } from '../core/chess/uci.ts';
 import { makeFen } from 'chessops/fen';
 import { CLASSIFICATION, moverScore, type Classification } from '../core/games/grade.ts';
@@ -33,6 +33,7 @@ import { Board, type BoardProps } from './Board.tsx';
 import { answerPending, repeatOpponent, setVoiceConfirm, voice, voiceConfirm, voiceOff, voiceOn } from '../app/voice.ts';
 import { useWakeLock } from './Train.tsx';
 import { isoDay } from './day.ts';
+import { Back } from './Back.tsx';
 
 const sq = (u: string, i: number) => u.slice(i, i + 2) as Key;
 
@@ -725,7 +726,7 @@ export function PracticeReview(props: { game: PracticeGame; onNext?: (() => void
                 💾 Save as a mistake
               </button>
             )}
-            <button type="button" class="secondary" title="Build the lines that refute it on the analysis board, and drill them as a sequence" onClick={() => open({ name: 'analysis', fen: mv.fenBefore, seq: '*' })}>
+            <button type="button" class="secondary" title="Build the lines that refute it on the analysis board, and drill them as a sequence" onClick={() => open({ name: 'analysis', fen: mv.fenBefore, seq: '*', side: s.color })}>
               🔍 Make a sequence
             </button>
           </div>
@@ -884,7 +885,7 @@ export function PracticeReview(props: { game: PracticeGame; onNext?: (() => void
               </button>
             )
           )}
-          <button type="button" class="secondary" onClick={() => open({ name: 'analysis', fen: board })}>
+          <button type="button" class="secondary" onClick={() => open({ name: 'analysis', fen: board, side: s.color })}>
             Analyse
           </button>
         </div>
@@ -898,8 +899,11 @@ export function PracticeReview(props: { game: PracticeGame; onNext?: (() => void
 /** `#/practice?fen=…`: a game from any position. */
 export function PracticeScreen(props: { fen: string; side?: 'white' | 'black' | undefined }) {
   const [opponent, setOpponent] = useState(loadOpponent);
-  // A game kept on this device (a reload, a switch of app) is offered first; one just resumed is played on.
-  const [saved, setSaved] = useState(() => (practice.peek()?.phase !== 'over' && practice.peek()?.setup.fen === props.fen ? undefined : savedPractice()));
+  // Come back to by ← from a page it was left for: the game as it was. Else a game kept on this
+  // device (a reload, a switch of app) is offered first; one just resumed is played on.
+  const [entry] = useState(entryKey);
+  const [back] = useState(() => takeUpPractice(entry));
+  const [saved, setSaved] = useState(() => (back || (practice.peek()?.phase !== 'over' && practice.peek()?.setup.fen === props.fen) ? undefined : savedPractice()));
   const start = () => {
     const pos = positionOf(props.fen);
     // Titled by the opening most of the user's games reaching it carry (mistake-lab's `lookupOpeningName`).
@@ -907,8 +911,8 @@ export function PracticeScreen(props: { fen: string; side?: 'white' | 'black' | 
   };
   useEffect(() => {
     const live = practice.peek();
-    if (!saved && !(live && live.phase !== 'over' && live.setup.fen === props.fen)) start();
-    return () => leavePractice();
+    if (!saved && !back && !(live && live.phase !== 'over' && live.setup.fen === props.fen)) start();
+    return () => parkPractice(entry);
   }, [props.fen, props.side]);
   const ok = !!positionOf(props.fen);
   if (saved)
@@ -924,9 +928,7 @@ export function PracticeScreen(props: { fen: string; side?: 'white' | 'black' | 
   return (
     <div class="games">
       <div class="chapter-head">
-        <a href="#/games" class="back" onClick={(e) => (e.preventDefault(), history.length > 1 ? history.back() : open({ name: 'games' }))}>
-          ←
-        </a>
+        <Back parent={{ name: 'games' }} />
         <div class="titles">
           <span class="study-title">Practice</span>
         </div>
@@ -950,9 +952,7 @@ export function HistoryScreen(props: { id: string }) {
   return (
     <div class="games">
       <div class="chapter-head">
-        <a href="#/games" class="back">
-          ←
-        </a>
+        <Back parent={{ name: 'games' }} />
         <div class="titles">
           <span class="study-title">Practice game</span>
           {entry && <span class="muted"> · {isoDay(entry.ts)} · {entry.openingName || entry.source}</span>}

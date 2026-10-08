@@ -1,7 +1,8 @@
 // The training settings dialog (PLAN.md §5.2, §5.16, §5.17): the daily limit of new moves, the
 // retention and the learning step, shared by every device through the data repo's
-// `settings.json`; then this device's: new moves shown, tried first or shown as a sequence, a line's end, where a line
-// starts, auto-play; and time travel, for this tab. Opened by ⚙ on the home screen's training
+// `settings.json`; then this device's: new moves shown, tried first or shown as a sequence, the
+// repetitions and the mistakes retried (§5.77), a line's end, where a line starts, auto-play; and
+// time travel, for this tab. Opened by ⚙ on the home screen's training
 // card and on the training screen.
 import { decidingNow } from '../app/time.ts';
 import { signal } from '@preact/signals';
@@ -43,6 +44,8 @@ function Dialog() {
   const set = <K extends keyof TrainPrefs>(key: K, value: TrainPrefs[K]) => setPrefs({ ...prefs, [key]: value });
   const [error, setError] = useState<string | undefined>(undefined);
   const [seqLength, setSeqLength] = useState(String(prefs.sequenceLength));
+  const [repetitions, setRepetitions] = useState(String(prefs.repetitions));
+  const [retries, setRetries] = useState(String(prefs.mistakeRetries));
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     if (!ref.current!.open) ref.current!.showModal();
@@ -55,9 +58,13 @@ function Dialog() {
     if (!(values.learnStepHours >= 0 && values.learnStepHours <= 48)) return setError('Learning step: from 0 to 48 hours.');
     const sequenceLength = Number(seqLength);
     if (prefs.newMoves === 'sequence' && !(Number.isInteger(sequenceLength) && sequenceLength >= 1 && sequenceLength <= 50)) return setError('New moves in a sequence: a whole number from 1 to 50.');
+    const reps = Number(repetitions);
+    if (!(Number.isInteger(reps) && reps >= 1 && reps <= 5)) return setError('Repetitions: a whole number from 1 to 5.');
+    const mistakeRetries = Number(retries);
+    if (!(Number.isInteger(mistakeRetries) && mistakeRetries >= 0 && mistakeRetries <= 5)) return setError('Mistakes retried: a whole number from 0 to 5.');
     const done = await saveTrainSettings(values);
     if (!done.ok) return setError(done.error);
-    saveTrainPrefs(prefs.newMoves === 'sequence' ? { ...prefs, sequenceLength } : prefs);
+    saveTrainPrefs({ ...(prefs.newMoves === 'sequence' ? { ...prefs, sequenceLength } : prefs), repetitions: reps, mistakeRetries });
     configureSession();
     close();
   };
@@ -96,6 +103,14 @@ function Dialog() {
             <input type="number" name="sequence-length" min={1} max={50} step={1} inputMode="numeric" value={seqLength} onInput={(e) => setSeqLength(e.currentTarget.value)} />
           </label>
         )}
+        <label>
+          Repetitions <span class="muted">(times a line is played through when you learn moves on it, 1–5)</span>
+          <input type="number" name="repetitions" min={1} max={5} step={1} inputMode="numeric" value={repetitions} onInput={(e) => setRepetitions(e.currentTarget.value)} />
+        </label>
+        <label>
+          Mistakes retried <span class="muted">(asked again when the line ends, until right this many times in a row, 0–5; 0: not)</span>
+          <input type="number" name="mistake-retries" min={0} max={5} step={1} inputMode="numeric" value={retries} onInput={(e) => setRetries(e.currentTarget.value)} />
+        </label>
         <label>
           Auto-play
           <select name="auto-play" value={prefs.autoPlay} onChange={(e) => set('autoPlay', e.currentTarget.value as AutoPlay)}>

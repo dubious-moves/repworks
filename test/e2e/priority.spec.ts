@@ -86,6 +86,11 @@ test('a line paused from the list: ⏸, out of the new moves, practised with not
   await expect(page.locator('.train-feedback')).toHaveText('New move: play Nf6');
   await clickSquare(page, 'g8', 'black');
   await clickSquare(page, 'f6', 'black');
+  // Walked a second time (Repetitions, 2 by default: §5.77), Nf6 asked; still nothing recorded.
+  await expect(page.locator('.train-feedback')).toHaveText('The line again: 2 of 2');
+  await expect(page.locator('.train-grid')).toHaveAttribute('data-phase', 'ask');
+  await clickSquare(page, 'g8', 'black');
+  await clickSquare(page, 'f6', 'black');
   await expect(page.getByRole('region', { name: 'Session done' })).toContainText('Line done');
   await sync(page);
   expect(pushed(git)).toHaveLength(1);

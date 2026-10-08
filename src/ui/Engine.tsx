@@ -128,7 +128,7 @@ function MaiaSwitch() {
   const s = maiaState.value;
   const note = !on ? '' : s.kind === 'loading' ? '…' : s.kind === 'downloading' ? ` ${Math.floor((100 * s.received) / s.total)}%` : s.kind === 'failed' ? ' !' : '';
   return (
-    <span class="maia-switch" title={s.kind === 'failed' ? s.reason : 'Maia: human move predictions in the explorer'}>
+    <span class="maia-switch" data-state={s.kind} title={s.kind === 'failed' ? s.reason : 'Maia: human move predictions in the explorer'}>
       <label class="switch">
         <input type="checkbox" role="switch" aria-label="Maia" checked={on} onChange={(e) => setMaiaOn(e.currentTarget.checked)} />
         <span class="slider" />

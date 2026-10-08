@@ -78,14 +78,18 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
   const filter = `${p.speeds.join()}|${p.ratings.join()}|${p.recent}|${p.local}`;
   useEffect(() => lookAt(p.on ? fen : undefined), [fen, p.on, p.tab, filter]);
   useEffect(() => () => lookAt(undefined), []);
-  // Maia's policy here (§5.33), once Maia is ready, a moment after the position is shown.
-  const maiaOn = p.on && maiaPrefs.value.on && maiaState.value.kind === 'ready';
+  // Maia's policy here (§5.33), once Maia is ready, a moment after the position is shown. Its
+  // columns stay while its worker is ended for being unused (`idle`): the ask starts it again,
+  // and the policy is asked once it is ready.
+  const maiaKind = maiaState.value.kind;
+  const maiaOn = p.on && maiaPrefs.value.on && (maiaKind === 'ready' || maiaKind === 'idle');
+  const maiaReady = maiaKind === 'ready';
   const elo = maiaElo.value;
   useEffect(() => {
     if (!maiaOn || !fen) return;
     const t = setTimeout(() => requestPolicy(fen), 120);
     return () => clearTimeout(t);
-  }, [fen, maiaOn, elo]);
+  }, [fen, maiaOn, maiaReady, elo]);
 
   const s = study.value;
   const data = trainData.value;
@@ -193,7 +197,26 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
     }
     if (waitingGames && paused) return <p class="explorer-note muted">Lichess asked to slow down: waiting up to a minute.</p>;
     if (!l || waitingGames) return stale ? null : <p class="explorer-note muted">Asking…</p>;
-    if (!table.rows.length) return <p class="explorer-note muted">{games ? 'No games here.' : 'ChessDB doesn’t know this position.'}</p>;
+    // No games: ChessDB's moves and Maia's are the rows (the owner's request, 2026-10-08), so say
+    // which are still coming, or that there are none.
+    const noGames = games && !!l.games && !l.games.moves.some((m) => m.games > 0);
+    const waitingEvals = !l.evals && !l.evalsError;
+    const waitingMaia = maiaOn && !seen?.policy && !seen?.error;
+    const coming = [waitingEvals ? 'ChessDB' : '', waitingMaia ? 'Maia' : ''].filter(Boolean).join(' and ');
+    if (!table.rows.length) {
+      if (coming) return <p class="explorer-note muted">{games ? `No games here: asking ${coming}…` : `Asking ${coming}…`}</p>;
+      if (pos.isCheckmate() || pos.isStalemate()) return <p class="explorer-note muted">{pos.isCheckmate() ? 'Checkmate.' : 'Stalemate.'}</p>;
+      const unknown = l.evals?.status !== 'ok' || !l.evals.moves?.length;
+      return <p class="explorer-note muted">{games ? (unknown ? 'No games here, and ChessDB doesn’t know this position.' : 'No games here.') : 'ChessDB doesn’t know this position.'}</p>;
+    }
+    if (noGames) {
+      const from = [table.rows.some((r) => r.novelty) ? 'ChessDB’s' : '', table.rows.some((r) => r.maiaOnly) ? 'Maia’s' : ''].filter(Boolean).join(' and ');
+      return (
+        <p class="explorer-note muted">
+          No games here: {from} moves{coming ? `; asking ${coming}…` : '.'}
+        </p>
+      );
+    }
     return null;
   })();
 
@@ -283,7 +306,7 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
       {stale && <StaleRows shown={stale} />}
       {!stale && table.rows.length > 0 && (
         <div class={`explorer-rows${games ? '' : ' no-games'}${prac ? ' with-prac' : ''}${maiaOn ? ' with-maia' : ''}`} role="list">
-          {maiaOn && seen?.policy && <MaiaScores fen={fen} sans={table.rows.slice(0, MAIA_ROWS).map((r) => r.san)} />}
+          {maiaOn && seen?.policy && <MaiaScores fen={fen} sans={table.rows.slice(0, MAIA_ROWS).map((r) => r.san)} ready={maiaReady} />}
           {table.rows.map((r, i) => {
             const cell = cells.get(r.san)!;
             const res = cell.result;
@@ -577,9 +600,9 @@ function MaiaCell(props: { fen: string; san: string; cell: CellState; mine: bool
 }
 
 /** Asks Maia for Qchess's Ms of the first rows, once its policy is in. */
-function MaiaScores(props: { fen: string; sans: string[] }) {
+function MaiaScores(props: { fen: string; sans: string[]; ready: boolean }) {
   const key = props.sans.join(' ');
-  useEffect(() => requestScores(props.fen, props.sans), [props.fen, key]);
+  useEffect(() => requestScores(props.fen, props.sans), [props.fen, key, props.ready]);
   return null;
 }
 

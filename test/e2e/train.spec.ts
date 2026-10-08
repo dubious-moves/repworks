@@ -10,6 +10,7 @@ import { REPO, TOKEN } from '../support/syncWorld.ts';
 import { clickSquare } from './board.ts';
 import { serveGithub, world } from './github.ts';
 import { serveSite, type SiteServer } from './server.ts';
+import { walkOnce } from './prefs.ts';
 
 /** The trainer asks for a move: the feedback line says nothing for it (§5.17), so the phase tells. */
 const asked = (page: Page) => expect(page.locator('.train-grid')).toHaveAttribute('data-phase', 'ask');
@@ -54,6 +55,7 @@ function pushed(git: FakeGit): Record<string, unknown>[] {
 }
 
 test('train: the counts, a due move asked, a wrong move taken back, new lines taught, a suspend, a reload', async ({ page }) => {
+  await walkOnce(page);
   const git = await setUp(page);
   await expect(page.locator('.train-card h2')).toHaveText('Train: 1 due · 3 new');
   await page.locator('.train-card').getByRole('link', { name: 'Train' }).click();

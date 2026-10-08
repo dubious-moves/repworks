@@ -203,6 +203,9 @@ export interface SessionView {
   upcoming?: Line;
   /** Show sequence, while shown: the plies it spans. */
   sequence?: { from: number; to: number };
+  /** A line walked again (repetitions), and the mistakes retried at a walk's end (§5.77). */
+  pass?: { n: number; of: number };
+  retry?: { left: number; streak: number; need: number };
   /** After a wrong move, the move "Save as alternative" saves; an alternative just saved (§5.18). */
   wrongMove?: string;
   savedAlt?: string;
@@ -297,6 +300,8 @@ export async function startSession(store: IdbStore, record: (event: Parameters<I
     askAll: interactive,
     follow: interactive,
     practice: of.kind === 'line',
+    // Retry, drill and the pins: a move missed again comes back until it is right (§5.77).
+    repeatMissed: !grading && !interactive,
     selfGrade: of.kind === 'show',
     index,
     plan,
@@ -321,11 +326,18 @@ export async function startSession(store: IdbStore, record: (event: Parameters<I
 /**
  * The per-device settings a session runs with (§5.17): the queue's and show and grade's lines start
  * as `startQueue` says and wait at their end or go on after two paces; a line picked or learned
- * starts as `startLearn` says, and Learn's lines wait at their end or go on after four paces.
+ * starts as `startLearn` says, and Learn's lines wait at their end or go on after four paces. A line
+ * learned is walked `repetitions` times, and a walk's mistakes are asked again at its end (§5.77).
  * Retry, drill, the pins and the Interactive view keep their own walk.
  */
 export function optionsFor(of: SessionKind, prefs: TrainPrefs): TrainerOptions {
-  const common: TrainerOptions = { autoPlay: prefs.autoPlay, tryNew: prefs.newMoves === 'try', sequence: prefs.newMoves === 'sequence' ? prefs.sequenceLength : 0 };
+  const common: TrainerOptions = {
+    autoPlay: prefs.autoPlay,
+    tryNew: prefs.newMoves === 'try',
+    sequence: prefs.newMoves === 'sequence' ? prefs.sequenceLength : 0,
+    repetitions: prefs.repetitions,
+    retryMistakes: prefs.mistakeRetries,
+  };
   switch (of.kind) {
     case 'queue':
     case 'show':
@@ -515,6 +527,8 @@ function apply(t: Trainer, effects: readonly ShowGradeEffect[]): void {
         break;
       case 'answer':
         answered.add(e.card);
+        // Asked again (a mistake retried, a line's later pass, a missed move again): counted once, and pinned or drilled once.
+        if (e.repeat) break;
         next.answers++;
         if (e.ok) {
           next.right++;
@@ -549,6 +563,10 @@ function apply(t: Trainer, effects: readonly ShowGradeEffect[]): void {
   else delete next.upcoming;
   if (v.sequence) next.sequence = v.sequence;
   else delete next.sequence;
+  if (v.pass) next.pass = v.pass;
+  else delete next.pass;
+  if (v.retry) next.retry = v.retry;
+  else delete next.retry;
   if (v.wrongMove) next.wrongMove = v.wrongMove.san;
   else delete next.wrongMove;
   if (v.savedAlt) next.savedAlt = v.savedAlt.san;

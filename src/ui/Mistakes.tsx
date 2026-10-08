@@ -3,7 +3,6 @@
 // its next drill and its clean answers so far; "Drill pinned" when some are due.
 import { decidingNow } from '../app/time.ts';
 import { makeSan } from 'chessops/san';
-import { open } from '../app/mode.ts';
 import { recordEvent } from '../app/state.ts';
 import { cardLine } from '../core/train/mistakes.ts';
 import { mistakesOf, pinnedOf, trainData, type TrainData } from '../app/train.ts';
@@ -13,6 +12,7 @@ import { CLEAN_TO_RETIRE } from '../core/train/pins.ts';
 import { header } from '../core/study/model.ts';
 import { positionAt, startPosition } from '../core/study/tree.ts';
 import { numbered } from './Train.tsx';
+import { Back } from './Back.tsx';
 
 const clock = (ms: number) => new Date(ms).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' });
 
@@ -50,9 +50,7 @@ export function MistakesView() {
   return (
     <div class="mistakes">
       <div class="chapter-head">
-        <a href="#/" class="back" onClick={(e) => (e.preventDefault(), open({ name: 'list' }))}>
-          ←
-        </a>
+        <Back parent={{ name: 'list' }} />
         <div class="titles">
           <span class="study-title">Mistakes</span>
         </div>

@@ -46,6 +46,7 @@ async function setUp(page: Page) {
 }
 
 const rows = (page: Page) => page.locator('.explorer-rows .ex-row:not(.ex-total)');
+const panel = (page: Page) => page.getByRole('region', { name: 'Explorer' });
 
 test('Maia’s dialog, its download, the Ml and Ms columns and its own rows; remembered', async ({ page }) => {
   test.setTimeout(90_000);
@@ -94,6 +95,35 @@ test('Maia’s dialog, its download, the Ml and Ms columns and its own rows; rem
   await page.getByRole('switch', { name: 'Maia' }).uncheck();
   await expect(page.locator('.explorer-head .ex-ml')).toHaveCount(0);
   await expect(rows(page).locator('.ex-san')).toHaveText(['e4', 'd4']);
+});
+
+test('Maia’s columns stay when its worker is ended for being unused, and it starts again by itself; with no games, Maia’s moves are the rows', async ({ page }) => {
+  test.setTimeout(120_000);
+  await setUp(page);
+  // Timers the test can run: Maia's worker ends 90 s after its last use.
+  await page.clock.install();
+  await page.getByRole('switch', { name: 'Maia' }).check();
+  await page.getByRole('dialog', { name: 'Enable Maia' }).getByRole('button', { name: /^Download/ }).click();
+  const head = page.locator('.explorer-head');
+  const ml = head.getByRole('button', { name: 'Ml' });
+  await expect(ml).toBeVisible({ timeout: 30_000 });
+  await expect.poll(async () => (await page.clock.runFor(500), rows(page).count()), { timeout: 30_000 }).toBe(4);
+  // Nothing left to ask: the Ms values are in.
+  await expect.poll(async () => (await page.clock.runFor(500), rows(page).locator('.ex-ms').allTextContents()), { timeout: 30_000 }).toEqual([expect.stringMatching(/%$/), expect.stringMatching(/%$/), expect.stringMatching(/%$/), expect.stringMatching(/%$/)]);
+  // 90 s unused: the worker ends, `idle`, and the columns stay (they went before, and nothing asked
+  // Maia again until it was switched off and on).
+  const state = page.locator('.maia-switch');
+  await expect.poll(async () => (await page.clock.runFor(30_000), state.getAttribute('data-state')), { timeout: 30_000 }).toBe('idle');
+  await expect(ml).toBeVisible();
+  await expect(rows(page).locator('.ex-ml').first()).not.toHaveText('');
+  // A new position, with no games: Maia starts again and its moves are the rows.
+  // (A key rather than a click: the click's checks wait on animation frames, which the clock holds.)
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4');
+  await expect.poll(async () => (await page.clock.runFor(500), panel(page).locator('.ex-row.maia-only').count()), { timeout: 30_000 }).toBe(4);
+  await expect(state).toHaveAttribute('data-state', 'ready');
+  await expect(panel(page).locator('.explorer-note')).toHaveText(/^No games here: (ChessDB’s and )?Maia’s moves/);
+  await expect(ml).toBeVisible();
 });
 
 test('the worker in the browser gives onnxruntime-web’s numbers under Node, to 1e-6', async ({ page, isMobile }) => {

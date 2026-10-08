@@ -233,6 +233,18 @@ test('the storm: positions gathered, a great move and a mistake scored, the revi
   await expect(page).toHaveURL(/#\/analysis\?/);
   await page.goBack();
   await expect(page.getByTestId('storm-summary')).toContainText('1 point from 2 answered');
+  // On from the analysis board to another page, then ← twice: the session is still there (the
+  // owner's request, 2026-10-08; it went before, once the page left the board).
+  await page.getByRole('button', { name: /^Analyse/ }).click();
+  await expect(page).toHaveURL(/#\/analysis\?/);
+  await page.getByRole('button', { name: 'Practise' }).click();
+  await expect(page).toHaveURL(/#\/practice\?/);
+  await page.locator('.chapter-head .back').click();
+  await expect(page).toHaveURL(/#\/analysis\?/);
+  await page.locator('.chapter-head .back').click();
+  await expect(page).toHaveURL(/#\/storm$/);
+  await expect(page.getByTestId('storm-summary')).toContainText('1 point from 2 answered');
+  await expect(page.locator('.storm-nav-count')).toHaveText('Position 2 of 3');
 
   // The analysis board saves a sequence from the user's move, past the move that led there (§5.74).
   const mine = (await rows.nth(1).locator(':scope > span').nth(1).textContent())!;

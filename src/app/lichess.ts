@@ -48,7 +48,7 @@ export function takeLichessCallback(): string | undefined {
   const params = new URLSearchParams(location.search);
   if (!params.has('code') && !params.has('error')) return undefined;
   const url = location.href;
-  history.replaceState(null, '', location.pathname + location.hash);
+  history.replaceState(history.state, '', location.pathname + location.hash);
   return url;
 }
 

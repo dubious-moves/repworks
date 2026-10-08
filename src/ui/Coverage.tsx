@@ -17,6 +17,7 @@ import type { StudyChapters } from '../core/repertoire/files.ts';
 import { header } from '../core/study/model.ts';
 import { startPosition } from '../core/study/tree.ts';
 import { movesFrom } from './LineList.tsx';
+import { Back } from './Back.tsx';
 
 const SEVERITY: Record<Severity, { label: string; help: string }> = {
   hole: { label: 'Hole', help: 'Your move, and the repertoire has none here' },
@@ -98,9 +99,7 @@ function Report(props: { here: StudyChapters; studies: StudyChapters[] }) {
   return (
     <div class="coverage">
       <div class="chapter-head">
-        <a href="#/" class="back" onClick={(e) => (e.preventDefault(), open({ name: 'chapter', sid: here.sid }))}>
-          ←
-        </a>
+        <Back parent={{ name: 'chapter', sid: here.sid }} />
         <div class="titles">
           <span class="study-title">Coverage · {here.name}</span>
         </div>

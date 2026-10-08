@@ -7,7 +7,7 @@ where the build differed). What remains is live: the spike's re-run (§4.2), the
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
 with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
-for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). Read with `DECISIONS.md`, which this plan updates (its
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -2691,6 +2691,89 @@ Tests: `plan.test.ts` (one game, bare movetext, several games, a start FEN with 
 an unreadable game, the headers written); `studies.spec.ts` (desktop and phone: a bad FEN
 refused then a good one, two pasted games, a file with the typed name, each checked in the fake
 data repo).
+
+Live: TESTING.md.
+
+#### 5.77 The owner's notes of 2026-10-08: repetitions, mistakes asked again, Copy FEN, the explorer without games, Maia's columns, the analysis board's side, ←
+
+Nine requests, each built as asked; the owner's words where they set a detail.
+
+**Training** (the trainer's options, `core/train/trainer.ts`; the settings per device, in the
+training settings' "This device"):
+- **Repetitions** ("the user has to go through the variation twice before they move onto the
+  next one"): a line on which a move was taught is walked again, `repetitions` times in all
+  (default 2, 1 to 5), before the next line. The later passes start as a line does (§5.17's "A line
+  starts", with the first move taught in place of the first move needed, so the moves before it
+  go as they went), and ask the moves taught on it with no arrow (`askAgain`); nothing is graded or taught
+  twice (a card is graded once a session), so their answers are practice, sent as `answer` with
+  `repeat`. The counters say "2 of 2 times", the feedback line "The line again: 2 of 2". Not in show
+  and grade (a move shown can't be found again), nor in retry, drill, the pins or the Interactive
+  view.
+- **Mistakes asked again at the line's end** ("each mistake should be answered correctly twice in
+  a row before you can move on"): at the end of a walk (a pass), every own move asked on it and
+  not answered right first time (a wrong move or Hint; an alternative is free) is asked again,
+  from the opponent's move before it, until right `retryMistakes` times in a row (default 2, 0 to
+  5; 0: not asked again); the mistakes take turns, and a miss starts a mistake's streak again. Then
+  the board goes back to the line's end, and the line's next pass or the next line follows. Graded
+  once, as before: the retries are practice. Moves taught are not mistakes (repetitions bring them
+  back). The feedback line: "Your 2 mistakes again: each right 2 times in a row", then at each
+  "Your mistake again: 1 of 2 right in a row"; the counters "mistakes left 1". Not in show and
+  grade, retry, drill, the pins or the Interactive view.
+- **A drill's misses come back** ("the failed mistakes should be repeated until you get everything
+  correct"): in retry, drill and the pins (`repeatMissed`), a move answered wrong has its line
+  walked again after the others ("Missed earlier: once more"), as often as it is missed. The
+  session's numbers and a pin's `drill` event count the first answer only.
+- Existing e2e specs about other things set Repetitions 1 and no retries (`test/e2e/prefs.ts`
+  `walkOnce`), so their walks stay as written.
+
+**Study and analysis**:
+- **Copy FEN**: under the study's board, a row with the FEN of the position shown (read-only,
+  selected on a tap) and "Copy FEN"; on the analysis board, "Copy FEN" beside Set up and New (the
+  position shown, not the board's start); and "Copy FEN" in every move's menu (the start's too).
+- **No games here**: the table already had ChessDB's moves (novelties) and Maia's top four as
+  rows where Lichess has no games; "No games here." showed when neither had answered yet, when
+  ChessDB doesn't know the position, or when Maia's columns had gone (below). Now the note says
+  which: "No games here: ChessDB's and Maia's moves." above their rows, "No games here: asking
+  ChessDB and Maia…" while they are asked, "No games here, and ChessDB doesn't know this position."
+  when nothing has any (Checkmate or Stalemate where it is one).
+- **Maia's columns disappearing**: Maia's worker ends after 90 s unused (its memory freed, §5.32),
+  and its state then went to `off`, so the explorer hid the columns, and as it asks Maia only while
+  they show, nothing ever started it again: switching Maia off and on was the only way back. The
+  state is `idle` now: the columns stay (with what Maia said kept for the session), and the next
+  position's ask starts the worker again. The switch carries `data-state`.
+- **The analysis board keeps the side it was opened from**: Analyse from here (the chapter's
+  side), the games' and the game cards' Analyse and Make a sequence (the player's), the practice
+  review's (the side played), the repertoire check's (yours), as the storm's already did. Practise
+  from the analysis board plays the side it is seen from. A FEN set up, and New, still turn the
+  board to the side to move (a pasted FEN has no side).
+- **←** ("always lead back to where you came from"): each history entry is stamped with its place
+  among the tab's entries of the app and a key of its own, and the tab keeps the page each place
+  shows (`pageOf` in `core/app/fsm.ts`: a study's chapters are one page, and so are training's
+  sessions and lines, the storm's scopes, the analysis board's positions). The ← on every screen
+  (`ui/Back.tsx`) goes back past the page's own entries to the page it was opened from, as the
+  browser's back does; a page opened from outside the app (a link, a bookmark, a new tab) goes up
+  to its parent as before. In a live storm ← still ends the session, and in its review goes to the
+  storm's page, first. Work under way is kept for the entry it was started on, so ← back finds it:
+  the storm's session (kept for any page now, not only the analysis board, while its clock is
+  stopped; its verdict waits), a practice game (over: its review as it was; in play: played on,
+  the opponent's move asked again) and the game cards' session (← on its own screen still ends it).
+  The ← is a filled button now.
+
+Tests: `trainer.test.ts` (repetitions: two passes, the moves asked with no arrow and nothing
+recorded twice, the pass starting at its first move; once by default, three, not on a line with
+nothing taught, not in show and grade; mistakes: asked again from the opponent's move until right
+twice in a row, a miss starting the streak again, taking turns, a hint, a practice ask, off, show
+and grade; after a second pass; a drill's misses asked again until right; the random repertoires
+under repetitions and retries), `timeTravel.test.ts` (the settings and each session kind's
+options), `fsm.test.ts` (`pageOf`); Playwright, desktop and phone: `repetitions.spec.ts` (a mistake
+asked again until right twice, a miss starting it again, a new line walked twice, the events
+recorded once; a drill's miss asked again; Repetitions 1), `views.spec.ts` and `editor.spec.ts`
+(Copy FEN), `explorer.spec.ts` (no games: ChessDB's rows and the notes), `maia.spec.ts` (the
+columns kept when the worker ends, Maia started again by the next position, its four moves the
+rows where there are no games; the test fails on the old code), `analysis.spec.ts` (the chapter's
+side kept, Practise as it), `back.spec.ts` (back past a study's chapters, past training's lines, up
+to the parent from outside the app; the button filled), `practice.spec.ts` (Analyse from the review
+and back to it), `storm.spec.ts` (analysis board, practice, ← twice, the session still there).
 
 Live: TESTING.md.
 

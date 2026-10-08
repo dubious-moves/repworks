@@ -158,6 +158,12 @@ test('a practice game: played against the explorer, stopped, reviewed, kept in t
   await expect(review.getByTestId('practice-end')).toContainText('Stopped.');
   await expect(review.getByTestId('practice-accuracy')).toContainText('1 key move');
   await expect(review.getByTestId('practice-keys')).toContainText('d4');
+  // Analyse, and ← comes back to the review as it was (the owner's request, 2026-10-08).
+  await review.locator('.review-actions').getByRole('button', { name: 'Analyse' }).click();
+  await expect(page).toHaveURL(/#\/analysis\?/);
+  await page.locator('.chapter-head .back').click();
+  await expect(review.getByTestId('practice-end')).toContainText('Stopped.');
+  await expect(review.getByTestId('practice-keys')).toContainText('d4');
   // The whole game stepped through: the review opens on the last move; ← → and Home step it.
   await expect(review).toHaveAttribute('data-at', '9');
   await page.keyboard.press('ArrowLeft');

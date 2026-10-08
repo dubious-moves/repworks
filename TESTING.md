@@ -5,6 +5,29 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## The owner's notes of 2026-10-08 (§5.77)
+
+- Phone, then desktop: learn a new line (the queue, Learn or a line picked): it is walked a second
+  time ("The line again: 2 of 2", the moves taught asked with no arrow) before the next line. A
+  mistake in a review comes back at the line's end, from the opponent's move, until right twice in
+  a row ("Your mistake again: 1 of 2 right in a row"). Is the pace of the retries right, and is two
+  a good number for both? (Training settings → This device: Repetitions, Mistakes retried.)
+- Mistakes → Drill (or Retry, or the pins): a move missed again comes back after the others,
+  until all are right.
+- The study: the FEN row under the board and its Copy FEN (paste it into Lichess); the analysis
+  board's Copy FEN; Copy FEN in a move's menu. On the phone, is the row under the board worth its
+  room?
+- The explorer deep in a line where Lichess has no games: ChessDB's moves (and Maia's, with Maia
+  on) as rows, under "No games here: …".
+- Maia on in a study, then a few minutes on one position (or away from the study page): are its
+  columns still there, and do they fill in again on the next move without switching Maia off and on?
+- Analyse from here in a Black chapter at a move where White is to move: the board stays Black's;
+  the same from a game, a game card and a practice game's review.
+- ←, everywhere: back where the page was opened from (a study's other chapters skipped; training's
+  lines skipped), and nothing lost on the way back: the storm's review or held card after Analyse →
+  Practise → ← ←, a practice game's review after Analyse → ←, the game cards after Analyse → ←. Does
+  the filled ← stand out enough on the phone?
+
 ## A new chapter from a FEN or from PGN (§5.76)
 
 - Phone and desktop: in a study, + New chapter → From PGN → pick a `.pgn` file (one of the
