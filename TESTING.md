@@ -241,6 +241,12 @@ explorer's Eval column too far from the move (§5.67).
   that reached the card one step back. Whether 1.2 s after a good move is long enough.
 - §5.72: "Clear positions…" on the storm's home, for a chapter, then the whole repertoire: the
   count goes to 0 for that scope only, the record stays, and a new gather fills it again.
+- §5.73 (desktop, then phone): a set with a wrong first move, then Try again with a good one: the
+  card says "Counted: the first answer, … · Mistake"; the review keeps Mistake on that row, with
+  "Then …: not counted" under the verdict, and "found" and the average given up count the first
+  answers only. On the desktop the position list sits beside the board under Try again and
+  Analyse, scrolling itself; "Show lines" puts each position's line under its row and is
+  remembered.
 
 ## Phase 5
 

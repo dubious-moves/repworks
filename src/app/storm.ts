@@ -409,6 +409,9 @@ export interface StormItem {
   attempts?: number;
   outcome?: SetOutcome;
   secondOutcome?: SetOutcome;
+  /** In the history: a set's later attempts (Try again, the second pass), kept beside the first
+   *  answer (`answer`), which alone counts. */
+  later?: StormAnswer[];
 }
 
 export interface StormSession {
@@ -639,7 +642,9 @@ function settle(item: StormItem, uci: string, v: StormAnswer): void {
   const held = setHeld(band, STORM) && !now.revealed;
   const outcome = held && attempts < STORM.setRetryMax ? undefined : setOutcome(attempts, band, now.revealed, STORM);
   const next: StormItem = { ...item, answer: v, attempts, ...(outcome ? (now.pass === 1 ? { outcome } : { secondOutcome: outcome }) : {}) };
-  update({ item: next, history: now.history.map((h) => (h.card === item.card ? { ...h, ...next } : h)) });
+  // Only the first answer counts: a later attempt is kept beside it, never over it.
+  const kept = (h: StormItem): StormItem => (first || !h.answer ? { ...h, ...next } : { ...h, ...next, answer: h.answer, later: [...(h.later ?? []), v] });
+  update({ item: next, history: now.history.map((h) => (h.card === item.card ? kept(h) : h)) });
   setPhase(held ? 'held' : 'verdict');
   if (!held && now.pass === 1 && outcome && outcome !== 'first' && outcome !== 'unknown') secondPass.push(again(item));
 }
@@ -675,8 +680,6 @@ async function answerPuzzle(item: StormItem, uci: string, retry: boolean, seq: n
     // A wrong move stays on the board, as a position's does.
     const next: StormItem = right ? { ...item, step: step + 1, answer: v } : { ...item, played: uci, answer: v };
     if (retry) return update({ retry: next });
-    const now = stormSession.value;
-    if (now) update({ history: now.history.map((h) => (h === item ? next : h)) });
     settle(next, uci, v);
   };
   if (!right) return solved('blunder');
@@ -740,7 +743,7 @@ export function showMove(): void {
   const outcome: SetOutcome = 'shown';
   const item: StormItem = { ...s.item, ...(s.pass === 1 ? { outcome } : { secondOutcome: outcome }) };
   if (s.pass === 1) secondPass.push(again(s.item));
-  update({ item, revealed: true, history: s.history.map((h) => (h.card === item.card ? { ...h, ...item } : h)) });
+  update({ item, revealed: true, history: s.history.map((h) => (h.card === item.card ? { ...h, ...item, answer: h.answer ?? item.answer, later: h.later } : h)) });
   setPhase('verdict');
 }
 

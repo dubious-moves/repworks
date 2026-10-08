@@ -7,7 +7,7 @@ where the build differed). What remains is live: the spike's re-run (§4.2), the
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
 with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
-for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. Read with `DECISIONS.md`, which this plan updates (its
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built. Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -2591,6 +2591,29 @@ status. Disabled while a gather runs. Puzzles are untouched.
 
 Tests: `storm.spec.ts` (desktop and phone: Cancel keeps them; Clear empties the home, Start
 disabled, still empty after a reload).
+
+Live: TESTING.md.
+
+#### 5.73 Only the first answer counts; the review's list beside the board (the owner's request, 2026-10-08)
+
+A set card tried again (held, then Try again) or answered again in the second pass wrote its new
+answer over the first in the session's history, so the review showed the last try's grade and its
+"n of m found" and average given up counted it, though the tally, the record and the progress
+events already took the first answer only. Now `settle` keeps the first answer as the history
+entry's `answer` and puts later ones in `later` (`showMove` keeps it too); the card says which
+answer counts once it is tried again, and the review shows the later ones under the verdict, "not
+counted". The review's own Try again was already apart (`retry`, nothing scored).
+
+The review's list of positions moved from under the board into the panel beside it, after the
+actions: one compact row per position (number, move, band, share of the game given up, best),
+filling the board's height and scrolling itself (`contain: size`), so it is in view without
+scrolling the page. The chapter and line are behind "Show lines" (remembered on the device in
+`repworks-storm-review-lines`) and in each row's tooltip; the position picked shows its line above
+the verdict anyway. On a narrow screen it follows the actions under the board.
+
+Tests: `storm.spec.ts` (desktop and phone: the counted answer shown after Try again; the first
+answer kept on the row after a Great in the second pass, the later ones not counted, 5 of 6 found;
+the lines toggle; on the desktop the list beside the board).
 
 Live: TESTING.md.
 

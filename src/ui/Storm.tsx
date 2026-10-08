@@ -41,6 +41,7 @@ import {
   toggleShown,
   tryAgain,
   puzzleFen,
+  type StormAnswer,
   type StormItem,
   type StormScopeData,
   type StormSession,
@@ -62,6 +63,9 @@ const BAND_WORD: Record<string, string> = { great: 'Great', good: 'Good', ok: 'I
 /** The card's title once answered: the band as a move's verdict reads in an annotated game. */
 const TITLE_WORD: Record<string, string> = { great: 'Great move', good: 'Good move', ok: 'Inaccuracy', bad: 'Mistake', blunder: 'Blunder', unknown: 'No verdict', unanswered: 'Not answered' };
 const BANDS = ['great', 'good', 'ok', 'bad', 'blunder'] as const;
+
+/** An answer in a few words: the move and its band ("Qe7 · Good"). */
+const answerWords = (a: StormAnswer, puzzle: boolean): string => `${a.userSan || '—'} · ${(puzzle ? PUZZLE_WORD[a.band] : undefined) ?? BAND_WORD[a.band] ?? ''}`;
 
 /** What a puzzle says once answered: its rating, how deep its game went into the line, its themes. */
 function puzzleFacts(p: NonNullable<StormItem['puzzle']>): string {
@@ -753,6 +757,8 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
   const band = v?.band ?? (phase === 'grading' ? 'checking' : 'none');
   const title = v ? (item.puzzle ? (PUZZLE_WORD[v.band] ?? '') : (TITLE_WORD[v.band] ?? '')) : phase === 'grading' && !item.puzzle ? 'Checking…' : 'Find a good move';
   const left = STORM.setRetryMax - (item.attempts ?? 0);
+  // A set card tried again (or back in the second pass): its first answer is the one that counts.
+  const counted = s.mode === 'set' ? s.history.find((h) => h.card === item.card)?.answer : undefined;
   const line = v
     ? item.puzzle
       ? `${v.userSan || '—'}${v.points ? ` · ${v.points > 0 ? '+' : ''}${v.points}` : ''}`
@@ -773,6 +779,11 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
           </p>
           <p class="storm-line">{line}</p>
         </div>
+        {counted && counted !== v && !counted.unanswered && (
+          <p class={`storm-counted band-${counted.band}`} data-testid="storm-counted">
+            Counted: the first answer, <span>{answerWords(counted, !!item.puzzle)}</span>
+          </p>
+        )}
         {v && held && !s.revealed && (
           <p class="muted storm-hint">{left > 0 ? `Play it again: ${plural(left, 'attempt')} left, then the move is shown.` : 'No attempts left: show the move to go on.'}</p>
         )}
@@ -837,6 +848,9 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
 
 /* ------------------------------------------------------------------ the review */
 
+/** The review list's lines shown (a per-device convenience). */
+const LINES_KEY = 'repworks-storm-review-lines';
+
 function Review(props: { s: StormSession; scope: StormScopeData }) {
   const s = props.s;
   const items = s.history;
@@ -848,6 +862,21 @@ function Review(props: { s: StormSession; scope: StormScopeData }) {
   };
   const item = items[at];
   const retry = s.retry;
+  const [lines, setLinesState] = useState(() => {
+    try {
+      return localStorage.getItem(LINES_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const setLines = (on: boolean) => {
+    setLinesState(on);
+    try {
+      localStorage.setItem(LINES_KEY, on ? '1' : '0');
+    } catch {
+      /* kept for this page only */
+    }
+  };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = (e.target as HTMLElement | null)?.tagName;
@@ -965,6 +994,11 @@ function Review(props: { s: StormSession; scope: StormScopeData }) {
                 </div>
               )
             )}
+            {!retry && item.later && item.later.length > 0 && (
+              <p class="muted storm-later" data-testid="storm-later">
+                Then {item.later.map((a) => answerWords(a, !!item.puzzle)).join(', then ')}: not counted
+              </p>
+            )}
             {item.puzzle && <p class="muted">{puzzleFacts(item.puzzle)}</p>}
             {shown && item.answer && (
               <p class="muted storm-best" title={item.puzzle ? '' : sourceTitle(item.answer)}>
@@ -982,24 +1016,40 @@ function Review(props: { s: StormSession; scope: StormScopeData }) {
                 Analyse <kbd>A</kbd>
               </button>
             </div>
+            <div class="storm-list-wrap">
+              <div class="storm-list-head">
+                <span class="muted">Every position</span>
+                <button type="button" class="link" aria-pressed={lines} onClick={() => setLines(!lines)}>
+                  {lines ? 'Hide lines' : 'Show lines'}
+                </button>
+              </div>
+              <ol class={`storm-list${lines ? ' lines' : ''}`}>
+                {items.map((it, i) => (
+                  <li key={i}>
+                    <button
+                      type="button"
+                      class={`storm-row band-${it.answer?.band ?? 'unanswered'}${i === at ? ' current' : ''}`}
+                      title={`${it.card.names[0] ?? ''} ${label(it)}`.trim()}
+                      onClick={() => setAt(i)}
+                    >
+                      <span class="storm-row-n">{i + 1}</span>
+                      <span>{it.answer?.userSan || '—'}</span>
+                      <span>{it.answer ? (it.puzzle ? (PUZZLE_WORD[it.answer.band] ?? '') : BAND_WORD[it.answer.band]) : ''}</span>
+                      <span>{it.answer && typeof it.answer.wp === 'number' ? formatWp(it.answer.wp) : '—'}</span>
+                      <span>{it.shown && it.answer ? (it.puzzle ? (it.puzzle.plies[0]?.san ?? '') : facts(it.card).bestSan) : '…'}</span>
+                      {lines && (
+                        <span class="storm-row-where">
+                          {it.card.names[0] ?? ''} <span class="muted">{label(it)}</span>
+                        </span>
+                      )}
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            </div>
           </div>
         </div>
       )}
-      <ol class="storm-list">
-        {items.map((it, i) => (
-          <li key={i}>
-            <button type="button" class={`storm-row band-${it.answer?.band ?? 'unanswered'}${i === at ? ' current' : ''}`} onClick={() => setAt(i)}>
-              <span class="storm-row-where">
-                <span class="storm-row-n">{i + 1}</span> {it.card.names[0] ?? ''} <span class="muted">{label(it)}</span>
-              </span>
-              <span>{it.answer?.userSan || '—'}</span>
-              <span>{it.answer ? (it.puzzle ? (PUZZLE_WORD[it.answer.band] ?? '') : BAND_WORD[it.answer.band]) : ''}</span>
-              <span>{it.answer && typeof it.answer.wp === 'number' ? formatWp(it.answer.wp) : '—'}</span>
-              <span>{it.shown && it.answer ? (it.puzzle ? (it.puzzle.plies[0]?.san ?? '') : facts(it.card).bestSan) : '…'}</span>
-            </button>
-          </li>
-        ))}
-      </ol>
     </div>
   );
 }

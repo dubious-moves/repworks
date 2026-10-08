@@ -307,7 +307,7 @@ test('Clear positions: asked once, then the gathered positions gone from this de
   await expect(page.getByTestId('storm-count')).toContainText('0 positions ready');
 });
 
-test('the set: a mistake held, tried again, shown, and the second pass', async ({ page }) => {
+test('the set: a mistake held, tried again, shown, and the second pass', async ({ page, isMobile }) => {
   const w = await setUp(page);
   await gathered(page, w);
   await page.getByRole('button', { name: /^Set of/ }).click();
@@ -325,6 +325,8 @@ test('the set: a mistake held, tried again, shown, and the second pass', async (
   expect(await pieceOn(page, worst.slice(0, 2))).toBe('');
   await page.getByRole('button', { name: /^Try again/ }).click();
   await expect(page.getByTestId('storm-verdict')).toContainText('Find a good move');
+  // The first answer stays in view: it is the one that counts.
+  await expect(page.getByTestId('storm-counted')).toContainText('Mistake');
   expect(await pieceOn(page, worst.slice(0, 2))).not.toBe('');
   await play(page, worst);
   // Analyse from a held card shows the move (it counts as shown); back, the set goes on.
@@ -342,6 +344,23 @@ test('the set: a mistake held, tried again, shown, and the second pass', async (
     await page.getByRole('button', { name: /^Next position/ }).click();
   }
   await expect(page.getByTestId('storm-summary')).toContainText('5 of 6 found first time · 1 of 1 in the second pass');
+  // The review keeps the first answer; the second pass's Great is beside it, not counted.
+  const rows = page.locator('.storm-row');
+  await expect(rows.nth(0)).toContainText('Mistake');
+  await expect(page.getByTestId('storm-later')).toContainText('Great');
+  await expect(page.getByTestId('storm-later')).toContainText('not counted');
+  await expect(page.locator('.storm-result')).toContainText('5 of 6 found');
+  // The list sits beside the board, the lines behind a toggle.
+  await expect(rows.nth(0).locator('.storm-row-where')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Show lines' }).click();
+  await expect(rows.nth(0).locator('.storm-row-where')).toHaveCount(1);
+  // On a wide screen the list sits beside the board, not under it.
+  if (!isMobile) {
+    const board = (await page.locator('.storm-review-grid .board').first().boundingBox())!;
+    const list = (await page.locator('.storm-list').boundingBox())!;
+    expect(list.x).toBeGreaterThan(board.x + board.width - 1);
+    expect(list.y + list.height).toBeLessThanOrEqual(board.y + board.height + 1);
+  }
   // Only each position's first answer was written (the set's own), marked.
   await page.locator('.chip').click();
   await expect
