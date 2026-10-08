@@ -1,4 +1,4 @@
-// The analysis board's head (PLAN.md §5.35): a FEN to start from, and "Add to a chapter…": the
+// The analysis board's head (PLAN.md §5.35), and the FEN to start from under its board, and "Add to a chapter…": the
 // line from the board's start to the move shown, into a chapter that reaches that start (the one
 // the board was opened from first, then the repertoire's), as a variation, synced like any edit.
 import { useEffect, useRef, useState } from 'preact/hooks';
@@ -17,14 +17,36 @@ function back(): void {
   else open({ name: 'list' });
 }
 
-export function AnalysisHead() {
+/** The FEN to start from, under the board: a long line of text has no place in the head. */
+export function AnalysisFen() {
   const c = chapter.value;
   const [fen, setFen] = useState('');
+  const start = c ? positionAt(c, []) : undefined;
+  return (
+    <form
+      class="fen-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (fen.trim() && openScratch(fen.trim())) setFen('');
+      }}
+    >
+      <input aria-label="FEN" placeholder={start ? makeFen(start.toSetup()) : 'Paste a FEN'} value={fen} onInput={(e) => setFen(e.currentTarget.value)} />
+      <button type="submit" class="secondary" disabled={!fen.trim()}>
+        Set up
+      </button>
+      <button type="button" class="secondary" title="A new board from the start position" onClick={() => openScratch('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1')}>
+        New
+      </button>
+    </form>
+  );
+}
+
+export function AnalysisHead() {
+  const c = chapter.value;
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
   const m = mode.value;
   const seq = m.name === 'analysis' ? m.seq : undefined;
-  const start = c ? positionAt(c, []) : undefined;
   const line = at.value;
   return (
     <div class="chapter-head analysis-head">
@@ -33,21 +55,6 @@ export function AnalysisHead() {
       </a>
       <div class="titles">
         <span class="study-title">Analysis board</span>
-        <form
-          class="fen-form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (fen.trim() && openScratch(fen.trim())) setFen('');
-          }}
-        >
-          <input aria-label="FEN" placeholder={start ? makeFen(start.toSetup()) : 'Paste a FEN'} value={fen} onInput={(e) => setFen(e.currentTarget.value)} />
-          <button type="submit" class="secondary" disabled={!fen.trim()}>
-            Set up
-          </button>
-          <button type="button" class="secondary" title="A new board from the start position" onClick={() => openScratch('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1')}>
-            New
-          </button>
-        </form>
       </div>
       <button type="button" disabled={!line.length} title={line.length ? 'Add the line to the move shown to a chapter' : 'Play a move first'} onClick={() => setAdding(true)}>
         Add to a chapter…

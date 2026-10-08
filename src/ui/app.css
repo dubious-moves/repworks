@@ -2744,19 +2744,19 @@ a.button.secondary {
   font-style: italic;
 }
 
-/* The analysis board's head (PLAN.md §5.35): a FEN box beside its title. */
-.analysis-head .fen-form {
+/* The analysis board's FEN box (PLAN.md §5.35), under the board. */
+.cv-board .fen-form {
   display: flex;
+  margin-top: 8px;
+  max-width: var(--board, 100%);
   gap: 6px;
   align-items: center;
   min-width: 0;
 }
 
-.analysis-head .fen-form input {
+.cv-board .fen-form input {
   flex: 1 1 auto;
   min-width: 0;
-  width: 22em;
-  max-width: 100%;
   font-size: 0.8rem;
 }
 
@@ -3151,12 +3151,12 @@ a.button.disabled {
   margin-top: 8px;
 }
 
-/* The analysis board's head: its buttons wrap below the FEN on a narrow screen (§5.56, §5.57). */
+/* The analysis board's head: its buttons wrap on a narrow screen (§5.56, §5.57). */
 .analysis-head {
   flex-wrap: wrap;
 }
 .analysis-head .titles {
-  flex: 1 1 16em;
+  flex: 1 1 8em;
 }
 
 /* The repertoire check (§5.58–§5.60) and recidivism's marks (§5.59). */
