@@ -342,12 +342,13 @@ test('the set: a mistake held, tried again, shown, and the second pass', async (
   // Held: the best move not shown, the move played still on the board; Try again sets it back.
   await expect(page.locator('.storm-best')).toHaveCount(0);
   const worst = moves[Math.min(moves.length, LADDER.length) - 1]!;
-  expect(await pieceOn(page, worst.slice(0, 2))).toBe('');
+  // Polled: chessground draws the board on a later frame than the verdict's text.
+  await expect.poll(() => pieceOn(page, worst.slice(0, 2))).toBe('');
   await page.getByRole('button', { name: /^Try again/ }).click();
   await expect(page.getByTestId('storm-verdict')).toContainText('Find a good move');
   // The first answer stays in view: it is the one that counts.
   await expect(page.getByTestId('storm-counted')).toContainText('Mistake');
-  expect(await pieceOn(page, worst.slice(0, 2))).not.toBe('');
+  await expect.poll(() => pieceOn(page, worst.slice(0, 2))).not.toBe('');
   await play(page, worst);
   // Analyse from a held card shows the move (it counts as shown); back, the set goes on.
   await page.getByRole('button', { name: /^Analyse/ }).click();
