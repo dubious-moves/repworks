@@ -135,7 +135,7 @@ explorer's Eval column too far from the move (§5.67).
 
 - §5.17: the second testing notes, built (desktop and phone): the new settings' defaults in a real
   session (auto-play `due`, the queue's lines starting at the first due move, a picked line and
-  Learn auto-played from the start, Learn waiting at each line's end); whether the quieter
+  Learn auto-played from the start, Learn and the day's queue waiting at each line's end); whether the quieter
   feedback line is enough; "Let me try first" for new moves; "Go on to the next line" on a picked
   line and in Learn; the four auto-play modes against what lichessable does (and whether
   `session` should be the default); time travel's banner, +4 hours bringing the day's taught

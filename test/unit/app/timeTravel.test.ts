@@ -86,10 +86,11 @@ test('the per-device settings: defaults, each field checked', () => {
   assert.deepEqual(parsePrefs(JSON.stringify({ autoPlay: 'always', startQueue: 3, sequenceLength: 0 })), DEFAULT_PREFS);
 });
 
-test('each session kind runs with its settings: the queue starts as set for it, Learn waits or goes on, retry and the views keep their walk', () => {
+test('each session kind runs with its settings: the queue starts as set for it, the queue and Learn wait or go on, retry and the views keep their walk', () => {
   const prefs = { ...DEFAULT_PREFS, newMoves: 'try' as const, startQueue: 'ask' as const };
-  assert.deepEqual(optionsFor({ kind: 'queue' }, prefs), { autoPlay: 'due', tryNew: true, sequence: 0, lineStart: 'ask' });
-  assert.deepEqual(optionsFor({ kind: 'show', scope: 's' }, prefs), { autoPlay: 'due', tryNew: true, sequence: 0, lineStart: 'ask' });
+  assert.deepEqual(optionsFor({ kind: 'queue' }, prefs), { autoPlay: 'due', tryNew: true, sequence: 0, lineStart: 'ask', holdLineEnd: true });
+  assert.deepEqual(optionsFor({ kind: 'show', scope: 's' }, prefs), { autoPlay: 'due', tryNew: true, sequence: 0, lineStart: 'ask', holdLineEnd: true });
+  assert.equal(optionsFor({ kind: 'queue' }, { ...prefs, lineEnd: 'go' }).holdLineEnd, false);
   assert.deepEqual(optionsFor({ kind: 'line', sid: 's', cid: 'c', at: ['e4'] }, prefs), { autoPlay: 'due', tryNew: true, sequence: 0, lineStart: 'auto' });
   assert.deepEqual(optionsFor({ kind: 'learn', sid: 's', cid: 'c' }, prefs), { autoPlay: 'due', tryNew: true, sequence: 0, lineStart: 'auto', holdLineEnd: true, lineEndPaces: 4 });
   assert.deepEqual(optionsFor({ kind: 'learn', sid: 's', cid: 'c' }, { ...prefs, lineEnd: 'go' }).holdLineEnd, false);

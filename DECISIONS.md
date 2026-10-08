@@ -1398,3 +1398,10 @@ The technical calls, each with its reason:
   it was proven on the owner's phone in mistake-lab; that still holds for 18, and 19 is not yet
   checked there, so it is offered rather than swapped in. The choice is a device setting, as the
   threads are, and the other engine client (the storm, practice, reviews) follows it.
+
+## Revision of 2026-10-08 (the queue waits at a line's end too)
+- **"At a line's end: wait" holds the day's queue and show and grade too,** not only Learn (the
+  owner's report: set to wait, review still went on by itself). Reversing §5.17's "the queue goes
+  on by itself": with "go on" the queue goes on after two paces as before; with "wait" (the
+  default) its lines end with "Line done · Next: …" and "Next line" (2 in show and grade). A line
+  picked from the list is unchanged.

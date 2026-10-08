@@ -386,8 +386,9 @@ function Session(props: { s: SessionView }) {
     return after ? { after, before: s.path.length ? positionAt(s.chapter!, s.path.slice(0, -1)) : undefined } : undefined;
   };
 
-  // Learn's line ends (§5.17): the next line named, and "Next line" when it waits for it.
-  const holding = !s.done && s.phase === 'lineDone' && s.upcoming !== undefined && s.of.kind === 'learn';
+  // A line's end in Learn, the queue or show and grade (§5.17): the next line named, and "Next
+  // line" when it waits for it.
+  const holding = !s.done && s.phase === 'lineDone' && s.upcoming !== undefined && (s.of.kind === 'learn' || s.of.kind === 'queue' || s.of.kind === 'show');
   const waits = holding && trainPrefs.value.lineEnd === 'wait';
   const upcoming = s.upcoming && `Line ${lineNumber(s.data.index, s.upcoming)}${s.line && s.upcoming.cid !== s.line.cid ? ` · ${chapterNameOf(s, s.upcoming)}` : ''}`;
   return (

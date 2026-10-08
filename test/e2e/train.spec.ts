@@ -68,6 +68,11 @@ test('train: the counts, a due move asked, a wrong move taken back, new lines ta
   await expect(feedback(page)).toHaveText('Not in your repertoire: try again');
   await expect(page.locator('cg-board piece.black.pawn')).toHaveCount(8);
   await play(page, 'c7', 'c5');
+  // The line's end waits for "Next line" (the default, "At a line's end: wait").
+  await expect(feedback(page)).toHaveText(/^Line done · Next: /);
+  await page.waitForTimeout(1500);
+  await expect(page.locator('.train-grid')).toHaveAttribute('data-phase', 'lineDone');
+  await page.getByRole('button', { name: 'Next line' }).click();
 
   // The first new line: 2. Nf3, then 2... d6 (suspended) played for the user, 3. d4, and the new
   // move 3... cxd4 shown with its arrow.
@@ -75,7 +80,7 @@ test('train: the counts, a due move asked, a wrong move taken back, new lines ta
   await expect(page.locator('.train-line')).toContainText('1. e4 c5 2. Nf3 d6 3. d4');
   await expect(page.locator('.train-counters')).toContainText('0 due · 3 new');
   await play(page, 'c5', 'd4');
-  await expect(feedback(page)).toHaveText(/New move learned: cxd4|New move: play Nc6/);
+  await expect(feedback(page)).toHaveText(/^Line done · Next: /);
 
   // A reload in the middle carries on from the log: c5 and cxd4 are answered, Nc6 comes next.
   await page.reload();
@@ -84,6 +89,7 @@ test('train: the counts, a due move asked, a wrong move taken back, new lines ta
   // "Always play this for me": recorded, the move played, and an undo offered.
   await page.getByRole('button', { name: 'Always play this for me' }).click();
   await expect(page.getByRole('button', { name: 'Undo: ask Nc6 again' })).toBeVisible();
+  await page.getByRole('button', { name: 'Next line' }).click();
 
   // The Alapin line: 1. e4 c5 played (both answered), 2. c3, then 2... Nf6 taught.
   await expect(feedback(page)).toHaveText('New move: play Nf6');
@@ -114,6 +120,7 @@ test('train: the counts, a due move asked, a wrong move taken back, new lines ta
   await asked(page);
   await expect(page.locator('.train-line')).toContainText('1. e4 c5 2. Nf3 d6 3. d4');
   await play(page, 'c5', 'd4');
+  await page.getByRole('button', { name: 'Next line' }).click();
   // Right first time: the feedback line stays quiet (§5.17), and the Alapin's Nf6 is asked next.
   await expect(page.locator('.train-line')).toContainText('2. c3');
   await asked(page);
@@ -210,6 +217,8 @@ test('mistakes: fail a move, pin it, see it, retry and drill it with nothing gra
 });
 
 test('show and grade: a session run with 2 and 4 only, its review events checked', async ({ page }) => {
+  // The queue goes on by itself at a line's end here (§5.17's "go on"); train.spec.ts covers "wait".
+  await page.addInitScript(() => localStorage.setItem('repworks.trainPrefs', JSON.stringify({ lineEnd: 'go' })));
   const git = await setUp(page);
   await expect(page.locator('.train-card h2')).toHaveText('Train: 1 due · 3 new');
   await page.getByRole('link', { name: 'Show and grade' }).click();

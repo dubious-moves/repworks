@@ -320,16 +320,16 @@ export async function startSession(store: IdbStore, record: (event: Parameters<I
 
 /**
  * The per-device settings a session runs with (§5.17): the queue's and show and grade's lines start
- * as `startQueue` says and go on by themselves; a line picked or learned starts as `startLearn`
- * says, and Learn's lines wait at their end or go on after four paces. Retry, drill, the pins and
- * the Interactive view keep their own walk.
+ * as `startQueue` says and wait at their end or go on after two paces; a line picked or learned
+ * starts as `startLearn` says, and Learn's lines wait at their end or go on after four paces.
+ * Retry, drill, the pins and the Interactive view keep their own walk.
  */
 export function optionsFor(of: SessionKind, prefs: TrainPrefs): TrainerOptions {
   const common: TrainerOptions = { autoPlay: prefs.autoPlay, tryNew: prefs.newMoves === 'try', sequence: prefs.newMoves === 'sequence' ? prefs.sequenceLength : 0 };
   switch (of.kind) {
     case 'queue':
     case 'show':
-      return { ...common, lineStart: prefs.startQueue };
+      return { ...common, lineStart: prefs.startQueue, holdLineEnd: prefs.lineEnd === 'wait' };
     case 'line':
       return { ...common, lineStart: prefs.startLearn };
     case 'learn':

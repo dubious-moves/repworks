@@ -137,7 +137,7 @@ test('time travel: a new move tried first, then due at +4 hours, its review reco
   await expect(phase(page)).toHaveAttribute('data-phase', 'ask');
   await expect(page.locator('.train-line')).toContainText('1. e4 c5 2. Nf3 d6 3. d4');
   await play(page, 'c5', 'd4');
-  await expect(feedback(page)).toHaveText(/^$|New move/);
+  await expect(feedback(page)).toHaveText(/^$|New move|^Line done/);
   await page.getByRole('button', { name: 'Stop' }).click();
   await page.locator('.chip').click();
   await expect.poll(() => pushed(git).filter((e) => e['k'] === 'review' && e['card'] === CXD4).length).toBe(1);

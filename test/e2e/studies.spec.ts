@@ -165,6 +165,8 @@ test('a study renamed from its card, and deleted from its settings in the chapte
 });
 
 test('train ↔ study: the line on the board opened editable, edited, and the session taken up again', async ({ page }) => {
+  // The queue goes on by itself at a line's end here (§5.17's "go on"); train.spec.ts covers "wait".
+  await page.addInitScript(() => localStorage.setItem('repworks.trainPrefs', JSON.stringify({ lineEnd: 'go' })));
   const git = await setUp(page);
   await page.locator('.train-card').getByRole('link', { name: 'Train' }).click();
   const feedback = page.locator('.train-feedback');

@@ -2150,8 +2150,9 @@ lichessable.
   "Line done · Next: Line 2" and "Next line"; the trainer's `next` command, and in show and
   grade the `next` press, go on) or go on after four paces (`lineEndPaces`), with Stop and
   Escape ending the session. A line picked, set to go on, opens the list's next line four paces
-  after its end, "Next: Line 2 · Stop" meanwhile; Stop or Escape stays. The queue goes on after
-  two paces, as before.
+  after its end, "Next: Line 2 · Stop" meanwhile; Stop or Escape stays. The queue and show and
+  grade hold as Learn does when set to wait, and go on after two paces otherwise (revised
+  2026-10-08: the owner's queue went on while set to wait).
 - **Quieter feedback**: "Your move" and "Correct" show nothing (the trainer still emits them; the
   UI words them as empty), and the line keeps its height. Speech never said them.
 - **The settings**: the training settings dialog gains "This device": New moves (show / try
