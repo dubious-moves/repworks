@@ -1,6 +1,6 @@
 // The study editor in a real browser (PLAN.md §4.11), on a desktop viewport and an emulated
 // phone: open a chapter, move through it, add a variation on the board, comment, add a glyph,
-// draw an arrow in draw mode, undo and redo, and check the PGN that reaches the (fake) data repo.
+// draw an arrow in draw mode, clear it by a left click, undo and redo, and check the PGN that reaches the (fake) data repo.
 // Then the conflicts view and resolving a conflict.
 import { test, expect, type Page } from '@playwright/test';
 import type { FakeGit } from '../support/fakeGit.ts';
@@ -100,6 +100,16 @@ test('open a chapter, move through it, and edit it: variation, comment, glyph, a
   await sync(page, git, (t) => t.includes('{ [%cal Rd7d5] }'));
   expect(git.textsOf().get(CHAPTER)).toContain('(2... e6! { The Taimanov way } { [%cal Rd7d5] })');
   expect(git.commits.get(git.head)!.message).toMatch(/^desktop: 1 study file/);
+
+  // A left click on an empty square clears the move's arrows, as on Lichess; undo brings them back.
+  const arrows = page.locator('cg-container svg.cg-shapes g[cgHash]');
+  await expect(arrows).toHaveCount(1);
+  await clickSquare(page, 'a5', 'black');
+  await expect(arrows).toHaveCount(0);
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 e6');
+  await sync(page, git, (t) => t.includes('(2... e6! { The Taimanov way })'));
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(arrows).toHaveCount(1);
 });
 
 test('line actions: promote, make main line, delete from here', async ({ page }) => {

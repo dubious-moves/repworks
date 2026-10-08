@@ -927,9 +927,12 @@ and offline editing with the PWA killed and reopened.
 - **The notation** is laid out in core (`src/core/study/notation.ts`) with the PGN writer's
   numbering rules, tested against the writer on every fixture and 200 random trees. Each move
   reads its own "current" signal, so moving redraws two moves.
-- **Shapes change only by drawing.** chessground clears a move's arrows on a left click (Lichess
-  does the same); here that would delete them from the study whenever a piece is moved, so the
-  board ignores clears that don't come from a drawing gesture. Right-drag and the phone's draw
+- **A left click clears the arrows, as on Lichess** (revised 2026-10-08, the owner's request; the
+  board first ignored every clear). chessground clears on a press that doesn't pick up a piece of
+  the side to move and isn't the move of a selected piece, so moving a piece never clears; in the
+  editor the move's arrows go from the study (Ctrl+Z brings them back), on a storm's card the
+  sketch goes, and on a board whose arrows aren't edited (Read, the trainer) what was drawn over it
+  goes and the shown arrows stay. Where no move can be made, a press on any piece clears too. Right-drag and the phone's draw
   mode toggle a shape as chessground does (same shape off, another colour replaces it). Draw mode
   catches touches and clicks before chessground sees them, since `viewOnly` can't change after
   the board starts.
@@ -2546,7 +2549,7 @@ release; Analyse lost the storm; the screens felt low effort. What was found, an
   set card keeps it until Try again. The verdict waits 1.2 s after a scoring move and 2.6 s after
   any other (§18.1), with a bar for it; Next (Space) goes on at once, Pause (P) keeps the position
   for as long as wanted (the clock is stopped then anyway).
-- **Arrows drawn on a card stay** until the next card: the board keeps them itself (`Board`'s
+- **Arrows drawn on a card stay** until the next card or a left click: the board keeps them itself (`Board`'s
   `sketchKey`), since the clock's re-render every 200 ms set them back to none. On a touch screen
   ✎ draws, as in the study.
 - **Analyse keeps the storm.** It opens the analysis board (engine, explorer, Add to a chapter)

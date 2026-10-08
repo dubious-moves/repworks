@@ -1380,3 +1380,14 @@ The technical calls, each with its reason:
   the page goes anywhere but the storm and that board.
 - **A storm's verdict can be paused** (not in lichessable): the clock is stopped between cards
   anyway, so a position looked at for longer costs nothing.
+
+## Revision of 2026-10-08 (a left click clears drawn arrows)
+- **A left click clears drawn arrows wherever arrows are drawn** (the owner's request), reversing
+  PLAN.md §4.11's "shapes change only by drawing". chessground's own rule decides what clears: a
+  press that neither picks up a piece that can move nor plays the selected one, so moving a piece
+  never clears. In the editor the cleared arrows leave the study as an edit, undone by Ctrl+Z, as
+  on Lichess; a storm card's sketch is cleared; on boards whose arrows aren't edited (Read, the
+  trainer, a game's review, practice) it clears what was drawn over them, while the study's arrows
+  and the engine's stay, being content rather than drawing. Where no move can be made, a press on
+  any piece clears too. Draw mode on a touch screen
+  keeps a tap for circles.

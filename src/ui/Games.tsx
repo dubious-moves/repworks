@@ -396,7 +396,7 @@ function GameView(props: { id: string; ply?: number }) {
   return (
     <div class="train-grid game-view" data-ply={ply}>
       <div class="train-board">
-        <Board fen={fen} orientation={g.color} turn={pos?.turn ?? 'white'} dests={new Map()} lastMove={last ? [sq(last, 0) as Key, sq(last, 2) as Key] : undefined} check={!!pos?.isCheck()} shapes={[]} drawMode={false} brush="green" onMove={() => undefined} onShapes={() => undefined} />
+        <Board fen={fen} orientation={g.color} turn={pos?.turn ?? 'white'} dests={new Map()} lastMove={last ? [sq(last, 0) as Key, sq(last, 2) as Key] : undefined} check={!!pos?.isCheck()} shapes={[]} drawMode={false} brush="green" onMove={() => undefined} />
         <div class="actions move-buttons">
           <button type="button" class="secondary" aria-label="Start" onClick={() => setPly(0)}>
             ⏮
@@ -510,7 +510,7 @@ function PlayBoard(props: { run: CardRun; asking: boolean; arrows: { orig: strin
   };
   return (
     <div class="train-board">
-      <Board fen={fen} orientation={r.card.item.color} turn={pos.turn} dests={dests} lastMove={last} check={pos.isCheck()} shapes={[]} autoShapes={line ? [] : props.arrows} drawMode={false} brush="green" onMove={onMove} onShapes={() => undefined} />
+      <Board fen={fen} orientation={r.card.item.color} turn={pos.turn} dests={dests} lastMove={last} check={pos.isCheck()} shapes={[]} autoShapes={line ? [] : props.arrows} drawMode={false} brush="green" onMove={onMove} />
       {promotion && (
         <div class="promotion" role="dialog" aria-label="Promote to">
           {(['queen', 'rook', 'bishop', 'knight'] as Role[]).map((role) => (

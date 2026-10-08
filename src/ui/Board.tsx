@@ -1,6 +1,7 @@
 // The board (PLAN.md §4.11): a Preact wrapper around chessground, with cburnett pieces from its
 // own CSS. Moves come from chessops's legal destinations. Arrows: right-drag on the desktop,
-// with chessground's own modifiers (Shift or Ctrl red, Alt blue, both yellow). chessground
+// with chessground's own modifiers (Shift or Ctrl red, Alt blue, both yellow), and a left click
+// clears them as on Lichess (a click that moves a piece never does). chessground
 // starts drawing only on a right button or Shift, so on the phone a draw mode turns a drag into
 // an arrow and a tap into a circle: those touches are caught before chessground sees them.
 import { Chessground } from '@lichess-org/chessground';
@@ -28,7 +29,12 @@ export interface BoardProps {
   drawMode: boolean;
   brush: Brush;
   onMove(orig: Key, dest: Key): void;
-  onShapes(shapes: Shape[]): void;
+  /**
+   * What is drawn or cleared, for a board whose `shapes` the user edits (a chapter's). Without it
+   * `shapes` are only shown: arrows drawn over them last until the next render or a left click,
+   * which clears those and leaves `shapes`.
+   */
+  onShapes?(shapes: Shape[]): void;
   /** Shapes drawn but not the chapter's (the engine's arrows, §5.31). */
   autoShapes?: readonly { orig: string; dest?: string; brush: string; lineWidth?: number }[];
   /** A move's classification on its square's corner (a game's review: mistake-lab's badge). */
@@ -37,8 +43,7 @@ export interface BoardProps {
   premove?: { color: 'white' | 'black'; current: [Key, Key] | undefined; onSet(orig: Key, dest: Key): void; onUnset(): void };
   /**
    * Arrows and circles drawn to think with, kept by the board itself until this key changes (a
-   * storm's card): `shapes` and `onShapes` are then not used. Without it, what is drawn is the
-   * owner's to keep through `onShapes`, and is gone at the next render if it doesn't.
+   * storm's card) or a left click clears them: `shapes` and `onShapes` are then not used.
    */
   sketchKey?: string;
 }
@@ -62,6 +67,8 @@ function config(p: BoardProps, drawn: DrawShape[]): Config {
     selectable: { enabled: !p.drawMode },
     drawable: {
       shapes: drawn,
+      // A press on a piece that can move picks it up; on a board that only shows, any press clears.
+      eraseOnMovablePieceClick: !p.dests.size && !p.premove,
       autoShapes: (p.autoShapes ?? []).map((a) => ({ orig: a.orig as Key, ...(a.dest ? { dest: a.dest as Key } : {}), brush: a.brush, ...(a.lineWidth ? { modifiers: { lineWidth: a.lineWidth } } : {}) })),
     },
   };
@@ -90,7 +97,7 @@ export function Board(p: BoardProps) {
     if (props.current.sketchKey !== undefined) {
       sketch.current.shapes = next;
       api.current?.set({ drawable: { shapes: toDraw(next) } });
-    } else props.current.onShapes(next);
+    } else props.current.onShapes?.(next);
   };
 
   useEffect(() => {
@@ -101,15 +108,17 @@ export function Board(p: BoardProps) {
       animation: { duration: 150 },
       highlight: { lastMove: true, check: true },
       drawable: {
+        ...config(props.current, toDraw(own(props.current))).drawable,
         enabled: true,
-        eraseOnMovablePieceClick: false,
-        shapes: toDraw(own(props.current)),
         onChange: (shapes) => {
-          // chessground also clears the shapes on a left click; here only drawing changes them,
-          // so a click to move a piece never deletes a move's arrows.
-          if (!drawing) return void board.set({ drawable: { shapes: toDraw(own(props.current)) } });
-          drawing = false;
-          shapesChanged(fromDraw(shapes));
+          if (drawing) {
+            drawing = false;
+            return shapesChanged(fromDraw(shapes));
+          }
+          // A left click cleared them (chessground's own: not on a press that picks up a piece,
+          // nor on the square a selected piece moves to). Shapes only shown come back.
+          if (props.current.sketchKey !== undefined || props.current.onShapes) shapesChanged([]);
+          else board.set({ drawable: { shapes: toDraw(own(props.current)) } });
         },
       },
       movable: { ...config(props.current, []).movable, events: { after: (orig, dest) => props.current.onMove(orig, dest) } },

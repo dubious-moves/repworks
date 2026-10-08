@@ -613,7 +613,7 @@ function CardBoard(props: { item: StormItem; asking: boolean; onMove(uci: string
         drawMode={!!props.draw}
         brush="green"
         onMove={onMove}
-        onShapes={() => undefined}
+       
         sketchKey={props.sketch}
       />
       {promotion && (

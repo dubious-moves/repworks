@@ -87,7 +87,7 @@ export function MoveBoard(props: { fen: string; orientation: 'white' | 'black'; 
   };
   return (
     <div class="train-board">
-      <Board fen={props.fen} orientation={props.orientation} turn={pos.turn} dests={dests} lastMove={last} check={pos.isCheck()} shapes={[]} autoShapes={props.arrows ?? []} drawMode={false} brush="green" onMove={onMove} onShapes={() => undefined} badge={props.badge} {...(props.premove ? { premove: props.premove } : {})} />
+      <Board fen={props.fen} orientation={props.orientation} turn={pos.turn} dests={dests} lastMove={last} check={pos.isCheck()} shapes={[]} autoShapes={props.arrows ?? []} drawMode={false} brush="green" onMove={onMove} badge={props.badge} {...(props.premove ? { premove: props.premove } : {})} />
       {promotion && (
         <div class="promotion" role="dialog" aria-label="Promote to">
           {(['queen', 'rook', 'bishop', 'knight'] as Role[]).map((role) => (

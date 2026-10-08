@@ -153,7 +153,7 @@ export function ReadView(props: { sid: string; cid: string; at: string[]; from?:
               drawMode={false}
               brush="green"
               onMove={() => undefined}
-              onShapes={() => undefined}
+             
             />
           )}
           <PreviewBar owner="read" />

@@ -405,7 +405,7 @@ function Session(props: { s: SessionView }) {
             drawMode={false}
             brush="green"
             onMove={onMove}
-            onShapes={() => undefined}
+           
           />
         )}
         {promotion && (

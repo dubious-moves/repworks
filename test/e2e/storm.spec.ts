@@ -165,6 +165,14 @@ test('the storm: positions gathered, a great move and a mistake scored, the revi
   await drawArrow(page, 'a2', 'a4', side);
   await page.waitForTimeout(700);
   expect(await shapes(page)).toBeGreaterThan(0);
+  // A left click on an empty square clears it, as on Lichess; drawn again, it stays to the next card.
+  const empty = ['a3', 'b3', 'g3', 'h3', 'a6', 'h6', 'd5', 'e5', 'd4', 'e4'];
+  let blank = '';
+  for (const k of empty) if (!blank && !(await pieceOn(page, k))) blank = k;
+  await clickSquare(page, blank, side);
+  await expect.poll(() => shapes(page)).toBe(0);
+  await drawArrow(page, 'a2', 'a4', side);
+  expect(await shapes(page)).toBeGreaterThan(0);
 
   // The best move: great, +2; the move stays on the board through the verdict.
   const best = ranked(first)[0]!;
