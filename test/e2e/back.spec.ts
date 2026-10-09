@@ -30,9 +30,13 @@ test('← goes back where the page was opened from, past a study’s chapters, a
   // The home, a study, its other chapter, then the analysis board from a move.
   await page.getByRole('link', { name: 'Test repertoire', exact: true }).click();
   await expect(page).toHaveURL(/#\/study\/Rep0Najd/);
+  // The phone picks chapters from the head's select, the desktop from the side list: wait for
+  // whichever this viewport shows before choosing, since isVisible() doesn't wait for the study.
   const chapter = page.getByLabel('Chapter', { exact: true });
+  const link = page.getByRole('navigation', { name: 'Chapters' }).getByRole('link', { name: 'Alapin' });
+  await expect(chapter.or(link).filter({ visible: true }).first()).toBeVisible();
   if (await chapter.isVisible()) await chapter.selectOption({ label: 'Alapin' });
-  else await page.getByRole('navigation', { name: 'Chapters' }).getByRole('link', { name: 'Alapin' }).click();
+  else await link.click();
   await expect(page).toHaveURL(/#\/study\/Rep0Najd\/Ch2Alapn/);
   await openMoveMenu(page, 'e4 c5');
   await page.getByRole('menuitem', { name: 'Analyse from here' }).click();
