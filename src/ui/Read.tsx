@@ -4,7 +4,7 @@
 // at the move shown; Escape or "Edit" goes back to the chapter at it. The training screen reads
 // the line on its board with the same body (`LineReader`).
 import type { ComponentChildren } from 'preact';
-import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { makeFen } from 'chessops/fen';
 import { parseSan } from 'chessops/san';
 import { chessgroundMove } from 'chessops/compat';
@@ -112,7 +112,8 @@ export function LineReader(props: { chapter: Chapter; line: readonly string[]; p
   };
   const latest = useRef({ last, jump, shown, onPly: props.onPly, onEscape: props.onEscape });
   latest.current = { last, jump, shown, onPly: props.onPly, onEscape: props.onEscape };
-  useEffect(() => {
+  // Listening before the reader is first painted: a key pressed as soon as it shows isn't lost.
+  useLayoutEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
