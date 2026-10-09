@@ -5,6 +5,17 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## The owner's notes of 2026-10-09 on training (§5.78)
+
+- Training settings → "A line starts, when learning or picked": From the start, asked. Learn a new
+  line: every own move is asked on both passes, nothing played for you but moves set to "Always
+  play this for me".
+- At a line's end (Learn holding at "Next line", or a picked line's end): the study's arrows of the
+  last move are on the board (the Benoni line's b5, h6, a5).
+- "Read" during a session and at its end: the whole line, ← → and the move list, the comments;
+  "Back to training" (or Escape) goes on where it was, a move due to be played coming only then.
+  On the phone, is the Read button's place in the actions right?
+
 ## The owner's notes of 2026-10-08 (§5.77)
 
 - Phone, then desktop: learn a new line (the queue, Learn or a line picked): it is walked a second

@@ -755,6 +755,18 @@ test('repetitions: the next pass starts as a line does, at its first move taught
   assert.deepEqual(plays(effects), ['opponent:Nc6', 'user:Bb5', 'opponent:Nc6', 'user:Bb5']);
 });
 
+test('from the start, asked: every own move is asked on every pass, whatever the auto-play mode; nothing more graded', () => {
+  // The owner's report (2026-10-09): the second pass auto-played the moves answered on the first.
+  const w = world(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 Nc6 3. Bb5'));
+  const states = new Map<string, CardState>([[card('e4'), notDue], [card('e4 e5 Nf3'), notDue]]);
+  for (const autoPlay of AUTO_PLAYS) {
+    const { effects, records } = run(trainer(w, planOf(w, states, 20), states, { repetitions: 2, lineStart: 'ask', autoPlay }), right);
+    const user = ['user:e4', 'opponent:e5', 'user:Nf3', 'opponent:Nc6', 'user:Bb5'];
+    assert.deepEqual(plays(effects), [...user, ...user], autoPlay);
+    assert.deepEqual(records.map((r) => r.k), ['taught'], autoPlay);
+  }
+});
+
 test('mistakes retried: at the line\'s end the missed move is asked again from the opponent\'s move, until right twice in a row; graded once', () => {
   const w = world(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 Nc6 3. Bb5'));
   const states = new Map<string, CardState>([[card('e4'), notDue], [card('e4 e5 Nf3'), dueNow], [card('e4 e5 Nf3 Nc6 Bb5'), dueNow]]);

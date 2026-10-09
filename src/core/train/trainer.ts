@@ -13,7 +13,7 @@
 // - Auto-play (§5.17, lichessable's modes): an own move the plan doesn't need graded or taught is
 //   played for the user or asked without a grade, by the `autoPlay` mode (`plays`). Suspended
 //   moves are always played. Where a line starts (`lineStart`) decides the moves before its first
-//   move the plan needs: skipped, played at the pace, or asked.
+//   move the plan needs: skipped, or played at the pace; or, `ask`, every own move is asked.
 // - Conflicting moves (D3): every own move of the position is accepted, and the one played is
 //   graded on its own card if it is due. The line's own move is then asked in the same position,
 //   on its own card, so a sibling can't stay due for ever. The trainer only lets the user move
@@ -72,7 +72,8 @@ export const AUTO_PLAYS: readonly AutoPlay[] = ['off', 'session', 'due', 'diffic
  * - `first`: there (one move before, so the opponent's move is seen), or where the board already
  *   is when the line shares its moves;
  * - `auto`: at the chapter's start, those moves played at the pace, own moves included;
- * - `ask`: at the chapter's start, every own move asked (ungraded unless due).
+ * - `ask`: at the chapter's start, and every own move of the line asked, whatever the auto-play
+ *   mode, on every pass (ungraded unless due); only suspended moves are played.
  */
 export type LineStart = 'first' | 'auto' | 'ask';
 export const LINE_STARTS: readonly LineStart[] = ['first', 'auto', 'ask'];
@@ -529,7 +530,9 @@ export class Trainer {
     if (this.suspended(card)) return 'auto';
     const need = this.needs(card);
     if (need) return need;
-    if (prefix) return this.options.lineStart === 'ask' && !(this.answered.has(card) && this.plays(card)) ? 'ask' : 'auto';
+    // From the start, asked (the owner's request, 2026-10-09): every own move, on every pass.
+    if (this.options.lineStart === 'ask') return 'ask';
+    if (prefix) return 'auto';
     return this.plays(card) ? 'auto' : 'ask';
   }
 

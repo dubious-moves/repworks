@@ -146,3 +146,58 @@ test('a drill: a move missed again comes back until it is right; Repetitions 1 w
   await expect(page.getByRole('region', { name: 'Session done' })).toBeVisible();
   await expect(page.locator('.train-counters')).not.toContainText('times');
 });
+
+test('from the start, asked: every own move asked on both passes; the last move\'s arrows at the end; the line read in the session', async ({ page }) => {
+  // The owner's notes of 2026-10-09. The last move gets an arrow of its own to show at the end.
+  const { git, github } = world();
+  const ch1 = 'studies/Rep0Najd/Ch1Najdf.pgn';
+  const text = git.textsOf().get(ch1)!.replace('3. d4 cxd4 *', '3. d4 cxd4 { [%cal Gf3d4] } *');
+  git.commitIfHead(git.head, 'An arrow at the line\'s end', new Map([[ch1, text]]), []);
+  await page.addInitScript(() => localStorage.setItem('repworks.trainPrefs', JSON.stringify({ repetitions: 2, mistakeRetries: 0, startLearn: 'ask' })));
+  await page.clock.install({ time: DAY });
+  await serveGithub(page, github);
+  await page.goto(`${site.url}#setup?repo=${encodeURIComponent(REPO)}&token=${TOKEN}&name=desktop`);
+  await expect(page.locator('.chip')).toHaveText(/^synced/);
+
+  await page.goto(`${site.url}#/train/Rep0Najd/Ch1Najdf?at=e4,c5,Nf3,d6,d4,cxd4`);
+  // First pass: c5 asked, cxd4 taught (2... d6 is always played: suspended in the fixture).
+  await asked(page);
+  // Read mid-session opens at the board's move; the session waits, and goes on where it was.
+  await page.getByRole('button', { name: 'Read', exact: true }).click();
+  await expect(page.locator('.read-move')).toContainText('1. e4');
+  await expect(page.locator('.read-move')).toContainText('1 / 6');
+  await page.keyboard.press('End');
+  await expect(page.locator('.read-move')).toContainText('3... cxd4');
+  await page.getByRole('button', { name: 'Back to training' }).click();
+  await asked(page);
+  await expect(page.locator('.train-line')).toHaveText(/Main line\s*1\. e4$/);
+  await play(page, 'c7', 'c5');
+  await expect(feedback(page)).toHaveText('New move: play cxd4');
+  await play(page, 'c5', 'd4');
+  // Second pass: every own move asked again, none played for the user.
+  await expect(feedback(page)).toHaveText('The line again: 2 of 2');
+  await asked(page);
+  await expect(page.locator('.train-line')).toHaveText(/Main line\s*1\. e4$/);
+  await play(page, 'c7', 'c5');
+  await expect(page.locator('.train-line')).toContainText('3. d4');
+  await asked(page);
+  // The study's arrow of the last move isn't shown while asked.
+  await expect(page.locator('cg-container svg.cg-shapes line')).toHaveCount(0);
+  await play(page, 'c5', 'd4');
+  await expect(page.getByRole('region', { name: 'Session done' })).toBeVisible();
+  await expect(page.locator('cg-container svg.cg-shapes line')).toHaveCount(1);
+
+  // Read: the whole line, its comments, stepped back and forth; Escape back to the session's end.
+  await page.getByRole('button', { name: 'Read', exact: true }).click();
+  await expect(page.locator('.read-move')).toContainText('3... cxd4');
+  await expect(page.locator('.read-move')).toContainText('6 / 6');
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('ArrowLeft');
+  await expect(page.locator('.read-move')).toContainText('2... d6');
+  await page.getByRole('button', { name: 'Previous move' }).click();
+  await expect(page.locator('.read-comments')).toContainText('A made-up comment');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.read-move')).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Session done' })).toBeVisible();
+  await expect(page.locator('.study-title')).toContainText('Line');
+});

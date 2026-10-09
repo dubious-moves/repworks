@@ -1,7 +1,9 @@
 // The Read view (PLAN.md §5.10), after Qchess's: a chapter's line through a move, to the end of
 // the main line below it, stepped through with ← and →. The board with the study's arrows, the
 // move and its comments in large text; no editing. "Quiz from here" opens the Interactive view
-// at the move shown; Escape or "Edit" goes back to the chapter at it.
+// at the move shown; Escape or "Edit" goes back to the chapter at it. The training screen reads
+// the line on its board with the same body (`LineReader`).
+import type { ComponentChildren } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { makeFen } from 'chessops/fen';
 import { parseSan } from 'chessops/san';
@@ -64,72 +66,12 @@ export function ReadView(props: { sid: string; cid: string; at: string[]; from?:
   }, [sid, cid, atKey, version]);
 
   const ok = loaded && 'chapter' in loaded ? loaded : undefined;
-  const last = ok ? ok.line.length : 0;
-  const shown = Math.min(ply, last);
+  const shown = Math.min(ply, ok ? ok.line.length : 0);
   const path = ok ? ok.line.slice(0, shown) : [];
   const toChapter = () => open({ name: 'chapter', sid, cid, at: path });
 
-  // The keys read the latest step through a ref: an effect re-registered after each render would
-  // let a quick Escape leave at the move before.
-  // Line jumping (§5.12): → on the line's last move enters the first line of its comments.
-  const jump = () => {
-    const node = ok && nodeAt(ok.chapter, path);
-    return !!node && enterCommentLines('read', pathKey(path), [...node.startingComments, ...node.comments], positionAt(ok.chapter, path), path.length ? positionAt(ok.chapter, path.slice(0, -1)) : undefined);
-  };
-  const latest = useRef({ last, toChapter, jump, shown });
-  latest.current = { last, toChapter, jump, shown };
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
-      const { last: end, toChapter: leave, jump: enter, shown: at } = latest.current;
-      // A line from a comment on the board takes ← → and Escape first.
-      const previewing = preview.peek()?.owner === 'read';
-      const keys: Record<string, () => void> = previewing
-        ? { ArrowLeft: () => stepPreview(-1), ArrowRight: () => stepPreview(1), Escape: endPreview }
-        : {
-            ArrowLeft: () => setPly((p) => Math.max(0, Math.min(p, end) - 1)),
-            ArrowRight: () => void (at === end ? enter() : setPly((p) => Math.min(end, p + 1))),
-            Home: () => setPly(0),
-            End: () => setPly(end),
-            Escape: leave,
-          };
-      const run = keys[e.key];
-      if (!run) return;
-      e.preventDefault();
-      run();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, []);
-
-  const board = useMemo(() => {
-    if (!ok) return undefined;
-    const pos = positionAt(ok.chapter, path);
-    if (!pos) return undefined;
-    let lastMove: [Key, Key] | undefined;
-    if (path.length) {
-      const before = positionAt(ok.chapter, path.slice(0, -1))!;
-      const m = parseSan(before, path[path.length - 1]!);
-      if (m) lastMove = chessgroundMove(m) as [Key, Key];
-    }
-    return { pos, fen: makeFen(pos.toSetup()), lastMove };
-  }, [ok, shown]);
-  const names = useMemo(() => (ok ? labels(ok.chapter, ok.line) : []), [ok]);
-
   if (!loaded) return <p class="muted">Opening…</p>;
   if (!ok) return <p class="warn">{'problem' in loaded ? loaded.problem : ''}</p>;
-  const node = nodeAt(ok.chapter, path);
-  const comments = node ? [...node.startingComments, ...node.comments] : [];
-  const glyphs = node && path.length ? node.nags.map(glyphSymbol).join('') : '';
-  const side = header(ok.chapter, 'Orientation') === 'black' ? 'black' : 'white';
-  const shownLine = previewBoard('read');
-  const go = (n: number) => {
-    endPreview();
-    setPly(n);
-  };
-  const positions = () => ({ after: positionAt(ok.chapter, path)!, before: path.length ? positionAt(ok.chapter, path.slice(0, -1)) : undefined });
-
   return (
     <div class="train read">
       <div class="chapter-head">
@@ -138,78 +80,154 @@ export function ReadView(props: { sid: string; cid: string; at: string[]; from?:
           <span class="study-title">Read · {header(ok.chapter, 'ChapterName') ?? cid}</span>
         </div>
       </div>
-      <div class="train-grid">
-        <div class="train-board" onPointerDown={shownLine ? endPreviewOnBoard : undefined}>
-          {board && (
-            <Board
-              fen={shownLine?.fen ?? board.fen}
-              orientation={side}
-              turn={shownLine?.turn ?? board.pos.turn}
-              dests={new Map()}
-              lastMove={shownLine ? shownLine.lastMove : board.lastMove}
-              check={shownLine?.check ?? board.pos.isCheck()}
-              shapes={shownLine ? [] : (node?.shapes ?? [])}
-              drawMode={false}
-              brush="green"
-              onMove={() => undefined}
-             
-            />
+      <LineReader chapter={ok.chapter} line={ok.line} ply={shown} onPly={setPly} onEscape={toChapter}>
+        <button type="button" onClick={() => open({ name: 'play', sid, cid, at: props.at, from: shown })}>
+          Quiz from here
+        </button>
+        <button type="button" class="secondary" onClick={toChapter}>
+          Edit
+        </button>
+      </LineReader>
+    </div>
+  );
+}
+
+/**
+ * A line read through (§5.10): the board with the study's arrows, the move and its comments in
+ * large text, the line's moves to click, ← → Home End; Escape calls `onEscape`. The Read view's
+ * body, and the training screen's Read (the owner's request, 2026-10-09). `children` are the actions.
+ */
+export function LineReader(props: { chapter: Chapter; line: readonly string[]; ply: number; onPly(ply: number): void; onEscape(): void; children?: ComponentChildren }) {
+  const { chapter, line } = props;
+  const last = line.length;
+  const shown = Math.max(0, Math.min(props.ply, last));
+  const path = line.slice(0, shown);
+
+  // The keys read the latest step through a ref: an effect re-registered after each render would
+  // let a quick Escape leave at the move before.
+  // Line jumping (§5.12): → on the line's last move enters the first line of its comments.
+  const jump = () => {
+    const node = nodeAt(chapter, path);
+    return !!node && enterCommentLines('read', pathKey(path), [...node.startingComments, ...node.comments], positionAt(chapter, path), path.length ? positionAt(chapter, path.slice(0, -1)) : undefined);
+  };
+  const latest = useRef({ last, jump, shown, onPly: props.onPly, onEscape: props.onEscape });
+  latest.current = { last, jump, shown, onPly: props.onPly, onEscape: props.onEscape };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+      const { last: end, jump: enter, shown: at, onPly: step, onEscape: leave } = latest.current;
+      // A line from a comment on the board takes ← → and Escape first.
+      const previewing = preview.peek()?.owner === 'read';
+      const keys: Record<string, () => void> = previewing
+        ? { ArrowLeft: () => stepPreview(-1), ArrowRight: () => stepPreview(1), Escape: endPreview }
+        : {
+            ArrowLeft: () => step(Math.max(0, at - 1)),
+            ArrowRight: () => void (at === end ? enter() : step(at + 1)),
+            Home: () => step(0),
+            End: () => step(end),
+            Escape: leave,
+          };
+      const run = keys[e.key];
+      if (!run) return;
+      e.preventDefault();
+      run();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      if (preview.peek()?.owner === 'read') endPreview();
+    };
+  }, []);
+
+  const board = useMemo(() => {
+    const pos = positionAt(chapter, path);
+    if (!pos) return undefined;
+    let lastMove: [Key, Key] | undefined;
+    if (path.length) {
+      const before = positionAt(chapter, path.slice(0, -1))!;
+      const m = parseSan(before, path[path.length - 1]!);
+      if (m) lastMove = chessgroundMove(m) as [Key, Key];
+    }
+    return { pos, fen: makeFen(pos.toSetup()), lastMove };
+  }, [chapter, line, shown]);
+  const names = useMemo(() => labels(chapter, line), [chapter, line]);
+
+  const node = nodeAt(chapter, path);
+  const comments = node ? [...node.startingComments, ...node.comments] : [];
+  const glyphs = node && path.length ? node.nags.map(glyphSymbol).join('') : '';
+  const side = header(chapter, 'Orientation') === 'black' ? 'black' : 'white';
+  const shownLine = previewBoard('read');
+  const go = (n: number) => {
+    endPreview();
+    props.onPly(n);
+  };
+  const positions = () => ({ after: positionAt(chapter, path)!, before: path.length ? positionAt(chapter, path.slice(0, -1)) : undefined });
+
+  return (
+    <div class="train-grid">
+      <div class="train-board" onPointerDown={shownLine ? endPreviewOnBoard : undefined}>
+        {board && (
+          <Board
+            fen={shownLine?.fen ?? board.fen}
+            orientation={side}
+            turn={shownLine?.turn ?? board.pos.turn}
+            dests={new Map()}
+            lastMove={shownLine ? shownLine.lastMove : board.lastMove}
+            check={shownLine?.check ?? board.pos.isCheck()}
+            shapes={shownLine ? [] : (node?.shapes ?? [])}
+            drawMode={false}
+            brush="green"
+            onMove={() => undefined}
+          />
+        )}
+        <PreviewBar owner="read" />
+        <div class="controls read-controls">
+          <button type="button" aria-label="Start" disabled={shown === 0} onClick={() => go(0)}>
+            ⏮
+          </button>
+          <button type="button" aria-label="Previous move" disabled={shown === 0} onClick={() => go(shown - 1)}>
+            ◀
+          </button>
+          <button type="button" aria-label="Next move" disabled={shown === last} onClick={() => go(shown + 1)}>
+            ▶
+          </button>
+          <button type="button" aria-label="End of the line" disabled={shown === last} onClick={() => go(last)}>
+            ⏭
+          </button>
+        </div>
+      </div>
+      <div class="train-panel">
+        <p class="read-move" aria-live="polite">
+          {shown === 0 ? 'Start' : names[shown - 1]}
+          {glyphs && <span class="glyphs">{glyphs}</span>}
+          <span class="muted read-count">
+            {' '}
+            {shown} / {last}
+          </span>
+        </p>
+        <div class="read-comments" aria-label="Comments">
+          {comments.length ? (
+            comments.map((c, i) => (
+              <p key={i}>
+                <CommentText text={c} owner="read" id={commentId(pathKey(path), c)} positions={positions} />
+              </p>
+            ))
+          ) : (
+            <p class="muted">No comment.</p>
           )}
-          <PreviewBar owner="read" />
-          <div class="controls read-controls">
-            <button type="button" aria-label="Start" disabled={shown === 0} onClick={() => go(0)}>
-              ⏮
-            </button>
-            <button type="button" aria-label="Previous move" disabled={shown === 0} onClick={() => go(shown - 1)}>
-              ◀
-            </button>
-            <button type="button" aria-label="Next move" disabled={shown === last} onClick={() => go(shown + 1)}>
-              ▶
-            </button>
-            <button type="button" aria-label="End of the line" disabled={shown === last} onClick={() => go(last)}>
-              ⏭
-            </button>
-          </div>
         </div>
-        <div class="train-panel">
-          <p class="read-move" aria-live="polite">
-            {shown === 0 ? 'Start' : names[shown - 1]}
-            {glyphs && <span class="glyphs">{glyphs}</span>}
-            <span class="muted read-count">
-              {' '}
-              {shown} / {last}
+        <p class="read-line" aria-label="The line">
+          {names.map((name, i) => (
+            <span key={i}>
+              <button type="button" class={`read-step${i + 1 === shown ? ' current' : ''}`} aria-current={i + 1 === shown ? 'true' : undefined} onClick={() => go(i + 1)}>
+                {/* A Black move after a White one goes without its number, as in a book. */}
+                {name.includes('...') && i > 0 ? line[i] : name}
+              </button>{' '}
             </span>
-          </p>
-          <div class="read-comments" aria-label="Comments">
-            {comments.length ? (
-              comments.map((c, i) => (
-                <p key={i}>
-                  <CommentText text={c} owner="read" id={commentId(pathKey(path), c)} positions={positions} />
-                </p>
-              ))
-            ) : (
-              <p class="muted">No comment.</p>
-            )}
-          </div>
-          <p class="read-line" aria-label="The line">
-            {names.map((name, i) => (
-              <span key={i}>
-                <button type="button" class={`read-step${i + 1 === shown ? ' current' : ''}`} aria-current={i + 1 === shown ? 'true' : undefined} onClick={() => go(i + 1)}>
-                  {/* A Black move after a White one goes without its number, as in a book. */}
-                  {name.includes('...') && i > 0 ? ok.line[i] : name}
-                </button>{' '}
-              </span>
-            ))}
-          </p>
-          <div class="actions">
-            <button type="button" onClick={() => open({ name: 'play', sid, cid, at: props.at, from: shown })}>
-              Quiz from here
-            </button>
-            <button type="button" class="secondary" onClick={toChapter}>
-              Edit
-            </button>
-          </div>
-        </div>
+          ))}
+        </p>
+        <div class="actions">{props.children}</div>
       </div>
     </div>
   );

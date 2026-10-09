@@ -14,7 +14,7 @@ import { commentId, endPreview, preview, stepPreview } from '../app/preview.ts';
 import { beginTraining } from '../app/state.ts';
 import { dataVersion } from '../app/sync.ts';
 import { decidingNow, timeOffset } from '../app/time.ts';
-import { command, endSession, seekSequence, isGraded, leaveForStudy, pace, PACES, pinMissed, playMove, press, queueOf, session, sessionProblem, setPace, setSelfGrade, setSpeech, speech, trainData, undoSuspend, type Pace, type SessionKind, type SessionView, type TrainData } from '../app/train.ts';
+import { command, endSession, seekSequence, isGraded, leaveForStudy, pace, PACES, pinMissed, playMove, press, queueOf, readLine, readingAt, session, sessionProblem, setPace, setSelfGrade, setSpeech, speech, trainData, undoSuspend, type Pace, type SessionKind, type SessionView, type TrainData } from '../app/train.ts';
 import { trainPrefs } from '../app/trainPrefs.ts';
 import type { Line, RepertoireIndex } from '../core/repertoire/index.ts';
 import type { Mode } from '../core/app/fsm.ts';
@@ -31,6 +31,7 @@ import { firstNewLine, LineList, nextLine } from './LineList.tsx';
 import { setMark } from '../app/lineMarks.ts';
 import { openTrainSettings } from './TrainSettings.tsx';
 import { Back } from './Back.tsx';
+import { LineReader } from './Read.tsx';
 
 const ASKING = new Set(['ask', 'teach', 'wrong', 'shown']);
 
@@ -150,8 +151,8 @@ export function TrainScreen(props: { of: SessionKind }) {
     const onKey = (e: KeyboardEvent) => {
       const showing = showingNow.current;
       const target = e.target as HTMLElement | null;
-      // Never swallowed in a text field, and a held key is one press.
-      if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+      // Never swallowed in a text field, and a held key is one press. The line read takes its own keys.
+      if ((target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) || readingAt.peek() !== undefined) return;
       // A line from a comment on the board takes ← → and Escape first (§5.12).
       if (preview.peek()?.owner === 'train' && (e.key === 'Escape' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
         e.preventDefault();
@@ -205,6 +206,7 @@ export function TrainScreen(props: { of: SessionKind }) {
   };
   const data = trainData.value ?? s.data;
   const listed = of.kind === 'queue' || of.kind === 'show' || of.kind === 'line' || of.kind === 'learn';
+  const read = readingAt.value;
   return (
     <div class="train">
       <div class="chapter-head">
@@ -220,7 +222,7 @@ export function TrainScreen(props: { of: SessionKind }) {
       <div class={`train-body${listed ? ' with-list' : ''}`}>
         {listed && <Lines s={s} data={data} />}
         {/* A line's or a session's end keeps the board on its last position (§5.17). */}
-        <div class="train-main">{s.done && !(s.position && s.plan.lines.length > 0) ? <Done s={s} /> : <Session s={s} />}</div>
+        <div class="train-main">{read !== undefined && s.line && s.chapter ? <ReadInSession s={s} line={s.line} ply={read} /> : s.done && !(s.position && s.plan.lines.length > 0) ? <Done s={s} /> : <Session s={s} />}</div>
       </div>
     </div>
   );
@@ -280,6 +282,11 @@ function Done(props: { s: SessionView; inline?: boolean }) {
         <button type="button" class={after ? 'secondary' : undefined} onClick={() => void beginTraining(of)}>
           {practice || of.kind === 'line' ? 'Again' : 'Train again'}
         </button>
+        {props.inline && props.s.line && (
+          <button type="button" class="secondary" onClick={() => readLine(props.s.path.length)} title="Step through the whole line and its comments">
+            Read
+          </button>
+        )}
         {(of.kind === 'line' || of.kind === 'learn') && (
           <button type="button" class="secondary" onClick={() => open({ name: 'train', sid: of.sid })}>
             Today's queue
@@ -381,8 +388,11 @@ function Session(props: { s: SessionView }) {
   const shownLine = previewBoard('train');
   const arrow = s.arrow && !shownLine ? parseUci(s.arrow) : undefined;
   const sq = (n: number) => `${'abcdefgh'[n & 7]}${(n >> 3) + 1}` as SquareName;
-  const shapes = arrow && 'from' in arrow ? [{ brush: 'green' as const, orig: sq(arrow.from), dest: sq(arrow.to) }] : [];
   const node = s.chapter ? nodeAt(s.chapter, s.path) : undefined;
+  // At a line's end the study's arrows of its last move are drawn too (the owner's request,
+  // 2026-10-09); before it they could give a move away.
+  const atEnd = !!s.done || s.phase === 'lineDone';
+  const shapes = [...(arrow && 'from' in arrow ? [{ brush: 'green' as const, orig: sq(arrow.from), dest: sq(arrow.to) }] : []), ...(atEnd && !shownLine ? (node?.shapes ?? []) : [])];
   // Comments of the move reached, except while a move is asked: they could give it away.
   const comments = !asking || s.phase === 'teach' ? (node?.comments ?? []) : [];
   const start = s.chapter ? startPosition(s.chapter) : undefined;
@@ -533,6 +543,11 @@ function Session(props: { s: SessionView }) {
               Skip line
             </button>
           )}
+          {s.line && (
+            <button type="button" class="secondary" onClick={() => readLine(s.path.length)} title="Step through the whole line and its comments; the session waits">
+              Read
+            </button>
+          )}
           <button type="button" class="secondary" onClick={() => command('stop')}>
             Stop
           </button>
@@ -558,6 +573,22 @@ function Session(props: { s: SessionView }) {
   );
 }
 
+
+/**
+ * Read within a session (the owner's request, 2026-10-09): the line on the board, its whole
+ * length, read as the Read view reads it; the session waits, and "Back to training" (or Escape)
+ * takes it up where it was.
+ */
+function ReadInSession(props: { s: SessionView; line: Line; ply: number }) {
+  const close = () => readLine(undefined);
+  return (
+    <LineReader chapter={props.s.chapter!} line={props.line.path} ply={props.ply} onPly={(n) => readLine(n)} onEscape={close}>
+      <button type="button" onClick={close}>
+        Back to training
+      </button>
+    </LineReader>
+  );
+}
 
 /** A line's number in its chapter, as the line list numbers it (Qchess's "Line 14"). */
 function lineNumber(index: RepertoireIndex, line: Line): number {

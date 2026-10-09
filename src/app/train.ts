@@ -242,6 +242,7 @@ export async function startSession(store: IdbStore, record: (event: Parameters<I
   shower = undefined;
   session.value = undefined;
   sessionProblem.value = undefined;
+  readingAt.value = undefined;
   recordEvent = record;
   // Taken up again from the study (§5.15), or a new session: either way nothing is left waiting.
   const key = JSON.stringify(of);
@@ -399,6 +400,27 @@ async function playPlan(store: IdbStore, of: Extract<SessionKind, { kind: 'play'
 function stopTimer() {
   if (timer !== undefined) clearTimeout(timer);
   timer = undefined;
+  held = undefined;
+}
+
+/**
+ * Read within a session (the owner's request, 2026-10-09; the Read view's body, §5.10): the line on
+ * the board read through from its start to its end, comments and arrows, at the ply shown. The
+ * session waits meanwhile: a move due to be played is held until the reading ends.
+ */
+export const readingAt = signal<number | undefined>(undefined);
+/** The tick that came while reading. */
+let held: number | undefined;
+export function readLine(ply: number | undefined): void {
+  const s = session.peek();
+  if (ply !== undefined && !s?.line) return;
+  const was = readingAt.peek();
+  readingAt.value = ply;
+  if (ply === undefined && was !== undefined && held !== undefined) {
+    const id = held;
+    held = undefined;
+    send({ type: 'tick', id, now: Date.now() });
+  }
 }
 
 /** A command from the screen, with the time now. */
@@ -434,6 +456,7 @@ export function pinMissed(): void {
 /** Leaves the screen: the timer stops; everything answered is already recorded. */
 export function endSession(): void {
   stopTimer();
+  readingAt.value = undefined;
   trainer = undefined;
   shower = undefined;
   stopSpeaking();
@@ -522,7 +545,9 @@ function apply(t: Trainer, effects: readonly ShowGradeEffect[]): void {
         stopTimer();
         timer = setTimeout(() => {
           timer = undefined;
-          send({ type: 'tick', id: e.id, now: Date.now() });
+          // While the line is read the session waits: the tick comes when the reading ends.
+          if (readingAt.peek() !== undefined) held = e.id;
+          else send({ type: 'tick', id: e.id, now: Date.now() });
         }, e.ms);
         break;
       case 'answer':

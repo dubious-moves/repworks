@@ -7,7 +7,7 @@ where the build differed). What remains is live: the spike's re-run (§4.2), the
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
 with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
-for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. Read with `DECISIONS.md`, which this plan updates (its
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -2136,8 +2136,9 @@ lichessable.
   the walk starts at the prefix's end, one move before it so the opponent's move is seen, or
   where the board already is when that is further on; `auto`: at the chapter's start, the prefix
   played at the pace, own moves included (even when the board already shares the line's
-  moves); `ask`: at the chapter's start, every own move of the prefix asked as practice unless
-  the mode plays it as answered this session. After the prefix, the mode decides. Unset (retry,
+  moves); `ask`: at the chapter's start, every own move of the line asked (practice unless the
+  plan grades it), on every pass, whatever the auto-play mode (revised 2026-10-09, §5.78: before,
+  only the prefix was asked, and the mode decided after it). Unset (retry,
   drill, the pins, the Interactive view): the walk as before. Defaults: `first` for the queue
   and show and grade, `auto` for a line picked and Learn.
 - **A line's end**: the board stays. The trainer now ends the session at the last line's end
@@ -2780,6 +2781,39 @@ rows where there are no games; the test fails on the old code), `analysis.spec.t
 side kept, Practise as it), `back.spec.ts` (back past a study's chapters, past training's lines, up
 to the parent from outside the app; the button filled), `practice.spec.ts` (Analyse from the review
 and back to it), `storm.spec.ts` (analysis board, practice, ← twice, the session still there).
+
+Live: TESTING.md.
+
+#### 5.78 The owner's notes of 2026-10-09 on training: every move asked, the arrows at the end, Read in a session
+
+Three requests, built as asked.
+
+- **"From the start, asked" asks every own move, on every pass** ("all moves should have to be
+  played (no auto-play). Even on the repetitions"). Before, `ask` asked only the line's prefix;
+  after the first move needed the auto-play mode decided, and on a later pass the moves answered
+  on the first were played for the user, so a repetition could be almost all auto-played. Now
+  with `lineStart: 'ask'` every own move of the line is asked, on every pass, whatever the
+  auto-play mode (`kindOf`); only a suspended move ("Always play this for me") is still played.
+  Grading is unchanged: only due moves are graded, once a session; the rest is practice. It holds
+  for the queue's setting too ("A line starts in the day's queue"), where `ask` means the same.
+- **The study's arrows at a line's end.** When a line is done (`lineDone`, or the session's end
+  with the board kept), the board draws the last move's arrows and circles from the study (its
+  `%cal`/`%csl`) beside the trainer's own arrow. Not before the end: an arrow on a move's node
+  could give the next move away, as its comments could while asked.
+- **Read in a session.** "Read" in the training screen's actions (and beside "Again" at a session's
+  end) opens the Read view's body (`LineReader`, shared with `ReadView`, §5.10) in place of the
+  session: the line on the board, its whole length, from the move on the board; ← → Home End and
+  the move list step through it, with each move's comments, glyphs and arrows, and a comment's
+  line on the board as in the Read view. The session waits meanwhile: a move due to be played for
+  the user is held (`readingAt`, the tick kept until the reading ends) and the board takes no
+  moves. "Back to training" or Escape takes the session up where it was.
+
+Tests: `trainer.test.ts` (from the start, asked: every own move asked on both passes under each
+auto-play mode, only the taught move recorded; the earlier `ask` case unchanged); Playwright,
+desktop and phone: `repetitions.spec.ts` (a picked line with "From the start, asked" and two
+passes: every own move asked on the second pass, the suspended move still played; the study's
+arrow of the last move absent while asked and drawn at the end; Read mid-session and at the end,
+stepped by keys and buttons, a comment shown, Escape and "Back to training" back to the session).
 
 Live: TESTING.md.
 

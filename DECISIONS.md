@@ -1435,3 +1435,14 @@ The technical calls, each with its reason:
   Qh5+ and Bc4 at 0.00. ChessDB keeps learning, and one request per position looked at is cheap;
   the searches keep the 7 days, since they ask hundreds of positions. A failed refresh keeps the
   cached answer up.
+
+## Revision of 2026-10-09 (training: every move asked, the arrows at the end, Read in a session, PLAN.md §5.78)
+- **"From the start, asked" asks every own move of the line, on every pass**, whatever the
+  auto-play mode (revising §5.17's `ask`, which asked the prefix only and let the mode decide after
+  it). The owner's report: with it on, a line's repetition was almost all played for them. Only a
+  suspended move is still played: suspending is the owner's own "always play this for me".
+  Grading is unchanged (a card graded once a session, only when due).
+- **The study's arrows show at a line's end**, not before: before the end an arrow could give a
+  move away, as comments could.
+- **Read is available within a session**, in its place on the screen; the session waits (a move
+  due to be played is held) and goes on where it was.
