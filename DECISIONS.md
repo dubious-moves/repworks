@@ -1446,3 +1446,10 @@ The technical calls, each with its reason:
   move away, as comments could.
 - **Read is available within a session**, in its place on the screen; the session waits (a move
   due to be played is held) and goes on where it was.
+
+## Revision of 2026-10-09 (the board's size, PLAN.md §5.79)
+- **The board's size is the owner's, dragged from its corner, and one for every page** (study,
+  training, practice and the rest of the training layout), kept per device. The default is as
+  large as fits on every page: training and practice lose their 640 px cap and fit the window's
+  height as the chapter view does, so the boards match before anything is dragged. Per device,
+  not synced, because the right size depends on the screen.

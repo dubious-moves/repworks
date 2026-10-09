@@ -17,6 +17,7 @@ import { useEffect, useLayoutEffect, useRef } from 'preact/hooks';
 import type { Role, SquareName } from 'chessops/types';
 import type { Brush, Shape } from '../core/study/model.ts';
 import { toggleShape } from '../core/study/ops.ts';
+import { BOARD_MAX, BOARD_MIN, boardSize, setBoardSize } from '../app/boardSize.ts';
 
 export interface BoardProps {
   fen: string;
@@ -202,7 +203,64 @@ export function Board(p: BoardProps) {
       <div class="cg-host" ref={el} />
       {p.badge && <Badge {...p.badge} orientation={p.orientation} />}
       {p.promotion && <PromotionChoice {...p.promotion} orientation={p.orientation} />}
+      <Resize board={wrap} />
     </div>
+  );
+}
+
+/**
+ * The board's size (src/app/boardSize.ts), set from its corner as on Lichess: dragged, or with the
+ * arrow keys once focused; a double click gives back the largest the window fits. Shown only on
+ * the boards a page is built around (app.css), which all take the one size.
+ */
+function Resize(props: { board: { current: HTMLDivElement | null } }) {
+  const side = () => props.board.current!.getBoundingClientRect().width;
+  const onPointerDown = (e: PointerEvent) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const handle = e.currentTarget as HTMLElement;
+    handle.setPointerCapture(e.pointerId);
+    const from = side();
+    const [x0, y0] = [e.clientX, e.clientY];
+    const move = (m: PointerEvent) => {
+      const dx = m.clientX - x0;
+      const dy = m.clientY - y0;
+      setBoardSize(from + (Math.abs(dx) > Math.abs(dy) ? dx : dy), false);
+    };
+    const end = () => {
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', end);
+      handle.removeEventListener('pointercancel', end);
+      // What the window lets it have, so a drag past the room left doesn't grow it on a bigger page.
+      setBoardSize(side());
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', end);
+    handle.addEventListener('pointercancel', end);
+  };
+  const onKeyDown = (e: KeyboardEvent) => {
+    const step = { ArrowUp: 20, ArrowRight: 20, ArrowDown: -20, ArrowLeft: -20 }[e.key];
+    if (step === undefined) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setBoardSize(side() + step);
+  };
+  return (
+    <span
+      class="board-resize"
+      role="slider"
+      tabIndex={0}
+      aria-label="Board size"
+      aria-valuemin={BOARD_MIN}
+      aria-valuemax={BOARD_MAX}
+      {...(boardSize.value === undefined ? { 'aria-valuetext': 'As large as fits' } : { 'aria-valuenow': boardSize.value })}
+      title="Drag to resize the board (double-click: as large as fits)"
+      data-testid="board-resize"
+      onPointerDown={onPointerDown}
+      onDblClick={() => setBoardSize(undefined)}
+      onKeyDown={onKeyDown}
+    />
   );
 }
 

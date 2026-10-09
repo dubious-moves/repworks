@@ -2819,6 +2819,27 @@ stepped by keys and buttons, a comment shown, Escape and "Back to training" back
 
 Live: TESTING.md.
 
+#### 5.79 The board's size, adjustable and the same on every page (the owner's request, 2026-10-09)
+
+"Let's make the size of the board adjustable. Make this size consistent between all pages
+(study/train/practice)." Built as asked.
+
+- **Dragged from the board's corner**, as on Lichess: a grip just outside its bottom-right corner
+  (a bigger one on a touch screen). Once focused, the arrow keys grow or shrink it by 20 px; a
+  double click gives back the default. The grip is on the boards a page is built around: the
+  chapter view's (and the analysis board's), and every board in the training layout
+  (`.train-grid`: training, Read, practice and its review, game cards, the storm, the checklist).
+- **One size for all of them**: a side in CSS pixels (`src/app/boardSize.ts`), set on the
+  document's root as `--board-size`; each of those boards is as large as its page fits, up to it.
+  What is stored at a drag's end is the side shown, so a drag past the room a page has doesn't
+  grow the board on a roomier page. Kept per device in localStorage (`repworks-board-size`), not
+  synced: a phone's and a desktop's want different sizes.
+- **The default is the same on every page too: as large as fits.** Before, the chapter view
+  filled the window's height while training and practice stopped at 640 px and fitted a little
+  differently (`100dvh − 200px`); now the training layout fits as the chapter view does
+  (`100dvh − 240px`, and its width less the panel's least and the line list's). On a 1440×900
+  window that is 660 px everywhere (the study's was 661, training's 640); on 1920×1080, 840.
+
 #### 5.14 Phase 1 acceptance test, and exit
 
 **Acceptance test (live, desktop + Android phone)**, after Phase 0's (§4.11) and once §5.15 is

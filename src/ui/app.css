@@ -644,7 +644,7 @@ textarea.script {
 }
 
 .board {
-  width: min(100%, 560px, calc(100dvh - 200px));
+  width: min(100%, var(--board-size, 560px), calc(100dvh - 200px));
   min-width: 260px;
   aspect-ratio: 1;
   margin: 0 auto;
@@ -658,6 +658,42 @@ textarea.script {
 
 .board {
   position: relative;
+}
+
+/* The board's size, dragged from its corner (Board.tsx, src/app/boardSize.ts): one size, kept as
+   `--board-size`, for the boards a page is built around (a study's, training's, practice's), each
+   as large as its page fits up to it. Just outside the corner, clear of the h-file's letter. */
+.board-resize {
+  display: none;
+  position: absolute;
+  z-index: 4;
+  right: -11px;
+  bottom: -11px;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+  touch-action: none;
+  opacity: 0.45;
+  background: linear-gradient(135deg, transparent 0 45%, var(--muted) 45% 52%, transparent 52% 64%, var(--muted) 64% 71%, transparent 71%);
+}
+
+.board-resize:hover,
+.board-resize:focus-visible {
+  opacity: 1;
+}
+
+.cv-board .board-resize,
+.train-grid .train-board .board-resize {
+  display: block;
+}
+
+@media (pointer: coarse) {
+  .board-resize {
+    right: -14px;
+    bottom: -14px;
+    width: 28px;
+    height: 28px;
+  }
 }
 
 /* A move's classification on its square's corner (a game's review), mistake-lab's badge. */
@@ -1274,7 +1310,7 @@ table.cards td {
 
   .cv-grid {
     --panel: clamp(320px, 34cqw, 560px);
-    --board: min(100cqh - 34px, 100cqw - var(--panel) - 16px);
+    --board: min(100cqh - 34px, 100cqw - var(--panel) - 16px, var(--board-size, 100vw));
     display: grid;
     grid-template-columns: var(--board) var(--panel);
     grid-template-areas: 'board panel';
@@ -1333,7 +1369,7 @@ table.cards td {
 @media (min-width: 1150px) {
   .cv-grid {
     --side: 220px;
-    --board: min(100cqh - 34px, 100cqw - var(--panel) - var(--side) - 32px);
+    --board: min(100cqh - 34px, 100cqw - var(--panel) - var(--side) - 32px, var(--board-size, 100vw));
     grid-template-columns: var(--side) var(--board) var(--panel);
     grid-template-areas: 'side board panel';
   }
@@ -1467,9 +1503,14 @@ table.cards td {
 }
 
 @media (min-width: 900px) {
+  /* The board as large as fits, as in the chapter view, up to the size chosen (`--board-size`):
+     the window's height less what is above and under it, and its width less the panel's least
+     (and the line list's, beside it from 1150 px). */
   .train-grid {
+    --board-room: calc(100vw - 340px);
+    --board: min(100dvh - 240px, var(--board-room), var(--board-size, 100vw));
     display: grid;
-    grid-template-columns: min(calc(100dvh - 200px), 640px) minmax(280px, 420px);
+    grid-template-columns: calc(var(--board) + var(--board-extra, 0px)) minmax(280px, 420px);
     justify-content: center;
     gap: 20px;
   }
@@ -1680,6 +1721,10 @@ table.cards td {
 
   .train-body.with-list .train-list {
     order: 0;
+  }
+
+  .train-body.with-list .train-grid {
+    --board-room: calc(100vw - 640px);
   }
 
   .train-body.with-list .line-list {
@@ -3778,6 +3823,10 @@ a.button.disabled {
 /* A practice game's review (§5.57): the eval bar by the board, the buttons under it; the summary,
    the move's card (or its line, or a retry) and the moves beside it. On a phone the move's card
    comes first, under the board. */
+/* The eval bar and its gap beside the board's column (22 + 6 px), so the board keeps its size. */
+.practice-review:has(.review-board-row) {
+  --board-extra: 28px;
+}
 .review-board-row {
   display: flex;
   align-items: stretch;
@@ -3789,7 +3838,7 @@ a.button.disabled {
   container-type: inline-size;
 }
 .review-board-main .board {
-  width: 100%;
+  width: min(100%, var(--board-size, 100%));
   min-width: 0;
 }
 .review-board .move-buttons {

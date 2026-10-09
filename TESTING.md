@@ -5,6 +5,13 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## The board's size (§5.79)
+
+- Desktop, then phone: drag the grip at the board's bottom-right corner on a study; the training
+  and practice boards are the same size, and stay so after a reload. A double click on the grip
+  gives back "as large as fits". On the phone: is the grip easy to catch, and does it get in the
+  way of anything under the board?
+
 ## The owner's notes of 2026-10-09 on training (§5.78)
 
 - Training settings → "A line starts, when learning or picked": From the start, asked. Learn a new
