@@ -2414,6 +2414,12 @@ functions, as the checklist's `Probs` does)
   nothing left to learn has value 0 and goes last. Must-learn lines are taken first. One setting,
   "Natural moves count less" (on by default), switches the `Π p` term off for a ranking by
   likelihood alone.
+- **Learned moves count as covered only while learned lines are kept outside the number**
+  (fixed 2026-10-09 after the owner's test). With Keep lines already learned off, a learned line
+  is ranked on its reach and moves like any other: counted as free, the lines learned first (the
+  best ones) went last, and keeping the top half kept 18% of the games and paused the lines
+  already learned. The lookups (`scoreLines`) and the order (`orderLines`) are apart, so both
+  checkboxes re-order the table at once, without scoring again.
 - **Why not the script's d'Hondt slots**: d'Hondt hands out a fixed number of slots down the
   tree in proportion to the shares, but it knows nothing of moves already covered or how hard a
   move is. The greedy order gives "the next N" directly, which (d) needs. On likelihood alone it

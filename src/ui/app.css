@@ -486,7 +486,7 @@ button.link {
   margin: 10px 0;
 }
 
-.form input:not([type='radio']):not([type='file']),
+.form input:not([type='radio']):not([type='checkbox']):not([type='file']),
 .form textarea,
 .form select,
 textarea.script {

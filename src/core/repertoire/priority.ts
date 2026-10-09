@@ -9,7 +9,11 @@
 //   share, or Maia's where the explorer is thin); unknown counts as 0, "wouldn't find it".
 // - The order is greedy by marginal value: reach × (1 − Π p) over the line's moves not covered
 //   by a line taken before it or learned already, so shared moves count once. Lines taken first
-//   (`first`: must-learn lines, or the active ones when growing) keep the index's order.
+//   (`first`: must-learn lines, or the active ones when growing) keep the index's order. Learned
+//   moves count as taken only when learned lines are kept outside the number (`keepLearned`);
+//   otherwise a learned line competes like any other, or the best lines, learned first, would
+//   rank last and be the ones paused.
+// - Scoring (the lookups) and ordering are apart, so the panel's checkboxes re-order at once.
 // - Gaps: replies the scope doesn't cover, played at least `GAP_MIN_PROB` of the time at a
 //   position it reaches, by reach.
 import type { Position } from 'chessops/chess';
@@ -37,20 +41,33 @@ export type ExplorerShares = (fen: string) => Promise<Shares>;
 /** Maia's probabilities at a position, by standard UCI; undefined when Maia isn't there. */
 export type MaiaShares = (fen: string) => Promise<ReadonlyMap<string, number> | undefined>;
 
-export interface PriorityInput {
+/** What scoring needs: the lines, and the explorer and Maia to look their positions up in. */
+export interface ScoreInput {
   /** The scope's lines for one side, in the index's order. */
   lines: readonly Line[];
   startOf: (line: Line) => Position | undefined;
-  /** A card taught or reviewed already: it costs nothing more to learn. */
-  learned: (card: CardId) => boolean;
   explorer: ExplorerShares;
   maia?: MaiaShares;
+  onProgress?: (done: number, total: number) => void;
+}
+
+/** What ordering needs: no lookups, so a change of these re-orders at once. */
+export interface OrderInput {
+  /** A card taught or reviewed already. */
+  learned: (card: CardId) => boolean;
   /** Natural moves count less (`1 − Π p`); off ranks by reach alone. */
   natural: boolean;
   /** Lines taken before the ranking proper, in the index's order (must-learn, or the active ones). */
   first?: (line: Line) => boolean;
-  onProgress?: (done: number, total: number) => void;
+  /**
+   * Learned lines are kept outside the number, so their moves cost nothing more and a line with
+   * nothing else to learn goes last. Off (default on), they are ranked like any other line: a
+   * learned line not kept is paused, so its moves count as much as anyone's.
+   */
+  keepLearned?: boolean;
 }
+
+export type PriorityInput = ScoreInput & OrderInput;
 
 export interface RankedLine {
   line: Line;
@@ -136,7 +153,18 @@ const bare = (san: string) => san.replace(/[+#]/g, '');
 const sameMove = (m: { uci: string; san: string }, uci: string, san: string) => m.uci === uci || bare(m.san) === bare(san);
 const shareOf = (e: Shares, uci: string, san: string) => e.moves.find((m) => sameMove(m, uci, san))?.share;
 
-export async function rankLines(input: PriorityInput): Promise<Ranking> {
+/** A scope's lines looked up: reach and natural moves, ready to order (`orderLines`). */
+export interface Scored {
+  walked: readonly Walked[];
+  reachOf: ReadonlyMap<Line, { reach: number; ownStart?: true }>;
+  /** Each own move's p, by card; undefined where nothing knows it. */
+  pOf: ReadonlyMap<CardId, number | undefined>;
+  gaps: PriorityGap[];
+  totalReach: number;
+  lookups: number;
+}
+
+export async function scoreLines(input: ScoreInput): Promise<Scored> {
   const walked: Walked[] = [];
   for (const line of input.lines) {
     const start = input.startOf(line);
@@ -203,6 +231,32 @@ export async function rankLines(input: PriorityInput): Promise<Ranking> {
   const pOf = new Map<CardId, number | undefined>();
   for (const w of walked) for (const s of w.steps) if (s.card && !pOf.has(s.card)) pOf.set(s.card, playedShare(s.key, s.uci, s.san));
 
+  // Gaps: uncovered replies played at least GAP_MIN_PROB of the time, by reach, one per position after.
+  const gapAt = new Map<string, PriorityGap>();
+  for (const w of order)
+    w.steps.forEach((s, i) => {
+      if (s.own) return;
+      const e = explorer.get(s.key);
+      if (!e || e.total === 0) return;
+      const here = [...covered.get(s.key)!];
+      for (const m of e.moves) {
+        if (m.share < GAP_MIN_PROB || here.some(([uci, san]) => sameMove(m, uci, san))) continue;
+        const reach = (reachAt.get(s.key) ?? 0) * m.share;
+        const id = `${s.key}|${bare(m.san)}`;
+        const before = gapAt.get(id);
+        if (before && before.reach >= reach) continue;
+        gapAt.set(id, { sid: w.line.sid, cid: w.line.cid, path: w.line.path.slice(0, i), san: m.san, uci: m.uci, share: m.share, reach });
+      }
+    });
+  const gaps = [...gapAt.values()].sort((a, b) => b.reach - a.reach).slice(0, MAX_GAPS);
+  const totalReach = walked.reduce((a, w) => a + reachOf.get(w.line)!.reach, 0);
+  return { walked, reachOf, pOf, gaps, totalReach, lookups: fens.size };
+}
+
+/** The scored lines in order: must-learn (or active) lines first, then greedy by marginal value. */
+export function orderLines(scored: Scored, input: OrderInput): Ranking {
+  const { walked, reachOf, pOf } = scored;
+  const keepLearned = input.keepLearned ?? true;
   const info = walked.map((w) => {
     const cards = [...new Set(w.line.cards)];
     const ps = cards.map((c) => pOf.get(c));
@@ -216,7 +270,7 @@ export async function rankLines(input: PriorityInput): Promise<Ranking> {
     };
   });
   const taken = new Set<CardId>();
-  for (const i of info) for (const c of i.cards) if (input.learned(c)) taken.add(c);
+  if (keepLearned) for (const i of info) for (const c of i.cards) if (input.learned(c)) taken.add(c);
   const valueOf = (cards: readonly CardId[], reach: number) => {
     let keep = 1;
     let any = false;
@@ -254,27 +308,11 @@ export async function rankLines(input: PriorityInput): Promise<Ranking> {
     const [chosen] = pending.splice(best, 1);
     take(chosen!.i, chosen!.value, false);
   }
+  return { lines: out, gaps: scored.gaps, totalReach: scored.totalReach, lookups: scored.lookups };
+}
 
-  // Gaps: uncovered replies played at least GAP_MIN_PROB of the time, by reach, one per position after.
-  const gapAt = new Map<string, PriorityGap>();
-  for (const w of order)
-    w.steps.forEach((s, i) => {
-      if (s.own) return;
-      const e = explorer.get(s.key);
-      if (!e || e.total === 0) return;
-      const here = [...covered.get(s.key)!];
-      for (const m of e.moves) {
-        if (m.share < GAP_MIN_PROB || here.some(([uci, san]) => sameMove(m, uci, san))) continue;
-        const reach = (reachAt.get(s.key) ?? 0) * m.share;
-        const id = `${s.key}|${bare(m.san)}`;
-        const before = gapAt.get(id);
-        if (before && before.reach >= reach) continue;
-        gapAt.set(id, { sid: w.line.sid, cid: w.line.cid, path: w.line.path.slice(0, i), san: m.san, uci: m.uci, share: m.share, reach });
-      }
-    });
-  const gaps = [...gapAt.values()].sort((a, b) => b.reach - a.reach).slice(0, MAX_GAPS);
-  const totalReach = out.reduce((a, r) => a + r.reach, 0);
-  return { lines: out, gaps, totalReach, lookups: fens.size };
+export async function rankLines(input: PriorityInput): Promise<Ranking> {
+  return orderLines(await scoreLines(input), input);
 }
 
 /**

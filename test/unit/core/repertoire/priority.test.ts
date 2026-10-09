@@ -10,7 +10,7 @@ import { standardUci } from '../../../../src/core/chess/uci.ts';
 import type { CardId } from '../../../../src/core/progress/cards.ts';
 import { parseChapterFile } from '../../../../src/core/pgn/parse.ts';
 import { indexStudies, type Line, type RepertoireIndex } from '../../../../src/core/repertoire/index.ts';
-import { coverageOf, keptLines, MISSING_PROB, rankLines, type PriorityInput, type Shares } from '../../../../src/core/repertoire/priority.ts';
+import { coverageOf, keptLines, MISSING_PROB, orderLines, rankLines, scoreLines, type PriorityInput, type Shares } from '../../../../src/core/repertoire/priority.ts';
 import { startPosition } from '../../../../src/core/study/tree.ts';
 import type { Chapter } from '../../../../src/core/study/model.ts';
 
@@ -164,6 +164,24 @@ test('a learned line is kept outside the number when asked, and ranked like the 
   assert.equal(fr.learned, true);
   assert.deepEqual(paths([...keptLines(r, 1, true)].map((line) => ({ line }))).sort(), ['e4 c5 Nf3', 'e4 e6 d4']);
   assert.deepEqual(paths([...keptLines(r, 1, false)].map((line) => ({ line }))), ['e4 c5 Nf3']);
+});
+
+test('learned lines not kept outside the number are ranked by their worth, not last', async () => {
+  // The owner learned the best lines first: learned moves counted as free would put them last,
+  // and keeping the top half would pause them.
+  const { ix, startOf } = setUp([white()]);
+  const { explorer } = explorerOf(TABLE);
+  const sicilian = ix.lines.find((l) => l.path[1] === 'c5')!;
+  const learned = (c: CardId) => sicilian.cards.includes(c);
+  const scored = await scoreLines(input(ix, startOf, explorer));
+  const kept = orderLines(scored, { learned, natural: false, keepLearned: true });
+  assert.equal(kept.lines.at(-1)!.line, sicilian);
+  const ranked = orderLines(scored, { learned, natural: false, keepLearned: false });
+  assert.deepEqual(paths(ranked.lines), ['e4 c5 Nf3', 'e4 e5 Nf3', 'e4 e6 d4']);
+  assert.equal(ranked.lines[0]!.learned, true);
+  close(coverageOf(ranked, keptLines(ranked, 1, false)), 0.5 / 0.9);
+  // One lookup run serves both orders.
+  assert.equal(ranked.lookups, kept.lookups);
 });
 
 test('a transposition has the same shares wherever it is reached', async () => {

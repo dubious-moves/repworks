@@ -4,10 +4,10 @@
 // list (a chapter's ⋯, or the list's own Prioritize button).
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { mode, open } from '../app/mode.ts';
-import { applyChanges, applyPriority, closePriority, linesOf, priorityPanel, priorityPrefs, priorityRun, RATINGS, runPriority, setPriorityPrefs, sidesOf, SPEEDS, stopPriority, type PriorityScope } from '../app/priority.ts';
+import { applyChanges, applyPriority, closePriority, linesOf, priorityPanel, priorityPrefs, priorityRun, rankingOf, RATINGS, runPriority, setPriorityPrefs, sidesOf, SPEEDS, stopPriority, type PriorityScope } from '../app/priority.ts';
 import { trainData, type TrainData } from '../app/train.ts';
 import type { Color } from '../core/games/record.ts';
-import { coverageOf, keptLines, type Ranking } from '../core/repertoire/priority.ts';
+import { coverageOf, keptLines } from '../core/repertoire/priority.ts';
 import type { Line } from '../core/repertoire/index.ts';
 import { header } from '../core/study/model.ts';
 import { startPosition } from '../core/study/tree.ts';
@@ -111,7 +111,7 @@ function Panel(props: { sid: string; cid?: string; data: TrainData }) {
           </p>
         )}
         {sameScope && run.phase === 'scoring' && <Scoring run={run} />}
-        {sameScope && run.phase === 'ranked' && <Ranked ranking={run.ranking} numbers={run.numbers} data={data} />}
+        {sameScope && run.phase === 'ranked' && <Ranked run={run} data={data} />}
       </div>
     </dialog>
   );
@@ -135,13 +135,17 @@ function Scoring(props: { run: Extract<NonNullable<typeof priorityRun.value>, { 
   );
 }
 
-function Ranked(props: { ranking: Ranking; numbers: Map<Line, number>; data: TrainData }) {
-  const { ranking, numbers, data } = props;
+function Ranked(props: { run: Extract<NonNullable<typeof priorityRun.value>, { phase: 'ranked' }>; data: TrainData }) {
+  const { run, data } = props;
+  const { numbers } = run;
   const prefs = priorityPrefs.value;
+  // Ordered here, from the run's lookups: the checkboxes re-order at once.
+  const ranking = useMemo(() => rankingOf(run, prefs), [run, prefs.natural, prefs.keepLearned]);
   const others = ranking.lines.filter((r) => !(prefs.keepLearned && r.learned)).length;
   const musts = ranking.lines.filter((r) => r.first).length;
   const active = ranking.lines.filter((r) => !r.line.paused && !(prefs.keepLearned && r.learned)).length;
-  const [count, setCount] = useState(Math.max(musts, Math.min(others, active === ranking.lines.length ? Math.min(20, others) : active)));
+  const [wanted, setCount] = useState(Math.max(musts, Math.min(others, active === ranking.lines.length ? Math.min(20, others) : active)));
+  const count = Math.max(Math.min(musts, others), Math.min(wanted, others));
   const kept = useMemo(() => keptLines(ranking, count, prefs.keepLearned), [ranking, count, prefs.keepLearned]);
   const changes = useMemo(() => applyChanges(ranking, count, prefs.keepLearned), [ranking, count, prefs.keepLearned]);
   const pausing = changes.filter((c) => c.mark === 'paused').length;

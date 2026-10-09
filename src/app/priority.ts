@@ -1,16 +1,18 @@
 // Prioritizing a study or a chapter (PLAN.md §5.70): its lines scored through the explorer worker
 // (its limiter and IndexedDB cache, so a second run comes from the cache) and Maia where the
-// explorer is thin and Maia is on; ranked in core (`rankLines`); Apply pauses the lines not kept
-// and unpauses the kept ones, recording only the lines whose mark changes. "Add the next N"
-// ranks again with the active lines taken first and unpauses the best N paused ones.
+// explorer is thin and Maia is on (`scoreLines`), then put in order by the panel (`orderLines`,
+// so its checkboxes re-order at once); Apply pauses the lines not kept and unpauses the kept
+// ones, recording only the lines whose mark changes. "Add the next N" ranks again with the
+// active lines taken first and unpauses the best N paused ones.
 import { signal } from '@preact/signals';
 import type { FromWorker, ToWorker } from '../core/explorer/service.ts';
 import type { Color } from '../core/games/record.ts';
-import { keptLines, rankLines, type Ranking, type Shares } from '../core/repertoire/priority.ts';
+import { keptLines, orderLines, scoreLines, type Ranking, type Scored, type Shares } from '../core/repertoire/priority.ts';
 import type { Line } from '../core/repertoire/index.ts';
 import { header } from '../core/study/model.ts';
 import { startPosition } from '../core/study/tree.ts';
 import { statusOf } from '../core/train/queue.ts';
+import type { CardId } from '../core/progress/cards.ts';
 import type { LineMark } from '../core/progress/events.ts';
 import { onWorker, postToWorker } from './explorer.ts';
 import { setMarks } from './lineMarks.ts';
@@ -56,7 +58,7 @@ export interface PriorityScope {
 
 export type PriorityRun =
   | { phase: 'scoring'; scope: PriorityScope; done: number; total: number; started: number }
-  | { phase: 'ranked'; scope: PriorityScope; ranking: Ranking; numbers: Map<Line, number> }
+  | { phase: 'ranked'; scope: PriorityScope; scored: Scored; learned: (card: CardId) => boolean; numbers: Map<Line, number> }
   | { phase: 'error'; scope: PriorityScope; error: string; login?: boolean };
 
 export const priorityRun = signal<PriorityRun | undefined>(undefined);
@@ -143,20 +145,24 @@ export function stopPriority(): void {
 
 class Stopped extends Error {}
 
-async function rank(data: TrainData, scope: PriorityScope, first: (l: Line) => boolean, onProgress?: (done: number, total: number) => void): Promise<Ranking> {
+/** A card taught or reviewed already (or suspended): it costs nothing more to learn. */
+function learnedIn(data: TrainData): (card: CardId) => boolean {
+  return (card) => {
+    const s = data.states.get(card);
+    return statusOf(s) !== 'fresh' || !!s?.suspended;
+  };
+}
+
+async function score(data: TrainData, scope: PriorityScope, onProgress?: (done: number, total: number) => void): Promise<Scored> {
   const mine = runId;
   const prefs = priorityPrefs.peek();
   const useMaia = maiaPrefs.peek().on;
   const elo = maiaElo.peek();
-  return rankLines({
+  return scoreLines({
     lines: linesOf(data, scope),
     startOf: (l) => {
       const c = data.chapters.get(`${l.sid}/${l.cid}`);
       return c ? startPosition(c) : undefined;
-    },
-    learned: (card) => {
-      const s = data.states.get(card);
-      return statusOf(s) !== 'fresh' || !!s?.suspended;
     },
     explorer: async (fen) => {
       if (mine !== runId) throw new Stopped();
@@ -170,13 +176,16 @@ async function rank(data: TrainData, scope: PriorityScope, first: (l: Line) => b
           },
         }
       : {}),
-    natural: prefs.natural,
-    first,
     ...(onProgress ? { onProgress } : {}),
   });
 }
 
-/** Scores and ranks the scope's lines, must-learn lines first. */
+/** A scored run in order for the panel's choices: must-learn lines first. */
+export function rankingOf(run: Extract<PriorityRun, { phase: 'ranked' }>, prefs: Pick<PriorityPrefs, 'natural' | 'keepLearned'>): Ranking {
+  return orderLines(run.scored, { learned: run.learned, natural: prefs.natural, first: (l) => !!l.must, keepLearned: prefs.keepLearned });
+}
+
+/** Scores the scope's lines; the panel puts them in order (`rankingOf`). */
 export async function runPriority(scope: PriorityScope): Promise<void> {
   const data = trainData.peek();
   if (!data) return;
@@ -184,11 +193,11 @@ export async function runPriority(scope: PriorityScope): Promise<void> {
   const mine = runId;
   priorityRun.value = { phase: 'scoring', scope, done: 0, total: 0, started: Date.now() };
   try {
-    const ranking = await rank(data, scope, (l) => !!l.must, (done, total) => {
+    const scored = await score(data, scope, (done, total) => {
       const r = priorityRun.peek();
       if (mine === runId && r?.phase === 'scoring') priorityRun.value = { ...r, done, total };
     });
-    if (mine === runId) priorityRun.value = { phase: 'ranked', scope, ranking, numbers: numbersOf(data) };
+    if (mine === runId) priorityRun.value = { phase: 'ranked', scope, scored, learned: learnedIn(data), numbers: numbersOf(data) };
   } catch (e) {
     if (e instanceof Stopped || mine !== runId) return;
     priorityRun.value = { phase: 'error', scope, error: e instanceof Error ? e.message : String(e), ...(e instanceof LookupFailed && e.login ? { login: true } : {}) };
@@ -229,7 +238,8 @@ export async function addNext(sid: string, n: number): Promise<number> {
     for (const side of sidesOf(data, sid)) {
       const scope: PriorityScope = { sid, side };
       if (!linesOf(data, scope).some((l) => l.paused)) continue;
-      const ranking = await rank(data, scope, (l) => !l.paused, (done, total) => (growing.value = { sid, done, total }));
+      const scored = await score(data, scope, (done, total) => (growing.value = { sid, done, total }));
+      const ranking = orderLines(scored, { learned: learnedIn(data), natural: priorityPrefs.peek().natural, first: (l) => !l.paused });
       ranked.push(...ranking.lines.filter((r) => r.line.paused).map((r) => ({ value: r.value, line: r.line })));
     }
     // Both sides' paused lines by value: the next N of the study.

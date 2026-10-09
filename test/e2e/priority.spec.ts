@@ -171,6 +171,13 @@ test('a study prioritized: ranked from the explorer, two lines kept, the third p
   await expect(rows.nth(2)).toContainText('30%');
   await expect(dialog.locator('.priority-gaps')).toContainText('1. d4');
   await expect(dialog.getByRole('button', { name: 'Nothing to change' })).toBeDisabled();
+  // The checkboxes are drawn as checkboxes, not as 44 px text fields that hide whether they're ticked.
+  const keepLearned = dialog.getByRole('checkbox', { name: /Keep lines already learned/ });
+  expect((await keepLearned.boundingBox())!.width).toBeLessThan(30);
+  // Unticked, the lines re-order from the same lookups: no Rank again.
+  await keepLearned.uncheck();
+  await expect(rows).toHaveCount(3);
+  await keepLearned.check();
 
   await dialog.getByRole('slider', { name: 'Lines to keep' }).fill('2');
   await expect(dialog.locator('.priority-count')).toContainText('Lines to keep: 2 · 82% of your games here');
