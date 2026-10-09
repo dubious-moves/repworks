@@ -1427,3 +1427,11 @@ The technical calls, each with its reason:
   from it plays that side; a FEN set up on the board still turns it to the side to move.
 - **Maia's worker ended for being unused is `idle`, not `off`**: its columns stay and the next ask
   starts it again (the owner's report: the columns vanished until Maia was switched off and on).
+
+## Revision of 2026-10-09 (ChessDB's answers on the panel kept fresh)
+- **The panel asks ChessDB again for a cached answer over an hour old**, after showing the cached
+  one at once (revising D5's ChessDB TTL for the panel only). The owner's report: a position
+  showed Nd5 alone as ChessDB's move from a cached answer, while ChessDB itself had since added
+  Qh5+ and Bc4 at 0.00. ChessDB keeps learning, and one request per position looked at is cheap;
+  the searches keep the 7 days, since they ask hundreds of positions. A failed refresh keeps the
+  cached answer up.

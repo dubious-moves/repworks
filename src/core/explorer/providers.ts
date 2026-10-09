@@ -52,6 +52,10 @@ export const TTL = {
   chessdb: 7 * DAY,
   chessdbUnknown: 1 * DAY, // ChessDB learns positions; ask again sooner
   analyse: 1 * DAY, // don't ask ChessDB to analyse the same thing twice a day
+  // The panel shows a cached answer at once and asks again when it is older than this: ChessDB
+  // adds moves and changes scores as it analyses, and a week-old answer had missed its two best
+  // moves (2026-10-09). The searches keep the week: they ask hundreds of positions.
+  panel: 60 * 60 * 1000,
   // After asking, look the position up again once this has passed: a queued position had evals
   // about 65 s later when measured (2026-09-25). Still unknown then, it is looked up again at this
   // interval for `recheckFor`, whenever a search needs it.
@@ -258,7 +262,8 @@ export interface Providers {
   games(ids: readonly string[]): Promise<string>;
   /** A masters game's PGN. */
   mastersGame(id: string): Promise<string>;
-  chessdb(fen: string, isStale?: () => boolean, priority?: number): Promise<ChessdbAnswer>;
+  /** maxAge: a cached answer older than this (ms) is asked again. */
+  chessdb(fen: string, isStale?: () => boolean, priority?: number, maxAge?: number): Promise<ChessdbAnswer>;
   analyse(fen: string, uci?: string | null): Promise<boolean>;
   testToken(token: string): Promise<{ ok: boolean; status: number }>;
   localInfo(address: string): Promise<LocalInfo>;
@@ -439,7 +444,7 @@ export function createProviders(o: ProvidersOptions): Providers {
   }
 
   // priority: among lookups waiting for the lane, higher goes first (createLimiter).
-  function chessdb(fen: string, isStale?: () => boolean, priority?: number): Promise<ChessdbAnswer> {
+  function chessdb(fen: string, isStale?: () => boolean, priority?: number, maxAge?: number): Promise<ChessdbAnswer> {
     const key = fenKey(fen);
     return Promise.all([o.cache.get('chessdb', key, TTL.chessdb), o.cache.get('chessdb', 'ask|' + key, TTL.analyse)]).then((r) => {
       const hit = r[0] as (ChessdbAnswer & { t: number }) | undefined;
@@ -448,7 +453,8 @@ export function createProviders(o: ProvidersOptions): Providers {
       // sees the new evals. A known position (a move was asked for) is looked up once more; an
       // unknown one until it is known, for a while.
       const asked = hit && ask && now() - Math.max(hit.t || 0, ask.t) >= TTL.recheck && (hit.status === 'ok' ? ask.t >= (hit.t || 0) : now() - ask.t < TTL.recheckFor);
-      if (hit && !asked && (hit.status === 'ok' || now() - hit.t < TTL.chessdbUnknown)) return hit;
+      const young = maxAge === undefined || now() - (hit?.t || 0) < maxAge;
+      if (hit && !asked && young && (hit.status === 'ok' || now() - hit.t < TTL.chessdbUnknown)) return hit;
       return once<ChessdbAnswer>('c' + key, isStale, priority, (stale) => {
         const out: { job: { priority: number } | null } = { job: null };
         function attempt(tries: number): Promise<ChessdbAnswer> {

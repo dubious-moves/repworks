@@ -14,7 +14,7 @@ import { parseSan } from 'chessops/san';
 import { standardUci } from '../chess/uci.ts';
 import { STORM } from '../storm/config.ts';
 import { LICHESS_RATE, OWN_BURST, type LimiterSnapshot, type Now, type Sleep } from './limiter.ts';
-import { createProviders, localAddress, type CompactExplorer, type ExplorerCache, type ExplorerFilter, type Http, type ProviderStats } from './providers.ts';
+import { createProviders, localAddress, TTL, type CompactExplorer, type ExplorerCache, type ExplorerFilter, type Http, type ProviderStats } from './providers.ts';
 import { createPreviewedSearch, type Budget, type RootSearch } from './rounds.ts';
 import { fenKey, type ChessdbAnswer, type MaiaMove, type PeError, type RowResult, type SearchOptions, type SearchProvider } from './search.ts';
 
@@ -214,7 +214,17 @@ export function createExplorerService(o: ServiceOptions): ExplorerService {
     providers
       .chessdb(fen, isStale, 2)
       .then(
-        (evals) => !isStale() && o.post({ type: 'evals', id, evals }),
+        (evals) => {
+          if (isStale()) return;
+          o.post({ type: 'evals', id, evals });
+          // An older answer is shown at once and asked again: ChessDB keeps learning. If that
+          // fails, the cached answer stays up.
+          if (o.now() - (evals.t || 0) < TTL.panel) return;
+          return providers.chessdb(fen, isStale, 2, TTL.panel).then(
+            (fresh) => !isStale() && o.post({ type: 'evals', id, evals: fresh }),
+            () => undefined,
+          );
+        },
         (e: PeError) => !isStale() && !e?.cancelled && o.post({ type: 'evals', id, error: reasonOf(e, 'ChessDB') }),
       )
       .finally(() => (pending.delete('evals'), settle()));

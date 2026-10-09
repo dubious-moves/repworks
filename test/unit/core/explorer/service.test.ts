@@ -79,6 +79,27 @@ test('a lookup: the games and ChessDB’s evals, asked once and then from the ca
   assert.ok(w.posts.some((m) => m.type === 'games' && m.id === 2));
 });
 
+test('the panel shows an hour-old ChessDB answer at once, then asks again and shows the new one', async () => {
+  const w = world();
+  const cdbUrls = () => w.urls.filter((u) => u.startsWith('https://www.chessdb.cn'));
+  w.service.handle({ type: 'lookup', id: 1, tab: 'chessdb', fen: START });
+  await settle();
+  assert.equal(cdbUrls().length, 1);
+  w.tick(30 * 60 * 1000);
+  w.service.handle({ type: 'lookup', id: 2, tab: 'chessdb', fen: START });
+  await settle();
+  assert.equal(cdbUrls().length, 1, 'half an hour old: from the cache alone');
+  assert.equal(w.posts.filter((m) => m.type === 'evals' && m.id === 2).length, 1);
+  w.tick(31 * 60 * 1000);
+  w.service.handle({ type: 'lookup', id: 3, tab: 'chessdb', fen: START });
+  await settle();
+  assert.equal(cdbUrls().length, 2, 'over an hour old: asked again');
+  const posted = w.posts.filter((m) => m.type === 'evals' && m.id === 3);
+  assert.equal(posted.length, 2, 'the cached answer, then the new one');
+  const ts = posted.map((m) => ('evals' in m ? m.evals.t : undefined));
+  assert.ok(ts[1]! > ts[0]!);
+});
+
 test('Masters is asked without the filter; ChessDB’s tab asks ChessDB alone', async () => {
   const w = world();
   w.service.handle({ type: 'lookup', id: 1, tab: 'masters', fen: START });
