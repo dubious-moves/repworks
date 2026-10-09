@@ -65,6 +65,28 @@ export function saveOpponent(o: Opponent): void {
   }
 }
 
+/** Per-move feedback while practising from a position (the owner's request, 2026-10-09): off unless
+ *  turned on, kept on the device. The review at the end classifies every move either way. */
+const FEEDBACK_KEY = 'repworks-practice-feedback';
+function loadFeedback(): boolean {
+  try {
+    return localStorage.getItem(FEEDBACK_KEY) === 'on';
+  } catch {
+    return false;
+  }
+}
+export const practiceFeedback = signal(loadFeedback());
+export function setPracticeFeedback(on: boolean): void {
+  practiceFeedback.value = on;
+  try {
+    localStorage.setItem(FEEDBACK_KEY, on ? 'on' : 'off');
+  } catch {
+    // this page only
+  }
+}
+/** Whether a game in play shows each move's classification: never in a drill, by the setting in practice. */
+export const showsFeedback = (s: PracticeSetup, on: boolean): boolean => !s.silent && (s.kind !== 'practice' || on);
+
 export interface PracticeSetup {
   kind: 'practice' | 'advantage' | 'checklist';
   fen: string;

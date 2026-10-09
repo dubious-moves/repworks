@@ -14,7 +14,7 @@ import type { Key } from '@lichess-org/chessground/types';
 import { entryKey, open } from '../app/mode.ts';
 import { recordEvent } from '../app/state.ts';
 import { openingNameOf, practiceHistory, savedDeck } from '../app/games.ts';
-import { analyse, claimVictory, clearPremove, detection, setFoundState, type FoundTactic, discardSaved, gameOfHistory, ignoreRepertoire, loadOpponent, practiceHint, resumePractice, savedPractice, saveOpponent, judge, parkPractice, practice, practiceMove, takeUpPractice, practiceReview, setPremove, startPractice, stopPractice, type Opponent, type PracticeGame, type PracticeMove } from '../app/practice.ts';
+import { analyse, claimVictory, clearPremove, detection, setFoundState, type FoundTactic, discardSaved, gameOfHistory, ignoreRepertoire, loadOpponent, practiceFeedback, practiceHint, resumePractice, setPracticeFeedback, showsFeedback, savedPractice, saveOpponent, judge, parkPractice, practice, practiceMove, takeUpPractice, practiceReview, setPremove, startPractice, stopPractice, type Opponent, type PracticeGame, type PracticeMove } from '../app/practice.ts';
 import { parseUciMove, standardUci } from '../core/chess/uci.ts';
 import { makeFen } from 'chessops/fen';
 import { CLASSIFICATION, moverScore, type Classification } from '../core/games/grade.ts';
@@ -143,7 +143,8 @@ export function PracticeBoard(props: { onNext?: () => void }) {
   const fen = p.moves.length ? p.moves[p.moves.length - 1]!.fen : s.fen;
   const last = p.moves[p.moves.length - 1];
   const lastUser = [...p.moves].reverse().find((m) => m.isUser);
-  const cls = !s.silent && lastUser?.classification ? CLASSIFICATION[lastUser.classification] : undefined;
+  const feedback = showsFeedback(s, practiceFeedback.value);
+  const cls = feedback && lastUser?.classification ? CLASSIFICATION[lastUser.classification] : undefined;
   const userMoves = p.moves.filter((m) => m.isUser).length;
   const hint = p.hint?.fen === fen && p.hint.uci ? p.hint : undefined;
   const arrows = hint ? [{ orig: hint.uci!.slice(0, 2), ...(hint.level === 2 ? { dest: hint.uci!.slice(2, 4) } : {}), brush: 'blue' }] : [];
@@ -161,7 +162,7 @@ export function PracticeBoard(props: { onNext?: () => void }) {
             ? 'The opponent is thinking…'
             : cls && lastUser
               ? `${lastUser.san}: ${cls.word}${lastUser.wpDrop ? ` · −${lastUser.wpDrop}%` : ''}`
-              : lastUser?.judging && !s.silent
+              : lastUser?.judging && feedback
                 ? 'Your move (the last one is being judged)'
                 : 'Your move'}
         </p>
@@ -177,7 +178,12 @@ export function PracticeBoard(props: { onNext?: () => void }) {
         )}
         {p.source && !s.silent && <p class="muted">Opponent: {p.source}</p>}
         {p.note && <p class="muted">{p.note}</p>}
-        <MoveList moves={p.moves} baseFen={s.fen} />
+        <MoveList moves={p.moves} baseFen={s.fen} marks={feedback} />
+        {s.kind === 'practice' && (
+          <label class="check" title="Each move’s classification as you play (the review at the end has them either way)">
+            <input type="checkbox" data-testid="practice-feedback-toggle" checked={practiceFeedback.value} onChange={(e) => setPracticeFeedback((e.target as HTMLInputElement).checked)} /> Move feedback
+          </label>
+        )}
         <VoiceControls />
         <div class="actions train-actions">
           {p.claim && (
@@ -246,8 +252,8 @@ function VoiceControls() {
   );
 }
 
-/** The game's moves while it is played, the user's with their symbols. */
-function MoveList(props: { moves: readonly PracticeMove[]; baseFen: string }) {
+/** The game's moves while it is played, the user's with their symbols when feedback is shown. */
+function MoveList(props: { moves: readonly PracticeMove[]; baseFen: string; marks: boolean }) {
   const [, turn, , , , n] = props.baseFen.split(' ');
   let number = Number(n) || 1;
   let white = turn !== 'b';
@@ -257,7 +263,7 @@ function MoveList(props: { moves: readonly PracticeMove[]; baseFen: string }) {
         const label = white ? `${number}. ` : i === 0 ? `${number}… ` : '';
         if (!white) number++;
         white = !white;
-        const cls = m.classification ? CLASSIFICATION[m.classification] : undefined;
+        const cls = props.marks && m.classification ? CLASSIFICATION[m.classification] : undefined;
         return (
           <span key={i} class="game-move">
             {label && <span class="muted">{label}</span>}

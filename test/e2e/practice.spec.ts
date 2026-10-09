@@ -152,6 +152,14 @@ test('a practice game: played against the explorer, stopped, reviewed, kept in t
     await expect(game).toHaveAttribute('data-phase', 'user');
   }
   await expect(page.getByText(/Opponent: DB \(100\)/)).toBeVisible();
+  // No move feedback while playing unless it is turned on (the owner's request, 2026-10-09).
+  const moves = page.getByTestId('practice-moves');
+  await expect(page.getByTestId('practice-feedback')).toHaveText(/^Your move/);
+  await expect(moves.locator('.practice-cls')).toHaveCount(0);
+  await page.getByTestId('practice-feedback-toggle').check();
+  await expect(moves.locator('.practice-cls').first()).toBeVisible();
+  await page.getByTestId('practice-feedback-toggle').uncheck();
+  await expect(moves.locator('.practice-cls')).toHaveCount(0);
   await page.getByRole('button', { name: 'Stop & review' }).click();
 
   const review = page.getByTestId('practice-review');

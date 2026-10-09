@@ -4843,6 +4843,13 @@ explorer stopped after five moves, its review, a practice mistake saved, the his
 the events synced; an advantage card's collapse graded Again). The corrected-deviation banner and
 resuming a game after a reload came with §6's second item (below).
 
+**Move feedback off by default** (2026-10-09, the owner's request): a game from a position no longer
+shows each move's classification while it is played (the feedback line's word, the move list's
+symbols) unless "Move feedback" under the moves is ticked; the setting is kept on the device
+(`repworks-practice-feedback`) and can be changed mid-game. The review at the end is unchanged; the
+drills (advantage, checklist) stay silent; the opponent's source is still shown. Tests: the practice
+e2e checks it off, on, and off again.
+
 **The review reworked** (2026-10-07, the owner's note: "more like mistake-lab", whose Game Review
 was read at its current `main`: `showReviewKeyMoveInfo`, `showReviewBestArrow`,
 `showReviewBestLine`, `showReviewRefutation`, `handleReviewRetryResult`): the board with an eval bar

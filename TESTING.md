@@ -65,6 +65,13 @@ fixes them and updates this file.
 - "Add the next 10" once the active lines are learned; and a line's ⋯ (right-click on the desktop)
   with Pause and Must learn.
 
+## Practice: move feedback off by default (§5.57, 2026-10-09)
+
+- A practice game from a position: no classification under the moves or in the feedback line while
+  playing; tick "Move feedback" under the moves and they appear (the last move's word, the symbols),
+  untick and they go; the setting is remembered on the device. The review at the end is unchanged.
+  Checked by the practice e2e (desktop and emulated phone).
+
 ## The practice game's review reworked (§5.57, 2026-10-07)
 
 - Desktop, then phone: a practice game's review (end one, or reopen one from Games' history). The
