@@ -622,26 +622,16 @@ function CardBoard(props: { item: StormItem; asking: boolean; onMove(uci: string
         onMove={onMove}
        
         sketchKey={props.sketch}
+        promotion={
+          promotion && {
+            dest: promotion.dest,
+            onPick: (role) => {
+              setPromotion(undefined);
+              if (role) props.onMove(makeUci({ from: parseSquare(promotion.orig)!, to: parseSquare(promotion.dest)!, promotion: role }));
+            },
+          }
+        }
       />
-      {promotion && (
-        <div class="promotion" role="dialog" aria-label="Promote to">
-          {(['queen', 'rook', 'bishop', 'knight'] as Role[]).map((r) => (
-            <button
-              key={r}
-              type="button"
-              onClick={() => {
-                props.onMove(makeUci({ from: parseSquare(promotion.orig)!, to: parseSquare(promotion.dest)!, promotion: r }));
-                setPromotion(undefined);
-              }}
-            >
-              {r}
-            </button>
-          ))}
-          <button type="button" class="secondary" onClick={() => setPromotion(undefined)}>
-            cancel
-          </button>
-        </div>
-      )}
     </div>
   );
 }

@@ -423,20 +423,8 @@ function Session(props: { s: SessionView }) {
             drawMode={false}
             brush="green"
             onMove={onMove}
-           
+            promotion={promotion && { dest: promotion.dest, onPick: (role) => (role ? promote(role) : setPromotion(undefined)) }}
           />
-        )}
-        {promotion && (
-          <div class="promotion" role="dialog" aria-label="Promote to">
-            {(['queen', 'rook', 'bishop', 'knight'] as Role[]).map((r) => (
-              <button key={r} type="button" onClick={() => promote(r)}>
-                {r}
-              </button>
-            ))}
-            <button type="button" class="secondary" onClick={() => setPromotion(undefined)}>
-              cancel
-            </button>
-          </div>
         )}
         <PreviewBar owner="train" />
         {/* One line, always its height, so the board never moves (§5.17). */}

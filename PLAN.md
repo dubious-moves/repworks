@@ -944,7 +944,9 @@ and offline editing with the PWA killed and reopened.
   asked for in the address stays pending until a read shows it: a sync finishing while a chapter
   opened started a newer read, which opened the chapter at its start (found on 2026-10-06, in two
   of three full e2e runs). A chapter whose file can't be read, or holds illegal moves an edit would
-  cut, is shown without editing. A promotion asks for the piece.
+  cut, is shown without editing. A promotion asks for the piece as Lichess does, on every board
+  that takes moves: the four pieces in a column from the promotion square over a dimmed board,
+  the pawn waiting there; Escape or a click elsewhere takes the move back.
 - **Conflicts** are resolved where they stand (`src/core/merge/resolve.ts`): for clashing text,
   either side, both, or a text written by hand; for a line kept after a delete, keep it (the
   marker goes) or delete it. The conflicts view also lists conflict copies of unmergeable files.

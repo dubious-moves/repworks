@@ -12,8 +12,9 @@ import type { Api } from '@lichess-org/chessground/api';
 import type { Config } from '@lichess-org/chessground/config';
 import type { DrawShape } from '@lichess-org/chessground/draw';
 import type { Key } from '@lichess-org/chessground/types';
+import { createElement } from 'preact';
 import { useEffect, useLayoutEffect, useRef } from 'preact/hooks';
-import type { SquareName } from 'chessops/types';
+import type { Role, SquareName } from 'chessops/types';
 import type { Brush, Shape } from '../core/study/model.ts';
 import { toggleShape } from '../core/study/ops.ts';
 
@@ -46,6 +47,12 @@ export interface BoardProps {
    * storm's card) or a left click clears them: `shapes` and `onShapes` are then not used.
    */
   sketchKey?: string;
+  /**
+   * A pawn's promotion being chosen, as on Lichess: the four pieces in a column on its square's
+   * file, over a dimmed board. A piece picks; a click elsewhere or Escape gives no piece. The
+   * pawn waits on its square meanwhile.
+   */
+  promotion?: { dest: Key; onPick(role: Role | undefined): void } | undefined;
 }
 
 const BRUSHES: readonly string[] = ['green', 'red', 'blue', 'yellow'];
@@ -178,7 +185,14 @@ export function Board(p: BoardProps) {
   // In the same commit as the rest of the view, so the board never shows a position the
   // notation has already left.
   useLayoutEffect(() => {
-    api.current?.set(config(p, toDraw(own(p))));
+    const c = config(p, toDraw(own(p)));
+    // While a promotion is chosen the pawn stays where it was dropped, and nothing else moves.
+    if (p.promotion) {
+      delete c.fen;
+      delete c.lastMove;
+      c.movable = { color: undefined };
+    }
+    api.current?.set(c);
     // A premove played or dropped by the game is taken off the board too.
     if (api.current?.state.premovable.current && !p.premove?.current) api.current.cancelPremove();
   });
@@ -187,6 +201,51 @@ export function Board(p: BoardProps) {
     <div class={`board${p.drawMode ? ' board-draw' : ''}`} ref={wrap}>
       <div class="cg-host" ref={el} />
       {p.badge && <Badge {...p.badge} orientation={p.orientation} />}
+      {p.promotion && <PromotionChoice {...p.promotion} orientation={p.orientation} />}
+    </div>
+  );
+}
+
+/** Lichess's order, from the promotion square inward. */
+const PROMOTION_ROLES: readonly Role[] = ['queen', 'knight', 'rook', 'bishop'];
+
+/** The promotion picker (`BoardProps.promotion`): Lichess's, with the board's own piece set. */
+function PromotionChoice(props: { dest: Key; onPick(role: Role | undefined): void; orientation: 'white' | 'black' }) {
+  const color = props.dest[1] === '8' ? 'white' : 'black';
+  const file = props.dest.charCodeAt(0) - 97;
+  const col = props.orientation === 'white' ? file : 7 - file;
+  // From the board's top edge down, or from its bottom edge up when the board is turned.
+  const top = (props.orientation === 'white') === (color === 'white');
+  const pick = useRef(props.onPick);
+  pick.current = props.onPick;
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.stopPropagation();
+      pick.current(undefined);
+    };
+    document.addEventListener('keydown', key, true);
+    return () => document.removeEventListener('keydown', key, true);
+  }, []);
+  // Presses stay here: none reaches chessground under it.
+  const stop = (e: Event) => e.stopPropagation();
+  return (
+    <div class="promotion-choice cg-wrap" role="dialog" aria-label="Promote to" data-testid="promotion" onMouseDown={stop} onTouchStart={stop} onClick={() => props.onPick(undefined)}>
+      {PROMOTION_ROLES.map((role, i) => (
+        <button
+          key={role}
+          type="button"
+          class="promotion-square"
+          aria-label={role}
+          style={{ left: `${col * 12.5}%`, top: `${(top ? i : 7 - i) * 12.5}%` }}
+          onClick={(e) => {
+            e.stopPropagation();
+            props.onPick(role);
+          }}
+        >
+          {createElement('piece', { class: `${role} ${color}` })}
+        </button>
+      ))}
     </div>
   );
 }

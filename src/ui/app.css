@@ -736,11 +736,62 @@ textarea.script {
   color: var(--warn);
 }
 
-.promotion {
-  display: flex;
-  justify-content: center;
-  gap: 6px;
-  margin: 8px 0;
+/* A promotion's pieces over the dimmed board (Board.tsx), as on Lichess. */
+.board .promotion-choice {
+  position: absolute;
+  inset: 0;
+  z-index: 205;
+  background: rgb(22 21 18 / 70%);
+}
+
+.promotion-choice .promotion-square {
+  position: absolute;
+  width: 12.5%;
+  height: 12.5%;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #b0b0b0;
+  box-shadow: inset 0 0 25px 3px #808080;
+  cursor: pointer;
+  transition: border-radius 0.13s, background 0.13s, box-shadow 0.13s;
+}
+
+.promotion-choice .promotion-square:focus-visible {
+  border-radius: 0;
+  background: #d64f00;
+  box-shadow: inset 0 0 48px 8px #a43e00;
+  outline: none;
+}
+
+.board .promotion-choice piece {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: scale(0.8);
+  transition: transform 0.13s;
+  pointer-events: none;
+}
+
+.promotion-choice .promotion-square:focus-visible piece {
+  transform: none;
+}
+
+/* Not on touch, where a tap would leave its square lit. */
+@media (hover: hover) {
+  .promotion-choice .promotion-square:hover {
+    border-radius: 0;
+    background: #d64f00;
+    box-shadow: inset 0 0 48px 8px #a43e00;
+  }
+
+  .board .promotion-choice .promotion-square:hover piece {
+    transform: none;
+  }
 }
 
 /* The notation (D21): Qchess's study layout and colours. */

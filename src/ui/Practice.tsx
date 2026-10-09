@@ -88,23 +88,30 @@ export function MoveBoard(props: { fen: string; orientation: 'white' | 'black'; 
   };
   return (
     <div class="train-board">
-      <Board fen={props.fen} orientation={props.orientation} turn={pos.turn} dests={dests} lastMove={last} check={pos.isCheck()} shapes={[]} autoShapes={props.arrows ?? []} drawMode={false} brush="green" onMove={onMove} badge={props.badge} {...(props.premove ? { premove: props.premove } : {})} />
-      {promotion && (
-        <div class="promotion" role="dialog" aria-label="Promote to">
-          {(['queen', 'rook', 'bishop', 'knight'] as Role[]).map((role) => (
-            <button
-              key={role}
-              type="button"
-              onClick={() => {
-                props.onMove(makeUci({ from: parseSquare(promotion.orig as SquareName)!, to: parseSquare(promotion.dest as SquareName)!, promotion: role }));
-                setPromotion(undefined);
-              }}
-            >
-              {role}
-            </button>
-          ))}
-        </div>
-      )}
+      <Board
+        fen={props.fen}
+        orientation={props.orientation}
+        turn={pos.turn}
+        dests={dests}
+        lastMove={last}
+        check={pos.isCheck()}
+        shapes={[]}
+        autoShapes={props.arrows ?? []}
+        drawMode={false}
+        brush="green"
+        onMove={onMove}
+        badge={props.badge}
+        {...(props.premove ? { premove: props.premove } : {})}
+        promotion={
+          promotion && {
+            dest: promotion.dest,
+            onPick: (role) => {
+              setPromotion(undefined);
+              if (role) props.onMove(makeUci({ from: parseSquare(promotion.orig as SquareName)!, to: parseSquare(promotion.dest as SquareName)!, promotion: role }));
+            },
+          }
+        }
+      />
     </div>
   );
 }

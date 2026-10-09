@@ -238,20 +238,9 @@ export function ChapterView() {
                 onMove={onMove}
                 onShapes={(shapes) => edit((ch) => setShapes(ch, at.peek(), shapes))}
                 autoShapes={shownLine || drawMode ? [] : arrows}
+                promotion={promotion && { dest: promotion.dest, onPick: (role) => (role ? promote_(role) : setPromotion(undefined)) }}
               />
               <EvalBar orientation={side.value} />
-              {promotion && (
-                <div class="promotion" role="dialog" aria-label="Promote to">
-                  {(['queen', 'rook', 'bishop', 'knight'] as Role[]).map((r) => (
-                    <button key={r} type="button" onClick={() => promote_(r)}>
-                      {r}
-                    </button>
-                  ))}
-                  <button type="button" class="secondary" onClick={() => setPromotion(undefined)}>
-                    cancel
-                  </button>
-                </div>
-              )}
               <PreviewBar owner="chapter" />
               <p class="feedback" role="status">
                 {feedback.value ?? ''}
