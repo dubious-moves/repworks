@@ -269,15 +269,38 @@ test('train ↔ study: the line on the board opened editable, edited, and the se
   expect(git.textsOf().get('studies/Rep0Najd/Ch1Najdf.pgn')).toContain('3. d4 cxd4 4. Nxd4 Nf6 *');
 });
 
-test('train ↔ study from the chapter view: a repertoire study trains, the Interactive view plays from the move shown', async ({ page }) => {
+test('train ↔ study from the chapter view: a repertoire study selects the line shown, the Interactive view plays from the move shown', async ({ page }) => {
   await setUp(page);
-  await page.goto(`${site.url}#/study/Rep0Najd/Ch2Alapn?at=e4,c5`);
-  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5');
+  // Before the fork: the topmost line selected, waiting; nothing asked (§5.83).
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf?at=e4,c5,Nf3`);
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3');
   const sw = page.getByRole('group', { name: 'Study or train' });
-  await expect(sw.getByRole('button', { name: 'Train' })).toHaveAttribute('title', 'Train this study');
+  await expect(sw.getByRole('button', { name: 'Train' })).toHaveAttribute('title', 'Train the line shown');
   await sw.getByRole('button', { name: 'Train' }).click();
-  await expect(page).toHaveURL(/#\/train\/Rep0Najd$/);
+  await expect(page).toHaveURL(/#\/train\/Rep0Najd\/Ch1Najdf\?at=e4,c5,Nf3&pick$/);
+  await expect(page.locator('.train-grid')).toHaveAttribute('data-phase', 'pick');
+  await expect(page.locator('.train-line')).toContainText('Main line · Line 1');
+  await expect(page.locator('.train-line')).toContainText('2. Nf3 d6 3. d4 cxd4');
+
+  // Back to the study, onto the other branch: that line selected.
+  await sw.getByRole('button', { name: 'Study' }).click();
+  await expect(page).toHaveURL(/#\/study\/Rep0Najd\/Ch1Najdf\?at=e4,c5,Nf3$/);
+  await page.locator('.move[data-path="e4 c5 Nf3 Nc6"]').click();
+  await sw.getByRole('button', { name: 'Train' }).click();
+  await expect(page.locator('.train-line')).toContainText('Main line · Line 2');
+  await expect(page.locator('.train-grid')).toHaveAttribute('data-phase', 'pick');
+  // Started only when asked: that line, picked as from the list.
+  await page.getByRole('button', { name: 'Train this line' }).click();
+  await expect(page).toHaveURL(/#\/train\/Rep0Najd\/Ch1Najdf\?at=e4,c5,Nf3,Nc6,d4$/);
   await asked(page);
+
+  // Left for the study, and another line browsed: that line selected, not the session taken up again.
+  await sw.getByRole('button', { name: 'Study' }).click();
+  await expect(sw.getByRole('button', { name: 'Train' })).toHaveAttribute('title', 'Back to the training session');
+  await page.locator('.move[data-path="e4 c5 Nf3 d6"]').click();
+  await sw.getByRole('button', { name: 'Train' }).click();
+  await expect(page).toHaveURL(/#\/train\/Rep0Najd\/Ch1Najdf\?at=e4,c5,Nf3,d6&pick$/);
+  await expect(page.locator('.train-line')).toContainText('Main line · Line 1');
 
   // Quiz from here, to the study at the board's move, and Train: played again from that move.
   await page.goto(`${site.url}#/play/Rep0Najd/Ch2Alapn?at=e4`);

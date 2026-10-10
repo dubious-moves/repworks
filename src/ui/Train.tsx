@@ -24,6 +24,7 @@ import { canSpeak } from '../platform/speech.ts';
 import type { Note } from '../core/train/trainer.ts';
 import { header } from '../core/study/model.ts';
 import { nodeAt, positionAt, startPosition } from '../core/study/tree.ts';
+import { lineThrough } from '../core/train/browse.ts';
 import { Board } from './Board.tsx';
 import { ModeSwitch } from './ModeSwitch.tsx';
 import { CommentText, endPreviewOnBoard, PreviewBar, previewBoard } from './CommentText.tsx';
@@ -220,7 +221,7 @@ export function TrainScreen(props: { of: SessionKind }) {
         <ModeSwitch current="train" {...(s.line || studyOf(s) ? { onStudy: toStudy } : {})} />
       </div>
       <div class={`train-body${listed ? ' with-list' : ''}`}>
-        {listed && <Lines s={s} data={data} />}
+        {listed && <Lines data={data} scope={s.scope} active={s.line && { sid: s.line.sid, cid: s.line.cid, path: s.line.path }} nothing={!!s.done && s.plan.lines.length === 0} />}
         {/* A line's or a session's end keeps the board on its last position (§5.17). */}
         <div class="train-main">{read !== undefined && s.line && s.chapter ? <ReadInSession s={s} line={s.line} ply={read} /> : s.done && !(s.position && s.plan.lines.length > 0) ? <Done s={s} /> : <Session s={s} />}</div>
       </div>
@@ -665,23 +666,111 @@ function studyOf(s: SessionView): Mode | undefined {
 }
 
 /** The line list beside the board (a wide screen) or under it, folded, on the phone (§5.16). */
-function Lines(props: { s: SessionView; data: TrainData }) {
-  const { s, data } = props;
+function Lines(props: { data: TrainData; scope?: string | undefined; active?: { sid: string; cid: string; path: readonly string[] } | undefined; nothing?: boolean }) {
+  const { data, scope, active } = props;
   const wide = typeof matchMedia === 'function' && matchMedia('(min-width: 1150px)').matches;
-  const nothing = !!s.done && s.plan.lines.length === 0;
+  const nothing = !!props.nothing;
   const [shown, setShown] = useState(wide || nothing);
   useEffect(() => {
     if (nothing) setShown(true);
   }, [nothing]);
-  const active = s.line ? { sid: s.line.sid, cid: s.line.cid, path: s.line.path } : undefined;
   return (
     <aside class={`train-list${shown ? ' shown' : ''}`} aria-label="Lines to train">
       <button type="button" class="train-list-head" aria-expanded={shown} onClick={() => setShown(!shown)}>
-        <span>{s.scope ? (data.studyNames.get(s.scope) ?? s.scope) : 'All lines'}</span>
+        <span>{scope ? (data.studyNames.get(scope) ?? scope) : 'All lines'}</span>
         <span class="muted">{shown ? 'Hide' : 'Show'} lines</span>
       </button>
-      {shown && <LineList data={data} {...(s.scope === undefined ? {} : { scope: s.scope })} {...(active ? { active } : {})} />}
+      {shown && <LineList data={data} {...(scope === undefined ? {} : { scope })} {...(active ? { active } : {})} />}
     </aside>
+  );
+}
+
+/**
+ * "Train" from the study (§5.83): the line through the move shown (the topmost, at a fork) selected
+ * in the list, the board at that move, waiting: nothing starts until "Train this line", or another
+ * line picked, or today's queue.
+ */
+export function TrainPick(props: { sid: string; cid: string; at: string[] }) {
+  const { sid, cid, at } = props;
+  const data = trainData.value;
+  if (!data) return <p class="muted">Reading the repertoire…</p>;
+  const line = lineThrough(data.index, sid, cid, at);
+  const chapter = data.chapters.get(`${sid}/${cid}`);
+  // The board at the move shown, or where it leaves the line chosen for it.
+  let shared = 0;
+  while (line && shared < at.length && line.path[shared] === at[shared]) shared++;
+  const shownPath = at.slice(0, shared);
+  const start = chapter ? startPosition(chapter) : undefined;
+  const pos = chapter ? positionAt(chapter, shownPath) : undefined;
+  let lastMove: [Key, Key] | undefined;
+  if (chapter && shownPath.length) {
+    const before = positionAt(chapter, shownPath.slice(0, -1));
+    const m = before && parseSan(before, shownPath[shownPath.length - 1]!);
+    if (m) lastMove = chessgroundMove(m) as [Key, Key];
+  }
+  const name = chapter ? (header(chapter, 'ChapterName') ?? cid) : cid;
+  const go = () => line && open({ name: 'train', sid, cid, at: [...line.path] });
+  return (
+    <div class="train train-pick">
+      <div class="chapter-head">
+        <Back parent={{ name: 'chapter', sid, cid, at }} />
+        <div class="titles">
+          <span class="study-title">Training · {data.studyNames.get(sid) ?? sid}</span>
+        </div>
+        <button type="button" class="icon" aria-label="Training settings" title="Training settings" onClick={openTrainSettings}>
+          ⚙
+        </button>
+        <ModeSwitch current="train" onStudy={() => open({ name: 'chapter', sid, cid, at })} />
+      </div>
+      <div class="train-body with-list">
+        <Lines data={data} scope={sid} active={line ? { sid, cid, path: line.path } : undefined} nothing={!line} />
+        <div class="train-main">
+          <div class="train-grid" data-phase="pick">
+            <div class="train-board">
+              {pos && (
+                <Board
+                  fen={makeFen(pos.toSetup())}
+                  orientation={chapter && header(chapter, 'Orientation') === 'black' ? 'black' : 'white'}
+                  turn={pos.turn}
+                  dests={new Map()}
+                  lastMove={lastMove}
+                  check={pos.isCheck()}
+                  shapes={[]}
+                  drawMode={false}
+                  brush="green"
+                  onMove={() => undefined}
+                />
+              )}
+              <p class="feedback train-feedback note-none" role="status">
+                {line ? 'Selected: start it when ready' : ''}
+              </p>
+            </div>
+            <div class="train-panel">
+              {line ? (
+                <p class="train-line">
+                  <strong>
+                    {name} · Line {lineNumber(data.index, line)}
+                  </strong>{' '}
+                  <span class="muted">{start ? numbered(start, line.path) : line.path.join(' ')}</span>
+                </p>
+              ) : (
+                <p class="train-line">This chapter has no lines to train: pick one from the list, or train today's queue.</p>
+              )}
+              <div class="actions train-actions">
+                {line && (
+                  <button type="button" onClick={go}>
+                    Train this line
+                  </button>
+                )}
+                <button type="button" class={line ? 'secondary' : undefined} onClick={() => open({ name: 'train', sid })}>
+                  Today's queue
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

@@ -16,6 +16,8 @@ test('hashes parse to modes, and modes write back to the same hash', () => {
     ['#/train', { name: 'train' }],
     ['#/train/Rep0Najd', { name: 'train', sid: 'Rep0Najd' }],
     ['#/train/Rep0Najd/Ch1Najdf?at=e4,c5', { name: 'train', sid: 'Rep0Najd', cid: 'Ch1Najdf', at: ['e4', 'c5'] }],
+    ['#/train/Rep0Najd/Ch1Najdf?at=e4,c5&pick', { name: 'train', sid: 'Rep0Najd', cid: 'Ch1Najdf', at: ['e4', 'c5'], pick: true }],
+    ['#/train/Rep0Najd/Ch1Najdf?at=&pick', { name: 'train', sid: 'Rep0Najd', cid: 'Ch1Najdf', at: [], pick: true }],
     ['#/learn/Rep0Najd/Ch1Najdf', { name: 'learn', sid: 'Rep0Najd', cid: 'Ch1Najdf' }],
     ['#/coverage/Rep0Najd', { name: 'coverage', sid: 'Rep0Najd' }],
     ['#/analysis', { name: 'analysis' }],

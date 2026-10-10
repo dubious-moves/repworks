@@ -1859,7 +1859,7 @@ behaviour is copied, then improved later. The owner's words:
    change, and §4.7 already restores a study deleted on one device and edited on another.
 4. **Train ↔ study as Qchess's MoveTrainer.** While a line is trained (§5.7, and the Interactive
    view, §5.10), one control opens the study view on that chapter with the trained line at the
-   current move, editable. From the chapter view, training resumes or starts from the move shown.
+   current move, editable. From the chapter view, training resumes or starts from the move shown (in a repertoire study, the line shown selected and waiting, §5.83).
    Qchess decides how the session continues (where it was, or that line again). Repworks also
    has to decide what an edit made mid-session does to the session plan, since the index and
    the line can change. That is a technical call for the build session, and §5.6's trainer is
@@ -2908,6 +2908,33 @@ wanted; a deepened list keeping Maia's; the verdict's line), with three controls
 kept position rated at the six ratings, the unintuitive count checked against the test's own
 reading of Maia and the fake ChessDB, the unintuitive storm dealing one of them, Maia's move
 graded below good with Maia's line, the review's rows and its line behind Best move).
+
+#### 5.83 "Train" from the study selects the line shown (the owner's request, 2026-10-10)
+
+> I've noticed that going from a specific variation/position in Study page to Train page doesn't
+> land on the correct variation. Most often, it starts the review queue of the first chapter. If
+> possible, I want the variation I was browsing to be selected when entering train page. It
+> shouldn't start a review automatically by clicking "Train". If there are multiple branches, the
+> topmost branch can be selected.
+
+Replaces §5.15's "from the chapter view, training starts" for a repertoire study:
+- **"Train" in a repertoire study's chapter view opens the training screen with the line through
+  the move shown selected**, waiting (`#/train/<sid>/<cid>?at=…&pick`): the line highlighted in
+  the list, the board at the move shown, the line named, and "Train this line" (the line picked as
+  from the list, §5.16) or "Today's queue" (the study's). Nothing starts by itself. At a fork the
+  topmost line through the move (the list's order, main line first); at the chapter's start, its
+  first line; a move on no line (cut where an illegal move stood), the line sharing most of it.
+- **A session left for the study is taken up again only while the move shown is on the line it
+  left** (or on that line as since extended in the study, §5.15's edit-and-return): one path leads
+  on to the other. Browsed elsewhere, "Train" selects the line shown instead; the left session is
+  dropped when the next session starts.
+- A reference study's "Train" and a session left from the Interactive view still play from the
+  move shown (§5.10).
+
+Tests: `browse.test.ts` (the line through a move: before a fork, at the start, on a branch, on no
+line), `fsm.test.ts` (the pick address), `studies.spec.ts` (desktop and phone: both branches of a
+fork selected from the study, nothing asked until "Train this line", a left session not taken up
+from another line).
 
 #### 5.14 Phase 1 acceptance test, and exit
 

@@ -150,7 +150,7 @@ export function ChapterView() {
     open(trainingFrom({ sid: s.sid, cid: s.cid, at: at.peek(), kind: s.meta.kind }));
   };
   const waiting = !!left.value;
-  const trainTitle = waiting ? 'Back to the training session' : s.meta.kind === 'repertoire' ? 'Train this study' : 'Play the line from this move';
+  const trainTitle = waiting ? 'Back to the training session' : s.meta.kind === 'repertoire' ? 'Train the line shown' : 'Play the line from this move';
   // The analysis board (§5.35): the same view over a chapter on this device only.
   const scratch = s.sid === SCRATCH;
 

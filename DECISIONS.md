@@ -1476,3 +1476,9 @@ The technical calls, each with its reason:
   move (§5.80).
 - **No new field in the progress log**: an unintuitive storm's answers are ordinary `storm`
   events.
+
+## Revision of 2026-10-10 ("Train" from the study, PLAN.md §5.83)
+- **"Train" in a repertoire study selects the line shown and waits** (the owner: it should land on
+  the variation browsed, the topmost at a fork, and not start a review by itself). Was: the
+  study's queue started at once, from its first chapter's lines. A session left for the study is
+  taken up again only while the move shown is still on its line.

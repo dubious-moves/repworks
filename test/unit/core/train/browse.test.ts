@@ -13,7 +13,7 @@ import { newCard, State } from '../../../../src/core/progress/fsrs.ts';
 import type { CardState } from '../../../../src/core/progress/replay.ts';
 import { parseChapterFile } from '../../../../src/core/pgn/parse.ts';
 import { indexStudies, type Line } from '../../../../src/core/repertoire/index.ts';
-import { chapterRows, findLine, learnPlan, pickedPlan } from '../../../../src/core/train/browse.ts';
+import { chapterRows, findLine, learnPlan, lineThrough, pickedPlan } from '../../../../src/core/train/browse.ts';
 import type { SessionPlan } from '../../../../src/core/train/plan.ts';
 import type { Day } from '../../../../src/core/train/queue.ts';
 import { DEFAULT_TRAIN } from '../../../../src/core/train/settings.ts';
@@ -113,6 +113,23 @@ test('each chapter lists its lines in order, numbered, with their state and wher
     ['learned', notDue.card.due],
     ['learned', notDue.card.due],
   ]);
+});
+
+test('the line through a study\'s move: the topmost through it, or the one sharing most of it (§5.83)', () => {
+  const path = (sans: string) => (sans ? sans.split(' ') : []);
+  const through = (at: string) => lineThrough(ix, 'Study001', 'Chapter1', path(at))?.path.join(' ');
+  const main = 'e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O';
+  const side = 'e4 e5 Nf3 Nc6 Bb5 a6 Bxc6 dxc6 O-O';
+  // Before the fork, and at the chapter's start: the topmost line, as the list shows it first.
+  assert.equal(through('e4 e5 Nf3'), main);
+  assert.equal(through(''), main);
+  // On a branch: that branch's line, at any of its moves.
+  assert.equal(through('e4 e5 Nf3 Nc6 Bb5 a6 Bxc6'), side);
+  assert.equal(through(side), side);
+  // A move on no line (cut, or gone since): the line sharing most of it.
+  assert.equal(through('e4 e5 Nf3 Nc6 Bb5 a6 Bxc6 bxc6'), side);
+  assert.equal(lineThrough(ix, 'Study001', 'Chapter2', ['d4'])?.path.join(' '), 'd4 d5 c4');
+  assert.equal(lineThrough(ix, 'Study001', 'Nowhere1', ['e4']), undefined);
 });
 
 test('a picked line: due moves graded, new ones taught, the rest asked with no record, suspended ones played', () => {

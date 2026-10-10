@@ -6,6 +6,7 @@
 //   #/study/<sid>[/<cid>][?at=e4,e5]    a chapter, at a move
 //   #/train[/<sid>]                     training: the whole repertoire, or one study (§5.7)
 //   #/train/<sid>/<cid>?at=e4,e5        one line picked from the training list (§5.16)
+//   #/train/<sid>/<cid>?at=e4,e5&pick   the line through a study's move, selected, not started (§5.83)
 //   #/learn/<sid>/<cid>                 a chapter's new lines, past the daily limit (§5.16)
 //   #/show[/<sid>]                      show and grade, by two keys (§5.9)
 //   #/mistakes                          the day's mistakes and the pins (§5.8)
@@ -45,9 +46,10 @@ export type Mode =
   | { name: 'chapter'; sid: string; cid?: string; at?: string[] }
   /**
    * A training session: the whole repertoire, or one study's lines; with `cid` and `at`, the one
-   * line of that chapter whose moves are `at`, picked from the list (§5.16).
+   * line of that chapter whose moves are `at`, picked from the list (§5.16). With `pick`, `at` is
+   * a move of the chapter ([] its start) and its line is selected, waiting to be started (§5.83).
    */
-  | { name: 'train'; sid?: string; cid?: string; at?: string[] }
+  | { name: 'train'; sid?: string; cid?: string; at?: string[]; pick?: true }
   /** A chapter's lines still holding new moves, learned past the daily limit (§5.16). */
   | { name: 'learn'; sid: string; cid: string }
   /** Show and grade (§5.9): the same queue, run with two keys. */
@@ -180,6 +182,7 @@ export function parseHash(hash: string): Mode {
     if (parts.length === 1) return { name };
     if (parts.length === 2 && isId(parts[1])) return { name, sid: parts[1] };
     const at = atOf(query);
+    if (name === 'train' && parts.length === 3 && isId(parts[1]) && isId(parts[2]) && at && query.split('&').includes('pick')) return { name, sid: parts[1], cid: parts[2], at, pick: true };
     if (name === 'train' && parts.length === 3 && isId(parts[1]) && isId(parts[2]) && at?.length) return { name, sid: parts[1], cid: parts[2], at };
     return { name: 'list' };
   }
@@ -276,6 +279,7 @@ export function modeHash(mode: Mode): string {
     case 'conflicts':
       return '#/conflicts';
     case 'train':
+      if (mode.sid && mode.cid && mode.pick) return `#/train/${mode.sid}/${mode.cid}?at=${(mode.at ?? []).map(encodeURIComponent).join(',')}&pick`;
       if (mode.sid && mode.cid && mode.at?.length) return `#/train/${mode.sid}/${mode.cid}${atQuery(mode.at)}`;
       return mode.sid ? `#/train/${mode.sid}` : '#/train';
     case 'learn':

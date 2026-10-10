@@ -110,6 +110,24 @@ export function findLine(index: RepertoireIndex, sid: string, cid: string, path:
 }
 
 /**
+ * The line a move of a chapter is on, for "Train" from the study (§5.83): the topmost line through
+ * it, the order the line list shows; when the move is on no line (a line cut where an illegal move
+ * stood), the topmost line sharing the most moves with it.
+ */
+export function lineThrough(index: RepertoireIndex, sid: string, cid: string, at: readonly string[]): Line | undefined {
+  let best: Line | undefined;
+  let shared = -1;
+  for (const line of index.lines) {
+    if (line.sid !== sid || line.cid !== cid) continue;
+    let n = 0;
+    while (n < at.length && n < line.path.length && line.path[n] === at[n]) n++;
+    if (n === at.length) return line;
+    if (n > shared) [best, shared] = [line, n];
+  }
+  return best;
+}
+
+/**
  * One line picked from the list: walked whole; its due moves (and known moves never answered)
  * asked and graded, its moves never answered taught; the trainer asks the rest ungraded
  * (`practice`).

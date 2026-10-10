@@ -68,6 +68,8 @@ test('an alternative is added from the study: the move played on the board is sa
 
   await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf?at=e4,c5`);
   const panel = page.getByRole('region', { name: 'Training card' });
+  // Counted once the notation is drawn: before it, there are none.
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5');
   const variations = await page.locator('.notation .variation').count();
   await panel.getByRole('button', { name: 'Add alternative…' }).click();
   await expect(panel).toContainText('Play the alternative on the board.');

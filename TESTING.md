@@ -5,6 +5,14 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## "Train" from the study selects the line shown (§5.83)
+
+- Desktop and phone, in a repertoire study: browse to a move in a side variation and press Train.
+  The training screen should name that line (highlighted in the list on desktop), show the board
+  at that move, and start nothing until "Train this line". At a fork, the topmost line.
+- Train a line, press Study, browse to another variation, press Train: that variation selected,
+  not the old session resumed. Pressing Train without leaving the line resumes the session.
+
 ## Maia in the storm: difficulty and the unintuitive storm (§5.82)
 
 - Desktop and phone: on the storm's page with Maia downloaded (or "Get Maia…" there), the

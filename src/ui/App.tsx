@@ -23,7 +23,7 @@ import { SetupForm } from './Setup.tsx';
 import { SyncBanners, SyncChip } from './Sync.tsx';
 import { MistakesView } from './Mistakes.tsx';
 import { ReadView } from './Read.tsx';
-import { TrainScreen } from './Train.tsx';
+import { TrainPick, TrainScreen } from './Train.tsx';
 import { TrainCard } from './TrainCard.tsx';
 import { TrainSettingsDialog } from './TrainSettings.tsx';
 import { PriorityDialog } from './Priority.tsx';
@@ -123,6 +123,7 @@ function Screen() {
       return <ChapterView />;
     case 'train': {
       const m = mode.value;
+      if (m.pick && m.sid && m.cid) return <TrainPick sid={m.sid} cid={m.cid} at={m.at ?? []} />;
       if (m.sid && m.cid && m.at?.length) return <TrainScreen of={{ kind: 'line', sid: m.sid, cid: m.cid, at: m.at }} />;
       return <TrainScreen of={m.sid ? { kind: 'queue', scope: m.sid } : { kind: 'queue' }} />;
     }

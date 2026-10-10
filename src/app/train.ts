@@ -607,6 +607,8 @@ function apply(t: Trainer, effects: readonly ShowGradeEffect[]): void {
 export interface LeftSession {
   of: SessionKind;
   answered: string[];
+  /** The line on the board when it was left: "Train" takes the session up only from it (§5.83). */
+  line?: { sid: string; cid: string; path: string[] };
 }
 const LEFT_KEY = 'repworks.leftSession';
 function readLeft(): LeftSession | undefined {
@@ -661,23 +663,33 @@ export function leaveForStudy(): Mode | undefined {
   const s = session.peek();
   const line = s?.line;
   if (!s || !line) return undefined;
-  setLeft({ of: s.of, answered: [...answered] });
+  setLeft({ of: s.of, answered: [...answered], line: { sid: line.sid, cid: line.cid, path: [...line.path] } });
   return { name: 'chapter', sid: line.sid, cid: line.cid, at: [...s.path] };
 }
 
 /**
- * "Train" in the chapter view. A session left for the study is taken up again: planned afresh
- * from the repertoire as it now is, less what it already answered. The Interactive view starts
- * again from the move shown. With no session left, a repertoire study's training starts (Qchess's
- * Move Trainer trains the study), and a reference study, which has no cards, is played from the
- * move shown.
+ * "Train" in the chapter view. A session left for the study is taken up again while the move shown
+ * is still on the line it left (or on that line as since extended): planned afresh from the
+ * repertoire as it now is, less what it already answered. The Interactive view starts again from
+ * the move shown. Otherwise a repertoire study's training opens with the line through the move
+ * shown selected, waiting to be started (§5.83), and a reference study, which has no cards, is
+ * played from the move shown.
  */
 export function trainingFrom(here: { sid: string; cid: string; at: readonly string[]; kind: StudyKind }): Mode {
   const l = left.peek();
-  if (l && l.of.kind !== 'play') {
+  if (l && l.of.kind !== 'play' && onLine(l, here)) {
     resuming = JSON.stringify(l.of);
     return sessionMode(l.of);
   }
-  if (!l && here.kind === 'repertoire') return { name: 'train', sid: here.sid };
+  if (here.kind === 'repertoire' && l?.of.kind !== 'play') return { name: 'train', sid: here.sid, cid: here.cid, at: [...here.at], pick: true };
   return { name: 'play', sid: here.sid, cid: here.cid, at: [...here.at] };
+}
+
+/** Whether the move shown is on the line a session was left at: one path leads on to the other. */
+function onLine(l: LeftSession, here: { sid: string; cid: string; at: readonly string[] }): boolean {
+  if (!l.line) return true;
+  if (l.line.sid !== here.sid || l.line.cid !== here.cid) return false;
+  const n = Math.min(l.line.path.length, here.at.length);
+  for (let i = 0; i < n; i++) if (l.line.path[i] !== here.at[i]) return false;
+  return true;
 }
