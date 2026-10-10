@@ -2850,6 +2850,19 @@ search against its score; the move goes to the two searches (the card's position
 after the move, MultiPV 1), each to depth 20 on every device (the phone was 18), at most 8 s
 each, the verdict showing the depth reached. Tests: none new (the grade lives in `src/app`);
 the phone's time to depth 20 is for the owner's live test.
+
+#### 5.81 A set's cards deepened while the user thinks (the owner's request, 2026-10-10)
+
+A set knows its six cards when it starts, so the storm's Stockfish deepens those still below the
+standard (MultiPV 12 at depth 20, §23) while a move is awaited: the card on the board first, then
+those still to come, then the second pass's; each is stored as deepened, as the home's deepening
+would, and takes the dealt card's place in the session. A move on a deepened card is graded at
+once from its list (§5.80); a move stops the look-ahead's search, so the grade's searches never
+wait behind it, and it starts again with the verdict and with each deal (the card stopped
+mid-search is tried again). Each card is tried once a session; the storm (timed) is not looked
+ahead, its next card being drawn only when dealt. Cards in a session now match by their id, not
+the object, since a deepened card replaces the one dealt. Tests: none new (`src/app`, a real
+engine); the live check is the owner's.
 #### 5.14 Phase 1 acceptance test, and exit
 
 **Acceptance test (live, desktop + Android phone)**, after Phase 0's (§4.11) and once §5.15 is

@@ -751,7 +751,7 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
   const title = v ? (item.puzzle ? (PUZZLE_WORD[v.band] ?? '') : (TITLE_WORD[v.band] ?? '')) : phase === 'grading' && !item.puzzle ? 'Checking…' : 'Find a good move';
   const left = STORM.setRetryMax - (item.attempts ?? 0);
   // A set card tried again (or back in the second pass): its first answer is the one that counts.
-  const counted = s.mode === 'set' ? s.history.find((h) => h.card === item.card)?.answer : undefined;
+  const counted = s.mode === 'set' ? s.history.find((h) => h.card.card === item.card.card)?.answer : undefined;
   const line = v
     ? item.puzzle
       ? `${v.userSan || '—'}${v.points ? ` · ${v.points > 0 ? '+' : ''}${v.points}` : ''}`

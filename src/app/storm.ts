@@ -387,6 +387,68 @@ export function stopDeepening(): void {
   deepening.value = false;
 }
 
+/* ------------------------------------------------------------------ a set's look-ahead (§5.81) */
+
+let lookRun = 0;
+let lookBusy = false;
+/** The cards searched this session, deepened or not: one try each. */
+const lookTried = new Set<string>();
+
+/**
+ * While a set waits for a move, Stockfish deepens its cards still below the standard (MultiPV 12
+ * at depth 20, §23), the one on the board first, then those still to come: a move on a deepened
+ * card is graded at once from its list. A move stops it (`pauseLookAhead`); the next deal, or the
+ * verdict, starts it again.
+ */
+async function lookAhead(): Promise<void> {
+  const s = stormSession.value;
+  if (!s || s.mode !== 'set' || s.phase === 'done' || lookBusy) return;
+  const run = ++lookRun;
+  lookBusy = true;
+  try {
+    for (;;) {
+      const now = stormSession.value;
+      if (run !== lookRun || !now || now.phase === 'done') return;
+      const onBoard = now.item && !now.item.puzzle && !now.item.answer ? [now.item.card] : [];
+      const p = [...onBoard, ...queue, ...secondPass.map((i) => i.card)].find((c) => c.src === 'sf' && c.depth < STORM.deepenDepth && !lookTried.has(c.card));
+      if (!p) return;
+      lookTried.add(p.card);
+      const a = await analyseForStorm(p.fen, STORM.deepenMultipv, STORM.deepenDepth, 60_000);
+      if (run !== lookRun) {
+        // Stopped by a move: tried again later.
+        lookTried.delete(p.card);
+        return;
+      }
+      const pos = positionOf(p.fen);
+      const d = pos && a ? deepenedPosition(p, engineList(a.lines, pos.turn, a.depth, STORM), STORM) : null;
+      if (d) {
+        swapIn(d);
+        await stormStore().putPosition(d);
+      }
+    }
+  } finally {
+    if (run === lookRun) lookBusy = false;
+  }
+}
+
+/** The look-ahead stopped, its search with it. */
+function pauseLookAhead(): void {
+  if (!lookBusy) return;
+  lookRun++;
+  lookBusy = false;
+  cancelStormEngine();
+}
+
+/** A deepened card in place of the one dealt, wherever the session holds it (cards match by id). */
+function swapIn(d: StoredPosition): void {
+  queue = queue.map((c) => (c.card === d.card ? d : c));
+  secondPass = secondPass.map((i) => (i.card.card === d.card ? { ...i, card: d } : i));
+  const s = stormSession.value;
+  if (!s) return;
+  const item = s.item && s.item.card.card === d.card && !s.item.answer ? { ...s.item, card: d } : s.item;
+  update({ item, history: s.history.map((h) => (h === s.item ? item! : h.card.card === d.card ? { ...h, card: d } : h)) });
+}
+
 /* ------------------------------------------------------------------ a session (§5.43, §5.44) */
 
 export type SessionMode = 'storm' | 'set';
@@ -543,6 +605,7 @@ export async function startStorm(s: StormScopeData, mode: SessionMode): Promise<
     total = queue.length + n;
   }
   secondPass = [];
+  lookTried.clear();
   stormSession.value = { mode, scopeKey: s.key, title: s.title, phase: 'solving', item: undefined, history: [], points: 0, streak: 0, left: STORM.sessionMs, endsAt: undefined, pass: 1, revealed: false, note: '', total, disguise: puzzleQueue.length > 0 };
   if (mode === 'storm') {
     tick = setInterval(() => {
@@ -599,6 +662,7 @@ function deal(): void {
   const { nextAt: _a, nextIn: _b, ...rest } = stormSession.value!;
   stormSession.value = { ...rest, item, revealed: false, history: s.pass === 1 ? [...s.history, item] : s.history };
   setPhase('solving');
+  void lookAhead();
 }
 
 /** The user's move on the card (standard UCI). */
@@ -616,7 +680,10 @@ export async function answerMove(uci: string): Promise<void> {
     update({ item: played });
     setPhase('grading');
   }
+  // The grade's searches come first: a set's look-ahead waits for the verdict.
+  pauseLookAhead();
   const v = await gradeMove(item.card, uci);
+  void lookAhead();
   const now = stormSession.value;
   if (!now || seq !== gradeSeq) return;
   if (retry) return update({ retry: { ...played, answer: v } });
@@ -634,7 +701,7 @@ function settle(item: StormItem, uci: string, v: StormAnswer): void {
     v.points = pts;
     void recordEvent({ t: new Date().toISOString(), ...stormAnswer(card.card, band, { uci, wp: v.wp ?? null, chapter: chapterOf(card) }) });
     const done: StormItem = { ...item, answer: v };
-    update({ item: done, history: now.history.map((h) => (h.card === item.card ? done : h)), points: now.points + pts, streak: nextStreak(now.streak, pts) });
+    update({ item: done, history: now.history.map((h) => (h.card.card === item.card.card ? done : h)), points: now.points + pts, streak: nextStreak(now.streak, pts) });
     setPhase('verdict');
     // A beat to read the verdict (shorter when the move scored, §18.1), then the next card by
     // itself; the clock is stopped meanwhile, and Pause keeps the card for as long as wanted.
@@ -652,7 +719,7 @@ function settle(item: StormItem, uci: string, v: StormAnswer): void {
   const next: StormItem = { ...item, answer: v, attempts, ...(outcome ? (now.pass === 1 ? { outcome } : { secondOutcome: outcome }) : {}) };
   // Only the first answer counts: a later attempt is kept beside it, never over it.
   const kept = (h: StormItem): StormItem => (first || !h.answer ? { ...h, ...next } : { ...h, ...next, answer: h.answer, later: [...(h.later ?? []), v] });
-  update({ item: next, history: now.history.map((h) => (h.card === item.card ? kept(h) : h)) });
+  update({ item: next, history: now.history.map((h) => (h.card.card === item.card.card ? kept(h) : h)) });
   setPhase(held ? 'held' : 'verdict');
   if (!held && now.pass === 1 && outcome && outcome !== 'first' && outcome !== 'unknown') secondPass.push(again(item));
 }
@@ -751,7 +818,7 @@ export function showMove(): void {
   const outcome: SetOutcome = 'shown';
   const item: StormItem = { ...s.item, ...(s.pass === 1 ? { outcome } : { secondOutcome: outcome }) };
   if (s.pass === 1) secondPass.push(again(s.item));
-  update({ item, revealed: true, history: s.history.map((h) => (h.card === item.card ? { ...h, ...item, answer: h.answer ?? item.answer, later: h.later } : h)) });
+  update({ item, revealed: true, history: s.history.map((h) => (h.card.card === item.card.card ? { ...h, ...item, answer: h.answer ?? item.answer, later: h.later } : h)) });
   setPhase('verdict');
 }
 
@@ -778,6 +845,7 @@ export function nextCard(): void {
 
 /** Ends the session: the card on the board kept, unanswered (§14.10c). */
 export function endStorm(why: 'time' | 'out' | 'empty' | 'stop'): void {
+  pauseLookAhead();
   clearInterval(tick);
   clearTimeout(verdictTimer);
   gradeSeq++;
@@ -794,6 +862,7 @@ export function endStorm(why: 'time' | 'out' | 'empty' | 'stop'): void {
 }
 
 export function endStormSession(): void {
+  pauseLookAhead();
   clearInterval(tick);
   clearTimeout(verdictTimer);
   gradeSeq++;
@@ -816,6 +885,7 @@ export function leaveStorm(): void {
  */
 export function suspendStorm(): void {
   pauseVerdict();
+  pauseLookAhead();
   stopGathering();
   stopDeepening();
   endStormEngine();

@@ -5,6 +5,12 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## A set's cards deepened while you think (§5.81)
+
+- A set of 6 with cards gathered by Stockfish and not yet deepened: think a while on each card
+  before moving. The verdict should come at once and say "by Stockfish d20"; the home's
+  "scored to depth 20" count goes up after the set. Moving at once still works (two searches).
+
 ## A storm move judged at depth 20 (§5.80)
 
 - Phone: a storm card gathered by Stockfish and not yet deepened (the home's "Stockfish: n of m

@@ -1459,3 +1459,8 @@ The technical calls, each with its reason:
   list** (the owner: depth 14 is not good enough to judge a move). A card whose stored list is
   below depth 20 is graded by two fresh searches at depth 20 (the phone too, was 18), 8 s each at
   most. The walk keeps depth 14 for finding positions, so gathering is no slower.
+
+## Revision of 2026-10-10 (a set's look-ahead, PLAN.md §5.81)
+- **A set deepens its own cards while the user thinks** (the owner's request): the card on the
+  board, then the rest of the six, to MultiPV 12 at depth 20, stored as the home's deepening
+  stores them. A move pre-empts it, so the grade is never slower for it.
