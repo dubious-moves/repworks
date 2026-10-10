@@ -65,7 +65,8 @@ test('the thresholds hold their meaning', () => {
   assert.ok(C.setRetryMax >= 2 && C.setRetryMax <= 5);
   assert.ok(C.setSize >= 4 && C.setSize <= 12);
   assert.ok(C.verdictFastMs < C.verdictMs);
-  assert.ok(C.walkDepth < C.deepenDepth);
+  assert.ok(C.walkDepth < C.judgeDepth && C.judgeDepth <= C.deepenDepth.mobile && C.deepenDepth.mobile <= C.deepenDepth.desktop);
+  assert.ok(C.engineDepth.mobile >= C.judgeDepth && C.engineDepth.desktop >= C.judgeDepth);
   assert.ok(C.walkMultipv >= C.minScored);
   assert.ok(C.puzzleAnchorMinPly >= 10);
 });

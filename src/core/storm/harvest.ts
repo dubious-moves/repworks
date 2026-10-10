@@ -248,17 +248,26 @@ export function storedList(p: StoredPosition): ScoredList {
   return Object.assign(moves, p.src === 'sf' ? { source: 'sf' as const, depth: p.depth } : { source: 'cdb' as const });
 }
 
-/** Whether a stored position still wants Stockfish's standard list (§23: MultiPV 12 at depth 20). */
-export function needsDeepening(p: StoredPosition, c: StormConfig): boolean {
-  return p.src !== 'sf' || p.depth < c.deepenDepth;
+/** Whether a stored position's list may judge a move: Stockfish's at `judgeDepth` or deeper (§5.80, §5.84). */
+export function judges(p: StoredPosition, c: StormConfig): boolean {
+  return p.src === 'sf' && p.depth >= c.judgeDepth;
+}
+
+/**
+ * Whether a stored position still wants Stockfish's standard list (§23: MultiPV 12 at the device's
+ * `target` depth, §5.84). ChessDB's list always does: it never judges a move.
+ */
+export function needsDeepening(p: StoredPosition, target: number): boolean {
+  return p.src !== 'sf' || p.depth < target;
 }
 
 /**
  * The position with Stockfish's list in place of the one it was stored with, or null when the
- * search fell short of the standard (§23.7.2: a list below it counts as not done) or found fewer
- * than three moves.
+ * search fell short of a list that may judge (§23.7.2: a list below it counts as not done), is no
+ * deeper than the Stockfish list already kept, or found fewer than three moves.
  */
 export function deepenedPosition(p: StoredPosition, list: ScoredList | null, c: StormConfig): StoredPosition | null {
-  if (!list || list.source !== 'sf' || (list.depth ?? 0) < c.deepenDepth || list.length < Math.min(3, p.scored.length)) return null;
-  return { ...p, scored: list.map((m) => ({ u: m.uci, s: m.score })), src: 'sf', depth: list.depth ?? 0 };
+  const depth = list?.depth ?? 0;
+  if (!list || list.source !== 'sf' || depth < c.judgeDepth || (p.src === 'sf' && depth <= p.depth) || list.length < Math.min(3, p.scored.length)) return null;
+  return { ...p, scored: list.map((m) => ({ u: m.uci, s: m.score })), src: 'sf', depth };
 }

@@ -8,7 +8,7 @@ import { createSearch, type Analysis, type EngineLine, type Search } from '../co
 import { positionOf } from '../core/storm/walk.ts';
 import { ensure } from '../platform/blobs.ts';
 import { startStockfish, stockfishFiles, type EngineProcess } from '../platform/stockfish.ts';
-import { enginePrefs } from './engine.ts';
+import { enginePrefs, runningThreads } from './engine.ts';
 
 export interface EngineAnswer {
   lines: EngineLine[];
@@ -36,12 +36,13 @@ async function start(): Promise<boolean> {
   if (failed) return false;
   starting ??= (async () => {
     try {
-      // The device's version (§5.75), as the study page's engine.
+      // The device's version (§5.75) and threads (§5.36), as the study page's engine (§5.84).
       const version = enginePrefs.peek().version;
-      const files = stockfishFiles(1, version);
+      const threads = runningThreads();
+      const files = stockfishFiles(threads, version);
       await ensure(files);
       search = createSearch({ send: (c) => proc?.send(c), now: () => performance.now(), onUpdate });
-      proc = startStockfish({ line: (l) => search?.receive(l), crashed: () => crash() }, matchMedia('(max-width: 768px)').matches ? 16 : 32, 1, version);
+      proc = startStockfish({ line: (l) => search?.receive(l), crashed: () => crash() }, matchMedia('(max-width: 768px)').matches ? 16 : 32, threads, version);
       return true;
     } catch {
       failed = true;
@@ -91,6 +92,16 @@ async function next(): Promise<void> {
     finish(now && now.fen === j.fen && now.lines.length ? { lines: now.lines, depth: now.depth } : null);
   }, j.movetime + 4000);
   search.analyse({ fen: j.fen, key: positionKeyOf(pos), turn: pos.turn, depth: j.depth, movetime: j.movetime, lines: j.lines, legal });
+}
+
+/**
+ * The search under way on `fen` as it stands, at its shallowest line's depth (lines of a MultiPV
+ * search finish an iteration one by one); null when none runs there or it has no line yet.
+ */
+export function stormSearchSoFar(fen: string): EngineAnswer | null {
+  const now = job && job.fen === fen ? search?.current() : undefined;
+  if (!now || now.fen !== fen || !now.lines.length) return null;
+  return { lines: now.lines, depth: Math.min(...now.lines.map((l) => l.depth)) };
 }
 
 /** Stockfish's MultiPV lines for a position, to `depth` or `movetime` ms; null when it can't. */

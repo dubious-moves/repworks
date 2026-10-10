@@ -6,10 +6,10 @@
 import type { Band } from './config.ts';
 
 /**
- * How a move was graded: the stored list (ChessDB's `list`, Stockfish's `sflist`), one more
- * request about the position after it (`child`), or Stockfish now (`engine`).
+ * How a move was graded, by Stockfish only (§5.84): the stored list (`sflist`), or searches now
+ * (`engine`).
  */
-export type VerdictSource = 'list' | 'sflist' | 'child' | 'engine';
+export type VerdictSource = 'sflist' | 'engine';
 
 export interface Verdict {
   verdict: Band | 'unanswered';
@@ -79,15 +79,12 @@ export function verdictLine(v: Verdict, s: CardFacts): string {
   return bits.join(' · ');
 }
 
-const fromEngine = (v: Verdict) => (v.source === 'engine' || v.source === 'sflist') && typeof v.bestScore === 'number';
+const fromEngine = (v: Verdict) => !!v.source && typeof v.bestScore === 'number';
 
 /** Where the numbers came from, in a few words; '' for a puzzle or no source. */
 export function sourceLabel(v: Verdict): string {
   if (v.puzzle) return '';
-  if (v.source === 'engine' || v.source === 'sflist') return 'by Stockfish' + (v.depth ? ' d' + v.depth : '');
-  if (v.source === 'child') return 'scored one move on';
-  if (v.source === 'list') return 'ChessDB’s ranking here';
-  return '';
+  return v.source ? 'by Stockfish' + (v.depth ? ' d' + v.depth : '') : '';
 }
 
 /** The second line: the best move (the engine's when the engine graded), the user's when it differs, the source. */
@@ -108,23 +105,17 @@ export function bestLine(v: Verdict, s: CardFacts): string {
   return parts.join('   ');
 }
 
-/** Whether the numbers are ChessDB's computed-on-the-spot estimates (§14.20), not a search's. */
-export function estimated(v: Verdict | null | undefined): boolean {
-  return Boolean(v) && !v!.puzzle && v!.source !== 'engine' && v!.source !== 'sflist';
-}
-
 /** The sentence behind the source's label, one per source. */
 export function sourceTitle(v: Verdict | null | undefined): string {
   if (!v) return '';
   if (v.puzzle) return 'A Lichess puzzle: the solution is published with it, so nothing was evaluated here — the move was either the solution or it was not.';
   const depth = v.depth ? ' to depth ' + v.depth : '';
-  if (v.source === 'sflist') return 'This position was scored by Stockfish' + depth + ' when it was gathered, and your move is in that list: the best move and yours come from one search of one position.';
+  if (v.source === 'sflist') return 'This position was scored by Stockfish' + depth + ' before you moved, and your move is in that list: the best move and yours come from one search of one position.';
   if (v.source === 'engine') {
-    if (v.oneSearch) return 'Your move is not in the list Stockfish stored for this position, so the position after it was searched now' + depth + ' and compared with the stored score: one engine, one depth.';
-    return 'ChessDB could score neither your move nor the position after it, so two Stockfish searches' + depth + ' graded it: the position and the position after your move, from one engine.';
+    if (v.oneSearch) return 'Your move is not in the list Stockfish stored for this position, so the position after it was searched now' + depth + ' and compared with the stored score: one engine.';
+    return 'Stockfish had not yet scored this position deeply enough to judge, so two searches' + depth + ' graded your move: the position and the position after it, from one engine.';
   }
-  if (v.source === 'child') return 'Your move is not in ChessDB’s list for this position, so it was graded from one more lookup on the position after it, computed on the spot rather than read from the analysed book.';
-  return 'ChessDB scores every legal move here, but those outside its analysed book are computed on the spot: good enough to rank your move against the others in this position, not a book evaluation.';
+  return '';
 }
 
 /** The uncovered reply a card is about (§19), or ''. */

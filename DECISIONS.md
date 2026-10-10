@@ -1482,3 +1482,15 @@ The technical calls, each with its reason:
   the variation browsed, the topmost at a fork, and not start a review by itself). Was: the
   study's queue started at once, from its first chapter's lines. A session left for the study is
   taken up again only while the move shown is still on its line.
+
+## Revision of 2026-10-10 (Stockfish alone judges a storm move, PLAN.md §5.84)
+- **A storm move is judged by Stockfish only, never by ChessDB** (the owner, as in lichessable).
+  Was (§5.80): ChessDB's list, or Stockfish's at depth 20. Why: ChessDB gives no depth, and the
+  moves outside its analysed book are computed on the spot, so a shallow score can't be told from
+  a deep one. ChessDB still finds positions in the gather. Maia's difficulty and the unintuitive
+  storm follow: they need a Stockfish list of depth 20 or more.
+- **The deepened standard is depth 24 on a desktop, 22 on a phone** (MultiPV 12; was 20), searched
+  while the user thinks, in a timed storm as in a set; a search stopped by the move is kept if it
+  reached 20. A list of 20 or more still judges a move.
+- **The storm's Stockfish runs on the device's chosen threads**, as the study page's does (it ran
+  on one).

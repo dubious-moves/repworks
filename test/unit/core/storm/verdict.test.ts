@@ -10,7 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { STORM as C } from '../../../../src/core/storm/config.ts';
-import { bestLine, estimated, formatCp, formatShare, formatWp, gapNote, sourceLabel, sourceTitle, verdictLine, type CardFacts } from '../../../../src/core/storm/verdict.ts';
+import { bestLine, formatCp, formatShare, formatWp, gapNote, sourceLabel, sourceTitle, verdictLine, type CardFacts } from '../../../../src/core/storm/verdict.ts';
 
 const card = (over: Partial<CardFacts> = {}): CardFacts => ({ bestSan: 'Bb5', bestScore: 32, bestWinrate: 54, nScored: 31, ...over });
 
@@ -61,22 +61,16 @@ test('the best line: both moves when they differ, the engine’s best when the e
   assert.equal(bestLine({ verdict: 'good', userSan: 'Qf3', rank: null, userScore: 32, source: 'engine', bestSan: 'Qf3', bestScore: 32 }, card()), 'best Qf3 +0.32   · by Stockfish');
 });
 
-test('which tier graded it (§14.20)', () => {
-  assert.equal(sourceLabel({ verdict: 'good', source: 'list' }), 'ChessDB’s ranking here');
-  assert.equal(sourceLabel({ verdict: 'good', source: 'child' }), 'scored one move on');
+test('which tier graded it (§14.20, §5.84: Stockfish only)', () => {
+  assert.equal(sourceLabel({ verdict: 'good', source: 'sflist', depth: 24 }), 'by Stockfish d24');
   assert.equal(sourceLabel({ verdict: 'good', source: 'engine', depth: 20 }), 'by Stockfish d20');
   assert.equal(sourceLabel({ verdict: 'good', source: 'engine' }), 'by Stockfish');
   assert.equal(sourceLabel({ verdict: 'good' }), '');
   assert.equal(sourceLabel({ verdict: 'great', puzzle: true }), '');
-  assert.equal(bestLine({ verdict: 'good', userSan: 'Nf3', rank: 4, userScore: -10, userWinrate: 49, source: 'list' }, card()), 'best Bb5 +0.32 · 54%   Nf3 -0.10 · 49%   · ChessDB’s ranking here');
-  assert.equal(bestLine({ verdict: 'blunder', userSan: 'a3', rank: null, userScore: -148, source: 'child' }, card()), 'best Bb5 +0.32 · 54%   a3 -1.48   · scored one move on');
-  assert.equal(estimated({ verdict: 'good', source: 'list' }), true);
-  assert.equal(estimated({ verdict: 'good', source: 'child' }), true);
-  assert.equal(estimated({ verdict: 'good', source: 'engine' }), false);
-  assert.equal(estimated({ verdict: 'good', source: 'sflist' }), false);
-  assert.equal(estimated({ verdict: 'unknown' }), true);
-  assert.equal(estimated(null), false);
-  assert.equal(new Set([sourceTitle({ verdict: 'good', source: 'list' }), sourceTitle({ verdict: 'good', source: 'child' }), sourceTitle({ verdict: 'good', source: 'engine', depth: 20 })]).size, 3);
+  assert.equal(bestLine({ verdict: 'good', userSan: 'Nf3', rank: 4, userScore: -10, source: 'sflist', depth: 24, bestSan: 'Bb5', bestScore: 32 }, card()), 'best Bb5 +0.32   Nf3 -0.10   · by Stockfish d24');
+  const titles = [sourceTitle({ verdict: 'good', source: 'sflist', depth: 24 }), sourceTitle({ verdict: 'good', source: 'engine', depth: 20, oneSearch: true }), sourceTitle({ verdict: 'good', source: 'engine', depth: 20 })];
+  assert.equal(new Set(titles).size, 3);
+  for (const t of titles) assert.ok(!/ChessDB/.test(t));
   assert.ok(/depth 20/.test(sourceTitle({ verdict: 'good', source: 'engine', depth: 20 })));
   assert.ok(!/depth/.test(sourceTitle({ verdict: 'good', source: 'engine' })));
   assert.equal(sourceTitle(null), '');

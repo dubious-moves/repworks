@@ -79,10 +79,13 @@ export interface StormConfig {
   reachTop: number;
   /** Line ends dealt recently, preferred against in the next sessions (§30b). */
   recentLines: number;
-  /** Stockfish in the walk, the deepened standard and the grade (§23, §26, §14.23). */
+  /** Stockfish in the walk, the deepened standard and the grade (§23, §26, §14.23, §5.84). */
   walkDepth: number;
   walkMultipv: number;
-  deepenDepth: number;
+  /** The least depth of a stored list that may judge a move (§5.80); ChessDB's never does (§5.84). */
+  judgeDepth: number;
+  /** The depth the deepening and a session's look-ahead aim for, per device (§5.84). */
+  deepenDepth: { desktop: number; mobile: number };
   deepenMultipv: number;
   engineDepth: { desktop: number; mobile: number };
   enginePhaseMs: number;
@@ -151,7 +154,8 @@ export const STORM: StormConfig = {
   recentLines: 24,
   walkDepth: 14,
   walkMultipv: 6,
-  deepenDepth: 20,
+  judgeDepth: 20,
+  deepenDepth: { desktop: 24, mobile: 22 },
   deepenMultipv: 12,
   engineDepth: { desktop: 20, mobile: 20 },
   enginePhaseMs: 8000,

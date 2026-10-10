@@ -1,7 +1,8 @@
 // A fake Stockfish for the browser tests (PLAN.md §5.31), served in place of the build's script
 // (serveSite's `engine`): it answers the handshake, then for each `go` gives the lines scripted
-// for its position, a shallow depth at once and depth 20 after `SLOW` ms, then `bestmove`; `stop`
-// ends a search at once. Every command it receives is requested from the site as
+// for its position (or, with `ask`, those serveSite's `engineLines` gives for it), a shallow depth
+// at once and the depth asked for (when it is from 21 to 30, else 20) after `SLOW` ms, then `bestmove`;
+// `stop` ends a search at once. Every command it receives is requested from the site as
 // `__engine/<command>`, so a test reads them from the server's request log. Scores are the side
 // to move's, as the engine writes them.
 
@@ -26,10 +27,21 @@ export const LINES: Record<string, [number, number, string][]> = {
 
 export const SLOW = 400;
 
-/** `slow`: how long a search takes to reach depth 20, in ms; `extra`: more positions' lines. */
-export function fakeEngine(slow = SLOW, extra: Record<string, [number, number, string][]> = {}): string {
+/**
+ * `slow`: how long a search takes to reach its depth, in ms; `extra`: more positions' lines; `ask`:
+ * a position with none scripted asks the site for its lines (serveSite's `engineLines`).
+ */
+export function fakeEngine(slow = SLOW, extra: Record<string, [number, number, string][]> = {}, ask = false): string {
   return `
 const LINES = ${JSON.stringify({ ...LINES, ...extra })};
+const ASK = ${ask};
+const linesOf = (f) => {
+  if (LINES[f] || !ASK) return;
+  const x = new XMLHttpRequest();
+  x.open('GET', '/repworks/__lines/' + encodeURIComponent(f), false);
+  x.send();
+  LINES[f] = JSON.parse(x.responseText);
+};
 let fen = '';
 let timers = [];
 let searching = false;
@@ -51,11 +63,15 @@ onmessage = (e) => {
   log(c);
   if (c === 'uci') return postMessage('uciok');
   if (c === 'isready') return postMessage('readyok');
-  if (c.startsWith('position fen ')) fen = c.slice(13).split(' ').slice(0, 4).join(' ');
+  if (c.startsWith('position fen ')) {
+    fen = c.slice(13).split(' ').slice(0, 4).join(' ');
+    linesOf(fen);
+  }
   if (c.startsWith('go')) {
     searching = true;
+    const asked = Number((/depth (\\d+)/.exec(c) || [])[1]);
     timers.push(setTimeout(() => emit(8), 20));
-    timers.push(setTimeout(() => emit(20), ${slow}));
+    timers.push(setTimeout(() => emit(asked > 20 && asked <= 30 ? asked : 20), ${slow}));
     timers.push(setTimeout(finish, ${slow} + 20));
   }
   if (c === 'stop') finish();

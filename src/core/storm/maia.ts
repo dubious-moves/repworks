@@ -35,9 +35,9 @@ export function missingRatings(have: readonly MaiaRating[] | undefined, userElo:
   return want.filter((e) => !have?.some((r) => r.elo === e));
 }
 
-/** Whether a list can judge a move (§5.80): ChessDB's, or Stockfish's at the deepened standard. */
+/** Whether a list can judge a move (§5.80, §5.84): Stockfish's at `judgeDepth` or deeper, never ChessDB's. */
 export function listJudges(list: ScoredList, c: StormConfig): boolean {
-  return list.length > 0 && (list.source !== 'sf' || (list.depth ?? 0) >= c.deepenDepth);
+  return list.length > 0 && list.source === 'sf' && (list.depth ?? 0) >= c.judgeDepth;
 }
 
 export interface MoveJudged {
@@ -48,8 +48,8 @@ export interface MoveJudged {
 }
 
 /**
- * A move judged by the position's list alone. A move outside a Stockfish list is no better than its
- * last line, so it is not clean when that line isn't; outside ChessDB's, nothing is known.
+ * A move judged by the position's list alone, a Stockfish list deep enough to judge (§5.84). A move
+ * outside it is no better than its last line, so it is not clean when that line isn't.
  */
 export function judgeMove(list: ScoredList, uci: string, c: StormConfig): MoveJudged {
   if (!listJudges(list, c)) return { clean: null };
@@ -59,7 +59,6 @@ export function judgeMove(list: ScoredList, uci: string, c: StormConfig): MoveJu
     const band = grade(wpLoss(best, m.score, c), c);
     return band === 'unknown' ? { clean: null } : { clean: c.storeDropOn.includes(band), band };
   }
-  if (list.source !== 'sf') return { clean: null };
   const last = grade(wpLoss(best, list[list.length - 1]!.score, c), c);
   return { clean: last === 'unknown' || c.storeDropOn.includes(last) ? null : false };
 }

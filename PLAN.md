@@ -7,7 +7,7 @@ where the build differed). What remains is live: the spike's re-run (§4.2), the
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
 with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
-for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. Read with `DECISIONS.md`, which this plan updates (its
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -2935,6 +2935,44 @@ Tests: `browse.test.ts` (the line through a move: before a fork, at the start, o
 line), `fsm.test.ts` (the pick address), `studies.spec.ts` (desktop and phone: both branches of a
 fork selected from the study, nothing asked until "Train this line", a left session not taken up
 from another line).
+
+#### 5.84 Stockfish alone judges a storm move, deeper, while the user thinks (the owner's request, 2026-10-10)
+
+The owner asked whether ChessDB's evaluations were used only where it had analysed the position
+well. They were not: a move in ChessDB's list was graded from it whatever its quality, and a move
+outside it from one more ChessDB lookup. ChessDB's `queryall` gives no depth (checked live: each
+move has `score`, `rank`, `note`, `winrate`; the note's `!`/`*`/`?` follows the rank, so 1…Nf6
+against 1.e4 is a `?`), so a shallow ChessDB score can't be told from a deep one. The owner chose
+Stockfish alone (lichessable came to the same conclusion), and asked for the deep search to run
+while the user thinks, deeper than 20, since a position takes 15–20 s or more:
+
+- **A move is graded by Stockfish only.** The stored list grades it when it is Stockfish's at
+  `judgeDepth` (20) or deeper; a move outside such a list, by one search of the position after
+  it against the list's best (§23); otherwise, two searches at depth 20 (MultiPV 1, 8 s each at
+  most), as §5.80's fallback. ChessDB's list never grades, and the child lookup is gone; the
+  verdict's provenance names Stockfish's tiers only (the italic "estimate" style went with them).
+  ChessDB still finds and pre-scores positions in the gather, where the walk only picks them.
+- **The deepened standard is MultiPV 12 at depth 24 on a desktop, 22 on a phone**
+  (`deepenDepth`), up from 20. The home's deepening aims for it, those whose list can't judge
+  yet (ChessDB's, the walk's) first; a list of 20 or more is kept even when the search stops
+  short of the target (time, a move), and only a deeper list replaces a Stockfish one. The home
+  counts the positions at the device's target ("scored to depth 24").
+- **The look-ahead runs in every session, the timed storm too**: the card on the board first
+  (whatever its list: ChessDB's now counts as not deepened), then the cards still to come. A move
+  stops it; if its search of that card has reached depth 20 (its shallowest line's), that list is
+  kept and grades the move at once, else the grade's own searches run.
+- **The storm's Stockfish uses the device's threads** (§5.36) as well as its version (§5.75); it
+  ran on one thread before.
+
+A timed storm on a card no search has reached costs the two searches (about a second or two on a
+desktop at depth 20; longer on a phone, at most 8 s each). The owner's live check is how often
+that happens and how it feels. Tests: `harvest.test.ts` (ChessDB never judges; the target per
+device; only a deeper list replaces), `maia.test.ts` (ChessDB's list judges nothing, with a
+control), `verdict.test.ts` (Stockfish's tiers only), `set.test.ts` (the depths' order);
+`storm.spec.ts` (desktop and phone) with a fake engine that scores positions as the fake ChessDB
+does and the position after a move as that move's rung: the deepening at 24/22 then a move
+graded with no search, the look-ahead searching the card on the board and its list grading the
+move, and the Maia storm over deepened lists.
 
 #### 5.14 Phase 1 acceptance test, and exit
 

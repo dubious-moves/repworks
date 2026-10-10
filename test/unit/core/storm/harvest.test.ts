@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { parseChapterFile } from '../../../../src/core/pgn/parse.ts';
 import { STORM as C } from '../../../../src/core/storm/config.ts';
 import type { ScoredList, ScoredMove } from '../../../../src/core/storm/grade.ts';
-import { cdbList, deepenedPosition, engineList, harvestDecision, harvestFrontier, needsDeepening, positionLineKey, positionLineLabel, storedList, storedPosition, type HarvestIo } from '../../../../src/core/storm/harvest.ts';
+import { cdbList, deepenedPosition, engineList, harvestDecision, harvestFrontier, judges, needsDeepening, positionLineKey, positionLineLabel, storedList, storedPosition, type HarvestIo } from '../../../../src/core/storm/harvest.ts';
 import { decisions, frontiers, lineTail, numberedMoves, stormLines } from '../../../../src/core/storm/sources.ts';
 import { positionOf, uciToSan } from '../../../../src/core/storm/walk.ts';
 import { standardUci } from '../../../../src/core/chess/uci.ts';
@@ -147,18 +147,26 @@ test('a stored position keeps every scored move and comes back as the same list'
   assert.deepEqual([p.games, p.at, p.names], [1234, 99, ['Ruy']]);
 });
 
-test('the deepened standard: a list below depth 20 doesn’t count; a deep one replaces ChessDB’s', async () => {
+test('the deepened standard: a list below depth 20 doesn’t count; a deep one replaces ChessDB’s, and only a deeper one replaces it', async () => {
   const lines = chapterLines('1. e4 e5 2. Nf3 Nc6 3. Bb5');
   const { frontiers: fs, cont } = frontiers(lines, C);
   const h = await harvestFrontier(fs[0]!, cont, io(), C, 2);
   const p = storedPosition(h.candidates.find((c) => !c.reject)!, { lines: fs[0]!.lines, names: fs[0]!.names }, 1)!;
-  assert.equal(needsDeepening(p, C), true);
+  // ChessDB's list never judges, and always wants Stockfish's.
+  assert.equal(judges(p, C), false);
+  assert.equal(needsDeepening(p, C.deepenDepth.desktop), true);
   const shallow = Object.assign(scoredFor(p.fen, 30), { source: 'sf' as const, depth: 18 });
   assert.equal(deepenedPosition(p, shallow, C), null);
   const deep = Object.assign(scoredFor(p.fen, 30), { source: 'sf' as const, depth: 21 });
   const d = deepenedPosition(p, deep, C)!;
   assert.deepEqual([d.src, d.depth, d.scored[0]!.s], ['sf', 21, 30]);
-  assert.equal(needsDeepening(d, C), false);
+  assert.equal(judges(d, C), true);
+  // Short of the device's target: deepened again, but only by a deeper list.
+  assert.equal(needsDeepening(d, C.deepenDepth.mobile), true);
+  assert.equal(needsDeepening(d, 21), false);
+  assert.equal(deepenedPosition(d, deep, C), null);
+  assert.equal(deepenedPosition(d, Object.assign(scoredFor(p.fen, 10), { source: 'sf' as const, depth: 20 }), C), null);
+  assert.equal(deepenedPosition(d, Object.assign(scoredFor(p.fen, 10), { source: 'sf' as const, depth: 24 }), C)!.depth, 24);
   assert.equal(deepenedPosition(p, cdbList({ status: 'ok', moves: [{ uci: 'a2a3', san: 'a3', score: 1 }] }), C), null);
 });
 

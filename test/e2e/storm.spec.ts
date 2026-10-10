@@ -2,7 +2,9 @@
 // repertoire (Black: 1. e4 c5 2. Nf3 d6 3. d4 cxd4, 2... Nc6 3. d4, and the Alapin 2. c3 Nf6),
 // with a fake explorer naming one game at each line end, a fake game export and a fake ChessDB
 // that scores every legal move (the sorted first best, a ladder down from it that never reaches
-// the blunder stop), so the walks run without Stockfish.
+// the blunder stop), so the walks run without Stockfish. The fake Stockfish scores a position the
+// same way (its first 12 moves), and a position one move after one it has scored as that move's
+// rung: a move is graded by Stockfish only (§5.84), and its verdict is the ladder's either way.
 //
 // Controls run on §5.71 (2026-10-08), each failing the storm test at its own assertion: the card's
 // board set back to the card's position after a move ("the move stays"), and the board's sketch
@@ -10,8 +12,8 @@
 import { test, expect, type Page } from '@playwright/test';
 import { Chess } from 'chessops/chess';
 import { makeFen, parseFen } from 'chessops/fen';
-import { makeUci } from 'chessops/util';
-import { castlingSide } from 'chessops/chess';
+import { makeUci, parseUci } from 'chessops/util';
+import { castlingSide, normalizeMove } from 'chessops/chess';
 import { kingCastlesTo } from 'chessops/util';
 import type { FakeGit } from '../support/fakeGit.ts';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
@@ -23,7 +25,7 @@ import { serveSite, type SiteServer } from './server.ts';
 
 let site: SiteServer;
 test.beforeAll(async () => {
-  site = await serveSite({ engine: fakeEngine() });
+  site = await serveSite({ engine: fakeEngine(undefined, {}, true), engineLines: ladderLines });
 });
 test.afterAll(async () => {
   await site.close();
@@ -46,6 +48,31 @@ function ranked(fen: string): string[] {
     }
   }
   return [...out].sort();
+}
+
+const positionOf = (fen: string) => Chess.fromSetup(parseFen(fen.split(' ').length === 4 ? `${fen} 0 1` : fen).unwrap()).unwrap();
+const fen4 = (fen: string) => fen.split(' ').slice(0, 4).join(' ');
+/** The positions the fake engine has scored by the ladder. */
+const scored = new Set<string>();
+/**
+ * The fake engine's lines: one move after a position it scored, the opponent's best is minus that
+ * move's rung (so one search of the position after a move agrees with the list); else the ladder
+ * over the first 12 moves, as the fake ChessDB's.
+ */
+function ladderLines(fen: string): [number, number, string][] {
+  const key = fen4(fen);
+  const own = ranked(key);
+  if (!own.length) return [];
+  for (const parent of scored) {
+    const i = ranked(parent).findIndex((uci) => {
+      const pos = positionOf(parent);
+      pos.play(normalizeMove(pos, parseUci(uci)!));
+      return fen4(makeFen(pos.toSetup())) === key;
+    });
+    if (i >= 0) return [[1, -LADDER[Math.min(i, LADDER.length - 1)]!, own[0]!]];
+  }
+  scored.add(key);
+  return own.slice(0, 12).map((uci, i) => [i + 1, LADDER[Math.min(i, LADDER.length - 1)]!, uci]);
 }
 
 const GAMES = [
@@ -404,19 +431,42 @@ test('the set: a mistake held, tried again, shown, and the second pass', async (
     .toBe(6);
 });
 
-test('Stockfish’s standard: the kept positions searched with MultiPV 12 to depth 20 while the home is open, stopped by a storm', async ({ page }) => {
+test('Stockfish’s standard: the kept positions searched with MultiPV 12 to depth 24 (22 on a phone) while the home is open, then the storm’s card first', async ({ page, isMobile }) => {
+  const depth = isMobile ? 22 : 24;
   const w = await setUp(page, { deepen: true });
-  await gathered(page, w);
-  await expect(page.getByTestId('storm-deep')).toContainText('scored to depth 20');
-  await expect.poll(() => commands(site.requests).filter((c) => c === 'go depth 20 movetime 60000').length, { timeout: 15_000 }).toBeGreaterThan(1);
+  const ready = await gathered(page, w);
+  await expect(page.getByTestId('storm-deep')).toContainText(`scored to depth ${depth}`);
+  await expect.poll(() => commands(site.requests).filter((c) => c === `go depth ${depth} movetime 60000`).length, { timeout: 15_000 }).toBeGreaterThan(1);
   expect(commands(site.requests)).toContain('setoption name MultiPV value 12');
+  await expect(page.getByTestId('storm-deep')).toContainText(`${ready} of ${ready} scored`, { timeout: 30_000 });
+  // Every position deepened: the session's look-ahead has nothing left to search, so a move is
+  // graded at once from the stored list, the top move by rank.
   await page.getByRole('button', { name: 'Start storm' }).click();
   await expect(page.locator('.storm-card')).toBeVisible();
   const before = commands(site.requests).filter((c) => c.startsWith('go ')).length;
-  // The fake engine finds no line for these positions, so nothing is stored as deepened; what is
-  // checked is that the pass yields to the session: no search starts while a card is up.
-  await page.waitForTimeout(1500);
+  await play(page, ranked(await cardFen(page))[0]!);
+  await expect(page.getByTestId('storm-verdict')).toContainText('the top move');
   expect(commands(site.requests).filter((c) => c.startsWith('go ')).length).toBe(before);
+});
+
+test('a storm’s look-ahead: the card on the board searched first, MultiPV 12 at the device’s depth', async ({ page, isMobile }) => {
+  const depth = isMobile ? 22 : 24;
+  const w = await setUp(page);
+  await gathered(page, w);
+  // The engine's log restarts its numbering with each page, so only this page's requests are read.
+  const start = site.requests.length;
+  const fresh = () => commands(site.requests.slice(start));
+  await page.getByRole('button', { name: 'Start storm' }).click();
+  await expect(page.locator('.storm-card')).toBeVisible();
+  const fen = fen4(await cardFen(page));
+  await expect.poll(() => fresh().find((c) => c.startsWith('position fen ')) ?? '').toContain(fen);
+  await expect.poll(() => fresh()).toContain(`go depth ${depth} movetime 60000`);
+  // Searched to the depth: the move is graded from that list, with no search of its own.
+  await page.waitForTimeout(800);
+  const before = site.requests.length;
+  await play(page, ranked(await cardFen(page))[0]!);
+  await expect(page.getByTestId('storm-verdict')).toContainText('the top move');
+  expect(commands(site.requests.slice(before))).not.toContain('go depth 20 movetime 8000');
 });
 
 /** The win% a move gives up against the best, from the fake ChessDB's ladder (Lichess's curve). */
@@ -430,8 +480,10 @@ test('Maia: got from the storm’s page, the kept positions rated, and an unintu
   test.setTimeout(240_000);
   // Maia's switch stays off: the storm asks it all the same once its files are here.
   await page.addInitScript(() => localStorage.setItem('repworks-maia', JSON.stringify({ on: false, rating: 1500 })));
-  const w = await setUp(page);
+  // Only a list Stockfish has deepened may judge a move (§5.84), so the deepening runs too.
+  const w = await setUp(page, { deepen: true });
   const ready = await gathered(page, w);
+  await expect(page.getByTestId('storm-deep')).toContainText(`${ready} of ${ready} scored`, { timeout: 60_000 });
   const count = page.getByTestId('storm-maia-count');
   await expect(count).toContainText('Maia can rate each position’s difficulty');
   await expect(page.getByRole('button', { name: 'Unintuitive storm' })).toHaveCount(0);

@@ -22,17 +22,15 @@ fixes them and updates this file.
   difficulty shown after each answer believable against how hard the position felt? Is "an
   inaccuracy or worse" the right bar, or should it be a mistake or worse?
 
-## A set's cards deepened while you think (§5.81)
+## Stockfish alone judges a storm move, at depth 24 (22 on a phone) while you think (§5.84)
 
-- A set of 6 with cards gathered by Stockfish and not yet deepened: think a while on each card
-  before moving. The verdict should come at once and say "by Stockfish d20"; the home's
-  "scored to depth 20" count goes up after the set. Moving at once still works (two searches).
-
-## A storm move judged at depth 20 (§5.80)
-
-- Phone: a storm card gathered by Stockfish and not yet deepened (the home's "Stockfish: n of m
-  scored to depth 20" below m): after a move, how long the verdict takes, and whether it says
-  "by Stockfish d20" or stops short at the 8 s limit.
+- Desktop (Stockfish 19, 4 threads) and phone: the storm's home with "Stockfish re-scores the
+  positions" on: "scored to depth 24" (22 on the phone) rising, how long a position takes, and
+  whether the phone gets hot.
+- A set, thinking 15–20 s on each card: the verdict should come at once and say "by Stockfish
+  d24" (d22 on the phone), or at least d20. Moving at once still works (two searches at d20).
+- A timed storm on positions not yet deepened: how long the verdicts take, on each device, and
+  whether that spoils the storm.
 
 ## The board's size (§5.79)
 

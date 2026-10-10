@@ -21,6 +21,7 @@ import {
   endStormSession,
   deepen,
   deepening,
+  deepenTarget,
   gather,
   gathering,
   leaveStorm,
@@ -55,7 +56,7 @@ import {
 import { STORM } from '../core/storm/config.ts';
 import { averageWp, blankRow, foundShare, recordOver, type RecordRow } from '../core/storm/record.ts';
 import { setTally } from '../core/storm/set.ts';
-import { bestLine, estimated, formatWp, gapNote, sourceTitle, verdictLine, type CardFacts } from '../core/storm/verdict.ts';
+import { bestLine, formatWp, gapNote, sourceTitle, verdictLine, type CardFacts } from '../core/storm/verdict.ts';
 import { positionLineKey, positionLineLabel, storedList, type StoredPosition } from '../core/storm/harvest.ts';
 import { fenAfterUci, positionOf, uciToSan } from '../core/storm/walk.ts';
 import { themeLabel } from '../core/puzzles/dataset.ts';
@@ -278,7 +279,7 @@ function Home(props: { scope: StormScopeData; where: StormWhere }) {
         )}
         {home && home.stored > 0 && (
           <p class="muted storm-deep" data-testid="storm-deep">
-            Stockfish: {home.deep} of {home.stored} scored to depth {STORM.deepenDepth}
+            Stockfish: {home.deep} of {home.stored} scored to depth {deepenTarget()}
             {deepening.value ? ' · scoring…' : ''}
           </p>
         )}
@@ -834,7 +835,7 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
           <p class="muted storm-hint">{left > 0 ? `Play it again: ${plural(left, 'attempt')} left, then the move is shown.` : 'No attempts left: show the move to go on.'}</p>
         )}
         {v && showBest && !item.puzzle && v.band !== 'unknown' && (
-          <p class={`muted storm-best${estimated(v) ? ' est' : ''}`} title={sourceTitle(v)}>
+          <p class="muted storm-best" title={sourceTitle(v)}>
             {bestLine(v, f)}
           </p>
         )}

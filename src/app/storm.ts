@@ -9,7 +9,7 @@ import type { FromWorker, ToWorker } from '../core/explorer/service.ts';
 import type { DeviceEvent } from '../core/progress/replay.ts';
 import { STORM, withPlyRange, type Band, type StormConfig } from '../core/storm/config.ts';
 import { engineLoss, grade, moveLoss, moverCp, nextStreak, points, type ScoredList } from '../core/storm/grade.ts';
-import { cdbList, deepenedPosition, engineList, harvestDecision, harvestFrontier, needsDeepening, positionLineKey, storedList, storedPosition, type HarvestIo, type StoredPosition } from '../core/storm/harvest.ts';
+import { cdbList, deepenedPosition, engineList, harvestDecision, harvestFrontier, judges, needsDeepening, positionLineKey, storedList, storedPosition, type HarvestIo, type StoredPosition } from '../core/storm/harvest.ts';
 import { stormRecord, type StormRecord } from '../core/storm/record.ts';
 import { setHeld, setOutcome, type SetOutcome } from '../core/storm/set.ts';
 import { decisions, frontiers, inScope, lineInScope, stormLines, type DecisionPoint, type Frontier, type StormLine, type StormScope } from '../core/storm/sources.ts';
@@ -26,7 +26,7 @@ import { openStormStore, type StormStore } from '../platform/stormStore.ts';
 import { onWorker, postToWorker } from './explorer.ts';
 import { entryKey, open } from './mode.ts';
 import { recordEvent } from './state.ts';
-import { analyseForStorm, cancelStormEngine, endStormEngine } from './stormEngine.ts';
+import { analyseForStorm, cancelStormEngine, endStormEngine, stormSearchSoFar } from './stormEngine.ts';
 import { trainData, type TrainData } from './train.ts';
 import { puzzlePrefs, readyPuzzles } from './puzzles.ts';
 import { keptPolicy, missingRatings, unintuitive, type MaiaRating } from '../core/storm/maia.ts';
@@ -234,7 +234,7 @@ export async function refreshHome(s: StormScopeData): Promise<void> {
   const all = storedInScope(await stormStore().positions(), s);
   const h = histories(data);
   const done = all.filter((p) => h.get(p.card)?.done).length;
-  const deep = all.filter((p) => !needsDeepening(p, STORM)).length;
+  const deep = all.filter((p) => !needsDeepening(p, deepenTarget())).length;
   const ready = all.filter((p) => !h.get(p.card)?.done);
   const lines = new Set(ready.map(positionLineKey).filter(Boolean)).size;
   const elo = maiaElo.peek();
@@ -361,10 +361,18 @@ export async function clearGathered(s: StormScopeData): Promise<number> {
 export const deepening = signal(false);
 let deepenRun = 0;
 
+const phone = () => typeof matchMedia !== 'undefined' && matchMedia('(max-width: 768px)').matches;
+/** The depth the deepening and the look-ahead aim for on this device (§5.84). */
+export const deepenTarget = (): number => (phone() ? STORM.deepenDepth.mobile : STORM.deepenDepth.desktop);
+
+/** The positions that can't judge a move yet first (ChessDB's, the walk's), then those short of the target. */
+const byNeed = (ps: StoredPosition[]): StoredPosition[] => [...ps.filter((p) => !judges(p, STORM)), ...ps.filter((p) => judges(p, STORM))];
+
 /**
  * While the storm's home is open and nothing else runs, Stockfish re-scores the scope's kept
- * positions (MultiPV 12 at depth 20, §23), the positions not yet done first. Stops when a session
- * or a gather starts, or the screen is left (`stopDeepening`).
+ * positions (MultiPV 12 at the device's target depth, §23, §5.84), the positions not yet done
+ * first, those whose list can't judge a move before those only short of the target. Stops when a
+ * session or a gather starts, or the screen is left (`stopDeepening`).
  */
 export async function deepen(s: StormScopeData): Promise<void> {
   if (deepening.value || !stormPrefs.value.deepen) return;
@@ -376,14 +384,14 @@ export async function deepen(s: StormScopeData): Promise<void> {
     const h = data ? histories(data) : new Map<string, StormHistory>();
     // At random: the deepened are dealt first among equals (§23.8), so a pass taken in the store's
     // order would put one corner of the repertoire at the front of every session.
-    const todo = storedInScope(await stormStore().positions(), s).filter((p) => needsDeepening(p, STORM) && !h.get(p.card)?.done);
+    const todo = storedInScope(await stormStore().positions(), s).filter((p) => needsDeepening(p, deepenTarget()) && !h.get(p.card)?.done);
     for (let i = todo.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [todo[i], todo[j]] = [todo[j]!, todo[i]!];
     }
-    for (const p of todo) {
+    for (const p of byNeed(todo)) {
       if (busy()) return;
-      const a = await analyseForStorm(p.fen, STORM.deepenMultipv, STORM.deepenDepth, 60_000);
+      const a = await analyseForStorm(p.fen, STORM.deepenMultipv, deepenTarget(), 60_000);
       if (busy()) return;
       const pos = positionOf(p.fen);
       const d = pos && a ? deepenedPosition(p, engineList(a.lines, pos.turn, a.depth, STORM), STORM) : null;
@@ -455,18 +463,22 @@ export function stopMaiaRating(): void {
 
 let lookRun = 0;
 let lookBusy = false;
+/** The card the look-ahead is searching, if any. */
+let lookCard: StoredPosition | undefined;
 /** The cards searched this session, deepened or not: one try each. */
 const lookTried = new Set<string>();
 
 /**
- * While a set waits for a move, Stockfish deepens its cards still below the standard (MultiPV 12
- * at depth 20, §23), the one on the board first, then those still to come: a move on a deepened
- * card is graded at once from its list. A move stops it (`pauseLookAhead`); the next deal, or the
- * verdict, starts it again.
+ * While a session waits for a move, Stockfish deepens its cards still below the device's target
+ * (MultiPV 12 at depth 24, 22 on a phone, §23, §5.84), the one on the board first, then those
+ * still to come: a move on a deepened card is graded at once from its list. A move stops it
+ * (`pauseLookAhead`), its search kept when it has reached a depth that may judge
+ * (`keepSearchSoFar`); the next deal, or the verdict, starts it again. A timed storm's queue is
+ * drawn as it goes, so there it is mostly the card on the board.
  */
 async function lookAhead(): Promise<void> {
   const s = stormSession.value;
-  if (!s || s.mode !== 'set' || s.phase === 'done' || lookBusy) return;
+  if (!s || s.phase === 'done' || lookBusy) return;
   const run = ++lookRun;
   lookBusy = true;
   try {
@@ -474,10 +486,12 @@ async function lookAhead(): Promise<void> {
       const now = stormSession.value;
       if (run !== lookRun || !now || now.phase === 'done') return;
       const onBoard = now.item && !now.item.puzzle && !now.item.answer ? [now.item.card] : [];
-      const p = [...onBoard, ...queue, ...secondPass.map((i) => i.card)].find((c) => c.src === 'sf' && c.depth < STORM.deepenDepth && !lookTried.has(c.card));
+      const p = [...onBoard, ...queue, ...secondPass.map((i) => i.card)].find((c) => needsDeepening(c, deepenTarget()) && !lookTried.has(c.card));
       if (!p) return;
       lookTried.add(p.card);
-      const a = await analyseForStorm(p.fen, STORM.deepenMultipv, STORM.deepenDepth, 60_000);
+      lookCard = p;
+      const a = await analyseForStorm(p.fen, STORM.deepenMultipv, deepenTarget(), 60_000);
+      lookCard = undefined;
       if (run !== lookRun) {
         // Stopped by a move: tried again later.
         lookTried.delete(p.card);
@@ -500,7 +514,24 @@ function pauseLookAhead(): void {
   if (!lookBusy) return;
   lookRun++;
   lookBusy = false;
+  lookCard = undefined;
   cancelStormEngine();
+}
+
+/**
+ * The look-ahead's search of `card`, stopped by a move on it, kept when it has reached a depth that
+ * may judge (§5.84): stored and swapped in as a finished one would be. The card to grade, deepened
+ * or as it was.
+ */
+async function keepSearchSoFar(card: StoredPosition): Promise<StoredPosition> {
+  if (!lookBusy || lookCard?.card !== card.card) return card;
+  const a = stormSearchSoFar(card.fen);
+  const pos = positionOf(card.fen);
+  const d = pos && a ? deepenedPosition(card, engineList(a.lines, pos.turn, a.depth, STORM), STORM) : null;
+  if (!d) return card;
+  swapIn(d);
+  await stormStore().updatePosition(d.card, (cur) => ({ ...cur, scored: d.scored, src: d.src, depth: d.depth }));
+  return d;
 }
 
 /** A deepened card in place of the one dealt, wherever the session holds it (cards match by id). */
@@ -639,7 +670,7 @@ async function dealt(s: StormScopeData): Promise<StoredPosition[]> {
   const data = trainData.value;
   if (!data) return [];
   const all = storedInScope(await stormStore().positions(), s);
-  const items = all.map((p) => ({ ...p, deep: p.src === 'sf' && p.depth >= STORM.deepenDepth }));
+  const items = all.map((p) => ({ ...p, deep: judges(p, STORM) }));
   return drawOrder(items, histories(data), Math.random, STORM.reachTop);
 }
 
@@ -753,9 +784,11 @@ export async function answerMove(uci: string): Promise<void> {
     update({ item: played });
     setPhase('grading');
   }
-  // The grade's searches come first: a set's look-ahead waits for the verdict.
+  // The grade's searches come first: the look-ahead waits for the verdict, its search of this
+  // card kept if deep enough to judge.
+  const card = await keepSearchSoFar(item.card);
   pauseLookAhead();
-  const v = await gradeMove(item.card, uci);
+  const v = await gradeMove(card, uci);
   void lookAhead();
   const now = stormSession.value;
   if (!now || seq !== gradeSeq) return;
@@ -1044,7 +1077,7 @@ const chapterOf = (p: StoredPosition): string | undefined => (p.lines[0] ? `${p.
 
 /* ------------------------------------------------------------------ the grade (§3.4's three tiers) */
 
-const engineDepth = () => (matchMedia('(max-width: 768px)').matches ? STORM.engineDepth.mobile : STORM.engineDepth.desktop);
+const engineDepth = () => (phone() ? STORM.engineDepth.mobile : STORM.engineDepth.desktop);
 
 async function engineScore(fen: string): Promise<{ score: Score; san: string; depth: number } | null> {
   const a = await analyseForStorm(fen, 1, engineDepth(), STORM.enginePhaseMs);
@@ -1054,32 +1087,26 @@ async function engineScore(fen: string): Promise<{ score: Score; san: string; de
   return { score: l.score, san: l.pv[0] ? uciToSan(pos, l.pv[0]) : '', depth: a.depth };
 }
 
-/** Grades a move: the stored list, then the position after it, then Stockfish on both. */
+/**
+ * Grades a move by Stockfish only (§5.80, §5.84): the stored list when it may judge, else one
+ * search of the position after the move against it, else two searches. ChessDB's list never
+ * grades: it gives no depth, and its unanalysed moves are estimates.
+ */
 export async function gradeMove(card: StoredPosition, uci: string): Promise<StormAnswer> {
   const pos = positionOf(card.fen)!;
   const userSan = uciToSan(pos, uci);
-  const list: ScoredList = storedList(card);
-  const engineListed = list.source === 'sf';
   const base = { userSan, userUci: uci };
-  const fromLoss = (ml: NonNullable<ReturnType<typeof moveLoss>>, source: Verdict['source'], extra: Partial<Verdict> = {}): StormAnswer => {
+  const deep = judges(card, STORM);
+  const list: ScoredList = storedList(card);
+  const fromLoss = (ml: NonNullable<ReturnType<typeof moveLoss>>, source: Verdict['source'], extra: Partial<Verdict>): StormAnswer => {
     const band = grade(ml.wp, STORM);
-    const v: StormAnswer = { ...base, verdict: band, band, rank: ml.rank, wp: ml.wp, loss: ml.loss, userScore: ml.score, userWinrate: ml.winrate, ...extra };
-    if (source) v.source = source;
-    return v;
+    return { ...base, verdict: band, band, rank: ml.rank, wp: ml.wp, loss: ml.loss, userScore: ml.score, userWinrate: ml.winrate, source, ...extra };
   };
-  // A walk's list (depth 14) never grades a move: below the deepened standard (depth 20), the
-  // move goes straight to the two searches.
-  const shallow = engineListed && (list.depth ?? 0) < STORM.deepenDepth;
-  const listed = shallow ? null : moveLoss(list, uci, undefined, STORM);
-  if (listed) return fromLoss(listed, engineListed ? 'sflist' : 'list', engineListed ? { depth: card.depth, bestScore: list[0]!.score, bestSan: uciToSan(pos, list[0]!.uci) } : {});
+  const listed = deep ? moveLoss(list, uci, undefined, STORM) : null;
+  if (listed) return fromLoss(listed, 'sflist', { depth: card.depth, bestScore: list[0]!.score, bestSan: uciToSan(pos, list[0]!.uci) });
   const child = fenAfterUci(card.fen, uci);
   if (!child) return { ...base, verdict: 'unknown', band: 'unknown' };
-  if (!engineListed) {
-    const r = await ask({ type: 'scores', fen: child });
-    const childList = r.type === 'scores' && 'evals' in r ? cdbList(r.evals) : null;
-    const ml = childList ? moveLoss(list, uci, childList[0]!.score, STORM) : null;
-    if (ml) return fromLoss(ml, 'child');
-  } else if (!shallow) {
+  if (deep) {
     // One search of the position after it, against the stored engine list (§23).
     const after = await engineScore(child);
     if (after) {

@@ -34,6 +34,11 @@ export interface SiteServer {
 export interface SiteOptions {
   /** A script served in place of the Stockfish build (a fake engine: test/e2e/engine.ts). */
   engine?: string;
+  /**
+   * The fake engine's lines for a position it has none scripted for (`fakeEngine`'s `ask`), as
+   * [multipv, cp for the side to move, pv]; served at `__lines/<fen>`.
+   */
+  engineLines?: (fen: string) => [number, number, string][];
 }
 
 export async function serveSite(options: SiteOptions = {}): Promise<SiteServer> {
@@ -43,6 +48,11 @@ export async function serveSite(options: SiteOptions = {}): Promise<SiteServer> 
     const path = new URL(req.url ?? '/', 'http://localhost').pathname;
     requests.push(path);
     if (!path.startsWith(BASE)) return void res.writeHead(404).end();
+    if (options.engineLines && path.startsWith(BASE + '__lines/')) {
+      const lines = options.engineLines(decodeURIComponent(path.slice(BASE.length + '__lines/'.length)));
+      res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+      return void res.end(JSON.stringify(lines));
+    }
     if (options.engine && /^engines\/stockfish-[^/]*\.js$/.test(path.slice(BASE.length))) {
       // Padded to the real file's length: the app checks a download's size against the build's.
       const real = (await readFile(join(DIST, normalize(path.slice(BASE.length))))).length;
