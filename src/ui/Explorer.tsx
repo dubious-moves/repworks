@@ -30,16 +30,6 @@ import { trainData } from '../app/train.ts';
 import { openExplorerSettings } from './ExplorerSettings.tsx';
 import { openTranspositions } from './Transpositions.tsx';
 
-/** Qchess's database button, first in the move-button bar: the panel on or off, per device. */
-export function ExplorerToggle() {
-  const on = prefs.value.on;
-  return (
-    <button type="button" aria-pressed={on} aria-label="Explorer" title={on ? 'Close the explorer (no requests while it is closed)' : 'Open the explorer'} class={`explorer-toggle${on ? ' on' : ''}`} onClick={() => setPrefs({ on: !on })}>
-      ⛁
-    </button>
-  );
-}
-
 const TABS: { tab: ExplorerTab; label: string }[] = [
   { tab: 'lichess', label: 'Lichess' },
   { tab: 'masters', label: 'Masters' },

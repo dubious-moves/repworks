@@ -5,6 +5,11 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## The study's ☰ menu (§5.87)
+
+- Desktop and phone, in a study: the bar under the notation is ☰ ⏮ ◀ ▶ ⏭ (and ✎ ⋯ on the phone).
+  ☰ opens Explorer, Undo, Redo and Copy FEN; is anything you reach for often now a tap too far?
+
 ## Themes, and the themes side by side (§5.86)
 
 - Phone and desktop: Settings and debug → Theme. Each theme should be readable everywhere

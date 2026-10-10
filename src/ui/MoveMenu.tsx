@@ -3,6 +3,7 @@
 // actions; "Comment" opens a dialog with the comment and the glyphs, so the panel keeps its room
 // for the notation.
 import { signal } from '@preact/signals';
+import type { ComponentChildren } from 'preact';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { chapter, doc, edit, feedback, goTo, SCRATCH, side, study } from '../app/editor.ts';
 import { planEnrolled, setPlanCard } from '../app/plans.ts';
@@ -64,38 +65,6 @@ async function copyLine(path: Path, how: 'line' | 'continuation') {
 export function MoveMenu() {
   const m = menu.value;
   const c = chapter.value;
-  const ref = useRef<HTMLDivElement>(null);
-  const [place, setPlace] = useState<{ left: number; top: number } | undefined>(undefined);
-
-  useEffect(() => {
-    if (!m) return;
-    const outside = (e: PointerEvent) => {
-      if (!ref.current?.contains(e.target as Node)) close();
-    };
-    document.addEventListener('pointerdown', outside, true);
-    addEventListener('resize', close);
-    return () => {
-      document.removeEventListener('pointerdown', outside, true);
-      removeEventListener('resize', close);
-    };
-  }, [m]);
-
-  // Kept inside the window, flipped up or left where it would run off the edge.
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!m || !el) return setPlace(undefined);
-    const w = el.offsetWidth;
-    const h = el.offsetHeight;
-    const left = m.x + w > innerWidth - 4 ? Math.max(4, m.x - w) : m.x;
-    const top = m.y + h > innerHeight - 4 ? Math.max(4, m.above - h) : m.y;
-    setPlace({ left, top });
-  }, [m]);
-
-  // Focused once placed: a hidden button can't take the focus.
-  useEffect(() => {
-    if (place) ref.current?.querySelector<HTMLButtonElement>('button')?.focus();
-  }, [place]);
-
   if (!m || !c) return null;
   const editable = Boolean(doc.value);
   const isMove = m.path.length > 0;
@@ -152,28 +121,8 @@ export function MoveMenu() {
     }
   }
 
-  const onKey = (e: KeyboardEvent) => {
-    const buttons = [...(ref.current?.querySelectorAll('button') ?? [])];
-    const i = buttons.indexOf(document.activeElement as HTMLButtonElement);
-    if (e.key === 'Escape' || e.key === 'Tab') close();
-    else if (e.key === 'ArrowDown') buttons[(i + 1) % buttons.length]?.focus();
-    else if (e.key === 'ArrowUp') buttons[(i - 1 + buttons.length) % buttons.length]?.focus();
-    else if (e.key !== 'Enter' && e.key !== ' ') return;
-    // The chapter view's keys would otherwise move along the line behind the menu.
-    e.stopPropagation();
-    if (e.key !== 'Enter' && e.key !== ' ') e.preventDefault();
-  };
-
   return (
-    <div
-      ref={ref}
-      class="move-menu"
-      role="menu"
-      aria-label="Move"
-      style={place ? { left: `${place.left}px`, top: `${place.top}px` } : { left: `${m.x}px`, top: `${m.y}px`, visibility: 'hidden' }}
-      onKeyDown={onKey}
-      onContextMenu={(e) => e.preventDefault()}
-    >
+    <FloatingMenu at={m} label="Move" onClose={close}>
       {items.map((item) => (
         <button
           key={item.label}
@@ -188,6 +137,80 @@ export function MoveMenu() {
           {item.label}
         </button>
       ))}
+    </FloatingMenu>
+  );
+}
+
+/**
+ * A menu at a point on screen (the move menu, the study's ☰ menu): kept inside the window,
+ * flipped up or left where it would run off the edge (up to end at `above`, a button's top edge,
+ * say), closed by a press outside it, a resize, Escape or Tab; ↑ ↓ move between its items.
+ */
+export function FloatingMenu(props: { at: { x: number; y: number; above: number; opener?: Element }; label: string; onClose: () => void; children: ComponentChildren }) {
+  const { at, onClose } = props;
+  const ref = useRef<HTMLDivElement>(null);
+  const [place, setPlace] = useState<{ left: number; top: number } | undefined>(undefined);
+
+  useEffect(() => {
+    // A press on the button that opened it is left to that button, which closes it.
+    const outside = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (!ref.current?.contains(t) && !at.opener?.contains(t)) onClose();
+    };
+    // Escape closes it wherever the focus is (a tap can leave it on the page behind).
+    const escape = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.stopPropagation();
+      onClose();
+    };
+    document.addEventListener('pointerdown', outside, true);
+    document.addEventListener('keydown', escape, true);
+    addEventListener('resize', onClose);
+    return () => {
+      document.removeEventListener('pointerdown', outside, true);
+      document.removeEventListener('keydown', escape, true);
+      removeEventListener('resize', onClose);
+    };
+  }, [at]);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return setPlace(undefined);
+    const w = el.offsetWidth;
+    const h = el.offsetHeight;
+    const left = at.x + w > innerWidth - 4 ? Math.max(4, at.x - w) : at.x;
+    const top = at.y + h > innerHeight - 4 ? Math.max(4, at.above - h) : at.y;
+    setPlace({ left, top });
+  }, [at]);
+
+  // Focused once placed: a hidden button can't take the focus.
+  useEffect(() => {
+    if (place) ref.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
+  }, [place]);
+
+  const onKey = (e: KeyboardEvent) => {
+    const buttons = [...(ref.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? [])];
+    const i = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    if (e.key === 'Escape' || e.key === 'Tab') onClose();
+    else if (e.key === 'ArrowDown') buttons[(i + 1) % buttons.length]?.focus();
+    else if (e.key === 'ArrowUp') buttons[(i - 1 + buttons.length) % buttons.length]?.focus();
+    else if (e.key !== 'Enter' && e.key !== ' ') return;
+    // The chapter view's keys would otherwise move along the line behind the menu.
+    e.stopPropagation();
+    if (e.key !== 'Enter' && e.key !== ' ') e.preventDefault();
+  };
+
+  return (
+    <div
+      ref={ref}
+      class="move-menu"
+      role="menu"
+      aria-label={props.label}
+      style={place ? { left: `${place.left}px`, top: `${place.top}px` } : { left: `${at.x}px`, top: `${at.y}px`, visibility: 'hidden' }}
+      onKeyDown={onKey}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      {props.children}
     </div>
   );
 }

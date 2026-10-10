@@ -59,6 +59,14 @@ export async function drawInDrawMode(page: Page, from: string, to: string, orien
   if (touch) await toggle.click();
 }
 
+/** Picks an item of the study's ☰ menu (§5.87): the explorer on or off, Undo, Redo, Copy FEN. */
+export async function studyMenu(page: Page, item: 'Explorer' | 'Undo' | 'Redo' | 'Copy FEN') {
+  await page.getByRole('button', { name: 'More', exact: true }).click();
+  const menu = page.getByRole('menu', { name: 'More' });
+  await menu.getByRole(item === 'Explorer' ? 'menuitemcheckbox' : 'menuitem', { name: item }).click();
+  await menu.waitFor({ state: 'detached' });
+}
+
 /** Opens a move's menu: by a right-click on the move, or for the move shown by the ⋯ button (touch) or a right-click on it. */
 export async function openMoveMenu(page: Page, path?: string) {
   const button = page.getByRole('button', { name: 'Move menu' });

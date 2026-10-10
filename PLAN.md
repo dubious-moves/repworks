@@ -2737,7 +2737,7 @@ training settings' "This device"):
 
 **Study and analysis**:
 - **Copy FEN**: under the study's board, a row with the FEN of the position shown (read-only,
-  selected on a tap) and "Copy FEN"; on the analysis board, "Copy FEN" beside Set up and New (the
+  selected on a tap) and "Copy FEN" (since §5.87, "Copy FEN" in the ☰ menu instead); on the analysis board, "Copy FEN" beside Set up and New (the
   position shown, not the board's start); and "Copy FEN" in every move's menu (the start's too).
 - **No games here**: the table already had ChessDB's moves (novelties) and Maia's top four as
   rows where Lichess has no games; "No games here." showed when neither had answered yet, when
@@ -3028,6 +3028,26 @@ opened in a frame, a theme left out, "Use this one", and no GitHub request from 
 
 Live: TESTING.md.
 
+#### 5.87 The owner's notes of 2026-10-10: the study's ☰ menu
+
+From the design canvas of themes, whose study screen had a ☰ button and only the move buttons
+beside it; the owner marked on a screenshot what to take out of the live page.
+- **The move-button bar** is ☰, ⏮ ◀ ▶ ⏭, and ✎ ⋯ where there is no mouse (§5.69): five buttons
+  on a desktop, seven on the phone (nine and eleven before).
+- **☰ opens a menu** (`StudyMenu.tsx`) with what left the bar and the board: Explorer (a
+  checkbox: the panel on or off, as the ⛁ button did), Undo and Redo (greyed when there is
+  nothing to undo or redo; Ctrl+Z / Ctrl+Y still work, shown beside them where there is a
+  keyboard) and Copy FEN (the position shown). The FEN row under the board is gone; the move
+  menu keeps its Copy FEN, and the analysis board its FEN field.
+- The move menu and the ☰ menu share `FloatingMenu` (placed inside the window, ↑ ↓ between
+  items, closed by a press outside, a resize, Escape anywhere or Tab); ☰ again closes its menu.
+
+Tests: `views.spec.ts` (the bar's buttons on desktop and phone, no FEN row, the menu's items,
+Undo and Redo greyed then working on a move played, ☰ and Escape closing it; Copy FEN from
+it), and the explorer, editor and engine specs through the menu (`studyMenu` in `board.ts`).
+
+Live: TESTING.md.
+
 #### 5.14 Phase 1 acceptance test, and exit
 
 **Acceptance test (live, desktop + Android phone)**, after Phase 0's (§4.11) and once §5.15 is
@@ -3314,7 +3334,8 @@ counts and bars equal for the same filter); the phone's layout and scrolling; th
 - `src/ui/Explorer.tsx`, under the notation's Read/Play buttons and the move's card in the
   chapter view's panel; on a wide screen it takes up to half the panel and scrolls, on the phone
   it follows the notation. The database button (`⛁`) is first in the move-button bar, which now
-  keeps its nine buttons on one row at every width.
+  keeps its nine buttons on one row at every width. (Since §5.87 the panel is switched in the ☰
+  menu, and the bar keeps the move buttons.)
 - Tabs: Lichess (named Local when a local explorer is set), Masters, ChessDB (removed since, by
   the owner's notes below); ⚙ opens the
   explorer's settings (`ExplorerSettings.tsx`: the Lichess login, Qchess's time controls and

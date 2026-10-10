@@ -25,14 +25,15 @@ import { pathKey } from '../core/study/notation.ts';
 import { nodeAt, positionAt, samePath, type Path } from '../core/study/tree.ts';
 import { Board } from './Board.tsx';
 import { addAlternative, altAdding, CardPanel } from './CardPanel.tsx';
-import { CommentDialog, copyFen, MoveMenu, openMenu } from './MoveMenu.tsx';
+import { CommentDialog, MoveMenu, openMenu } from './MoveMenu.tsx';
+import { StudyMenu, StudyMenuButton } from './StudyMenu.tsx';
 import { BranchPicker, branchOpen, chooseBranch, closeBranches, stepOn } from './BranchPicker.tsx';
 import { Notation } from './Notation.tsx';
 import { endPreviewOnBoard, PreviewBar, previewBoard } from './CommentText.tsx';
 import { ModeSwitch } from './ModeSwitch.tsx';
 import { openChapterSettings, openNewChapter, openStudySettings } from './StudyDialogs.tsx';
 import { TranspositionList } from './Transpositions.tsx';
-import { Explorer, ExplorerToggle } from './Explorer.tsx';
+import { Explorer } from './Explorer.tsx';
 import { EnginePanel, EvalBar, useEngineArrows } from './Engine.tsx';
 import { analysePosition, setThreat, threat } from '../app/engine.ts';
 import { Back } from './Back.tsx';
@@ -245,7 +246,7 @@ export function ChapterView() {
               <p class="feedback" role="status">
                 {feedback.value ?? ''}
               </p>
-              {scratch ? <AnalysisFen /> : <FenRow fen={shownLine?.fen ?? board.fen} />}
+              {scratch && <AnalysisFen />}
             </div>
             <div class="cv-panel">
               <EnginePanel board={board.pos} />
@@ -266,7 +267,7 @@ export function ChapterView() {
                 </div>
               )}
               <div class="controls">
-                <ExplorerToggle />
+                <StudyMenuButton />
                 <button type="button" aria-label="Start" onClick={() => move('start')}>
                   ⏮
                 </button>
@@ -278,12 +279,6 @@ export function ChapterView() {
                 </button>
                 <button type="button" aria-label="End of the line" onClick={() => move('end')}>
                   ⏭
-                </button>
-                <button type="button" aria-label="Undo" disabled={!doc.value?.past.length} onClick={undoEdit}>
-                  ↶
-                </button>
-                <button type="button" aria-label="Redo" disabled={!doc.value?.future.length} onClick={redoEdit}>
-                  ↷
                 </button>
                 <button type="button" aria-pressed={drawMode} aria-label="Draw mode" class={`touch-only${drawMode ? ' on' : ''}`} onClick={() => setDrawMode(!drawMode)}>
                   ✎
@@ -307,21 +302,10 @@ export function ChapterView() {
       )}
       {/* Outside the frame, whose size containment would place a fixed menu inside it. */}
       <MoveMenu />
+      {c && board && <StudyMenu fen={shownLine?.fen ?? board.fen} />}
       <BranchPicker />
       <TranspositionList />
       <CommentDialog />
-    </div>
-  );
-}
-
-/** The board's FEN under it, to read, select or copy (the owner's request, 2026-10-08). */
-function FenRow(props: { fen: string }) {
-  return (
-    <div class="fen-form fen-row">
-      <input aria-label="FEN of the position shown" readOnly value={props.fen} onFocus={(e) => e.currentTarget.select()} />
-      <button type="button" class="secondary" title="Copy the FEN of the position shown" onClick={() => void copyFen(props.fen)}>
-        Copy FEN
-      </button>
     </div>
   );
 }

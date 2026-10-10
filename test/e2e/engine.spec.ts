@@ -6,6 +6,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
 import { serveGithub, world } from './github.ts';
 import { serveSite, type SiteServer } from './server.ts';
+import { studyMenu } from './board.ts';
 import { AFTER_E4, commands, fakeEngine, START, START_THREAT } from './engine.ts';
 
 let site: SiteServer;
@@ -59,7 +60,7 @@ test('the engine’s lines, eval bar and arrows; a line previewed and added; the
   await expect(bar).toHaveCount(0);
   await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'd4 d5');
   await expect(page.locator('.notation .variation').first()).toHaveText('1. d4 d5');
-  await page.getByRole('button', { name: 'Undo' }).click();
+  await studyMenu(page, 'Undo');
   await expect(page.locator('.notation')).not.toContainText('1. d4 d5');
 
   // Remembered on this device.

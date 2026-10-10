@@ -3,6 +3,7 @@
 // Alapin: 1. e4 c5 2. c3 Nf6, both Black's).
 import { test, expect, type Page } from '@playwright/test';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
+import { studyMenu } from './board.ts';
 import { fakeExplorer, lichessLogin, serveExplorer, serveLocalExplorer, type FakeExplorer } from './explorer.ts';
 import { serveGithub, world } from './github.ts';
 import { serveSite, type SiteServer } from './server.ts';
@@ -96,12 +97,14 @@ test('the panel: Qchess’s rows, sorted by eval, a row clicked plays its move, 
   await expect(page.locator('.move.current')).toHaveText(/d4/);
 
   // Off: no panel, remembered after a reload.
-  await page.getByRole('button', { name: 'Explorer', exact: true }).click();
+  await studyMenu(page, 'Explorer');
   await expect(panel(page)).toHaveCount(0);
   await page.reload();
   await expect(page.locator('.notation')).toBeVisible();
   await expect(panel(page)).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Explorer', exact: true })).toHaveAttribute('aria-pressed', 'false');
+  await page.getByRole('button', { name: 'More', exact: true }).click();
+  await expect(page.getByRole('menuitemcheckbox', { name: 'Explorer' })).toHaveAttribute('aria-checked', 'false');
+  await page.keyboard.press('Escape');
 });
 
 test('no games here: ChessDB’s moves are the rows, said above them; with ChessDB not knowing it either, that is said', async ({ page }) => {

@@ -5,7 +5,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import type { FakeGit } from '../support/fakeGit.ts';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
-import { chapterSettings, clickSquare, drawInDrawMode, newChapter, openMoveMenu } from './board.ts';
+import { chapterSettings, clickSquare, drawInDrawMode, newChapter, openMoveMenu, studyMenu } from './board.ts';
 import { serveGithub, world } from './github.ts';
 import { serveSite, type SiteServer } from './server.ts';
 
@@ -94,9 +94,9 @@ test('open a chapter, move through it, and edit it: variation, comment, glyph, a
   );
 
   // Undo takes the circle back, then the arrow; redo brings the arrow again.
-  await page.getByRole('button', { name: 'Undo' }).click();
-  await page.getByRole('button', { name: 'Undo' }).click();
-  await page.getByRole('button', { name: 'Redo' }).click();
+  await studyMenu(page, 'Undo');
+  await studyMenu(page, 'Undo');
+  await studyMenu(page, 'Redo');
   await sync(page, git, (t) => t.includes('{ [%cal Rd7d5] }'));
   expect(git.textsOf().get(CHAPTER)).toContain('(2... e6! { The Taimanov way } { [%cal Rd7d5] })');
   expect(git.commits.get(git.head)!.message).toMatch(/^desktop: 1 study file/);
@@ -108,7 +108,7 @@ test('open a chapter, move through it, and edit it: variation, comment, glyph, a
   await expect(arrows).toHaveCount(0);
   await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 e6');
   await sync(page, git, (t) => t.includes('(2... e6! { The Taimanov way })'));
-  await page.getByRole('button', { name: 'Undo' }).click();
+  await studyMenu(page, 'Undo');
   await expect(arrows).toHaveCount(1);
 });
 

@@ -6,7 +6,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import type { FakeGit } from '../support/fakeGit.ts';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
-import { clickSquare, comment, openMoveMenu } from './board.ts';
+import { clickSquare, comment, openMoveMenu, studyMenu } from './board.ts';
 import { serveGithub, world } from './github.ts';
 import { serveSite, type SiteServer } from './server.ts';
 
@@ -242,15 +242,14 @@ test('copy continuation: from the variation’s first move to the end of its lin
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('2... d6 3. d4 cxd4');
 });
 
-test('copy FEN: the board’s position from the row under it and from the move menu (the owner’s request, 2026-10-08)', async ({ page, context, browserName }) => {
+test('copy FEN: the board’s position from the ☰ menu and from the move menu (the owner’s request, 2026-10-08)', async ({ page, context, browserName }) => {
   test.skip(browserName !== 'chromium', 'clipboard permissions are Chromium-only here');
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await setUp(page);
   await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf?at=e4,c5`);
   await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5');
   const after = 'rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2';
-  await expect(page.getByLabel('FEN of the position shown')).toHaveValue(after);
-  await page.getByRole('button', { name: 'Copy FEN' }).click();
+  await studyMenu(page, 'Copy FEN');
   await expect(page.locator('.cv-board .feedback')).toHaveText('FEN copied');
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(after);
   await page.locator('.move[data-path="e4 c5 Nf3"]').click();
@@ -263,6 +262,41 @@ test('copy FEN: the board’s position from the row under it and from the move m
   await clickSquare(page, 'f3', 'white');
   await page.getByRole('button', { name: 'Copy FEN' }).click();
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2');
+});
+
+test('the ☰ menu: the explorer, undo and redo, Copy FEN; the bar keeps the moves (the owner’s notes, 2026-10-10)', async ({ page, isMobile }) => {
+  await setUp(page);
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf?at=e4,c5`);
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5');
+  const bar = page.locator('.cv-panel .controls');
+  const shown = await bar.getByRole('button').evaluateAll((bs) => bs.filter((b) => (b as HTMLElement).offsetParent).map((b) => b.getAttribute('aria-label')));
+  expect(shown).toEqual(['More', 'Start', 'Previous move', 'Next move', 'End of the line', ...(isMobile ? ['Draw mode', 'Move menu'] : [])]);
+  await expect(page.getByLabel('FEN of the position shown')).toHaveCount(0);
+
+  const more = page.getByRole('button', { name: 'More', exact: true });
+  const menu = page.getByRole('menu', { name: 'More' });
+  await more.click();
+  await expect(more).toHaveAttribute('aria-expanded', 'true');
+  await expect(menu.getByRole('menuitemcheckbox')).toHaveAccessibleName('Explorer');
+  await expect(menu.getByRole('menuitem')).toHaveText([/^↶Undo/, /^↷Redo/, 'Copy FEN']);
+  await expect(menu.getByRole('menuitem', { name: 'Undo' })).toBeDisabled();
+  await expect(menu.getByRole('menuitem', { name: 'Redo' })).toBeDisabled();
+  // ☰ again closes it, as Escape does; the keys move along the line again afterwards.
+  await more.click();
+  await expect(menu).toHaveCount(0);
+  await more.click();
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await expect(more).toHaveAttribute('aria-expanded', 'false');
+
+  // A move played can be undone from it, then redone.
+  await clickSquare(page, 'g2', 'black');
+  await clickSquare(page, 'g3', 'black');
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 g3');
+  await studyMenu(page, 'Undo');
+  await expect(page.locator('.notation .move[data-path="e4 c5 g3"]')).toHaveCount(0);
+  await studyMenu(page, 'Redo');
+  await expect(page.locator('.notation .move[data-path="e4 c5 g3"]')).toHaveCount(1);
 });
 
 test('clickable lines: preview a comment’s line, step through its lines, and back out', async ({ page, isMobile }) => {

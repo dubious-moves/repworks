@@ -1025,6 +1025,31 @@ textarea.script {
   color: var(--danger);
 }
 
+/* The study's ☰ menu (StudyMenu.tsx): a column for ✓ and the ↶ ↷ marks, the shortcut at the end. */
+.move-menu .menu-check {
+  display: inline-block;
+  width: 1.4em;
+  color: var(--muted);
+}
+
+.move-menu button {
+  display: flex;
+  align-items: center;
+}
+
+.move-menu kbd {
+  margin-left: auto;
+  padding-left: 16px;
+  font: 0.75rem var(--font-mono);
+  color: var(--muted);
+}
+
+@media (hover: none) {
+  .move-menu kbd {
+    display: none;
+  }
+}
+
 @media (pointer: fine) {
   .move-menu button {
     min-height: 34px;
@@ -1256,7 +1281,7 @@ table.cards td {
   max-height: 55dvh;
 }
 
-/* Eight move buttons in one row on a 360 px phone: they share the width, 44 px apiece at 412. */
+/* The move buttons in one row on a 360 px phone: they share the width. */
 @media (max-width: 899px) {
   .cv-panel .controls {
     flex-wrap: nowrap;
@@ -2212,15 +2237,6 @@ a.button.secondary {
   margin: 0 0 6px;
 }
 
-.controls .explorer-toggle {
-  font-size: 1.1rem;
-}
-
-.controls .explorer-toggle.on {
-  background: var(--info-strong);
-  color: var(--on-select);
-}
-
 @media (pointer: coarse) {
   .ex-row {
     min-height: 32px;
@@ -2289,7 +2305,7 @@ a.button.secondary {
   margin: 4px 0 0;
 }
 
-/* Nine move buttons with the explorer's: one row in the panel at every width, sharing it. */
+/* ☰, the four move buttons, and ✎ ⋯ on a touch screen: one row in the panel at every width, sharing it. */
 .cv-panel .controls {
   flex-wrap: nowrap;
   gap: 4px;
@@ -4310,13 +4326,6 @@ a.button.disabled {
 
 .storm-clear {
   margin-top: 0.5rem;
-}
-
-/* The study board's FEN under it, read-only, with Copy FEN (the owner's request, 2026-10-08). */
-.cv-board .fen-row input {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: var(--muted);
 }
 
 /* The look (Debug.tsx): the theme, and the gallery's link. */
