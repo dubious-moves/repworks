@@ -153,7 +153,7 @@ export const STORM: StormConfig = {
   walkMultipv: 6,
   deepenDepth: 20,
   deepenMultipv: 12,
-  engineDepth: { desktop: 20, mobile: 18 },
+  engineDepth: { desktop: 20, mobile: 20 },
   enginePhaseMs: 8000,
   puzzleAnchorMinPly: 12,
   puzzleAnchorMaxPly: 24,

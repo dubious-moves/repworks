@@ -2840,6 +2840,16 @@ Live: TESTING.md.
   (`100dvh − 240px`, and its width less the panel's least and the line list's). On a 1440×900
   window that is 660 px everywhere (the study's was 661, training's 640); on 1920×1080, 840.
 
+#### 5.80 A storm move judged at depth 20 (the owner's request, 2026-10-10)
+
+The owner: depth 14 is not enough to judge a move. The walk still scores its positions at depth 14
+(MultiPV 6) on a ChessDB miss, since it searches every ply it walks and only picks positions; the
+deepening (§23: MultiPV 12, depth 20) replaces those lists in the background. What changed is the
+grade: a stored Stockfish list below depth 20 grades nothing, neither from the list nor as one
+search against its score; the move goes to the two searches (the card's position and the one
+after the move, MultiPV 1), each to depth 20 on every device (the phone was 18), at most 8 s
+each, the verdict showing the depth reached. Tests: none new (the grade lives in `src/app`);
+the phone's time to depth 20 is for the owner's live test.
 #### 5.14 Phase 1 acceptance test, and exit
 
 **Acceptance test (live, desktop + Android phone)**, after Phase 0's (§4.11) and once §5.15 is
@@ -4250,8 +4260,9 @@ position, the phone's time with the engine's share.
   name; one move. **The verdict**: the band's word and colour (green, dim green, neutral, amber,
   red: one ramp), the move's rank and win% lost, the best move; points, the streak; the clock
   (3:00, amber under 30 s) runs only while a card waits for a move. Grading: the stored list, then
-  the child (ChessDB for a ChessDB list), then Stockfish on both positions (depth 18, 8 s) when
-  neither answers, the board held shut meanwhile; `unknown` scores nothing and holds the streak.
+  the child (ChessDB for a ChessDB list), then Stockfish on both positions (depth 20, 8 s) when
+  neither answers; a Stockfish list below depth 20 (the walk's, not yet deepened) grades nothing,
+  the move going straight to the two searches (§5.80), the board held shut meanwhile; `unknown` scores nothing and holds the streak.
 - **The review** when the clock ends or on End (the card left on the board kept, unanswered):
   every position with the move played, its band and loss; the best move hidden until asked (`b`);
   Try again (`t`, scored nothing); Analyse (the analysis board, §5.35, with the engine and the

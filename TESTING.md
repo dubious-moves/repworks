@@ -5,6 +5,12 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## A storm move judged at depth 20 (§5.80)
+
+- Phone: a storm card gathered by Stockfish and not yet deepened (the home's "Stockfish: n of m
+  scored to depth 20" below m): after a move, how long the verdict takes, and whether it says
+  "by Stockfish d20" or stops short at the 8 s limit.
+
 ## The board's size (§5.79)
 
 - Desktop, then phone: drag the grip at the board's bottom-right corner on a study; the training

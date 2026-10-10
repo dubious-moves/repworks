@@ -1453,3 +1453,9 @@ The technical calls, each with its reason:
   large as fits on every page: training and practice lose their 640 px cap and fit the window's
   height as the chapter view does, so the boards match before anything is dragged. Per device,
   not synced, because the right size depends on the screen.
+
+## Revision of 2026-10-10 (a storm move judged at depth 20, PLAN.md §5.80)
+- **A storm move is judged by Stockfish at depth 20 or by ChessDB, never by the walk's depth-14
+  list** (the owner: depth 14 is not good enough to judge a move). A card whose stored list is
+  below depth 20 is graded by two fresh searches at depth 20 (the phone too, was 18), 8 s each at
+  most. The walk keeps depth 14 for finding positions, so gathering is no slower.

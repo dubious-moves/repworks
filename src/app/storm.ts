@@ -922,7 +922,10 @@ export async function gradeMove(card: StoredPosition, uci: string): Promise<Stor
     if (source) v.source = source;
     return v;
   };
-  const listed = moveLoss(list, uci, undefined, STORM);
+  // A walk's list (depth 14) never grades a move: below the deepened standard (depth 20), the
+  // move goes straight to the two searches.
+  const shallow = engineListed && (list.depth ?? 0) < STORM.deepenDepth;
+  const listed = shallow ? null : moveLoss(list, uci, undefined, STORM);
   if (listed) return fromLoss(listed, engineListed ? 'sflist' : 'list', engineListed ? { depth: card.depth, bestScore: list[0]!.score, bestSan: uciToSan(pos, list[0]!.uci) } : {});
   const child = fenAfterUci(card.fen, uci);
   if (!child) return { ...base, verdict: 'unknown', band: 'unknown' };
@@ -931,7 +934,7 @@ export async function gradeMove(card: StoredPosition, uci: string): Promise<Stor
     const childList = r.type === 'scores' && 'evals' in r ? cdbList(r.evals) : null;
     const ml = childList ? moveLoss(list, uci, childList[0]!.score, STORM) : null;
     if (ml) return fromLoss(ml, 'child');
-  } else {
+  } else if (!shallow) {
     // One search of the position after it, against the stored engine list (§23).
     const after = await engineScore(child);
     if (after) {
