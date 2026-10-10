@@ -5,6 +5,14 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## Themes, and the themes side by side (§5.86)
+
+- Phone and desktop: Settings and debug → Theme. Each theme should be readable everywhere
+  (study, training, storm, games, dialogs), with the phone's bar colour matching the top bar.
+- "Compare the themes": the frames follow each other as you open screens and step through a
+  line; on the phone the row scrolls sideways. Which themes, or which parts of them,
+  are worth keeping or mixing?
+
 ## "Train" from the study selects the line shown (§5.83)
 
 - Desktop and phone, in a repertoire study: browse to a move in a side variation and press Train.

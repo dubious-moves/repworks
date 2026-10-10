@@ -39,7 +39,8 @@ export const starting = signal<string>('opening the local database');
 let store: IdbStore | undefined;
 let controller: SyncController | undefined;
 
-export async function startApp(link: SetupParse | undefined, lichessCallback?: string): Promise<void> {
+/** `sync` false: a styles gallery's frame (styles.html), which shows this device's data and never syncs it. */
+export async function startApp(link: SetupParse | undefined, lichessCallback?: string, sync = true): Promise<void> {
   try {
     store = await IdbStore.open();
   } catch (error) {
@@ -65,7 +66,7 @@ export async function startApp(link: SetupParse | undefined, lichessCallback?: s
     notice.value = done.notice;
     if (done.returnTo) location.hash = done.returnTo;
   }
-  await controller.start();
+  if (sync) await controller.start();
   effect(() => {
     void dataVersion.value;
     void reload();

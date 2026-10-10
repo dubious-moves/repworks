@@ -2992,6 +2992,36 @@ best shown, the Mistake still counted).
 
 Live: TESTING.md.
 
+#### 5.86 Themes, and the themes side by side (the owner's request, 2026-10-10)
+
+To try other looks for the app quickly. As built:
+- **Tokens** (`src/ui/themes.css`): app.css takes every colour, its fonts and its two radii from
+  variables. The only colours it still writes are marked `/* fixed */`: the chess sides (side
+  tags, result and eval bars), the arrows' brushes, Lichess's promotion squares, the QR code,
+  the storm's bands and the games' eval graph. Overlays and borders are `rgb(var(--ink) / n%)`,
+  so a light theme flips them with one value. `test/unit/ui/themes.test.ts` fails on a new
+  colour written in app.css, a variable read and never declared, or a theme setting a token
+  Forest doesn't have.
+- **Themes**: Forest (the look until now, unchanged but for two near-identical text greys merged),
+  Slate (Lichess-like neutral dark, blue), Walnut (warm browns, amber), Midnight (black, high
+  contrast, flat blue-grey board) and Paper (light, flat green board). A theme is one block of
+  variables; Forest's are the fallback for any it leaves out (the light theme sets them all).
+- **The choice** is per device, in localStorage (`repworks-theme`), from "Settings and debug";
+  `index.html` sets it before the first paint, and the phone's bar colour and `color-scheme`
+  follow it.
+- **Side by side**: `styles.html` (linked from the settings) shows the real app in a frame per
+  theme, at a phone's size or a desktop's scaled to fit, with screen buttons above. The frames
+  follow each other: a screen opened or a move stepped to in one is shown in all (the frames'
+  addresses are polled, since stepping through a line uses `replaceState`). A frame is the app
+  with `?theme=<id>&preview`: shown in that theme, not kept, and never syncing (its edits are the
+  device's and sync from the app). "Use this one" makes a theme the app's.
+
+Tests: `themes.spec.ts` (desktop and phone: a theme chosen is on `<html>`, light, and kept over
+a reload; the gallery's five frames, each in its theme, following a screen picked above and one
+opened in a frame, a theme left out, "Use this one", and no GitHub request from a frame).
+
+Live: TESTING.md.
+
 #### 5.14 Phase 1 acceptance test, and exit
 
 **Acceptance test (live, desktop + Android phone)**, after Phase 0's (§4.11) and once §5.15 is

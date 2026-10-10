@@ -13,6 +13,26 @@ import { conflicts } from '../core/repertoire/index.ts';
 import { TimeControl } from './TimeTravel.tsx';
 import { EngineFiles } from './Engines.tsx';
 import { isoDay } from './day.ts';
+import { isTheme, setTheme, theme, THEMES } from '../app/theme.ts';
+
+/** The look (src/ui/themes.css): this device's theme, and the gallery that shows them side by side. */
+function Look() {
+  return (
+    <div class="look">
+      <label>
+        Theme{' '}
+        <select value={theme.value} onChange={(e) => isTheme(e.currentTarget.value) && setTheme(e.currentTarget.value)}>
+          {THEMES.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name} ({t.note})
+            </option>
+          ))}
+        </select>
+      </label>{' '}
+      <a href={`${import.meta.env.BASE_URL}styles.html`}>Compare the themes</a>
+    </div>
+  );
+}
 
 /** The repertoire index (§5.1, §5.7): its size and build time, positions with more than one own move, chapters left out. */
 function Repertoire() {
@@ -78,6 +98,7 @@ export function Debug() {
   return (
     <details class="card debug">
       <summary>Settings and debug</summary>
+      <Look />
       <dl>
         <dt>Device</dt>
         <dd>

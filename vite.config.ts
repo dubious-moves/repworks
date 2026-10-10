@@ -21,8 +21,8 @@ export default defineConfig({
     // Every browser the site supports preloads modules natively.
     modulePreload: { polyfill: false },
     rolldownOptions: {
-      // spike.html is the throwaway remote spike (PLAN.md §4.2).
-      input: { main: 'index.html', spike: 'spike.html' },
+      // spike.html is the throwaway remote spike (PLAN.md §4.2); styles.html the themes side by side.
+      input: { main: 'index.html', spike: 'spike.html', styles: 'styles.html' },
     },
   },
   preview: {

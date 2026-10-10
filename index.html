@@ -6,6 +6,13 @@
     <meta name="theme-color" content="#22412e" />
     <meta name="color-scheme" content="dark" />
     <title>Repworks</title>
+    <script>
+      // The theme before the first paint (src/app/theme.ts keeps it afterwards).
+      try {
+        var t = new URLSearchParams(location.search).get('theme') || localStorage.getItem('repworks-theme');
+        if (t) document.documentElement.dataset.theme = t;
+      } catch (e) {}
+    </script>
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />

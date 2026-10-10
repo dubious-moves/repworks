@@ -1,0 +1,308 @@
+/*
+ * The themes: every colour, font and radius app.css uses, as tokens. `:root` holds Forest (the
+ * look the app was built with); a theme is `[data-theme='<id>']` on <html> (src/app/theme.ts),
+ * or on any element, where it re-themes that element's subtree (the styles gallery's columns).
+ * A theme leaves out what it shares with Forest. The list of themes is THEMES in theme.ts.
+ *
+ * app.css writes no colour of its own except the ones marked `fixed` (the chess sides, the
+ * arrows' brushes, Lichess's promotion squares, a QR code): test/unit/ui/themes.test.ts keeps it so.
+ */
+
+:root,
+[data-theme='forest'] {
+  --scheme: dark;
+  /* The colour of the browser's own bar on the phone (index.html's theme-color). */
+  --theme-color: #22412e;
+  --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, monospace;
+  --radius: 6px;
+  --radius-card: 8px;
+
+  /* The page */
+  --bg: #161a17;
+  --surface: #202621;
+  --text: #d6dbd5;
+  --text-soft: #bdbdbd;
+  --muted: #8d978e;
+  --link: #9fd3a8;
+  /* Overlays and borders are this colour at a few per cent: white on a dark theme, black on a light one. */
+  --ink: 255 255 255;
+  --shadow: 0 0 0;
+
+  /* Buttons and the top bar */
+  --accent: #22412e;
+  --accent-text: #e8efe9;
+  --accent-border: #3f6b50;
+  --accent-hover: #2f5a3f;
+  --accent-hover-border: #5f9a73;
+  --chip-text: #e8efe9;
+  /* A repertoire study's badge, on the accent. */
+  --badge-text: #9fd3a8;
+  --primary-bg: #2f6b3e;
+  --primary-border: #4c9a5c;
+
+  /* States */
+  --warn: #c99a3e;
+  --on-warn: #1b1b1b;
+  --error: #e08a7a;
+  --danger: #e57373;
+  --good-text: #8fd18a;
+
+  /* Dialogs, menus, fields */
+  --dialog-bg: #1a1a1a;
+  --menu-bg: #2c2c2c;
+  --field-bg: #111;
+  --control-bg: #2a2a2a;
+  --control-border: #444;
+  --control-border-strong: #555;
+  --control-text: #ddd;
+  --switch-off: #3a403b;
+  --switch-knob: #ddd;
+  --switch-on: #2ea043;
+
+  /* Selection and the explorer's blues */
+  --select-bg: #2c4a7a;
+  --on-select: #fff;
+  --info: #5c83ca;
+  --info-strong: #4a6ba6;
+  --info-bg: #2b3f63;
+  --info-text: #e8ecf5;
+  --info-muted: #48566e;
+  --info-light: #8fb4f0;
+  --xref-bg: #3b4a5c;
+
+  /* The notation */
+  --move-hover: #2d5171;
+  --move-current: #319a28;
+  --on-current: #fff;
+  --move-number: #b9b3b3;
+  --glyph-current: #ffe9a8;
+  --comment: #7ec8e3;
+  --on-comment: #111;
+  --comment-line: #6fb3ff;
+  --variation-bg: rgb(237 226 226 / 10%);
+  --variation-text: #bbb;
+  --branch-line: #555;
+
+  /* Training */
+  --due: #e05050;
+  --learned: #319a28;
+  --must: #e0b84a;
+  --paused: #9aa0a6;
+
+  /* Evaluations, the explorer, games */
+  --plus: #4caf50;
+  --minus: #f44336;
+  --win: #62cf8e;
+  --loss: #ef5f5f;
+  --eval-white: #e8e8e8;
+  --eval-black: #ff6b6b;
+  --engine: #3fb950;
+  --novelty: #ff9800;
+  --maia: #b392f0;
+  --ms: #e8c98f;
+  --sev-high: #7a2e25;
+  --sev-mid: #6b5a1d;
+  --mistake: #e07a3a;
+  --tactic: #5b9bd5;
+  --advantage: #8b7dd8;
+}
+
+/* Slate: neutral greys and a blue accent, after Lichess's dark theme. */
+[data-theme='slate'] {
+  --theme-color: #262421;
+  --bg: #161512;
+  --surface: #262421;
+  --text: #cfcdca;
+  --text-soft: #b5b3b0;
+  --muted: #8b8987;
+  --link: #6eb0f0;
+  --accent: #2f5f93;
+  --accent-text: #f2f6fb;
+  --accent-border: #4a7bb3;
+  --accent-hover: #3a6ea8;
+  --accent-hover-border: #6b98cc;
+  --chip-text: #f2f6fb;
+  --badge-text: #cfe3f7;
+  --primary-bg: #3692e7;
+  --primary-border: #5aa8ef;
+  --dialog-bg: #1e1d1a;
+  --menu-bg: #302e2b;
+  --field-bg: #121110;
+  --control-bg: #302e2b;
+  --switch-off: #403e3b;
+  --switch-on: #3692e7;
+  --move-hover: #3a3833;
+  --move-current: #3692e7;
+  --learned: #629924;
+  --comment: #9cc9e8;
+}
+
+/* Walnut: warm browns with amber highlights, on the classic board. */
+[data-theme='walnut'] {
+  --theme-color: #4a321c;
+  --bg: #1b1612;
+  --surface: #28211b;
+  --text: #e6dccf;
+  --text-soft: #c9bcab;
+  --muted: #9a8b7a;
+  --link: #e3b36a;
+  --accent: #4a321c;
+  --accent-text: #f6ead9;
+  --accent-border: #6e4c2c;
+  --accent-hover: #5c3f24;
+  --accent-hover-border: #8f6a43;
+  --chip-text: #f6ead9;
+  --badge-text: #e3b36a;
+  --primary-bg: #8a5a24;
+  --primary-border: #b07a3c;
+  --dialog-bg: #1f1915;
+  --menu-bg: #33291f;
+  --field-bg: #15110d;
+  --control-bg: #33291f;
+  --control-border: #54453a;
+  --control-border-strong: #6a5848;
+  --control-text: #e6dccf;
+  --switch-off: #46392d;
+  --switch-on: #b5762a;
+  --move-hover: #4a3a2a;
+  --move-current: #b5762a;
+  --move-number: #a99a89;
+  --comment: #d9b98a;
+  --comment-line: #e3b36a;
+  --variation-bg: rgb(255 230 200 / 7%);
+  --branch-line: #6a5848;
+  --select-bg: #7a4f1d;
+  --info: #b5823f;
+  --learned: #8fae4a;
+}
+
+/* Midnight: black for an OLED phone, high contrast, a cyan accent. */
+[data-theme='midnight'] {
+  --theme-color: #000;
+  --bg: #000;
+  --surface: #0f1216;
+  --text: #f2f4f7;
+  --text-soft: #c8ccd2;
+  --muted: #9aa3ad;
+  --link: #5fd4f4;
+  --accent: #0b3a4a;
+  --accent-text: #e9fbff;
+  --accent-border: #1f6a82;
+  --accent-hover: #0f4c61;
+  --accent-hover-border: #3a93ad;
+  --chip-text: #e9fbff;
+  --badge-text: #7fe0f4;
+  --primary-bg: #0e7490;
+  --primary-border: #22a3c4;
+  --dialog-bg: #0b0d10;
+  --menu-bg: #161a20;
+  --field-bg: #000;
+  --control-bg: #161a20;
+  --control-border: #2e3540;
+  --control-border-strong: #3d4653;
+  --control-text: #e6e9ee;
+  --switch-off: #2a3038;
+  --switch-on: #0ea5c9;
+  --move-hover: #16303d;
+  --move-current: #0e8fb3;
+  --move-number: #9aa3ad;
+  --comment: #7fe0c8;
+  --comment-line: #5fd4f4;
+  --variation-bg: rgb(255 255 255 / 6%);
+  --branch-line: #3d4653;
+  --learned: #22c55e;
+  --board-light: #dee3e6;
+  --board-dark: #8ca2ad;
+}
+
+/* Paper: a light theme, warm off-white and green, on a green board. */
+[data-theme='paper'] {
+  --scheme: light;
+  --theme-color: #2f5d43;
+  --bg: #f1ede4;
+  --surface: #fffdf8;
+  --text: #2a2925;
+  --text-soft: #4c4a44;
+  --muted: #6f6a60;
+  --link: #2a6b45;
+  --ink: 0 0 0;
+  --shadow: 60 50 30;
+  --accent: #2f5d43;
+  --accent-text: #fbfaf6;
+  --accent-border: #4f7d62;
+  --accent-hover: #3b6f52;
+  --accent-hover-border: #2f5d43;
+  --chip-text: #fbfaf6;
+  --badge-text: #e6f2ea;
+  --primary-bg: #2f7d4a;
+  --primary-border: #256a3d;
+  --warn: #a86f00;
+  --on-warn: #fff;
+  --error: #b3402e;
+  --danger: #c0392b;
+  --good-text: #2e7d32;
+  --dialog-bg: #fffdf8;
+  --menu-bg: #fff;
+  --field-bg: #fff;
+  --control-bg: #ece7dc;
+  --control-border: #cfc8b8;
+  --control-border-strong: #b9b1a0;
+  --control-text: #2a2925;
+  --switch-off: #cfc8b8;
+  --switch-knob: #fff;
+  --switch-on: #2f7d4a;
+  --select-bg: #2f5fae;
+  --on-select: #fff;
+  --info: #3a64b0;
+  --info-strong: #3a62a8;
+  --info-bg: #dfe6f3;
+  --info-text: #1d2b45;
+  --info-muted: #c9d3e6;
+  --info-light: #2f5fae;
+  --xref-bg: #d5dde8;
+  --move-hover: #dce6ef;
+  --move-current: #2f7d4a;
+  --on-current: #fff;
+  --move-number: #8a847a;
+  --glyph-current: #fff3b0;
+  --comment: #1f6f8b;
+  --on-comment: #fff;
+  --comment-line: #1f5fae;
+  --variation-bg: rgb(0 0 0 / 5%);
+  --variation-text: #55524b;
+  --branch-line: #bdb5a5;
+  --due: #c62828;
+  --learned: #2e7d32;
+  --must: #946200;
+  --paused: #7a7f86;
+  --plus: #2e7d32;
+  --minus: #c62828;
+  --win: #2e7d32;
+  --loss: #c62828;
+  --eval-white: #3a3a3a;
+  --eval-black: #c62828;
+  --engine: #2e7d32;
+  --novelty: #c25400;
+  --maia: #7b4fc9;
+  --ms: #8a5a00;
+  --sev-high: #f2c9c1;
+  --sev-mid: #efe0ae;
+  --mistake: #c25400;
+  --tactic: #2f6fb0;
+  --advantage: #6a54c4;
+  --board-light: #eeeed2;
+  --board-dark: #769656;
+}
+
+/* A themed element outside <html> (a gallery column) paints its own page. */
+[data-theme] {
+  color-scheme: var(--scheme);
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* A theme with --board-light and --board-dark draws flat squares instead of chessground's brown. */
+:is([data-theme='midnight'], [data-theme='paper']) cg-board {
+  background: repeating-conic-gradient(var(--board-dark) 0 25%, var(--board-light) 0 50%) 0 0 / 25% 25%;
+}
