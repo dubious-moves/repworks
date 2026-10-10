@@ -4,7 +4,7 @@ import { mode } from '../app/mode.ts';
 import { modeHash } from '../core/app/fsm.ts';
 import { findConflicts } from '../app/overview.ts';
 import { online, shellVersion, updateReady } from '../app/shell.ts';
-import { device, fatal, localStore, ready, studies, type StudyRow } from '../app/state.ts';
+import { device, fatal, localStore, ready, starting, studies, type StudyRow } from '../app/state.ts';
 import { queueOf, trainData } from '../app/train.ts';
 import { dataVersion } from '../app/sync.ts';
 import { ChapterView } from './ChapterView.tsx';
@@ -64,7 +64,7 @@ export function App() {
       </Guard>
       <main class="content">
         <Guard name="This screen" retry={modeHash(mode.value)}>
-          {ready.value && (!device.value ? <SetupForm /> : <Screen />)}
+          {ready.value ? !device.value ? <SetupForm /> : <Screen /> : !fatal.value && <Starting />}
         </Guard>
       </main>
       <Guard name="A dialog">
@@ -80,6 +80,35 @@ export function App() {
         {shellVersion.value && <> · shell {shellVersion.value.slice(0, 8)}</>} · <a href={`${import.meta.env.BASE_URL}spike.html`}>remote spike</a>
       </footer>
     </div>
+  );
+}
+
+/** Shown when the start takes long, naming the step it waits on, instead of a blank page. */
+const SLOW_START_MS = 4000;
+
+function Starting() {
+  const [waited, setWaited] = useState(0);
+  useEffect(() => {
+    const since = Date.now();
+    const timer = setInterval(() => setWaited(Date.now() - since), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  if (waited < SLOW_START_MS) return null;
+  return (
+    <section class="card starting" role="status">
+      <p>
+        Still starting: waiting for {starting.value} ({Math.round(waited / 1000)} s).
+      </p>
+      <p class="muted">
+        If a reload doesn't help, close the app fully (swipe it away from the recent apps, or close every Repworks tab) and open it again: the browser
+        may still hold the database for the page before. Nothing needs reinstalling.
+      </p>
+      <div class="actions">
+        <button type="button" onClick={() => location.reload()}>
+          Reload
+        </button>
+      </div>
+    </section>
   );
 }
 

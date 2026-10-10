@@ -143,6 +143,20 @@ confirmed that this is the phone's own cause: its data can't be read from here.
   executing your query" (2026-10-07) should no longer show; the commit goes through REST instead.
   The chip's request counts (Settings and debug) show REST writes when it happened.
 
+## The blank page after a reload (2026-10-10)
+
+Reported by the owner on 2026-10-10 (build `57ed03b`, phone): sometimes after a reload the page
+stays empty below the top bar, and seemed to need a reinstall. Read from the screenshot: no error
+banner, no sync chip, so the start never got past the local database (opened, then the device
+read): the screen waits for it and drew nothing meanwhile. Not reproduced here; a guess is that
+the browser still held the database for the page before the reload.
+
+- When it happens again, after 4 s the page now says "Still starting: waiting for <step> (N s)"
+  with Reload; report the step and whether it ever goes on by itself. An error in the start now
+  shows as a banner instead of a blank page: report its text.
+- Instead of reinstalling, try closing the app fully (swipe it away from the recent apps) and
+  opening it again; report whether that's enough.
+
 ## Phase 0
 
 Reported by the owner on 2026-10-06: the spike's desktop run (all steps passed, §4.2), the

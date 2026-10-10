@@ -30,6 +30,11 @@ export const studies = signal<StudyRow[]>([]);
 export const notice = signal<Notice | undefined>(undefined);
 /** Something that stops the app from working at all. */
 export const fatal = signal<string | undefined>(undefined);
+/**
+ * The step the start waits on until the app is ready, shown when it takes long: the owner's phone
+ * (2026-10-10, build 57ed03b) sometimes stayed blank after a reload, with no error to report.
+ */
+export const starting = signal<string>('opening the local database');
 
 let store: IdbStore | undefined;
 let controller: SyncController | undefined;
@@ -41,9 +46,19 @@ export async function startApp(link: SetupParse | undefined, lichessCallback?: s
     fatal.value = `The local database can't be opened: ${error instanceof Error ? error.message : String(error)}`;
     return;
   }
-  controller = new SyncController(store);
-  if (link) await setUpFrom(link, false);
-  await reload();
+  try {
+    controller = new SyncController(store);
+    if (link) {
+      starting.value = 'applying the setup link';
+      await setUpFrom(link, false);
+    }
+    starting.value = 'reading the device and its studies';
+    await reload();
+  } catch (error) {
+    console.error('The start failed:', error);
+    fatal.value = `Repworks couldn't start while ${starting.value}: ${error instanceof Error ? `${error.name}: ${error.message}` : String(error)}`;
+    return;
+  }
   ready.value = true;
   if (lichessCallback) {
     const done = await finishLichessLogin(lichessCallback);
