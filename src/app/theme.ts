@@ -9,6 +9,9 @@ export const THEMES = [
   { id: 'walnut', name: 'Walnut', note: 'warm browns, amber' },
   { id: 'midnight', name: 'Midnight', note: 'black, high contrast' },
   { id: 'paper', name: 'Paper', note: 'light' },
+  { id: 'mist', name: 'Mist', note: 'calm slate, sage' },
+  { id: 'grove', name: 'Grove', note: 'Forest tuned, green board' },
+  { id: 'fjord', name: 'Fjord', note: 'dark teal, sand highlight' },
 ] as const;
 
 export type ThemeId = (typeof THEMES)[number]['id'];

@@ -3006,6 +3006,12 @@ To try other looks for the app quickly. As built:
   Slate (Lichess-like neutral dark, blue), Walnut (warm browns, amber), Midnight (black, high
   contrast, flat blue-grey board) and Paper (light, flat green board). A theme is one block of
   variables; Forest's are the fallback for any it leaves out (the light theme sets them all).
+- **Mist, Grove, Fjord** (the owner's picks from a design canvas of directions, 2026-10-10): Mist
+  (soft slate, a sage accent, grey-green board), Grove (Forest tuned: a leaf-green current move
+  with dark text, since Forest's white on #319a28 is about 3.6:1, and the green tournament
+  board) and Fjord (dark petrol teal, a sand current move, sea-grey board). Each sets every
+  token, all text pairs at WCAG AA or better; all three draw the flat board, and the unit test
+  fails on a theme with board colours missing from the flat-board rule.
 - **The choice** is per device, in localStorage (`repworks-theme`), from "Settings and debug";
   `index.html` sets it before the first paint, and the phone's bar colour and `color-scheme`
   follow it.
@@ -3017,7 +3023,7 @@ To try other looks for the app quickly. As built:
   device's and sync from the app). "Use this one" makes a theme the app's.
 
 Tests: `themes.spec.ts` (desktop and phone: a theme chosen is on `<html>`, light, and kept over
-a reload; the gallery's five frames, each in its theme, following a screen picked above and one
+a reload; the gallery's eight frames, each in its theme, following a screen picked above and one
 opened in a frame, a theme left out, "Use this one", and no GitHub request from a frame).
 
 Live: TESTING.md.

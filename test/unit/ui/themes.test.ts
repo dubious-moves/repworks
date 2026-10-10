@@ -51,6 +51,14 @@ test('a light theme sets every colour token', () => {
   assert.deepEqual([...forest.keys()].filter((k) => !paper.has(k) && !shared.includes(k)), []);
 });
 
+test('a theme with its own board colours draws the flat board', () => {
+  const flat = themes.match(/:is\(([^)]*)\) cg-board/)?.[1] ?? '';
+  for (const t of THEMES) {
+    if (t.id === 'forest' || !block(themes, `[data-theme='${t.id}'] {`).has('--board-light')) continue;
+    assert.ok(flat.includes(`[data-theme='${t.id}']`), `${t.id} sets board colours but keeps chessground's brown`);
+  }
+});
+
 test("index.html reads the theme from theme.ts's key", () => {
   assert.ok(read('index.html').includes(`localStorage.getItem('${THEME_KEY}')`));
 });

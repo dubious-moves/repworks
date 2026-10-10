@@ -45,8 +45,8 @@ test('the gallery: a frame per theme, following each other, never syncing', asyn
   });
   await page.goto(`${site.url}styles.html`);
   const frames = page.locator('iframe[data-theme-frame]');
-  await expect(frames).toHaveCount(5);
-  for (const id of ['forest', 'slate', 'walnut', 'midnight', 'paper']) {
+  await expect(frames).toHaveCount(8);
+  for (const id of ['forest', 'slate', 'walnut', 'midnight', 'paper', 'mist', 'grove', 'fjord']) {
     const f = page.frameLocator(`iframe[data-theme-frame="${id}"]`);
     await expect(f.locator('html')).toHaveAttribute('data-theme', id);
     await expect(f.locator('.study-card').first()).toBeVisible();
@@ -63,7 +63,7 @@ test('the gallery: a frame per theme, following each other, never syncing', asyn
 
   // A theme left out goes; "Use this one" makes it the app's.
   await page.getByRole('group', { name: 'Themes' }).getByLabel('Walnut').uncheck();
-  await expect(frames).toHaveCount(4);
+  await expect(frames).toHaveCount(7);
   await page.getByRole('region', { name: 'Midnight' }).getByRole('button', { name: 'Use this one' }).click();
   expect(await page.evaluate(() => localStorage.getItem('repworks-theme'))).toBe('midnight');
   expect(fromFrames).toEqual([]);

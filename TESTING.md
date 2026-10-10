@@ -12,6 +12,9 @@ fixes them and updates this file.
 - "Compare the themes": the frames follow each other as you open screens and step through a
   line; on the phone the row scrolls sideways. Which themes, or which parts of them,
   are worth keeping or mixing?
+- Mist, Grove and Fjord (added from the design canvas): on the phone, long sessions in study and
+  training. Is the current move easy to find, the board's flat colours right with the pieces, and
+  the phone's bar colour matching the top bar?
 
 ## "Train" from the study selects the line shown (§5.83)
 
