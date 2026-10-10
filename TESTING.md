@@ -353,6 +353,9 @@ explorer's Eval column too far from the move (§5.67).
   great answer, then both in Games → Review ("Find a better move than …" and "Find the best
   move"). Analyse a storm card and "Save as a sequence…": the drill starts at your move. On the
   analysis board from the home screen, a few moves and "Save as a sequence…", then drilled.
+- §5.85 (desktop, then phone): a set with a wrong first move, Try again, then a good move that
+  isn't the best: Try again and Show the move stay, the best hidden; Try again again until the best
+  move, then Try again goes. The row still counts the first answer.
 
 ## Phase 5
 

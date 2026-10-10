@@ -15,6 +15,7 @@ import { trainData } from '../app/train.ts';
 import {
   analyse,
   answerMove,
+  canTryAgain,
   clearGathered,
   clockLeft,
   endStorm,
@@ -781,8 +782,8 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
       if (e.key === 'Escape') endStorm('stop');
       else if ((e.key === ' ' || e.key === 'Enter') && now.phase === 'verdict') nextCard();
       else if (e.key === 'p' && now.phase === 'verdict' && now.nextAt !== undefined) pauseVerdict();
-      else if (e.key === 't' && now.phase === 'held') tryAgain();
-      else if (e.key === 's' && now.phase === 'held') showMove();
+      else if (e.key === 't' && canTryAgain(now)) tryAgain();
+      else if (e.key === 's' && (now.phase === 'held' || canTryAgain(now))) showMove();
       else if (e.key === 'a' && now.mode === 'set' && now.item && (now.phase === 'held' || now.phase === 'verdict')) analyse(now.item, props.scope.route);
       else return;
       e.preventDefault();
@@ -796,8 +797,11 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
   const asking = phase === 'solving';
   // The disguise (§13): before a move a puzzle and a position read the same.
   const hush = s.disguise && !v;
-  // The best move stays off the panel while a set holds the card and it wasn't asked for (§17.3).
-  const showBest = !!v && (s.mode === 'storm' || !held || s.revealed);
+  // A set card found on a retry with less than the top move can be tried on (Try again stays).
+  const more = phase === 'verdict' && canTryAgain(s);
+  // The best move stays off the panel while a set holds the card, or offers more tries, and it
+  // wasn't asked for (§17.3).
+  const showBest = !!v && (s.mode === 'storm' || (!held && !more) || s.revealed);
   const best = storedList(item.card)[0];
   const arrows = s.revealed && best && !item.puzzle ? [{ orig: best.uci.slice(0, 2), dest: best.uci.slice(2, 4), brush: 'green' }] : [];
   const turn = positionOf(item.puzzle ? puzzleFen(item) : item.card.fen)?.turn ?? item.card.side;
@@ -834,6 +838,7 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
         {v && held && !s.revealed && (
           <p class="muted storm-hint">{left > 0 ? `Play it again: ${plural(left, 'attempt')} left, then the move is shown.` : 'No attempts left: show the move to go on.'}</p>
         )}
+        {more && <p class="muted storm-hint">Found, but not the top move: try again for it, or go on.</p>}
         {v && showBest && !item.puzzle && v.band !== 'unknown' && (
           <p class="muted storm-best" title={sourceTitle(v)}>
             {bestLine(v, f)}
@@ -851,12 +856,12 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
           </div>
         )}
         <div class="actions train-actions">
-          {held && left > 0 && (
-            <button type="button" class="primary" onClick={tryAgain}>
+          {(held || more) && canTryAgain(s) && (
+            <button type="button" class={held ? 'primary' : 'secondary'} onClick={tryAgain}>
               Try again <kbd>T</kbd>
             </button>
           )}
-          {held && (
+          {(held || more) && (
             <button type="button" class="secondary" onClick={showMove}>
               Show the move <kbd>S</kbd>
             </button>

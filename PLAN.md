@@ -2974,6 +2974,24 @@ does and the position after a move as that move's rung: the deepening at 24/22 t
 graded with no search, the look-ahead searching the card on the board and its list grading the
 move, and the Maia storm over deepened lists.
 
+#### 5.85 A set's Try again stays until the top move (the owner's request, 2026-10-10)
+
+A held set card tried again and found with a good move (Great or Good, but not the top move)
+ended the tries: the verdict, the best shown, Next. Now a card found on a retry, or in the second
+pass, with anything but the top move keeps Try again (`t`, secondary beside Next) and Show the move
+(`s`), the best hidden until shown, with no limit on the tries. The top move is the list's first
+(rank 1), the engine's best SAN, or no loss at all; a puzzle's is solving it. Those further tries
+are practice: the outcome (found on a retry) and the counted first answer stay, each try kept in
+`later`; a worse one says so and keeps Try again and Next. Show the move there only shows it.
+The first answer of a set's first pass is as before (a clean one resolves, no Try again), and the
+timed storm has no Try again.
+
+Tests: `storm.spec.ts` (desktop and phone: a Mistake, Try again, the second-ranked move graded
+Great with Try again and no best; a Mistake as practice keeping it; the top move ending it, the
+best shown, the Mistake still counted).
+
+Live: TESTING.md.
+
 #### 5.14 Phase 1 acceptance test, and exit
 
 **Acceptance test (live, desktop + Android phone)**, after Phase 0's (§4.11) and once §5.15 is

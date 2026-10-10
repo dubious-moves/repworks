@@ -818,6 +818,13 @@ function settle(item: StormItem, uci: string, v: StormAnswer): void {
   }
   // The set (§17): a clean answer resolves, a worse one holds the card.
   const attempts = (item.attempts ?? 0) + 1;
+  if (now.pass === 1 ? item.outcome : item.secondOutcome) {
+    // Tried again after it was found (not with the top move): practice, its outcome kept.
+    const next: StormItem = { ...item, answer: v, attempts };
+    update({ item: next, history: now.history.map((h) => (h.card.card === item.card.card ? { ...h, ...next, answer: h.answer, later: [...(h.later ?? []), v] } : h)) });
+    setPhase('verdict');
+    return;
+  }
   const first = now.pass === 1 && attempts === 1;
   if (first) void recordEvent({ t: new Date().toISOString(), ...stormAnswer(card.card, band, { uci, wp: v.wp ?? null, set: true, chapter: chapterOf(card) }) });
   const held = setHeld(band, STORM) && !now.revealed;
@@ -907,20 +914,42 @@ function puzzleAsCard(p: ReadyPuzzle): StoredPosition {
   };
 }
 
-/** A held set card: try again (best still hidden) — the board is set back. */
+/** The absolute best move: the top of the list, or level with it (a puzzle: solved). */
+export function isTopMove(v: StormAnswer): boolean {
+  if (v.puzzle) return v.band === 'great';
+  return v.rank === 1 || (!!v.bestSan && v.userSan === v.bestSan) || v.loss === 0;
+}
+
+/**
+ * Whether the set's card can be tried again: held, with attempts left; or found on a retry (or in
+ * the second pass) with anything but the top move, as often as wanted, the outcome kept.
+ */
+export function canTryAgain(s: StormSession | undefined): boolean {
+  const item = s?.item;
+  if (!s || !item || s.mode !== 'set') return false;
+  if (s.phase === 'held') return (item.attempts ?? 0) < STORM.setRetryMax;
+  if (s.phase !== 'verdict' || s.revealed || !item.answer) return false;
+  const out = s.pass === 1 ? item.outcome : item.secondOutcome;
+  return (out === 'retry' || (out === 'first' && s.pass === 2)) && !isTopMove(item.answer);
+}
+
+/** A set card tried again (best still hidden) — the board is set back. */
 export function tryAgain(): void {
   const s = stormSession.value;
-  if (!s?.item || s.phase !== 'held') return;
-  if ((s.item.attempts ?? 0) >= STORM.setRetryMax) return;
+  if (!s?.item || !canTryAgain(s)) return;
   const { answer: _gone, played: _move, ...rest } = s.item;
   update({ item: s.item.puzzle ? { ...rest, step: 0 } : rest });
   setPhase('solving');
 }
 
-/** A held set card: show the move. It ends as shown, and comes back in the second pass. */
+/** A held set card: show the move. It ends as shown, and comes back in the second pass. A card
+ *  found but kept for more tries only shows it. */
 export function showMove(): void {
   const s = stormSession.value;
-  if (!s?.item || s.phase !== 'held') return;
+  if (!s?.item) return;
+  // Found already, kept for more tries: the move shown, the outcome as it was.
+  if (s.phase === 'verdict' && canTryAgain(s)) return update({ revealed: true });
+  if (s.phase !== 'held') return;
   const outcome: SetOutcome = 'shown';
   const item: StormItem = { ...s.item, ...(s.pass === 1 ? { outcome } : { secondOutcome: outcome }) };
   if (s.pass === 1) secondPass.push(again(s.item));

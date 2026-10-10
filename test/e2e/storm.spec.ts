@@ -366,6 +366,37 @@ test('Clear positions: asked once, then the gathered positions gone from this de
   await expect(page.getByTestId('storm-count')).toContainText('0 positions ready');
 });
 
+test('the set: a retry found with less than the top move keeps Try again; the top move ends it', async ({ page }) => {
+  const w = await setUp(page);
+  await gathered(page, w);
+  await page.getByRole('button', { name: /^Set of/ }).click();
+  await expect(page.locator('.storm-card')).toBeVisible();
+  const moves = ranked(await cardFen(page));
+  await play(page, moves[Math.min(moves.length, LADDER.length) - 1]!);
+  await expect(page.getByTestId('storm-verdict')).toContainText('Mistake');
+  await page.getByRole('button', { name: /^Try again/ }).click();
+  // The second-ranked move: graded Great, but not the top move, so the tries go on, the best hidden.
+  await play(page, moves[1]!);
+  await expect(page.getByTestId('storm-verdict')).toContainText('Great move');
+  await expect(page.getByRole('button', { name: /^Try again/ })).toBeVisible();
+  await expect(page.locator('.storm-best')).toHaveCount(0);
+  await page.getByRole('button', { name: /^Try again/ }).click();
+  await expect(page.getByTestId('storm-verdict')).toContainText('Find a good move');
+  // A worse practice try keeps the card found, and Try again.
+  await play(page, moves[Math.min(moves.length, LADDER.length) - 1]!);
+  await expect(page.getByTestId('storm-verdict')).toContainText('Mistake');
+  await expect(page.getByRole('button', { name: /^Next position/ })).toBeVisible();
+  await page.keyboard.press('t');
+  await expect(page.getByTestId('storm-verdict')).toContainText('Find a good move');
+  // The top move: Try again goes, the best is shown.
+  await play(page, moves[0]!);
+  await expect(page.getByTestId('storm-verdict')).toContainText('Great move');
+  await expect(page.getByRole('button', { name: /^Try again/ })).toHaveCount(0);
+  await expect(page.locator('.storm-best')).toContainText('best');
+  // The first answer still the one that counts.
+  await expect(page.getByTestId('storm-counted')).toContainText('Mistake');
+});
+
 test('the set: a mistake held, tried again, shown, and the second pass', async ({ page, isMobile }) => {
   const w = await setUp(page);
   await gathered(page, w);
