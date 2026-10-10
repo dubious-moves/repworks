@@ -22,7 +22,7 @@ function Dialog() {
         <h2 id="dialog-maia">Enable Maia</h2>
         <p>
           Maia 3 is a neural network that predicts how likely human players of a given rating are to play each move, and what score they can expect. The explorer shows it beside the games: <strong>Ml</strong>, the
-          likelihood of a move for a {maiaElo.value} player, and <strong>Ms</strong>, the score Maia expects after it. It is most useful where there are few or no games.
+          likelihood of a move for a {maiaElo.value} player, and <strong>Ms</strong>, the score Maia expects after it. It is most useful where there are few or no games. The storm uses it to rate each position’s difficulty and to find the unintuitive ones.
         </p>
         <p>
           It needs a <strong>one-time {megabytes(bytes)} download</strong>, kept on this device; it runs entirely on the device.{phone ? ' On mobile data, better wait for Wi-Fi.' : ''}

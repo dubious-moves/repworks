@@ -5,6 +5,15 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## Maia in the storm: difficulty and the unintuitive storm (§5.82)
+
+- Desktop and phone: on the storm's page with Maia downloaded (or "Get Maia…" there), the
+  "Maia: n of m rated" count should rise to m within a few minutes, and the page stay responsive
+  meanwhile; on the phone, whether rating beside Stockfish's deepening is too hot or slow.
+- An unintuitive storm: do the positions feel like ones where the natural move is wrong? Is the
+  difficulty shown after each answer believable against how hard the position felt? Is "an
+  inaccuracy or worse" the right bar, or should it be a mistake or worse?
+
 ## A set's cards deepened while you think (§5.81)
 
 - A set of 6 with cards gathered by Stockfish and not yet deepened: think a while on each card

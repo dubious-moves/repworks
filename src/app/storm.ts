@@ -29,6 +29,8 @@ import { recordEvent } from './state.ts';
 import { analyseForStorm, cancelStormEngine, endStormEngine } from './stormEngine.ts';
 import { trainData, type TrainData } from './train.ts';
 import { puzzlePrefs, readyPuzzles } from './puzzles.ts';
+import { keptPolicy, missingRatings, unintuitive, type MaiaRating } from '../core/storm/maia.ts';
+import { maiaElo, maiaPolicies, maiaStored } from './maia.ts';
 import type { ReadyPuzzle } from '../core/puzzles/puzzles.ts';
 
 /* ------------------------------------------------------------------ settings (per device) */
@@ -40,9 +42,11 @@ export interface StormPrefs {
   source: StormSource;
   /** Stockfish re-scores the kept positions while the storm's home is open (§5.45). */
   deepen: boolean;
+  /** Maia rates the kept positions while the storm's home is open, once it is downloaded (§5.82). */
+  maia: boolean;
 }
 const PREFS_KEY = 'repworks-storm';
-const DEFAULT_PREFS: StormPrefs = { minPly: STORM.minPly, maxPly: STORM.maxPly, source: 'both', deepen: typeof matchMedia === 'undefined' || !matchMedia('(max-width: 768px)').matches };
+const DEFAULT_PREFS: StormPrefs = { minPly: STORM.minPly, maxPly: STORM.maxPly, source: 'both', deepen: typeof matchMedia === 'undefined' || !matchMedia('(max-width: 768px)').matches, maia: true };
 
 function loadPrefs(): StormPrefs {
   try {
@@ -215,6 +219,12 @@ export interface StormHome {
   deep: number;
   /** The line ends the ready positions come from (the spread deals one per line end first, §30). */
   lines: number;
+  /** Maia (§5.82): whether its files are on this device; the ready positions rated at every rating
+   *  wanted; those unintuitive at the user's rating, `elo`. */
+  maiaHere: boolean;
+  rated: number;
+  unintuitive: number;
+  elo: number;
 }
 export const stormHome = signal<StormHome | undefined>(undefined);
 
@@ -225,8 +235,13 @@ export async function refreshHome(s: StormScopeData): Promise<void> {
   const h = histories(data);
   const done = all.filter((p) => h.get(p.card)?.done).length;
   const deep = all.filter((p) => !needsDeepening(p, STORM)).length;
-  const lines = new Set(all.filter((p) => !h.get(p.card)?.done).map(positionLineKey).filter(Boolean)).size;
-  stormHome.value = { stored: all.length, done, ready: all.length - done, deep, lines };
+  const ready = all.filter((p) => !h.get(p.card)?.done);
+  const lines = new Set(ready.map(positionLineKey).filter(Boolean)).size;
+  const elo = maiaElo.peek();
+  const rated = ready.filter((p) => !missingRatings(p.maia, elo).length).length;
+  const odd = ready.filter((p) => unintuitive(p.maia, elo, storedList(p), STORM)).length;
+  const maiaHere = await maiaStored().catch(() => false);
+  stormHome.value = { stored: all.length, done, ready: ready.length, deep, lines, maiaHere, rated, unintuitive: odd, elo };
 }
 
 /* ------------------------------------------------------------------ the gather (§5.42) */
@@ -330,6 +345,7 @@ export function stopGathering(): void {
 export async function clearGathered(s: StormScopeData): Promise<number> {
   if (gathering.value?.running) return 0;
   stopDeepening();
+  stopMaiaRating();
   const store = stormStore();
   const all = await store.positions();
   const gone = storedInScope(all, s);
@@ -372,7 +388,7 @@ export async function deepen(s: StormScopeData): Promise<void> {
       const pos = positionOf(p.fen);
       const d = pos && a ? deepenedPosition(p, engineList(a.lines, pos.turn, a.depth, STORM), STORM) : null;
       if (d) {
-        await stormStore().putPosition(d);
+        await stormStore().updatePosition(d.card, (cur) => ({ ...cur, scored: d.scored, src: d.src, depth: d.depth }));
         await refreshHome(s);
       }
     }
@@ -385,6 +401,54 @@ export function stopDeepening(): void {
   deepenRun++;
   if (deepening.value) cancelStormEngine();
   deepening.value = false;
+}
+
+/* ------------------------------------------------------------------ Maia's ratings (§5.82) */
+
+export const maiaRating = signal(false);
+let maiaRun = 0;
+
+/**
+ * While the storm's home is open, Maia's policy for the scope's kept positions not done, at the
+ * ladder's ratings and the user's (core/storm/maia.ts), kept with each position: the difficulty
+ * and the unintuitive storm come from it. Runs beside a gather and the deepening (Maia's worker is
+ * a thread of its own), never during a session; only once Maia is downloaded. A position takes
+ * about a second (one batch), against a minute for Stockfish's deepening.
+ */
+export async function rateWithMaia(s: StormScopeData): Promise<void> {
+  if (maiaRating.value || !stormPrefs.value.maia) return;
+  const run = ++maiaRun;
+  maiaRating.value = true;
+  const busy = () => run !== maiaRun || (!!stormSession.value && stormSession.value.phase !== 'done') || !stormPrefs.value.maia;
+  let shown = Date.now();
+  try {
+    if (!(await maiaStored().catch(() => false))) return;
+    const data = trainData.value;
+    const h = data ? histories(data) : new Map<string, StormHistory>();
+    const elo = maiaElo.peek();
+    const todo = storedInScope(await stormStore().positions(), s).filter((p) => missingRatings(p.maia, elo).length && !h.get(p.card)?.done);
+    for (const p of todo) {
+      if (busy()) return;
+      const elos = missingRatings(p.maia, elo);
+      const policies = await maiaPolicies(p.fen, elos);
+      // Maia couldn't answer (stopped, or failed): tried again on the next visit.
+      if (!policies) return;
+      const fresh: MaiaRating[] = elos.map((e, i) => keptPolicy(e, policies[i]!));
+      await stormStore().updatePosition(p.card, (cur) => ({ ...cur, maia: [...(cur.maia ?? []).filter((r) => !elos.includes(r.elo)), ...fresh].sort((a, b) => a.elo - b.elo) }));
+      if (Date.now() - shown > 2000) {
+        shown = Date.now();
+        await refreshHome(s);
+      }
+    }
+  } finally {
+    if (run === maiaRun) maiaRating.value = false;
+    await refreshHome(s);
+  }
+}
+
+export function stopMaiaRating(): void {
+  maiaRun++;
+  maiaRating.value = false;
 }
 
 /* ------------------------------------------------------------------ a set's look-ahead (§5.81) */
@@ -423,7 +487,7 @@ async function lookAhead(): Promise<void> {
       const d = pos && a ? deepenedPosition(p, engineList(a.lines, pos.turn, a.depth, STORM), STORM) : null;
       if (d) {
         swapIn(d);
-        await stormStore().putPosition(d);
+        await stormStore().updatePosition(d.card, (cur) => ({ ...cur, scored: d.scored, src: d.src, depth: d.depth }));
       }
     }
   } finally {
@@ -506,6 +570,8 @@ export interface StormSession {
   retry?: StormItem;
   /** Puzzles are in play: before a move, a puzzle and a position read the same (§13). */
   disguise: boolean;
+  /** An unintuitive storm (§5.82): only positions whose likeliest move for Maia at this rating isn't a good one. */
+  unintuitive?: number;
   /** The next card comes by itself at this time (a storm's verdict, §18.1), unless paused. */
   nextAt?: number;
   /** …after this long, for the bar that shows it. */
@@ -581,16 +647,23 @@ async function dealt(s: StormScopeData): Promise<StoredPosition[]> {
 let sessionEntry: string | undefined;
 export const stormEntry = (): string | undefined => sessionEntry;
 
-export async function startStorm(s: StormScopeData, mode: SessionMode): Promise<void> {
+/**
+ * Starts a timed storm or a set. `unintuitive` (§5.82): only the positions whose likeliest move for
+ * Maia at the user's rating isn't a good one, and no puzzles.
+ */
+export async function startStorm(s: StormScopeData, mode: SessionMode, o: { unintuitive?: boolean } = {}): Promise<void> {
   endStormSession();
   sessionEntry = entryKey();
   stopDeepening();
+  stopMaiaRating();
   scopeNow = s;
   recent ??= loadRecent();
   recentAtStart = new Set(recent);
   dealtLines = new Set();
+  const elo = maiaElo.peek();
   queue = await dealt(s);
-  share = puzzlePrefs.value.share;
+  if (o.unintuitive) queue = queue.filter((p) => unintuitive(p.maia, elo, storedList(p), STORM));
+  share = o.unintuitive ? 0 : puzzlePrefs.value.share;
   const data = trainData.value;
   const ready = share > 0 ? await readyPuzzles(s) : [];
   puzzleQueue = data ? drawOrder(ready.map((p) => ({ card: 'z|' + p.id, p })), histories(data), Math.random, STORM.reachTop).map((x) => x.p) : [];
@@ -606,7 +679,7 @@ export async function startStorm(s: StormScopeData, mode: SessionMode): Promise<
   }
   secondPass = [];
   lookTried.clear();
-  stormSession.value = { mode, scopeKey: s.key, title: s.title, phase: 'solving', item: undefined, history: [], points: 0, streak: 0, left: STORM.sessionMs, endsAt: undefined, pass: 1, revealed: false, note: '', total, disguise: puzzleQueue.length > 0 };
+  stormSession.value = { mode, scopeKey: s.key, title: s.title, phase: 'solving', item: undefined, history: [], points: 0, streak: 0, left: STORM.sessionMs, endsAt: undefined, pass: 1, revealed: false, note: '', total, disguise: puzzleQueue.length > 0, ...(o.unintuitive ? { unintuitive: elo } : {}) };
   if (mode === 'storm') {
     tick = setInterval(() => {
       const st = stormSession.value;
@@ -873,6 +946,7 @@ export function endStormSession(): void {
 export function leaveStorm(): void {
   stopGathering();
   stopDeepening();
+  stopMaiaRating();
   endStormSession();
   endStormEngine();
 }
@@ -888,6 +962,7 @@ export function suspendStorm(): void {
   pauseLookAhead();
   stopGathering();
   stopDeepening();
+  stopMaiaRating();
   endStormEngine();
 }
 

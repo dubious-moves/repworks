@@ -20,6 +20,7 @@ import type { Coverage, DecisionPoint, ExplorerReply, Frontier, LineRef } from '
 import { lineRefKey, lineTail, uncoveredMoves } from './sources.ts';
 import { candidate, fenAfterUci, pickGames, positionOf, randomLine, walkGame, type Arrival, type Ask, type Candidate } from './walk.ts';
 import { positionKeyOf } from '../chess/positionKey.ts';
+import type { MaiaRating } from './maia.ts';
 
 /** ChessDB's answer as a scored list: its scored moves only, best first; null when it knows nothing. */
 export function cdbList(a: ChessdbAnswer | null | undefined): ScoredList | null {
@@ -185,6 +186,8 @@ export interface StoredPosition {
   games: number | null;
   /** When it was stored, ms. */
   at: number;
+  /** Maia's policy at the ratings it was rated at (§5.82), added in the background. */
+  maia?: MaiaRating[];
 }
 
 export function storedPosition(cand: Candidate & { unc?: StoredPosition['unc'] }, from: { lines: LineRef[]; names: string[]; games?: number | null }, at: number): StoredPosition | null {

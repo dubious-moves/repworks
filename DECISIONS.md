@@ -1464,3 +1464,15 @@ The technical calls, each with its reason:
 - **A set deepens its own cards while the user thinks** (the owner's request): the card on the
   board, then the rest of the six, to MultiPV 12 at depth 20, stored as the home's deepening
   stores them. A move pre-empts it, so the grade is never slower for it.
+
+## Revision of 2026-10-10 (Maia in the storm, PLAN.md §5.82)
+- **Maia rates the storm's positions in the background, never during a card** (the owner asked
+  for a difficulty per position and an unintuitive storm without slowing the storm): about a
+  second a position at six ratings, while the storm's home is open, kept with the position on the
+  device. A session deals at once from what is kept.
+- **The difficulty is a rating**: where Maia finds a good move (great or good) half the time,
+  between 1000 and 2600. **Unintuitive** means Maia's likeliest move at the user's Maia rating is
+  an inaccuracy or worse (it would not count as found), judged only by a list that may judge a
+  move (§5.80).
+- **No new field in the progress log**: an unintuitive storm's answers are ordinary `storm`
+  events.

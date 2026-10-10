@@ -418,3 +418,71 @@ test('Stockfish’s standard: the kept positions searched with MultiPV 12 to dep
   await page.waitForTimeout(1500);
   expect(commands(site.requests).filter((c) => c.startsWith('go ')).length).toBe(before);
 });
+
+/** The win% a move gives up against the best, from the fake ChessDB's ladder (Lichess's curve). */
+const ladderLoss = (fen: string, uci: string) => {
+  const i = ranked(fen).indexOf(uci);
+  const wp = (cp: number) => 50 + 50 * (2 / (1 + Math.exp(-0.00368208 * cp)) - 1);
+  return wp(LADDER[0]!) - wp(LADDER[Math.min(i, LADDER.length - 1)]!);
+};
+
+test('Maia: got from the storm’s page, the kept positions rated, and an unintuitive storm of those whose likeliest move isn’t good', async ({ page }) => {
+  test.setTimeout(240_000);
+  // Maia's switch stays off: the storm asks it all the same once its files are here.
+  await page.addInitScript(() => localStorage.setItem('repworks-maia', JSON.stringify({ on: false, rating: 1500 })));
+  const w = await setUp(page);
+  const ready = await gathered(page, w);
+  const count = page.getByTestId('storm-maia-count');
+  await expect(count).toContainText('Maia can rate each position’s difficulty');
+  await expect(page.getByRole('button', { name: 'Unintuitive storm' })).toHaveCount(0);
+  await count.getByRole('button', { name: 'Get Maia…' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Enable Maia' });
+  await expect(dialog).toContainText('rate each position’s difficulty');
+  await dialog.getByRole('button', { name: /^Download/ }).click();
+  await expect(dialog).toHaveCount(0, { timeout: 30_000 });
+  await expect(count).toContainText(`Maia: ${ready} of ${ready} rated`, { timeout: 180_000 });
+  // The explorer's switch is still off.
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('repworks-maia')!).on)).toBe(false);
+
+  // Each kept position has the ladder's ratings and the user's; its unintuitive ones worked out
+  // here from Maia's likeliest move at 1500 and the fake ChessDB's ladder (good: under 6%).
+  const kept = await page.evaluate(
+    () =>
+      new Promise<{ card: string; fen: string; maia: { elo: number; moves: [string, number][] }[] }[]>((resolve, reject) => {
+        const open = indexedDB.open('repworks-storm');
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const req = open.result.transaction('positions').objectStore('positions').getAll();
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        };
+      }),
+  );
+  expect(kept.length).toBe(ready);
+  for (const p of kept) expect(p.maia.map((r) => r.elo)).toEqual([1000, 1400, 1500, 1800, 2200, 2600]);
+  const odd = kept.filter((p) => ladderLoss(p.fen, p.maia.find((r) => r.elo === 1500)!.moves[0]![0]) >= 6);
+  expect(odd.length).toBeGreaterThan(0);
+  await expect(page.getByTestId('storm-spread')).toContainText(`${odd.length} unintuitive`);
+
+  // The unintuitive storm deals those only; Maia's likeliest move played is not a good one.
+  await page.getByRole('button', { name: 'Unintuitive storm' }).click();
+  await expect(page.locator('.study-title')).toContainText('Unintuitive storm');
+  await expect(page.locator('.storm-card')).toBeVisible();
+  const card = (await page.locator('.storm-card').getAttribute('data-card'))!;
+  const p = odd.find((x) => x.card === card)!;
+  expect(p).toBeTruthy();
+  await play(page, p.maia.find((r) => r.elo === 1500)!.moves[0]![0]);
+  await expect(page.getByTestId('storm-verdict')).toContainText(/Inaccuracy|Mistake|Blunder/);
+  const note = page.getByTestId('storm-maia');
+  await expect(note).toContainText('Difficulty');
+  await expect(note).toContainText(/Maia at 1500 finds a good move \d+% of the time; its likeliest, \S+ \(\d+%\), is (an inaccuracy|a mistake|a blunder|not a good move)\./);
+  await page.getByRole('button', { name: /^End/ }).click();
+  const rows = page.locator('.storm-row');
+  await expect(rows.first()).toBeVisible();
+  for (const t of await rows.evaluateAll((els) => els.map((e) => e.getAttribute('title') ?? ''))) expect(t).toContain('difficulty');
+  // Maia's line comes with the best move in the review, not before.
+  await rows.first().click();
+  await expect(page.locator('.storm-review [data-testid=storm-maia]')).toHaveCount(0);
+  await page.getByRole('button', { name: /^Best move/ }).click();
+  await expect(page.locator('.storm-review [data-testid=storm-maia]')).toContainText('Difficulty');
+});

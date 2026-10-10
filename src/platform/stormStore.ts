@@ -13,6 +13,11 @@ export interface StormStore {
   /** Adds positions not stored yet (by card); keeps at most `max`, the oldest out. Returns how many were new. */
   addPositions(list: readonly StoredPosition[], max: number): Promise<number>;
   putPosition(p: StoredPosition): Promise<void>;
+  /**
+   * Changes a stored position in one transaction, from what is stored now (the deepening and
+   * Maia's ratings write different fields of the same positions); nothing when it is gone.
+   */
+  updatePosition(card: string, change: (p: StoredPosition) => StoredPosition): Promise<StoredPosition | undefined>;
   removePositions(cards: readonly string[]): Promise<void>;
   clearPositions(): Promise<void>;
   all<T>(store: StormStoreName): Promise<T[]>;
@@ -94,6 +99,21 @@ export function openStormStore(idb: IDBFactory = indexedDB, name = DB_NAME): Sto
       return fresh.length;
     },
     putPosition: (p) => put('positions', p.card, p),
+    async updatePosition(card, change) {
+      const db = await open();
+      const tx = db.transaction('positions', 'readwrite');
+      const os = tx.objectStore('positions');
+      let out: StoredPosition | undefined;
+      const req = os.get(card);
+      req.onsuccess = () => {
+        const cur = req.result as StoredPosition | undefined;
+        if (!cur) return;
+        out = change(cur);
+        os.put(out, card);
+      };
+      await done(tx);
+      return out;
+    },
     removePositions: (cards) => remove('positions', cards),
     clearPositions: () => clear('positions'),
     all,

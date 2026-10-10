@@ -2863,6 +2863,52 @@ mid-search is tried again). Each card is tried once a session; the storm (timed)
 ahead, its next card being drawn only when dealt. Cards in a session now match by their id, not
 the object, since a deepened card replaces the one dealt. Tests: none new (`src/app`, a real
 engine); the live check is the owner's.
+#### 5.82 Maia in the storm: a difficulty for each position, and the unintuitive storm (the owner's request, 2026-10-10)
+
+The owner: Maia could estimate a difficulty for each position, and a storm could deal only the
+positions where Maia's most likely move is a mistake, without slowing the storm down.
+
+- **Measured** (onnxruntime-web under Node in a cloud container, the vendored model, 20 fixture
+  positions): one position at one rating ~170 ms; batching ratings barely helps there (5 ratings
+  ~1.0 s, 11 ~1.7 s). In headless Chromium in the same container, 14 gathered positions at six
+  ratings took 16 s including the model's load. Stockfish's deepening takes up to a minute a
+  position, so Maia is cheap beside it, but not cheap enough to run while a card waits.
+- **So Maia never runs during a card.** While the storm's home is open (beside a gather and the
+  deepening: Maia's worker is a thread of its own), Maia's policy is asked for each kept position
+  not done, at 1000, 1400, 1800, 2200 and 2600 and at the user's Maia rating (the engine settings'
+  rating, or the explorer filter's), in one batch, and kept with the position (`maia`: the moves
+  of 0.5% and up, to three decimals). A session start stops it. Only once Maia's files are on the
+  device; the explorer's Maia switch can stay off. Without them, the home offers "Get Maia…" (the
+  existing dialog). A setting turns it off ("Maia rates the positions' difficulty while this page
+  is open").
+- **Everything else is worked out from the kept policy and the position's list**
+  (`core/storm/maia.ts`), so a list deepened later re-judges it with no new Maia run. A move is
+  judged as the grade would (the list's best against it, the five bands), by a list that may
+  judge (§5.80: ChessDB's, or Stockfish's at depth 20; the walk's depth-14 list judges nothing).
+  A move outside Stockfish's list is no better than its last line; outside ChessDB's, unknown.
+- **The difficulty** is the rating at which Maia finds a good move (great or good: what the storm
+  counts as found) half the time: Maia's likelihood on good moves over its likelihood on the moves
+  the list can judge (at least 60% of it, or no share), at each ladder rating, crossing one half
+  going up, straight between two ratings, to the nearest 50; "1000 or less" and "over 2600" at the
+  ends. Shown once a card is answered (with the best move: never before the move, and in a set's
+  held card only once the move is shown), with how often Maia at the user's rating finds a good
+  move and its likeliest move with the list's word for it; in the review with the best move, and
+  in each row's title.
+- **The unintuitive storm**: a timed storm of the positions whose likeliest move for Maia at the
+  user's rating is judged and isn't a good one (an inaccuracy or worse: it would not count as
+  found), no puzzles. "Unintuitive storm" beside Start storm and Set of 6 once Maia is here, with
+  the count beside the positions ready. Its answers are ordinary `storm` events (no new field, so
+  the record is unchanged and old devices read them).
+
+Tests: `test/unit/core/storm/maia.test.ts` (a move judged, the lower bound, nothing below depth
+20; Maia's share; the difficulty and its ends; unintuitive; the policy as kept; the ratings
+wanted; a deepened list keeping Maia's; the verdict's line), with three controls in its header;
+`stormStore.test.ts` (two writers of different fields of a position both kept); `storm.spec.ts`
+(desktop and phone, the real model: Get Maia from the storm's page with the switch off, every
+kept position rated at the six ratings, the unintuitive count checked against the test's own
+reading of Maia and the fake ChessDB, the unintuitive storm dealing one of them, Maia's move
+graded below good with Maia's line, the review's rows and its line behind Best move).
+
 #### 5.14 Phase 1 acceptance test, and exit
 
 **Acceptance test (live, desktop + Android phone)**, after Phase 0's (§4.11) and once §5.15 is

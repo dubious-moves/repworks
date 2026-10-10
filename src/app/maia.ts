@@ -6,7 +6,7 @@
 import { computed, signal } from '@preact/signals';
 import { maiaEloFor, type MaiaMove } from '../core/maia/encode.ts';
 import type { FromMaia, ToMaia } from '../core/maia/protocol.ts';
-import { ENGINES, ensure, remove } from '../platform/blobs.ts';
+import { ENGINES, ensure, remove, stored } from '../platform/blobs.ts';
 import { linkMaia, prefs as explorerPrefs, setPrefs as setExplorerPrefs } from './explorer.ts';
 import { effect } from '@preact/signals';
 
@@ -96,7 +96,8 @@ function stopWorker(): void {
   // Ended for being unused, not switched off: the explorer keeps its columns, and the next ask
   // starts it again. (Set to `off` before, the columns went and nothing asked again: the owner
   // had to switch Maia off and on, 2026-10-08.)
-  if (maiaState.peek().kind === 'ready') maiaState.value = { kind: 'idle' };
+  // Started by the storm with the switch off (§5.82): off again.
+  if (maiaState.peek().kind === 'ready') maiaState.value = maiaPrefs.peek().on ? { kind: 'idle' } : { kind: 'off' };
 }
 
 /** Whether the worker is ended and the next ask should start it: switched on, unused a while. */
@@ -218,6 +219,25 @@ export async function maiaPolicy(fen: string, elo: number): Promise<MaiaMove[] |
   if (maiaState.peek().kind !== 'ready') return null;
   const r = await ask<Extract<FromMaia, { type: 'answer' } | { type: 'error' }>>({ type: 'ask', fen, elo });
   return r.type === 'answer' ? r.policy : null;
+}
+
+/** Whether Maia's files are on this device (downloaded once, §5.32). */
+export const maiaStored = (): Promise<boolean> => stored(MAIA_FILES);
+
+/**
+ * Maia's policy at `fen` at each of `elos`, in one batch, for the storm's ratings (§5.82): asked
+ * whether or not the switch is on, once the files are on this device; null when it can't answer.
+ */
+export async function maiaPolicies(fen: string, elos: readonly number[]): Promise<MaiaMove[][] | null> {
+  if (!worker) {
+    if (!(await maiaStored().catch(() => false))) return null;
+    startWorker();
+  }
+  const starting = () => maiaState.peek().kind === 'loading' || (maiaState.peek().kind === 'idle' && !!worker);
+  for (let waited = 0; starting() && waited < 30_000; waited += 100) await new Promise((r) => setTimeout(r, 100));
+  if (maiaState.peek().kind !== 'ready') return null;
+  const answers = await Promise.all(elos.map((elo) => ask<Extract<FromMaia, { type: 'answer' } | { type: 'error' }>>({ type: 'ask', fen, elo })));
+  return answers.every((a) => a.type === 'answer') ? answers.map((a) => (a as Extract<FromMaia, { type: 'answer' }>).policy) : null;
 }
 
 /** Qchess's Ms for `sans` at `fen` (those not asked yet). */

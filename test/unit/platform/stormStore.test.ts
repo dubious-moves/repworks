@@ -26,6 +26,21 @@ test('positions: stored once by card, the oldest out past the cap, removed, clea
   assert.equal((await s.positions()).length, 0);
 });
 
+test('a position changed from what is stored: two writers of different fields both kept', async () => {
+  const s = openStormStore(indexedDB, fresh());
+  await s.addPositions([pos('a', 1)], 10);
+  const [deepened, rated] = await Promise.all([
+    s.updatePosition('s|a', (p) => ({ ...p, src: 'sf', depth: 20 })),
+    s.updatePosition('s|a', (p) => ({ ...p, maia: [{ elo: 1800, moves: [['e2e4', 0.5]] }] })),
+  ]);
+  assert.equal(deepened!.depth, 20);
+  assert.equal(rated!.depth, 20);
+  const [p] = await s.positions();
+  assert.equal(p!.depth, 20);
+  assert.deepEqual(p!.maia, [{ elo: 1800, moves: [['e2e4', 0.5]] }]);
+  assert.equal(await s.updatePosition('s|gone', (x) => x), undefined);
+});
+
 test('the other stores: put, get, all, remove, clear', async () => {
   const s = openStormStore(indexedDB, fresh());
   await s.put('meta', 'builtAt', '2026-05-23');

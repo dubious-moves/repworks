@@ -44,6 +44,8 @@ import {
   toggleShown,
   tryAgain,
   puzzleFen,
+  maiaRating,
+  rateWithMaia,
   type StormAnswer,
   type StormItem,
   type StormScopeData,
@@ -57,6 +59,8 @@ import { bestLine, estimated, formatWp, gapNote, sourceTitle, verdictLine, type 
 import { positionLineKey, positionLineLabel, storedList, type StoredPosition } from '../core/storm/harvest.ts';
 import { fenAfterUci, positionOf, uciToSan } from '../core/storm/walk.ts';
 import { themeLabel } from '../core/puzzles/dataset.ts';
+import { difficulty, difficultyWords, maiaLine } from '../core/storm/maia.ts';
+import { maiaDialog, maiaElo, maiaState } from '../app/maia.ts';
 import { Board } from './Board.tsx';
 import { useWakeLock } from './Train.tsx';
 import { collect, fillBodies, puzzlePrefs, puzzleState, refreshPuzzles, setPuzzlePrefs, SHARD_MB, SHARES, SHARDS_PER_COLLECT, stopPuzzles, WORKING_SET } from '../app/puzzles.ts';
@@ -88,6 +92,12 @@ function facts(p: StoredPosition): CardFacts {
   const best = list[0];
   const pos = positionOf(p.fen);
   return { bestSan: best && pos ? uciToSan(pos, best.uci) : '', bestScore: best?.score ?? 0, bestWinrate: best?.winrate, nScored: list.length, unc: p.unc ? { san: p.unc.san, share: p.unc.share } : null };
+}
+
+/** Maia's line on an answered position (§5.82): its difficulty, and Maia's likeliest move at the rating. */
+function maiaWords(p: StoredPosition, elo: number): string {
+  const pos = positionOf(p.fen);
+  return maiaLine(p.maia, elo, storedList(p), (u) => (pos ? uciToSan(pos, u) : ''), STORM);
 }
 
 /** How far past the line a card is, in words: a claim about a game, or about an invented line, or an uncovered reply. */
@@ -147,7 +157,7 @@ export function StormScreen(props: { where: StormWhere }) {
         />
         <div class="titles">
           <span class="study-title">
-            {s ? (s.mode === 'storm' ? 'Storm' : `Set of ${STORM.setSize}`) : 'Storm'} · {scope.title}
+            {s ? (s.unintuitive ? 'Unintuitive storm' : s.mode === 'storm' ? 'Storm' : `Set of ${STORM.setSize}`) : 'Storm'} · {scope.title}
           </span>
         </div>
       </div>
@@ -173,6 +183,11 @@ function Home(props: { scope: StormScopeData; where: StormWhere }) {
   useEffect(() => {
     if (prefs.deepen && home && home.deep < home.stored && !g?.running && !deepening.value) void deepen(scope);
   }, [prefs.deepen, home?.stored, home?.deep, g?.running]);
+  // Maia's ratings beside it, once Maia is downloaded (§5.82); again when it comes ready.
+  const maiaKind = maiaState.value.kind;
+  useEffect(() => {
+    if (prefs.maia && home && home.rated < home.ready && !maiaRating.value) void rateWithMaia(scope);
+  }, [prefs.maia, home?.ready, home?.rated, home?.maiaHere, maiaKind === 'ready']);
   // Positions, or puzzles when they are dealt.
   const puzzlesReady = prefs2.share > 0 ? (puzzleState.value?.ready ?? 0) : 0;
   const canStart = !!home?.ready || puzzlesReady > 0;
@@ -197,6 +212,7 @@ function Home(props: { scope: StormScopeData; where: StormWhere }) {
               from {plural(home.lines, 'line end')}
               {ends > 0 && home.lines < Math.min(ends, 6) ? ' · gather more for variety' : ''}
               {puzzlesReady ? ` · ${plural(puzzlesReady, 'puzzle')} at ${prefs2.share}%` : ''}
+              {home.maiaHere && home.unintuitive > 0 ? ` · ${home.unintuitive} unintuitive` : ''}
             </p>
           )}
         </div>
@@ -207,10 +223,27 @@ function Home(props: { scope: StormScopeData; where: StormWhere }) {
           <button type="button" class="secondary" disabled={!canStart || g?.running} onClick={() => void startStorm(scope, 'set')}>
             Set of {STORM.setSize}
           </button>
+          {home?.maiaHere && (
+            <button
+              type="button"
+              class="secondary"
+              disabled={!home.unintuitive || g?.running}
+              title={`A storm of the positions where Maia’s likeliest move at ${home.elo} isn’t a good one${home.unintuitive ? '' : ': none found yet'}`}
+              onClick={() => void startStorm(scope, 'storm', { unintuitive: true })}
+            >
+              Unintuitive storm
+            </button>
+          )}
         </div>
         <p class="muted storm-about">
           <strong>Storm:</strong> {STORM.sessionMs / 60000} minutes; the clock runs only while a position waits for your move. <strong>Set:</strong> {STORM.setSize} positions, no clock, a
           mistake held until you find a good move. A move is graded by how much of the game it gives up against the best: within {STORM.greatWp}% is great, within {STORM.goodWp}% good.
+          {home?.maiaHere && (
+            <>
+              {' '}
+              <strong>Unintuitive:</strong> a storm of the positions where the move Maia expects of a {home.elo} player isn’t a good one.
+            </>
+          )}
         </p>
       </section>
 
@@ -249,6 +282,23 @@ function Home(props: { scope: StormScopeData; where: StormWhere }) {
             {deepening.value ? ' · scoring…' : ''}
           </p>
         )}
+        {home && home.stored > 0 && prefs.maia && (
+          <p class="muted storm-maia-count" data-testid="storm-maia-count">
+            {home.maiaHere ? (
+              <>
+                Maia: {home.rated} of {home.ready} rated for difficulty
+                {maiaRating.value && home.rated < home.ready ? ' · rating…' : ''}
+              </>
+            ) : (
+              <>
+                Maia can rate each position’s difficulty and find the unintuitive ones.{' '}
+                <button type="button" class="link" onClick={() => (maiaDialog.value = true)}>
+                  Get Maia…
+                </button>
+              </>
+            )}
+          </p>
+        )}
         {home && <ClearPositions scope={scope} stored={home.stored} whole={!where.sid} disabled={!!g?.running} />}
         <details class="storm-settings">
           <summary>Settings</summary>
@@ -284,6 +334,9 @@ function Home(props: { scope: StormScopeData; where: StormWhere }) {
             </label>
             <label class="check">
               <input type="checkbox" checked={prefs.deepen} onChange={(e) => setStormPrefs({ deepen: e.currentTarget.checked })} /> Stockfish re-scores the positions while this page is open
+            </label>
+            <label class="check">
+              <input type="checkbox" checked={prefs.maia} onChange={(e) => setStormPrefs({ maia: e.currentTarget.checked })} /> Maia rates the positions’ difficulty while this page is open (at {maiaElo.value} and from 1000 to 2600)
             </label>
           </div>
         </details>
@@ -785,6 +838,7 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
             {bestLine(v, f)}
           </p>
         )}
+        {v && showBest && !item.puzzle && v.band !== 'unanswered' && <MaiaNote p={item.card} elo={s.unintuitive ?? maiaElo.value} />}
         {v && showBest && item.puzzle && (
           <p class="muted storm-best" data-testid="puzzle-facts">
             Solution: {solution(item.puzzle)} · {puzzleFacts(item.puzzle)}
@@ -838,6 +892,15 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
       </div>
     </div>
   );
+}
+
+function MaiaNote(props: { p: StoredPosition; elo: number }) {
+  const words = maiaWords(props.p, props.elo);
+  return words ? (
+    <p class="muted storm-maia" data-testid="storm-maia" title="Maia 3 (CSSLab): the move human players of a rating are likely to play. The difficulty is the rating at which it finds a good move half the time.">
+      {words}
+    </p>
+  ) : null;
 }
 
 /** "Save as a mistake" (§5.74): the position into the game cards, whether or not it was answered well. */
@@ -918,6 +981,11 @@ function Review(props: { s: StormSession; scope: StormScopeData }) {
   for (const i of graded) bands[i.answer!.band as keyof RecordRow['bands']]++;
   const again = s.mode === 'storm' ? 'Another storm' : 'Another set';
   const label = (it: StormItem) => (it.puzzle ? 'Puzzle' : positionLineLabel(it.card));
+  // The row's title: where it is, and Maia's difficulty when known (§5.82).
+  const rowTitle = (it: StormItem) => {
+    const d = it.puzzle ? null : difficulty(it.card.maia, storedList(it.card), STORM);
+    return `${it.card.names[0] ?? ''} ${label(it)}${d ? ` · difficulty ${difficultyWords(d)}` : ''}`.trim();
+  };
   return (
     <div class="storm-review">
       <section class="card storm-result">
@@ -961,7 +1029,7 @@ function Review(props: { s: StormSession; scope: StormScopeData }) {
           </div>
         </div>
         <div class="actions">
-          <button type="button" class="primary" onClick={() => void startStorm(props.scope, s.mode)}>
+          <button type="button" class="primary" onClick={() => void startStorm(props.scope, s.mode, { unintuitive: !!s.unintuitive })}>
             {again}
           </button>
           <button type="button" class="secondary" onClick={() => void startStorm(props.scope, s.mode === 'storm' ? 'set' : 'storm')}>
@@ -1016,6 +1084,7 @@ function Review(props: { s: StormSession; scope: StormScopeData }) {
                 {item.puzzle ? `Solution: ${solution(item.puzzle)}` : bestLine(item.answer, facts(item.card))}
               </p>
             )}
+            {shown && item.answer && !item.puzzle && <MaiaNote p={item.card} elo={s.unintuitive ?? maiaElo.value} />}
             <div class="actions">
               <button type="button" class="secondary" onClick={() => toggleShown(at)}>
                 {shown ? 'Hide best move' : 'Best move'} <kbd>B</kbd>
@@ -1041,7 +1110,7 @@ function Review(props: { s: StormSession; scope: StormScopeData }) {
                     <button
                       type="button"
                       class={`storm-row band-${it.answer?.band ?? 'unanswered'}${i === at ? ' current' : ''}`}
-                      title={`${it.card.names[0] ?? ''} ${label(it)}`.trim()}
+                      title={rowTitle(it)}
                       onClick={() => setAt(i)}
                     >
                       <span class="storm-row-n">{i + 1}</span>
