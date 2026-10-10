@@ -260,6 +260,7 @@ test('voice input (§5.63): a move said and played, the opponent’s spoken, a m
   await page.addInitScript(() => {
     const w = window as unknown as Record<string, unknown>;
     w['__spoken'] = [];
+    w['__speaking'] = 0;
     w['SpeechRecognition'] = class {
       onresult: ((e: unknown) => void) | null = null;
       constructor() {
@@ -279,7 +280,11 @@ test('voice input (§5.63): a move said and played, the opponent’s spoken, a m
       value: {
         speak(u: { text: string; onend?: () => void }) {
           (w['__spoken'] as string[]).push(u.text);
-          setTimeout(() => u.onend?.(), 0);
+          w['__speaking'] = (w['__speaking'] as number) + 1;
+          setTimeout(() => {
+            w['__speaking'] = (w['__speaking'] as number) - 1;
+            u.onend?.();
+          }, 0);
         },
         cancel() {},
       },
@@ -300,6 +305,8 @@ test('voice input (§5.63): a move said and played, the opponent’s spoken, a m
   await expect(page.getByTestId('voice-note')).toHaveText('Nf3?');
   await expect.poll(() => page.evaluate(() => (window as unknown as { __spoken: string[] }).__spoken)).toContain('Knight f, 3?');
   await expect(game).toHaveAttribute('data-moves', '2');
+  // Nothing is heard while the app speaks: the yes waits for the question to end.
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __speaking: number }).__speaking)).toBe(0);
   await page.evaluate(() => (window as unknown as { __say(a: string[]): void }).__say(['yes']));
   await expect(game).toHaveAttribute('data-moves', '4');
   await expect(page.getByTestId('practice-moves')).toContainText('2. Nf3');
