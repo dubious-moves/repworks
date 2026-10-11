@@ -18,10 +18,7 @@ export async function clickSquare(page: Page, name: string, orientation: 'white'
   await page.mouse.click(p.x, p.y);
 }
 
-/**
- * Makes a chapter in the open study by "+ New chapter": by the chapter list on a wide screen, the
- * ☰ menu with a chapter open (§5.88), or "+" in the head of a study with none.
- */
+/** Makes a chapter in the open study: from the ☰ menu with a chapter open (§5.88), or "+" in the head of a study with none. */
 export async function newChapter(page: Page, name: string, side?: 'white' | 'black') {
   const direct = page.getByRole('button', { name: 'New chapter' });
   if (await direct.isVisible()) await direct.click();
@@ -33,11 +30,9 @@ export async function newChapter(page: Page, name: string, side?: 'white' | 'bla
   await dialog.waitFor({ state: 'detached' });
 }
 
-/** Opens the open chapter's settings: its ⚙ in the chapter list on a wide screen, else from the ☰ menu (§5.88). */
-export async function chapterSettings(page: Page, name: string) {
-  const inList = page.getByRole('navigation', { name: 'Chapters' }).getByRole('button', { name: `Settings: ${name}` });
-  if (await inList.isVisible()) await inList.click();
-  else await studyMenu(page, 'Chapter settings');
+/** Opens the open chapter's settings, from the ☰ menu (§5.88). */
+export async function chapterSettings(page: Page) {
+  await studyMenu(page, 'Chapter settings');
   return page.getByRole('dialog', { name: 'Chapter settings' });
 }
 

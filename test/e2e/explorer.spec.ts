@@ -135,7 +135,9 @@ test('tabs: Lichess and Masters, which asks Lichess’s masters with no filter; 
   expect(fake.requests.find((r) => r.url.includes('/masters'))!.url).not.toContain('speeds=');
 });
 
-test('the panel keeps its height between positions, and its handle resizes it, kept after a reload', async ({ page }) => {
+test('the panel keeps its height between positions, and its handle resizes it, kept after a reload', async ({ page, isMobile }) => {
+  // The handle is the panel's under 1150px; on the stage the explorer fills the left side (option B).
+  if (!isMobile) await page.setViewportSize({ width: 1100, height: 720 });
   await setUp(page);
   await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf`);
   await expect(rows(page)).toHaveText(['e4', 'd4', 'Nf3', 'c4']);
@@ -170,6 +172,14 @@ test('the panel keeps its height between positions, and its handle resizes it, k
   await expect.poll(height).toBe(before - 36);
   await grip.dblclick();
   await expect(panel(page)).not.toHaveAttribute('style', /--ex-height/);
+  if (isMobile) return;
+  // On the stage: left of the board, as tall as its side allows, with no handle.
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await expect(page.locator('.cv-side .explorer')).toBeVisible();
+  await expect(grip).toBeHidden();
+  const side = (await page.locator('.cv-side').boundingBox())!;
+  const box = (await panel(page).boundingBox())!;
+  expect(Math.round(box.y + box.height)).toBe(Math.round(side.y + side.height));
 });
 
 test('a move other repertoire chapters play is marked, and its list opens the other chapter there', async ({ page }) => {

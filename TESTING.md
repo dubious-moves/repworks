@@ -5,6 +5,14 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## The study page, option B (§5.94)
+- The installed desktop app, a study at your usual board size: the engine and the explorer on the
+  left, the notation on the right as running text. Is the notation easier to read, with comments
+  and variations breaking the line? Does the explorer have enough rows and columns there?
+- The head: ‹ › and the select pick the chapter, "2 / 5" beside them. Are the chapter's ⚙ and
+  "New chapter" in ☰ enough, now the list is gone?
+- Study ↔ Train: the board should still not move (on a narrower window it may shift a little).
+
 ## The training screen's comments and line list (§5.93)
 - Train a line with comments: they shouldn't flash as the moves go by, only show after a wrong
   move, at a taught or shown move, and at the line's end. At the end, click a move in a comment's
@@ -16,13 +24,12 @@ fixes them and updates this file.
   keep to one centred column. Does it feel better than the window's edges? Is 1600px the right
   width, or should it be narrower?
 - Study ↔ Train, on a chapter and in a running session: the board shouldn't move at all, only the
-  sides. Is the board's place in the middle right, and are the chapter list and the line list (now
-  as wide as the right panel) good at that width?
+  sides. Is the board's place in the middle right, and is the line list (now as wide as the right
+  panel) good at that width?
 - The installed app on the desktop: no top bar, and the window's title bar in the page's dark
   colour, not green (with any theme, Settings → look). Is the content's distance from it right?
 - The study on the desktop with the engine on: the wider eval bar left of the board, its number
-  at the leading side's end (try a position where Black is better, and a turned board); the
-  chapter list only as tall as its chapters.
+  at the leading side's end (try a position where Black is better, and a turned board).
 - The explorer: short counts (872M, 1.39B), Move narrower, columns hidden and shown again from
   ⚙ → Columns shown. With Maia on, does everything fit without the sideways scrollbar?
 - The sync status in the footer's right: quiet while synced; offline (DevTools) it turns amber.

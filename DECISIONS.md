@@ -1520,3 +1520,11 @@ The technical calls, each with its reason:
   number, the chapter list filling the rest of its side but only as tall as its chapters (a
   280px list with empty room before the board was tried first and dropped); the explorer's counts short (k, M, B), its columns
   each hideable (a per-device setting), Move and Eval narrower.
+
+## Revision of 2026-10-11 (the study page, option B, PLAN.md §5.94)
+- **D21 from 1150px: the engine and the explorer left of the board, the notation alone on its
+  right as running text, and the chapter picked in the head with ‹ ›** (the owner's choice of two
+  designs). Was (§5.92): the chapter list on the left, the engine, notation and explorer stacked on
+  the right in three scrolling boxes, and Qchess's two-column move table. Why: the list left most
+  of its side empty while the notation, the page's main work, had the least room. Under 1150px
+  nothing changed. The board stays resizable.

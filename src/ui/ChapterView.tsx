@@ -1,11 +1,13 @@
-// The chapter view (PLAN.md §4.11, D21), laid out as Qchess's study page: on a wide screen the
-// chapters on the left (each with its ⚙, the study's ⚙ by its name, "+ New chapter" at the foot:
-// §5.15), the board, and a panel with the notation, the conflicts at the move shown and the move
-// buttons. On the phone: the board, the move buttons, the notation, then the tools; the study's
-// and the chapter's ⚙ and "+" sit in the head, by the chapter menu. The head's switch goes to
-// training as Qchess's Move Trainer does. Play a move to extend a line or branch from it; a
-// move's other edits are in its menu (right-click or long-press) and the comment dialog.
+// The chapter view (PLAN.md §4.11, D21), laid out as Qchess's study page: the board, and a panel
+// with the notation, the conflicts at the move shown and the move buttons. On the stage (from
+// 1150px, the owner's option B) the engine and the explorer sit left of the board and the notation
+// has the right to itself; the chapter is picked in the head, with ‹ › beside it. On the phone:
+// the board, the move buttons, the notation, then the tools; the study's and the chapter's ⚙ and
+// "+" sit in the ☰ menu (§5.88). The head's switch goes to training as Qchess's Move Trainer
+// does. Play a move to extend a line or branch from it; a move's other edits are in its menu
+// (right-click or long-press) and the comment dialog.
 import { useEffect, useMemo, useState } from 'preact/hooks';
+import { signal } from '@preact/signals';
 import { makeFen } from 'chessops/fen';
 import { makeSan, parseSan } from 'chessops/san';
 import { parseSquare } from 'chessops/util';
@@ -39,6 +41,11 @@ import { analysePosition, setThreat, threat } from '../app/engine.ts';
 import { Back } from './Back.tsx';
 
 const BRUSH_NAMES: Brush[] = ['green', 'red', 'blue', 'yellow'];
+
+/** The stage's width (app.css, from 1150px), where the engine and the explorer sit left of the board. */
+const stageQuery = typeof matchMedia === 'function' ? matchMedia('(min-width: 1150px)') : undefined;
+const stage = signal(stageQuery?.matches ?? false);
+stageQuery?.addEventListener('change', (e) => (stage.value = e.matches));
 
 function boardState(c: Chapter, path: Path) {
   const pos = positionAt(c, path)!;
@@ -155,26 +162,34 @@ export function ChapterView() {
   // The analysis board (§5.35): the same view over a chapter on this device only.
   const scratch = s.sid === SCRATCH;
   const framed = !!(c && board);
-  const current = s.chapters.find((ch) => ch.id === s.cid);
+  const index = s.chapters.findIndex((ch) => ch.id === s.cid);
+  const prev = index > 0 ? s.chapters[index - 1] : undefined;
+  const next = index >= 0 ? s.chapters[index + 1] : undefined;
+  const wide = stage.value;
 
   return (
     <div class={`chapter-view${c && board ? ' has-frame' : ''}${waiting ? ' session-waiting' : ''}${scratch ? ' scratch' : ''}`}>
       {scratch ? <AnalysisHead /> : <div class="chapter-head">
         <Back parent={{ name: 'list' }} />
-        {/* The study, then the chapter: picked here, or from the list beside the board on a wide
-            screen, where the head names it (the design canvas's crumb). With a chapter open, the
-            ☰ menu holds the study's and the chapter's settings and New chapter (§5.88). */}
+        {/* The study, then the chapter, picked in the head: on the phone under the study's name, on
+            the stage beside it with ‹ › for the chapters on either side and its place among them
+            (the owner's choice of the design canvas's option B, 2026-10-11). With a chapter open,
+            the ☰ menu holds the study's and the chapter's settings and New chapter (§5.88). */}
         <div class="titles">
           <span class="study-title">
             {s.meta.name}
-            {current && <span class="crumb-chapter"> › <b>{current.name}</b></span>}
             {!framed && (
               <button type="button" class="icon" aria-label="Study settings" title="Study settings" onClick={studySettings}>
                 ⚙
               </button>
             )}
           </span>
-          <div class="chapter-pick head-tool">
+          <div class="chapter-pick">
+            {s.chapters.length > 1 && (
+              <button type="button" class="secondary chapter-step" aria-label="Previous chapter" title={prev ? prev.name : undefined} disabled={!prev} onClick={() => prev && open({ name: 'chapter', sid: s.sid, cid: prev.id })}>
+                ‹
+              </button>
+            )}
             {s.chapters.length > 0 && (
               <select aria-label="Chapter" value={s.cid} onChange={(e) => open({ name: 'chapter', sid: s.sid, cid: e.currentTarget.value })}>
                 {s.chapters.map((ch) => (
@@ -183,6 +198,16 @@ export function ChapterView() {
                   </option>
                 ))}
               </select>
+            )}
+            {s.chapters.length > 1 && (
+              <button type="button" class="secondary chapter-step" aria-label="Next chapter" title={next ? next.name : undefined} disabled={!next} onClick={() => next && open({ name: 'chapter', sid: s.sid, cid: next.id })}>
+                ›
+              </button>
+            )}
+            {s.chapters.length > 1 && index >= 0 && (
+              <span class="chapter-count muted">
+                {index + 1} / {s.chapters.length}
+              </span>
             )}
             {!framed && s.cid && (
               <button type="button" class="icon" aria-label="Chapter settings" title="Chapter settings" onClick={() => openChapterSettings(s.sid, s.cid)}>
@@ -206,40 +231,13 @@ export function ChapterView() {
       {c && board && (
         <div class="cv-frame">
           <div class="cv-grid">
-            {!scratch && <nav class="cv-chapters" aria-label="Chapters">
-              <div class="cv-study">
-                <span class="cv-study-name">
-                  {s.meta.name}
-                  <small class="muted">
-                    {s.chapters.length} chapter{s.chapters.length === 1 ? '' : 's'}
-                  </small>
-                </span>
-                <button type="button" class="icon" aria-label="Study settings" title="Study settings" onClick={studySettings}>
-                  ⚙
-                </button>
+            {/* The stage's left (option B): the engine and the explorer, the notation having the right to itself. */}
+            {wide && (
+              <div class="cv-side">
+                <EnginePanel board={board.pos} />
+                <Explorer chapter={c} path={path} />
               </div>
-              <ol>
-                {s.chapters.map((ch) => (
-                  <li key={ch.id} onContextMenu={(e) => (e.preventDefault(), openChapterSettings(s.sid, ch.id))}>
-                    <a
-                      href={`#/study/${s.sid}/${ch.id}`}
-                      aria-current={ch.id === s.cid ? 'page' : undefined}
-                      onClick={(e) => (e.preventDefault(), open({ name: 'chapter', sid: s.sid, cid: ch.id }))}
-                    >
-                      {ch.name}
-                    </a>
-                    <button type="button" class="icon" aria-label={`Settings: ${ch.name}`} title="Chapter settings" onClick={() => openChapterSettings(s.sid, ch.id)}>
-                      ⚙
-                    </button>
-                  </li>
-                ))}
-              </ol>
-              <div class="cv-new">
-                <button type="button" onClick={openNewChapter}>
-                  + New chapter
-                </button>
-              </div>
-            </nav>}
+            )}
             <div class="cv-board" onPointerDown={shownLine ? endPreviewOnBoard : undefined}>
               <Board
                 fen={shownLine?.fen ?? board.fen}
@@ -265,14 +263,14 @@ export function ChapterView() {
               {scratch && <AnalysisFen />}
             </div>
             <div class="cv-panel">
-              <EnginePanel board={board.pos} />
+              {!wide && <EnginePanel board={board.pos} />}
               <Notation chapter={c} />
               {!scratch && (
                 <div class="cv-tools">
                   {doc.value && <Conflicts />}
                 </div>
               )}
-              <Explorer chapter={c} path={path} />
+              {!wide && <Explorer chapter={c} path={path} />}
               {drawMode && (
                 <div class="brushes" role="radiogroup" aria-label="Colour">
                   {BRUSH_NAMES.map((b) => (

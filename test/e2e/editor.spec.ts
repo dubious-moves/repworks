@@ -202,11 +202,11 @@ test('chapters: add one, rename it, change its side, move it, and delete it', as
   expect(git.textsOf().get(`studies/Rep0Najd/${cid}.pgn`)).toBe('[Event "Test repertoire: Smith-Morra"]\n[Result "*"]\n[StudyName "Test repertoire"]\n[ChapterName "Smith-Morra"]\n[Orientation "white"]\n\n1. e4 *\n');
   expect(JSON.parse(git.textsOf().get('studies/Rep0Najd/study.json')!).chapters).toEqual(['Ch1Najdf', 'Ch2Alapn', cid]);
   // Rename and side, saved together; Cancel changes nothing.
-  let dialog = await chapterSettings(page, 'Smith-Morra');
+  let dialog = await chapterSettings(page);
   await dialog.getByLabel('Chapter name').fill('Not this');
   await dialog.getByRole('button', { name: 'Cancel' }).click();
   await expect(page.getByLabel('Chapter', { exact: true }).locator('option:checked')).toHaveText('Smith-Morra');
-  dialog = await chapterSettings(page, 'Smith-Morra');
+  dialog = await chapterSettings(page);
   await expect(dialog.getByLabel('Chapter name')).toHaveValue('Smith-Morra');
   await dialog.getByLabel('Chapter name').fill('Morra');
   await dialog.getByLabel('Black').check();
@@ -214,7 +214,7 @@ test('chapters: add one, rename it, change its side, move it, and delete it', as
   await expect(page.locator('.cg-wrap')).toHaveClass(/orientation-black/);
   await expect(page.getByLabel('Chapter', { exact: true }).locator('option:checked')).toHaveText('Morra');
   // Moved up one place.
-  dialog = await chapterSettings(page, 'Morra');
+  dialog = await chapterSettings(page);
   await expect(dialog).toContainText('Chapter 3 of 3');
   await expect(dialog.getByRole('button', { name: 'Move down' })).toBeDisabled();
   await dialog.getByRole('button', { name: 'Move up' }).click();
@@ -222,7 +222,7 @@ test('chapters: add one, rename it, change its side, move it, and delete it', as
   await dialog.getByRole('button', { name: 'Cancel' }).click();
   await expect(page.getByLabel('Chapter', { exact: true }).locator('option')).toHaveText(['Main line', 'Morra', 'Alapin']);
   // Delete, after asking: back to the study's first chapter.
-  dialog = await chapterSettings(page, 'Morra');
+  dialog = await chapterSettings(page);
   page.once('dialog', (d) => {
     expect(d.message()).toBe('Delete the chapter “Morra”?');
     void d.accept();
@@ -288,19 +288,34 @@ test('a move lands on the squares pressed after the board has moved down the pag
   await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 Nc6 d4 cxd4');
 });
 
-test('a wide screen shows the chapters on the left, and the board and panel fit the window', async ({ page, isMobile }) => {
+test('a wide screen: the engine and explorer left of the board, the notation right, the chapter picked in the head', async ({ page, isMobile }) => {
   test.skip(isMobile, 'the phone keeps one column');
   await page.setViewportSize({ width: 1400, height: 800 });
   await setUp(page);
   await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf`);
-  const chapters = page.getByRole('navigation', { name: 'Chapters' });
-  await expect(chapters.locator('[aria-current="page"]')).toHaveCount(1);
-  for (const sel of ['.cv-board .board', '.cv-panel', '.cv-chapters']) {
+  const board = (await page.locator('.cv-board .board').boundingBox())!;
+  for (const sel of ['.cv-board .board', '.cv-panel', '.cv-side']) {
     const box = (await page.locator(sel).boundingBox())!;
     expect(box.y + box.height, sel).toBeLessThanOrEqual(800);
     expect(box.x + box.width, sel).toBeLessThanOrEqual(1400);
   }
-  await chapters.getByRole('link').nth(1).click();
+  // Option B (2026-10-11): the engine and the explorer on the left, the notation alone on the right.
+  for (const sel of ['.cv-side .engine', '.cv-side .explorer']) expect((await page.locator(sel).boundingBox())!.x, sel).toBeLessThan(board.x);
+  expect((await page.locator('.cv-panel .notation').boundingBox())!.x).toBeGreaterThan(board.x + board.width);
+  await expect(page.locator('.cv-panel .explorer, .cv-panel .engine')).toHaveCount(0);
+  // The main line as running text: a pair's moves on the line of the one before.
+  const pairs = page.locator('.cv-panel .notation .pair');
+  const first = (await pairs.nth(0).boundingBox())!;
+  const second = (await pairs.nth(1).boundingBox())!;
+  expect(Math.abs(second.y - first.y)).toBeLessThan(4);
+  // The chapter in the head, with ‹ › and its place among them.
+  const head = page.locator('.chapter-head');
+  await expect(head.locator('.chapter-count')).toHaveText('1 / 2');
+  await expect(head.getByRole('button', { name: 'Previous chapter' })).toBeDisabled();
+  await head.getByRole('button', { name: 'Next chapter' }).click();
   await expect(page).toHaveURL(/#\/study\/Rep0Najd\/Ch2Alapn/);
-  await expect(chapters.getByRole('link').nth(1)).toHaveAttribute('aria-current', 'page');
+  await expect(head.locator('.chapter-count')).toHaveText('2 / 2');
+  await expect(head.getByRole('button', { name: 'Next chapter' })).toBeDisabled();
+  await head.getByRole('button', { name: 'Previous chapter' }).click();
+  await expect(page).toHaveURL(/#\/study\/Rep0Najd\/Ch1Najdf/);
 });

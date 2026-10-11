@@ -816,16 +816,6 @@ textarea.script {
   overflow-wrap: anywhere;
 }
 
-/* The study's head on a wide screen: Study › Chapter, the chapter list beside the board picking it. */
-.crumb-chapter {
-  display: none;
-}
-
-.crumb-chapter b {
-  color: var(--text);
-  font-weight: 600;
-}
-
 .study-title .icon {
   min-width: 28px;
   min-height: 28px;
@@ -843,6 +833,28 @@ textarea.script {
 .chapter-pick select {
   flex: 1;
   min-width: 0;
+}
+
+/* ‹ › and "2 / 5" beside the picker, on the stage only. */
+.chapter-step,
+.chapter-count {
+  display: none;
+}
+
+.chapter-step {
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+}
+
+.chapter-count {
+  padding: 0 4px;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 /* Below the chapter list's width the picker sits under the study's name: ←, the picker and the
@@ -1683,7 +1695,7 @@ table.cards td {
 /* The stage (the owner's notes of 2026-10-11): on a wide screen the study and the training screen
    share one frame, so the board stays where it is when Study ↔ Train switches and only the sides
    change: the board in the page's middle, as large as the frame fits up to the size chosen, and
-   a side of one width on each hand, the chapters and the notation in the study, the lines and
+   a side of one width on each hand, the engine and explorer and the notation in the study, the lines and
    the session's panel in training. The sides fill the page's column, so the head above lines up
    with their outer edges. Where the page is too narrow for both at the right panel's least (the
    explorer's columns need about 400px), the right keeps it and the left gives way, the board a
@@ -1704,6 +1716,13 @@ table.cards td {
     justify-content: center;
     align-items: stretch;
     gap: 16px;
+  }
+
+  /* The study's explorer is on its left (option B), so there the side keeps the least the
+     explorer's columns need and the notation on the right gives way; the board's size is the
+     training screen's, and from about 1600px the two sides are of one width either way. */
+  .cv-grid {
+    grid-template-columns: var(--panel) var(--board) var(--side);
   }
 
   .shell-train:has(.train-frame) {
@@ -1786,101 +1805,108 @@ table.cards td {
     font-size: 1rem;
   }
 
-  /* The chapters fill their side, as tall as the list (the owner's notes, 2026-10-11); with the
-     engine on, they leave the eval bar its room and a gap either side of it. */
-  .cv-chapters {
+  /* Option B of the design canvas (the owner's choice, 2026-10-11): the head names the study,
+     then picks the chapter, with ‹ › and its place among them; the engine and the explorer on
+     the left, the explorer filling it; the notation alone on the right. */
+  .has-frame .chapter-head .titles {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .has-frame .chapter-head .study-title::after {
+    content: '/';
+    margin-left: 10px;
+    color: var(--muted);
+  }
+
+  .has-frame .chapter-pick {
+    flex: 0 1 auto;
+    gap: 4px;
+  }
+
+  .has-frame .chapter-pick select {
+    flex: 0 1 auto;
+    max-width: 420px;
+    min-height: 36px;
+    font-weight: 600;
+  }
+
+  .has-frame .chapter-step,
+  .has-frame .chapter-count {
+    display: inline-flex;
+  }
+
+  .cv-side {
     grid-area: side;
-    justify-self: start;
-    align-self: start;
-    width: 100%;
-    max-height: 100%;
+    min-width: 0;
+    min-height: 0;
     display: flex;
     flex-direction: column;
-    min-height: 0;
-    overflow-y: auto;
+    gap: 12px;
+  }
+
+  .cv-side .engine {
+    flex: none;
+    border-bottom: 0;
     background: var(--surface);
     border-radius: var(--radius-card);
   }
 
-  .cv-study {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 4px;
-    padding: 4px 4px 4px 12px;
-    font-weight: 600;
-    border-bottom: 1px solid rgb(var(--ink) / 10%);
+  /* A line wraps once rather than being cut after four moves, its moves clear of the eval. */
+  .cv-side .engine-line {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    white-space: normal;
+    padding-left: calc(3.4em + 6px);
+    text-indent: calc(-3.4em - 6px);
+    line-height: 1.55;
+    padding-block: 3px;
   }
 
-  .cv-study-name {
-    display: grid;
-    padding: 4px 0;
-    overflow-wrap: anywhere;
+  .cv-side .explorer {
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    border-top: 0;
+    background: var(--surface);
+    border-radius: var(--radius-card);
   }
 
-  .cv-study-name small {
-    font-weight: 400;
-    font-size: 0.8rem;
+  .cv-side .explorer-grip {
+    display: none;
   }
 
-  .cv-chapters ol {
-    flex: 1;
+  /* The notation as running text: the main line's moves flow on, broken only by a comment or a
+     variation, as a book prints them (Qchess's table stays under 1150px). A pair's "…" stays
+     where Black's move starts a run, and goes where White's move ends one. */
+  .cv-panel .notation {
+    padding: 8px 10px;
+    line-height: 1.9;
   }
 
-  .cv-chapters li {
-    display: flex;
-    align-items: center;
-    border-bottom: 1px solid rgb(var(--ink) / 6%);
+  .cv-panel .notation .pair {
+    display: inline;
+    margin-right: 6px;
   }
 
-  .cv-chapters li a {
-    flex: 1;
-    min-width: 0;
+  .cv-panel .notation .pair .cell,
+  .cv-panel .notation .pair .cell-move {
+    display: inline;
   }
 
-  .cv-chapters li .icon {
-    visibility: hidden;
+  .cv-panel .notation .pair .index {
+    padding-right: 2px;
   }
 
-  .cv-chapters li:hover .icon,
-  .cv-chapters li .icon:focus-visible,
-  .cv-chapters li:has(a[aria-current='page']) .icon {
-    visibility: visible;
+  .cv-panel .notation .pair .gap {
+    padding: 0 2px;
   }
 
-  .cv-new {
-    padding: 8px;
-    border-top: 1px solid rgb(var(--ink) / 10%);
-  }
-
-  .cv-new button {
-    width: 100%;
-    min-height: 36px;
-  }
-
-  .cv-chapters ol {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-
-  .cv-chapters a {
-    display: flex;
-    align-items: center;
-    min-height: 40px;
-    padding: 4px 12px;
-    color: var(--text);
-    text-decoration: none;
-    border-left: 3px solid transparent;
-  }
-
-  .cv-chapters a:hover {
-    background: rgb(var(--ink) / 5%);
-  }
-
-  .cv-chapters a[aria-current='page'] {
-    background: rgb(var(--ink) / 8%);
-    border-left-color: var(--move-current);
+  .cv-panel .notation .pair .gap:last-child {
+    display: none;
   }
 }
 
@@ -3204,7 +3230,8 @@ a.button.primary {
     border-radius: 3px;
   }
 
-  .cv-grid:has(.eval-bar) .cv-chapters {
+  .cv-grid:has(.eval-bar) .cv-side {
+    justify-self: start;
     width: calc(100% + 16px - var(--eval-w) - 2 * var(--eval-gap));
   }
 

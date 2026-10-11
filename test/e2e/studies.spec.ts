@@ -67,7 +67,7 @@ test('the study cards: kind, chapters, side and today’s moves; a card opens it
   await expect(page.locator('.notation')).toContainText('1. e4');
 });
 
-test('a study made with no import, managed where Qchess has it, and deleted from its card', async ({ page, isMobile }) => {
+test('a study made with no import, managed where Qchess has it, and deleted from its card', async ({ page }) => {
   const git = await setUp(page);
 
   // New study: a name, its kind, and a first chapter with its side.
@@ -104,14 +104,13 @@ test('a study made with no import, managed where Qchess has it, and deleted from
   await dialog.getByRole('button', { name: 'Save' }).click();
   await expect(page.locator('.chapter-view .study-title').first()).toContainText('Caro-Kann Defence');
   // The chapter's ⚙: renamed and turned; a second chapter added.
-  dialog = await chapterSettings(page, 'Advance');
+  dialog = await chapterSettings(page);
   await dialog.getByLabel('Chapter name').fill('Advance 3. e5');
   await dialog.getByLabel('White').check();
   await dialog.getByRole('button', { name: 'Save' }).click();
   await expect(page.locator('.cg-wrap')).toHaveClass(/orientation-white/);
   await newChapter(page, 'Exchange');
   await expect(page.getByLabel('Chapter', { exact: true }).locator('option')).toHaveText(['Advance 3. e5', 'Exchange']);
-  if (!isMobile) await expect(page.getByRole('navigation', { name: 'Chapters' }).getByRole('link')).toHaveText(['Advance 3. e5', 'Exchange']);
   await sync(page);
   const meta = JSON.parse(files().get(`studies/${sid}/study.json`)!) as { name: string; kind: string; chapters: string[] };
   expect(meta).toMatchObject({ name: 'Caro-Kann Defence', kind: 'repertoire' });
@@ -121,7 +120,7 @@ test('a study made with no import, managed where Qchess has it, and deleted from
   expect(files().get(`studies/${sid}/${meta.chapters[1]}.pgn`)).toContain('[ChapterName "Exchange"]\n[Orientation "white"]');
 
   // The chapter deleted, after asking.
-  dialog = await chapterSettings(page, 'Exchange');
+  dialog = await chapterSettings(page);
   page.once('dialog', (d) => void d.accept());
   await dialog.getByRole('button', { name: 'Delete chapter' }).click();
   await expect(page.getByLabel('Chapter', { exact: true }).locator('option')).toHaveText(['Advance 3. e5']);
