@@ -12,7 +12,8 @@ fixes them and updates this file.
 - Study ↔ Train, on a chapter and in a running session: the board shouldn't move at all, only the
   sides. Is the board's place in the middle right, and are the chapter list and the line list (now
   as wide as the right panel) good at that width?
-- The installed app on the desktop: no green top bar under the window's title bar. Is it missed?
+- The installed app on the desktop: no top bar, and the window's title bar in the page's dark
+  colour, not green (with any theme, Settings → look). Is the content's distance from it right?
 - The sync status in the footer's right: quiet while synced; offline (DevTools) it turns amber.
   Noticeable enough when something is wrong?
 

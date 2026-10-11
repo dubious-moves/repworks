@@ -42,14 +42,6 @@ body {
   color: var(--accent-text);
 }
 
-/* The installed app on a desktop: its window's title bar, in the theme colour, already shows the
-   icon and the name, and the sync status is in the footer, so the head has nothing left to say. */
-@media (display-mode: standalone) and (hover: hover) and (pointer: fine) and (min-width: 900px) {
-  .topbar {
-    display: none;
-  }
-}
-
 .topbar h1 {
   font-size: 1.15rem;
   margin: 0;
@@ -4911,4 +4903,19 @@ a.button.disabled {
 .note-dialog textarea {
   width: 100%;
   box-sizing: border-box;
+}
+
+/* The installed app on a desktop: its window's title bar already shows the icon and the name, and
+   the sync status is in the footer, so the head has nothing left to say. The title bar takes the
+   page's background (themes.css, theme.ts), not the accent: a green band over a dark page looked
+   strange (the owner's notes, 2026-10-11); the content a little further from it. Last in the
+   file, so its padding wins over the board pages' own. Keep the query as theme.ts has it. */
+@media (display-mode: standalone) and (hover: hover) and (pointer: fine) and (min-width: 900px) {
+  .topbar {
+    display: none;
+  }
+
+  .shell .content {
+    padding-top: 24px;
+  }
 }

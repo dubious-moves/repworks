@@ -5672,7 +5672,11 @@ judged live:
   line list (Play, the pins, retry) keep the left side empty, so the board is where it is
   everywhere; so does the analysis board. Under 1150px nothing changed.
 - **The installed app on a desktop** (`display-mode: standalone` with a fine pointer, ≥900px)
-  has no top bar: the window's title bar, in the theme colour, shows the icon and the name.
+  has no top bar: the window's title bar shows the icon and the name. The title bar takes the
+  page's background rather than the accent (`--theme-color: var(--bg)` there, which `theme.ts`
+  puts in the `theme-color` meta; the owner found the green band over the dark page strange), and
+  the content starts 24px under it. The manifest's `theme_color` is unchanged, so the bar may show
+  the green for a moment as the app starts.
 - **The sync status** sits in the footer's right on a desktop (≥900px), as muted as the build line
   on its left, and in the top bar on the phone, without its outline. Offline, a refused token, a
   sync error or GitHub's limit turn it into the amber chip. It still syncs on a click.

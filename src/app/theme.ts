@@ -55,6 +55,10 @@ export function applyTheme(id: ThemeId = theme.peek()): void {
   if (scheme) document.querySelector('meta[name="color-scheme"]')?.setAttribute('content', scheme);
 }
 
+/** The installed app on a desktop, whose title bar takes the page's colour (themes.css): as it starts or stops matching, the bar follows. */
+const installedDesktop = typeof matchMedia === 'function' ? matchMedia('(display-mode: standalone) and (hover: hover) and (pointer: fine) and (min-width: 900px)') : undefined;
+installedDesktop?.addEventListener('change', () => applyTheme());
+
 export function setTheme(id: ThemeId): void {
   theme.value = id;
   try {
