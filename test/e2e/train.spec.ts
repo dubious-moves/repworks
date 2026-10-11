@@ -7,7 +7,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import type { FakeGit } from '../support/fakeGit.ts';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
-import { clickSquare, openMoveMenu } from './board.ts';
+import { clickSquare, comment, openMoveMenu } from './board.ts';
 import { serveGithub, world } from './github.ts';
 import { serveSite, type SiteServer } from './server.ts';
 import { walkOnce } from './prefs.ts';
@@ -269,4 +269,47 @@ test('show and grade: a session run with 2 and 4 only, its review events checked
   ]);
   expect(events[0]).toMatchObject({ g: 1 });
   expect(events[0]!['w']).toBeUndefined();
+});
+
+test('a line’s comments: folded list at the start, hidden while asked, shown after a wrong move and at the end, where their lines step by keys', async ({ page }) => {
+  await walkOnce(page);
+  await setUp(page);
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf?at=e4`);
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4');
+  await comment(page, 'Here (1... e6 2. d4)');
+  await page.locator('.move[data-path="e4 c5 Nf3 d6 d4 cxd4"]').click({ position: { x: 6, y: 8 } });
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 d6 d4 cxd4');
+  await comment(page, 'Then (4. Nxd4 Nf6 5. Nc3)');
+
+  // The session starts with the line list folded (the owner's request, 2026-10-11).
+  await page.goto(`${site.url}#/train/Rep0Najd/Ch1Najdf?at=e4,c5,Nf3,d6,d4,cxd4`);
+  await asked(page);
+  const list = page.getByRole('complementary', { name: 'Lines to train' });
+  await expect(list.getByRole('button', { name: /Show lines/ })).toHaveAttribute('aria-expanded', 'false');
+
+  // 1... c5 asked: 1. e4's comment stays hidden; a wrong move shows it.
+  const comments = page.locator('.train-comments');
+  await expect(comments).toHaveCount(0);
+  await play(page, 'e7', 'e5');
+  await expect(feedback(page)).toHaveText('Not in your repertoire: try again');
+  await expect(comments).toContainText('Here');
+  await play(page, 'c7', 'c5');
+  await expect(feedback(page)).toHaveText('New move: play cxd4');
+  await play(page, 'c5', 'd4');
+
+  // The line's end: its last move's comment, a line in it previewed and stepped by ← → and left by Escape.
+  await expect(page.getByRole('region', { name: 'Session done' })).toBeVisible();
+  await expect(comments).toContainText('Then');
+  const bar = page.getByRole('group', { name: 'Line from the comment' });
+  await comments.locator('.line-move', { hasText: 'Nf6' }).click();
+  await expect(bar).toContainText('From the comment: Nxd4 Nf6');
+  await page.keyboard.press('ArrowRight');
+  await expect(bar).toContainText('From the comment: Nxd4 Nf6 Nc3');
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('ArrowLeft');
+  await expect(bar).toContainText('From the comment: Nxd4');
+  await expect(bar).not.toContainText('Nf6');
+  await page.keyboard.press('Escape');
+  await expect(bar).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Session done' })).toBeVisible();
 });

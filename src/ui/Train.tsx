@@ -36,6 +36,7 @@ import { LineReader } from './Read.tsx';
 import { FloatingMenu } from './MoveMenu.tsx';
 
 const ASKING = new Set(['ask', 'teach', 'wrong', 'shown']);
+const COMMENTS_SHOWN = new Set(['teach', 'wrong', 'shown', 'lineDone']);
 
 /**
  * What the feedback line says (§5.7): only what asks something of the user (§5.17). "Your move"
@@ -148,18 +149,20 @@ export function TrainScreen(props: { of: SessionKind }) {
   // after the screen is drawn, so a 2 pressed just after 1 would otherwise reach the old one.
   const showingNow = useRef(showing);
   showingNow.current = showing;
+  const runningNow = useRef(running);
+  runningNow.current = running;
   useEffect(() => {
-    if (!running) return;
     const onKey = (e: KeyboardEvent) => {
       const showing = showingNow.current;
       const target = e.target as HTMLElement | null;
       // Never swallowed in a text field, and a held key is one press. The line read takes its own keys.
       if ((target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) || readingAt.peek() !== undefined) return;
-      // A line from a comment on the board takes ← → and Escape first (§5.12).
+      // A line from a comment on the board takes ← → and Escape first (§5.12), at a session's end too.
       if (preview.peek()?.owner === 'train' && (e.key === 'Escape' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
         e.preventDefault();
         return e.key === 'Escape' ? endPreview() : stepPreview(e.key === 'ArrowLeft' ? -1 : 1);
       }
+      if (!runningNow.current) return;
       if (e.key === 'Escape') command('stop');
       else if (showing && !e.repeat && pressOf(e.key)) press(pressOf(e.key)!);
       // "1" switches a session to show and grade, as in Chessable (§5.16).
@@ -170,7 +173,7 @@ export function TrainScreen(props: { of: SessionKind }) {
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [running]);
+  }, []);
 
   // The ring's buttons, when they arrive as media keys rather than key events (§5.9).
   useEffect(() => {
@@ -224,7 +227,7 @@ export function TrainScreen(props: { of: SessionKind }) {
       {/* The frame the study's shares on a wide screen, so the board stays put on Study ↔ Train. */}
       <div class="train-frame">
         <div class={`train-body${listed ? ' with-list' : ''}`}>
-          {listed && <Lines data={data} scope={s.scope} active={s.line && { sid: s.line.sid, cid: s.line.cid, path: s.line.path }} nothing={!!s.done && s.plan.lines.length === 0} />}
+          {listed && <Lines data={data} scope={s.scope} active={s.line && { sid: s.line.sid, cid: s.line.cid, path: s.line.path }} nothing={!!s.done && s.plan.lines.length === 0} started={running ? key : undefined} />}
           {/* A line's or a session's end keeps the board on its last position (§5.17). */}
           <div class="train-main">{read !== undefined && s.line && s.chapter ? <ReadInSession s={s} line={s.line} ply={read} /> : s.done && !(s.position && s.plan.lines.length > 0) ? <Done s={s} /> : <Session s={s} />}</div>
         </div>
@@ -398,8 +401,10 @@ function Session(props: { s: SessionView }) {
   // 2026-10-09); before it they could give a move away.
   const atEnd = !!s.done || s.phase === 'lineDone';
   const shapes = [...(arrow && 'from' in arrow ? [{ brush: 'green' as const, orig: sq(arrow.from), dest: sq(arrow.to) }] : []), ...(atEnd && !shownLine ? (node?.shapes ?? []) : [])];
-  // Comments of the move reached, except while a move is asked: they could give it away.
-  const comments = !asking || s.phase === 'teach' ? (node?.comments ?? []) : [];
+  // Comments of the move reached only where they are read (the owner's request, 2026-10-11): a
+  // move taught or shown, after a wrong move, and at the line's end. While the moves go by and
+  // one is asked they stay hidden: they came and went with each move, and could give it away.
+  const comments = s.done || COMMENTS_SHOWN.has(s.phase) ? (node?.comments ?? []) : [];
   const start = s.chapter ? startPosition(s.chapter) : undefined;
   const moves = start ? numbered(start, s.path) : s.path.join(' ');
   const chapterName = s.chapter ? (header(s.chapter, 'ChapterName') ?? s.chapter.id) : '';
@@ -685,7 +690,8 @@ function GoingOn(props: { line: Line; number: number; data: TrainData; from: Lin
     if (stopped) return;
     const go = setTimeout(() => open({ name: 'train', sid: line.sid, cid: line.cid, at: [...line.path] }), 4 * PACES[pace.peek()]);
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
+      // Escape that ends a comment's line on the board stops nothing else.
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
       e.preventDefault();
       setStopped(true);
     };
@@ -718,15 +724,22 @@ function studyOf(s: SessionView): Mode | undefined {
   return first ? { name: 'chapter', sid: first.sid, cid: first.cid } : undefined;
 }
 
-/** The line list beside the board (a wide screen) or under it, folded, on the phone (§5.16). */
-function Lines(props: { data: TrainData; scope?: string | undefined; active?: { sid: string; cid: string; path: readonly string[] } | undefined; nothing?: boolean }) {
-  const { data, scope, active } = props;
+/**
+ * The line list beside the board (a wide screen) or under it, folded, on the phone (§5.16). A
+ * session that starts folds it (the owner's request, 2026-10-11): `started` is the running
+ * session's key; "Show lines" opens it again.
+ */
+function Lines(props: { data: TrainData; scope?: string | undefined; active?: { sid: string; cid: string; path: readonly string[] } | undefined; nothing?: boolean; started?: string | undefined }) {
+  const { data, scope, active, started } = props;
   const wide = typeof matchMedia === 'function' && matchMedia('(min-width: 1150px)').matches;
   const nothing = !!props.nothing;
-  const [shown, setShown] = useState(wide || nothing);
+  const [shown, setShown] = useState((wide && started === undefined) || nothing);
   useEffect(() => {
     if (nothing) setShown(true);
   }, [nothing]);
+  useEffect(() => {
+    if (started !== undefined) setShown(false);
+  }, [started]);
   return (
     <aside class={`train-list${shown ? ' shown' : ''}`} aria-label="Lines to train">
       <button type="button" class="train-list-head" aria-expanded={shown} onClick={() => setShown(!shown)}>

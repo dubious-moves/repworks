@@ -1804,7 +1804,8 @@ comment and step back out.
   last move (a move with no continuation in the chapter view; the line's end in Read) enters
   the first line of that move's comments.
 - Used in the chapter view's notation (comments in conflict stay a warning), the Read view's
-  comments, and the training screen's comments (which stay hidden while a move is asked). In
+  comments, and the training screen's comments (shown only at a move taught or shown, after a
+  wrong move and at a line's end, §5.93). In
   training, the session goes on underneath a preview; the board takes no move until it ends.
 - Tests: `test/unit/core/repertoire/lines.test.ts` (a line at the same ply, a line before the
   move, the text places, glyphs and `0-0`, remarks, an illegal first move, the other-position
@@ -5697,5 +5698,26 @@ judged live:
 Tests: `boardsize.spec.ts` (desktop, 1600×900: the board in the page's middle, the same box on the
 study, the picked line, a running session and back; the status in the footer); the rest of the
 suite on desktop and phone unchanged.
+
+Live: TESTING.md.
+
+#### 5.93 The owner's notes of 2026-10-11: the training screen's comments and line list
+
+- **A comment's line at a session's end steps by ← →** (and Escape ends it), as it did while the
+  session ran: the training screen's key listener stays while the screen is open, the session's
+  own keys only while it runs. Escape that ends the preview leaves "Next: Line n" going on.
+- **The comments of the move reached show only where they are read:** a move taught (`teach`) or
+  shown (`shown`, after Hint or a second wrong move, and Show in show and grade), after a first
+  wrong move (`wrong`), and at the line's end (`lineDone`, the session's end). While the opponent's
+  and the auto-played moves go by, in a sequence watched, and while a move is asked, they are
+  hidden: they came and went with each move. Was: hidden only while a move was asked. The study's
+  arrows still show only at the line's end.
+- **A session that starts folds the line list** ("Show lines" opens it), on a wide screen too; a
+  new session (another line picked, "Next line", "Again") folds it again. A picked line waiting to
+  start, and a screen with nothing to train, keep it open.
+
+Tests: `train.spec.ts` (desktop and phone: the list folded at the start, a comment hidden while
+asked and shown after a wrong move, a line in the last move's comment stepped by ← → and left by
+Escape at the session's end).
 
 Live: TESTING.md.
