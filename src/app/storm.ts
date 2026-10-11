@@ -16,7 +16,7 @@ import { decisions, frontiers, inScope, lineInScope, stormLines, type DecisionPo
 import { drawOrder, noteRecent, stormAnswer, stormHistories, takeSpread, type StormHistory } from '../core/storm/store.ts';
 import type { Verdict } from '../core/storm/verdict.ts';
 import { gameCard } from '../core/progress/cards.ts';
-import { practiceMistakeSaved, stormMistakeItem } from '../core/games/saved.ts';
+import { practiceMistakeOf, practiceMistakeSaved, stormMistakeItem } from '../core/games/saved.ts';
 import { savedDeck } from './games.ts';
 import { drawFrontier, fenAfterUci, positionOf, uciToSan } from '../core/storm/walk.ts';
 import type { Chapter } from '../core/study/model.ts';
@@ -1092,6 +1092,13 @@ function stormMistake(item: StormItem) {
 export function stormMistakeSaved(item: StormItem): boolean {
   const m = stormMistake(item);
   return !!m.item && practiceMistakeSaved(savedDeck.value, m.fen, m.item.san);
+}
+
+/** The game card a storm card was saved as, with its position and side (for its note, §5.91); undefined when not saved. */
+export function stormMistakeCard(item: StormItem): { card: string; fen: string; color: 'white' | 'black' } | undefined {
+  const m = stormMistake(item);
+  const saved = m.item && practiceMistakeOf(savedDeck.value, m.fen, m.item.san);
+  return saved ? { card: gameCard(saved.pid), fen: m.fen, color: m.color } : undefined;
 }
 
 /** Saves a storm card as a mistake in the game cards, answered well or not; nothing is scored. */

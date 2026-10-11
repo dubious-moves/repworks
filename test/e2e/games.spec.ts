@@ -344,3 +344,83 @@ test('Hide time trouble: the mistake marked, then left out of the counts and the
   await chip.uncheck();
   await expect(page.getByTestId('games-queue')).toContainText('0 due · 3 new today');
 });
+
+test('a note on a game card: written on its position with a line and an arrow, shown once answered, its line on the board, synced (§5.91)', async ({ page }) => {
+  const w = await setUp(page);
+  await page.getByRole('link', { name: 'Games' }).click();
+  await page.getByRole('button', { name: 'Refresh' }).click();
+  await expect(page.getByTestId('games-count')).toHaveText('4 of 4');
+  await page.getByRole('link', { name: 'Review' }).click();
+  const card = page.locator('.game-card');
+  await expect(card).toHaveAttribute('data-card', 'm|GameOne1_7');
+  // Not before the card is answered: it would give the move away.
+  await expect(page.getByTestId('note-button')).toHaveCount(0);
+  await play(page, 'f3d4');
+  await expect(page.getByTestId('game-feedback')).toHaveText(/Best move/);
+  await page.getByTestId('note-button').click();
+
+  // The dialog's own board, at the card's position.
+  const dialog = page.locator('dialog.note-dialog');
+  await expect(dialog).toBeVisible();
+  const at = async (sq: string) => {
+    const box = (await dialog.locator('cg-board').boundingBox())!;
+    const file = sq.charCodeAt(0) - 97;
+    const rank = Number(sq[1]) - 1;
+    return { x: box.x + ((file + 0.5) * box.width) / 8, y: box.y + ((7 - rank + 0.5) * box.height) / 8 };
+  };
+  const click = async (sq: string) => {
+    const p = await at(sq);
+    await page.mouse.click(p.x, p.y);
+  };
+  await dialog.getByTestId('note-text').fill('Nxe5? drops a piece:');
+  // A line played on the board, into the words with its move numbers.
+  await click('f3');
+  await click('e5');
+  await click('d8');
+  await click('g5');
+  await expect(dialog.getByTestId('note-line')).toContainText('Line: 4. Nxe5 Qg5');
+  await dialog.getByRole('button', { name: 'Add to the note' }).click();
+  await expect(dialog.getByTestId('note-text')).toHaveValue('Nxe5? drops a piece: (4. Nxe5 Qg5)');
+  // An arrow on the position: a right-drag, or ✎ on a touch screen.
+  const toggle = dialog.getByRole('button', { name: 'Draw mode' });
+  const touch = await toggle.isVisible();
+  if (touch) await toggle.click();
+  const a = await at('d8');
+  const b = await at('g5');
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down({ button: touch ? 'left' : 'right' });
+  await page.mouse.move(b.x, b.y, { steps: 4 });
+  await page.mouse.up({ button: touch ? 'left' : 'right' });
+  await expect(dialog.getByTestId('note-line')).toContainText('1 arrow or circle');
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await expect(dialog).toHaveCount(0);
+
+  // Shown under the board, its line clickable from the card's position, its arrow on request.
+  const note = page.getByTestId('card-note');
+  await expect(note).toHaveText('Nxe5? drops a piece: (4. Nxe5 Qg5)');
+  await note.getByRole('button', { name: 'Qg5' }).click();
+  await expect(page.locator('.preview-bar')).toContainText('From the comment: Nxe5 Qg5');
+  await page.keyboard.press('ArrowLeft');
+  await expect(page.locator('.preview-bar')).toContainText('From the comment: Nxe5');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.preview-bar')).toHaveCount(0);
+  await page.getByTestId('note-arrows').click();
+  await expect(page.locator('.train-board cg-container svg.cg-shapes line')).toHaveCount(1);
+  await page.getByTestId('note-arrows').click();
+  await expect(page.locator('.train-board cg-container svg.cg-shapes line')).toHaveCount(0);
+
+  // Synced as one comment: the words, then the arrow as Lichess writes it.
+  await page.locator('.chip').click();
+  const notes = () => [...w.git.textsOf()].filter(([p]) => p.startsWith('progress/')).map(([, t]) => t).join('').match(/"k":"note".*/g) ?? [];
+  await expect.poll(notes, { timeout: 15_000 }).toEqual(['"k":"note","card":"m|GameOne1_7","text":"Nxe5? drops a piece: (4. Nxe5 Qg5) [%cal Gd8g5]"}']);
+
+  // Edited: the words come back as written; deleted, it is gone.
+  await expect(page.getByTestId('note-button')).toHaveText('✎ Edit the note');
+  await page.getByTestId('note-button').click();
+  await expect(dialog.getByTestId('note-text')).toHaveValue('Nxe5? drops a piece: (4. Nxe5 Qg5)');
+  await dialog.getByRole('button', { name: 'Delete the note' }).click();
+  await expect(note).toHaveCount(0);
+  await expect(page.getByTestId('note-arrows')).toHaveCount(0);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+});

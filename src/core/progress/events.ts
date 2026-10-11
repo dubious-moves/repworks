@@ -171,6 +171,16 @@ export interface LineEvent extends Base {
   card: string;
   mark: LineMark;
 }
+/**
+ * A game card's note (§5.91): a PGN comment on the card's position, its arrows and circles as
+ * `[%cal …]` and `[%csl …]`, its lines as `(12. Bxf7+ Kxf7)`. The latest is the card's note; ''
+ * removes it. Shown after the card is answered.
+ */
+export interface NoteEvent extends Base {
+  k: 'note';
+  card: string;
+  text: string;
+}
 export type KnownEvent =
   | ReviewEvent
   | SuspendEvent
@@ -190,8 +200,9 @@ export type KnownEvent =
   | SavedEvent
   | PlayedEvent
   | PracticeEvent
-  | LineEvent;
-export const KNOWN_KINDS = ['review', 'suspend', 'unsuspend', 'forget', 'taught', 'pin', 'unpin', 'drill', 'alt', 'storm', 'snapshot', 'drop', 'relapse', 'plan', 'dismiss', 'saved', 'played', 'practice', 'line'] as const;
+  | LineEvent
+  | NoteEvent;
+export const KNOWN_KINDS = ['review', 'suspend', 'unsuspend', 'forget', 'taught', 'pin', 'unpin', 'drill', 'alt', 'storm', 'snapshot', 'drop', 'relapse', 'plan', 'dismiss', 'saved', 'played', 'practice', 'line', 'note'] as const;
 
 /** A line as read. `event` is set for the kinds this code knows; `raw` is always the line itself. */
 export interface LogLine {
@@ -398,6 +409,12 @@ function knownEvent(o: Record<string, unknown>): KnownEvent | string {
       if (mark !== 'paused' && mark !== 'must' && mark !== 'none') return 'mark must be paused, must or none';
       return { ...base, k: 'line', mark };
     }
+    case 'note': {
+      if (!card.startsWith('m|') || card.length < 3) return 'card must be a game card (m|…)';
+      const text = o['text'];
+      if (typeof text !== 'string') return 'text must be a string';
+      return { ...base, k: 'note', text };
+    }
     default:
       return { ...base, k: 'forget' };
   }
@@ -426,6 +443,7 @@ export function formatEvent(event: KnownEvent): string {
   if (event.k === 'plan') Object.assign(o, { on: event.on, side: event.side });
   if (event.k === 'dismiss') o['on'] = event.on;
   if (event.k === 'line') o['mark'] = event.mark;
+  if (event.k === 'note') o['text'] = event.text;
   if (event.k === 'saved') o['item'] = event.item;
   if (event.k === 'played') o['game'] = event.game;
   if (event.k === 'practice') {

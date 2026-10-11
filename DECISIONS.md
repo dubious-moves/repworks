@@ -1501,3 +1501,10 @@ The technical calls, each with its reason:
   the suspend toggle, "Add alternative…" and the alternatives' ✕.
 - **The move menu loses Copy FEN and Read from here; Analyse, Storm, Practise and the plan card
   move to the study's ☰ menu**, acting on the move shown (the owner's request, to make room).
+
+## Revision of 2026-10-11 (a note on a game card, PLAN.md §5.91)
+- **D4: a new event kind `note`** on a game card (`m|<pid>`): `text`, the card's note as one PGN
+  comment (words, `(…)` lines, `[%csl …][%cal …]`), the latest winning and '' removing it. Why an
+  event and not a field of the saved item: a game's own mistakes have no `saved` event, a note is
+  edited after saving, and older builds skip a kind they don't know. Shown only after the card is
+  answered (the owner's choice).

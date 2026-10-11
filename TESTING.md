@@ -5,6 +5,15 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## A note on a game card (§5.91)
+- On the phone: answer a game card, "✎ Add a note", draw an arrow with ✎ and a colour, play a line
+  on the dialog's board and "Add to the note", type words, Save. The note shows under the verdict;
+  tap a move of its line (the board follows; ◀ ▶ Back under it), "The note's arrows".
+- On the desktop: the same with a right-drag for the arrow (Shift red, Alt blue).
+- Save a practice game's mistake and a storm position as a mistake, and write a note there; in a
+  timed storm the verdict should wait while the dialog is open. Next day, the card shows the note
+  only after it is answered, on both devices after a sync.
+
 ## Every page looked over for layout (§5.88)
 
 - Phone: no page with a board scrolls sideways any more, and the coordinates sit inside the
@@ -144,7 +153,7 @@ fixes them and updates this file.
 
 - Desktop: the ✎ and ⋯ buttons are gone from the move buttons (right-click a move for its menu;
   right-drag on the board to draw). The phone still has both.
-- "Add alternative…" in the menu of an own move in a repertoire chapter (§5.90; was a card panel):
+- "Add alternative…" in the menu of an own move in a repertoire chapter (§5.91; was a card panel):
   the board shows the position before the move, the move you play is saved as an alternative (and
   listed in that menu as "Remove alternative …"). Checked by tests on a desktop and an emulated phone only. On the phone, is tapping a
   piece and its square on that board as natural as in training?
@@ -272,7 +281,7 @@ explorer's Eval column too far from the move (§5.67).
 
 - §5.18: alternative moves (desktop and phone): a wrong move saved as an alternative from the
   training screen, taken back for free when played again on another line or another day (and on
-  the other device after a sync), listed in the move's menu in the study and removed there (§5.90).
+  the other device after a sync), listed in the move's menu in the study and removed there (§5.91).
 
 ## Phase 2
 

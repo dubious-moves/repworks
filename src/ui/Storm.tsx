@@ -39,6 +39,7 @@ import {
   stopGathering,
   stormHome,
   stormPrefs,
+  stormMistakeCard,
   stormMistakeSaved,
   stormSession,
   stormEntry,
@@ -67,6 +68,7 @@ import { Board } from './Board.tsx';
 import { useWakeLock } from './Train.tsx';
 import { collect, fillBodies, puzzlePrefs, puzzleState, refreshPuzzles, setPuzzlePrefs, SHARD_MB, SHARES, SHARDS_PER_COLLECT, stopPuzzles, WORKING_SET } from '../app/puzzles.ts';
 import { Back } from './Back.tsx';
+import { NoteButton } from './CardNote.tsx';
 
 const PUZZLE_WORD: Record<string, string> = { great: 'Solved', blunder: 'Not the solution', unanswered: 'Not answered' };
 const BAND_WORD: Record<string, string> = { great: 'Great', good: 'Good', ok: 'Inaccuracy', bad: 'Mistake', blunder: 'Blunder', unknown: 'No verdict', unanswered: 'Not answered' };
@@ -776,7 +778,8 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
   useEffect(() => setDraw(false), [sketch]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      // A card's note being written (§5.91) takes every key.
+      if (e.ctrlKey || e.metaKey || e.altKey || document.querySelector('dialog[open]')) return;
       const now = stormSession.peek();
       if (!now || now.phase === 'done') return;
       if (e.key === 'Escape') endStorm('stop');
@@ -912,7 +915,9 @@ function MaiaNote(props: { p: StoredPosition; elo: number }) {
 /** "Save as a mistake" (§5.74): the position into the game cards, whether or not it was answered well. */
 function SaveMistake(props: { item: StormItem }) {
   const saved = stormMistakeSaved(props.item);
+  const card = saved ? stormMistakeCard(props.item) : undefined;
   return (
+    <>
     <button
       type="button"
       class="secondary"
@@ -923,6 +928,8 @@ function SaveMistake(props: { item: StormItem }) {
     >
       {saved ? 'Saved as a mistake' : 'Save as a mistake'}
     </button>
+    {card && <NoteButton {...card} onOpen={pauseVerdict} />}
+    </>
   );
 }
 
@@ -960,7 +967,7 @@ function Review(props: { s: StormSession; scope: StormScopeData }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = (e.target as HTMLElement | null)?.tagName;
-      if (t === 'SELECT' || t === 'INPUT' || t === 'TEXTAREA' || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (t === 'SELECT' || t === 'INPUT' || t === 'TEXTAREA' || e.ctrlKey || e.metaKey || e.altKey || document.querySelector('dialog[open]')) return;
       const now = stormSession.peek();
       if (e.key === 'b') toggleShown(at);
       else if (e.key === 't') retryFromReview(now?.retry ? undefined : at);

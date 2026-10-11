@@ -24,7 +24,8 @@ import { whiteShare } from '../core/engine/winning.ts';
 import { makeSan } from 'chessops/san';
 import { closeReviewLine, reviewLine, reviewLineMove, reviewLineStep, reviewLineToAlt, reviewLineToMain, showBestLine, showRefutation } from '../app/reviewLine.ts';
 import { EngineLinePanel, formatCp } from './EngineLinePanel.tsx';
-import { practiceMistakeItem, practiceMistakeSaved } from '../core/games/saved.ts';
+import { practiceMistakeItem, practiceMistakeOf, practiceMistakeSaved } from '../core/games/saved.ts';
+import { NoteButton } from './CardNote.tsx';
 import { practiceTacticItem, tacticSaved, type DetectedTactic } from '../core/games/detect.ts';
 import { nextLine, playReply, playUser, repliesDue, startTactic, type TacticRun } from '../core/games/tactic.ts';
 import { gameCard } from '../core/progress/cards.ts';
@@ -471,7 +472,7 @@ export function PracticeReview(props: { game: PracticeGame; onNext?: (() => void
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = (e.target as HTMLElement | null)?.tagName;
-      if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return;
+      if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT' || document.querySelector('dialog[open]')) return;
       const lineOpen = !!reviewLine.peek()?.line;
       if (e.key === 'ArrowLeft') lineOpen ? reviewLineStep(-1) : go(at - 1);
       else if (e.key === 'ArrowRight') lineOpen ? reviewLineStep(1) : go(at + 1);
@@ -686,7 +687,7 @@ export function PracticeReview(props: { game: PracticeGame; onNext?: (() => void
     const c = mv.classification ? CLASSIFICATION[mv.classification] : undefined;
     const dev = review.deviations.get(at);
     const tried = review.corrected.has(at) ? mv.repTried?.san : undefined;
-    const saved = practiceMistakeSaved(savedDeck.value, mv.fenBefore, mv.san);
+    const saved = practiceMistakeOf(savedDeck.value, mv.fenBefore, mv.san);
     const loss = (mv.wpDrop ?? 0) > 2;
     const bestSan = best ? sanOf(mv.fenBefore, mv.bestMoveUci) : undefined;
     const exact = mv.classification === 'best' || mv.classification === 'great';
@@ -731,9 +732,12 @@ export function PracticeReview(props: { game: PracticeGame; onNext?: (() => void
         {loss && (
           <div class="actions">
             {saved ? (
-              <button type="button" class="secondary" disabled>
-                ✓ Saved
-              </button>
+              <>
+                <button type="button" class="secondary" disabled>
+                  ✓ Saved
+                </button>
+                <NoteButton card={gameCard(saved.pid)} fen={mv.fenBefore} color={s.color} />
+              </>
             ) : (
               <button type="button" class="secondary" title="A practice mistake in your game cards" onClick={() => saveMistake(at)}>
                 💾 Save as a mistake

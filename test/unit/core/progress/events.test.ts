@@ -50,3 +50,13 @@ test('card IDs', () => {
   assert.equal(parseCard('r|key|castle'), undefined);
   assert.equal(parseCard('nonsense'), undefined);
 });
+
+test('a note (§5.91): on a game card, its text kept as written; anything else refused', () => {
+  const note: KnownEvent = { v: 1, n: 1, t: '2026-10-11T10:00:00.000Z', k: 'note', card: 'm|g1_12', text: 'Bxf7+? (12. Bxf7+ Kxf7) [%cal Rc4f7]' };
+  const line = formatEvent(note);
+  assert.equal(line, '{"v":1,"n":1,"t":"2026-10-11T10:00:00.000Z","k":"note","card":"m|g1_12","text":"Bxf7+? (12. Bxf7+ Kxf7) [%cal Rc4f7]"}');
+  const bad = ['{"v":1,"n":2,"t":"2026-10-11T10:00:00.000Z","k":"note","card":"r|x|e2e4","text":"x"}', '{"v":1,"n":3,"t":"2026-10-11T10:00:00.000Z","k":"note","card":"m|g1_12"}'];
+  const { lines, problems } = parseLog([line, ...bad].join('\n'));
+  assert.deepEqual(lines.map((l) => l.event), [note]);
+  assert.deepEqual(problems.map((p) => p.reason), ['card must be a game card (m|…)', 'text must be a string']);
+});

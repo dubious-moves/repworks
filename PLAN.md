@@ -5619,3 +5619,34 @@ and could not be resized.
 Tests: `editor.spec.ts` (the menu's items), `train.spec.ts` (the card and suspend from the menu),
 `alternatives.spec.ts` (add, cancel, remove from the menu), `views.spec.ts` (the ☰ menu's items,
 Copy FEN), `plans.spec.ts`, `analysis.spec.ts` and `back.spec.ts` (from ☰).
+
+#### 5.91 A note on a game card: words, arrows and lines (the owner's request, 2026-10-11)
+
+The owner: when saving a mistake, a comment on its position, with arrows and clickable lines, to
+show why certain moves don't work. Shown after the card is answered (the owner's choice: before,
+it would give the move away).
+- **Stored as a PGN comment, in a `note` event** on the game card (`m|<pid>`, any kind: a game's
+  mistake or tactic, a practice or storm mistake, a sequence): `text` is the comment, the words
+  with `(12. Bxf7+ Kxf7)` groups for lines, then `[%csl …][%cal …]` as Lichess writes them (D3:
+  notes are PGN comments). The latest note is the card's; '' removes it. Older builds skip the
+  kind. Mistakes themselves stay JSON items (`saved` events, the analyzer's games), not PGN.
+- **Written in a dialog** on the card's position: arrows and circles drawn on its board
+  (right-drag with Lichess's modifiers; ✎ and the four colours on a touch screen); moves played on
+  it make a line, which "Add to the note" writes into the words with its move numbers; the words
+  tidied as a study comment is (`sanitizeComment`). "✎ Add a note" / "✎ Edit the note" is on the
+  trainer's card once answered, and beside "Saved" when a practice game's mistake or a storm
+  position is saved (opening it holds a timed storm's verdict). "Delete the note" removes it.
+- **Shown in the trainer** once the card is answered (found, shown, or not judged): the words
+  under the verdict, each line clickable (the comment lines of §5.12, starting at the card's
+  position; ← → step, Escape or a click on the board ends it); "The note's arrows" turns the board
+  back to the card's position with them, and back.
+- Core: `core/games/notes.ts` (`noteOf`, `noteComment`), the `note` kind in `events.ts`; app:
+  `app/notes.ts`; UI: `ui/CardNote.tsx`.
+
+Tests: `events.test.ts` (the kind formatted, read, refused off a game card), `notes.test.ts` (the
+comment written, the latest note read, a line from the card's position); `games.spec.ts` (desktop
+and phone: not before the answer, a line played and added, an arrow drawn, shown, its line
+stepped on the board, the arrows, synced as one comment, edited and deleted); `storm.spec.ts` (a
+note written as a storm position is saved, synced).
+
+Live: TESTING.md.
