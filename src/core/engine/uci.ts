@@ -90,6 +90,12 @@ export function pvToSan(pos: Position, pv: readonly string[]): string[] {
 }
 
 /** A score as Qchess writes it: `+0.38`, `-1.20`, `0.00`, `#3`, `-#2`, and `#0` for mated. */
+/** The eval bar's number, as Chess.com writes it: the leader's lead in pawns to one decimal, or `M3` for a mate; whose lead it is shows by where it stands. */
+export function barScore(score: Score): string {
+  if (score.mate !== undefined) return `M${Math.abs(score.mate)}`;
+  return (Math.abs(score.cp) / 100).toFixed(1);
+}
+
 export function formatScore(score: Score): string {
   if (score.mate !== undefined) return score.mate < 0 ? `-#${-score.mate}` : `#${score.mate}`;
   const pawns = score.cp / 100;

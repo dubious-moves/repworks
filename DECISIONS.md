@@ -1516,6 +1516,7 @@ The technical calls, each with its reason:
   width, the training screen its own grid. The board pages keep to a centred 1600px column, the
   installed desktop app has no top bar, and the sync status moved to the footer, quiet unless
   something is wrong. A trial, for the owner to judge.
-- **Second round, the same day:** the study's chapter list keeps to 280px with empty room before
-  the board, the eval bar left of the board; the explorer's counts short (k, M, B), its columns
+- **Second round, the same day:** the eval bar left of the board, Chess.com's width with its
+  number, the chapter list filling the rest of its side but only as tall as its chapters (a
+  280px list with empty room before the board was tried first and dropped); the explorer's counts short (k, M, B), its columns
   each hideable (a per-device setting), Move and Eval narrower.

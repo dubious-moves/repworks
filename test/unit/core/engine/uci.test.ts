@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Chess } from 'chessops/chess';
 import { parseFen } from 'chessops/fen';
-import { formatScore, parseBestmove, parseInfo, pvToSan } from '../../../../src/core/engine/uci.ts';
+import { barScore, formatScore, parseBestmove, parseInfo, pvToSan } from '../../../../src/core/engine/uci.ts';
 
 const pos = (fen: string) => Chess.fromSetup(parseFen(fen).unwrap()).unwrap();
 
@@ -52,4 +52,8 @@ test('scores written as Qchess writes them', () => {
   assert.equal(formatScore({ cp: 0 }), '0.00');
   assert.equal(formatScore({ mate: 3 }), '#3');
   assert.equal(formatScore({ mate: -2 }), '-#2');
+});
+
+test('the eval bar’s number: the lead to one decimal, or M and the moves to mate', () => {
+  assert.deepEqual([{ cp: 20 }, { cp: -150 }, { cp: 0 }, { cp: 1234 }, { mate: 3 }, { mate: -2 }].map((s) => barScore(s as Parameters<typeof barScore>[0])), ['0.2', '1.5', '0.0', '12.3', 'M3', 'M2']);
 });

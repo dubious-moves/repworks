@@ -5682,10 +5682,13 @@ judged live:
   sync error or GitHub's limit turn it into the amber chip. It still syncs on a click.
 
 **Second round (the owner's notes, 2026-10-11, on the deployed trial):**
-- **The study's chapter list at its own width** (up to 280px) at the left side's outer edge; the
-  room between it and the board is left empty (a trial: the owner wasn't sure how it looks), and
-  the **eval bar moves to the board's left** there, from 1150px (it stays right of the board from
-  900 to 1149px, where nothing is on the left).
+- **The eval bar on the board's left** from 1150px, as wide as Chess.com's (24px) with its
+  number: the leader's lead to one decimal (`0.2`) or `M3`, at the leader's end, inside its colour
+  (`barScore`); 10px from the board and from the chapter list, which fills the rest of its side
+  (a narrower list with empty room before the board was tried and dropped the same day). From
+  900 to 1149px it stays the thin strip right of the board. The chapter list is only as tall as
+  its chapters, "+ New chapter" at its foot. The stage's board is a multiple of 8px, as
+  chessground draws its squares, so the bar is exactly as tall as they are.
 - **The explorer:** counts short, three figures and k, M or B (`formatCount`: 900k, 2.51M,
   1.52B); **each column can be hidden** in the explorer's settings ("Columns shown": Eval, Share,
   Games, Score, Ml, Ms; Move always shows, Prac is the Practical column's own switch), kept per

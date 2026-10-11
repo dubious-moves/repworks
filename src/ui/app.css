@@ -1692,7 +1692,9 @@ table.cards td {
   .cv-grid,
   .train-frame > .train-body {
     --panel-min: clamp(320px, 33cqw, 400px);
-    --board: min(100cqh - 34px, 100cqw - var(--panel-min) - 200px - 32px, var(--board-size, 100vw));
+    /* A multiple of 8px, as chessground draws its squares: the board's box is then the squares'
+       own, and the eval bar beside it as tall as they are. */
+    --board: round(down, min(100cqh - 34px, 100cqw - var(--panel-min) - 200px - 32px, var(--board-size, 100vw)), 8px);
     --panel: max(var(--panel-min), (100cqw - var(--board) - 32px) / 2);
     --side: calc(100cqw - var(--board) - var(--panel) - 32px);
     display: grid;
@@ -1784,12 +1786,14 @@ table.cards td {
     font-size: 1rem;
   }
 
-  /* The chapters at their own width at the side's outer edge, the room between them and the
-     board left empty, the eval bar in it (the owner's notes, 2026-10-11: a trial). */
+  /* The chapters fill their side, as tall as the list (the owner's notes, 2026-10-11); with the
+     engine on, they leave the eval bar its room and a gap either side of it. */
   .cv-chapters {
     grid-area: side;
     justify-self: start;
-    width: min(100%, 280px);
+    align-self: start;
+    width: 100%;
+    max-height: 100%;
     display: flex;
     flex-direction: column;
     min-height: 0;
@@ -3182,10 +3186,58 @@ a.button.primary {
   }
 }
 
-/* On the stage, left of the board, where the side's room is (the owner's notes, 2026-10-11). */
+/* On the stage, left of the board, as wide as Chess.com's with its number at the leader's end,
+   a gap on either side (the owner's notes, 2026-10-11). */
+.eval-num {
+  display: none;
+}
+
 @media (min-width: 1150px) {
+  .cv-grid {
+    --eval-w: 24px;
+    --eval-gap: 10px;
+  }
+
   .eval-bar {
-    left: -12px;
+    left: calc(-1 * (var(--eval-w) + var(--eval-gap)));
+    width: var(--eval-w);
+    border-radius: 3px;
+  }
+
+  .cv-grid:has(.eval-bar) .cv-chapters {
+    width: calc(100% + 16px - var(--eval-w) - 2 * var(--eval-gap));
+  }
+
+  .eval-num {
+    display: block;
+    position: absolute;
+    left: 0;
+    right: 0;
+    font: 600 0.62rem/1 var(--font);
+    text-align: center;
+    letter-spacing: -0.02em;
+  }
+
+  /* White's end is the bottom, or the top with the board turned; the number sits inside the
+     leader's colour. */
+  .eval-num.lead-white {
+    bottom: 5px;
+    color: #333; /* fixed */
+  }
+
+  .eval-num.lead-black {
+    top: 5px;
+    color: #ddd; /* fixed */
+  }
+
+  .eval-bar.flipped .eval-num.lead-white {
+    top: 5px;
+    bottom: auto;
+  }
+
+  .eval-bar.flipped .eval-num.lead-black {
+    top: auto;
+    bottom: 5px;
   }
 }
 

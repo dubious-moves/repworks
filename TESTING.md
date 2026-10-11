@@ -14,8 +14,9 @@ fixes them and updates this file.
   as wide as the right panel) good at that width?
 - The installed app on the desktop: no top bar, and the window's title bar in the page's dark
   colour, not green (with any theme, Settings → look). Is the content's distance from it right?
-- The study on the desktop: the chapter list narrower with empty room before the board, and the
-  eval bar left of the board. Does the empty room look wrong?
+- The study on the desktop with the engine on: the wider eval bar left of the board, its number
+  at the leading side's end (try a position where Black is better, and a turned board); the
+  chapter list only as tall as its chapters.
 - The explorer: short counts (872M, 1.39B), Move narrower, columns hidden and shown again from
   ⚙ → Columns shown. With Maia on, does everything fit without the sideways scrollbar?
 - The sync status in the footer's right: quiet while synced; offline (DevTools) it turns amber.

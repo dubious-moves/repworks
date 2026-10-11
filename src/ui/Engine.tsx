@@ -10,7 +10,7 @@ import { analysis, enginePrefs, engineStatus, goDeeper, retryEngine, runningThre
 import { previewOf, showLine } from '../app/preview.ts';
 import type { Analysis, EngineLine } from '../core/engine/search.ts';
 import { engineArrows, type EngineArrow } from '../core/engine/shapes.ts';
-import { formatScore } from '../core/engine/uci.ts';
+import { barScore, formatScore } from '../core/engine/uci.ts';
 import { whiteShare } from '../core/engine/winning.ts';
 import { makeSanAndPlay } from 'chessops/san';
 import { parseUciMove } from '../core/chess/uci.ts';
@@ -183,10 +183,16 @@ function LineRow(props: { line: EngineLine; start: Position; threat: boolean }) 
 export function EvalBar(props: { orientation: 'white' | 'black' }) {
   const shown = useShown();
   if (!enginePrefs.value.on || threat.value || !shown || !shown.a.lines[0]) return null;
-  const share = whiteShare(shown.a.lines[0].score);
+  const score = shown.a.lines[0].score;
+  const share = whiteShare(score);
+  // The number at the leader's end, inside its colour (Chess.com's); White's at an even score.
+  const whiteLeads = score.mate !== undefined ? score.mate > 0 : score.cp >= 0;
   return (
-    <div class={`eval-bar${props.orientation === 'black' ? ' flipped' : ''}`} role="img" aria-label={`Eval ${formatScore(shown.a.lines[0].score)}`} data-white={share.toFixed(1)}>
+    <div class={`eval-bar${props.orientation === 'black' ? ' flipped' : ''}`} role="img" aria-label={`Eval ${formatScore(score)}`} data-white={share.toFixed(1)}>
       <div class="eval-white" style={{ flexBasis: `${share}%` }} />
+      <span class={`eval-num ${whiteLeads ? 'lead-white' : 'lead-black'}`} aria-hidden="true">
+        {barScore(score)}
+      </span>
     </div>
   );
 }
