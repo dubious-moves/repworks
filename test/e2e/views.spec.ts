@@ -36,6 +36,13 @@ async function fromMenu(page: Page, name: string) {
   await page.getByRole('menuitem', { name }).click();
 }
 
+/** The Read view of the line through the move shown (no longer in the move menu since §5.90; training opens it). */
+async function readFromHere(page: Page) {
+  const path = await page.locator('.notation .move.current').getAttribute('data-path');
+  const [, sid, cid] = /#\/study\/([^/]+)\/([^/?]+)/.exec(page.url())!;
+  await page.evaluate((h) => (location.hash = h), `#/read/${sid}/${cid}?at=${path!.split(' ').join(',')}`);
+}
+
 /** Progress files this device wrote (the fixture's devices excluded). */
 const ownProgress = (git: FakeGit) => [...git.textsOf().keys()].filter((p) => p.startsWith('progress/') && !p.startsWith('progress/Desktop1/') && !p.startsWith('progress/Phone001/'));
 
@@ -43,7 +50,7 @@ test('read: a line stepped through with its comments, then back to the chapter a
   await setUp(page);
   await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf`);
   await page.locator('.move[data-path="e4"]').click({ position: { x: 6, y: 8 } }); // the move, not its +1
-  await fromMenu(page, 'Read from here');
+  await readFromHere(page);
   await expect(page).toHaveURL(/#\/read\/Rep0Najd\/Ch1Najdf\?at=e4$/);
   await expect(page.locator('.study-title')).toHaveText('Read · Main line');
   const move = page.locator('.read-move');
@@ -72,7 +79,7 @@ test('read: a line stepped through with its comments, then back to the chapter a
 
   // From a variation's move, the line goes through it.
   await page.locator('.move[data-path="e4 c5 Nf3 Nc6"]').click();
-  await fromMenu(page, 'Read from here');
+  await readFromHere(page);
   await expect(move).toContainText('2... Nc6');
   await expect(move).toContainText('4 / 5');
 });
@@ -242,7 +249,7 @@ test('copy continuation: from the variation’s first move to the end of its lin
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('2... d6 3. d4 cxd4');
 });
 
-test('copy FEN: the board’s position from the ☰ menu and from the move menu (the owner’s request, 2026-10-08)', async ({ page, context, browserName }) => {
+test('copy FEN: the board’s position from the ☰ menu (the owner’s request, 2026-10-08)', async ({ page, context, browserName }) => {
   test.skip(browserName !== 'chromium', 'clipboard permissions are Chromium-only here');
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await setUp(page);
@@ -252,9 +259,9 @@ test('copy FEN: the board’s position from the ☰ menu and from the move menu 
   await studyMenu(page, 'Copy FEN');
   await expect(page.locator('.cv-board .feedback')).toHaveText('FEN copied');
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(after);
+  // The move menu has no Copy FEN since §5.90: the ☰ menu's copies the move shown.
   await page.locator('.move[data-path="e4 c5 Nf3"]').click();
-  await openMoveMenu(page);
-  await page.getByRole('menuitem', { name: 'Copy FEN' }).click();
+  await studyMenu(page, 'Copy FEN');
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2');
   // The analysis board copies the position shown, not its start.
   await page.goto(`${site.url}#/analysis?fen=${encodeURIComponent(after)}`);
@@ -278,7 +285,7 @@ test('the ☰ menu: the explorer, undo and redo, Copy FEN, the study’s own; th
   await more.click();
   await expect(more).toHaveAttribute('aria-expanded', 'true');
   await expect(menu.getByRole('menuitemcheckbox')).toHaveAccessibleName('Explorer');
-  await expect(menu.getByRole('menuitem')).toHaveText([/^↶Undo/, /^↷Redo/, 'Copy FEN', '+New chapter…', 'Chapter settings…', 'Study settings…']);
+  await expect(menu.getByRole('menuitem')).toHaveText([/^↶Undo/, /^↷Redo/, 'Copy FEN', 'Analyse from here', 'Storm from here', 'Practise from here', '+New chapter…', 'Chapter settings…', 'Study settings…']);
   await expect(menu.getByRole('menuitem', { name: 'Undo' })).toBeDisabled();
   await expect(menu.getByRole('menuitem', { name: 'Redo' })).toBeDisabled();
   // ☰ again closes it, as Escape does; the keys move along the line again afterwards.
@@ -393,7 +400,7 @@ test('line jumping: → on a line’s last move enters its comment’s line, in 
   await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 d6 d4 cxd4');
 
   // The Read view: the line's end, then into the comment; Escape leaves the line, then the view.
-  await fromMenu(page, 'Read from here');
+  await readFromHere(page);
   await expect(page.locator('.read-move')).toContainText('3... cxd4');
   await expect(page.locator('.read-comments .line-move')).toHaveText(['Nxd4', 'Nf6', 'Nc3']);
   await page.keyboard.press('ArrowRight');

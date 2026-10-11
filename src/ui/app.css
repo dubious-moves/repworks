@@ -1201,6 +1201,19 @@ textarea.script {
   margin-top: 8px;
 }
 
+/* Only the conflicts at the move shown are left here (§5.90). */
+.cv-tools:empty {
+  display: none;
+}
+
+/* Picking an alternative from a move's menu (MoveCard.tsx). */
+.alt-adding {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 0;
+}
+
 /* The move menu and the comment dialog, after Qchess's (read live, 2026-10-06). */
 
 .notation .move,
@@ -1266,6 +1279,14 @@ textarea.script {
   margin: 4px 0;
   border: 0;
   border-top: 1px solid rgb(var(--ink) / 12%);
+}
+
+.move-menu .menu-note {
+  max-width: 260px;
+  margin: 2px 0 4px;
+  padding: 0 16px;
+  font-size: 0.8rem;
+  color: var(--muted);
 }
 
 .move-menu kbd {

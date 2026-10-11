@@ -1524,7 +1524,7 @@ by drag at the pace, reading the feedback, the wake lock, the time a session tak
 - `src/ui/TrainCard.tsx`: the home screen's "Train: 1 due · 3 new", the moves whose learning
   step ends later today ("2 more today from 14:00"), the known pool, and orphaned cards. The
   study list has a Train link per repertoire study.
-- `src/ui/CardPanel.tsx`: in the chapter view, for an own move of a repertoire chapter: new,
+- `src/ui/CardPanel.tsx` (since §5.90 `MoveCard.tsx`, in the move's menu): in the chapter view, for an own move of a repertoire chapter: new,
   learning (with its first review's time), or its due date and reviews; whether it is played
   for the user; how many other places reach the same card; and the suspend toggle.
 - The debug panel gains the repertoire's size, the index build time (§5.1's live check), the
@@ -5597,3 +5597,25 @@ From a phone screenshot of a study.
 
 Tests: `views.spec.ts` (the bar's buttons; the picker's, ←'s and the switch's bottom edges on a
 phone).
+
+#### 5.90 The owner's notes of 2026-10-11: the card panel into the move's menu
+
+The panel beside the notation holding "Always play this for me" and "Add alternative" was tiny
+and could not be resized.
+- **The panel is gone; an own move's card is in its menu** (right-click or long-press the move in
+  a repertoire chapter): a muted line on where the card stands (new, learning, due, reviews,
+  played for you, met elsewhere), then "Always play this for me" (or "Ask me this move again"),
+  "Add alternative…", and "Remove alternative <move>" for each saved alternative there.
+- **Picking an alternative** shows, under the board, "Play the alternative on the board." with
+  Cancel (Escape, or another move shown, cancels too).
+- **Out of the move's menu:** "Copy FEN" (in ☰ already) and "Read from here" (training's Read
+  button still opens Read). **Into ☰**, between Copy FEN and the study's own, for the move shown:
+  "Analyse from here", "Storm from here" (repertoire chapters), "Practise from here", and "Make a
+  plan card" / "Remove the plan card" (where the position has comments or arrows). The move's
+  menu keeps Comment, the line edits, the copies and "Quiz from here".
+- The tools area under the notation now holds only the conflicts at the move shown, and is
+  hidden when there are none.
+
+Tests: `editor.spec.ts` (the menu's items), `train.spec.ts` (the card and suspend from the menu),
+`alternatives.spec.ts` (add, cancel, remove from the menu), `views.spec.ts` (the ☰ menu's items,
+Copy FEN), `plans.spec.ts`, `analysis.spec.ts` and `back.spec.ts` (from ☰).

@@ -7,7 +7,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import type { FakeGit } from '../support/fakeGit.ts';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
-import { clickSquare } from './board.ts';
+import { clickSquare, openMoveMenu } from './board.ts';
 import { serveGithub, world } from './github.ts';
 import { serveSite, type SiteServer } from './server.ts';
 import { walkOnce } from './prefs.ts';
@@ -164,20 +164,27 @@ test('the chapter view shows the move’s card and toggles its suspend; the debu
   await expect(page.locator('.repertoire-conflicts li')).toHaveText(['Test repertoire: e4 c5 Nf3 → d6, Nc6']);
 
   await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf`);
-  await page.locator('.move[data-path="e4 c5"]').click({ position: { x: 6, y: 8 } }); // the move, not its +1
-  const panel = page.getByRole('region', { name: 'Training card' });
-  await expect(panel).toContainText('Due');
-  await expect(panel).toContainText('2 reviews');
-  await expect(panel).toContainText('Also met in 1 other place');
+  // The card is in the move's menu (§5.90): where it stands, and its items.
+  const note = page.getByRole('menu', { name: 'Move' }).locator('.menu-note');
+  await openMoveMenu(page, 'e4 c5');
+  await expect(note).toContainText('Due');
+  await expect(note).toContainText('2 reviews');
+  await expect(note).toContainText('Also met in 1 other place');
+  await page.keyboard.press('Escape');
   // White's move makes no card here (a Black chapter).
-  await page.locator('.move[data-path="e4 c5 Nf3"]').click();
-  await expect(panel).toHaveCount(0);
-  await page.locator('.move[data-path="e4 c5 Nf3 d6"]').click();
-  await expect(panel).toContainText('Always played for you');
-  await panel.getByRole('button', { name: 'Ask me this move again' }).click();
-  await expect(panel).toContainText('New: not learned yet');
-  await panel.getByRole('button', { name: 'Always play this for me' }).click();
-  await expect(panel).toContainText('Always played for you');
+  await openMoveMenu(page, 'e4 c5 Nf3');
+  await expect(note).toHaveCount(0);
+  await expect(page.getByRole('menuitem', { name: 'Add alternative…' })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await openMoveMenu(page, 'e4 c5 Nf3 d6');
+  await expect(note).toContainText('Always played for you');
+  await page.getByRole('menuitem', { name: 'Ask me this move again' }).click();
+  await openMoveMenu(page);
+  await expect(note).toContainText('New: not learned yet');
+  await page.getByRole('menuitem', { name: 'Always play this for me' }).click();
+  await openMoveMenu(page);
+  await expect(note).toContainText('Always played for you');
+  await page.keyboard.press('Escape');
   await page.locator('.chip').click();
   await expect.poll(() => pushed(git).map((e) => e['k'])).toEqual(['unsuspend', 'suspend']);
 });

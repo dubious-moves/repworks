@@ -4,7 +4,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
 import type { FakeGit } from '../support/fakeGit.ts';
-import { clickSquare, openMoveMenu } from './board.ts';
+import { clickSquare, studyMenu } from './board.ts';
 import { commands, fakeEngine } from './engine.ts';
 import { serveGithub, world } from './github.ts';
 import { serveSite, type SiteServer } from './server.ts';
@@ -69,16 +69,16 @@ test('from a chapter’s move: a line played there and added back to the chapter
   await page.getByRole('link', { name: 'Test repertoire', exact: true }).click();
   await expect(page.locator('.notation')).toContainText('A made-up comment');
   // The board keeps the chapter's side (Black) even with White to move (the owner's request, 2026-10-08).
-  await openMoveMenu(page, 'e4 c5');
-  await page.getByRole('menuitem', { name: 'Analyse from here' }).click();
+  await page.locator('.move[data-path="e4 c5"]').click({ position: { x: 6, y: 8 } }); // the move, not its +1
+  await studyMenu(page, 'Analyse from here');
   await expect(page).toHaveURL(/#\/analysis\?fen=.*&from=Rep0Najd\/Ch1Najdf&at=e4,c5&side=black$/);
   await expect(page.locator('.cg-wrap')).toHaveClass(/orientation-black/);
   // …and so does practising from it: Black is played, White moves first.
   await page.getByRole('button', { name: 'Practise' }).click();
   await expect(page).toHaveURL(/#\/practice\?fen=.*&side=black$/);
   await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf`);
-  await openMoveMenu(page, 'e4 c5 Nf3');
-  await page.getByRole('menuitem', { name: 'Analyse from here' }).click();
+  await page.locator('.move[data-path="e4 c5 Nf3"]').click();
+  await studyMenu(page, 'Analyse from here');
   await expect(page).toHaveURL(/#\/analysis\?fen=.*&from=Rep0Najd\/Ch1Najdf&at=e4,c5,Nf3&side=black$/);
   // Black to move after 2. Nf3: the board from Black's side; 2... e6 3. d4 played.
   await expect(page.locator('.cg-wrap')).toHaveClass(/orientation-black/);

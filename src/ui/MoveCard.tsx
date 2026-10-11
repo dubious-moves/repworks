@@ -1,8 +1,9 @@
-// The card of the move shown (PLAN.md §5.7): for an own move of a repertoire chapter, where its
-// card stands (new, learning, due, reviewed) and the suspend toggle, "Always play this for me";
-// and the alternatives saved for its position (§5.18), each removed by its ✕. They are saved in
-// training, after a wrong move, or here: "Add alternative" shows the position before the move and
-// saves the move played on the board, which is not written into the study.
+// The card of an own move in a repertoire chapter (PLAN.md §5.7, §5.90), in the move's menu: where
+// it stands (new, learning, due, reviewed), the suspend toggle "Always play this for me", and the
+// alternatives saved for its position (§5.18), each removable. They are saved in training, after
+// a wrong move, or here: "Add alternative" shows the position before the move and saves the move
+// played on the board, which is not written into the study. (A panel beside the notation held
+// these until §5.90.)
 import { signal } from '@preact/signals';
 import { decidingNow } from '../app/time.ts';
 import { parseSan } from 'chessops/san';
@@ -52,15 +53,21 @@ export function addAlternative(path: Path, m: Move): void {
   altAdding.value = undefined;
 }
 
-export function CardPanel() {
+/** A menu item of the move's card. */
+export interface CardItem {
+  label: string;
+  run: () => void;
+}
+
+/** The card of the own move at `path`, for its menu: a line on where it stands, and its items. */
+export function moveCard(path: Path): { note: string; items: CardItem[] } | undefined {
   const c = chapter.value;
-  const path = at.value;
   const data = trainData.value;
-  if (!c || !data || path.length === 0 || study.value?.meta.kind !== 'repertoire') return null;
+  if (!c || !data || path.length === 0 || study.value?.meta.kind !== 'repertoire') return undefined;
   const before = positionAt(c, path.slice(0, -1));
-  if (!before || before.turn !== side.value) return null;
+  if (!before || before.turn !== side.value) return undefined;
   const move = parseSan(before, path[path.length - 1]!);
-  if (!move || !isNormal(move)) return null;
+  if (!move || !isNormal(move)) return undefined;
   const key = positionKeyOf(before);
   const card = repertoireCard(key, standardUci(before, move));
   const alts = alternativesAt(data.alternatives, key).flatMap((uci) => {
@@ -72,49 +79,37 @@ export function CardPanel() {
   const due = dueAt(state, data.settings);
   const suspended = state?.suspended === true;
   const others = (data.index.cards.get(card)?.length ?? 1) - 1;
-  const toggle = () => void recordEvent({ t: new Date().toISOString(), k: suspended ? 'unsuspend' : 'suspend', card });
+  const note = [
+    status === 'fresh' ? 'New: not learned yet.' : status === 'learning' ? `Learning: first review ${due !== undefined ? when(due) : 'soon'}.` : `Due ${due !== undefined ? when(due) : '?'} · ${state!.reviews} review${state!.reviews === 1 ? '' : 's'}.`,
+    suspended ? 'Always played for you.' : '',
+    others > 0 ? `Also met in ${others} other place${others === 1 ? '' : 's'}.` : '',
+  ].filter(Boolean).join(' ');
+  const items: CardItem[] = [
+    {
+      label: suspended ? 'Ask me this move again' : 'Always play this for me',
+      run: () => void recordEvent({ t: new Date().toISOString(), k: suspended ? 'unsuspend' : 'suspend', card }),
+    },
+    { label: 'Add alternative…', run: () => ((altAdding.value = [...path]), (feedback.value = undefined)) },
+    ...alts.map((a) => ({
+      label: `Remove alternative ${a.san}`,
+      run: () => {
+        void recordEvent({ t: new Date().toISOString(), k: 'alt', card: repertoireCard(key, a.uci), on: false });
+        feedback.value = `${a.san} removed from the alternatives: it counts as a wrong move again`;
+      },
+    })),
+  ];
+  return { note, items };
+}
+
+/** Under the board while an alternative is being picked: what to do, and Cancel. */
+export function AltAdding() {
+  if (!altAdding.value || !samePath(altAdding.value, at.value)) return null;
   return (
-    <section class="node-panel card-panel" aria-label="Training card">
-      <p>
-        <strong>Your move.</strong>{' '}
-        {status === 'fresh' ? 'New: not learned yet.' : status === 'learning' ? `Learning: first review ${due !== undefined ? when(due) : 'soon'}.` : `Due ${due !== undefined ? when(due) : '?'} · ${state!.reviews} review${state!.reviews === 1 ? '' : 's'}.`}
-        {suspended && ' Always played for you.'}
-        {others > 0 && <span class="muted"> Also met in {others} other place{others === 1 ? '' : 's'}.</span>}
-      </p>
-      <button type="button" class="secondary" aria-pressed={suspended} onClick={toggle}>
-        {suspended ? 'Ask me this move again' : 'Always play this for me'}
+    <p class="alt-adding" role="status">
+      <span>Play the alternative on the board.</span>{' '}
+      <button type="button" class="secondary" onClick={() => (altAdding.value = undefined)}>
+        Cancel
       </button>
-      {altAdding.value && samePath(altAdding.value, path) ? (
-        <p class="card-alts" role="status">
-          <span class="muted">Play the alternative on the board.</span>{' '}
-          <button type="button" class="secondary" onClick={() => (altAdding.value = undefined)}>
-            Cancel
-          </button>
-        </p>
-      ) : (
-        <button type="button" class="secondary" onClick={() => (altAdding.value = [...path])}>
-          Add alternative…
-        </button>
-      )}
-      {alts.length > 0 && (
-        <p class="card-alts">
-          <span class="muted">Alternatives here:</span>{' '}
-          {alts.map((a) => (
-            <span key={a.uci} class="card-alt">
-              {a.san}
-              <button
-                type="button"
-                class="icon"
-                aria-label={`Remove ${a.san} from the alternatives`}
-                title={`Remove ${a.san}: it counts as a wrong move again`}
-                onClick={() => void recordEvent({ t: new Date().toISOString(), k: 'alt', card: repertoireCard(key, a.uci), on: false })}
-              >
-                ✕
-              </button>
-            </span>
-          ))}
-        </p>
-      )}
-    </section>
+    </p>
   );
 }

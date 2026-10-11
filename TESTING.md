@@ -144,9 +144,9 @@ fixes them and updates this file.
 
 - Desktop: the ✎ and ⋯ buttons are gone from the move buttons (right-click a move for its menu;
   right-drag on the board to draw). The phone still has both.
-- "Add alternative…" in the card panel of an own move in a repertoire chapter: the board shows the
-  position before the move, the move you play is saved as an alternative (and listed there; ✕
-  removes it). Checked by tests on a desktop and an emulated phone only. On the phone, is tapping a
+- "Add alternative…" in the menu of an own move in a repertoire chapter (§5.90; was a card panel):
+  the board shows the position before the move, the move you play is saved as an alternative (and
+  listed in that menu as "Remove alternative …"). Checked by tests on a desktop and an emulated phone only. On the phone, is tapping a
   piece and its square on that board as natural as in training?
 
 ## The owner's notes of 2026-10-07 (§5.67)
@@ -272,7 +272,7 @@ explorer's Eval column too far from the move (§5.67).
 
 - §5.18: alternative moves (desktop and phone): a wrong move saved as an alternative from the
   training screen, taken back for free when played again on another line or another day (and on
-  the other device after a sync), listed in the study's card panel and removed there.
+  the other device after a sync), listed in the move's menu in the study and removed there (§5.90).
 
 ## Phase 2
 

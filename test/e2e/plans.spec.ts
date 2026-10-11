@@ -3,7 +3,7 @@
 // in the game cards' session (Show plan, then Good), and removed from the same menu; the events synced.
 import { test, expect } from '@playwright/test';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
-import { openMoveMenu } from './board.ts';
+import { studyMenu } from './board.ts';
 import { serveGithub, world } from './github.ts';
 import { serveSite, type SiteServer } from './server.ts';
 
@@ -24,8 +24,7 @@ test('a plan card made from a move’s menu, reviewed with the game cards, and r
   await expect(page.locator('button.chip')).toHaveText(/^synced/);
   await page.evaluate(() => (location.hash = '#/study/Rep0Najd/Ch1Najdf?at=e4,c5,Nf3'));
   await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3');
-  await openMoveMenu(page);
-  await page.getByRole('menuitem', { name: 'Make a plan card' }).click();
+  await studyMenu(page, 'Make a plan card');
 
   await page.evaluate(() => (location.hash = '#/games'));
   await expect(page.getByTestId('games-queue')).toContainText('0 due · 1 new today');
@@ -42,8 +41,7 @@ test('a plan card made from a move’s menu, reviewed with the game cards, and r
 
   await page.evaluate(() => (location.hash = '#/study/Rep0Najd/Ch1Najdf?at=e4,c5,Nf3'));
   await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3');
-  await openMoveMenu(page);
-  await page.getByRole('menuitem', { name: 'Remove the plan card' }).click();
+  await studyMenu(page, 'Remove the plan card');
   await page.locator('button.chip').click();
   const log = () =>
     [...git.textsOf()]
