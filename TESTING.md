@@ -5,6 +5,12 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## The training screen's comments and line list (§5.93)
+- Train a line with comments: they shouldn't flash as the moves go by, only show after a wrong
+  move, at a taught or shown move, and at the line's end. At the end, click a move in a comment's
+  line and step with ← → (desktop); Escape goes back.
+- Starting a session (desktop too) folds the line list; "Show lines" opens it.
+
 ## A desktop layout trial (§5.92)
 - On the desktop, in a browser tab: the top bar's name, the ← and Study/Train, and the footer
   keep to one centred column. Does it feel better than the window's edges? Is 1600px the right
