@@ -40,7 +40,7 @@ export function SyncChip() {
   const s = syncStatus.value;
   const bad = s.phase === 'offline' || s.phase === 'auth' || s.phase === 'error' || s.phase === 'rate';
   return (
-    <button type="button" class={bad ? 'chip chip-warn' : 'chip'} onClick={syncNow} title={s.message ?? 'Sync now'} data-phase={s.phase}>
+    <button type="button" class={bad ? 'chip sync-chip chip-warn' : 'chip sync-chip'} onClick={syncNow} title={s.message ?? 'Sync now'} data-phase={s.phase}>
       {statusText(s)}
     </button>
   );

@@ -221,10 +221,13 @@ export function TrainScreen(props: { of: SessionKind }) {
         </button>
         <ModeSwitch current="train" {...(s.line || studyOf(s) ? { onStudy: toStudy } : {})} />
       </div>
-      <div class={`train-body${listed ? ' with-list' : ''}`}>
-        {listed && <Lines data={data} scope={s.scope} active={s.line && { sid: s.line.sid, cid: s.line.cid, path: s.line.path }} nothing={!!s.done && s.plan.lines.length === 0} />}
-        {/* A line's or a session's end keeps the board on its last position (§5.17). */}
-        <div class="train-main">{read !== undefined && s.line && s.chapter ? <ReadInSession s={s} line={s.line} ply={read} /> : s.done && !(s.position && s.plan.lines.length > 0) ? <Done s={s} /> : <Session s={s} />}</div>
+      {/* The frame the study's shares on a wide screen, so the board stays put on Study ↔ Train. */}
+      <div class="train-frame">
+        <div class={`train-body${listed ? ' with-list' : ''}`}>
+          {listed && <Lines data={data} scope={s.scope} active={s.line && { sid: s.line.sid, cid: s.line.cid, path: s.line.path }} nothing={!!s.done && s.plan.lines.length === 0} />}
+          {/* A line's or a session's end keeps the board on its last position (§5.17). */}
+          <div class="train-main">{read !== undefined && s.line && s.chapter ? <ReadInSession s={s} line={s.line} ply={read} /> : s.done && !(s.position && s.plan.lines.length > 0) ? <Done s={s} /> : <Session s={s} />}</div>
+        </div>
       </div>
     </div>
   );
@@ -772,49 +775,51 @@ export function TrainPick(props: { sid: string; cid: string; at: string[] }) {
         </button>
         <ModeSwitch current="train" onStudy={() => open({ name: 'chapter', sid, cid, at })} />
       </div>
-      <div class="train-body with-list">
-        <Lines data={data} scope={sid} active={line ? { sid, cid, path: line.path } : undefined} nothing={!line} />
-        <div class="train-main">
-          <div class="train-grid" data-phase="pick">
-            <div class="train-board">
-              {pos && (
-                <Board
-                  fen={makeFen(pos.toSetup())}
-                  orientation={chapter && header(chapter, 'Orientation') === 'black' ? 'black' : 'white'}
-                  turn={pos.turn}
-                  dests={new Map()}
-                  lastMove={lastMove}
-                  check={pos.isCheck()}
-                  shapes={[]}
-                  drawMode={false}
-                  brush="green"
-                  onMove={() => undefined}
-                />
-              )}
-              <p class="feedback train-feedback note-none" role="status">
-                {line ? 'Selected: start it when ready' : ''}
-              </p>
-            </div>
-            <div class="train-panel">
-              {line ? (
-                <p class="train-line">
-                  <strong>
-                    {name} · Line {lineNumber(data.index, line)}
-                  </strong>{' '}
-                  <span class="muted">{start ? numbered(start, line.path) : line.path.join(' ')}</span>
-                </p>
-              ) : (
-                <p class="train-line">This chapter has no lines to train: pick one from the list, or train today's queue.</p>
-              )}
-              <div class="actions train-actions">
-                {line && (
-                  <button type="button" onClick={go}>
-                    Train this line
-                  </button>
+      <div class="train-frame">
+        <div class="train-body with-list">
+          <Lines data={data} scope={sid} active={line ? { sid, cid, path: line.path } : undefined} nothing={!line} />
+          <div class="train-main">
+            <div class="train-grid" data-phase="pick">
+              <div class="train-board">
+                {pos && (
+                  <Board
+                    fen={makeFen(pos.toSetup())}
+                    orientation={chapter && header(chapter, 'Orientation') === 'black' ? 'black' : 'white'}
+                    turn={pos.turn}
+                    dests={new Map()}
+                    lastMove={lastMove}
+                    check={pos.isCheck()}
+                    shapes={[]}
+                    drawMode={false}
+                    brush="green"
+                    onMove={() => undefined}
+                  />
                 )}
-                <button type="button" class={line ? 'secondary' : undefined} onClick={() => open({ name: 'train', sid })}>
-                  Today's queue
-                </button>
+                <p class="feedback train-feedback note-none" role="status">
+                  {line ? 'Selected: start it when ready' : ''}
+                </p>
+              </div>
+              <div class="train-panel">
+                {line ? (
+                  <p class="train-line">
+                    <strong>
+                      {name} · Line {lineNumber(data.index, line)}
+                    </strong>{' '}
+                    <span class="muted">{start ? numbered(start, line.path) : line.path.join(' ')}</span>
+                  </p>
+                ) : (
+                  <p class="train-line">This chapter has no lines to train: pick one from the list, or train today's queue.</p>
+                )}
+                <div class="actions train-actions">
+                  {line && (
+                    <button type="button" onClick={go}>
+                      Train this line
+                    </button>
+                  )}
+                  <button type="button" class={line ? 'secondary' : undefined} onClick={() => open({ name: 'train', sid })}>
+                    Today's queue
+                  </button>
+                </div>
               </div>
             </div>
           </div>

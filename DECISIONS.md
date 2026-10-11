@@ -1508,3 +1508,11 @@ The technical calls, each with its reason:
   event and not a field of the saved item: a game's own mistakes have no `saved` event, a note is
   edited after saving, and older builds skip a kind they don't know. Shown only after the card is
   answered (the owner's choice).
+
+## Revision of 2026-10-11 (a desktop layout trial, PLAN.md §5.92)
+- **D21 on a wide screen: the board in the page's middle, between two sides of one width,** and
+  the study and the training screen sharing that frame, so the board keeps its place on
+  Study ↔ Train (the owner's request). Was: the chapter list 220px and the panel a third of the
+  width, the training screen its own grid. The board pages keep to a centred 1600px column, the
+  installed desktop app has no top bar, and the sync status moved to the footer, quiet unless
+  something is wrong. A trial, for the owner to judge.

@@ -5650,3 +5650,35 @@ stepped on the board, the arrows, synced as one comment, edited and deleted); `s
 note written as a storm position is saved, synced).
 
 Live: TESTING.md.
+
+#### 5.92 A desktop layout trial: a centred page, one stage for study and training (the owner's notes, 2026-10-11)
+
+The owner, on a 1920 px desktop: the head's and the top bar's ends anchored to the window's sides
+felt far apart; the board moved a little on Study ↔ Train; the installed app's top bar was thick
+under the window's own title bar; the sync chip drew the eye while all was well. A trial, to be
+judged live:
+- **One page column.** The top bar's, the banners', the content's and the footer's edges keep to
+  a centred column: 1100px on the pages of text and forms (as the content already did), 1600px on
+  the board pages (`--page-max`, `--gutter` on `.shell`).
+- **One stage from 1150px** (`.cv-grid` and `.train-frame > .train-body`, the same rule): the
+  board as large as the frame fits (its height less the feedback line's 34px) up to the size
+  chosen; on its left the chapters (study) or the lines (training), on its right the notation and
+  explorer (study) or the session's panel (training). The two sides take one width when the right
+  one gets at least its least, `clamp(320px, 33cqw, 400px)` (the explorer's Maia columns need
+  about 400px), so the board is in the page's middle from about 1600px wide; on a narrower desktop
+  the left side gives way (down to 200px) and the board sits a little left of it. The training
+  screen is as tall as the window, as the study is, its panel and line list scrolling on their
+  own; a session's end with no board takes the board's and the panel's place. Screens without a
+  line list (Play, the pins, retry) keep the left side empty, so the board is where it is
+  everywhere; so does the analysis board. Under 1150px nothing changed.
+- **The installed app on a desktop** (`display-mode: standalone` with a fine pointer, ≥900px)
+  has no top bar: the window's title bar, in the theme colour, shows the icon and the name.
+- **The sync status** sits in the footer's right on a desktop (≥900px), as muted as the build line
+  on its left, and in the top bar on the phone, without its outline. Offline, a refused token, a
+  sync error or GitHub's limit turn it into the amber chip. It still syncs on a click.
+
+Tests: `boardsize.spec.ts` (desktop, 1600×900: the board in the page's middle, the same box on the
+study, the picked line, a running session and back; the status in the footer); the rest of the
+suite on desktop and phone unchanged.
+
+Live: TESTING.md.

@@ -5,6 +5,17 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## A desktop layout trial (§5.92)
+- On the desktop, in a browser tab: the top bar's name, the ← and Study/Train, and the footer
+  keep to one centred column. Does it feel better than the window's edges? Is 1600px the right
+  width, or should it be narrower?
+- Study ↔ Train, on a chapter and in a running session: the board shouldn't move at all, only the
+  sides. Is the board's place in the middle right, and are the chapter list and the line list (now
+  as wide as the right panel) good at that width?
+- The installed app on the desktop: no green top bar under the window's title bar. Is it missed?
+- The sync status in the footer's right: quiet while synced; offline (DevTools) it turns amber.
+  Noticeable enough when something is wrong?
+
 ## A note on a game card (§5.91)
 - On the phone: answer a game card, "✎ Add a note", draw an arrow with ✎ and a colour, play a line
   on the dialog's board and "Add to the note", type words, Save. The note shows under the verdict;

@@ -1,5 +1,6 @@
 import { decidingNow } from '../app/time.ts';
 import { useEffect, useState } from 'preact/hooks';
+import { signal } from '@preact/signals';
 import { mode } from '../app/mode.ts';
 import { modeHash } from '../core/app/fsm.ts';
 import { findConflicts } from '../app/overview.ts';
@@ -39,11 +40,7 @@ export function App() {
       <header class="topbar">
         <img class="topbar-icon" src={`${import.meta.env.BASE_URL}icons/icon.svg`} alt="" width={28} height={28} />
         <h1>Repworks</h1>
-        {device.value ? (
-          <Guard name="The sync status">
-            <SyncChip />
-          </Guard>
-        ) : !online.value && <span class="status status-offline">offline</span>}
+        {!wide.value && <SyncStatus />}
       </header>
       {updateReady.value && (
         <div class="banner" role="status">
@@ -76,10 +73,32 @@ export function App() {
         <PriorityDialog />
       </Guard>
       <footer class="footer">
-        build {__BUILD_ID__}
-        {shellVersion.value && <> · shell {shellVersion.value.slice(0, 8)}</>} · <a href={`${import.meta.env.BASE_URL}spike.html`}>remote spike</a>
+        <span>
+          build {__BUILD_ID__}
+          {shellVersion.value && <> · shell {shellVersion.value.slice(0, 8)}</>} · <a href={`${import.meta.env.BASE_URL}spike.html`}>remote spike</a>
+        </span>
+        {wide.value && <SyncStatus />}
       </footer>
     </div>
+  );
+}
+
+/** A desktop's width, where the sync status sits in the footer rather than the head. */
+const wideQuery = typeof matchMedia === 'function' ? matchMedia('(min-width: 900px)') : undefined;
+const wide = signal(wideQuery?.matches ?? false);
+wideQuery?.addEventListener('change', (e) => (wide.value = e.matches));
+
+/**
+ * The sync status (the owner's notes of 2026-10-11): quiet while sync works, as the build line is,
+ * in the footer's right on a desktop and in the head on the phone; a warning chip when it doesn't.
+ */
+function SyncStatus() {
+  return device.value ? (
+    <Guard name="The sync status">
+      <SyncChip />
+    </Guard>
+  ) : (
+    !online.value && <span class="status status-offline">offline</span>
   );
 }
 

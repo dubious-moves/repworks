@@ -16,19 +16,38 @@ body {
   min-height: 100dvh;
 }
 
+/* The page's width (the owner's notes of 2026-10-11): the head's, the content's and the footer's
+   edges keep to one column, centred, rather than to the window's sides on a wide screen. The
+   pages of text and forms keep to 1100px, a line of 1400px being hard to read; the board pages
+   to 1600px. `--gutter` is the space from the window's side to the column's edge. */
 .shell {
+  --page-max: 1100px;
+  --gutter: max(12px, (100% - var(--page-max)) / 2 + 12px);
   display: flex;
   flex-direction: column;
   min-height: 100dvh;
+}
+
+.shell-chapter,
+.shell-train {
+  --page-max: 1600px;
 }
 
 .topbar {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: calc(8px + env(safe-area-inset-top)) 12px 8px;
+  padding: calc(8px + env(safe-area-inset-top)) var(--gutter) 8px;
   background: var(--accent);
   color: var(--accent-text);
+}
+
+/* The installed app on a desktop: its window's title bar, in the theme colour, already shows the
+   icon and the name, and the sync status is in the footer, so the head has nothing left to say. */
+@media (display-mode: standalone) and (hover: hover) and (pointer: fine) and (min-width: 900px) {
+  .topbar {
+    display: none;
+  }
 }
 
 .topbar h1 {
@@ -56,7 +75,7 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px 12px;
+  padding: 8px var(--gutter);
   background: var(--surface);
 }
 
@@ -67,19 +86,16 @@ body {
 
 .content {
   flex: 1;
-  padding: 16px 12px;
-}
-
-/* The pages of text and forms keep to a column on a wide screen, centred; a line of 1400px was
-   hard to read. The board pages (.shell-chapter, .shell-train) take the whole width. */
-.shell:not(.shell-chapter, .shell-train) .content {
-  width: 100%;
-  max-width: 1100px;
-  margin-inline: auto;
+  padding: 16px var(--gutter);
 }
 
 .footer {
-  padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+  padding: 8px var(--gutter) calc(8px + env(safe-area-inset-bottom));
   color: var(--muted);
   font-size: 0.8rem;
 }
@@ -127,6 +143,31 @@ h2 {
 .chip-warn {
   border-color: var(--warn);
   color: var(--warn);
+}
+
+/* The sync status: quiet while sync works, as the build line beside it is; a warning chip when it
+   doesn't (offline, the token refused, an error, GitHub's limit). Still a button: sync now. */
+.sync-chip:not(.chip-warn) {
+  border-color: transparent;
+  opacity: 0.75;
+}
+
+.footer .sync-chip {
+  min-height: 24px;
+  padding: 0 8px;
+  margin-right: -8px;
+  font-size: 0.8rem;
+}
+
+.footer .sync-chip:not(.chip-warn) {
+  color: var(--muted);
+  opacity: 1;
+}
+
+.footer .chip-warn {
+  margin-right: 0;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
 }
 
 .banner-warn {
@@ -1569,7 +1610,7 @@ table.cards td {
     display: flex;
     flex-direction: column;
     min-height: 0;
-    padding: 8px 12px 0;
+    padding: 8px var(--gutter) 0;
   }
 
   .shell-chapter .chapter-view {
@@ -1647,12 +1688,96 @@ table.cards td {
   }
 }
 
+/* The stage (the owner's notes of 2026-10-11): on a wide screen the study and the training screen
+   share one frame, so the board stays where it is when Study ↔ Train switches and only the sides
+   change: the board in the page's middle, as large as the frame fits up to the size chosen, and
+   a side of one width on each hand, the chapters and the notation in the study, the lines and
+   the session's panel in training. The sides fill the page's column, so the head above lines up
+   with their outer edges. Where the page is too narrow for both at the right panel's least (the
+   explorer's columns need about 400px), the right keeps it and the left gives way, the board a
+   little left of the middle. */
 @media (min-width: 1150px) {
-  .cv-grid {
-    --side: 220px;
-    --board: min(100cqh - 34px, 100cqw - var(--panel) - var(--side) - 32px, var(--board-size, 100vw));
+  .cv-grid,
+  .train-frame > .train-body {
+    --panel-min: clamp(320px, 33cqw, 400px);
+    --board: min(100cqh - 34px, 100cqw - var(--panel-min) - 200px - 32px, var(--board-size, 100vw));
+    --panel: max(var(--panel-min), (100cqw - var(--board) - 32px) / 2);
+    --side: calc(100cqw - var(--board) - var(--panel) - 32px);
+    display: grid;
     grid-template-columns: var(--side) var(--board) var(--panel);
     grid-template-areas: 'side board panel';
+    grid-template-rows: 100cqh;
+    justify-content: center;
+    align-items: stretch;
+    gap: 16px;
+  }
+
+  .shell-train:has(.train-frame) {
+    height: 100dvh;
+    min-height: 0;
+  }
+
+  .shell-train:has(.train-frame) .content {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: 8px var(--gutter) 0;
+  }
+
+  .train {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .train .chapter-head {
+    margin-bottom: 6px;
+  }
+
+  .train-frame {
+    flex: 1;
+    min-height: 0;
+    container-type: size;
+  }
+
+  .train-body .train-list {
+    grid-area: side;
+    order: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    align-self: start;
+    max-height: 100%;
+  }
+
+  .train-body .line-list {
+    flex: 1;
+    max-height: none;
+  }
+
+  /* The session's board and panel are the frame's own columns. */
+  .train-main:has(> .train-grid),
+  .train-body .train-grid {
+    display: contents;
+  }
+
+  .train-body .train-board {
+    grid-area: board;
+    min-width: 0;
+  }
+
+  .train-body .train-panel {
+    grid-area: panel;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  /* A session's end with no board: its card where the board and the panel are. */
+  .train-main:not(:has(> .train-grid)) {
+    grid-column: board / panel;
+    min-height: 0;
+    overflow-y: auto;
   }
 
   .has-frame .head-tool {
@@ -2053,25 +2178,6 @@ table.cards td {
   background: var(--learned);
 }
 
-@media (min-width: 1150px) {
-  .train-body.with-list {
-    display: grid;
-    grid-template-columns: 280px minmax(0, 1fr);
-    align-items: start;
-  }
-
-  .train-body.with-list .train-list {
-    order: 0;
-  }
-
-  .train-body.with-list .train-grid {
-    --board-room: calc(100vw - 640px);
-  }
-
-  .train-body.with-list .line-list {
-    max-height: calc(100dvh - 190px);
-  }
-}
 
 /* Mistakes and pins (PLAN.md §5.8). */
 
@@ -3214,6 +3320,15 @@ a.button.primary {
     --board: min(100cqh - 34px - 52px, 100cqw - var(--panel) - 16px, var(--board-size, 100vw));
     grid-template-columns: var(--board) var(--panel);
     grid-template-areas: 'board panel';
+  }
+}
+
+/* The stage's middle, as the study's board, its left side left empty. */
+@media (min-width: 1150px) {
+  .scratch .cv-grid {
+    --board: min(100cqh - 34px - 52px, 100cqw - var(--panel-min) - 200px - 32px, var(--board-size, 100vw));
+    grid-template-columns: var(--side) var(--board) var(--panel);
+    grid-template-areas: 'side board panel';
   }
 }
 
