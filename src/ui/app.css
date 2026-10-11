@@ -1212,6 +1212,19 @@ textarea.script {
   margin-top: 8px;
 }
 
+/* Only the conflicts at the move shown are left here (§5.90). */
+.cv-tools:empty {
+  display: none;
+}
+
+/* Picking an alternative from a move's menu (MoveCard.tsx). */
+.alt-adding {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 0;
+}
+
 /* The move menu and the comment dialog, after Qchess's (read live, 2026-10-06). */
 
 .notation .move,
@@ -1277,6 +1290,14 @@ textarea.script {
   margin: 4px 0;
   border: 0;
   border-top: 1px solid rgb(var(--ink) / 12%);
+}
+
+.move-menu .menu-note {
+  max-width: 260px;
+  margin: 2px 0 4px;
+  padding: 0 16px;
+  font-size: 0.8rem;
+  color: var(--muted);
 }
 
 .move-menu kbd {
@@ -4454,7 +4475,8 @@ a.button.disabled {
 /* A mouse has the board's right-click and Shift-drag for drawing and the move's context menu, so
    the ✎ and ⋯ buttons are for touch alone. */
 @media (hover: hover) and (pointer: fine) {
-  .cv-panel .controls button.touch-only {
+  .cv-panel .controls button.touch-only,
+  .note-dialog button.touch-only {
     display: none;
   }
 }
@@ -4749,4 +4771,29 @@ a.button.disabled {
   display: block;
   border: 0;
   transform-origin: 0 0;
+}
+
+/* A game card's note (§5.91): its dialog's board leaves room for the words under it. */
+.note-dialog .board {
+  width: min(100%, calc(100dvh - 400px));
+  min-width: 220px;
+}
+
+.note-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.note-line-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.note-dialog textarea {
+  width: 100%;
+  box-sizing: border-box;
 }

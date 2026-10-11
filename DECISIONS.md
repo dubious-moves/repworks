@@ -1494,3 +1494,17 @@ The technical calls, each with its reason:
   reached 20. A list of 20 or more still judges a move.
 - **The storm's Stockfish runs on the device's chosen threads**, as the study page's does (it ran
   on one).
+
+## Revision of 2026-10-11 (the card panel into the move's menu, PLAN.md §5.90)
+- **An own move's training card lives in its move menu, not a panel** (the owner: the panel was
+  tiny and not resizable). Was (§5.7, §5.18): a panel under the notation with the card's state,
+  the suspend toggle, "Add alternative…" and the alternatives' ✕.
+- **The move menu loses Copy FEN and Read from here; Analyse, Storm, Practise and the plan card
+  move to the study's ☰ menu**, acting on the move shown (the owner's request, to make room).
+
+## Revision of 2026-10-11 (a note on a game card, PLAN.md §5.91)
+- **D4: a new event kind `note`** on a game card (`m|<pid>`): `text`, the card's note as one PGN
+  comment (words, `(…)` lines, `[%csl …][%cal …]`), the latest winning and '' removing it. Why an
+  event and not a field of the saved item: a game's own mistakes have no `saved` event, a note is
+  edited after saving, and older builds skip a kind they don't know. Shown only after the card is
+  answered (the owner's choice).

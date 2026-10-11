@@ -2,10 +2,17 @@
 // bar, it holds what the bar and the row under the board held besides moving along the line: the
 // explorer, undo and redo, and Copy FEN. The bar keeps ⏮ ◀ ▶ ⏭ (and ✎ ⋯ on a touch screen).
 // Below them the study's own (§5.88): New chapter and the chapter's and the study's settings,
-// which a phone's head had squeezed beside the chapter's name.
+// which a phone's head had squeezed beside the chapter's name. Between the two, what starts from
+// the move shown (§5.90, out of the move's menu): Analyse, Storm, Practise and its plan card.
 import { signal } from '@preact/signals';
-import { doc, redoEdit, undoEdit } from '../app/editor.ts';
+import { makeFen } from 'chessops/fen';
+import { at, chapter, doc, feedback, redoEdit, side, study, undoEdit } from '../app/editor.ts';
 import { prefs, setPrefs } from '../app/explorer.ts';
+import { open } from '../app/mode.ts';
+import { planEnrolled, setPlanCard } from '../app/plans.ts';
+import { trainData } from '../app/train.ts';
+import { positionKeyOf } from '../core/chess/positionKey.ts';
+import { nodeAt, positionAt } from '../core/study/tree.ts';
 import { copyFen, FloatingMenu } from './MoveMenu.tsx';
 
 const menu = signal<{ x: number; y: number; above: number; opener: Element } | undefined>(undefined);
@@ -18,7 +25,7 @@ export function StudyMenuButton() {
       aria-label="More"
       aria-haspopup="menu"
       aria-expanded={Boolean(menu.value)}
-      title="The explorer, undo and redo, Copy FEN, the chapter and the study"
+      title="The explorer, undo and redo, Copy FEN, from the move shown, the chapter and the study"
       onClick={(e) => {
         if (menu.peek()) return close();
         const r = e.currentTarget.getBoundingClientRect();
@@ -64,6 +71,7 @@ export function StudyMenu(props: { fen: string; study?: StudyActions }) {
         <span class="menu-check" aria-hidden="true" />
         Copy FEN
       </button>
+      {props.study && <FromHere run={run} />}
       {props.study && (
         <>
           <hr class="menu-sep" role="separator" />
@@ -82,5 +90,53 @@ export function StudyMenu(props: { fen: string; study?: StudyActions }) {
         </>
       )}
     </FloatingMenu>
+  );
+}
+
+/** What starts from the move shown, in a study: the analysis board, the storm, a game, a plan card. */
+function FromHere(props: { run: (f: () => void) => () => void }) {
+  const s = study.value;
+  const c = chapter.value;
+  const path = at.value;
+  const pos = c && positionAt(c, path);
+  const node = c && nodeAt(c, path);
+  if (!s || !c || !pos || !node) return null;
+  const fen = makeFen(pos.toSetup());
+  const key = positionKeyOf(pos);
+  const enrolled = planEnrolled.value.has(key);
+  // A plan card's content is the comments there, read live (§5.61): none without them.
+  const plannable = enrolled || node.comments.some((t) => t.trim()) || node.shapes.length > 0;
+  const { run } = props;
+  return (
+    <>
+      <hr class="menu-sep" role="separator" />
+      {/* Its lines able to come back here (§5.35); the board keeps the chapter's side, whoever is to move. */}
+      <button type="button" role="menuitem" onClick={run(() => open({ name: 'analysis', fen, from: { sid: s.sid, cid: s.cid, at: [...path] }, side: side.peek() }))}>
+        <span class="menu-check" aria-hidden="true" />
+        Analyse from here
+      </button>
+      {/* The storm over the lines through this move (§5.43), in a repertoire chapter. */}
+      {trainData.value?.chapters.has(`${s.sid}/${s.cid}`) && (
+        <button type="button" role="menuitem" onClick={run(() => open({ name: 'storm', sid: s.sid, cid: s.cid, at: [...path] }))}>
+          <span class="menu-check" aria-hidden="true" />
+          Storm from here
+        </button>
+      )}
+      {/* A game from this position against the database, Maia and Stockfish, as the chapter's side (§5.57). */}
+      <button type="button" role="menuitem" onClick={run(() => open({ name: 'playOn', fen, side: side.peek() }))}>
+        <span class="menu-check" aria-hidden="true" />
+        Practise from here
+      </button>
+      {plannable && (
+        <button
+          type="button"
+          role="menuitem"
+          onClick={run(() => (enrolled ? setPlanCard(key, side.peek(), false) : (setPlanCard(key, side.peek(), true), (feedback.value = 'Plan card made: it comes up with the game cards'))))}
+        >
+          <span class="menu-check" aria-hidden="true" />
+          {enrolled ? 'Remove the plan card' : 'Make a plan card'}
+        </button>
+      )}
+    </>
   );
 }

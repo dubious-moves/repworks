@@ -33,6 +33,9 @@ import { keyFen } from '../core/chess/positionKey.ts';
 import { fenAfterUci, START_FEN, uciToSan } from '../core/storm/walk.ts';
 import { discardSaved, resumePractice, savedPractice } from '../app/practice.ts';
 import { useWakeLock } from './Train.tsx';
+import { endPreview, preview, stepPreview } from '../app/preview.ts';
+import { endPreviewOnBoard, PreviewBar, previewBoard } from './CommentText.tsx';
+import { NoteButton, NoteText, noteArrows } from './CardNote.tsx';
 import { isoDay } from './day.ts';
 import { Back } from './Back.tsx';
 
@@ -487,17 +490,20 @@ function GameView(props: { id: string; ply?: number }) {
 
 /* ------------------------------------------------------------------ the game cards' session */
 
-function PlayBoard(props: { run: CardRun; asking: boolean; arrows: { orig: string; dest?: string; brush: string }[] }) {
+function PlayBoard(props: { run: CardRun; asking: boolean; arrows: { orig: string; dest?: string; brush: string }[]; atStart?: boolean }) {
   const r = props.run;
-  // With the engine's line shown, the board is the line's (a move on it goes along the line or branches it).
-  const line = r.line;
-  const fen = r.pendingFen ?? (line ? lineFen(line) : r.board);
+  // A line of the card's note (§5.91) on the board, then the engine's line: the board is the line's
+  // (a move on it goes along the line or branches it). `atStart`: the card's position, for the
+  // note's arrows.
+  const shown = previewBoard('games');
+  const line = shown || props.atStart ? undefined : r.line;
+  const fen = shown?.fen ?? (props.atStart ? r.fen : (r.pendingFen ?? (line ? lineFen(line) : r.board)));
   const pos = useMemo(() => positionOf(fen)!, [fen]);
   const [promotion, setPromotion] = useState<{ orig: Key; dest: Key } | undefined>(undefined);
-  const movable = props.asking || (!!line && !r.lineBusy);
+  const movable = !shown && !props.atStart && (props.asking || (!!line && !r.lineBusy));
   const dests = movable ? (chessgroundDests(pos) as Map<Key, Key[]>) : new Map<Key, Key[]>();
-  const lastUci = r.pendingFen ? undefined : line ? moveAt(line, line.currentIdx)?.uci : r.lastUci;
-  const last = lastUci ? ([sq(lastUci, 0), sq(lastUci, 2)] as [Key, Key]) : undefined;
+  const lastUci = shown || props.atStart || r.pendingFen ? undefined : line ? moveAt(line, line.currentIdx)?.uci : r.lastUci;
+  const last = shown ? shown.lastMove : lastUci ? ([sq(lastUci, 0), sq(lastUci, 2)] as [Key, Key]) : undefined;
   const send = (uci: string) => (line ? lineMove(uci) : playMove(uci));
   const onMove = (orig: Key, dest: Key) => {
     const piece = pos.board.get(parseSquare(orig)!);
@@ -507,7 +513,7 @@ function PlayBoard(props: { run: CardRun; asking: boolean; arrows: { orig: strin
     send(isNormal(move) ? standardUci(pos, move) : makeUci(move));
   };
   return (
-    <div class="train-board">
+    <div class="train-board" onPointerDown={shown ? endPreviewOnBoard : undefined}>
       <Board
         fen={fen}
         orientation={r.card.item.color}
@@ -516,7 +522,7 @@ function PlayBoard(props: { run: CardRun; asking: boolean; arrows: { orig: strin
         lastMove={last}
         check={pos.isCheck()}
         shapes={[]}
-        autoShapes={line ? [] : props.arrows}
+        autoShapes={line || shown ? [] : props.arrows}
         drawMode={false}
         brush="green"
         onMove={onMove}
@@ -530,6 +536,7 @@ function PlayBoard(props: { run: CardRun; asking: boolean; arrows: { orig: strin
           }
         }
       />
+      <PreviewBar owner="games" />
     </div>
   );
 }
@@ -546,7 +553,12 @@ function Review() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const st = gameSession.value;
-      if (!st || (e.target as HTMLElement | null)?.tagName === 'INPUT') return;
+      if (!st || /^(INPUT|TEXTAREA|SELECT)$/.test((e.target as HTMLElement | null)?.tagName ?? '') || document.querySelector('dialog[open]')) return;
+      // A line of the card's note on the board takes ← → and Escape first (§5.91).
+      if (preview.peek()?.owner === 'games' && (e.key === 'Escape' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        e.preventDefault();
+        return e.key === 'Escape' ? endPreview() : stepPreview(e.key === 'ArrowLeft' ? -1 : 1);
+      }
       if (st.run?.line && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) lineStep(e.key === 'ArrowLeft' ? -1 : 1);
       else if (e.key === 'h') hint();
       else if (e.key === 't') tryAgain();
@@ -560,7 +572,7 @@ function Review() {
   if (!s) return <p class="muted">Dealing…</p>;
   if (s.phase === 'done') return <Done s={s} />;
   const r = s.run!;
-  return <Card s={s} r={r} />;
+  return <Card key={r.card.card} s={s} r={r} />;
 }
 
 function Done(props: { s: GameSession }) {
@@ -585,6 +597,10 @@ function Card(props: { s: GameSession; r: CardRun }) {
   const { s, r } = props;
   const item = r.card.item;
   const game = gameById.value.get(item.gameId)?.game;
+  // The note's arrows on the card's position (§5.91), shown on request once it is answered.
+  const [noteBoard, setNoteBoard] = useState(false);
+  // A line of the note previewed ends with the card.
+  useEffect(() => endPreview, []);
   if (item.kind === 'plan') {
     const n = item.note;
     return (
@@ -668,10 +684,13 @@ function Card(props: { s: GameSession; r: CardRun }) {
   const j = r.judged;
   const cls = j ? CLASSIFICATION[j.classification] : undefined;
   const graded = s.results.get(r.card.card);
+  const answered = s.phase === 'right' || r.revealed || s.phase === 'unjudged';
+  const arrowsOfNote = answered ? noteArrows(r.card.card) : [];
+  const atStart = noteBoard && arrowsOfNote.length > 0;
   const prompt = item.kind === 'tactic' ? 'Find the tactic' : item.kind === 'mistake' ? (item.san ? `Find a better move than ${item.san}` : 'Find the best move') : '';
   return (
     <div class="train-grid game-card" data-phase={s.phase} data-card={r.card.card} data-kind={item.kind} data-step={r.tactic?.played.length ?? (r.lastUci ? 1 : 0)}>
-      <PlayBoard run={r} asking={asking} arrows={arrows} />
+      <PlayBoard run={r} asking={asking} arrows={atStart ? arrowsOfNote : arrows} atStart={atStart} />
       <div class="train-panel">
         <p class="train-counters">
           {s.index + 1} of {s.cards.length} · {KIND_WORD[item.kind]}
@@ -710,7 +729,15 @@ function Card(props: { s: GameSession; r: CardRun }) {
             {item.san ? ` · played ${item.gameId.startsWith('_storm_') ? 'in the storm' : 'in the game'}: ${item.san}` : ''}
           </p>
         )}
-        {r.line && <LinePanel line={r.line} busy={!!r.lineBusy} wrong={s.phase === 'wrong'} />}
+        {answered && <NoteText card={r.card.card} fen={r.fen} />}
+        {arrowsOfNote.length > 0 && (
+          <div class="actions">
+            <button type="button" class="secondary" aria-pressed={atStart} data-testid="note-arrows" onClick={() => (endPreview(), setNoteBoard(!noteBoard))}>
+              {atStart ? 'Back to the board' : 'The note’s arrows'}
+            </button>
+          </div>
+        )}
+        {r.line && !atStart && <LinePanel line={r.line} busy={!!r.lineBusy} wrong={s.phase === 'wrong'} />}
         {graded && <p class="muted">Recorded: {GRADE_WORD[graded]}</p>}
         <div class="actions train-actions">
           {asking && (
@@ -756,6 +783,7 @@ function Card(props: { s: GameSession; r: CardRun }) {
           <button type="button" class="secondary" onClick={() => open({ name: 'analysis', fen: r.board, side: item.color })}>
             Analyse
           </button>
+          {answered && <NoteButton card={r.card.card} fen={r.fen} color={item.color} />}
           {item.kind === 'mistake' && (
             <button type="button" class="secondary" title="Build the lines that refute it on the analysis board, and drill them as a sequence instead" onClick={() => open({ name: 'analysis', fen: item.fenBefore, seq: item.pid, side: item.color })}>
               Make a sequence

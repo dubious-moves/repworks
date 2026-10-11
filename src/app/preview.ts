@@ -1,14 +1,14 @@
-// A line from a comment shown on the board (PLAN.md §5.12): the chapter view, the Read view and
-// the training screen each preview one at a time. A preview changes nothing else; it ends on
-// Escape, a click on the board, its Back button, another move shown in the chapter view, or
-// another screen.
+// A line from a comment shown on the board (PLAN.md §5.12): the chapter view, the Read view, the
+// training screen and the game cards' trainer (a card's note, §5.91) each preview one at a time. A
+// preview changes nothing else; it ends on Escape, a click on the board, its Back button, another
+// move shown in the chapter view, or another screen.
 import { effect, signal } from '@preact/signals';
 import type { Position } from 'chessops/chess';
 import { firstCursor, playedLines, stepCursor, type Cursor, type PlayedLine } from '../core/repertoire/lines.ts';
 import { at } from './editor.ts';
 import { mode } from './mode.ts';
 
-export type PreviewOwner = 'chapter' | 'read' | 'train';
+export type PreviewOwner = 'chapter' | 'read' | 'train' | 'games';
 
 export interface Preview {
   owner: PreviewOwner;

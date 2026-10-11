@@ -1,20 +1,17 @@
 // The move menu and the comment dialog (PLAN.md §4.11), as Qchess's study page has them:
-// right-click a move (long-press on the phone, or the ⋯ button for the move shown) for its
-// actions; "Comment" opens a dialog with the comment and the glyphs, so the panel keeps its room
+// right-click a move (long-press on the phone) for its actions, and an own move's training card
+// (§5.90); "Comment" opens a dialog with the comment and the glyphs, so the panel keeps its room
 // for the notation.
 import { signal } from '@preact/signals';
 import type { ComponentChildren } from 'preact';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { chapter, doc, edit, feedback, goTo, SCRATCH, side, study } from '../app/editor.ts';
-import { planEnrolled, setPlanCard } from '../app/plans.ts';
-import { positionKeyOf } from '../core/chess/positionKey.ts';
-import { makeFen } from 'chessops/fen';
-import { trainData } from '../app/train.ts';
+import { chapter, doc, edit, feedback, goTo, SCRATCH, study } from '../app/editor.ts';
 import { open } from '../app/mode.ts';
+import { moveCard } from './MoveCard.tsx';
 import { LICHESS_COMMENT_LIMIT, sanitizeComment } from '../core/pgn/comment.ts';
 import { GLYPHS, MOVE_GLYPHS, OBSERVATION_GLYPHS, POSITION_GLYPHS } from '../core/pgn/nags.ts';
 import { continuation, deletePath, linePgn, makeMainline, ownComment, promote, setComment, setNags, toggleGlyph, variationStart } from '../core/study/ops.ts';
-import { nodeAt, positionAt, type Path } from '../core/study/tree.ts';
+import { nodeAt, type Path } from '../core/study/tree.ts';
 
 const GLYPH_ROWS: readonly (readonly number[])[] = [
   [3, 1, 5, 6, 2, 4, 146],
@@ -78,48 +75,12 @@ export function MoveMenu() {
   if (isMove) items.push({ label: 'Copy line as PGN', run: () => void copyLine(m.path, 'line') });
   // From the branch's first move to the line's end, numbered from there (§5.11).
   if (isMove) items.push({ label: 'Copy continuation', run: () => void copyLine(m.path, 'continuation') });
-  // The position after the move (or the start), as on the board.
-  items.push({
-    label: 'Copy FEN',
-    run: () => {
-      const pos = positionAt(c, m.path);
-      if (pos) void copyFen(makeFen(pos.toSetup()));
-    },
-  });
   const s = study.value;
-  if (s && s.sid !== SCRATCH) {
-    // The analysis board from this move's position, its lines able to come back here (§5.35).
-    items.push({
-      label: 'Analyse from here',
-      run: () => {
-        const pos = positionAt(c, m.path);
-        // The board keeps its side: the chapter's, whoever is to move.
-        if (pos) open({ name: 'analysis', fen: makeFen(pos.toSetup()), from: { sid: s.sid, cid: s.cid, at: [...m.path] }, side: side.peek() });
-      },
-    });
-    // The storm over the lines through this move (§5.43, lichessable §28), in a repertoire chapter.
-    if (trainData.value?.chapters.has(`${s.sid}/${s.cid}`)) items.push({ label: 'Storm from here', run: () => open({ name: 'storm', sid: s.sid, cid: s.cid, at: [...m.path] }) });
-    // Qchess's two training views of the line through this move (§5.10).
-    items.push({ label: 'Read from here', run: () => open({ name: 'read', sid: s.sid, cid: s.cid, at: [...m.path] }) });
-    items.push({ label: 'Quiz from here', run: () => open({ name: 'play', sid: s.sid, cid: s.cid, at: [...m.path] }) });
-    // A game from this position against the database, Maia and Stockfish, as the chapter's side (§5.57).
-    items.push({
-      label: 'Practise from here',
-      run: () => {
-        const pos = positionAt(c, m.path);
-        if (pos) open({ name: 'playOn', fen: makeFen(pos.toSetup()), side: side.peek() });
-      },
-    });
-    // A plan card for this position (§5.61): its content is the comments there, read live.
-    const pos = positionAt(c, m.path);
-    const node = nodeAt(c, m.path);
-    if (pos && node) {
-      const key = positionKeyOf(pos);
-      const enrolled = planEnrolled.value.has(key);
-      if (enrolled) items.push({ label: 'Remove the plan card', run: () => setPlanCard(key, side.peek(), false) });
-      else if (node.comments.some((t) => t.trim()) || node.shapes.length) items.push({ label: 'Make a plan card', run: () => (setPlanCard(key, side.peek(), true), (feedback.value = 'Plan card made: it comes up with the game cards')) });
-    }
-  }
+  // Qchess's quiz of the line through this move (§5.10). Read, Analyse, Storm, Practise and the
+  // plan card left this menu for the ☰ menu or went (§5.90), for the card's items.
+  if (s && s.sid !== SCRATCH) items.push({ label: 'Quiz from here', run: () => open({ name: 'play', sid: s.sid, cid: s.cid, at: [...m.path] }) });
+  // An own move of a repertoire chapter: its training card (§5.7, §5.18).
+  const card = moveCard(m.path);
 
   return (
     <FloatingMenu at={m} label="Move" onClose={close}>
@@ -137,6 +98,25 @@ export function MoveMenu() {
           {item.label}
         </button>
       ))}
+      {card && (
+        <>
+          <hr class="menu-sep" role="separator" />
+          <p class="menu-note">{card.note}</p>
+          {card.items.map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                close();
+                item.run();
+              }}
+            >
+              {item.label}
+            </button>
+          ))}
+        </>
+      )}
     </FloatingMenu>
   );
 }

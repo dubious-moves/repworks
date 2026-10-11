@@ -24,7 +24,7 @@ import { setShapes } from '../core/study/ops.ts';
 import { pathKey } from '../core/study/notation.ts';
 import { nodeAt, positionAt, samePath, type Path } from '../core/study/tree.ts';
 import { Board } from './Board.tsx';
-import { addAlternative, altAdding, CardPanel } from './CardPanel.tsx';
+import { addAlternative, altAdding, AltAdding } from './MoveCard.tsx';
 import { CommentDialog, MoveMenu } from './MoveMenu.tsx';
 import { StudyMenu, StudyMenuButton } from './StudyMenu.tsx';
 import { BranchPicker, branchOpen, chooseBranch, closeBranches, stepOn } from './BranchPicker.tsx';
@@ -261,6 +261,7 @@ export function ChapterView() {
               <p class="feedback" role="status">
                 {feedback.value ?? ''}
               </p>
+              <AltAdding />
               {scratch && <AnalysisFen />}
             </div>
             <div class="cv-panel">
@@ -269,7 +270,6 @@ export function ChapterView() {
               {!scratch && (
                 <div class="cv-tools">
                   {doc.value && <Conflicts />}
-                  <CardPanel />
                 </div>
               )}
               <Explorer chapter={c} path={path} />

@@ -4,7 +4,7 @@
 // stands out.
 import { test, expect, type Page } from '@playwright/test';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
-import { openMoveMenu } from './board.ts';
+import { studyMenu } from './board.ts';
 import { serveGithub, world } from './github.ts';
 import { serveSite, type SiteServer } from './server.ts';
 
@@ -38,8 +38,8 @@ test('← goes back where the page was opened from, past a study’s chapters, a
   if (await chapter.isVisible()) await chapter.selectOption({ label: 'Alapin' });
   else await link.click();
   await expect(page).toHaveURL(/#\/study\/Rep0Najd\/Ch2Alapn/);
-  await openMoveMenu(page, 'e4 c5');
-  await page.getByRole('menuitem', { name: 'Analyse from here' }).click();
+  await page.locator('.move[data-path="e4 c5"]').click({ position: { x: 6, y: 8 } }); // the move, not its +1
+  await studyMenu(page, 'Analyse from here');
   await expect(page).toHaveURL(/#\/analysis\?/);
   // A button of its own: filled, not a bare arrow.
   const fill = await back(page).evaluate((e) => getComputedStyle(e).backgroundColor);

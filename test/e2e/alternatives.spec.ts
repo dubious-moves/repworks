@@ -4,7 +4,7 @@
 // card panel, and removed there.
 import { test, expect, type Page } from '@playwright/test';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
-import { clickSquare } from './board.ts';
+import { clickSquare, openMoveMenu } from './board.ts';
 import { serveGithub, world } from './github.ts';
 import { serveSite, type SiteServer } from './server.ts';
 
@@ -51,12 +51,14 @@ test('a wrong move saved as an alternative is free next time, and is listed and 
   await play(page, 'c7', 'c5');
   await expect(phase(page)).not.toHaveAttribute('data-phase', 'ask');
 
-  // The study's card panel on 1... c5 lists it; its ✕ removes it.
+  // The menu of 1... c5 in the study lists it; its item removes it.
   await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf?at=e4,c5`);
-  const panel = page.getByRole('region', { name: 'Training card' });
-  await expect(panel.locator('.card-alts')).toContainText('Alternatives here: e5');
-  await panel.getByRole('button', { name: 'Remove e5 from the alternatives' }).click();
-  await expect(panel.locator('.card-alts')).toHaveCount(0);
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5');
+  await openMoveMenu(page);
+  await page.getByRole('menuitem', { name: 'Remove alternative e5' }).click();
+  await expect(page.locator('.cv-board .feedback')).toHaveText('e5 removed from the alternatives: it counts as a wrong move again');
+  await openMoveMenu(page);
+  await expect(page.getByRole('menuitem', { name: /^Remove alternative/ })).toHaveCount(0);
 });
 
 test('an alternative is added from the study: the move played on the board is saved, and the chapter is not changed', async ({ page }) => {
@@ -67,24 +69,35 @@ test('an alternative is added from the study: the move played on the board is sa
   await expect(page.locator('.chip')).toHaveText(/^synced/);
 
   await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf?at=e4,c5`);
-  const panel = page.getByRole('region', { name: 'Training card' });
+  const adding = page.locator('.cv-board .alt-adding');
   // Counted once the notation is drawn: before it, there are none.
   await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5');
   const variations = await page.locator('.notation .variation').count();
-  await panel.getByRole('button', { name: 'Add alternative…' }).click();
-  await expect(panel).toContainText('Play the alternative on the board.');
+  await openMoveMenu(page);
+  await page.getByRole('menuitem', { name: 'Add alternative…' }).click();
+  await expect(adding).toContainText('Play the alternative on the board.');
   // The board shows the position before 1... c5, and the notation still stands at c5.
   await play(page, 'e7', 'e5');
   await expect(page.locator('.cv-board .feedback')).toHaveText('e5 saved as an alternative');
-  await expect(panel.locator('.card-alts')).toContainText('Alternatives here: e5');
+  await expect(adding).toHaveCount(0);
+  await openMoveMenu(page);
+  await expect(page.getByRole('menuitem', { name: 'Remove alternative e5' })).toBeVisible();
+  await page.keyboard.press('Escape');
   await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5');
   await expect(page.locator('.notation .variation')).toHaveCount(variations);
 
   // The repertoire's own move, and one saved already, are refused with a reason.
-  await panel.getByRole('button', { name: 'Add alternative…' }).click();
+  await openMoveMenu(page);
+  await page.getByRole('menuitem', { name: 'Add alternative…' }).click();
   await play(page, 'c7', 'c5');
   await expect(page.locator('.cv-board .feedback')).toHaveText("c5 is the repertoire's move here already");
-  await panel.getByRole('button', { name: 'Add alternative…' }).click();
+  await openMoveMenu(page);
+  await page.getByRole('menuitem', { name: 'Add alternative…' }).click();
   await page.keyboard.press('Escape');
-  await expect(panel.getByRole('button', { name: 'Add alternative…' })).toBeVisible();
+  await expect(adding).toHaveCount(0);
+  // Cancel does the same.
+  await openMoveMenu(page);
+  await page.getByRole('menuitem', { name: 'Add alternative…' }).click();
+  await adding.getByRole('button', { name: 'Cancel' }).click();
+  await expect(adding).toHaveCount(0);
 });

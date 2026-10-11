@@ -289,6 +289,11 @@ test('the storm: positions gathered, a great move and a mistake scored, the revi
   await expect(page.getByTestId('storm-save-mistake')).toHaveText('Save as a mistake');
   await page.getByTestId('storm-save-mistake').click();
   await expect(page.getByTestId('storm-save-mistake')).toBeDisabled();
+  // Its note (§5.91), written as it is saved.
+  await page.getByTestId('note-button').click();
+  await page.getByTestId('note-text').fill('A note on the storm position');
+  await page.locator('dialog.note-dialog').getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByTestId('note-button')).toHaveText('✎ Edit the note');
 
   // Two answers in the log, synced.
   await page.getByRole('button', { name: 'Done' }).click();
@@ -307,6 +312,7 @@ test('the storm: positions gathered, a great move and a mistake scored, the revi
   expect(log).toContain(`"san":"${mine}"`);
   expect((log.match(/"k":"saved","card":"m\|_storm_\d+_\d+","item":\{"kind":"mistake"/g) ?? []).length).toBe(2);
   expect(log).toContain('"san":"","uci":""');
+  expect(log).toMatch(/"k":"note","card":"m\|_storm_\d+_\d+","text":"A note on the storm position"/);
   // The record on the home.
   await expect(page.locator('.storm-record').first()).toContainText('2 answered · 50% found');
   // …and by study: the answers' chapters, from the positions' lines.

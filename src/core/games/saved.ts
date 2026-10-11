@@ -328,5 +328,8 @@ export function stormMistakeItem(a: { fen: string; color: Color; move?: { san: s
   return item;
 }
 
+/** The practice mistake saved for this move from this position, if one is. */
+export const practiceMistakeOf = (saved: readonly SavedItem[], fenBefore: string, san: string): MistakeItem | undefined =>
+  saved.find((s): s is MistakeItem => s.kind === 'mistake' && s.fenBefore === fenBefore && s.san === san);
 /** Whether the same move from the same position is already saved. */
-export const practiceMistakeSaved = (saved: readonly SavedItem[], fenBefore: string, san: string) => saved.some((s) => s.kind === 'mistake' && s.fenBefore === fenBefore && s.san === san);
+export const practiceMistakeSaved = (saved: readonly SavedItem[], fenBefore: string, san: string) => !!practiceMistakeOf(saved, fenBefore, san);
