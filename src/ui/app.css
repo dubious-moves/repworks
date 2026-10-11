@@ -2689,6 +2689,7 @@ a.button.primary {
 .ex-bar {
   display: flex;
   height: 18px;
+  border-radius: 3px;
   min-width: 0;
   font-size: 0.7rem;
   overflow: hidden;
@@ -2701,19 +2702,21 @@ a.button.primary {
   overflow: hidden;
 }
 
+/* Softened from pure white and black, so a long table doesn't glare (the owner's notes of
+   2026-10-11). */
 .ex-white {
-  background: #fff; /* fixed */
+  background: #d8d8d8; /* fixed */
   color: #333; /* fixed */
 }
 
 .ex-draw {
-  background: gray;
-  color: #ddd; /* fixed */
+  background: #8a8a8a; /* fixed */
+  color: #eee; /* fixed */
 }
 
 .ex-black {
-  background: #000; /* fixed */
-  color: #ddd; /* fixed */
+  background: #2e2e2e; /* fixed */
+  color: #ccc; /* fixed */
 }
 
 .ex-bar.ex-novelty {
@@ -3083,10 +3086,6 @@ a.button.primary {
 .engine-deeper {
   color: var(--info);
   font-weight: 700;
-}
-
-.engine-threat.on {
-  color: var(--due);
 }
 
 .switch {

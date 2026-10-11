@@ -1,12 +1,12 @@
 // The engine panel on the study page (PLAN.md §5.31), as Qchess's engine bar: the switch, the
-// engine's name, the depth (with the speed while it computes), "+" to go deeper, the threat and
-// the settings; under it one row per line, its eval from White's side and its moves, each move a
+// engine's name, the depth, "+" to go deeper and the settings (the threat stays on W, with no
+// button: the owner's notes of 2026-10-11); under it one row per line, its eval from White's side and its moves, each move a
 // line to preview on the board (◀ ▶ Back), which the preview bar's Add puts in the chapter. The
 // eval bar sits by the board, and the arrows go to the board as auto shapes.
 import { useEffect, useMemo, useRef } from 'preact/hooks';
 import { Chess, type Position } from 'chessops/chess';
 import { parseFen } from 'chessops/fen';
-import { analysis, enginePrefs, engineStatus, goDeeper, retryEngine, runningThreads, setThreat, threat, updateEnginePrefs } from '../app/engine.ts';
+import { analysis, enginePrefs, engineStatus, goDeeper, retryEngine, runningThreads, threat, updateEnginePrefs } from '../app/engine.ts';
 import { previewOf, showLine } from '../app/preview.ts';
 import type { Analysis, EngineLine } from '../core/engine/search.ts';
 import { engineArrows, type EngineArrow } from '../core/engine/shapes.ts';
@@ -20,8 +20,6 @@ import { maiaPrefs, maiaState, setMaiaOn } from '../app/maia.ts';
 
 /** Moves shown in a row (the row is cut to its width on a narrow screen). */
 const SHOWN_MOVES = 16;
-
-const formatNps = (nps: number): string => (nps >= 1e6 ? `${(nps / 1e6).toFixed(1)} Mn/s` : nps >= 1000 ? `${Math.round(nps / 1000)} kn/s` : `${nps} n/s`);
 
 /** A line played from the analysed position, as the preview takes it. */
 function playPv(start: Position, pv: readonly string[]): PlayedLine {
@@ -58,8 +56,7 @@ function statusText(board: Position | undefined, shown: { a: Analysis } | undefi
   if (board?.isEnd()) return 'Draw';
   if (threat.value && board?.isCheck()) return 'No threat while in check';
   if (!shown) return s.kind === 'ready' ? 'Computing…' : '';
-  const a = shown.a;
-  return `Depth ${a.depth}${a.nps ? ` · ${formatNps(a.nps)}` : ''}`;
+  return `Depth ${shown.a.depth}`;
 }
 
 export function EnginePanel(props: { board: Position | undefined }) {
@@ -104,9 +101,6 @@ export function EnginePanel(props: { board: Position | undefined }) {
           </button>
         )}
         <span class="spacer" />
-        <button type="button" class={`icon engine-threat${threat.value ? ' on' : ''}`} aria-pressed={threat.value} aria-label="Show threat" title="Show threat (W)" onClick={() => setThreat(!threat.value)}>
-          ⌖
-        </button>
         <button type="button" class="icon" aria-label="Engine settings" title="Engine settings" onClick={openEngineSettings}>
           ⚙
         </button>

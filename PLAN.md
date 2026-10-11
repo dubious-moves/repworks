@@ -3868,9 +3868,9 @@ Live: (phone) the depth reached in 8 s and the heat over ten minutes.
 #### 5.31 The engine panel on the study page (Qchess's engine bar)
 
 - **The bar**, at the top of the panel (on the phone, under the move buttons, above the
-  notation): the engine's switch, "SF18", "Depth 18 · 650 kn/s" (the speed while it computes),
-  "+" to go deeper once a search is done, the threat button (Qchess's W: the position with the
-  other side to move, its best move as a red arrow), ⚙ (`EngineSettings.tsx`: depth 20/30/40,
+  notation): the engine's switch, "SF18", "Depth 18" (no speed since 2026-10-11), "+" to go
+  deeper once a search is done, the threat on W with no button since 2026-10-11 (Qchess's W: the
+  position with the other side to move, its best move as a red arrow), ⚙ (`EngineSettings.tsx`: depth 20/30/40,
   lines 1–5, max time 5/8/30 s, arrows on or off; Qchess's defaults, lines 3 for the outline's
   MultiPV arrows). On or off per device, off by default; the settings per device.
 - **The lines**: one row per PV: the eval from White's side (`+0.38`, `#3`, `-#2`), then the
@@ -3897,8 +3897,9 @@ Live (desktop and phone): beside Qchess's SF18 on the same positions (the best m
 evals close at the same depth); the arrows' readability; a line added and synced.
 
 **As built** (2026-10-06):
-- `src/ui/Engine.tsx`: the bar (a switch, "SF18", "Depth 18 · 650 kn/s" or the download's
-  progress, Retry after a failure, "+" once a search is done, the threat ⌖, ⚙) at the panel's
+- `src/ui/Engine.tsx`: the bar (a switch, "SF18", "Depth 18" or the download's
+  progress, Retry after a failure, "+" once a search is done, ⚙; the threat ⌖ was dropped for W
+  alone on 2026-10-11) at the panel's
   top on a wide screen and after the move buttons on the phone; one row per line (the eval in
   Qchess's format, then up to 16 moves numbered from the position, cut with an ellipsis); the
   eval bar (`EvalBar`: a 9 px column in the gap right of the board on a wide screen, a 6 px

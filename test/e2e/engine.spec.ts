@@ -92,13 +92,13 @@ test('a new position mid-search stops the old one first; Black to move is scored
 
   // The threat at the start: the position with Black to move, one red arrow.
   await page.getByRole('button', { name: 'Start' }).click();
-  await panel.getByRole('button', { name: 'Show threat' }).click();
+  await page.keyboard.press('w');
   await expect(panel.locator('.engine-line')).toHaveCount(1);
   await expect(panel.locator('.engine-line')).toHaveText(/^Threat\s*1… e5 2\. Nf3/);
   await expect(page.locator('.eval-bar')).toHaveCount(0);
   await expect(page.locator('.cg-wrap svg.cg-shapes line')).toHaveCount(1);
   expect(positions(site)).toContain(START_THREAT);
-  await panel.getByRole('button', { name: 'Show threat' }).click();
+  await page.keyboard.press('w');
   await expect(panel.locator('.engine-line')).toHaveCount(3);
 });
 
