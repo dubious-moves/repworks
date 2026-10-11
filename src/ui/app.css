@@ -70,6 +70,14 @@ body {
   padding: 16px 12px;
 }
 
+/* The pages of text and forms keep to a column on a wide screen, centred; a line of 1400px was
+   hard to read. The board pages (.shell-chapter, .shell-train) take the whole width. */
+.shell:not(.shell-chapter, .shell-train) .content {
+  width: 100%;
+  max-width: 1100px;
+  margin-inline: auto;
+}
+
 .footer {
   padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
   color: var(--muted);
@@ -144,6 +152,44 @@ button:disabled {
   opacity: 0.6;
 }
 
+/* Every field in the theme's colours and a finger's height, on every page as in a form: the
+   browser's own were small and light on the dark themes. A page's rule still sizes and places
+   its fields (`:where` gives this none of its own weight). */
+:where(select, textarea, input:not([type='checkbox'], [type='radio'], [type='range'], [type='file'], [type='color'])) {
+  min-height: 44px;
+  max-width: 100%;
+  padding: 6px 10px;
+  font: inherit;
+  color: var(--text);
+  background-color: var(--bg);
+  border: 1px solid rgb(var(--ink) / 25%);
+  border-radius: var(--radius);
+}
+
+:where(select, textarea, input):focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 1px;
+}
+
+:where(input[type='checkbox'], input[type='radio'], input[type='range']) {
+  accent-color: var(--switch-on);
+}
+
+/* A checkbox and its words on one line, the whole label a finger's height. */
+label.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+
+label.check input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
+
 .setup label {
   display: block;
   margin: 10px 0;
@@ -162,8 +208,58 @@ button:disabled {
   border-radius: var(--radius);
 }
 
+/* The home screen's training card: the counts in the line list's colours (due red, new blue),
+   and on a phone its buttons a row of their own, sharing it (the design canvas's study list). */
+.train-card .card-head {
+  flex-wrap: wrap;
+}
+
+.train-card .card-head .actions {
+  margin: 0;
+}
+
+.train-due.some {
+  color: var(--due);
+}
+
+.train-new.some {
+  color: var(--comment);
+}
+
+@media (max-width: 599px) {
+  .train-card .card-head .actions {
+    flex: 1 1 100%;
+    flex-wrap: nowrap;
+  }
+
+  .train-card .card-head .actions .button {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+}
+
+/* The pages besides the studies: a row of their own under the studies' head; two by two on a phone. */
+.home-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+@media (max-width: 599px) {
+  .home-tools {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .home-tools .button {
+    justify-content: center;
+  }
+}
+
 /* The study cards (PLAN.md §5.15), after Qchess's /studies (read live, 2026-10-06): a grid of
-   cards, the badge and the star's place top left, the tag and delete buttons top right. */
+   cards, the badge and the star's place top left, the tag and delete buttons top right; Train
+   beside the counts, not on a row of its own. */
 
 .studies {
   list-style: none;
@@ -176,10 +272,11 @@ button:disabled {
 
 .study-card {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-content: start;
+  justify-items: start;
+  gap: 6px 12px;
   padding: 14px 16px;
   background: rgb(var(--ink) / 4%);
   border: 1px solid rgb(var(--ink) / 12%);
@@ -257,12 +354,28 @@ button:disabled {
   display: flex;
 }
 
+.study-card > * {
+  grid-column: 1 / -1;
+}
+
+.study-card-meta {
+  grid-column: 1;
+}
+
 .study-card-train {
   position: relative;
   z-index: 1;
-  align-self: flex-end;
-  min-height: 36px;
-  margin-top: 2px;
+  grid-column: 2;
+  grid-row: 3;
+  align-self: end;
+}
+
+.study-card-counts .some.due {
+  color: var(--due);
+}
+
+.study-card-counts .some.new {
+  color: var(--comment);
 }
 
 button.icon {
@@ -617,6 +730,25 @@ textarea.script {
   font-size: 0.85rem;
 }
 
+/* A page's own title, when the head has nothing else to name (Training · …, Read · …, Games): the
+   page's name, as the design canvas's crumb has it, not a muted aside. */
+.chapter-head .titles > .study-title:only-child {
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* The study's head on a wide screen: Study › Chapter, the chapter list beside the board picking it. */
+.crumb-chapter {
+  display: none;
+}
+
+.crumb-chapter b {
+  color: var(--text);
+  font-weight: 600;
+}
+
 .study-title .icon {
   min-width: 28px;
   min-height: 28px;
@@ -653,6 +785,57 @@ textarea.script {
   position: relative;
 }
 
+/* The coordinates inside the edge squares, as Lichess draws them: the files in the bottom row's
+   right corners, the ranks in the left column's top corners, each in the other square colour.
+   chessground's own put the files 24px right of their squares, the h past the board's edge, and a
+   phone's page then scrolled sideways (the owner's notes of 2026-10-10). */
+.board .cg-wrap coords {
+  font: 700 11px/1 var(--font);
+  opacity: 0.9;
+}
+
+.board .cg-wrap coords.files {
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: auto;
+}
+
+.board .cg-wrap coords.files coord {
+  flex: 1 1 0;
+  text-align: right;
+  padding: 0 3px 2px 0;
+}
+
+.board .cg-wrap coords.ranks {
+  left: 0;
+  top: 0;
+  width: auto;
+  height: 100%;
+}
+
+.board .cg-wrap coords.ranks coord {
+  flex: 1 1 0;
+  transform: none;
+  padding: 3px 0 0 3px;
+}
+
+/* On a dark square the light colour, on a light one the dark: a1 is dark, a8 and h1 light. A
+   theme with flat squares names its colours; the others draw chessground's brown, whose these are. */
+.board .orientation-white .files coord:nth-child(odd),
+.board .orientation-white .ranks coord:nth-child(odd),
+.board .orientation-black .files coord:nth-child(even),
+.board .orientation-black .ranks coord:nth-child(even) {
+  color: var(--board-light, #f0d9b5); /* fixed */
+}
+
+.board .orientation-white .files coord:nth-child(even),
+.board .orientation-white .ranks coord:nth-child(even),
+.board .orientation-black .files coord:nth-child(odd),
+.board .orientation-black .ranks coord:nth-child(odd) {
+  color: var(--board-dark, #b58863); /* fixed */
+}
+
 /* The board's size, dragged from its corner (Board.tsx, src/app/boardSize.ts): one size, kept as
    `--board-size`, for the boards a page is built around (a study's, training's, practice's), each
    as large as its page fits up to it. Just outside the corner, clear of the h-file's letter. */
@@ -680,11 +863,13 @@ textarea.script {
   display: block;
 }
 
+/* Bigger to the finger, and no further right than the page's 12px gutter: a board as wide as a
+   phone's page would otherwise make it scroll sideways. */
 @media (pointer: coarse) {
   .board-resize {
-    right: -14px;
+    right: -12px;
     bottom: -14px;
-    width: 28px;
+    width: 26px;
     height: 28px;
   }
 }
@@ -1035,6 +1220,12 @@ textarea.script {
 .move-menu button {
   display: flex;
   align-items: center;
+}
+
+.move-menu .menu-sep {
+  margin: 4px 0;
+  border: 0;
+  border-top: 1px solid rgb(var(--ink) / 12%);
 }
 
 .move-menu kbd {
@@ -1396,6 +1587,14 @@ table.cards td {
     display: none;
   }
 
+  .has-frame .crumb-chapter {
+    display: inline;
+  }
+
+  .has-frame .chapter-head .study-title {
+    font-size: 1rem;
+  }
+
   .cv-chapters {
     grid-area: side;
     display: flex;
@@ -1414,6 +1613,17 @@ table.cards td {
     padding: 4px 4px 4px 12px;
     font-weight: 600;
     border-bottom: 1px solid rgb(var(--ink) / 10%);
+  }
+
+  .cv-study-name {
+    display: grid;
+    padding: 4px 0;
+    overflow-wrap: anywhere;
+  }
+
+  .cv-study-name small {
+    font-weight: 400;
+    font-size: 0.8rem;
   }
 
   .cv-chapters ol {
@@ -1512,6 +1722,23 @@ table.cards td {
 
 .train-actions {
   margin: 10px 0;
+}
+
+/* On a phone the buttons under the board two to a row, of one width: as they came, Stop was left
+   on a row of its own and the rows ragged. What isn't a button (a sequence's steps) takes a row. */
+@media (max-width: 599px) {
+  .train-panel:not(.storm-panel) > .train-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .train-panel:not(.storm-panel) > .train-actions > button {
+    padding: 0 8px;
+  }
+
+  .train-panel:not(.storm-panel) > .train-actions > :not(button) {
+    grid-column: 1 / -1;
+  }
 }
 
 .train-pace {
@@ -1795,6 +2022,16 @@ table.cards td {
 a.button.secondary {
   background: transparent;
   color: var(--text);
+}
+
+/* The one thing a card is for (Train, + New study): the theme's primary colour, as the design
+   canvas has it. */
+button.primary,
+a.button.primary {
+  background: var(--primary-bg);
+  border-color: var(--primary-border);
+  color: var(--accent-text);
+  font-weight: 600;
 }
 
 /* The Read view (PLAN.md §5.10): the move and its comments in large text. */
@@ -2292,17 +2529,10 @@ a.button.secondary {
   color: var(--on-select);
 }
 
-.form label.check {
+/* A form's labels are blocks (.form label): a checkbox's is the row label.check makes it. */
+.form label.check,
+.games-setup label.check {
   display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-
-.form label.check input {
-  display: inline-block;
-  width: auto;
-  min-height: 0;
-  margin: 4px 0 0;
 }
 
 /* ☰, the four move buttons, and ✎ ⋯ on a touch screen: one row in the panel at every width, sharing it. */
@@ -2879,6 +3109,16 @@ a.button.secondary {
   flex: 1 1 auto;
   min-width: 0;
   font-size: 0.8rem;
+}
+
+/* On a wide screen the board keeps room for the FEN box under it (it ran past the frame, over the
+   footer), and the analysis board, with no chapter list, gives that column to the board. */
+@media (min-width: 900px) {
+  .scratch .cv-grid {
+    --board: min(100cqh - 34px - 52px, 100cqw - var(--panel) - 16px, var(--board-size, 100vw));
+    grid-template-columns: var(--board) var(--panel);
+    grid-template-areas: 'board panel';
+  }
 }
 
 /* Show sequence's steps (the owner's third notes): one group of small buttons. */
@@ -3538,7 +3778,15 @@ a.button.secondary {
   margin-bottom: 8px;
 }
 .games-filters label.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  border-radius: 22px;
   cursor: pointer;
+}
+.games-filters label.chip input {
+  margin: 0;
 }
 .games-setup {
   display: grid;

@@ -183,24 +183,24 @@ function Home() {
       <section class="card">
         <div class="card-head">
           <h2>Studies</h2>
-          <div class="actions">
-            <a class="button secondary" href="#/storm">
-              Storm
-            </a>
-            <a class="button secondary" href="#/games">
-              Games
-            </a>
-            <a class="button secondary" href="#/analysis">
-              Analysis board
-            </a>
-            <a class="button secondary" href="#/import">
-              Import
-            </a>
-            <button type="button" onClick={openNewStudy}>
-              + New study
-            </button>
-          </div>
+          <button type="button" class="primary" onClick={openNewStudy}>
+            + New study
+          </button>
         </div>
+        <nav class="home-tools" aria-label="Pages">
+          <a class="button secondary" href="#/storm">
+            Storm
+          </a>
+          <a class="button secondary" href="#/games">
+            Games
+          </a>
+          <a class="button secondary" href="#/analysis">
+            Analysis board
+          </a>
+          <a class="button secondary" href="#/import">
+            Import
+          </a>
+        </nav>
         {studies.value.length === 0 ? (
           <p class="muted">No studies yet: make one, or import one.</p>
         ) : (
@@ -261,12 +261,12 @@ function StudyCard(props: { study: StudyRow }) {
         {s.side && <span class={`study-tag tag-${s.side}`}>{SIDES[s.side]}</span>}
         {queue && (queue.due.length > 0 || queue.newCards.length > 0) && (
           <span class="study-card-counts">
-            {queue.due.length} due · {queue.newCards.length} new
+            <span class={`due${queue.due.length ? ' some' : ''}`}>{queue.due.length} due</span> · <span class={`new${queue.newCards.length ? ' some' : ''}`}>{queue.newCards.length} new</span>
           </span>
         )}
       </div>
       {s.kind === 'repertoire' && (
-        <a class="button study-card-train" href={`#/train/${s.id}`} aria-label={`Train ${s.name}`}>
+        <a class="button primary study-card-train" href={`#/train/${s.id}`} aria-label={`Train ${s.name}`}>
           Train
         </a>
       )}

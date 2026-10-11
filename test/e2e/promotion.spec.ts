@@ -3,7 +3,7 @@
 // waiting on its square; Escape or a click elsewhere takes no piece, a click on one plays it.
 import { test, expect } from '@playwright/test';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
-import { clickSquare } from './board.ts';
+import { clickSquare, studyMenu } from './board.ts';
 import { serveGithub, world } from './github.ts';
 import { serveSite, type SiteServer } from './server.ts';
 
@@ -22,7 +22,7 @@ test('a promotion: the pieces on the board, Escape and a click elsewhere take no
   await expect(page.locator('.chip')).toHaveText(/^synced/);
   await page.getByRole('link', { name: 'Test repertoire', exact: true }).click();
   await expect(page.locator('.notation')).toContainText('1. e4');
-  await page.getByRole('button', { name: 'New chapter' }).click();
+  await studyMenu(page, 'New chapter');
   const dialog = page.getByRole('dialog', { name: 'New chapter' });
   await dialog.getByLabel('From FEN').check();
   await dialog.getByLabel('FEN', { exact: true }).fill('4k3/1P6/8/8/8/8/8/4K3 w - - 0 1');

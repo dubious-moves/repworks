@@ -260,11 +260,11 @@ test('copy FEN: the board’s position from the ☰ menu and from the move menu 
   await page.goto(`${site.url}#/analysis?fen=${encodeURIComponent(after)}`);
   await clickSquare(page, 'g1', 'white');
   await clickSquare(page, 'f3', 'white');
-  await page.getByRole('button', { name: 'Copy FEN' }).click();
+  await studyMenu(page, 'Copy FEN');
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2');
 });
 
-test('the ☰ menu: the explorer, undo and redo, Copy FEN; the bar keeps the moves (the owner’s notes, 2026-10-10)', async ({ page, isMobile }) => {
+test('the ☰ menu: the explorer, undo and redo, Copy FEN, the study’s own; the bar keeps the moves (the owner’s notes, 2026-10-10)', async ({ page, isMobile }) => {
   await setUp(page);
   await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf?at=e4,c5`);
   await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5');
@@ -278,7 +278,7 @@ test('the ☰ menu: the explorer, undo and redo, Copy FEN; the bar keeps the mov
   await more.click();
   await expect(more).toHaveAttribute('aria-expanded', 'true');
   await expect(menu.getByRole('menuitemcheckbox')).toHaveAccessibleName('Explorer');
-  await expect(menu.getByRole('menuitem')).toHaveText([/^↶Undo/, /^↷Redo/, 'Copy FEN']);
+  await expect(menu.getByRole('menuitem')).toHaveText([/^↶Undo/, /^↷Redo/, 'Copy FEN', '+New chapter…', 'Chapter settings…', 'Study settings…']);
   await expect(menu.getByRole('menuitem', { name: 'Undo' })).toBeDisabled();
   await expect(menu.getByRole('menuitem', { name: 'Redo' })).toBeDisabled();
   // ☰ again closes it, as Escape does; the keys move along the line again afterwards.
@@ -297,6 +297,24 @@ test('the ☰ menu: the explorer, undo and redo, Copy FEN; the bar keeps the mov
   await expect(page.locator('.notation .move[data-path="e4 c5 g3"]')).toHaveCount(0);
   await studyMenu(page, 'Redo');
   await expect(page.locator('.notation .move[data-path="e4 c5 g3"]')).toHaveCount(1);
+
+  // The study's own (§5.88): with a chapter open the head holds no ⚙ or +, the ☰ menu does. The
+  // chapter is picked in the head, or on a wide screen from the list, the head then naming it.
+  const head = page.locator('.chapter-head');
+  await expect(head.getByRole('button', { name: /settings|New chapter/ })).toHaveCount(0);
+  if (isMobile) {
+    await expect(head.getByLabel('Chapter', { exact: true })).toBeVisible();
+    await expect(head.locator('.crumb-chapter')).toBeHidden();
+  } else {
+    await expect(head.getByLabel('Chapter', { exact: true })).toBeHidden();
+    await expect(head.locator('.crumb-chapter')).toHaveText('› Main line');
+  }
+  for (const item of ['Chapter settings', 'Study settings', 'New chapter'] as const) {
+    await studyMenu(page, item);
+    const dialog = page.getByRole('dialog', { name: item });
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    await expect(dialog).toHaveCount(0);
+  }
 });
 
 test('clickable lines: preview a comment’s line, step through its lines, and back out', async ({ page, isMobile }) => {

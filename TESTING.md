@@ -5,6 +5,15 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## Every page looked over for layout (§5.88)
+
+- Phone: no page with a board scrolls sideways any more, and the coordinates sit inside the
+  edge squares. Are they readable on your board colours?
+- Phone, a study: the head shows the chapter's full name; New chapter, Chapter settings and
+  Study settings are in ☰. Desktop: the head reads Study › Chapter.
+- Home, training, games, coverage, storm: the dropdowns and boxes in the theme's colours; home's
+  buttons and the training buttons on the phone in even rows. Anything that now looks off?
+
 ## The study's ☰ menu (§5.87)
 
 - Desktop and phone, in a study: the bar under the notation is ☰ ⏮ ◀ ▶ ⏭ (and ✎ ⋯ on the phone).

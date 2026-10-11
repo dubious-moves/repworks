@@ -5,7 +5,6 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { makeFen } from 'chessops/fen';
 import { addToChapter, targetsFor, type Target } from '../app/analysis.ts';
 import { at, chapter, feedback, goTo, openScratch, side } from '../app/editor.ts';
-import { copyFen } from './MoveMenu.tsx';
 import { checkSequence, saveSequence, sourceMistake, type CheckResult } from '../app/sequence.ts';
 import type { Chapter } from '../core/study/model.ts';
 import { goBack, mode, open } from '../app/mode.ts';
@@ -22,12 +21,11 @@ function parent(): Mode {
 }
 const back = () => goBack(parent());
 
-/** The FEN to start from, under the board: a long line of text has no place in the head; and the position shown's, copied. */
+/** The FEN to start from, under the board: a long line of text has no place in the head. The position shown's is copied from the ☰ menu (§5.87), as on a study. */
 export function AnalysisFen() {
   const c = chapter.value;
   const [fen, setFen] = useState('');
   const start = c ? positionAt(c, []) : undefined;
-  const shown = c ? positionAt(c, at.value) : undefined;
   return (
     <form
       class="fen-form"
@@ -42,9 +40,6 @@ export function AnalysisFen() {
       </button>
       <button type="button" class="secondary" title="A new board from the start position" onClick={() => openScratch('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1')}>
         New
-      </button>
-      <button type="button" class="secondary" disabled={!shown} title="Copy the FEN of the position shown" onClick={() => shown && void copyFen(makeFen(shown.toSetup()))}>
-        Copy FEN
       </button>
     </form>
   );

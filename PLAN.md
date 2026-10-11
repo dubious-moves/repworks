@@ -3048,6 +3048,49 @@ it), and the explorer, editor and engine specs through the menu (`studyMenu` in 
 
 Live: TESTING.md.
 
+#### 5.88 Every page looked over for layout (the owner's request, 2026-10-11)
+
+Each page screenshotted on a desktop (1440 wide) and an emulated phone, with three studies; what
+was found and changed:
+- **The phone scrolled sideways** on every page with a board: chessground's file letters sat 24px
+  right of their squares, the h past the board's edge. The coordinates are now inside the edge
+  squares, Lichess's way (files bottom right, ranks top left, each in the other square colour,
+  11px bold instead of 9px), and the resize corner keeps inside the page's 12px gutter on a
+  touch screen.
+- **Fields** (selects, text and number boxes) were the browser's own on most pages: small and
+  light on the dark themes. All take the theme's colours and 44px now, as the forms had;
+  checkboxes the switch colour, a checkbox and its words one row (the games' sources had the box
+  above its words, the speed chips off its line).
+- **The study's head:** with a chapter open, its study ⚙, chapter ⚙ and + went into the ☰ menu
+  (New chapter…, Chapter settings…, Study settings…, under a rule), so the phone's chapter
+  picker shows the chapter's name (it was cut to "Giuoco Piar"). A study with no chapter keeps
+  them in the head. On a wide screen the head reads Study › **Chapter** (the design canvas's
+  crumb), and the chapter list's head counts the chapters.
+- **A page's title** (Training · …, Read · …, Games, Mistakes…) is the page's name in the text
+  colour, not a muted aside; Import and Conflicts have the ← and title the other pages have
+  (they had a "← Studies" link).
+- **Text pages** (home, games, mistakes, coverage, import…) keep to a centred 1100px column on a
+  wide screen; the board pages take the width.
+- **Home:** the training card's counts in the line list's colours (due red, new blue, only when
+  not 0), Train in the primary colour, and on a phone its buttons a row sharing the width. The
+  studies card: + New study by its title, Storm, Games, Analysis board and Import a row under it
+  (two by two on a phone, not squeezed beside the title); a study card's Train beside its counts.
+  Forest's `--due` went from #e05050 to #e66464: 4.5:1 on its surface (it was 4.0), for Slate,
+  Walnut and Midnight too, which take it.
+- **Training on a phone:** the buttons under the board two to a row, of one width.
+- **The analysis board:** its FEN box ran past the frame over the footer on a wide screen; the
+  board now keeps room for it, and takes the chapter list's empty column. Its Copy FEN went to
+  ☰ (the study's), the box keeps Set up and New.
+
+Not changed, for the owner to say: the shortcut keys' "(1) (2) (4)" on the training buttons show
+on a phone too; the explorer's columns (the canvas had a Maia column).
+
+Tests: `views.spec.ts` (the ☰ menu's study items opening their dialogs, no ⚙ or + in the head,
+the crumb on a desktop and the picker on a phone; Copy FEN on the analysis board from ☰), and the
+study, promotion and chapter helpers through ☰ (`newChapter`, `chapterSettings`, `studyMenu`).
+
+Live: TESTING.md.
+
 #### 5.14 Phase 1 acceptance test, and exit
 
 **Acceptance test (live, desktop + Android phone)**, after Phase 0's (§4.11) and once §5.15 is

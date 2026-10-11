@@ -154,17 +154,25 @@ export function ChapterView() {
   const trainTitle = waiting ? 'Back to the training session' : s.meta.kind === 'repertoire' ? 'Train the line shown' : 'Play the line from this move';
   // The analysis board (§5.35): the same view over a chapter on this device only.
   const scratch = s.sid === SCRATCH;
+  const framed = !!(c && board);
+  const current = s.chapters.find((ch) => ch.id === s.cid);
 
   return (
     <div class={`chapter-view${c && board ? ' has-frame' : ''}${waiting ? ' session-waiting' : ''}${scratch ? ' scratch' : ''}`}>
       {scratch ? <AnalysisHead /> : <div class="chapter-head">
         <Back parent={{ name: 'list' }} />
+        {/* The study, then the chapter: picked here, or from the list beside the board on a wide
+            screen, where the head names it (the design canvas's crumb). With a chapter open, the
+            ☰ menu holds the study's and the chapter's settings and New chapter (§5.88). */}
         <div class="titles">
           <span class="study-title">
             {s.meta.name}
-            <button type="button" class="icon head-tool" aria-label="Study settings" title="Study settings" onClick={studySettings}>
-              ⚙
-            </button>
+            {current && <span class="crumb-chapter"> › <b>{current.name}</b></span>}
+            {!framed && (
+              <button type="button" class="icon" aria-label="Study settings" title="Study settings" onClick={studySettings}>
+                ⚙
+              </button>
+            )}
           </span>
           <div class="chapter-pick head-tool">
             {s.chapters.length > 0 && (
@@ -176,14 +184,16 @@ export function ChapterView() {
                 ))}
               </select>
             )}
-            {s.cid && (
+            {!framed && s.cid && (
               <button type="button" class="icon" aria-label="Chapter settings" title="Chapter settings" onClick={() => openChapterSettings(s.sid, s.cid)}>
                 ⚙
               </button>
             )}
-            <button type="button" class="icon" aria-label="New chapter" title="New chapter" onClick={openNewChapter}>
-              +
-            </button>
+            {!framed && (
+              <button type="button" class="icon" aria-label="New chapter" title="New chapter" onClick={openNewChapter}>
+                +
+              </button>
+            )}
           </div>
         </div>
         <ModeSwitch current="study" onTrain={() => void train()} trainTitle={trainTitle} />
@@ -198,7 +208,12 @@ export function ChapterView() {
           <div class="cv-grid">
             {!scratch && <nav class="cv-chapters" aria-label="Chapters">
               <div class="cv-study">
-                <span>{s.meta.name}</span>
+                <span class="cv-study-name">
+                  {s.meta.name}
+                  <small class="muted">
+                    {s.chapters.length} chapter{s.chapters.length === 1 ? '' : 's'}
+                  </small>
+                </span>
                 <button type="button" class="icon" aria-label="Study settings" title="Study settings" onClick={studySettings}>
                   ⚙
                 </button>
@@ -302,7 +317,12 @@ export function ChapterView() {
       )}
       {/* Outside the frame, whose size containment would place a fixed menu inside it. */}
       <MoveMenu />
-      {c && board && <StudyMenu fen={shownLine?.fen ?? board.fen} />}
+      {c && board && (
+        <StudyMenu
+          fen={shownLine?.fen ?? board.fen}
+          {...(scratch ? {} : { study: { settings: studySettings, chapterSettings: () => openChapterSettings(s.sid, s.cid), newChapter: openNewChapter } })}
+        />
+      )}
       <BranchPicker />
       <TranspositionList />
       <CommentDialog />

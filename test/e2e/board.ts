@@ -18,9 +18,14 @@ export async function clickSquare(page: Page, name: string, orientation: 'white'
   await page.mouse.click(p.x, p.y);
 }
 
-/** Makes a chapter in the open study by "+ New chapter" (by the chapter list, or "+" in the head). */
+/**
+ * Makes a chapter in the open study by "+ New chapter": by the chapter list on a wide screen, the
+ * ☰ menu with a chapter open (§5.88), or "+" in the head of a study with none.
+ */
 export async function newChapter(page: Page, name: string, side?: 'white' | 'black') {
-  await page.getByRole('button', { name: 'New chapter' }).click();
+  const direct = page.getByRole('button', { name: 'New chapter' });
+  if (await direct.isVisible()) await direct.click();
+  else await studyMenu(page, 'New chapter');
   const dialog = page.getByRole('dialog', { name: 'New chapter' });
   await dialog.getByLabel('Chapter name').fill(name);
   if (side) await dialog.getByLabel(side === 'white' ? 'White' : 'Black').check();
@@ -28,10 +33,11 @@ export async function newChapter(page: Page, name: string, side?: 'white' | 'bla
   await dialog.waitFor({ state: 'detached' });
 }
 
-/** Opens the open chapter's settings: its ⚙ in the chapter list on a wide screen, else in the head. */
+/** Opens the open chapter's settings: its ⚙ in the chapter list on a wide screen, else from the ☰ menu (§5.88). */
 export async function chapterSettings(page: Page, name: string) {
   const inList = page.getByRole('navigation', { name: 'Chapters' }).getByRole('button', { name: `Settings: ${name}` });
-  await (await inList.isVisible() ? inList : page.getByRole('button', { name: 'Chapter settings' })).click();
+  if (await inList.isVisible()) await inList.click();
+  else await studyMenu(page, 'Chapter settings');
   return page.getByRole('dialog', { name: 'Chapter settings' });
 }
 
@@ -59,8 +65,8 @@ export async function drawInDrawMode(page: Page, from: string, to: string, orien
   if (touch) await toggle.click();
 }
 
-/** Picks an item of the study's ☰ menu (§5.87): the explorer on or off, Undo, Redo, Copy FEN. */
-export async function studyMenu(page: Page, item: 'Explorer' | 'Undo' | 'Redo' | 'Copy FEN') {
+/** Picks an item of the study's ☰ menu (§5.87, §5.88): the explorer on or off, Undo, Redo, Copy FEN, the study's own. */
+export async function studyMenu(page: Page, item: 'Explorer' | 'Undo' | 'Redo' | 'Copy FEN' | 'New chapter' | 'Chapter settings' | 'Study settings') {
   await page.getByRole('button', { name: 'More', exact: true }).click();
   const menu = page.getByRole('menu', { name: 'More' });
   await menu.getByRole(item === 'Explorer' ? 'menuitemcheckbox' : 'menuitem', { name: item }).click();

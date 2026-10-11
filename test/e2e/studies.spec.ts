@@ -7,7 +7,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import type { FakeGit } from '../support/fakeGit.ts';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
-import { chapterSettings, clickSquare, newChapter } from './board.ts';
+import { chapterSettings, clickSquare, newChapter, studyMenu } from './board.ts';
 import { serveGithub, world } from './github.ts';
 import { serveSite, type SiteServer } from './server.ts';
 import { walkOnce } from './prefs.ts';
@@ -94,8 +94,8 @@ test('a study made with no import, managed where Qchess has it, and deleted from
   expect(JSON.parse(files().get(`studies/${sid}/study.json`)!)).toEqual({ format: 1, id: sid, name: 'Caro-Kann', kind: 'reference', chapters: [cid] });
   expect(files().get(`studies/${sid}/${cid}.pgn`)).toBe('[Event "Caro-Kann: Advance"]\n[Result "*"]\n[StudyName "Caro-Kann"]\n[ChapterName "Advance"]\n[Orientation "black"]\n\n1. e4 c6 *\n');
 
-  // The study's ⚙: renamed and made a repertoire, every chapter's StudyName with it.
-  await page.getByRole('button', { name: 'Study settings' }).click();
+  // The study's settings (☰): renamed and made a repertoire, every chapter's StudyName with it.
+  await studyMenu(page, 'Study settings');
   dialog = page.getByRole('dialog', { name: 'Study settings' });
   await expect(dialog.getByLabel('Study name')).toHaveValue('Caro-Kann');
   await expect(dialog.getByLabel('Reference')).toBeChecked();
@@ -153,7 +153,7 @@ test('a new chapter from a FEN, from pasted PGN and from a PGN file', async ({ p
   const options = page.getByLabel('Chapter', { exact: true }).locator('option');
   const before = await options.allTextContents();
   const start = async () => {
-    await page.getByRole('button', { name: 'New chapter' }).click();
+    await studyMenu(page, 'New chapter');
     return page.getByRole('dialog', { name: 'New chapter' });
   };
 
@@ -212,7 +212,7 @@ test('a study renamed from its card, and deleted from its settings in the chapte
   await expect(card(page, 'Sicilian')).toBeVisible();
   await card(page, 'Sicilian').getByRole('link', { name: 'Sicilian', exact: true }).click();
   await expect(page.locator('.notation')).toContainText('1. e4');
-  await page.getByRole('button', { name: 'Study settings' }).click();
+  await studyMenu(page, 'Study settings');
   dialog = page.getByRole('dialog', { name: 'Study settings' });
   page.once('dialog', (d) => void d.accept());
   await dialog.getByRole('button', { name: 'Delete study' }).click();

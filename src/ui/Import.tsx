@@ -9,6 +9,7 @@ import type { StudyKind, StudySource } from '../core/study/model.ts';
 import { lichess, lichessUser, logInWithLichess, logOutOfLichess } from '../app/lichess.ts';
 import { open } from '../app/mode.ts';
 import { notice, saveImport } from '../app/state.ts';
+import { Back } from './Back.tsx';
 
 interface Read {
   reading: ImportReading;
@@ -21,9 +22,12 @@ export function ImportScreen() {
   const [read, setRead] = useState<Read | undefined>(undefined);
   return (
     <>
-      <p>
-        <a href="#/">← Studies</a>
-      </p>
+      <div class="chapter-head">
+        <Back parent={{ name: 'list' }} />
+        <div class="titles">
+          <span class="study-title">Import</span>
+        </div>
+      </div>
       {read ? <Review read={read} onCancel={() => setRead(undefined)} /> : <Sources onRead={setRead} />}
     </>
   );
