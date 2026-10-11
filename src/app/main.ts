@@ -19,6 +19,8 @@ const lichessCallback = takeLichessCallback();
 applyTheme();
 render(h(App, {}), document.getElementById('app')!);
 closeDialogsOnBackdrop();
+// Safari on iOS shows :active (a button's press, app.css) only once the page listens for touches.
+document.addEventListener('touchstart', () => {}, { passive: true });
 // A frame of the styles gallery (styles.html): shown in another theme, never syncing.
 void startApp(link, lichessCallback, !new URLSearchParams(location.search).has('preview'));
 
