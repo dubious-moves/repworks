@@ -1,7 +1,7 @@
 // The explorer panel's table (PLAN.md §5.23): Qchess's rows, novelties, Σ and sort orders.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { barLabel, buildTable, evalTone, formatEval, formatShare } from '../../../../src/core/explorer/table.ts';
+import { barLabel, buildTable, evalTone, formatCount, formatEval, formatShare } from '../../../../src/core/explorer/table.ts';
 import type { CompactExplorer } from '../../../../src/core/explorer/providers.ts';
 import type { ChessdbAnswer } from '../../../../src/core/explorer/search.ts';
 
@@ -113,4 +113,11 @@ test('Maia (§5.33): its likelihoods on the rows, its top moves the table lacks 
   assert.equal(sans(buildTable({ turn: 'b', games, evals, sort: 'eval', side: 'w', maia })).at(-1), 'c5');
   // Without Maia, no Maia order: as given, nothing added.
   assert.deepEqual(sans(buildTable({ turn: 'b', games, evals, sort: 'popularity', side: 'w' })), ['Nf6', 'd5', 'f5', 'e5', 'g5']);
+});
+
+test('counts are short: three figures and k, M or B', () => {
+  assert.deepEqual(
+    [0, 7, 999, 1000, 1234, 12345, 900000, 999499, 999500, 2511428, 800000000, 1523467321, 872123524].map(formatCount),
+    ['0', '7', '999', '1k', '1.23k', '12.3k', '900k', '999k', '1M', '2.51M', '800M', '1.52B', '872M'],
+  );
 });

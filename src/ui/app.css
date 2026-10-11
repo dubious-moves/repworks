@@ -1784,8 +1784,12 @@ table.cards td {
     font-size: 1rem;
   }
 
+  /* The chapters at their own width at the side's outer edge, the room between them and the
+     board left empty, the eval bar in it (the owner's notes, 2026-10-11: a trial). */
   .cv-chapters {
     grid-area: side;
+    justify-self: start;
+    width: min(100%, 280px);
     display: flex;
     flex-direction: column;
     min-height: 0;
@@ -2387,9 +2391,11 @@ a.button.primary {
 
 .explorer {
   /* The Move and Eval columns: Eval close after the move, as Qchess's (the owner's 2026-10-07
-     notes: the third notes' wider gap was too wide). */
-  --ex-move-w: 52px;
-  --ex-eval-w: 46px;
+     notes: the third notes' wider gap was too wide), and narrower again on 2026-10-11. */
+  --ex-move-w: 46px;
+  --ex-eval-w: 40px;
+  /* The columns shown, set by Explorer.tsx; this only until it does. */
+  --ex-cols: var(--ex-move-w) var(--ex-eval-w) minmax(0, 1fr);
   font-size: 0.85rem;
   border-top: 1px solid rgb(var(--ink) / 10%);
   display: flex;
@@ -2488,18 +2494,15 @@ a.button.primary {
   color: var(--info-text);
 }
 
+/* The columns shown (Explorer.tsx's `template`, as `--ex-cols`): Move, the ones not hidden, and
+   the bar (or the header's sort) taking the rest. */
 .explorer-head,
 .ex-row {
   display: grid;
-  grid-template-columns: var(--ex-move-w) var(--ex-eval-w) 40px var(--ex-count-w, 64px) minmax(60px, 1fr);
+  grid-template-columns: var(--ex-cols);
   align-items: center;
-  column-gap: 6px;
+  column-gap: 5px;
   padding: 0 8px;
-}
-
-.explorer-head.no-games,
-.explorer-rows.no-games .ex-row {
-  grid-template-columns: var(--ex-move-w) var(--ex-eval-w) 1fr;
 }
 
 .explorer-head {
@@ -2509,23 +2512,27 @@ a.button.primary {
   min-height: 30px;
 }
 
+/* The bar's column in the header: Score (or Prepared) on its left, the sort on its right. */
+.explorer-head .ex-last {
+  grid-column: -2 / -1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
 .explorer-head .ex-sort {
-  grid-column: -2;
-  justify-self: end;
+  margin-left: auto;
   position: relative;
   display: flex;
   align-items: center;
   min-height: 24px;
-  padding: 0 8px;
+  padding: 0 6px;
   white-space: nowrap;
   color: var(--text);
   border: 1px solid rgb(var(--ink) / 20%);
   border-radius: 4px;
   cursor: pointer;
-}
-
-.explorer-head.no-games .ex-sort {
-  grid-column: 3;
 }
 
 .explorer-head .ex-sort select {
@@ -2675,11 +2682,6 @@ a.button.primary {
 }
 
 @media (min-width: 900px) {
-  .explorer {
-    --ex-move-w: 56px;
-    --ex-eval-w: 48px;
-  }
-
   .cv-panel .explorer {
     height: var(--ex-height, calc(50% - var(--engine-h, 0px)));
     /* The engine's bar and lines (§5.31) come out of its room: --engine-h is their height. */
@@ -2723,6 +2725,13 @@ a.button.primary {
   color: var(--on-select);
 }
 
+/* The columns' checkboxes: two to a row. */
+.explorer-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0 12px;
+}
+
 /* A form's labels are blocks (.form label): a checkbox's is the row label.check makes it. */
 .form label.check,
 .games-setup label.check {
@@ -2746,11 +2755,6 @@ a.button.primary {
    deepens, green on the best at one depth, `·` computing, `–` no value, `?` an error, `×` left
    out; an empty cell computes on a click. The games' count has one width for all rows (set from
    the longest count), so the bars line up as Qchess's. */
-.explorer-head.with-prac,
-.explorer-rows.with-prac .ex-row {
-  grid-template-columns: var(--ex-move-w) var(--ex-eval-w) 44px 40px var(--ex-count-w, 64px) minmax(60px, 1fr);
-}
-
 .ex-prac {
   text-align: right;
   font-weight: 700;
@@ -3136,8 +3140,8 @@ a.button.primary {
   color: var(--accent-text);
 }
 
-/* The eval bar: in the gap right of the board on a wide screen (Qchess's place), a thin strip
-   under it on the phone. White's share grows from White's side of the board. */
+/* The eval bar: in the gap right of the board on a wide screen (Qchess's place; left of it on the
+   stage, from 1150px), a thin strip under it on the phone. White's share grows from White's side of the board. */
 
 .cv-board {
   position: relative;
@@ -3178,27 +3182,15 @@ a.button.primary {
   }
 }
 
+/* On the stage, left of the board, where the side's room is (the owner's notes, 2026-10-11). */
+@media (min-width: 1150px) {
+  .eval-bar {
+    left: -12px;
+  }
+}
+
 /* Maia in the explorer (PLAN.md §5.33), as Qchess's: Ml (likelihood, blue) and Ms (score, gold)
    before the bars; Maia's own moves purple. */
-
-.explorer-head.with-maia,
-.explorer-rows.with-maia .ex-row {
-  grid-template-columns: var(--ex-move-w) var(--ex-eval-w) 40px var(--ex-count-w, 64px) 36px 36px minmax(60px, 1fr);
-}
-
-.explorer-head.with-maia.with-prac,
-.explorer-rows.with-maia.with-prac .ex-row {
-  grid-template-columns: var(--ex-move-w) var(--ex-eval-w) 44px 40px var(--ex-count-w, 64px) 36px 36px minmax(60px, 1fr);
-}
-
-.explorer-head.with-maia.no-games,
-.explorer-rows.with-maia.no-games .ex-row {
-  grid-template-columns: var(--ex-move-w) var(--ex-eval-w) 36px 36px 1fr;
-}
-
-.explorer-head.with-maia.no-games .ex-sort {
-  grid-column: 5;
-}
 
 .ex-ml,
 .ex-ms {
@@ -3229,23 +3221,11 @@ a.button.primary {
   color: var(--maia);
 }
 
-/* The phone: with Maia's two columns, the games' count gives way (its share stays). */
+/* The phone: closer columns (with Maia's two, Explorer.tsx drops the games' count). */
 @media (max-width: 480px) {
-  .explorer-head.with-maia,
-  .explorer-rows.with-maia .ex-row {
-    grid-template-columns: 54px 46px 36px 34px 34px minmax(40px, 1fr);
+  .explorer-head,
+  .ex-row {
     column-gap: 4px;
-  }
-
-  .explorer-head.with-maia.with-prac,
-  .explorer-rows.with-maia.with-prac .ex-row {
-    grid-template-columns: 54px 46px 40px 36px 34px 34px minmax(40px, 1fr);
-    column-gap: 4px;
-  }
-
-  .explorer-rows.with-maia:not(.no-games) .ex-count,
-  .explorer-head.with-maia:not(.no-games) .ex-score {
-    display: none;
   }
 }
 

@@ -3,7 +3,7 @@
 // q_extension's popup has them, ChessDB analysis (off, D9) and the local explorer's address.
 import { signal } from '@preact/signals';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { DEFAULT_PREFS, onWorker, postToWorker, prefs, RATINGS, setPrefs, SPEEDS, testLocalExplorer, type ExplorerPrefs } from '../app/explorer.ts';
+import { DEFAULT_PREFS, onWorker, postToWorker, prefs, RATINGS, setPrefs, SPEEDS, testLocalExplorer, type ExplorerColumn, type ExplorerPrefs } from '../app/explorer.ts';
 import type { FromWorker } from '../core/explorer/service.ts';
 import { lichessUser, logInWithLichess } from '../app/lichess.ts';
 import { mode } from '../app/mode.ts';
@@ -31,6 +31,17 @@ const NUMBERS: { key: NumberKey; label: string; min: number; max: number; step: 
   { key: 'ownMargin', label: 'Your moves compared within (win% points)', min: 0, max: 50, step: 0.5, advanced: true },
   { key: 'ownMaxCandidates', label: 'Your moves compared, at most', min: 1, max: 10, step: 1, advanced: true },
   { key: 'prepPriorGames', label: 'Prepared score: trust in the Practical value (games)', min: 0, max: 10000, step: 1, advanced: true },
+];
+
+// The columns that can be hidden (the owner's notes, 2026-10-11): Move always shows, and Prac is
+// the Practical column's own switch below.
+const COLUMNS: { key: ExplorerColumn; label: string }[] = [
+  { key: 'eval', label: 'Eval' },
+  { key: 'share', label: 'Share (%)' },
+  { key: 'games', label: 'Games' },
+  { key: 'score', label: 'Score (the results’ bar)' },
+  { key: 'ml', label: 'Ml (Maia’s likelihood)' },
+  { key: 'ms', label: 'Ms (Maia’s score)' },
 ];
 
 function Dialog() {
@@ -115,6 +126,17 @@ function Dialog() {
           Only games from the past 6 months
         </label>
         <fieldset>
+          <legend>Columns shown</legend>
+          <div class="explorer-columns">
+            {COLUMNS.map((c) => (
+              <label key={c.key} class="check">
+                <input type="checkbox" name={`column-${c.key}`} checked={!draft.hidden.includes(c.key)} onChange={() => setDraft({ ...draft, hidden: toggle(draft.hidden, c.key) })} />
+                {c.label}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        <fieldset>
           <legend>Practical column</legend>
           <label class="check">
             <input type="checkbox" name="practical" checked={draft.practical} onChange={(e) => setDraft({ ...draft, practical: e.currentTarget.checked })} />
@@ -179,7 +201,7 @@ function Dialog() {
             type="button"
             class="secondary"
             onClick={() => {
-              setDraft({ ...DEFAULT_PREFS, on: draft.on, tab: draft.tab, sort: draft.sort });
+              setDraft({ ...DEFAULT_PREFS, on: draft.on, tab: draft.tab, sort: draft.sort, hidden: draft.hidden });
               setNumbers(Object.fromEntries(NUMBERS.map((n) => [n.key, String(DEFAULT_PREFS[n.key])])) as Record<NumberKey, string>);
             }}
           >

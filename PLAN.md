@@ -5681,6 +5681,19 @@ judged live:
   on its left, and in the top bar on the phone, without its outline. Offline, a refused token, a
   sync error or GitHub's limit turn it into the amber chip. It still syncs on a click.
 
+**Second round (the owner's notes, 2026-10-11, on the deployed trial):**
+- **The study's chapter list at its own width** (up to 280px) at the left side's outer edge; the
+  room between it and the board is left empty (a trial: the owner wasn't sure how it looks), and
+  the **eval bar moves to the board's left** there, from 1150px (it stays right of the board from
+  900 to 1149px, where nothing is on the left).
+- **The explorer:** counts short, three figures and k, M or B (`formatCount`: 900k, 2.51M,
+  1.52B); **each column can be hidden** in the explorer's settings ("Columns shown": Eval, Share,
+  Games, Score, Ml, Ms; Move always shows, Prac is the Practical column's own switch), kept per
+  device as `hidden`; the rows' grid is built from the columns shown (`--ex-cols`), so every
+  combination lines up; Move 46px and Eval 40px (from 56 and 48); the header's Games title spans
+  the share and the count, Score (or Prepared) heads the bar's own column with the sort as ⇅ at
+  its right. On a phone with Maia on, the count still gives way.
+
 Tests: `boardsize.spec.ts` (desktop, 1600×900: the board in the page's middle, the same box on the
 study, the picked line, a running session and back; the status in the footer); the rest of the
 suite on desktop and phone unchanged.

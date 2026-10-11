@@ -99,6 +99,18 @@ export function formatShare(share: number): string {
   return (Math.round(x) === 0 && x > 0 ? x.toFixed(1) : String(Math.round(x))) + '%';
 }
 
+/** A count of games, short (the owner's notes, 2026-10-11): three figures and k, M or B from a thousand: `999`, `12.3k`, `900k`, `2.51M`, `1.52B`. */
+export function formatCount(n: number): string {
+  const units = ['', 'k', 'M', 'B'];
+  let i = 0;
+  let x = n;
+  while (i < units.length - 1 && Math.abs(Number(x.toPrecision(3))) >= 1000) {
+    x /= 1000;
+    i++;
+  }
+  return (i ? String(Number(x.toPrecision(3))) : String(Math.round(x))) + units[i];
+}
+
 /** A bar part's label: written only from 15% (Qchess's rule). */
 export function barLabel(fraction: number): string {
   const x = fraction * 100;

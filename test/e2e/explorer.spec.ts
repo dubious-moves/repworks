@@ -71,8 +71,8 @@ test('the panel: Qchess’s rows, sorted by eval, a row clicked plays its move, 
   await expect(e4.locator('.ex-white')).toHaveText('50%');
   await expect(e4).toHaveAttribute('title', 'Average rating: 2101');
   await expect(panel(page).locator('.ex-row.novelty')).toHaveText(/Nf3.*novelty/);
-  await expect(panel(page).locator('.ex-total .ex-count')).toHaveText('1,000');
-  // The bars line up whatever the counts' lengths (600, 1,000): the count has one width (Qchess's).
+  await expect(panel(page).locator('.ex-total .ex-count')).toHaveText('1k');
+  // The bars line up whatever the counts' lengths (600, 1k): the count has one width (Qchess's).
   const lefts = await panel(page).locator('.ex-bar:not(.ex-novelty)').evaluateAll((bars) => bars.map((b) => Math.round(b.getBoundingClientRect().left)));
   expect(lefts.length).toBeGreaterThan(2);
   expect(new Set(lefts).size).toBe(1);
@@ -304,4 +304,33 @@ test('the local explorer: its address tested, then the Lichess tab answered by i
   } finally {
     await local.close();
   }
+});
+
+test('columns hidden in the settings leave the rows, and come back', async ({ page }) => {
+  await setUp(page);
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf`);
+  await expect(rows(page)).toHaveText(['e4', 'd4', 'Nf3', 'c4']);
+  const e4 = panel(page).locator('.ex-row', { hasText: 'e4' }).first();
+  await expect(e4.locator('.ex-count')).toHaveText('600');
+  await panel(page).getByRole('button', { name: 'Explorer settings' }).click();
+  let dialog = page.getByRole('dialog', { name: 'Explorer settings' });
+  await dialog.getByLabel('Eval', { exact: true }).uncheck();
+  await dialog.getByLabel('Games', { exact: true }).uncheck();
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await expect(e4.locator('.ex-eval')).toHaveCount(0);
+  await expect(e4.locator('.ex-count')).toHaveCount(0);
+  await expect(panel(page).locator('.explorer-head .ex-eval')).toHaveCount(0);
+  // The share and the bar stay, the header's Games over the share alone; remembered after a reload.
+  await expect(e4.locator('.ex-share')).toHaveText('60%');
+  await expect(e4.locator('.ex-bar')).toBeVisible();
+  await page.reload();
+  await expect(rows(page)).toHaveText(['e4', 'd4', 'Nf3', 'c4']);
+  await expect(panel(page).locator('.ex-row .ex-eval')).toHaveCount(0);
+  await panel(page).getByRole('button', { name: 'Explorer settings' }).click();
+  dialog = page.getByRole('dialog', { name: 'Explorer settings' });
+  await dialog.getByLabel('Eval', { exact: true }).check();
+  await dialog.getByLabel('Games', { exact: true }).check();
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await expect(panel(page).locator('.ex-row', { hasText: 'e4' }).first().locator('.ex-eval')).toHaveText('+0.30');
+  await expect(panel(page).locator('.ex-row', { hasText: 'e4' }).first().locator('.ex-count')).toHaveText('600');
 });

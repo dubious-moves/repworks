@@ -46,7 +46,11 @@ export interface ExplorerPrefs {
   practicalMaia: boolean;
   /** Maia's preview beside the Lichess values (q_extension's peMaiaPreview). */
   maiaPreview: boolean;
+  /** The columns hidden (the owner's notes, 2026-10-11); Move always shows, Prac is `practical`. */
+  hidden: ExplorerColumn[];
 }
+
+export type ExplorerColumn = 'eval' | 'share' | 'games' | 'ml' | 'ms' | 'score';
 
 // Qchess's defaults for the filter and the sort; q_extension's for the rest.
 export const DEFAULT_PREFS: ExplorerPrefs = {
@@ -72,6 +76,7 @@ export const DEFAULT_PREFS: ExplorerPrefs = {
   height: 0,
   practicalMaia: true,
   maiaPreview: true,
+  hidden: [],
 };
 
 const PREFS_KEY = 'repworks-explorer';
