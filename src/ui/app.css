@@ -2710,12 +2710,12 @@ a.button.primary {
 }
 
 .ex-draw {
-  background: #8a8a8a; /* fixed */
+  background: #6e6e6e; /* fixed */
   color: #eee; /* fixed */
 }
 
 .ex-black {
-  background: #2e2e2e; /* fixed */
+  background: #181818; /* fixed */
   color: #ccc; /* fixed */
 }
 
