@@ -152,32 +152,43 @@ button:disabled {
   opacity: 0.6;
 }
 
-/* Every control answers the pointer the same way. Hover: a veil and the border in the control's
-   own text colour, so a filled button brightens, a bare one on a light page tints darker, a
-   danger one reddens, and a borderless one gains no border. Press: a shade
-   darker and 3% smaller. The veil is an inset shadow, under the text and over any background,
-   so it works on filled and transparent controls alike; a control with its own shadow, border
-   or transform for these states keeps it (these rules weigh one class). Hover only where there
-   is a mouse, so a tap on a phone leaves nothing lit. */
-:where(button:not(:disabled), a.button:not([aria-disabled='true']), .chip, [role='button']) {
-  transition: box-shadow 0.12s, border-color 0.12s, transform 0.06s;
+/* Every control answers the pointer the same way, at once (a shadow eased in grew from the edges
+   and lagged behind the border). Hover: a button in the accent takes the theme's hover colours,
+   as the ← always did; every control also gets a faint veil of its own text colour, so a bare
+   or primary one lights up too, and its border is drawn in that colour (a borderless one gains
+   none). Press: a shade darker and 3% smaller. The veil is an inset shadow, under the text and
+   over any background; a control with its own background, shadow or border for these states
+   keeps it (these rules weigh one class). Hover only where there is a mouse, so a tap on a phone
+   leaves nothing lit. */
+:where(button:not(:disabled), a.button:not([aria-disabled='true']), .chip, [role='button'], .back) {
+  transition: transform 0.06s;
   -webkit-tap-highlight-color: transparent;
 }
 
 @media (hover: hover) {
-  :where(button:not(:disabled), a.button:not([aria-disabled='true']), .chip, [role='button']):hover {
-    box-shadow: inset 0 0 0 100vmax color-mix(in srgb, currentColor 12%, transparent);
-    border-color: color-mix(in srgb, currentColor 50%, transparent);
+  :where(button:not(:disabled), a.button:not([aria-disabled='true']), .chip, [role='button'], .back):hover {
+    box-shadow: inset 0 0 0 100vmax color-mix(in srgb, currentColor 5%, transparent);
+    border-color: color-mix(in srgb, currentColor 40%, transparent);
+  }
+
+  :where(button:not(:disabled, .chip), a.button:not([aria-disabled='true'])):hover {
+    background-color: var(--accent-hover);
+    border-color: var(--accent-hover-border);
+  }
+
+  /* A primary button a step toward its border; the comment dialog's keeps its own colour. */
+  .primary:not(:disabled, .comment-dialog *):hover {
+    background-color: color-mix(in srgb, var(--primary-bg) 75%, var(--primary-border));
   }
 }
 
-:where(button:not(:disabled), a.button:not([aria-disabled='true']), .chip, [role='button']):active {
+:where(button:not(:disabled), a.button:not([aria-disabled='true']), .chip, [role='button'], .back):active {
   box-shadow: inset 0 0 0 100vmax rgb(var(--shadow) / 18%);
   transform: scale(0.97);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :where(button, a.button, .chip, [role='button']):active {
+  :where(button, a.button, .chip, [role='button'], .back):active {
     transform: none;
   }
 }
