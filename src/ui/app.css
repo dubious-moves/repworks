@@ -768,6 +768,14 @@ textarea.script {
   min-width: 0;
 }
 
+/* Below the chapter list's width the picker sits under the study's name: ←, the picker and the
+   mode switch share their bottom edge, one row of 44px boxes (the owner's note, 2026-10-11). */
+@media (max-width: 1149px) {
+  .chapter-head:has(.chapter-pick select) {
+    align-items: flex-end;
+  }
+}
+
 .board {
   width: min(100%, var(--board-size, 560px), calc(100dvh - 200px));
   min-width: 260px;

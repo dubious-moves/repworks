@@ -4,7 +4,7 @@
 // buttons. On the phone: the board, the move buttons, the notation, then the tools; the study's
 // and the chapter's ⚙ and "+" sit in the head, by the chapter menu. The head's switch goes to
 // training as Qchess's Move Trainer does. Play a move to extend a line or branch from it; a
-// move's other edits are in its menu (right-click, long-press or ⋯) and the comment dialog.
+// move's other edits are in its menu (right-click or long-press) and the comment dialog.
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { makeFen } from 'chessops/fen';
 import { makeSan, parseSan } from 'chessops/san';
@@ -25,7 +25,7 @@ import { pathKey } from '../core/study/notation.ts';
 import { nodeAt, positionAt, samePath, type Path } from '../core/study/tree.ts';
 import { Board } from './Board.tsx';
 import { addAlternative, altAdding, CardPanel } from './CardPanel.tsx';
-import { CommentDialog, MoveMenu, openMenu } from './MoveMenu.tsx';
+import { CommentDialog, MoveMenu } from './MoveMenu.tsx';
 import { StudyMenu, StudyMenuButton } from './StudyMenu.tsx';
 import { BranchPicker, branchOpen, chooseBranch, closeBranches, stepOn } from './BranchPicker.tsx';
 import { Notation } from './Notation.tsx';
@@ -292,23 +292,8 @@ export function ChapterView() {
                 <button type="button" aria-label="Next move" onClick={() => void stepOn()}>
                   ▶
                 </button>
-                <button type="button" aria-label="End of the line" onClick={() => move('end')}>
-                  ⏭
-                </button>
                 <button type="button" aria-pressed={drawMode} aria-label="Draw mode" class={`touch-only${drawMode ? ' on' : ''}`} onClick={() => setDrawMode(!drawMode)}>
                   ✎
-                </button>
-                <button
-                  type="button"
-                  aria-label="Move menu"
-                  aria-haspopup="menu"
-                  class="touch-only"
-                  onClick={(e) => {
-                    const r = e.currentTarget.getBoundingClientRect();
-                    openMenu(at.peek(), r.left, r.bottom, r.top);
-                  }}
-                >
-                  ⋯
                 </button>
               </div>
             </div>

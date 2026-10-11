@@ -3033,7 +3033,7 @@ Live: TESTING.md.
 From the design canvas of themes, whose study screen had a ☰ button and only the move buttons
 beside it; the owner marked on a screenshot what to take out of the live page.
 - **The move-button bar** is ☰, ⏮ ◀ ▶ ⏭, and ✎ ⋯ where there is no mouse (§5.69): five buttons
-  on a desktop, seven on the phone (nine and eleven before).
+  on a desktop, seven on the phone (nine and eleven before). ⏭ and ⋯ went in §5.89.
 - **☰ opens a menu** (`StudyMenu.tsx`) with what left the bar and the board: Explorer (a
   checkbox: the panel on or off, as the ⛁ button did), Undo and Redo (greyed when there is
   nothing to undo or redo; Ctrl+Z / Ctrl+Y still work, shown beside them where there is a
@@ -5580,3 +5580,15 @@ Still to do, in this order (actions, no decisions):
    reminder.
 4. When Phase 0 reaches §4.5: the Lichess test study (§4.5 (a)), plus a Qchess export of each
    repertoire study and a sample of your Chessable script's output, all kept in the data repo.
+
+#### 5.89 The owner's notes of 2026-10-11: a shorter bar, the head in line
+
+From a phone screenshot of a study.
+- **⏭ and ⋯ left the move-button bar:** it is ☰ ⏮ ◀ ▶, and ✎ where there is no mouse. The End
+  key still goes to the line's end; a move's menu opens by a long-press (or right-click) on the
+  move in the notation.
+- **The phone's head:** the chapter picker sits under the study's name, so it stood lower than ←
+  and Study | Train. Below 1150px wide the head's items share their bottom edge, all 44px high.
+
+Tests: `views.spec.ts` (the bar's buttons; the picker's, ←'s and the switch's bottom edges on a
+phone).

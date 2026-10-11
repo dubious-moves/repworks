@@ -270,7 +270,7 @@ test('the ☰ menu: the explorer, undo and redo, Copy FEN, the study’s own; th
   await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5');
   const bar = page.locator('.cv-panel .controls');
   const shown = await bar.getByRole('button').evaluateAll((bs) => bs.filter((b) => (b as HTMLElement).offsetParent).map((b) => b.getAttribute('aria-label')));
-  expect(shown).toEqual(['More', 'Start', 'Previous move', 'Next move', 'End of the line', ...(isMobile ? ['Draw mode', 'Move menu'] : [])]);
+  expect(shown).toEqual(['More', 'Start', 'Previous move', 'Next move', ...(isMobile ? ['Draw mode'] : [])]);
   await expect(page.getByLabel('FEN of the position shown')).toHaveCount(0);
 
   const more = page.getByRole('button', { name: 'More', exact: true });
@@ -305,6 +305,14 @@ test('the ☰ menu: the explorer, undo and redo, Copy FEN, the study’s own; th
   if (isMobile) {
     await expect(head.getByLabel('Chapter', { exact: true })).toBeVisible();
     await expect(head.locator('.crumb-chapter')).toBeHidden();
+    // ←, the picker and Study | Train in one row: their bottom edges level (§5.89).
+    const bottoms = await Promise.all(
+      [head.locator('.back'), head.getByLabel('Chapter', { exact: true }), head.locator('.mode-switch')].map(async (l) => {
+        const b = (await l.boundingBox())!;
+        return Math.round(b.y + b.height);
+      }),
+    );
+    expect(Math.max(...bottoms) - Math.min(...bottoms)).toBeLessThanOrEqual(1);
   } else {
     await expect(head.getByLabel('Chapter', { exact: true })).toBeHidden();
     await expect(head.locator('.crumb-chapter')).toHaveText('› Main line');

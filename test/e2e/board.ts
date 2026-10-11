@@ -73,11 +73,9 @@ export async function studyMenu(page: Page, item: 'Explorer' | 'Undo' | 'Redo' |
   await menu.waitFor({ state: 'detached' });
 }
 
-/** Opens a move's menu: by a right-click on the move, or for the move shown by the ⋯ button (touch) or a right-click on it. */
+/** Opens a move's menu by a right-click on the move (the move shown when no path is given). */
 export async function openMoveMenu(page: Page, path?: string) {
-  const button = page.getByRole('button', { name: 'Move menu' });
-  if (path === undefined && (await button.isVisible())) await button.click();
-  else await page.locator(path === undefined ? '.notation .move.current' : `.notation .move[data-path="${path}"]`).click({ button: 'right' });
+  await page.locator(path === undefined ? '.notation .move.current' : `.notation .move[data-path="${path}"]`).click({ button: 'right' });
   await page.getByRole('menu', { name: 'Move' }).waitFor();
 }
 
