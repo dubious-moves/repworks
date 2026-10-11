@@ -1478,6 +1478,11 @@ pace delays never under 450 ms; every effect sequence is deterministic for a giv
   the comments of the node reached, with clickable lines (§5.12).
 - Buttons, one primary action per state (lichessable's UI inventory): Hint; Skip line; Stop;
   "Always play this for me" (suspend, with undo); Pin (§5.9). Counters: due left, new left.
+  Since 2026-10-11 (the owner's request): the buttons under the board stay the same through a line
+  (Hint greyed out while nothing is asked, "Next line" in its place at a line's end; a moment's
+  extras, such as an undo or Pin, in a row after them), the comments come after them, "Always
+  play this for me", Skip line and the pace are in a small ⋯ menu by the counters, and a phone
+  shows the line's name without its moves.
 - The device's screen stays on during a session (Screen Wake Lock, D7's spec), and is released
   when the session stops or the app is hidden.
 - Keys: Space for Hint, Escape to stop.

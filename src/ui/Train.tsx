@@ -33,6 +33,7 @@ import { setMark } from '../app/lineMarks.ts';
 import { openTrainSettings } from './TrainSettings.tsx';
 import { Back } from './Back.tsx';
 import { LineReader } from './Read.tsx';
+import { FloatingMenu } from './MoveMenu.tsx';
 
 const ASKING = new Set(['ask', 'teach', 'wrong', 'shown']);
 
@@ -434,6 +435,7 @@ function Session(props: { s: SessionView }) {
         </p>
       </div>
       <div class="train-panel">
+        <div class="train-counters-row">
         <p class="train-counters" aria-label="Left today">
           {s.of.kind === 'play' ? (
             <>
@@ -451,29 +453,22 @@ function Session(props: { s: SessionView }) {
             </>
           )}
         </p>
+        <TrainMenu graded={isGraded(s.of)} suspend={!s.done && asking} skip={!s.done && s.of.kind !== 'play' && s.of.kind !== 'line'} />
+        </div>
         <p class="train-line">
-          <strong>{chapterName}</strong> <span class="muted">{moves}</span>
+          <strong>{chapterName}</strong> <span class="muted train-moves">{moves}</span>
         </p>
         {s.of.kind === 'line' && s.line?.paused && <PausedLine line={s.line} />}
-        {comments.length > 0 && (
-          <div class="train-comments">
-            {comments.map((c, i) => (
-              <p key={i}>
-                <CommentText text={c} owner="train" id={commentId(s.path.join(' '), c)} positions={commentPositions} />
-              </p>
-            ))}
-          </div>
-        )}
         {s.done && <Done s={s} inline />}
+        {/* The buttons stay as they are through a line (the owner's request, 2026-10-11): none
+            comes or goes while the opponent moves or a comment shows, so none moves under a
+            finger. Hint is greyed out when nothing is asked, and gives its place to "Next line";
+            what a moment offers (an alternative, a pin, an undo) goes in a row after them. The
+            comments come after the buttons, so their coming and going moves nothing above. */}
         {!s.done && (
         <div class="actions train-actions">
-          {waits && (
-            <button type="button" onClick={() => command('next')}>
-              Next line
-            </button>
-          )}
           {s.sequence && <SequenceControls s={s} seq={s.sequence} />}
-          {show && (
+          {show ? (
             <>
               <button type="button" class="press press-next" onClick={() => press('next')}>
                 {s.phase === 'shown' ? 'Knew it' : 'Show'} <span class="muted">(2)</span>
@@ -487,10 +482,37 @@ function Session(props: { s: SessionView }) {
                 </button>
               )}
             </>
-          )}
-          {(s.phase === 'ask' || s.phase === 'wrong') && !show && (
-            <button type="button" onClick={() => command('hint')}>
+          ) : waits ? (
+            <button type="button" onClick={() => command('next')}>
+              Next line
+            </button>
+          ) : (
+            <button type="button" disabled={s.phase !== 'ask' && s.phase !== 'wrong'} onClick={() => command('hint')}>
               Hint
+            </button>
+          )}
+          {show ? (
+            <button type="button" class="secondary" disabled={s.phase === 'shown'} onClick={() => setSelfGrade(false)} title="Back to playing the moves on the board">
+              Play the moves
+            </button>
+          ) : (
+            <button type="button" class="secondary" onClick={() => setSelfGrade(true)} title="Show each move and grade it yourself, by 2 and 4">
+              Show and grade <span class="muted">(1)</span>
+            </button>
+          )}
+          <button type="button" class="secondary" disabled={!s.line} onClick={() => readLine(s.path.length)} title="Step through the whole line and its comments; the session waits">
+            Read
+          </button>
+          <button type="button" class="secondary" onClick={() => command('stop')}>
+            Stop
+          </button>
+        </div>
+        )}
+        {!s.done && ((show && waits) || (s.wrongMove && !show) || s.savedAlt || s.missed || s.suspended) && (
+        <div class="actions train-actions train-extra">
+          {show && waits && (
+            <button type="button" onClick={() => command('next')}>
+              Next line
             </button>
           )}
           {s.wrongMove && !show && (
@@ -508,60 +530,88 @@ function Session(props: { s: SessionView }) {
               Pin this mistake
             </button>
           )}
-          {asking && isGraded(s.of) && (
-            <button type="button" class="secondary" onClick={() => command('suspend')}>
-              Always play this for me
-            </button>
-          )}
           {s.suspended && (
             <button type="button" class="secondary" onClick={undoSuspend}>
               Undo: ask {s.suspended.san} again
             </button>
           )}
-          {show ? (
-            <button type="button" class="secondary" disabled={s.phase === 'shown'} onClick={() => setSelfGrade(false)} title="Back to playing the moves on the board">
-              Play the moves
-            </button>
-          ) : (
-            <button type="button" class="secondary" onClick={() => setSelfGrade(true)} title="Show each move and grade it yourself, by 2 and 4">
-              Show and grade <span class="muted">(1)</span>
-            </button>
-          )}
-          {s.of.kind !== 'play' && s.of.kind !== 'line' && (
-            <button type="button" class="secondary" onClick={() => command('skipLine')}>
-              Skip line
-            </button>
-          )}
-          {s.line && (
-            <button type="button" class="secondary" onClick={() => readLine(s.path.length)} title="Step through the whole line and its comments; the session waits">
-              Read
-            </button>
-          )}
-          <button type="button" class="secondary" onClick={() => command('stop')}>
-            Stop
-          </button>
         </div>
+        )}
+        {comments.length > 0 && (
+          <div class="train-comments">
+            {comments.map((c, i) => (
+              <p key={i}>
+                <CommentText text={c} owner="train" id={commentId(s.path.join(' '), c)} positions={commentPositions} />
+              </p>
+            ))}
+          </div>
         )}
         {show && canSpeak() && (
           <label class="train-speech">
             <input type="checkbox" checked={speech.value} onChange={(e) => setSpeech(e.currentTarget.checked)} /> Speak each move
           </label>
         )}
-        <label class="train-pace">
-          Pace{' '}
-          <select value={pace.value} onChange={(e) => setPace(e.currentTarget.value as Pace)}>
-            {(Object.keys(PACES) as Pace[]).map((p) => (
-              <option key={p} value={p}>
-                {p} ({PACES[p]} ms)
-              </option>
-            ))}
-          </select>
-        </label>
       </div>
     </div>
   );
 }
 
+
+/**
+ * The session's "⋯" menu (the owner's request, 2026-10-11): what is seldom pressed, out of the
+ * buttons under the board: "Always play this for me", "Skip line" and the pace.
+ */
+function TrainMenu(props: { graded: boolean; suspend: boolean; skip: boolean }) {
+  const [at, setAt] = useState<{ x: number; y: number; above: number; opener: Element } | undefined>(undefined);
+  const close = () => setAt(undefined);
+  const run = (f: () => void) => () => {
+    close();
+    f();
+  };
+  return (
+    <>
+      <button
+        type="button"
+        class="secondary train-more"
+        aria-label="More"
+        aria-haspopup="menu"
+        aria-expanded={Boolean(at)}
+        title="Always play this for me, Skip line, the pace"
+        onClick={(e) => {
+          if (at) return close();
+          const r = e.currentTarget.getBoundingClientRect();
+          setAt({ x: r.right, y: r.bottom, above: r.top, opener: e.currentTarget });
+        }}
+      >
+        ⋯
+      </button>
+      {at && (
+        <FloatingMenu at={at} label="More" onClose={close}>
+          {props.graded && (
+            <button type="button" role="menuitem" disabled={!props.suspend} onClick={run(() => command('suspend'))}>
+              <span class="menu-check" aria-hidden="true" />
+              Always play this for me
+            </button>
+          )}
+          {props.skip && (
+            <button type="button" role="menuitem" onClick={run(() => command('skipLine'))}>
+              <span class="menu-check" aria-hidden="true" />
+              Skip line
+            </button>
+          )}
+          {(props.graded || props.skip) && <hr class="menu-sep" role="separator" />}
+          <span class="menu-heading">Pace</span>
+          {(Object.keys(PACES) as Pace[]).map((p) => (
+            <button key={p} type="button" role="menuitemradio" aria-checked={pace.value === p} onClick={run(() => setPace(p))}>
+              <span class="menu-check" aria-hidden="true">{pace.value === p ? '✓' : ''}</span>
+              {p} <kbd>{PACES[p]} ms</kbd>
+            </button>
+          ))}
+        </FloatingMenu>
+      )}
+    </>
+  );
+}
 
 /**
  * Read within a session (the owner's request, 2026-10-09): the line on the board, its whole

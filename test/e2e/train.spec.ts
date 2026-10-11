@@ -88,9 +88,16 @@ test('train: the counts, a due move asked, a wrong move taken back, new lines ta
   await page.reload();
   await expect(feedback(page)).toHaveText('New move: play Nc6');
   await expect(page.locator('.train-counters')).toContainText('0 due · 2 new');
-  // "Always play this for me": recorded, the move played, and an undo offered.
-  await page.getByRole('button', { name: 'Always play this for me' }).click();
+  // "Always play this for me", from the ⋯ menu: recorded, the move played, and an undo offered.
+  await page.getByRole('button', { name: 'More' }).click();
+  await page.getByRole('menuitem', { name: 'Always play this for me' }).click();
   await expect(page.getByRole('button', { name: 'Undo: ask Nc6 again' })).toBeVisible();
+  // The pace is chosen in the same menu, and stays chosen.
+  await page.getByRole('button', { name: 'More' }).click();
+  await page.getByRole('menuitemradio', { name: /relaxed/ }).click();
+  await page.getByRole('button', { name: 'More' }).click();
+  await expect(page.getByRole('menuitemradio', { name: /relaxed/ })).toHaveAttribute('aria-checked', 'true');
+  await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Next line' }).click();
 
   // The Alapin line: 1. e4 c5 played (both answered), 2. c3, then 2... Nf6 taught.

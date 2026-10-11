@@ -1720,6 +1720,19 @@ table.cards td {
   margin: 4px 0 8px;
 }
 
+/* On a phone the line's name alone (the owner's request, 2026-10-11): the moves grew a line at a
+   time and pushed the buttons down; the board shows where the line is. */
+@media (max-width: 599px) {
+  .train-line .train-moves {
+    display: none;
+  }
+}
+
+/* What a moment offers (an alternative, a pin, an undo), under the buttons that stay. */
+.train-actions.train-extra {
+  margin-top: -2px;
+}
+
 .train-comments {
   background: var(--surface);
   border-radius: var(--radius-card);
@@ -1749,10 +1762,21 @@ table.cards td {
   }
 }
 
-.train-pace {
-  display: block;
-  color: var(--muted);
-  margin-top: 8px;
+/* The counters, and at their end the session's small ⋯ menu (Train.tsx's TrainMenu). */
+.train-counters-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.train-counters-row .train-counters {
+  flex: 1;
+}
+
+.train-more {
+  flex: none;
+  min-width: 40px;
+  padding: 0 10px;
 }
 
 @media (min-width: 900px) {
