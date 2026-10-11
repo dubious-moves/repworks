@@ -1528,3 +1528,9 @@ The technical calls, each with its reason:
   the right in three scrolling boxes, and Qchess's two-column move table. Why: the list left most
   of its side empty while the notation, the page's main work, had the least room. Under 1150px
   nothing changed. The board stays resizable.
+
+## Revision of 2026-10-11 (the owner's notes on option B, PLAN.md §5.95)
+- **⏭ is back in the study's move bar** (the owner's request), reversing §5.89's removal.
+- **The move shown's comment gets a panel under the board on the stage, where the board leaves
+  room**, for reading; the notation still shows it in place. "+" New chapter returns to the
+  stage's head (§5.88 had it in ☰ only); the phone's stays in ☰.

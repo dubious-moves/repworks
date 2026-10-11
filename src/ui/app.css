@@ -835,19 +835,10 @@ textarea.script {
   min-width: 0;
 }
 
-/* ‹ › and "2 / 5" beside the picker, on the stage only. */
-.chapter-step,
-.chapter-count {
+/* "2 / 5" beside the picker, and with a chapter open its "+", on the stage only. */
+.chapter-count,
+.chapter-new {
   display: none;
-}
-
-.chapter-step {
-  min-width: 36px;
-  min-height: 36px;
-  padding: 0;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.2rem;
 }
 
 .chapter-count {
@@ -1806,7 +1797,7 @@ table.cards td {
   }
 
   /* Option B of the design canvas (the owner's choice, 2026-10-11): the head names the study,
-     then picks the chapter, with ‹ › and its place among them; the engine and the explorer on
+     then picks the chapter, with its place among them and "+"; the engine and the explorer on
      the left, the explorer filling it; the notation alone on the right. */
   .has-frame .chapter-head .titles {
     flex-direction: row;
@@ -1832,9 +1823,64 @@ table.cards td {
     font-weight: 600;
   }
 
-  .has-frame .chapter-step,
-  .has-frame .chapter-count {
+  .has-frame .chapter-count,
+  .has-frame .chapter-new {
     display: inline-flex;
+  }
+
+  .has-frame .chapter-new {
+    align-items: center;
+    justify-content: center;
+    min-width: 36px;
+    min-height: 36px;
+    border: 1px solid rgb(var(--ink) / 20%);
+    border-radius: var(--radius);
+  }
+
+  /* Under the board: the move shown's comment in the room left (the owner's notes, 2026-10-11),
+     hidden when that is too small to read in. */
+  .cv-board {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .cv-comment {
+    position: relative;
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+    margin-top: 2px;
+    padding: 10px 40px 10px 14px;
+    background: var(--surface);
+    border-radius: var(--radius-card);
+    font-size: 1.02rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .cv-comment.small {
+    visibility: hidden;
+  }
+
+  .cv-comment p {
+    margin: 0 0 6px;
+  }
+
+  .cv-comment p:last-of-type {
+    margin-bottom: 0;
+  }
+
+  .cv-comment .conflict {
+    color: var(--warn);
+    font-weight: 600;
+  }
+
+  .cv-comment-edit {
+    position: absolute;
+    top: 4px;
+    right: 4px;
   }
 
   .cv-side {
@@ -1851,18 +1897,6 @@ table.cards td {
     border-bottom: 0;
     background: var(--surface);
     border-radius: var(--radius-card);
-  }
-
-  /* A line wraps once rather than being cut after four moves, its moves clear of the eval. */
-  .cv-side .engine-line {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    white-space: normal;
-    padding-left: calc(3.4em + 6px);
-    text-indent: calc(-3.4em - 6px);
-    line-height: 1.55;
-    padding-block: 3px;
   }
 
   .cv-side .explorer {

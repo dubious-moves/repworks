@@ -277,7 +277,7 @@ test('the ☰ menu: the explorer, undo and redo, Copy FEN, the study’s own; th
   await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5');
   const bar = page.locator('.cv-panel .controls');
   const shown = await bar.getByRole('button').evaluateAll((bs) => bs.filter((b) => (b as HTMLElement).offsetParent).map((b) => b.getAttribute('aria-label')));
-  expect(shown).toEqual(['More', 'Start', 'Previous move', 'Next move', ...(isMobile ? ['Draw mode'] : [])]);
+  expect(shown).toEqual(['More', 'Start', 'Previous move', 'Next move', 'End of the line', ...(isMobile ? ['Draw mode'] : [])]);
   await expect(page.getByLabel('FEN of the position shown')).toHaveCount(0);
 
   const more = page.getByRole('button', { name: 'More', exact: true });
@@ -305,13 +305,13 @@ test('the ☰ menu: the explorer, undo and redo, Copy FEN, the study’s own; th
   await studyMenu(page, 'Redo');
   await expect(page.locator('.notation .move[data-path="e4 c5 g3"]')).toHaveCount(1);
 
-  // The study's own (§5.88): with a chapter open the head holds no ⚙ or +, the ☰ menu does. The
-  // chapter is picked in the head, on a wide screen with ‹ › beside it (option B, 2026-10-11).
+  // The study's own (§5.88): with a chapter open the head holds no ⚙, the ☰ menu does; "+" stays
+  // in the head on a wide screen only (the owner's notes, 2026-10-11). The chapter is picked there.
   const head = page.locator('.chapter-head');
-  await expect(head.getByRole('button', { name: /settings|New chapter/ })).toHaveCount(0);
+  await expect(head.getByRole('button', { name: /settings/ })).toHaveCount(0);
+  await expect(head.getByRole('button', { name: 'New chapter' })).toBeVisible({ visible: !isMobile });
   await expect(head.getByLabel('Chapter', { exact: true })).toBeVisible();
   if (isMobile) {
-    await expect(head.getByRole('button', { name: 'Next chapter' })).toBeHidden();
     // ←, the picker and Study | Train in one row: their bottom edges level (§5.89).
     const bottoms = await Promise.all(
       [head.locator('.back'), head.getByLabel('Chapter', { exact: true }), head.locator('.mode-switch')].map(async (l) => {
@@ -321,7 +321,7 @@ test('the ☰ menu: the explorer, undo and redo, Copy FEN, the study’s own; th
     );
     expect(Math.max(...bottoms) - Math.min(...bottoms)).toBeLessThanOrEqual(1);
   } else {
-    await expect(head.getByRole('button', { name: 'Next chapter' })).toBeVisible();
+    await expect(head.locator('.chapter-count')).toBeVisible();
   }
   for (const item of ['Chapter settings', 'Study settings', 'New chapter'] as const) {
     await studyMenu(page, item);

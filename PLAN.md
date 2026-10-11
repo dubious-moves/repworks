@@ -7,7 +7,7 @@ where the build differed). What remains is live: the spike's re-run (§4.2), the
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
 with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
-for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) is built (2026-10-11). Read with `DECISIONS.md`, which this plan updates (its
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -5752,5 +5752,28 @@ Not taken from the canvas: the sync status next to Study/Train and the build lin
 Tests: `editor.spec.ts` (1400×800: the engine and explorer left of the board, the notation right,
 running text, the chapter's ‹ › and place), `explorer.spec.ts` (the handle at 1100px, none on the
 stage), `views.spec.ts` (the head's picker on both).
+
+Live: TESTING.md.
+
+#### 5.95 The owner's notes on option B (2026-10-11)
+
+- **The engine's lines cut to one row again**: the owner reads the first one to three moves
+  (§5.94 wrapped each line once).
+- **The move shown's comment under the board, on the stage, where there's room** (`CommentPanel`
+  in `Notation.tsx`): the board's column is a flex column, the panel taking what the board and the
+  feedback line leave, scrolling inside; under 72px of room it is hidden (`visibility`), so a board
+  as tall as the frame has none. Its text is larger and upright, comment lines clickable as in the
+  notation; "No comment on this move." when there is none, and ✎ opens the comment dialog. The
+  notation keeps its comments too.
+- **⏭ back in the move bar** ("End of the line", the End key's move), on the phone too; §5.89 had
+  taken it out.
+- **No ‹ › beside the chapter select**; its place ("2 / 5") stays. A chapter picked lets go of
+  the select (it blurs), so ← → step through the new chapter's moves rather than the options.
+- **"+" (New chapter) in the stage's head**, beside the select, with a chapter open; the phone
+  keeps it in ☰ (§5.88).
+
+Tests: `editor.spec.ts` (1400×800: no panel at the default size, the comment and "No comment" at
+480px, ✎, the select blurred and → stepping the new chapter, "+"), `views.spec.ts` (⏭ in the bar,
+"+" in the desktop head only).
 
 Live: TESTING.md.

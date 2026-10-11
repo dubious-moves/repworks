@@ -3,17 +3,17 @@
 // signal, so stepping through a line redraws the move left and the move reached, not the tree.
 // Right-click (long-press on the phone) opens a move's menu; on a comment, its move's.
 import { effect, signal, type Signal } from '@preact/signals';
-import { useContext, useEffect, useMemo, useRef } from 'preact/hooks';
-import { at, chapter, goTo, study } from '../app/editor.ts';
+import { useContext, useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { at, chapter, doc, goTo, study } from '../app/editor.ts';
 import { commentId } from '../app/preview.ts';
 import { trainData } from '../app/train.ts';
 import { hasMarker } from '../core/merge/markers.ts';
 import type { Chapter } from '../core/study/model.ts';
 import { notation, pathKey, type Cell, type Inline, type Line, type Move as MoveData } from '../core/study/notation.ts';
-import { positionAt, type Path } from '../core/study/tree.ts';
+import { nodeAt, positionAt, type Path } from '../core/study/tree.ts';
 import { transpositions } from '../core/study/transpositions.ts';
 import { CommentText } from './CommentText.tsx';
-import { openMenu } from './MoveMenu.tsx';
+import { editComment, openMenu } from './MoveMenu.tsx';
 import { Badges, badgesOf, openTranspositions } from './Transpositions.tsx';
 
 const current = new Map<string, Signal<boolean>>();
@@ -182,5 +182,44 @@ export function Notation(props: { chapter: Chapter }) {
         )}
       </div>
     </Badges.Provider>
+  );
+}
+
+/**
+ * The move shown's comment under the board on the stage (the owner's notes, 2026-10-11): larger,
+ * on a panel of its own, easier to read than in the notation's run. It takes the room the board
+ * leaves under it, and is hidden where that room is too small to read in.
+ */
+export function CommentPanel() {
+  const c = chapter.value;
+  const path = at.value;
+  const node = c ? nodeAt(c, path) : undefined;
+  const box = useRef<HTMLElement>(null);
+  const [small, setSmall] = useState(false);
+  useEffect(() => {
+    const el = box.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => setSmall(el.clientHeight < 72));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const texts = node?.comments ?? [];
+  return (
+    <section class={`cv-comment${small ? ' small' : ''}`} aria-label="Comment" ref={box}>
+      {texts.length ? (
+        texts.map((text, i) => (
+          <p key={i} class={hasMarker(text) ? 'conflict' : undefined}>
+            {hasMarker(text) ? '⚠ conflict: open the move to resolve it' : <CommentText text={text} owner="chapter" id={commentId(pathKey(path), text)} positions={() => positionsOf(path)} />}
+          </p>
+        ))
+      ) : (
+        <p class="muted">No comment on this move.</p>
+      )}
+      {doc.value && node && (
+        <button type="button" class="icon cv-comment-edit" aria-label="Edit comment" title="Comment on this move" onClick={() => editComment(path)}>
+          ✎
+        </button>
+      )}
+    </section>
   );
 }

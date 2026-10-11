@@ -288,7 +288,7 @@ test('a move lands on the squares pressed after the board has moved down the pag
   await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 Nc6 d4 cxd4');
 });
 
-test('a wide screen: the engine and explorer left of the board, the notation right, the chapter picked in the head', async ({ page, isMobile }) => {
+test('a wide screen: the engine and explorer left of the board, the comment under it, the notation right, the chapter picked in the head', async ({ page, isMobile }) => {
   test.skip(isMobile, 'the phone keeps one column');
   await page.setViewportSize({ width: 1400, height: 800 });
   await setUp(page);
@@ -308,14 +308,30 @@ test('a wide screen: the engine and explorer left of the board, the notation rig
   const first = (await pairs.nth(0).boundingBox())!;
   const second = (await pairs.nth(1).boundingBox())!;
   expect(Math.abs(second.y - first.y)).toBeLessThan(4);
-  // The chapter in the head, with ‹ › and its place among them.
+  // The move shown's comment under the board, in the room it leaves: none at the default size,
+  // which fills the height; a smaller board leaves it room.
+  const panel = page.getByRole('region', { name: 'Comment' });
+  await expect(page.locator('.cv-comment')).toBeHidden();
+  await page.evaluate(() => localStorage.setItem('repworks-board-size', '480'));
+  await page.reload();
+  await page.locator('.move[data-path="e4 c5 Nf3"]').click({ position: { x: 6, y: 8 } });
+  await expect(panel).toContainText('A made-up comment');
+  const small = (await page.locator('.cv-board .board').boundingBox())!;
+  expect((await panel.boundingBox())!.y).toBeGreaterThan(small.y + small.height);
+  await page.keyboard.press('ArrowLeft');
+  await expect(panel).toContainText('No comment on this move.');
+  await panel.getByRole('button', { name: 'Edit comment' }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.keyboard.press('Escape');
+  // The chapter in the head with its place among them; picked, the select lets go of the keys.
   const head = page.locator('.chapter-head');
   await expect(head.locator('.chapter-count')).toHaveText('1 / 2');
-  await expect(head.getByRole('button', { name: 'Previous chapter' })).toBeDisabled();
-  await head.getByRole('button', { name: 'Next chapter' }).click();
+  await expect(head.getByRole('button', { name: 'New chapter' })).toBeVisible();
+  await head.getByLabel('Chapter', { exact: true }).selectOption({ label: 'Alapin' });
   await expect(page).toHaveURL(/#\/study\/Rep0Najd\/Ch2Alapn/);
   await expect(head.locator('.chapter-count')).toHaveText('2 / 2');
-  await expect(head.getByRole('button', { name: 'Next chapter' })).toBeDisabled();
-  await head.getByRole('button', { name: 'Previous chapter' }).click();
-  await expect(page).toHaveURL(/#\/study\/Rep0Najd\/Ch1Najdf/);
+  await expect(head.getByLabel('Chapter', { exact: true })).not.toBeFocused();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4');
+  await expect(head.getByLabel('Chapter', { exact: true })).toHaveValue('Ch2Alapn');
 });

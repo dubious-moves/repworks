@@ -195,6 +195,11 @@ export function FloatingMenu(props: { at: { x: number; y: number; above: number;
   );
 }
 
+/** Opens the comment dialog on a move (its menu's "Comment", the comment panel's ✎). */
+export function editComment(path: Path): void {
+  commenting.value = path;
+}
+
 export function CommentDialog() {
   const path = commenting.value;
   const c = chapter.value;

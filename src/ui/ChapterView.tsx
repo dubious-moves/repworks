@@ -1,7 +1,8 @@
 // The chapter view (PLAN.md §4.11, D21), laid out as Qchess's study page: the board, and a panel
 // with the notation, the conflicts at the move shown and the move buttons. On the stage (from
-// 1150px, the owner's option B) the engine and the explorer sit left of the board and the notation
-// has the right to itself; the chapter is picked in the head, with ‹ › beside it. On the phone:
+// 1150px, the owner's option B) the engine and the explorer sit left of the board, the move
+// shown's comment under it where there's room, and the notation has the right to itself; the
+// chapter is picked in the head, "+" beside it. On the phone:
 // the board, the move buttons, the notation, then the tools; the study's and the chapter's ⚙ and
 // "+" sit in the ☰ menu (§5.88). The head's switch goes to training as Qchess's Move Trainer
 // does. Play a move to extend a line or branch from it; a move's other edits are in its menu
@@ -30,7 +31,7 @@ import { addAlternative, altAdding, AltAdding } from './MoveCard.tsx';
 import { CommentDialog, MoveMenu } from './MoveMenu.tsx';
 import { StudyMenu, StudyMenuButton } from './StudyMenu.tsx';
 import { BranchPicker, branchOpen, chooseBranch, closeBranches, stepOn } from './BranchPicker.tsx';
-import { Notation } from './Notation.tsx';
+import { CommentPanel, Notation } from './Notation.tsx';
 import { endPreviewOnBoard, PreviewBar, previewBoard } from './CommentText.tsx';
 import { ModeSwitch } from './ModeSwitch.tsx';
 import { openChapterSettings, openNewChapter, openStudySettings } from './StudyDialogs.tsx';
@@ -163,8 +164,6 @@ export function ChapterView() {
   const scratch = s.sid === SCRATCH;
   const framed = !!(c && board);
   const index = s.chapters.findIndex((ch) => ch.id === s.cid);
-  const prev = index > 0 ? s.chapters[index - 1] : undefined;
-  const next = index >= 0 ? s.chapters[index + 1] : undefined;
   const wide = stage.value;
 
   return (
@@ -172,9 +171,9 @@ export function ChapterView() {
       {scratch ? <AnalysisHead /> : <div class="chapter-head">
         <Back parent={{ name: 'list' }} />
         {/* The study, then the chapter, picked in the head: on the phone under the study's name, on
-            the stage beside it with ‹ › for the chapters on either side and its place among them
-            (the owner's choice of the design canvas's option B, 2026-10-11). With a chapter open,
-            the ☰ menu holds the study's and the chapter's settings and New chapter (§5.88). */}
+            the stage beside it with its place among them (the owner's choice of the design
+            canvas's option B, 2026-10-11). With a chapter open, the ☰ menu holds the study's and
+            the chapter's settings and New chapter (§5.88), and the stage's head a "+" too. */}
         <div class="titles">
           <span class="study-title">
             {s.meta.name}
@@ -185,24 +184,22 @@ export function ChapterView() {
             )}
           </span>
           <div class="chapter-pick">
-            {s.chapters.length > 1 && (
-              <button type="button" class="secondary chapter-step" aria-label="Previous chapter" title={prev ? prev.name : undefined} disabled={!prev} onClick={() => prev && open({ name: 'chapter', sid: s.sid, cid: prev.id })}>
-                ‹
-              </button>
-            )}
             {s.chapters.length > 0 && (
-              <select aria-label="Chapter" value={s.cid} onChange={(e) => open({ name: 'chapter', sid: s.sid, cid: e.currentTarget.value })}>
+              <select
+                aria-label="Chapter"
+                value={s.cid}
+                onChange={(e) => {
+                  // Picked, the select lets go of the keys: ← → step through the new chapter's moves.
+                  e.currentTarget.blur();
+                  open({ name: 'chapter', sid: s.sid, cid: e.currentTarget.value });
+                }}
+              >
                 {s.chapters.map((ch) => (
                   <option key={ch.id} value={ch.id}>
                     {ch.name}
                   </option>
                 ))}
               </select>
-            )}
-            {s.chapters.length > 1 && (
-              <button type="button" class="secondary chapter-step" aria-label="Next chapter" title={next ? next.name : undefined} disabled={!next} onClick={() => next && open({ name: 'chapter', sid: s.sid, cid: next.id })}>
-                ›
-              </button>
             )}
             {s.chapters.length > 1 && index >= 0 && (
               <span class="chapter-count muted">
@@ -214,11 +211,10 @@ export function ChapterView() {
                 ⚙
               </button>
             )}
-            {!framed && (
-              <button type="button" class="icon" aria-label="New chapter" title="New chapter" onClick={openNewChapter}>
-                +
-              </button>
-            )}
+            {/* With a chapter open, "+" stays in the head on the stage only; the phone's is in ☰ (§5.88). */}
+            <button type="button" class={`icon${framed ? ' chapter-new' : ''}`} aria-label="New chapter" title="New chapter" onClick={openNewChapter}>
+              +
+            </button>
           </div>
         </div>
         <ModeSwitch current="study" onTrain={() => void train()} trainTitle={trainTitle} />
@@ -261,6 +257,7 @@ export function ChapterView() {
               </p>
               <AltAdding />
               {scratch && <AnalysisFen />}
+              {wide && <CommentPanel />}
             </div>
             <div class="cv-panel">
               {!wide && <EnginePanel board={board.pos} />}
@@ -289,6 +286,9 @@ export function ChapterView() {
                 </button>
                 <button type="button" aria-label="Next move" onClick={() => void stepOn()}>
                   ▶
+                </button>
+                <button type="button" aria-label="End of the line" onClick={() => move('end')}>
+                  ⏭
                 </button>
                 <button type="button" aria-pressed={drawMode} aria-label="Draw mode" class={`touch-only${drawMode ? ' on' : ''}`} onClick={() => setDrawMode(!drawMode)}>
                   ✎

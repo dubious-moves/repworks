@@ -5,12 +5,15 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
-## The study page, option B (§5.94)
+## The study page, option B (§5.94, §5.95)
 - The installed desktop app, a study at your usual board size: the engine and the explorer on the
   left, the notation on the right as running text. Is the notation easier to read, with comments
   and variations breaking the line? Does the explorer have enough rows and columns there?
-- The head: ‹ › and the select pick the chapter, "2 / 5" beside them. Are the chapter's ⚙ and
-  "New chapter" in ☰ enough, now the list is gone?
+- The head: the select picks the chapter, "2 / 5" and "+" beside it. After picking one, ← → step
+  through its moves at once (§5.95).
+- At your board size, the comment panel under the board (§5.95): the move's comment readable
+  there, its lines clickable, ✎ to edit; gone when the board is dragged as tall as the window.
+- The engine's lines on one row each, and ⏭ in the move bar (§5.95).
 - Study ↔ Train: the board should still not move (on a narrower window it may shift a little).
 
 ## The training screen's comments and line list (§5.93)
