@@ -1617,3 +1617,11 @@ The technical calls, each with its reason:
 - **300 s, not 120 s** (the owner, the same day): 120 s still left positions short of the target
   depth, and they would rather the deepening be slow than the depths uneven.
 - **600 s, not 300 s** (the owner, the same day): 300 s still left some short.
+
+## Revision of 2026-10-12 (overnight scoring, too easy, PLAN.md §5.105)
+- **With Focused on, an overnight gather scores every position before its next pass.** Was
+  (§5.102): scoring between passes for as long as the pass took. Why: the owner prefers every
+  position scored to more passes. Without Focused the time share stays (one engine would rarely
+  finish).
+- **A position Maia at the user's rating solves 95% of the time or more is never dealt** (kept in
+  the store). Why: the owner's call, 95% their suggestion; 85% stays "easy, dealt last".

@@ -123,6 +123,8 @@ export interface StormConfig {
   takeShare: number;
   /** Easy: Maia at the user's rating finds a good move this often; dealt last in the classic storm. */
   easyShare: number;
+  /** Too easy: Maia at the user's rating finds a good move this often; never dealt (§5.105). */
+  tooEasyShare: number;
 }
 
 /** A move's verdict (§16.2), `unknown` when nothing could grade it. */
@@ -203,6 +205,7 @@ export const STORM: StormConfig = {
   levelAbove: 300,
   takeShare: 0.25,
   easyShare: 0.85,
+  tooEasyShare: 0.95,
 };
 
 /** The config with the user's ply range folded in (§14.9): the walks never learn a setting exists. */

@@ -478,6 +478,10 @@ explorer's Eval column too far from the move (§5.67).
   counting up its depth and seconds, the last positions listed as they finish, the time left
   plausible after a few minutes; how many are stopped by the 600 s limit (it should be few or none) at depth 24 on this
   machine (focused on and off). The console's `[storm deepen]` lines.
+- §5.105 (desktop): an overnight gather with Focused on: the status shows each pass's scoring
+  running until "n of n scored" before the next pass walks. On the home, with Maia's ratings in,
+  "n too easy, left out" in the count; a storm deals none whose card says Maia at your rating finds
+  a good move 95% or more.
 
 ## Phase 5
 

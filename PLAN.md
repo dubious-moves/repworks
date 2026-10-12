@@ -6094,3 +6094,18 @@ starts no focused worker). Live: TESTING.md.
 Tests: `storm.spec.ts` (desktop and phone: `go depth … movetime 600000`; the focused test reads
 the fold: every position searched and kept, three engines, the last one at the target depth).
 Live: TESTING.md.
+
+#### 5.105 Overnight: everything scored before the next pass when focused; too easy left out (the owner's request, 2026-10-12)
+- **An overnight gather with Focused on scores every position before the next pass** (no time
+  share); without Focused, scoring between passes lasts as long as the pass took, as before
+  (§5.102), and the rest is scored after the last pass. Why: the owner would rather have every
+  position at the standard than more passes; focused, scoring keeps up.
+- **Too easy: never dealt** (`tooEasyShare` 0.95): a position where Maia at the user's rating
+  finds a good move 95% of the time or more (the share `easyAt` measures, over the moves the list
+  can judge) is left out of every storm and set, whatever the focus; it stays stored, so a higher
+  rating can bring it back. 85–95% stays easy: dealt last in the classic storm (§5.100). Unrated
+  positions are dealt. The home's count says how many were left out ("n too easy, left out").
+  Why: the owner saw "Maia at 2150 finds a good move 100% of the time" on a card; such a position
+  teaches nothing.
+
+Tests: `kinds.test.ts` (90% easy, not too easy; 96% both). Live: TESTING.md.

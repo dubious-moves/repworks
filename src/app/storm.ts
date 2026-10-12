@@ -31,7 +31,7 @@ import { analyseForStorm, cancelStormEngine, endStormEngine, focusedWidth, setSt
 import { trainData, type TrainData } from './train.ts';
 import { puzzlePrefs, readyPuzzles } from './puzzles.ts';
 import { keptPolicy, missingRatings, type MaiaRating } from '../core/storm/maia.ts';
-import { cleanFocus, easyAt, FOCUSES, matchesFocus, positionTags, type Focus } from '../core/storm/kinds.ts';
+import { cleanFocus, easyAt, FOCUSES, tooEasyAt, matchesFocus, positionTags, type Focus } from '../core/storm/kinds.ts';
 import { maiaElo, maiaPolicies, maiaStored } from './maia.ts';
 import type { ReadyPuzzle } from '../core/puzzles/puzzles.ts';
 
@@ -244,6 +244,8 @@ export interface StormHome {
   matching: number;
   /** Kept positions gathered on other devices (§5.102). */
   shared: number;
+  /** Ready positions too easy to deal (§5.105): Maia at the user's rating finds a good move almost always. */
+  tooEasy: number;
 }
 export const stormHome = signal<StormHome | undefined>(undefined);
 
@@ -274,14 +276,19 @@ export async function refreshHome(s: StormScopeData): Promise<void> {
   const tags = Object.fromEntries(FOCUSES.map((f) => [f, 0])) as Record<Focus, number>;
   const focus = stormPrefs.value.focus;
   let matching = 0;
+  let tooEasy = 0;
   for (const p of ready) {
+    if (tooEasyAt(p.maia, elo, storedList(p), STORM)) {
+      tooEasy++;
+      continue;
+    }
     const t = positionTags(p, storedList(p), elo, STORM);
     for (const f of t) tags[f]++;
     if (matchesFocus(t, p.kind, focus)) matching++;
   }
   const maiaHere = await maiaStored().catch(() => false);
   const shared = all.filter((p) => p.from).length;
-  stormHome.value = { stored: all.length, done, ready: ready.length, deep, lines, maiaHere, rated, elo, tags, matching, shared };
+  stormHome.value = { stored: all.length, done, ready: ready.length, deep, lines, maiaHere, rated, elo, tags, matching, shared, tooEasy };
 }
 
 /* ------------------------------------------------------------------ the gather (§5.42) */
@@ -437,7 +444,8 @@ export async function gather(s: StormScopeData, overnight = false): Promise<void
         o.doing = 'scoring';
         g.note = '';
         show();
-        await deepen(s, { gather: true, untilMs: Date.now() + Math.max(STORM.deepenMs, Date.now() - passStart) });
+        // Focused (§5.105): every position scored before the next pass; else for as long as the pass took.
+        await deepen(s, { gather: true, untilMs: stormPrefs.value.focused ? undefined : Date.now() + Math.max(STORM.deepenMs, Date.now() - passStart) });
         if (stopGather) break;
         await shareOwn(stormStore());
         const all = await stormStore().positions();
@@ -914,7 +922,10 @@ const update = (patch: Partial<StormSession>) => {
 async function dealt(s: StormScopeData, focus: readonly Focus[], elo: number): Promise<StoredPosition[]> {
   const data = trainData.value;
   if (!data) return [];
-  const all = storedInScope(await stormStore().positions(), s).filter((p) => matchesFocus(positionTags(p, storedList(p), elo, STORM), p.kind, focus));
+  // Too easy (§5.105): left out whatever the focus.
+  const all = storedInScope(await stormStore().positions(), s).filter(
+    (p) => !tooEasyAt(p.maia, elo, storedList(p), STORM) && matchesFocus(positionTags(p, storedList(p), elo, STORM), p.kind, focus),
+  );
   const items = all.map((p) => ({ ...p, deep: judges(p, STORM) }));
   const order = drawOrder(items, histories(data), Math.random, STORM.reachTop);
   if (focus.length) return order;

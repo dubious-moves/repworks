@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { STORM as C } from '../../../../src/core/storm/config.ts';
 import type { ScoredList, ScoredMove } from '../../../../src/core/storm/grade.ts';
 import { storedPosition } from '../../../../src/core/storm/harvest.ts';
-import { cleanFocus, easyAt, expectedLoss, focusTitle, goodMoves, matchesFocus, moveFacts, positionTags, tagWords, type Focus } from '../../../../src/core/storm/kinds.ts';
+import { cleanFocus, easyAt, tooEasyAt, expectedLoss, focusTitle, goodMoves, matchesFocus, moveFacts, positionTags, tagWords, type Focus } from '../../../../src/core/storm/kinds.ts';
 import type { MaiaRating } from '../../../../src/core/storm/maia.ts';
 import { candidate, fenAfterUci, kept, positionOf, sanToUci, specialKind, START_FEN, walkGame } from '../../../../src/core/storm/walk.ts';
 import { positionKey } from '../../../../src/core/chess/positionKey.ts';
@@ -93,6 +93,11 @@ test('Maia’s expected loss, and the tags hard for you: unintuitive, critical, 
   assert.equal(easyAt(finds, 1500, list, C), true);
   assert.equal(easyAt(maia, 1500, list, C), false);
   assert.equal(easyAt(undefined, 1500, list, C), false);
+  // Too easy (§5.105): 90% is easy, not too easy; 96% is.
+  assert.equal(tooEasyAt(finds, 1500, list, C), false);
+  const always = maia.map((r) => (r.elo === 1500 ? rating(1500, [['b5a4', 0.96], ['b5c6', 0.04]]) : r));
+  assert.equal(tooEasyAt(always, 1500, list, C), true);
+  assert.equal(easyAt(always, 1500, list, C), true);
   // Unrated at the user's rating: nothing from Maia.
   assert.equal(positionTags({ fen: RUY, maia }, list, 1600, C).has('critical'), false);
 });

@@ -240,6 +240,7 @@ function Home(props: { scope: StormScopeData; where: StormWhere }) {
               <>
                 <strong>{home.matching}</strong> position{home.matching === 1 ? '' : 's'} ready{focus.length ? ` for ${focusTitle(focus)}` : ''}
                 {home.done ? ` · ${home.done} done for now` : ''}
+                {home.tooEasy ? ` · ${home.tooEasy} too easy, left out (Maia at ${home.elo} finds a good move ${Math.round(STORM.tooEasyShare * 100)}% of the time or more)` : ''}
               </>
             ) : (
               '…'
@@ -289,7 +290,7 @@ function Home(props: { scope: StormScopeData; where: StormWhere }) {
         </p>
         <label class="check storm-overnight">
           <input type="checkbox" checked={prefs.overnight} disabled={!!g?.running} onChange={(e) => setStormPrefs({ overnight: e.currentTarget.checked })} /> Keep going until stopped: older games
-          each pass, Stockfish scoring in between (overnight)
+          each pass, Stockfish scoring in between (overnight; with Focused on, every position before the next pass)
         </label>
         {g && (
           <>
