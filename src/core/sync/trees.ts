@@ -91,7 +91,7 @@ function shaOf(content: string, text: Text, candidates: readonly (string | undef
  * - a file changed on one side only takes that side;
  * - a study changed on both sides merges through mergeAuthoredFiles (§4.7);
  * - the training settings changed on both sides merge per field (§5.2);
- * - any other file changed on both sides takes theirs;
+ * - any other file changed on both sides takes theirs, but this device's storm files ours;
  * - other devices' progress files are theirs, always;
  * - this device's progress files are ours; if someone else changed one, every line of every
  *   side is kept (a union by n), and it is reported.
@@ -130,7 +130,10 @@ export function mergeTrees(sides: Sides, text: Text, ctx: FileMergeContext): Tre
         texts.set(sha, merged);
       }
     } else {
-      const v = o === t || t === b ? o : o === b ? t : t;
+      // Changed on both sides: theirs, but for this device's storm files (§5.102), which only it writes.
+      const where = classifyPath(path);
+      const mine = where.kind === 'storm' && where.dev === ctx.device;
+      const v = o === t || t === b ? o : o === b ? t : mine ? o : t;
       if (v !== undefined) files.set(path, v);
     }
   }

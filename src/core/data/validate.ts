@@ -6,6 +6,7 @@ import { parseLog } from '../progress/events.ts';
 import { parseChapterFile } from '../pgn/parse.ts';
 import { chapterFileText } from '../pgn/write.ts';
 import { parseSettings } from '../train/settings.ts';
+import { parseSharedFile } from '../storm/shared.ts';
 import { classifyPath, DATA_FORMAT, FORMAT_FILE, utcDay, utcMonth } from './layout.ts';
 
 export interface Issue {
@@ -131,6 +132,11 @@ export function validateDataRepo(files: ReadonlyMap<string, string>, options: Va
         } catch {
           error(path, 'not JSON');
         }
+        break;
+      }
+      case 'storm': {
+        const { unread } = parseSharedFile(text);
+        if (unread) warn(path, `${unread} line(s) this version can't read as a storm position: they are left out, and the file is never rewritten`);
         break;
       }
       case 'other':

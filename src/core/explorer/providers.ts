@@ -90,6 +90,8 @@ export interface ExplorerFilter {
   ratings?: number[];
   /** `YYYY-MM`: games from then on. */
   since?: string;
+  /** `YYYY-MM`: games up to then (an overnight gather's older passes, §5.102). */
+  until?: string;
   db?: ExplorerDb;
   /** Also name this many top and recent games (the storm's walks, §5.42); never the local explorer's. */
   games?: number;
@@ -106,7 +108,7 @@ export function filterHash(f: ExplorerFilter | undefined): string {
     g.since || '',
   ];
   // Masters answers are another database's: their own key. Lichess's keep q_extension's.
-  const games = g.games ? '|g' + g.games : '';
+  const games = (g.games ? '|g' + g.games : '') + (g.until ? '|u' + g.until : '');
   if (g.db === 'masters') return 'masters' + games;
   return parts.join('|') + games;
 }
@@ -119,6 +121,7 @@ export function explorerUrl(fen: string, f: ExplorerFilter, base?: string): stri
   const n = f.games || 0;
   let q = 'variant=standard&fen=' + encodeURIComponent(fenKey(fen)) + '&speeds=' + (f.speeds || []).join(',') + '&ratings=' + (f.ratings || []).join(',') + '&moves=30&topGames=' + n + '&recentGames=' + n;
   if (f.since) q += '&since=' + f.since;
+  if (f.until) q += '&until=' + f.until;
   return (base || EXPLORER_URL) + '?' + q;
 }
 

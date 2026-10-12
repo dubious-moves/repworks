@@ -7,6 +7,8 @@
 //   progress/<dev>/<YYYY-MM-DD>.jsonl  events of that UTC day, written only by <dev>
 //   progress/<dev>/<YYYY-MM>.jsonl     a closed month, compacted by <dev>
 //   devices/<dev>.json                 { "name", "created" }, written once by <dev>
+//   storm/<dev>/<YYYY-MM-DD>.<k>.jsonl the storm positions <dev> gathered that UTC day (§5.102),
+//                                      one JSON object a line, written only by <dev>
 import { isId } from '../study/ids.ts';
 
 export const FORMAT_FILE = 'repworks.json';
@@ -18,6 +20,9 @@ export const conflictCopyPath = (sid: string, cid: string, dev: string) => `stud
 export const progressDayPath = (dev: string, day: string) => `progress/${dev}/${day}.jsonl`;
 export const progressMonthPath = (dev: string, month: string) => `progress/${dev}/${month}.jsonl`;
 export const devicePath = (dev: string) => `devices/${dev}.json`;
+export const stormFilePath = (dev: string, day: string, k: number) => `storm/${dev}/${day}.${k}.jsonl`;
+/** Where a device's storm files are. */
+export const stormDir = (dev: string) => `storm/${dev}/`;
 
 export type DataPath =
   | { kind: 'format' }
@@ -28,6 +33,7 @@ export type DataPath =
   | { kind: 'progress-day'; dev: string; day: string }
   | { kind: 'progress-month'; dev: string; month: string }
   | { kind: 'device'; dev: string }
+  | { kind: 'storm'; dev: string; day: string; k: number }
   | { kind: 'other' };
 
 const DAY = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
@@ -53,6 +59,10 @@ export function classifyPath(path: string): DataPath {
   if (parts.length === 2 && top === 'devices' && a !== undefined) {
     const dev = /^([A-Za-z0-9]{8})\.json$/.exec(a);
     if (dev) return { kind: 'device', dev: dev[1]! };
+  }
+  if (parts.length === 3 && top === 'storm' && isId(a) && b !== undefined) {
+    const m = /^(\d{4}-\d{2}-\d{2})\.([1-9]\d{0,3})\.jsonl$/.exec(b);
+    if (m && DAY.test(m[1]!)) return { kind: 'storm', dev: a, day: m[1]!, k: Number(m[2]) };
   }
   return { kind: 'other' };
 }

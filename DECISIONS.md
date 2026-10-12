@@ -1578,3 +1578,25 @@ The technical calls, each with its reason:
   time). Why: they are mostly wasted cards; kept rather than dropped, since they feed the streak.
 - **Questions other than "find a move"** (two moves, who's better, what's the threat) are planned
   in §5.101 for the next session.
+
+## Revision of 2026-10-12 (storm positions shared, and an overnight gather, PLAN.md §5.102)
+- **The gathered positions are shared through the data repo, revising the revision of 2026-10-07**
+  ("stay on each device", D5's cache tier): each device writes those it gathered to
+  `storm/<dev>/<YYYY-MM-DD>.<k>.jsonl` (a new file kind in format 1, written only by `<dev>`, one
+  JSON position a line), and merges the other devices' files into its store. Why: the owner wants
+  to gather overnight on one device and play the storm on another; that revision named a
+  per-device file as the step after. Through the ordinary sync rather than a separate upload
+  because the sync already handles offline, stale heads and lost answers; a device's own folder
+  needs no merge since only it writes there. Files by the day gathered so a night's positions
+  leave earlier files as they were (the repo's history grows by what changed). The format number
+  stays 1: an older app classifies the files as `other` and leaves them alone.
+- **A cleared position stays cleared on that device** (a tombstone with the time) unless another
+  device gathers it again; other devices keep their copies. Why: Clear is per device, and a
+  position that came back at the next sync would make it look broken.
+- **`storeMax` 4,000** (was lichessable's 900), the done positions out first. Why: a night over the
+  whole repertoire gathers more than 900, and evicting unseen positions oldest-first would throw
+  away the start of the night.
+- **An overnight gather walks older games through the explorer's `until`**, four months back a
+  pass, 13 passes. Why: the explorer names at most four top and four recent games per position, so
+  a second pass with the same filter finds nothing new; an older window names other games.
+

@@ -222,6 +222,15 @@ export class IdbStore implements LocalStore {
     });
   }
 
+  /** The base's blob SHAs of the files `want` selects that have no working copy, without reading contents. */
+  async baseShas(want: (path: string) => boolean): Promise<Map<string, string>> {
+    return this.tx(['meta', 'files'], 'readonly', async (s) => {
+      const base = await IdbStore.get<SyncBase>(s('meta'), 'base');
+      const overlay = await this.overlayOf(s('files'));
+      return new Map([...(base?.files ?? [])].filter(([path]) => want(path) && !overlay.has(path)));
+    });
+  }
+
   /** The device's own events not yet uploaded. */
   async unsentEvents(): Promise<LocalEvent[]> {
     return this.tx(['meta', 'log'], 'readonly', async (s) => {

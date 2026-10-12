@@ -63,7 +63,7 @@ export type ToWorker =
    * The storm's gather (§5.42): a position's games at the storm's relaxed filter (every speed,
    * ratings 1000–2500) with the games it names; Lichess's explorer always, under the panel.
    */
-  | { type: 'stormGames'; id: number; fen: string }
+  | { type: 'stormGames'; id: number; fen: string; until?: string }
   /** The storm's games as PGN: Lichess ids in one export, or one masters game. */
   | { type: 'gamePgns'; id: number; ids: string[]; masters?: boolean }
   /** ChessDB's scored moves for the storm's walk, under every other lookup. */
@@ -248,8 +248,8 @@ export function createExplorerService(o: ServiceOptions): ExplorerService {
 
   /* ---------------------------------------------------------------- the storm's gather (§5.42) */
 
-  function stormGames(id: number, fen: string) {
-    const filter: ExplorerFilter = { speeds: [...STORM.speeds], ratings: [...STORM.ratings], db: 'lichess', games: STORM.gatherGamesPerFrontier };
+  function stormGames(id: number, fen: string, until?: string) {
+    const filter: ExplorerFilter = { speeds: [...STORM.speeds], ratings: [...STORM.ratings], db: 'lichess', games: STORM.gatherGamesPerFrontier, ...(until ? { until } : {}) };
     providers.explorer(fen, filter, undefined, { priority: 300 }).then(
       (games) => o.post({ type: 'stormGames', id, games }),
       (e: PeError) => o.post({ type: 'stormGames', id, error: reasonOf(e, 'Lichess') }),
@@ -447,7 +447,7 @@ export function createExplorerService(o: ServiceOptions): ExplorerService {
         case 'search':
           return searchRows(msg);
         case 'stormGames':
-          return stormGames(msg.id, msg.fen);
+          return stormGames(msg.id, msg.fen, msg.until);
         case 'practiceGames':
           return practiceGames(msg.id, msg.fen, msg.speeds, msg.ratings);
         case 'gamePgns':

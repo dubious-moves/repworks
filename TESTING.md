@@ -461,6 +461,14 @@ explorer's Eval column too far from the move (§5.67).
 - §5.85 (desktop, then phone): a set with a wrong first move, Try again, then a good move that
   isn't the best: Try again and Show the move stay, the best hidden; Try again again until the best
   move, then Try again goes. The row still counts the first answer.
+- §5.102 (desktop overnight, then phone): on the desktop, Storm → whole repertoire → "Keep going
+  until stopped" → Gather positions, the laptop on power, the page in front; in the morning the
+  status line (which pass, how many stored, any failures waited out), whether the screen stayed
+  on and the tab wasn't suspended or discarded, and "Stockfish: n of m scored". Then the phone:
+  open Storm (or Sync now there): "n positions here came from your other devices" and the same
+  count ready; a storm from them. In the data repo, `storm/<desktop id>/` holds the night's files
+  and nothing from the phone. Clear on the phone, then a sync: still cleared there, still kept on
+  the desktop. How long the phone's first pull of the positions takes.
 
 ## Phase 5
 

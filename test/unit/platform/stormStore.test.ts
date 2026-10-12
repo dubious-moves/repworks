@@ -52,3 +52,29 @@ test('the other stores: put, get, all, remove, clear', async () => {
   await s.clear('meta');
   assert.equal(await s.get('meta', 'builtAt'), undefined);
 });
+
+test('the cap: the cards spared (done) go first, then the oldest', async () => {
+  const s = openStormStore(indexedDB, fresh());
+  await s.addPositions([pos('a', 1), pos('b', 2), pos('c', 3)], 3);
+  await s.addPositions([pos('d', 4)], 3, new Set(['s|c']));
+  assert.deepEqual((await s.positions()).map((p) => p.card).sort(), ['s|a', 's|b', 's|d']);
+});
+
+test("other devices' positions merged in (§5.102): new ones marked, kept ones bettered, cleared ones kept out until gathered again", async () => {
+  const s = openStormStore(indexedDB, fresh());
+  await s.addPositions([pos('a', 10), pos('b', 10)], 10);
+  await s.removePositions(['s|b']);
+  await s.noteCleared(['s|b'], 20);
+  const theirs = [pos('a', 5), pos('b', 15), pos('c', 30)].map((p) => ({ ...p, src: 'sf' as const, depth: 22 }));
+  assert.deepEqual(await s.mergePositions([{ dev: 'Desk0001', positions: theirs }], 10), { added: 1, updated: 1 });
+  const byCard = new Map((await s.positions()).map((p) => [p.card, p]));
+  assert.deepEqual([...byCard.keys()].sort(), ['s|a', 's|c']);
+  assert.deepEqual([byCard.get('s|a')!.from, byCard.get('s|a')!.depth, byCard.get('s|a')!.at], [undefined, 22, 10]);
+  assert.equal(byCard.get('s|c')!.from, 'Desk0001');
+  // Gathered there after it was cleared here: it comes in.
+  assert.deepEqual(await s.mergePositions([{ dev: 'Desk0001', positions: [{ ...pos('b', 25), src: 'sf', depth: 22 }] }], 10), { added: 1, updated: 0 });
+  // Merged again: no change. And past the cap, what was kept goes before what came in.
+  assert.deepEqual(await s.mergePositions([{ dev: 'Desk0001', positions: theirs }], 10), { added: 0, updated: 0 });
+  await s.mergePositions([{ dev: 'Desk0001', positions: [pos('d', 1), pos('e', 1)] }], 3);
+  assert.deepEqual((await s.positions()).map((p) => p.card).sort(), ['s|c', 's|d', 's|e']);
+});

@@ -10,7 +10,9 @@ test('data repo paths are classified', () => {
   assert.deepEqual(classifyPath('progress/Phone001/2026-10-05.jsonl'), { kind: 'progress-day', dev: 'Phone001', day: '2026-10-05' });
   assert.deepEqual(classifyPath('progress/Phone001/2026-10.jsonl'), { kind: 'progress-month', dev: 'Phone001', month: '2026-10' });
   assert.deepEqual(classifyPath('devices/Phone001.json'), { kind: 'device', dev: 'Phone001' });
-  for (const other of ['README.md', 'studies/short/study.json', 'studies/Rep0Najd/notes.txt', 'progress/Phone001/2026-13-01.jsonl', 'progress/Phone001/today.jsonl', 'devices/x.json', 'studies/Rep0Najd/a/b.pgn']) {
+  assert.deepEqual(classifyPath('storm/Phone001/2026-10-05.1.jsonl'), { kind: 'storm', dev: 'Phone001', day: '2026-10-05', k: 1 });
+  assert.deepEqual(classifyPath('storm/Phone001/2026-10-05.12.jsonl'), { kind: 'storm', dev: 'Phone001', day: '2026-10-05', k: 12 });
+  for (const other of ['README.md', 'studies/short/study.json', 'studies/Rep0Najd/notes.txt', 'progress/Phone001/2026-13-01.jsonl', 'progress/Phone001/today.jsonl', 'devices/x.json', 'studies/Rep0Najd/a/b.pgn', 'storm/Phone001/2026-10-05.jsonl', 'storm/Phone001/2026-10-05.0.jsonl', 'storm/Phone001/2026-13-05.1.jsonl', 'storm/short/2026-10-05.1.jsonl']) {
     assert.deepEqual(classifyPath(other), { kind: 'other' }, other);
   }
 });

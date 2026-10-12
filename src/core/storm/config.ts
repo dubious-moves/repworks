@@ -53,6 +53,12 @@ export interface StormConfig {
    */
   gamesPerFrontier: number;
   gatherGamesPerFrontier: number;
+  /**
+   * An overnight gather (PLAN.md §5.102): how many passes over the line ends, and how many months
+   * further back each pass after the first asks the explorer for games (its `until`).
+   */
+  overnightPasses: number;
+  overnightStepMonths: number;
   /** The relaxed explorer filter (§6.4): any human game rather than one at the user's rating. */
   speeds: readonly string[];
   ratings: readonly number[];
@@ -153,6 +159,8 @@ export const STORM: StormConfig = {
   randomMinPlies: 2,
   gamesPerFrontier: 2,
   gatherGamesPerFrontier: 4,
+  overnightPasses: 13,
+  overnightStepMonths: 4,
   speeds: ['bullet', 'blitz', 'rapid', 'classical', 'correspondence'],
   ratings: [1000, 1200, 1400, 1600, 1800, 2000, 2200, 2500],
   uncMinShare: 3,
@@ -167,7 +175,7 @@ export const STORM: StormConfig = {
   setCleanOn: ['great', 'good'],
   storeDropOn: ['great', 'good'],
   goneDays: 60,
-  storeMax: 900,
+  storeMax: 4000,
   queueTarget: 3,
   reachTop: 4,
   recentLines: 24,

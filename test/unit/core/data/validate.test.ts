@@ -47,6 +47,15 @@ test('a progress line that will not parse is a warning, and the rest of the file
   ]);
 });
 
+test('a storm file (§5.102): read in full passes; lines this version can’t read are a warning', () => {
+  const files = fixture();
+  const good = '{"v":1,"fen":"rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2","side":"white","ply":2,"lines":[],"names":[],"arrived":null,"scored":[{"u":"g1f3","s":30}],"src":"cdb","depth":0,"invented":false,"unc":null,"games":null,"at":1}';
+  files.set('storm/Desktop1/2026-10-05.1.jsonl', good + '\n');
+  assert.deepEqual(validateDataRepo(files), { errors: [], warnings: [] });
+  files.set('storm/Desktop1/2026-10-05.1.jsonl', good + '\nnot json\n');
+  assert.deepEqual(messages(validateDataRepo(files).warnings), ["storm/Desktop1/2026-10-05.1.jsonl: 1 line(s) this version can't read as a storm position: they are left out, and the file is never rewritten"]);
+});
+
 test('other problems: unknown format, unlisted chapter, missing device, a clashing n, stray files', () => {
   const files = fixture();
   files.set('repworks.json', '{ "format": 2 }');

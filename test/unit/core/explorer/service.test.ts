@@ -328,3 +328,15 @@ test('the preview: the same rows valued with Maia in place of games, asking no e
   assert.equal(explorerUrls(w.urls).length, explorerUrls(plain.urls).length);
   assert.ok(w.posts.some((m) => m.type === 'update' && m.pass === 'maia' && m.root === 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -'));
 });
+
+test("the storm's games up to a month (an overnight gather's older pass, §5.102): `until` asked, and cached apart", async () => {
+  const w = world();
+  w.service.handle({ type: 'stormGames', id: 1, fen: START });
+  w.service.handle({ type: 'stormGames', id: 2, fen: START, until: '2026-06' });
+  await settle();
+  const ex = explorerUrls(w.urls);
+  assert.equal(ex.length, 2);
+  assert.ok(!ex[0]!.includes('until='));
+  assert.match(ex[1]!, /&topGames=4&recentGames=4&until=2026-06$/);
+  assert.ok(w.posts.some((m) => m.type === 'stormGames' && m.id === 2));
+});

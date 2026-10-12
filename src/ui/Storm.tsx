@@ -10,7 +10,8 @@ import { makeUci, parseSquare } from 'chessops/util';
 import type { Key } from '@lichess-org/chessground/types';
 import type { Role, SquareName } from 'chessops/types';
 import { entryKey, goBack, open } from '../app/mode.ts';
-import { dataVersion } from '../app/sync.ts';
+import { dataVersion, syncStatus } from '../app/sync.ts';
+import { settings, syncNow } from '../app/state.ts';
 import { trainData } from '../app/train.ts';
 import {
   analyse,
@@ -49,6 +50,7 @@ import {
   puzzleFen,
   maiaRating,
   rateWithMaia,
+  refreshShared,
   type StormAnswer,
   type StormItem,
   type StormScopeData,
@@ -162,7 +164,7 @@ export function StormScreen(props: { where: StormWhere }) {
     };
   }, [key]);
   useEffect(() => {
-    if (scope && typeof scope !== 'string') void refreshHome(scope);
+    if (scope && typeof scope !== 'string') void refreshHome(scope).then(() => refreshShared(scope));
   }, [scope, version]);
   const s = stormSession.value;
   useWakeLock(!!gathering.value?.running || (!!s && s.phase !== 'done'));
@@ -265,15 +267,19 @@ function Home(props: { scope: StormScopeData; where: StormWhere }) {
               Stop
             </button>
           ) : (
-            <button type="button" class={home?.ready ? 'secondary gather' : 'primary gather'} onClick={() => void gather(scope)}>
+            <button type="button" class={home?.ready ? 'secondary gather' : 'primary gather'} onClick={() => void gather(scope, prefs.overnight)}>
               Gather positions
             </button>
           )}
         </div>
         <p class="muted">
           {ends} line end{ends === 1 ? '' : 's'} and {scope.decisions.length} place{scope.decisions.length === 1 ? '' : 's'} where the opponent may leave your lines. Gathering follows real games past
-          them and keeps the positions worth a question on this device.
+          them and keeps the positions worth a question{settings.value ? '; your other devices get them with the sync' : ' on this device'}.
         </p>
+        <label class="check storm-overnight">
+          <input type="checkbox" checked={prefs.overnight} disabled={!!g?.running} onChange={(e) => setStormPrefs({ overnight: e.currentTarget.checked })} /> Keep going until stopped: older games
+          each pass, Stockfish scoring in between (overnight)
+        </label>
         {g && (
           <>
             {g.running && g.of > 0 && (
@@ -282,9 +288,30 @@ function Home(props: { scope: StormScopeData; where: StormWhere }) {
               </div>
             )}
             <p class="muted storm-gather" role="status">
-              {g.running ? `Gathering: ${g.frontiers} of ${g.of} walked, ${g.stored} stored` : `${g.stored} stored from ${g.frontiers} of ${g.of}. ${g.note}`} · requests: {g.spent.explorer} explorer, {g.spent.games} game exports, {g.spent.chessdb} ChessDB, {g.spent.searches} Stockfish
+              {g.overnight ? `Pass ${g.overnight.pass} of ${g.overnight.passes} · ` : ''}
+              {g.running
+                ? g.overnight?.doing === 'scoring'
+                  ? `Stockfish scoring what came in, ${g.stored} stored`
+                  : g.overnight?.doing === 'waiting'
+                    ? `${g.note} · ${g.stored} stored`
+                    : `Gathering: ${g.frontiers} of ${g.of} walked, ${g.stored} stored`
+                : `${g.stored} stored from ${g.frontiers} of ${g.of}. ${g.note}`}{' '}
+              · requests: {g.spent.explorer} explorer, {g.spent.games} game exports, {g.spent.chessdb} ChessDB, {g.spent.searches} Stockfish
             </p>
+            {g.running && g.overnight && (
+              <p class="muted storm-overnight-note" data-testid="storm-overnight-note">
+                Keep this page open and in front, on power: the screen stays on until you press Stop. A failure is waited out, not the end of it.
+              </p>
+            )}
           </>
+        )}
+        {home && settings.value && (
+          <p class="muted storm-shared" data-testid="storm-shared">
+            {home.shared ? `${plural(home.shared, 'position')} here came from your other devices. ` : 'Positions gathered on your other devices come with the sync. '}
+            <button type="button" class="link" disabled={syncStatus.value.phase === 'syncing'} onClick={syncNow}>
+              {syncStatus.value.phase === 'syncing' ? 'Syncing…' : 'Sync now'}
+            </button>
+          </p>
         )}
         {home && home.stored > 0 && (
           <p class="muted storm-deep" data-testid="storm-deep">
@@ -432,7 +459,7 @@ function ClearPositions(props: { scope: StormScopeData; stored: number; whole: b
       {armed ? (
         <>
           <p class="muted" role="status">
-            Removes {what} from this device. Your answers and the record stay; gathering again finds positions anew.
+            Removes {what} from this device and from what it shares; your other devices keep theirs. Your answers and the record stay; gathering again finds positions anew.
           </p>
           <div class="actions">
             <button type="button" class="danger" disabled={props.disabled} onClick={clear}>

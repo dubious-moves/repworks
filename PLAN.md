@@ -7,7 +7,7 @@ where the build differed). What remains is live: the spike's re-run (§4.2), the
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
 with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
-for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Read with `DECISIONS.md`, which this plan updates (its
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Storm positions shared between devices through the data repo, and an overnight gather (§5.102), are built (2026-10-12). Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -5992,3 +5992,55 @@ and Set:
 
 Tests in core for the pair, the eval steps and the threat's position; e2e for each mode on desktop
 and phone.
+
+#### 5.102 Storm positions shared between devices, and an overnight gather (the owner's request, 2026-10-12)
+
+The owner: gather positions across the whole repertoire during the night, and have them on every
+device. The positions had stayed on the device that gathered them (D5's cache tier, revision of
+2026-10-07), which said a per-device store file was the step after if gathering on the phone was
+too slow; and a gather ended after one pass over the line ends (at most four games each). Built:
+
+- **Each device writes the positions it gathered to the data repo**:
+  `storm/<dev>/<YYYY-MM-DD>.<k>.jsonl`, the UTC day each was gathered, one position a line in the
+  stored shape (`v: 1`; no card or key, which the FEN gives), at most 400 to a file
+  (`core/storm/shared.ts`, `classifyPath`'s `storm` kind). Only that device writes its folder,
+  as with progress files: the tree merge keeps a device's own files as ours and another's as
+  theirs, never read. They are working copies that the ordinary sync pushes, so offline, a stale
+  head and a lost answer are handled as for any file. A night's positions land in that night's
+  files, so the earlier days' stay as they were and history grows by what changed. The device
+  writes them at the end of a gather (and after each overnight pass), on Clear, on leaving the
+  storm's page, and ten minutes after the deepening or Maia's ratings change one
+  (`app/stormShare.ts`). Validation warns on lines the app can't read, and such a file is never
+  rewritten.
+- **Other devices' files come down with the ordinary pull** and are merged into the storm's store
+  when its page opens and after every sync that changes the data, a file read again only when
+  its blob changed. A position not kept comes in marked with the device it came from (`from`); one
+  kept takes a better list (Stockfish over ChessDB, then deeper) and the Maia ratings it lacks.
+  The home says how many came from other devices, with "Sync now".
+- **Clear removes the positions from this device and from its files**; other devices keep their
+  copies. A cleared position from another device isn't merged back in unless that device
+  gathers it again later (a tombstone per card, with the time).
+- **The store keeps 4,000 positions** (was 900), the done ones out first, then the oldest: a night
+  over the whole repertoire gathers more than 900.
+- **Overnight**: "Keep going until stopped" under the Positions card. After the usual pass, each
+  pass walks every line end again over older games (the explorer's `until`, four months further
+  back each pass, 13 passes: four years), only games not walked yet; between passes Stockfish
+  scores what came in (whatever the deepening setting) for as long as the pass took, and the
+  positions are written out; at the end it scores the rest. A failure is waited out (1 minute,
+  then 2, 4, 8, up to 15 in a row) instead of ending the gather. It stops at Stop, after the last
+  pass, or when the store holds 4,000 positions not answered well. The screen is kept on (the wake
+  lock already held while gathering); the page must stay open and in front, since a browser
+  suspends a hidden tab and a phone a locked screen's.
+
+Tests: `test/unit/core/storm/shared.test.ts` (a line and back, unread lines counted; the files by
+day and part, own positions only; the merge; the explorer's window), with three controls in its
+header; `layout.test.ts`, `validate.test.ts`, `core/sync/trees.test.ts` (own storm files ours,
+another's theirs, nothing read), `service.test.ts` (`until` asked and cached apart),
+`stormStore.test.ts` (the cap sparing done cards; the merge, the tombstone); `storm.spec.ts`
+(desktop and phone: an overnight gather through all 13 windows, the older window's game walked
+once, every position scored, the wake lock asked, and the files pushed holding every position;
+a failure waited out and the gather going on, then Stop; a gather on one device dealt on a second
+after its sync, which writes nothing of its own, then cleared there and staying cleared after a
+reload, the first device's files untouched).
+
+Live: TESTING.md.

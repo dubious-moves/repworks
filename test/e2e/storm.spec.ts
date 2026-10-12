@@ -87,8 +87,18 @@ interface World {
   requests: string[];
 }
 
-async function setUp(page: Page, options: { deepen?: boolean } = {}): Promise<World> {
-  const { git, github } = world();
+/** A game only an overnight gather's first older window names (§5.102): a Dragon past the Najdorf line's end. */
+const OLDER = ['GameDDDD', '1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 g6 6. Be3 Bg7 7. f3 O-O 8. Qd2 Nc6 9. Bc4 Bd7 10. O-O-O Rc8'] as const;
+const OLDER_PGN = `[Event "Rated blitz game"]\n[GameId "${OLDER[0]}"]\n[Result "*"]\n\n${OLDER[1]} *\n\n\n`;
+/** The explorer's `until` for the overnight gather's second pass: four months before now (UTC). */
+const firstWindow = () => {
+  const d = new Date();
+  const m = d.getUTCFullYear() * 12 + d.getUTCMonth() - 4;
+  return `${Math.floor(m / 12)}-${String((m % 12) + 1).padStart(2, '0')}`;
+};
+
+async function setUp(page: Page, options: { deepen?: boolean; world?: ReturnType<typeof world>; name?: string } = {}): Promise<World> {
+  const { git, github } = options.world ?? world();
   await lichessLogin(page);
   // Stockfish's re-scoring of the kept positions (§5.45) has a test of its own.
   const deepen = options.deepen ?? false;
@@ -103,13 +113,16 @@ async function setUp(page: Page, options: { deepen?: boolean } = {}): Promise<Wo
       return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'Authorization', 'access-control-allow-methods': 'GET,OPTIONS' } });
     }
     const url = new URL(route.request().url());
-    requests.push(`explorer ${url.searchParams.get('topGames') ?? ''}`);
-    await route.fulfill({ status: 200, headers: cors, body: JSON.stringify({ white: 10, draws: 2, black: 8, moves: [], topGames: GAMES.map(([id]) => ({ id })), recentGames: [] }) });
+    const until = url.searchParams.get('until');
+    requests.push(`explorer ${url.searchParams.get('topGames') ?? ''}${until ? ` until=${until}` : ''}`);
+    // An older window names the fixture's games again (all walked by then), and the first one a game of its own.
+    const games = until ? [...GAMES.map(([id]) => ({ id })), ...(until === firstWindow() ? [{ id: OLDER[0] }] : [])] : GAMES.map(([id]) => ({ id }));
+    await route.fulfill({ status: 200, headers: cors, body: JSON.stringify({ white: 10, draws: 2, black: 8, moves: [], topGames: games, recentGames: [] }) });
   });
   await page.route('https://lichess.org/api/games/export/**', async (route) => {
     const r = route.request();
     requests.push(`export ${r.method()} ${r.postData()} ${r.headers()['authorization'] ?? 'no-token'} ${r.headers()['content-type']}`);
-    await route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*', 'content-type': 'application/x-chess-pgn' }, body: PGN });
+    await route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*', 'content-type': 'application/x-chess-pgn' }, body: PGN + (r.postData()?.includes(OLDER[0]) ? OLDER_PGN : '') });
   });
   await page.route('https://www.chessdb.cn/**', async (route) => {
     const board = new URL(route.request().url()).searchParams.get('board') ?? '';
@@ -117,7 +130,7 @@ async function setUp(page: Page, options: { deepen?: boolean } = {}): Promise<Wo
     const moves = ranked(board).map((uci, i) => ({ uci, san: uci, score: LADDER[Math.min(i, LADDER.length - 1)] }));
     await route.fulfill({ status: 200, headers: cors, body: JSON.stringify({ status: 'ok', moves }) });
   });
-  await page.goto(`${site.url}#setup?repo=${encodeURIComponent(REPO)}&token=${TOKEN}&name=desktop`);
+  await page.goto(`${site.url}#setup?repo=${encodeURIComponent(REPO)}&token=${TOKEN}&name=${options.name ?? 'desktop'}`);
   await expect(page.locator('.chip')).toHaveText(/^synced/);
   return { git, requests };
 }
@@ -338,6 +351,128 @@ test('the storm: positions gathered, a great move and a mistake scored, the revi
 
   const wide = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(wide).toBeLessThanOrEqual(0);
+});
+
+/** The positions in the data repo's storm files (§5.102), by the device folder they are in. */
+function sharedIn(git: FakeGit): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const [path, text] of git.textsOf()) {
+    const m = /^storm\/([A-Za-z0-9]{8})\/\d{4}-\d{2}-\d{2}\.\d+\.jsonl$/.exec(path);
+    if (m) out.set(m[1]!, (out.get(m[1]!) ?? 0) + text.split('\n').filter(Boolean).length);
+  }
+  return out;
+}
+/** The FENs of the positions in this device's storm store. */
+const storedFens = (page: Page) =>
+  page.evaluate(
+    () =>
+      new Promise<string[]>((resolve, reject) => {
+        const open = indexedDB.open('repworks-storm');
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const req = open.result.transaction('positions').objectStore('positions').getAll();
+          req.onsuccess = () => resolve((req.result as { fen: string }[]).map((p) => p.fen));
+          req.onerror = () => reject(req.error);
+        };
+      }),
+  );
+const storedOf = async (page: Page) => Number(/(\d+) stored from/.exec((await page.locator('.storm-gather').textContent()) ?? '')?.[1] ?? NaN);
+
+test('overnight (§5.102): the gather goes on over older games, Stockfish scoring between passes, the screen kept on, and the positions written to the data repo', async ({ page }) => {
+  test.setTimeout(120_000);
+  const w = await setUp(page);
+  await page.addInitScript(() => {
+    // The wake lock asked for, as the browser would grant it.
+    (window as unknown as { locks: string[] }).locks = [];
+    Object.defineProperty(navigator, 'wakeLock', {
+      value: { request: async (t: string) => ((window as unknown as { locks: string[] }).locks.push(t), Object.assign(new EventTarget(), { release: async () => undefined })) },
+    });
+  });
+  await page.reload();
+  await page.getByRole('link', { name: 'Storm' }).click();
+  await page.getByLabel(/Keep going until stopped/).check();
+  await page.getByRole('button', { name: 'Gather positions' }).click();
+  await expect(page.getByTestId('storm-overnight-note')).toBeVisible();
+  await expect(page.locator('.storm-gather')).toContainText('Pass 1 of 13');
+  expect(await page.evaluate(() => (window as unknown as { locks: string[] }).locks)).toContain('screen');
+  await expect(page.locator('.storm-gather')).toContainText(/Pass 1[0-3] of 13|Every pass walked/, { timeout: 60_000 });
+  await expect(page.locator('.storm-gather')).toContainText('Every pass walked', { timeout: 60_000 });
+  await expect(page.getByTestId('storm-overnight-note')).toHaveCount(0);
+  // Twelve older windows, four months apart, each asked once at every line end.
+  const untils = [...new Set(w.requests.filter((r) => r.includes('until=')).map((r) => r.split('until=')[1]))];
+  expect(untils.length).toBe(12);
+  expect(untils[0]).toBe(firstWindow());
+  expect(w.requests.filter((r) => r.includes(`until=${firstWindow()}`)).length).toBe(3);
+  // The older game exported at each line end its window named it at (only the Najdorf's leads
+  // anywhere), and nothing else: every other game had been walked already.
+  const exports = w.requests.filter((r) => r.startsWith('export'));
+  expect(exports.filter((r) => r.includes(OLDER[0])).length).toBe(3);
+  expect(exports.length).toBe(9);
+  // Positions from it kept: the Dragon's fianchetto.
+  expect((await storedFens(page)).some((f) => f.includes('/3p1np1/'))).toBe(true);
+  const stored = await storedOf(page);
+  // Stockfish scored every kept position (the setting is off: overnight scores anyway).
+  await expect(page.getByTestId('storm-deep')).toContainText(new RegExp(`Stockfish: (\\d+) of \\1 scored`));
+  // Every position kept is in this device's files, pushed with the sync.
+  await page.locator('.chip').click();
+  await expect.poll(() => [...sharedIn(w.git).values()].reduce((a, b) => a + b, 0), { timeout: 15_000 }).toBe(stored);
+  expect(sharedIn(w.git).size).toBe(1);
+});
+
+test('overnight: a failure is waited out, not the end; Stop ends it', async ({ page }) => {
+  test.setTimeout(120_000);
+  // Time runs as usual, but can jump past the minute's wait.
+  await page.clock.install();
+  await page.clock.resume();
+  await setUp(page);
+  let fail = true;
+  // The older windows' first explorer request fails once.
+  await page.route(/until=/, async (route) => {
+    if (fail) {
+      fail = false;
+      return route.fulfill({ status: 500, headers: { 'access-control-allow-origin': '*' }, body: 'down' });
+    }
+    return route.fallback();
+  });
+  await page.getByRole('link', { name: 'Storm' }).click();
+  await page.getByLabel(/Keep going until stopped/).check();
+  await page.getByRole('button', { name: 'Gather positions' }).click();
+  await expect(page.locator('.storm-gather')).toContainText('Waiting 1 min after a failure', { timeout: 30_000 });
+  await page.clock.fastForward(61_000);
+  await expect(page.locator('.storm-gather')).toContainText(/Pass [3-9] of 13/, { timeout: 30_000 });
+  await page.getByRole('button', { name: 'Stop' }).click();
+  await expect(page.locator('.storm-gather')).toContainText('Stopped.');
+  await expect(page.getByRole('button', { name: 'Gather positions' })).toBeEnabled();
+});
+
+test('shared (§5.102): positions gathered on one device are dealt on another after its sync; cleared there, they stay cleared', async ({ page, browser }) => {
+  test.setTimeout(120_000);
+  const shared = world();
+  const w = await setUp(page, { world: shared });
+  const ready = await gathered(page, w);
+  await page.locator('.chip').click();
+  await expect.poll(() => [...sharedIn(w.git).values()].reduce((a, b) => a + b, 0), { timeout: 15_000 }).toBe(ready);
+  const files = [...w.git.textsOf().keys()].filter((p) => p.startsWith('storm/'));
+
+  const context = await browser.newContext();
+  const phone = await context.newPage();
+  await setUp(phone, { world: shared, name: 'phone' });
+  await phone.getByRole('link', { name: 'Storm' }).click();
+  await expect(phone.getByTestId('storm-count')).toContainText(`${ready} positions ready`);
+  await expect(phone.getByTestId('storm-shared')).toContainText(`${ready} positions here came from your other devices`);
+  // Only the device that gathered them writes them.
+  await phone.locator('.chip').click();
+  await expect(phone.locator('.chip')).toHaveText(/^synced/);
+  expect(sharedIn(w.git).size).toBe(1);
+
+  // Cleared on the phone: gone there, after a reload too; the desktop's files are as they were.
+  await phone.getByRole('button', { name: 'Clear positions…' }).click();
+  await phone.getByRole('button', { name: `Clear ${ready} positions` }).click();
+  await expect(phone.getByTestId('storm-count')).toContainText('0 positions ready');
+  await phone.reload();
+  await expect(phone.getByTestId('storm-count')).toContainText('0 positions ready');
+  expect([...w.git.textsOf().keys()].filter((p) => p.startsWith('storm/'))).toEqual(files);
+  await context.close();
 });
 
 test('the gather: its requests counted as they go out, and Stop at once while one is under way', async ({ page }) => {

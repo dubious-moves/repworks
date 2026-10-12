@@ -192,6 +192,8 @@ export interface StoredPosition {
   maia?: MaiaRating[];
   /** A kind beyond the classic storm's (§5.100); absent for a classic position. */
   kind?: StoredKind;
+  /** The device whose shared file it came from (§5.102); absent for one gathered here. */
+  from?: string;
 }
 
 export function storedPosition(cand: Candidate & { unc?: StoredPosition['unc'] }, from: { lines: LineRef[]; names: string[]; games?: number | null }, at: number): StoredPosition | null {
@@ -245,6 +247,17 @@ export function positionLineLabel(p: Pick<StoredPosition, 'lines' | 'unc' | 'arr
     if (ply !== null && ply <= r.path.length) return ply ? lineTail(r.path, 4, ply) : 'the start';
   }
   return lineTail(r.path);
+}
+
+/**
+ * The explorer's `until` (YYYY-MM, UTC) `months` before `now`: an overnight gather's later passes
+ * ask for the games up to it (§5.102). Undefined for none back.
+ */
+export function explorerUntil(now: number, months: number): string | undefined {
+  if (months <= 0) return undefined;
+  const d = new Date(now);
+  const m = d.getUTCFullYear() * 12 + d.getUTCMonth() - months;
+  return `${Math.floor(m / 12)}-${String((m % 12) + 1).padStart(2, '0')}`;
 }
 
 /** A stored position's list back as a scored list. */
