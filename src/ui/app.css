@@ -2200,6 +2200,19 @@ button.comment-offer-chip.important {
   cursor: pointer;
 }
 
+.comment-offer-acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+
+.comment-offer-acts button {
+  min-height: 36px;
+  padding: 0 10px;
+  font-size: 0.85rem;
+}
+
 .mini-board {
   width: 168px;
   aspect-ratio: 1;

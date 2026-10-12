@@ -13,7 +13,10 @@ fixes them and updates this file.
   quiet enough?
 - At the line's end the lines are played on the board: the opponent's moves played, yours asked. A
   line where one of your moves is marked `?`, `?!` or `??` never comes. Nothing is graded.
-- Try the setting in the training settings (all / important / pick / off), and "Quiz it" on the chip.
+- Try the setting in the training settings (all / important / pick / off), and "At the end" on the chip.
+- §5.99: at the line's end nothing starts by itself: "Next line" or "Quiz lines (n)". Open the chip
+  mid-line and press "Quiz now" on a line: it is played from where it starts, then the move you were
+  asked is asked again. Is "Quiz now" easy to reach on the phone (tap the chip)?
 - On your real courses: do the lines quizzed stop where they should (a second branch written in the
   same parentheses, words, passes)? Any line you'd expect that never comes, or one that shouldn't?
 

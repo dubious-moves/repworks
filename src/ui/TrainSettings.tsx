@@ -25,9 +25,9 @@ const AUTO: Record<AutoPlay, string> = {
 };
 
 const COMMENTS: Record<CommentQuiz, string> = {
-  all: 'Quiz each one when the line ends',
-  important: 'Quiz the important ones (first move ! or !!), offer the rest',
-  pick: 'Offer them: quiz the ones I pick',
+  all: 'Each one in “Quiz lines” at the line’s end',
+  important: 'The important ones (first move ! or !!) in “Quiz lines”',
+  pick: 'Only the ones I pick in “Quiz lines”',
   off: 'Off',
 };
 
@@ -159,7 +159,7 @@ function Dialog() {
             ))}
           </select>
         </label>
-        <p class="muted">The clickable lines in the comments that start with your opponent's move, played on the board after the line, nothing graded. A line where one of your moves is marked ?, ?! or ?? is never quizzed.</p>
+        <p class="muted">The clickable lines in the comments that start with your opponent's move, played on the board, nothing graded: one at a time with “Quiz now” on the Comment lines chip, or at the line's end with “Quiz lines” (or go on with “Next line”). A line where one of your moves is marked ?, ?! or ?? is never quizzed.</p>
         <label>
           At a line's end
           <select name="line-end" value={prefs.lineEnd} onChange={(e) => set('lineEnd', e.currentTarget.value as TrainPrefs['lineEnd'])}>

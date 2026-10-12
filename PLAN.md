@@ -5840,7 +5840,7 @@ an extension couldn't do. Decided:
 - **When**: on a walk of the day's queue or of a line picked that teaches nothing (a walk that
   teaches is learning). Lines starting where the user is first asked (the opponent's move before
   it) to the walk's end are met as the walk reaches them; from the start, asked, from the walk's
-  start. At the walk's end, after its mistakes, the lines on are played on the main board, one
+  start. At the walk's end, after its mistakes, the lines on are played on the main board (§5.99: when the user picks "Quiz lines" over "Next line", or one at a time by "Quiz now"), one
   after another, then the line is done as before. Each line once a session. Not in Learn, show and
   grade, retry, drill, the pins or the Interactive view.
 - **The quiz takes over the board**, as the mistakes retried at a walk's end do: the board goes
@@ -5882,3 +5882,33 @@ emulated phone (the chip and its board, `(…)` in a comment shown, both lines q
 review pushed, picked off, Skip, the setting).
 
 Live: TESTING.md.
+
+#### 5.99 Lines from the comments: "Quiz now", and "Next line" or "Quiz lines" at a line's end (the owner's request, 2026-10-12)
+
+The owner, on §5.98: quiz a line at the point of its comment, from the panel; and the quiz at the
+end optional, not started by itself: the user picks "Next line" or "Quiz lines". Decided:
+
+- **"Quiz now"** on each line in the chip's card (`ui/CommentOffer.tsx`; `quizComments` with the
+  line's key in `core/train/trainer.ts`): the line takes the board from where it starts, as at the
+  end (the opponent's first move after two paces, the user's moves found), then the walk resumes
+  exactly where it was: the move asked still asked, a wrong move already made still counting
+  (its grade is as without the quiz), the time taken before it kept; a move played for the user
+  or the opponent's played at the pace. Offered wherever the walk is playing or asking (and at
+  the line's end), not during show and grade, a sequence shown, a mistake retried or another line
+  from the comments. A line quizzed reads "Quizzed" with "Quiz again"; it leaves "Quiz lines".
+- **At the line's end** (after its mistakes and passes) nothing starts by itself. When lines from
+  the comments are left to quiz (on by the setting or a pick, not quizzed yet), the line waits
+  whatever "At a line's end" says, with "Next line" (or "Finish" at the session's last line, which
+  now waits for it too) and "Quiz lines (n)". "Quiz lines" plays them one after another and comes
+  back to the line's end, which then goes on as set. "Next line" leaves them: the lines met on a
+  walk are offered once a session, as before. The pause and its note "Next, 2 lines from the
+  comments" are gone.
+- **The checkbox** in the card is now "At the end" (in "Quiz lines" or not); the setting's words
+  follow: each one / the important ones / the ones I pick in "Quiz lines" / off.
+- `(…)` in a comment shown: a line still to be quizzed at the end (on, not quizzed); once quizzed,
+  now or at the end, its comment shows it.
+
+Tests: `trainer.test.ts` ("comment lines": "Quiz lines" at the end, "Next line" leaving them and
+the end waiting even with `holdLineEnd` off at the last line, show and grade at the end, "Quiz now"
+mid-walk resuming at the move asked, after a wrong move keeping its grade, at the end with the
+rest left to "Quiz lines"); `test/e2e/commentLines.spec.ts` on desktop and the emulated phone.

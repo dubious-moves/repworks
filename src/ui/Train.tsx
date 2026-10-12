@@ -14,7 +14,7 @@ import { commentId, endPreview, preview, stepPreview } from '../app/preview.ts';
 import { beginTraining } from '../app/state.ts';
 import { dataVersion } from '../app/sync.ts';
 import { decidingNow, timeOffset } from '../app/time.ts';
-import { command, endSession, seekSequence, isGraded, leaveForStudy, pace, PACES, pinMissed, playMove, press, queueOf, readLine, readingAt, session, sessionProblem, setPace, setSelfGrade, setSpeech, speech, trainData, undoSuspend, type Pace, type SessionKind, type SessionView, type TrainData } from '../app/train.ts';
+import { command, endSession, seekSequence, isGraded, leaveForStudy, pace, PACES, pinMissed, playMove, press, queueOf, quizComments, readLine, readingAt, session, sessionProblem, setPace, setSelfGrade, setSpeech, speech, trainData, undoSuspend, type Pace, type SessionKind, type SessionView, type TrainData } from '../app/train.ts';
 import { trainPrefs } from '../app/trainPrefs.ts';
 import type { Line, RepertoireIndex } from '../core/repertoire/index.ts';
 import type { Mode } from '../core/app/fsm.ts';
@@ -81,8 +81,6 @@ export function noteText(note: Note | undefined): string {
       return `The line again: ${note.pass} of ${note.of}`;
     case 'missedAgain':
       return 'Missed earlier: once more';
-    case 'asides':
-      return note.count === 1 ? 'Next, a line from the comments' : `Next, ${note.count} lines from the comments`;
     case 'aside':
       return `${note.important ? 'Important line' : 'Line'} from the comments${note.of > 1 ? ` · ${note.n} of ${note.of}` : ''}`;
     case 'asideWrong':
@@ -429,7 +427,7 @@ function Session(props: { s: SessionView }) {
   // Not while a line from the comments is on the board: the comment there writes its moves.
   const comments = s.aside ? [] : s.done || COMMENTS_SHOWN.has(s.phase) ? (node?.comments ?? []) : [];
   // A line of a comment shown that is still to be quizzed is left out of its text (§5.98).
-  const toQuiz = s.commentsSettled ? [] : (s.comments ?? []).filter((c) => c.on).map((c) => c.line);
+  const toQuiz = (s.comments ?? []).filter((c) => c.on && !c.done).map((c) => c.line);
   const quizzedLater = (l: PlayedLine) => {
     const start = l.positions[0];
     if (!start || !toQuiz.length) return false;
@@ -447,9 +445,12 @@ function Session(props: { s: SessionView }) {
   };
 
   // A line's end in Learn, the queue or show and grade (§5.17): the next line named, and "Next
-  // line" when it waits for it.
-  const holding = !s.done && s.phase === 'lineDone' && s.upcoming !== undefined && (s.of.kind === 'learn' || s.of.kind === 'queue' || s.of.kind === 'show');
-  const waits = holding && trainPrefs.value.lineEnd === 'wait';
+  // line" when it waits for it. With lines from the comments to quiz it always waits, for "Next
+  // line" or "Quiz lines" (§5.98), at the session's last line too.
+  const endQuiz = !s.done && s.phase === 'lineDone' ? (s.endQuiz ?? 0) : 0;
+  const holding = (!s.done && s.phase === 'lineDone' && s.upcoming !== undefined && (s.of.kind === 'learn' || s.of.kind === 'queue' || s.of.kind === 'show')) || endQuiz > 0;
+  const waits = holding && (trainPrefs.value.lineEnd === 'wait' || endQuiz > 0);
+  const nextLabel = s.upcoming ? 'Next line' : 'Finish';
   const upcoming = s.upcoming && `Line ${lineNumber(s.data.index, s.upcoming)}${s.line && s.upcoming.cid !== s.line.cid ? ` · ${chapterNameOf(s, s.upcoming)}` : ''}`;
   return (
     <div class="train-grid" data-phase={s.done ? 'done' : s.phase}>
@@ -472,7 +473,7 @@ function Session(props: { s: SessionView }) {
         <PreviewBar owner="train" />
         {/* One line, always its height, so the board never moves (§5.17). */}
         <p class={`feedback train-feedback note-${holding ? 'next' : (s.note?.kind ?? 'none')}${s.note?.kind === 'aside' && s.note.important ? ' important' : ''}`} role="status">
-          {s.done ? '' : holding ? `Line done · Next: ${upcoming}` : noteText(s.note)}
+          {s.done ? '' : holding ? `Line done${upcoming ? ` · Next: ${upcoming}` : ''}` : noteText(s.note)}
         </p>
       </div>
       <div class="train-panel">
@@ -531,9 +532,16 @@ function Session(props: { s: SessionView }) {
               )}
             </>
           ) : waits ? (
-            <button type="button" onClick={() => command('next')}>
-              Next line
-            </button>
+            <>
+              <button type="button" onClick={() => command('next')}>
+                {nextLabel}
+              </button>
+              {endQuiz > 0 && (
+                <button type="button" onClick={() => quizComments()} title="Play the lines from the comments met on this line on the board, one after another">
+                  Quiz lines ({endQuiz})
+                </button>
+              )}
+            </>
           ) : (
             <button type="button" disabled={s.phase !== 'ask' && s.phase !== 'wrong'} onClick={() => command('hint')}>
               Hint
@@ -559,13 +567,13 @@ function Session(props: { s: SessionView }) {
         {!s.done && ((show && waits) || (s.wrongMove && !show) || s.savedAlt || s.missed || s.suspended || aside) && (
         <div class="actions train-actions train-extra">
           {aside && (
-            <button type="button" class="secondary" onClick={() => command('skipComment')} title="On to the next line from the comments, or back to the line's end">
+            <button type="button" class="secondary" onClick={() => command('skipComment')} title="On to the next line from the comments, or back to where the line was">
               Skip this line
             </button>
           )}
           {show && waits && (
             <button type="button" onClick={() => command('next')}>
-              Next line
+              {nextLabel}
             </button>
           )}
           {s.wrongMove && !show && (

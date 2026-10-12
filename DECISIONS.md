@@ -1556,3 +1556,10 @@ The technical calls, each with its reason:
   play on, with the trainer's pace, keys and arrows. Why a chip rather than a popup: the owner
   found popups coming and going annoying; the chip only appears and grows, and shows the small
   boards when asked. Grading the lines as cards of their own is left to the owner (a data format).
+
+## Revision of 2026-10-12 (lines from the comments: "Quiz now", "Quiz lines", PLAN.md §5.99)
+- **§5.98's quiz at a walk's end no longer starts by itself**: the line's end waits for "Next
+  line" or "Quiz lines" whenever lines from the comments are left to quiz, and each line can be
+  quizzed at its comment by "Quiz now" on the chip's card, the walk resuming where it was. Why:
+  the owner's request; the quiz is practice, so the user decides when it is worth the time. The
+  walk's move asked keeps its wrong moves and time across the quiz, so its grade is unchanged.

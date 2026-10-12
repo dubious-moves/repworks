@@ -207,9 +207,10 @@ export interface SessionView {
   /** A line walked again (repetitions), and the mistakes retried at a walk's end (§5.77). */
   pass?: { n: number; of: number };
   retry?: { left: number; streak: number; need: number };
-  /** The lines from the comments offered on this walk, the one on the board, and the session's count (§5.98). */
+  /** The lines from the comments offered on this walk, how many "Quiz lines" plays at its end, whether one can be quizzed now, the one on the board, and the session's count (§5.98). */
   comments?: TrainerView['comments'];
-  commentsSettled?: true;
+  endQuiz?: number;
+  canQuiz?: true;
   aside?: TrainerView['aside'];
   asides?: TrainerView['asides'];
   /** After a wrong move, the move "Save as alternative" saves; an alternative just saved (§5.18). */
@@ -452,7 +453,11 @@ export function readLine(ply: number | undefined): void {
 export function command(type: 'hint' | 'suspend' | 'skipLine' | 'stop' | 'next' | 'ready' | 'saveAlt' | 'unsaveAlt' | 'skipComment'): void {
   send({ type, now: Date.now() });
 }
-/** A line from the comments offered: quizzed at the line's end, or not (§5.98). */
+/** A line from the comments met quizzed now, the walk resuming after it; without a key, at a line's end, the lines on (§5.98). */
+export function quizComments(key?: string): void {
+  send(key === undefined ? { type: 'quizComments', now: Date.now() } : { type: 'quizComments', key, now: Date.now() });
+}
+/** A line from the comments offered: in "Quiz lines" at the line's end, or not (§5.98). */
 export function pickComment(key: string, on: boolean): void {
   const t = trainer;
   // Nothing to play: the screen reads the offer again.
@@ -627,7 +632,7 @@ function apply(t: Trainer, effects: readonly ShowGradeEffect[], always = false):
   else delete next.wrongMove;
   if (v.savedAlt) next.savedAlt = v.savedAlt.san;
   else delete next.savedAlt;
-  for (const k of ['comments', 'commentsSettled', 'aside', 'asides'] as const) {
+  for (const k of ['comments', 'endQuiz', 'canQuiz', 'aside', 'asides'] as const) {
     if (v[k]) (next as unknown as Record<string, unknown>)[k] = v[k];
     else delete next[k];
   }

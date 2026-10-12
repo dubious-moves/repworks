@@ -120,7 +120,7 @@ export function CommentText(props: {
     <>
       {parts.map((p, i) =>
         'masked' in p ? (
-          <span key={i} class="comment-line masked" title="A line from the comments: quizzed on the board when the line ends">
+          <span key={i} class="comment-line masked" title="A line from the comments, still to be quizzed">
             (…)
           </span>
         ) : 'group' in p ? (

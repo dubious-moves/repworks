@@ -1,8 +1,9 @@
 // The lines from the comments offered in review (PLAN.md §5.98): a small notice in the counters'
 // row, there from the moment the walk reaches a position a comment's line starts from, its count
 // growing as it reaches more. Nothing pops up by itself: hovering it (or a tap, or the keyboard)
-// shows each line's start on a small board, the opponent's first move as an arrow, with a switch
-// for whether it is quizzed when the line ends. A line whose first move is marked ! or !! is
+// shows each line's start on a small board, the opponent's first move as an arrow, "Quiz now" (the
+// line played on the board from where it starts, the walk resuming after it), and a switch for
+// whether "Quiz lines" plays it at the line's end. A line whose first move is marked ! or !! is
 // important, in gold.
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { Chessground } from '@lichess-org/chessground';
@@ -10,7 +11,7 @@ import type { Api } from '@lichess-org/chessground/api';
 import type { Key } from '@lichess-org/chessground/types';
 import { makeFen } from 'chessops/fen';
 import type { Position } from 'chessops/chess';
-import { pickComment, type SessionView } from '../app/train.ts';
+import { pickComment, quizComments, type SessionView } from '../app/train.ts';
 import type { QuizLine } from '../core/train/commentQuiz.ts';
 
 /** A board to look at: a position and an arrow, no moves, no coordinates. */
@@ -70,8 +71,12 @@ export function CommentOffer(props: { s: SessionView }) {
   if (offered.length === 0) return null;
   const on = offered.filter((o) => o.on);
   const important = offered.some((o) => o.line.important);
-  const settled = !!s.commentsSettled;
-  const title = `${offered.length === 1 ? 'A line' : `${offered.length} lines`} from the comments${settled ? '' : on.length ? `: ${on.length === offered.length ? '' : `${on.length} `}quizzed when the line ends` : ': none quizzed (pick them here)'}`;
+  const title = `${offered.length === 1 ? 'A line' : `${offered.length} lines`} from the comments${on.length ? `: ${on.length === offered.length ? '' : `${on.length} `}offered at the line's end` : ': none offered at the line\'s end (pick them here)'}`;
+  const quiz = (key: string) => {
+    setOpen(false);
+    setHover(false);
+    quizComments(key);
+  };
   return (
     <div class="comment-offer" ref={ref} onPointerEnter={(e) => e.pointerType === 'mouse' && setHover(true)} onPointerLeave={(e) => e.pointerType === 'mouse' && setHover(false)}>
       <button
@@ -92,10 +97,10 @@ export function CommentOffer(props: { s: SessionView }) {
       </button>
       {(open || hover) && (
         <div class="comment-offer-card" role="group" aria-label="Lines from the comments">
-          <p class="comment-offer-lead">{settled ? 'From the comments, on this line' : 'From the comments: quizzed on the board when the line ends'}</p>
+          <p class="comment-offer-lead">From the comments: quiz one now, or at the line's end</p>
           <ul>
-            {offered.map(({ line, on }) => (
-              <OfferedLine key={line.key} line={line} on={on} settled={settled} side={s.side} />
+            {offered.map(({ line, on, done }) => (
+              <OfferedLine key={line.key} line={line} on={on} done={done} can={!!s.canQuiz} quiz={quiz} side={s.side} />
             ))}
           </ul>
         </div>
@@ -104,7 +109,7 @@ export function CommentOffer(props: { s: SessionView }) {
   );
 }
 
-function OfferedLine(props: { line: QuizLine; on: boolean; settled: boolean; side: 'white' | 'black' }) {
+function OfferedLine(props: { line: QuizLine; on: boolean; done: boolean; can: boolean; quiz: (key: string) => void; side: 'white' | 'black' }) {
   const { line } = props;
   const first = line.ucis[0]!;
   return (
@@ -115,11 +120,18 @@ function OfferedLine(props: { line: QuizLine; on: boolean; settled: boolean; sid
         <strong>{line.label}</strong>
         <span class="muted"> {line.own.filter(Boolean).length === 1 ? '1 move to find' : `${line.own.filter(Boolean).length} moves to find`}</span>
       </span>
-      {!props.settled && (
-        <label class="comment-offer-pick">
-          <input type="checkbox" checked={props.on} onChange={(e) => pickComment(line.key, e.currentTarget.checked)} /> Quiz it
-        </label>
-      )}
+      <span class="comment-offer-acts">
+        <button type="button" class="secondary" disabled={!props.can} onClick={() => props.quiz(line.key)} title="Play it on the board now, from where it starts; the line goes on after it">
+          {props.done ? 'Quiz again' : 'Quiz now'}
+        </button>
+        {props.done ? (
+          <span class="muted comment-offer-done">Quizzed</span>
+        ) : (
+          <label class="comment-offer-pick">
+            <input type="checkbox" checked={props.on} onChange={(e) => pickComment(line.key, e.currentTarget.checked)} /> At the end
+          </label>
+        )}
+      </span>
     </li>
   );
 }
