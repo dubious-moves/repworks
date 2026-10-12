@@ -2,7 +2,8 @@
 // grade's engine tier, and the deepened standard. A client of its own over the same worker and
 // search lifecycle as the study page's (§5.30): the storm's screen shows no engine panel, and it
 // asks for one position at a time and waits for the answer. Started when first asked, ended when
-// the storm's screen is left (`endStormEngine`).
+// the storm's screen is left (`endStormEngine`). Focused scoring (§5.103) runs several workers at
+// once, one position each: a lane per worker, the waiting positions dealt to the free ones.
 import { positionKeyOf } from '../core/chess/positionKey.ts';
 import { createSearch, type Analysis, type EngineLine, type Search } from '../core/engine/search.ts';
 import { positionOf } from '../core/storm/walk.ts';
@@ -23,75 +24,114 @@ interface Job {
   resolve(a: EngineAnswer | null): void;
 }
 
-let proc: EngineProcess | undefined;
-let search: Search | undefined;
-let starting: Promise<boolean> | undefined;
-let job: Job | undefined;
-let timer: ReturnType<typeof setTimeout> | undefined;
+interface Lane {
+  proc?: EngineProcess;
+  search?: Search;
+  starting?: Promise<boolean>;
+  job?: Job;
+  timer?: ReturnType<typeof setTimeout>;
+}
+
+const phone = () => matchMedia('(max-width: 768px)').matches;
+/** A focused lane's hash: each searches a position of its own, so each gets more than the one engine's 32 MB. */
+const FOCUSED_HASH_MB = 64;
+
+let lanes: Lane[] = [{}];
 const queue: Job[] = [];
 let failed = false;
 
-async function start(): Promise<boolean> {
-  if (search) return true;
+/**
+ * Engines at once in focused scoring (§5.103): one a core, less one for the page, at most 16.
+ * One where the device can't tell or has two cores or fewer.
+ */
+export function focusedWidth(): number {
+  const cores = typeof navigator === 'undefined' ? 1 : navigator.hardwareConcurrency || 1;
+  return Math.max(1, Math.min(16, cores - 1));
+}
+
+/** The workers running now. */
+export const stormEngineWidth = (): number => lanes.length;
+
+/**
+ * One worker on the device's threads (§5.36), or `n` single-threaded ones (§5.103): many positions
+ * at once scale with the cores better than one search on many threads. The workers there now end,
+ * their searches answered with nothing.
+ */
+export function setStormEngineWidth(n: number): void {
+  if (n === lanes.length) return;
+  endStormEngine();
+  lanes = Array.from({ length: n }, () => ({}));
+}
+
+async function start(lane: Lane): Promise<boolean> {
+  if (lane.search) return true;
   if (failed) return false;
-  starting ??= (async () => {
+  lane.starting ??= (async () => {
     try {
-      // The device's version (§5.75) and threads (§5.36), as the study page's engine (§5.84).
+      // The device's version (§5.75) and threads (§5.36), as the study page's engine (§5.84);
+      // a focused lane is one thread of its own.
       const version = enginePrefs.peek().version;
-      const threads = runningThreads();
+      const focused = lanes.length > 1;
+      const threads = focused ? 1 : runningThreads();
       const files = stockfishFiles(threads, version);
       await ensure(files);
-      search = createSearch({ send: (c) => proc?.send(c), now: () => performance.now(), onUpdate });
-      proc = startStockfish({ line: (l) => search?.receive(l), crashed: () => crash() }, matchMedia('(max-width: 768px)').matches ? 16 : 32, threads, version);
+      if (!lanes.includes(lane)) return false;
+      lane.search = createSearch({ send: (c) => lane.proc?.send(c), now: () => performance.now(), onUpdate: (a) => onUpdate(lane, a) });
+      lane.proc = startStockfish({ line: (l) => lane.search?.receive(l), crashed: () => crash(lane) }, focused ? FOCUSED_HASH_MB : phone() ? 16 : 32, threads, version);
       return true;
     } catch {
       failed = true;
       return false;
     } finally {
-      starting = undefined;
+      lane.starting = undefined;
     }
   })();
-  return starting;
+  return lane.starting;
 }
 
-function crash(): void {
-  proc?.terminate();
-  proc = undefined;
-  search = undefined;
-  finish(null);
-  for (const j of queue.splice(0)) j.resolve(null);
+function crash(lane: Lane): void {
+  lane.proc?.terminate();
+  lane.proc = undefined;
+  lane.search = undefined;
+  finish(lane, null);
+  // A lane of several dies alone; the one engine takes its queue with it, as before.
+  if (lanes.length === 1) for (const j of queue.splice(0)) j.resolve(null);
 }
 
-function onUpdate(a: Analysis): void {
-  if (!job || a.fen !== job.fen) return;
-  if (a.done || a.noMove) finish({ lines: a.lines, depth: a.depth });
+function onUpdate(lane: Lane, a: Analysis): void {
+  if (!lane.job || a.fen !== lane.job.fen) return;
+  if (a.done || a.noMove) finish(lane, { lines: a.lines, depth: a.depth });
 }
 
-function finish(a: EngineAnswer | null): void {
-  clearTimeout(timer);
-  const j = job;
-  job = undefined;
+function finish(lane: Lane, a: EngineAnswer | null): void {
+  clearTimeout(lane.timer);
+  const j = lane.job;
+  lane.job = undefined;
   j?.resolve(a);
   void next();
 }
 
 async function next(): Promise<void> {
-  if (job || !queue.length) return;
-  job = queue.shift()!;
-  if (!(await start()) || !search) return finish(null);
+  const lane = lanes.find((l) => !l.job);
+  if (!lane || !queue.length) return;
+  const job = queue.shift()!;
+  lane.job = job;
+  // Another free lane takes the next position while this one starts.
+  void next();
+  if (!(await start(lane)) || !lane.search) return finish(lane, null);
+  const search = lane.search;
   const pos = positionOf(job.fen);
-  if (!pos || pos.isEnd()) return finish(null);
+  if (!pos || pos.isEnd()) return finish(lane, null);
   let legal = 0;
   for (const [, dests] of pos.allDests()) legal += dests.size();
-  const j = job;
   // A search that runs out of time is taken at the depth it reached (§14.23).
-  timer = setTimeout(() => {
-    if (job !== j) return;
-    const now = search?.current();
-    search?.stop();
-    finish(now && now.fen === j.fen && now.lines.length ? { lines: now.lines, depth: now.depth } : null);
-  }, j.movetime + 4000);
-  search.analyse({ fen: j.fen, key: positionKeyOf(pos), turn: pos.turn, depth: j.depth, movetime: j.movetime, lines: j.lines, legal });
+  lane.timer = setTimeout(() => {
+    if (lane.job !== job) return;
+    const now = search.current();
+    search.stop();
+    finish(lane, now && now.fen === job.fen && now.lines.length ? { lines: now.lines, depth: now.depth } : null);
+  }, job.movetime + 4000);
+  search.analyse({ fen: job.fen, key: positionKeyOf(pos), turn: pos.turn, depth: job.depth, movetime: job.movetime, lines: job.lines, legal });
 }
 
 /**
@@ -99,7 +139,8 @@ async function next(): Promise<void> {
  * search finish an iteration one by one); null when none runs there or it has no line yet.
  */
 export function stormSearchSoFar(fen: string): EngineAnswer | null {
-  const now = job && job.fen === fen ? search?.current() : undefined;
+  const lane = lanes.find((l) => l.job?.fen === fen);
+  const now = lane?.search?.current();
   if (!now || now.fen !== fen || !now.lines.length) return null;
   return { lines: now.lines, depth: Math.min(...now.lines.map((l) => l.depth)) };
 }
@@ -112,20 +153,24 @@ export function analyseForStorm(fen: string, lines: number, depth: number, movet
   });
 }
 
-/** The search running and those waiting answered with nothing; the worker stays. */
+/** The searches running and those waiting answered with nothing; the workers stay. */
 export function cancelStormEngine(): void {
   for (const j of queue.splice(0)) j.resolve(null);
-  search?.stop();
-  finish(null);
+  for (const lane of lanes) {
+    lane.search?.stop();
+    finish(lane, null);
+  }
 }
 
-/** Nothing more is wanted: the queue answered with nothing, the worker ended. */
+/** Nothing more is wanted: the queue answered with nothing, the workers ended. */
 export function endStormEngine(): void {
   for (const j of queue.splice(0)) j.resolve(null);
-  finish(null);
-  search?.stop();
-  proc?.terminate();
-  proc = undefined;
-  search = undefined;
+  for (const lane of lanes) {
+    finish(lane, null);
+    lane.search?.stop();
+    lane.proc?.terminate();
+    lane.proc = undefined;
+    lane.search = undefined;
+  }
   failed = false;
 }

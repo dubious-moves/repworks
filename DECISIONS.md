@@ -1600,3 +1600,10 @@ The technical calls, each with its reason:
   pass, 13 passes. Why: the explorer names at most four top and four recent games per position, so
   a second pass with the same filter finds nothing new; an older window names other games.
 
+## Revision of 2026-10-12 (focused scoring, PLAN.md §5.103)
+- **The storm's deepening may run an engine a core** ("Focused", per device, off by default):
+  `hardwareConcurrency − 1` single-threaded workers, at most 16, each on a position of its own,
+  64 MB of hash each. Was (§5.84): one worker on the study page's threads, 32 MB. Why: the owner
+  saw the computer at half its CPU while positions waited; independent positions in parallel scale
+  with the cores better than one search on many threads, and need no isolated page. Sessions keep
+  the one engine. MultiPV stays 12.

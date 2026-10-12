@@ -6044,3 +6044,30 @@ after its sync, which writes nothing of its own, then cleared there and staying 
 reload, the first device's files untouched).
 
 Live: TESTING.md.
+
+#### 5.103 Focused scoring: every core for the deepening (the owner's request, 2026-10-12)
+The owner saw the deepening take long with the computer at about half its CPU and memory. The
+storm's Stockfish was one worker on the threads chosen for the study page (1, 2, 4 or 8; one when
+the page isn't isolated), with a 32 MB hash. Measured in Node over the vendored Stockfish 19 lite
+(one thread, depth 20, six opening positions): MultiPV 1 1.7 s a position, 6 8.3 s, 8 11.7 s, 12
+18.8 s; the time goes with the lines, about 1.5 s a line. MultiPV stays 12 for now (8 offered
+to the owner: about 1.6 times faster). Six positions at MultiPV 12 on a 4-core container: one worker
+103.6 s, three at once 35.1 s (2.95 times); one worker with a 128 MB hash 96.7 s (7% faster).
+
+- **"Focused" under the storm's settings** (per device, off by default; shown where the device
+  has three cores or more): the deepening runs `hardwareConcurrency − 1` single-threaded workers
+  (at most 16), each searching a position of its own, each with a 64 MB hash. Why: the positions
+  are independent, so several searches at once scale with the cores almost fully, where one
+  search on many threads (Lazy SMP, in wasm) scales worse; single-threaded workers also need no
+  isolated page. One core is left for the page. Memory is not what limits the search: a bigger
+  hash helps a little at these depths, and each worker is its own wasm instance (its net and hash).
+- **It applies to the home's deepening and an overnight gather's scoring.** A session goes back to
+  the one engine on the device's threads (its look-ahead is one position at a time, the card on
+  the board first), and the home starts the focused workers again when it deepens. Ticked while a
+  deepening runs, it starts again with the engines that now apply; a gather's scoring takes the
+  setting at its next pass.
+- The status line names them: "scoring, n at once…".
+
+Tests: `storm.spec.ts` (desktop and phone, `hardwareConcurrency` 4: three workers, each with a
+64 MB hash and no Threads option, every position searched once at the device's depth; a session
+starts no focused worker). Live: TESTING.md.

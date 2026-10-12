@@ -22,6 +22,7 @@ import {
   endStorm,
   endStormSession,
   deepen,
+  stopDeepening,
   deepening,
   deepenTarget,
   gather,
@@ -58,6 +59,7 @@ import {
   type StormWhere,
 } from '../app/storm.ts';
 import { STORM } from '../core/storm/config.ts';
+import { focusedWidth, stormEngineWidth } from '../app/stormEngine.ts';
 import { averageWp, blankRow, foundShare, recordOver, type RecordRow } from '../core/storm/record.ts';
 import { setTally } from '../core/storm/set.ts';
 import { bestLine, formatWp, gapNote, sourceTitle, verdictLine, type CardFacts } from '../core/storm/verdict.ts';
@@ -208,6 +210,14 @@ function Home(props: { scope: StormScopeData; where: StormWhere }) {
   useEffect(() => {
     if (prefs.deepen && home && home.deep < home.stored && !g?.running && !deepening.value) void deepen(scope);
   }, [prefs.deepen, home?.stored, home?.deep, g?.running]);
+  // Focused or not (§5.103): a deepening under way starts again with the engines that now apply.
+  const setFocused = (focused: boolean) => {
+    setStormPrefs({ focused });
+    // A gather's scoring takes the new setting at its next pass.
+    if (!deepening.value || g?.running) return;
+    stopDeepening();
+    void deepen(scope);
+  };
   // Maia's ratings beside it, once Maia is downloaded (§5.82); again when it comes ready.
   const maiaKind = maiaState.value.kind;
   useEffect(() => {
@@ -316,7 +326,7 @@ function Home(props: { scope: StormScopeData; where: StormWhere }) {
         {home && home.stored > 0 && (
           <p class="muted storm-deep" data-testid="storm-deep">
             Stockfish: {home.deep} of {home.stored} scored to depth {deepenTarget()}
-            {deepening.value ? ' · scoring…' : ''}
+            {deepening.value ? (stormEngineWidth() > 1 ? ` · scoring, ${stormEngineWidth()} at once…` : ' · scoring…') : ''}
           </p>
         )}
         {home && home.stored > 0 && prefs.maia && (
@@ -372,6 +382,12 @@ function Home(props: { scope: StormScopeData; where: StormWhere }) {
             <label class="check">
               <input type="checkbox" checked={prefs.deepen} onChange={(e) => setStormPrefs({ deepen: e.currentTarget.checked })} /> Stockfish re-scores the positions while this page is open
             </label>
+            {focusedWidth() > 1 && (
+              <label class="check">
+                <input type="checkbox" data-testid="storm-focused" checked={prefs.focused} onChange={(e) => setFocused(e.currentTarget.checked)} /> Focused: {focusedWidth()} engines at once, one a core, for
+                this computer’s whole power (the fans may spin up)
+              </label>
+            )}
             <label class="check">
               <input type="checkbox" checked={prefs.maia} onChange={(e) => setStormPrefs({ maia: e.currentTarget.checked })} /> Maia rates the positions’ difficulty while this page is open (at {maiaElo.value} and from 1000 to 2600)
             </label>

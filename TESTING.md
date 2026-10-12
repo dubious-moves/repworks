@@ -469,6 +469,11 @@ explorer's Eval column too far from the move (§5.67).
   count ready; a storm from them. In the data repo, `storm/<desktop id>/` holds the night's files
   and nothing from the phone. Clear on the phone, then a sync: still cleared there, still kept on
   the desktop. How long the phone's first pull of the positions takes.
+- §5.103 (desktop): Storm → More settings → "Focused: n engines at once" ticked, with positions not
+  yet scored: the status line reads "scoring, n at once…"; the system monitor shows the CPU near
+  full (it was about half); how many positions an hour against the setting off (the home's count
+  before and after ten minutes, each way); the page stays responsive; memory with n engines. Then a
+  storm: it starts at once, and Task Manager shows the engines gone back to one.
 
 ## Phase 5
 

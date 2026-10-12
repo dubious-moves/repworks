@@ -27,7 +27,7 @@ import { importShared, shareOwn, shareSoon } from './stormShare.ts';
 import { onWorker, postToWorker } from './explorer.ts';
 import { entryKey, open } from './mode.ts';
 import { recordEvent } from './state.ts';
-import { analyseForStorm, cancelStormEngine, endStormEngine, stormSearchSoFar } from './stormEngine.ts';
+import { analyseForStorm, cancelStormEngine, endStormEngine, focusedWidth, setStormEngineWidth, stormSearchSoFar } from './stormEngine.ts';
 import { trainData, type TrainData } from './train.ts';
 import { puzzlePrefs, readyPuzzles } from './puzzles.ts';
 import { keptPolicy, missingRatings, type MaiaRating } from '../core/storm/maia.ts';
@@ -50,9 +50,11 @@ export interface StormPrefs {
   focus: Focus[];
   /** Gather keeps going until stopped (§5.102). */
   overnight: boolean;
+  /** The deepening runs an engine a core, several positions at once (§5.103). */
+  focused: boolean;
 }
 const PREFS_KEY = 'repworks-storm';
-const DEFAULT_PREFS: StormPrefs = { minPly: STORM.minPly, maxPly: STORM.maxPly, source: 'both', deepen: typeof matchMedia === 'undefined' || !matchMedia('(max-width: 768px)').matches, maia: true, focus: [], overnight: false };
+const DEFAULT_PREFS: StormPrefs = { minPly: STORM.minPly, maxPly: STORM.maxPly, source: 'both', deepen: typeof matchMedia === 'undefined' || !matchMedia('(max-width: 768px)').matches, maia: true, focus: [], overnight: false, focused: false };
 
 function loadPrefs(): StormPrefs {
   try {
@@ -530,7 +532,8 @@ const byNeed = (ps: StoredPosition[]): StoredPosition[] => [...ps.filter((p) => 
 
 /**
  * While the storm's home is open and nothing else runs, Stockfish re-scores the scope's kept
- * positions (MultiPV 12 at the device's target depth, §23, §5.84), the positions not yet done
+ * positions (MultiPV 12 at the device's target depth, §23, §5.84; focused, several at once,
+ * §5.103), the positions not yet done
  * first, those whose list can't judge a move before those only short of the target. Stops when a
  * session or a gather starts, or the screen is left (`stopDeepening`). Within an overnight gather
  * (`gather`, §5.102) it runs whatever the setting, until `untilMs` or the gather is stopped.
@@ -553,18 +556,25 @@ export async function deepen(s: StormScopeData, o: { gather?: boolean; untilMs?:
       const j = Math.floor(Math.random() * (i + 1));
       [todo[i], todo[j]] = [todo[j]!, todo[i]!];
     }
-    for (const p of byNeed(todo)) {
-      if (busy()) return;
-      const a = await analyseForStorm(p.fen, STORM.deepenMultipv, deepenTarget(), 60_000);
-      if (busy()) return;
-      const pos = positionOf(p.fen);
-      const d = pos && a ? deepenedPosition(p, engineList(a.lines, pos.turn, a.depth, STORM), STORM) : null;
-      if (d) {
-        await stormStore().updatePosition(d.card, (cur) => ({ ...cur, scored: d.scored, src: d.src, depth: d.depth }));
-        if (!p.from) shareSoon(stormStore());
-        await refreshHome(s);
+    const order = byNeed(todo);
+    // Focused (§5.103): as many positions at once as there are engines, each taken in turn.
+    const width = stormPrefs.value.focused ? focusedWidth() : 1;
+    setStormEngineWidth(width);
+    const one = async (): Promise<void> => {
+      for (let p = order.shift(); p; p = order.shift()) {
+        if (busy()) return;
+        const a = await analyseForStorm(p.fen, STORM.deepenMultipv, deepenTarget(), 60_000);
+        if (busy()) return;
+        const pos = positionOf(p.fen);
+        const d = pos && a ? deepenedPosition(p, engineList(a.lines, pos.turn, a.depth, STORM), STORM) : null;
+        if (d) {
+          await stormStore().updatePosition(d.card, (cur) => ({ ...cur, scored: d.scored, src: d.src, depth: d.depth }));
+          if (!p.from) shareSoon(stormStore());
+          await refreshHome(s);
+        }
       }
-    }
+    };
+    await Promise.all(Array.from({ length: width }, one));
   } finally {
     if (run === deepenRun) deepening.value = false;
   }
@@ -861,6 +871,8 @@ export async function startStorm(s: StormScopeData, mode: SessionMode, o: { focu
   endStormSession();
   sessionEntry = entryKey();
   stopDeepening();
+  // A session's look-ahead is one position at a time: the one engine on the device's threads.
+  setStormEngineWidth(1);
   stopMaiaRating();
   scopeNow = s;
   recent ??= loadRecent();

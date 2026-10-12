@@ -97,12 +97,12 @@ const firstWindow = () => {
   return `${Math.floor(m / 12)}-${String((m % 12) + 1).padStart(2, '0')}`;
 };
 
-async function setUp(page: Page, options: { deepen?: boolean; world?: ReturnType<typeof world>; name?: string } = {}): Promise<World> {
+async function setUp(page: Page, options: { deepen?: boolean; focused?: boolean; world?: ReturnType<typeof world>; name?: string } = {}): Promise<World> {
   const { git, github } = options.world ?? world();
   await lichessLogin(page);
   // Stockfish's re-scoring of the kept positions (§5.45) has a test of its own.
   const deepen = options.deepen ?? false;
-  await page.addInitScript((d) => localStorage.setItem('repworks-storm', JSON.stringify({ deepen: d })), deepen);
+  await page.addInitScript(([d, f]) => localStorage.setItem('repworks-storm', JSON.stringify({ deepen: d, focused: f })), [deepen, options.focused ?? false]);
   await serveGithub(page, github);
   await serveExplorer(page, fakeExplorer());
   const requests: string[] = [];
@@ -619,6 +619,26 @@ test('Stockfish’s standard: the kept positions searched with MultiPV 12 to dep
   await play(page, ranked(await cardFen(page))[0]!);
   await expect(page.getByTestId('storm-verdict')).toContainText('the top move');
   expect(commands(site.requests).filter((c) => c.startsWith('go ')).length).toBe(before);
+});
+
+test('focused scoring: an engine a core but one, each searching a position of its own, then one engine for a session (§5.103)', async ({ page, isMobile }) => {
+  const depth = isMobile ? 22 : 24;
+  const start = site.requests.length;
+  const mine = () => commands(site.requests.slice(start));
+  await page.addInitScript(() => Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 4 }));
+  const w = await setUp(page, { deepen: true, focused: true });
+  const ready = await gathered(page, w);
+  await expect(page.getByTestId('storm-focused')).toBeChecked();
+  await expect(page.getByTestId('storm-deep')).toContainText(`${ready} of ${ready} scored`, { timeout: 30_000 });
+  // Three workers, single-threaded, each with a hash of its own; every position searched once.
+  expect(mine().filter((c) => c === 'setoption name Hash value 64').length).toBe(3);
+  expect(mine().filter((c) => c.startsWith('setoption name Threads'))).toEqual([]);
+  expect(mine().filter((c) => c === `go depth ${depth} movetime 60000`).length).toBe(ready);
+  // A session goes back to the one engine: the three end, and no focused one starts again.
+  const before = mine().length;
+  await page.getByRole('button', { name: 'Start storm' }).click();
+  await expect(page.locator('.storm-card')).toBeVisible();
+  expect(mine().slice(before).filter((c) => c === 'setoption name Hash value 64')).toEqual([]);
 });
 
 test('a storm’s look-ahead: the card on the board searched first, MultiPV 12 at the device’s depth', async ({ page, isMobile }) => {
