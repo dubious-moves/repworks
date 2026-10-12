@@ -1,10 +1,15 @@
 // Clickable lines in comments (PLAN.md §5.12), after q_extension's `clParse` and `clStartFen`
 // (`src/main-world.js` at c26242f), first rebuilt from the plan's description, then checked against
 // that source (Phase 2, §5.20):
-// - A line is a group in parentheses that starts with a move number, `(7. Bc4 Qa5)` or
-//   `(6... Nbd7 7. Bc4)`, and holds only moves, move numbers and glyphs. A group holding anything
-//   else is a remark, `(with braces typed as parens)`, and stays text. Glyphs standing alone
-//   (`!?`, `$14`) are allowed here; q_extension would read such a group as a remark.
+// - A line is a group in parentheses that starts with a move number and a move, `(7. Bc4 Qa5)` or
+//   `(6... Nbd7 7. Bc4)`. Any other group is a remark, `(with braces typed as parens)`, and stays
+//   text. Glyphs standing alone (`!?`, `$14`) are allowed; q_extension would read such a group as
+//   a remark.
+// - Words may follow a move, `(12. Ng5 Ndf6 taking e6 under control 13. Nxe6 Bxe6)`: they are
+//   text, and the line goes on at the next move number, so a square or a move named in the words
+//   is never read as a move. A comma, colon or semicolon after a move is text too.
+// - `--` is a null move: the side to move passes, so a plan can be shown as one side's moves,
+//   `(7. -- Bg7 8. -- O-O)`. It can't be played in check.
 // - A line starts at the commented move's position when its first move number and side are that
 //   position's, or at the position before the move (it replaces the move) when they are that
 //   one's. The two differ by a ply, so at most one fits; a line that fits neither stays text, as
@@ -18,7 +23,7 @@ import type { Color } from 'chessops/types';
 import { makeUci } from 'chessops/util';
 
 export interface CommentMove {
-  /** The move as chessops reads it: glyphs and check marks off, `0-0` as `O-O`. */
+  /** The move as chessops reads it: glyphs and check marks off, `0-0` as `O-O`; `--` a null move. */
   san: string;
   /** Where the move is written in the comment: `text.slice(from, to)`. */
   from: number;
@@ -33,7 +38,13 @@ export interface CommentLine {
   number: number;
   turn: Color;
   moves: CommentMove[];
+  /** The words written between the moves (`text.slice(from, to)`), each run of them once. */
+  words: { from: number; to: number }[];
 }
+
+/** A null move, as written and as played (SAN and UCI). */
+export const NULL_SAN = '--';
+export const NULL_UCI = '0000';
 
 const NUMBER = /^(\d+)(\.\.\.|…|\.)(.*)$/;
 const SAN = /^(?:[NBRQK][a-h]?[1-8]?x?[a-h][1-8]|[a-h](?:x[a-h])?[1-8](?:=?[NBRQ])?|O-O(?:-O)?|0-0(?:-0)?)[+#]?[!?]*$/;
@@ -44,7 +55,16 @@ const clean = (token: string) => token.replace(/[!?]+$/, '').replace(/[+#]$/, ''
 /** One group's moves, or undefined when it is a remark. `at` is the group's inner text offset. */
 function parseGroup(inner: string, at: number): Omit<CommentLine, 'from' | 'to'> | undefined {
   const moves: CommentMove[] = [];
+  const words: { from: number; to: number }[] = [];
   let first: { number: number; turn: Color } | undefined;
+  // In words: the line goes on only at a move number.
+  let prose = false;
+  // A word joins the run before it when only spaces are between them.
+  const word = (from: number, to: number) => {
+    const last = words.at(-1);
+    if (last && !inner.slice(last.to - at, from - at).trim()) last.to = to;
+    else words.push({ from, to });
+  };
   for (const m of inner.matchAll(/\S+/g)) {
     let token = m[0];
     let offset = at + m.index;
@@ -52,17 +72,27 @@ function parseGroup(inner: string, at: number): Omit<CommentLine, 'from' | 'to'>
     if (numbered) {
       const turn: Color = numbered[2] === '.' ? 'white' : 'black';
       if (!first && moves.length === 0) first = { number: Number(numbered[1]), turn };
+      prose = false;
       token = numbered[3]!;
       offset += numbered[1]!.length + numbered[2]!.length;
       if (token === '') continue;
     } else if (!first) return undefined;
-    if (GLYPH.test(token)) continue;
-    if (!SAN.test(token)) return undefined;
-    // The glyphs written on a move stay text; the move is the rest.
-    const bare = token.replace(/[!?]+$/, '');
-    moves.push({ san: clean(token), from: offset, to: offset + bare.length });
+    // A comma, colon or semicolon after a move is text.
+    const move = prose ? '' : token.replace(/[,;:]+$/, '');
+    if (move && GLYPH.test(move)) continue;
+    if (move === NULL_SAN || SAN.test(move)) {
+      // The glyphs written on a move stay text; the move is the rest.
+      const bare = move.replace(/[!?]+$/, '');
+      moves.push({ san: move === NULL_SAN ? NULL_SAN : clean(move), from: offset, to: offset + bare.length });
+      if (move.length < token.length) word(offset + move.length, offset + token.length);
+      continue;
+    }
+    // Words: a line must start with a move; after one, they are text until the next number.
+    if (!moves.length) return undefined;
+    prose = true;
+    word(offset, offset + token.length);
   }
-  return first && moves.length ? { ...first, moves } : undefined;
+  return first && moves.length ? { ...first, moves, words } : undefined;
 }
 
 /** Every line written in a comment, in order. */
@@ -105,6 +135,18 @@ export function playLine(line: CommentLine, start: Position | undefined): Played
   const pos = start.clone();
   const out: PlayedLine = { line, placed: true, positions: [pos.clone()], ucis: [], sans: [] };
   for (const m of line.moves) {
+    if (m.san === NULL_SAN) {
+      // The side to move passes: never out of check.
+      if (pos.isCheck()) break;
+      if (pos.turn === 'black') pos.fullmoves++;
+      pos.turn = pos.turn === 'white' ? 'black' : 'white';
+      pos.epSquare = undefined;
+      pos.halfmoves++;
+      out.sans.push(NULL_SAN);
+      out.ucis.push(NULL_UCI);
+      out.positions.push(pos.clone());
+      continue;
+    }
     const move = parseSan(pos, m.san);
     if (!move) break;
     out.sans.push(makeSan(pos, move));
@@ -154,4 +196,13 @@ export function stepCursor(lines: readonly PlayedLine[], c: Cursor, dir: 1 | -1)
 export function cursorAt(lines: readonly PlayedLine[], line: number, move: number): Cursor | undefined {
   const n = legal(lines[line]);
   return n === 0 ? undefined : { line, ply: Math.min(move + 1, n) };
+}
+
+/**
+ * ↓ or ↑ through a comment's lines, as through a move's branches: the first move of the next or
+ * previous line that has a legal one. Undefined when there is none that way.
+ */
+export function switchLine(lines: readonly PlayedLine[], c: Cursor, dir: 1 | -1): Cursor | undefined {
+  for (let i = c.line + dir; i >= 0 && i < lines.length; i += dir) if (legal(lines[i]) > 0) return { line: i, ply: 1 };
+  return undefined;
 }

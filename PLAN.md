@@ -5778,3 +5778,29 @@ Tests: `editor.spec.ts` (1400×800: no panel at the default size, the comment an
 "+" in the desktop head only).
 
 Live: TESTING.md.
+
+#### 5.96 Clickable lines: words, null moves, ↓ into a line (the owner's request, 2026-10-12)
+
+- **Words in a line** (`lines.ts`): `( 12.Ng5 Ndf6 taking the e6-pawn under control 13.Nxe6 Bxe6
+  14.dxe6 d5!)` is one line of six moves. A group is a line when it starts with a move number and
+  a move; after a move, a word that isn't one is text, and the line goes on only at the next move
+  number, so a square or a move named in the words (`as a5 would`) is never played. A comma,
+  colon or semicolon after a move is text. The words are drawn as the comment around them, not in
+  the line's bold blue. `(1. e4 is best)` was a remark and is now a line of one move.
+- **Null moves**: `--` passes, `(7.-- Bg7, 8.-- O-O, and 9.-- a5)` shows Black's plan move after
+  move. Played as a pass (the side to move changes, no en passant), never out of check: the line
+  stops there, as at an illegal move. The board shows no last move for a pass; the bar under it
+  shows `--`.
+- **↓ enters a move's lines**, in the chapter view and the Read view, as it would choose a branch:
+  the first line of the move's comments, at its first move, wherever the move is (→ still enters
+  them only at a line's end). In the chapter view it goes before the next variation (`move('down')`),
+  which ↓ still reaches on a move with no line in its comments. In a line: ← → along it and on
+  through the comment's lines as before; ↓ ↑ to the next or previous line's first move; ↑ on the
+  first line leaves, as ← before its first move and Escape do. The training screen keeps ← → only.
+
+Tests: `lines.test.ts` (the owner's two examples, a5 in the words, `(1. is best)` a remark, a pass
+in check, ↓ ↑ between lines), `views.spec.ts` (a comment with words and passes on 2... d6, which has
+a variation: ↓ enters its line, no last move for a pass, ↓ ↑ between lines, ↑ out; ↓ ↑ in the Read
+view).
+
+Live: TESTING.md.

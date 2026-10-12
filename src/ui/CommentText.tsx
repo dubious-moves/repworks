@@ -1,5 +1,5 @@
 // A comment with its lines clickable (PLAN.md §5.12): each move of a `(7. Bc4 Qa5)` group is a
-// link that previews the position on the board; ← → step through the comment's lines, and the bar
+// link (words written in the group are plain text, `--` a pass) that previews the position on the board; ← → step through the comment's lines, and the bar
 // under the board (◀ ▶ Back) does the same with no keyboard. Used in the chapter view, the Read
 // view and the training screen.
 import { useMemo } from 'preact/hooks';
@@ -19,12 +19,13 @@ export interface CommentPositions {
 }
 
 type Piece = { text: string } | { text: string; line: number; move: number };
-/** Plain text, or a line group: its text from `(` to `)`, with its moves clickable. */
+/** Plain text, or a run of a line group (its moves clickable). Words written in a line are plain. */
 type Segment = { text: string } | { group: Piece[] };
 
 /**
  * The comment cut into text and lines. With the lines played (`played`), a line that fits neither
- * position stays text, as in q_extension; without them every group is drawn as a line.
+ * position stays text, as in q_extension; without them every group is drawn as a line. A line's
+ * words are plain text between runs of the line, so they read as the comment around it.
  */
 function segments(text: string, played: readonly PlayedLine[] | undefined): Segment[] {
   const out: Segment[] = [];
@@ -32,15 +33,21 @@ function segments(text: string, played: readonly PlayedLine[] | undefined): Segm
   parseCommentLines(text).forEach((line, i) => {
     if (played && !played[i]?.placed) return;
     if (line.from > at) out.push({ text: text.slice(at, line.from) });
-    const group: Piece[] = [];
+    const marks = [...line.moves.map((m, j) => ({ ...m, move: j })), ...line.words.map((w) => ({ ...w, move: -1 }))].sort((a, b) => a.from - b.from);
+    let group: Piece[] = [];
     let g = line.from;
-    line.moves.forEach((m, j) => {
+    for (const m of marks) {
       if (m.from > g) group.push({ text: text.slice(g, m.from) });
-      group.push({ text: text.slice(m.from, m.to), line: i, move: j });
+      if (m.move >= 0) group.push({ text: text.slice(m.from, m.to), line: i, move: m.move });
+      else {
+        if (group.length) out.push({ group });
+        group = [];
+        out.push({ text: text.slice(m.from, m.to) });
+      }
       g = m.to;
-    });
+    }
     if (g < line.to) group.push({ text: text.slice(g, line.to) });
-    out.push({ group });
+    if (group.length) out.push({ group });
     at = line.to;
   });
   if (at < text.length) out.push({ text: text.slice(at) });

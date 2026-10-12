@@ -24,7 +24,7 @@ const SHOWN_MOVES = 16;
 /** A line played from the analysed position, as the preview takes it. */
 function playPv(start: Position, pv: readonly string[]): PlayedLine {
   const pos = start.clone();
-  const out: PlayedLine = { line: { from: 0, to: 0, number: pos.fullmoves, turn: pos.turn, moves: [] }, placed: true, positions: [pos.clone()], ucis: [], sans: [] };
+  const out: PlayedLine = { line: { from: 0, to: 0, number: pos.fullmoves, turn: pos.turn, moves: [], words: [] }, placed: true, positions: [pos.clone()], ucis: [], sans: [] };
   for (const uci of pv.slice(0, SHOWN_MOVES)) {
     const move = parseUciMove(pos, uci);
     if (!move) break;

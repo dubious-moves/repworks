@@ -5,6 +5,13 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## Clickable lines: words, null moves, ↓ (§5.96)
+- Write a comment like `( 12.Ng5 Ndf6 taking the e6-pawn under control 13.Nxe6 Bxe6)` and one like
+  `(7.-- Bg7, 8.-- O-O, and 9.-- a5)`: the words in plain comment style, the moves clickable, the
+  passes leaving the board as it is but for the side to move.
+- On a move with such a comment, ↓ enters the line; ← → along it, ↓ ↑ between the comment's lines,
+  ↑ on the first goes back. Is ↓ going to the line before the next variation right for you?
+
 ## The study page, option B (§5.94, §5.95)
 - The installed desktop app, a study at your usual board size: the engine and the explorer on the
   left, the notation on the right as running text. Is the notation easier to read, with comments

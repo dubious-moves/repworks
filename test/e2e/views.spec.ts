@@ -376,6 +376,45 @@ test('clickable lines: preview a comment’s line, step through its lines, and b
   await expect(bar).toHaveCount(0);
 });
 
+test('a line with words and null moves; ↓ enters a move’s lines, ↑ ↓ between them, ← → along', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'arrow keys: the desktop');
+  await setUp(page);
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf?at=e4,c5,Nf3,d6`);
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 d6');
+  // 2... d6 has a variation below it (2... Nc6): ↓ takes the comment's line first.
+  await comment(page, 'Plan (3. -- Nf6 4. -- g6, then 5. -- Bg7) or (3. d4 cxd4 the main line 4. Nxd4)');
+  const written = page.locator('.notation .comment', { hasText: 'the main line' });
+  await expect(written.locator('.line-move')).toHaveText(['--', 'Nf6', '--', 'g6', '--', 'Bg7', 'd4', 'cxd4', 'Nxd4']);
+  // The words are the comment's own text, not the line's.
+  await expect(written.locator('.comment-line', { hasText: 'main line' })).toHaveCount(0);
+  await expect(written.locator('.comment-line', { hasText: 'then' })).toHaveCount(0);
+
+  const bar = page.getByRole('group', { name: 'Line from the comment' });
+  await page.keyboard.press('ArrowDown');
+  await expect(bar).toContainText('From the comment: --');
+  // A pass moves nothing: no last move on the board (chessground hides the squares it leaves).
+  await expect(page.locator('cg-board square.last-move:visible')).toHaveCount(0);
+  await page.keyboard.press('ArrowRight');
+  await expect(bar).toContainText('From the comment: -- Nf6');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  await expect(bar).toContainText('From the comment: -- Nf6 -- g6');
+  // ↓ the next line, at its first move; ↓ again stays; ↑ back to the first, ↑ out.
+  await page.keyboard.press('ArrowDown');
+  await expect(bar).toContainText('From the comment: d4');
+  await expect(written.locator('.line-move.current')).toHaveText('d4');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  await expect(bar).toContainText('From the comment: d4 cxd4 Nxd4');
+  await page.keyboard.press('ArrowUp');
+  await expect(bar).toContainText('From the comment: --');
+  await expect(written.locator('.line-move.current')).toHaveText('--');
+  await page.keyboard.press('ArrowUp');
+  await expect(bar).toHaveCount(0);
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 d6');
+});
+
 test('line jumping: → on a line’s last move enters its comment’s line, in the chapter view and the Read view', async ({ page, isMobile }) => {
   test.skip(isMobile, 'arrow keys: the desktop');
   await setUp(page);
@@ -406,6 +445,12 @@ test('line jumping: → on a line’s last move enters its comment’s line, in 
   await expect(bar).toContainText('From the comment: Nxd4');
   await expect(page.locator('.read-comments .line-move.current')).toHaveText('Nxd4');
   await page.keyboard.press('Escape');
+  await expect(bar).toHaveCount(0);
+  await expect(page).toHaveURL(/#\/read\//);
+  // ↓ enters the line too, ↑ leaves it.
+  await page.keyboard.press('ArrowDown');
+  await expect(bar).toContainText('From the comment: Nxd4');
+  await page.keyboard.press('ArrowUp');
   await expect(bar).toHaveCount(0);
   await expect(page).toHaveURL(/#\/read\//);
   await page.locator('.read-comments .line-move', { hasText: 'Nc3' }).click();

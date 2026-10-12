@@ -1534,3 +1534,14 @@ The technical calls, each with its reason:
 - **The move shown's comment gets a panel under the board on the stage, where the board leaves
   room**, for reading; the notation still shows it in place. "+" New chapter returns to the
   stage's head (§5.88 had it in ☰ only); the phone's stays in ☰.
+
+## Revision of 2026-10-12 (clickable lines: words, null moves, ↓, PLAN.md §5.96)
+- **D21 / §5.12: a line may hold words.** A group starting with a move number and a move is a line;
+  words after a move are text, and the line goes on at the next move number. Was: any word made
+  the group a remark (q_extension's rule). Why: the owner writes explanations inside a line, and
+  resuming only at a number keeps squares and moves named in the words from being played.
+- **`--` is a null move in a comment's line**, played as a pass and never out of check, so a plan
+  shows one side's moves in a row.
+- **↓ on a move whose comment has a line enters it**, ahead of ↓'s next variation, and ↑ ↓ move
+  between the comment's lines; ↑ on the first leaves. The owner asked for "like selecting a
+  branch"; the variation stays one ← → away.

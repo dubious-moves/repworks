@@ -10,7 +10,7 @@ import { parseSan } from 'chessops/san';
 import { chessgroundMove } from 'chessops/compat';
 import type { Key } from '@lichess-org/chessground/types';
 import { open } from '../app/mode.ts';
-import { commentId, endPreview, enterCommentLines, preview, stepPreview } from '../app/preview.ts';
+import { commentId, endPreview, enterCommentLines, preview, stepPreview, switchPreviewLine } from '../app/preview.ts';
 import { localStore } from '../app/state.ts';
 import { dataVersion } from '../app/sync.ts';
 import { chapterPath } from '../core/data/layout.ts';
@@ -105,7 +105,7 @@ export function LineReader(props: { chapter: Chapter; line: readonly string[]; p
 
   // The keys read the latest step through a ref: an effect re-registered after each render would
   // let a quick Escape leave at the move before.
-  // Line jumping (§5.12): → on the line's last move enters the first line of its comments.
+  // Line jumping (§5.12): → on the line's last move, or ↓ on any, enters the first line of its comments.
   const jump = () => {
     const node = nodeAt(chapter, path);
     return !!node && enterCommentLines('read', pathKey(path), [...node.startingComments, ...node.comments], positionAt(chapter, path), path.length ? positionAt(chapter, path.slice(0, -1)) : undefined);
@@ -121,10 +121,12 @@ export function LineReader(props: { chapter: Chapter; line: readonly string[]; p
       // A line from a comment on the board takes ← → and Escape first.
       const previewing = preview.peek()?.owner === 'read';
       const keys: Record<string, () => void> = previewing
-        ? { ArrowLeft: () => stepPreview(-1), ArrowRight: () => stepPreview(1), Escape: endPreview }
+        ? { ArrowLeft: () => stepPreview(-1), ArrowRight: () => stepPreview(1), ArrowUp: () => switchPreviewLine(-1), ArrowDown: () => switchPreviewLine(1), Escape: endPreview }
         : {
             ArrowLeft: () => step(Math.max(0, at - 1)),
             ArrowRight: () => void (at === end ? enter() : step(at + 1)),
+            // ↓ enters the first line of the move's comments, wherever the move is.
+            ArrowDown: () => void enter(),
             Home: () => step(0),
             End: () => step(end),
             Escape: leave,

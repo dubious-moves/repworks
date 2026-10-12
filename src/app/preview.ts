@@ -4,7 +4,7 @@
 // move shown in the chapter view, or another screen.
 import { effect, signal } from '@preact/signals';
 import type { Position } from 'chessops/chess';
-import { firstCursor, playedLines, stepCursor, type Cursor, type PlayedLine } from '../core/repertoire/lines.ts';
+import { firstCursor, playedLines, stepCursor, switchLine, type Cursor, type PlayedLine } from '../core/repertoire/lines.ts';
 import { at } from './editor.ts';
 import { mode } from './mode.ts';
 
@@ -42,6 +42,18 @@ export function stepPreview(dir: 1 | -1): void {
   if (!p) return;
   const next = stepCursor(p.lines, p.cursor, dir);
   preview.value = next ? { ...p, cursor: next } : undefined;
+}
+
+/**
+ * ↓ or ↑ to the next or previous line of the comment, at its first move, as between a move's
+ * branches; ↓ on the last line stays, ↑ on the first ends the preview (↓ entered it).
+ */
+export function switchPreviewLine(dir: 1 | -1): void {
+  const p = preview.peek();
+  if (!p) return;
+  const next = switchLine(p.lines, p.cursor, dir);
+  if (next) preview.value = { ...p, cursor: next };
+  else if (dir === -1) preview.value = undefined;
 }
 
 /**

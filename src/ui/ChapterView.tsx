@@ -20,7 +20,7 @@ import { afterEdits, at, chapter, conflictsHere, doc, edit, feedback, move, play
 import { AnalysisFen, AnalysisHead } from './Analysis.tsx';
 import { open } from '../app/mode.ts';
 import { left, trainingFrom } from '../app/train.ts';
-import { endPreview, enterCommentLines, preview, stepPreview } from '../app/preview.ts';
+import { endPreview, enterCommentLines, preview, stepPreview, switchPreviewLine } from '../app/preview.ts';
 import { isKeptMarker, parseTextConflict, type OpenConflict } from '../core/merge/markers.ts';
 import type { Brush, Chapter } from '../core/study/model.ts';
 import { setShapes } from '../core/study/ops.ts';
@@ -65,9 +65,15 @@ function boardState(c: Chapter, path: Path) {
  */
 function jumpIntoComment(): boolean {
   const c = chapter.peek();
+  return !!c && !nodeAt(c, at.peek())?.children.length && enterLinesHere();
+}
+
+/** ↓ enters the first line written in the move's comments, as it would choose a branch. */
+function enterLinesHere(): boolean {
+  const c = chapter.peek();
   const path = at.peek();
   const node = c && nodeAt(c, path);
-  if (!c || !node || node.children.length) return false;
+  if (!c || !node) return false;
   return enterCommentLines('chapter', pathKey(path), node.comments, positionAt(c, path), path.length ? positionAt(c, path.slice(0, -1)) : undefined);
 }
 
@@ -84,9 +90,15 @@ export function ChapterView() {
       const target = e.target as HTMLElement | null;
       if (target && (/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName) || target.closest('dialog'))) return;
       const ctrl = e.ctrlKey || e.metaKey;
-      // A line from a comment on the board takes ← → and Escape (§5.12).
+      // A line from a comment on the board takes ← →, ↑ ↓ between its lines, and Escape (§5.12).
       if (preview.peek()?.owner === 'chapter' && !ctrl) {
-        const step: Record<string, () => void> = { ArrowLeft: () => stepPreview(-1), ArrowRight: () => stepPreview(1), Escape: endPreview };
+        const step: Record<string, () => void> = {
+          ArrowLeft: () => stepPreview(-1),
+          ArrowRight: () => stepPreview(1),
+          ArrowUp: () => switchPreviewLine(-1),
+          ArrowDown: () => switchPreviewLine(1),
+          Escape: endPreview,
+        };
         if (step[e.key]) {
           e.preventDefault();
           return step[e.key]!();
@@ -98,7 +110,8 @@ export function ChapterView() {
         ArrowLeft: () => (picking ? closeBranches() : move('prev')),
         ArrowRight: () => void (stepOn() || jumpIntoComment()),
         ArrowUp: () => void (chooseBranch(-1) || move('up')),
-        ArrowDown: () => void (chooseBranch(1) || move('down')),
+        // A move whose comment has a line: ↓ enters it, ahead of the next variation.
+        ArrowDown: () => void (chooseBranch(1) || enterLinesHere() || move('down')),
         ...(picking ? { Enter: () => void stepOn(), Escape: closeBranches } : {}),
         ...(altAdding.peek() ? { Escape: () => (altAdding.value = undefined) } : {}),
         Home: () => move('start'),

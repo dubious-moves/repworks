@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseChapterFile } from '../../../../src/core/pgn/parse.ts';
-import { cursorAt, firstCursor, lineStart, parseCommentLines, playedLines, playLine, stepCursor } from '../../../../src/core/repertoire/lines.ts';
+import { cursorAt, firstCursor, lineStart, parseCommentLines, playedLines, playLine, stepCursor, switchLine } from '../../../../src/core/repertoire/lines.ts';
 import { makeFen } from 'chessops/fen';
 import type { Chapter } from '../../../../src/core/study/model.ts';
 import { nodeAt, positionAt, startPosition } from '../../../../src/core/study/tree.ts';
@@ -56,7 +56,7 @@ test('where each move is written, and what a line is made of', () => {
 });
 
 test('remarks in parentheses stay text', () => {
-  for (const text of ['(with braces typed as parens)', '(see 5. Nf3)', '(2)', '(10...)', '(1. e4 is best)', '()', 'no group 1. e4 at all', '(5. Nf3 (6. Nc3))']) {
+  for (const text of ['(with braces typed as parens)', '(see 5. Nf3)', '(2)', '(10...)', '(1. is best)', '(1. a4x)', '()', 'no group 1. e4 at all', '(5. Nf3 (6. Nc3))']) {
     const lines = parseCommentLines(text);
     if (text === '(5. Nf3 (6. Nc3))') assert.deepEqual(lines.map((l) => l.moves.map((m) => m.san)), [['Nc3']], text);
     else assert.deepEqual(lines, [], text);
@@ -182,4 +182,47 @@ test('playLine stops at the first illegal move', () => {
   const line = parseCommentLines('(1. e4 e5 2. Ke3 Nc6)')[0]!;
   const c = chapter('1. e4');
   assert.deepEqual(playLine(line, startPosition(c)!).sans, ['e4', 'e5']);
+});
+
+test('words written in a line are text, and the line goes on at the next move number', () => {
+  const text = '( 12.Ng5 Ndf6 taking the e6-pawn under control, as a5 would 13.Nxe6 Bxe6 14.dxe6 d5!)';
+  const [line] = parseCommentLines(text);
+  assert.ok(line);
+  assert.deepEqual({ number: line.number, turn: line.turn }, { number: 12, turn: 'white' });
+  // a5 in the words is not a move: the words go on to the next number.
+  assert.deepEqual(line.moves.map((m) => m.san), ['Ng5', 'Ndf6', 'Nxe6', 'Bxe6', 'dxe6', 'd5']);
+  assert.deepEqual(line.words.map((w) => text.slice(w.from, w.to)), ['taking the e6-pawn under control, as a5 would']);
+  // A line still starts with a move; words after the number make a remark.
+  assert.deepEqual(parseCommentLines('(1. is best) (1. e4 is best)').map((l) => [l.moves.map((m) => m.san), l.words.length]), [[['e4'], 1]]);
+  // Played: the words change nothing.
+  const c = chapter('1. e4 e5 { (2. Nf3 Nc6 the main line 3. Bb5) }');
+  assert.deepEqual(linesAt(c, ['e4', 'e5'])[0]!.sans, ['Nf3', 'Nc6', 'Bb5']);
+});
+
+test('null moves: one side’s plan, move after move', () => {
+  const text = '(7.-- Bg7, 8.-- O-O, and 9.-- a5)';
+  const [line] = parseCommentLines(text);
+  assert.ok(line);
+  assert.deepEqual(line.moves.map((m) => m.san), ['--', 'Bg7', '--', 'O-O', '--', 'a5']);
+  assert.deepEqual(line.moves.map((m) => text.slice(m.from, m.to)), ['--', 'Bg7', '--', 'O-O', '--', 'a5']);
+  assert.deepEqual(line.words.map((w) => text.slice(w.from, w.to)), [',', ', and']);
+  // From White's 7th move, Black's moves only.
+  const fen = 'rnbqkb1r/pppppp1p/5np1/8/2PP4/2N5/PP2PPPP/R1BQKBNR w KQkq - 0 7';
+  const c = chapter('{ (7.-- Bg7, 8.-- O-O, and 9.-- a5) } 7. e4', `[SetUp "1"]\n[FEN "${fen}"]`);
+  const [played] = playedLines(c.root.comments[0]!, startPosition(c)!, undefined);
+  assert.deepEqual(played!.sans, ['--', 'Bg7', '--', 'O-O', '--', 'a5']);
+  assert.deepEqual(played!.ucis.filter((u) => u === '0000').length, 3);
+  assert.equal(makeFen(played!.positions.at(-1)!.toSetup()), 'rnbq1rk1/1pppppbp/5np1/p7/2PP4/2N5/PP2PPPP/R1BQKBNR w KQ - 0 10');
+  // Not out of check: the line stops there.
+  const check = chapter('1. e4 e5 2. Qh5 Nc6 3. Qxf7+ { (3... -- Kxf7) }');
+  assert.deepEqual(linesAt(check, ['e4', 'e5', 'Qh5', 'Nc6', 'Qxf7+'])[0]!.sans, []);
+});
+
+test('↓ ↑ between a comment’s lines, at each line’s first move', () => {
+  const c = chapter('1. e4 c5 2. Nf3 { (2... d6 3. d4) or (2... Qxh2) or (2... Nc6 3. d4 cxd4) }');
+  const lines = linesAt(c, ['e4', 'c5', 'Nf3']);
+  assert.deepEqual(switchLine(lines, { line: 0, ply: 2 }, 1), { line: 2, ply: 1 });
+  assert.equal(switchLine(lines, { line: 2, ply: 3 }, 1), undefined);
+  assert.deepEqual(switchLine(lines, { line: 2, ply: 3 }, -1), { line: 0, ply: 1 });
+  assert.equal(switchLine(lines, { line: 0, ply: 2 }, -1), undefined);
 });
