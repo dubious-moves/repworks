@@ -14,7 +14,7 @@ import type { Color } from 'chessops/types';
 import { positionKeyOf, type PositionKey } from '../chess/positionKey.ts';
 import { parseUciMove, standardUci } from '../chess/uci.ts';
 import type { StormConfig } from './config.ts';
-import { userEval, type ScoredList, type ScoredMove } from './grade.ts';
+import { userEval, wpLoss, type ScoredList, type ScoredMove } from './grade.ts';
 
 export const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
@@ -48,7 +48,15 @@ export interface Candidate {
   reject: string | null;
   /** The uncovered reply it came from (§19). */
   unc?: { san: string; share: number; games: number } | null;
+  /**
+   * A kind beyond the classic storm's (§5.100): kept although a pick rule refuses it (or, for
+   * punish, reached only past an opponent's error), and dealt only when a focus asks for it.
+   */
+  kind?: StoredKind | null;
 }
+
+/** What the gather keeps beyond the classic storm (§5.100). */
+export type StoredKind = 'only' | 'punish' | 'hold' | 'convert';
 
 /** Scored moves at a position, best first, or null when nothing could score it. */
 export type Ask = (fen: string) => Promise<ScoredList | null>;
@@ -95,6 +103,27 @@ export function pickReject(c: Pick<Candidate, 'evalUser' | 'nScored' | 'inCheck'
   return null;
 }
 
+/**
+ * The kind a candidate is kept as (§5.100), or null. Past an opponent's error (`afterError`):
+ * punish, from losing a little up to `convertHiCp`. Otherwise a refused one: hold (worse, down to
+ * `holdLoCp`), convert (better, up to `convertHiCp`), only (in the band, a gap to the second
+ * beyond `spreadMaxCp`, or in check with the second a mistake). Each with something to get wrong:
+ * a move in the top five that gives up `okWp`; never a forced recapture.
+ */
+export function specialKind(c: Pick<Candidate, 'evalUser' | 'nScored' | 'inCheck' | 'recapture' | 'spread2' | 'scored'>, cfg: StormConfig, afterError = false): StoredKind | null {
+  if (c.recapture || c.nScored < 2) return null;
+  const s = c.scored;
+  const best = s[0]!.score;
+  const lossAt = (i: number) => wpLoss(best, s[Math.min(i, s.length - 1)]!.score, cfg) ?? 0;
+  const wrong = c.nScored >= 3 && lossAt(4) >= cfg.okWp;
+  if (afterError) return wrong && c.evalUser >= cfg.userLoCp && c.evalUser <= cfg.convertHiCp ? 'punish' : null;
+  if (c.evalUser > cfg.userHiCp) return wrong && c.nScored >= cfg.minScored && c.evalUser <= cfg.convertHiCp ? 'convert' : null;
+  if (c.evalUser < cfg.userLoCp) return wrong && c.nScored >= cfg.minScored && c.evalUser >= cfg.holdLoCp ? 'hold' : null;
+  if (c.inCheck) return lossAt(1) >= cfg.okWp ? 'only' : null;
+  if (c.spread2 > cfg.spreadMaxCp && c.nScored >= cfg.minScored) return 'only';
+  return null;
+}
+
 export interface CandidateContext {
   fen: string;
   pos: Position;
@@ -105,6 +134,8 @@ export interface CandidateContext {
   /** The square the previous move captured on, or null. */
   prevCapSq?: string | null;
   invented?: boolean;
+  /** Reached by an opponent's move that gave up `blunderCp` or more (§5.100: punish). */
+  afterError?: boolean;
 }
 
 /** The one candidate builder both walks use. */
@@ -130,8 +161,12 @@ export function candidate(ctx: CandidateContext, cfg: StormConfig): Candidate {
     reject: null,
   };
   c.reject = pickReject(c, cfg);
+  c.kind = ctx.afterError || c.reject ? specialKind(c, cfg, ctx.afterError) : null;
   return c;
 }
+
+/** Kept by the gather: offered by the pick rules, or of a kind beyond them (§5.100). */
+export const kept = (c: Pick<Candidate, 'reject' | 'kind'>): boolean => !c.reject || !!c.kind;
 
 /** One move forward: the position after it, the square it captured on, and how it arrived. */
 export function advance(fen: string, pos: Position, uci: string): { fen: string; prevCapSq: string | null; arrived: Arrival } | null {
@@ -200,6 +235,11 @@ export async function walkGame(frontierFen: string, userSide: Color, sans: reado
     }
     const best = scored[0]!.score;
     if (Math.abs(best) > cfg.decidedCp) {
+      // Decided: the classic storm stops; a hold or convert is kept from here (§5.100).
+      if (pos.turn === userSide && k + 1 >= cfg.minPly) {
+        const last = candidate({ fen, pos, scored, ply: k + 1, userSide, arrived, prevCapSq }, cfg);
+        if (last.kind) out.push(last);
+      }
       stop = 'the position is already decided';
       break;
     }
@@ -213,6 +253,18 @@ export async function walkGame(frontierFen: string, userSide: Color, sans: reado
     const played = scored.find((m) => m.uci === uci);
     if (played && best - played.score >= cfg.blunderCp) {
       stop = pos.turn === userSide ? 'you would have erred here' : 'the opponent erred here';
+      // The position the opponent's error left: a punish (§5.100), one more request.
+      if (pos.turn !== userSide && k + 2 >= cfg.minPly && k + 2 <= cfg.maxPly) {
+        const step = advance(fen, pos, uci);
+        const next = step && positionOf(step.fen);
+        if (step && next && !reentered(covered, next, userSide)) {
+          const after = await ask(step.fen);
+          if (after && after.length) {
+            const p = candidate({ fen: step.fen, pos: next, scored: after, ply: k + 2, userSide, arrived: step.arrived, prevCapSq: step.prevCapSq, afterError: true }, cfg);
+            if (p.kind) out.push(p);
+          }
+        }
+      }
       break;
     }
     const step = advance(fen, pos, uci);
@@ -256,6 +308,10 @@ export async function randomLine(frontierFen: string, userSide: Color, ask: Ask,
     }
     const best = scored[0]!.score;
     if (Math.abs(best) > cfg.decidedCp) {
+      if (pos.turn === userSide && k + 1 >= cfg.minPly) {
+        const last = candidate({ fen, pos, scored, ply: k + 1, userSide, arrived, prevCapSq, invented: true }, cfg);
+        if (last.kind) out.push(last);
+      }
       stop = 'the position is already decided';
       break;
     }

@@ -18,7 +18,7 @@ import type { Verdict } from '../core/storm/verdict.ts';
 import { gameCard } from '../core/progress/cards.ts';
 import { practiceMistakeOf, practiceMistakeSaved, stormMistakeItem } from '../core/games/saved.ts';
 import { savedDeck } from './games.ts';
-import { drawFrontier, fenAfterUci, positionOf, uciToSan } from '../core/storm/walk.ts';
+import { drawFrontier, fenAfterUci, kept, positionOf, uciToSan } from '../core/storm/walk.ts';
 import type { Chapter } from '../core/study/model.ts';
 import { positionAt } from '../core/study/tree.ts';
 import type { Score } from '../core/engine/uci.ts';
@@ -29,7 +29,8 @@ import { recordEvent } from './state.ts';
 import { analyseForStorm, cancelStormEngine, endStormEngine, stormSearchSoFar } from './stormEngine.ts';
 import { trainData, type TrainData } from './train.ts';
 import { puzzlePrefs, readyPuzzles } from './puzzles.ts';
-import { keptPolicy, missingRatings, unintuitive, type MaiaRating } from '../core/storm/maia.ts';
+import { keptPolicy, missingRatings, type MaiaRating } from '../core/storm/maia.ts';
+import { cleanFocus, easyAt, FOCUSES, matchesFocus, positionTags, type Focus } from '../core/storm/kinds.ts';
 import { maiaElo, maiaPolicies, maiaStored } from './maia.ts';
 import type { ReadyPuzzle } from '../core/puzzles/puzzles.ts';
 
@@ -44,14 +45,16 @@ export interface StormPrefs {
   deepen: boolean;
   /** Maia rates the kept positions while the storm's home is open, once it is downloaded (§5.82). */
   maia: boolean;
+  /** The focus a session deals (§5.100): none is the classic storm. */
+  focus: Focus[];
 }
 const PREFS_KEY = 'repworks-storm';
-const DEFAULT_PREFS: StormPrefs = { minPly: STORM.minPly, maxPly: STORM.maxPly, source: 'both', deepen: typeof matchMedia === 'undefined' || !matchMedia('(max-width: 768px)').matches, maia: true };
+const DEFAULT_PREFS: StormPrefs = { minPly: STORM.minPly, maxPly: STORM.maxPly, source: 'both', deepen: typeof matchMedia === 'undefined' || !matchMedia('(max-width: 768px)').matches, maia: true, focus: [] };
 
 function loadPrefs(): StormPrefs {
   try {
     const raw = JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}') as Partial<StormPrefs>;
-    return { ...DEFAULT_PREFS, ...raw };
+    return { ...DEFAULT_PREFS, ...raw, focus: cleanFocus(raw.focus) };
   } catch {
     return DEFAULT_PREFS;
   }
@@ -220,11 +223,13 @@ export interface StormHome {
   /** The line ends the ready positions come from (the spread deals one per line end first, §30). */
   lines: number;
   /** Maia (§5.82): whether its files are on this device; the ready positions rated at every rating
-   *  wanted; those unintuitive at the user's rating, `elo`. */
+   *  wanted; the user's rating, `elo`. */
   maiaHere: boolean;
   rated: number;
-  unintuitive: number;
   elo: number;
+  /** The ready positions with each tag (§5.100), and those the focus chosen deals. */
+  tags: Record<Focus, number>;
+  matching: number;
 }
 export const stormHome = signal<StormHome | undefined>(undefined);
 
@@ -239,9 +244,16 @@ export async function refreshHome(s: StormScopeData): Promise<void> {
   const lines = new Set(ready.map(positionLineKey).filter(Boolean)).size;
   const elo = maiaElo.peek();
   const rated = ready.filter((p) => !missingRatings(p.maia, elo).length).length;
-  const odd = ready.filter((p) => unintuitive(p.maia, elo, storedList(p), STORM)).length;
+  const tags = Object.fromEntries(FOCUSES.map((f) => [f, 0])) as Record<Focus, number>;
+  const focus = stormPrefs.value.focus;
+  let matching = 0;
+  for (const p of ready) {
+    const t = positionTags(p, storedList(p), elo, STORM);
+    for (const f of t) tags[f]++;
+    if (matchesFocus(t, p.kind, focus)) matching++;
+  }
   const maiaHere = await maiaStored().catch(() => false);
-  stormHome.value = { stored: all.length, done, ready: ready.length, deep, lines, maiaHere, rated, unintuitive: odd, elo };
+  stormHome.value = { stored: all.length, done, ready: ready.length, deep, lines, maiaHere, rated, elo, tags, matching };
 }
 
 /* ------------------------------------------------------------------ the gather (§5.42) */
@@ -290,7 +302,7 @@ export async function gather(s: StormScopeData): Promise<void> {
   const show = () => (gathering.value = { ...g, spent: { ...spent } });
   show();
   const keep = async (cands: Parameters<typeof storedPosition>[0][], from: Parameters<typeof storedPosition>[1]) => {
-    const fresh = cands.filter((x) => !x.reject).map((x) => storedPosition(x, from, Date.now())).filter((p): p is StoredPosition => !!p);
+    const fresh = cands.filter(kept).map((x) => storedPosition(x, from, Date.now())).filter((p): p is StoredPosition => !!p);
     g.stored += await stormStore().addPositions(fresh, STORM.storeMax);
   };
   try {
@@ -601,8 +613,10 @@ export interface StormSession {
   retry?: StormItem;
   /** Puzzles are in play: before a move, a puzzle and a position read the same (§13). */
   disguise: boolean;
-  /** An unintuitive storm (§5.82): only positions whose likeliest move for Maia at this rating isn't a good one. */
-  unintuitive?: number;
+  /** The focus dealt (§5.100; the unintuitive storm of §5.82 is one): none for the classic storm. */
+  focus?: Focus[];
+  /** The user's Maia rating when it started: Maia's line on a card speaks of it. */
+  elo: number;
   /** The next card comes by itself at this time (a storm's verdict, §18.1), unless paused. */
   nextAt?: number;
   /** …after this long, for the bar that shows it. */
@@ -665,13 +679,20 @@ const update = (patch: Partial<StormSession>) => {
   if (s) stormSession.value = { ...s, ...patch };
 };
 
-/** Deals the scope's stored positions: done ones out, misses to the back (§14.15). */
-async function dealt(s: StormScopeData): Promise<StoredPosition[]> {
+/**
+ * Deals the scope's stored positions that match the focus (§5.100): done ones out, misses to the
+ * back (§14.15). The classic storm (no focus) deals the positions Maia at the user's rating finds
+ * easily after the others.
+ */
+async function dealt(s: StormScopeData, focus: readonly Focus[], elo: number): Promise<StoredPosition[]> {
   const data = trainData.value;
   if (!data) return [];
-  const all = storedInScope(await stormStore().positions(), s);
+  const all = storedInScope(await stormStore().positions(), s).filter((p) => matchesFocus(positionTags(p, storedList(p), elo, STORM), p.kind, focus));
   const items = all.map((p) => ({ ...p, deep: judges(p, STORM) }));
-  return drawOrder(items, histories(data), Math.random, STORM.reachTop);
+  const order = drawOrder(items, histories(data), Math.random, STORM.reachTop);
+  if (focus.length) return order;
+  const easy = (p: StoredPosition) => easyAt(p.maia, elo, storedList(p), STORM);
+  return [...order.filter((p) => !easy(p)), ...order.filter(easy)];
 }
 
 /** The history entry the session was started on (app/mode.ts): left for another page and come back to by ←, it is there. */
@@ -679,10 +700,10 @@ let sessionEntry: string | undefined;
 export const stormEntry = (): string | undefined => sessionEntry;
 
 /**
- * Starts a timed storm or a set. `unintuitive` (§5.82): only the positions whose likeliest move for
- * Maia at the user's rating isn't a good one, and no puzzles.
+ * Starts a timed storm or a set. `focus` (§5.100): only the positions that match it, and no
+ * puzzles; none is the classic storm.
  */
-export async function startStorm(s: StormScopeData, mode: SessionMode, o: { unintuitive?: boolean } = {}): Promise<void> {
+export async function startStorm(s: StormScopeData, mode: SessionMode, o: { focus?: readonly Focus[] } = {}): Promise<void> {
   endStormSession();
   sessionEntry = entryKey();
   stopDeepening();
@@ -692,9 +713,9 @@ export async function startStorm(s: StormScopeData, mode: SessionMode, o: { unin
   recentAtStart = new Set(recent);
   dealtLines = new Set();
   const elo = maiaElo.peek();
-  queue = await dealt(s);
-  if (o.unintuitive) queue = queue.filter((p) => unintuitive(p.maia, elo, storedList(p), STORM));
-  share = o.unintuitive ? 0 : puzzlePrefs.value.share;
+  const focus = cleanFocus(o.focus ?? []);
+  queue = await dealt(s, focus, elo);
+  share = focus.length ? 0 : puzzlePrefs.value.share;
   const data = trainData.value;
   const ready = share > 0 ? await readyPuzzles(s) : [];
   puzzleQueue = data ? drawOrder(ready.map((p) => ({ card: 'z|' + p.id, p })), histories(data), Math.random, STORM.reachTop).map((x) => x.p) : [];
@@ -710,7 +731,7 @@ export async function startStorm(s: StormScopeData, mode: SessionMode, o: { unin
   }
   secondPass = [];
   lookTried.clear();
-  stormSession.value = { mode, scopeKey: s.key, title: s.title, phase: 'solving', item: undefined, history: [], points: 0, streak: 0, left: STORM.sessionMs, endsAt: undefined, pass: 1, revealed: false, note: '', total, disguise: puzzleQueue.length > 0, ...(o.unintuitive ? { unintuitive: elo } : {}) };
+  stormSession.value = { mode, scopeKey: s.key, title: s.title, phase: 'solving', item: undefined, history: [], points: 0, streak: 0, left: STORM.sessionMs, endsAt: undefined, pass: 1, revealed: false, note: '', total, disguise: puzzleQueue.length > 0, elo, ...(focus.length ? { focus } : {}) };
   if (mode === 'storm') {
     tick = setInterval(() => {
       const st = stormSession.value;

@@ -506,6 +506,79 @@ test('a storm’s look-ahead: the card on the board searched first, MultiPV 12 a
   expect(commands(site.requests.slice(before))).not.toContain('go depth 20 movetime 8000');
 });
 
+interface Kept {
+  card: string;
+  fen: string;
+  scored: { u: string; s: number }[];
+  src: 'cdb' | 'sf';
+  depth: number;
+  maia?: { elo: number; moves: [string, number][] }[];
+}
+/** The positions kept on this device, as the store has them. */
+const keptPositions = (page: Page) =>
+  page.evaluate(
+    () =>
+      new Promise<Kept[]>((resolve, reject) => {
+        const open = indexedDB.open('repworks-storm');
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const req = open.result.transaction('positions').objectStore('positions').getAll();
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        };
+      }),
+  );
+
+/** Lichess's winning chances, in percent, from centipawns. */
+const winPct = (cp: number) => 50 + 50 * (2 / (1 + Math.exp(-0.00368208 * cp)) - 1);
+
+/**
+ * Quiet (§5.100), worked out here: a Stockfish list at depth 20 or more whose last line isn't good,
+ * every good move (under 6% given up) no capture, check or promotion.
+ */
+function quietHere(p: Kept): boolean {
+  if (p.src !== 'sf' || p.depth < 20 || p.scored.length < 2) return false;
+  const best = p.scored[0]!.s;
+  const good = (s: number) => winPct(best) - winPct(s) < 6;
+  if (good(p.scored[p.scored.length - 1]!.s)) return false;
+  const pos = positionOf(p.fen);
+  return p.scored
+    .filter((m) => good(m.s))
+    .every((m) => {
+      const move = normalizeMove(pos, parseUci(m.u)!) as { from: number; to: number; promotion?: string };
+      const piece = pos.board.get(move.from)!;
+      const victim = pos.board.get(move.to);
+      const capture = (!!victim && victim.color !== pos.turn) || (piece.role === 'pawn' && move.to === pos.epSquare);
+      const after = pos.clone();
+      after.play(move as Parameters<typeof after.play>[0]);
+      return !capture && !after.isCheck() && !move.promotion;
+    });
+}
+
+test('the focus: Quiet chosen and kept, only its positions dealt, the card naming it once answered', async ({ page }) => {
+  test.setTimeout(120_000);
+  const w = await setUp(page, { deepen: true });
+  const ready = await gathered(page, w);
+  await expect(page.getByTestId('storm-deep')).toContainText(`${ready} of ${ready} scored`, { timeout: 60_000 });
+  const quiet = (await keptPositions(page)).filter(quietHere);
+  expect(quiet.length).toBeGreaterThan(0);
+  const focus = page.getByTestId('storm-focus');
+  await focus.locator('summary').click();
+  const chip = focus.getByRole('group', { name: 'The move' }).getByRole('button', { name: /^Quiet/ });
+  await expect(chip).toHaveText(`Quiet ${quiet.length}`);
+  await chip.click();
+  await expect(chip).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('storm-count')).toContainText(`${quiet.length} position${quiet.length === 1 ? '' : 's'} ready for Quiet`);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('repworks-storm')!).focus)).toEqual(['quiet']);
+  await page.getByRole('button', { name: 'Quiet storm' }).click();
+  await expect(page.locator('.study-title')).toContainText('Quiet storm');
+  await expect(page.locator('.storm-card')).toBeVisible();
+  const card = await page.locator('.storm-card').getAttribute('data-card');
+  expect(quiet.map((p) => p.card)).toContain(card);
+  await play(page, ranked(await cardFen(page))[0]!);
+  await expect(page.getByTestId('storm-kinds')).toContainText('Quiet');
+});
+
 /** The win% a move gives up against the best, from the fake ChessDB's ladder (Lichess's curve). */
 const ladderLoss = (fen: string, uci: string) => {
   const i = ranked(fen).indexOf(uci);
@@ -523,7 +596,9 @@ test('Maia: got from the storm’s page, the kept positions rated, and an unintu
   await expect(page.getByTestId('storm-deep')).toContainText(`${ready} of ${ready} scored`, { timeout: 60_000 });
   const count = page.getByTestId('storm-maia-count');
   await expect(count).toContainText('Maia can rate each position’s difficulty');
-  await expect(page.getByRole('button', { name: 'Unintuitive storm' })).toHaveCount(0);
+  // Without Maia, the focus offers no group of its.
+  await page.getByTestId('storm-focus').locator('summary').click();
+  await expect(page.getByRole('group', { name: 'Hard for you' })).toHaveCount(0);
   await count.getByRole('button', { name: 'Get Maia…' }).click();
   const dialog = page.getByRole('dialog', { name: 'Enable Maia' });
   await expect(dialog).toContainText('rate each position’s difficulty');
@@ -535,32 +610,24 @@ test('Maia: got from the storm’s page, the kept positions rated, and an unintu
 
   // Each kept position has the ladder's ratings and the user's; its unintuitive ones worked out
   // here from Maia's likeliest move at 1500 and the fake ChessDB's ladder (good: under 6%).
-  const kept = await page.evaluate(
-    () =>
-      new Promise<{ card: string; fen: string; maia: { elo: number; moves: [string, number][] }[] }[]>((resolve, reject) => {
-        const open = indexedDB.open('repworks-storm');
-        open.onerror = () => reject(open.error);
-        open.onsuccess = () => {
-          const req = open.result.transaction('positions').objectStore('positions').getAll();
-          req.onsuccess = () => resolve(req.result);
-          req.onerror = () => reject(req.error);
-        };
-      }),
-  );
+  const kept = await keptPositions(page);
   expect(kept.length).toBe(ready);
-  for (const p of kept) expect(p.maia.map((r) => r.elo)).toEqual([1000, 1400, 1500, 1800, 2200, 2600]);
-  const odd = kept.filter((p) => ladderLoss(p.fen, p.maia.find((r) => r.elo === 1500)!.moves[0]![0]) >= 6);
+  for (const p of kept) expect(p.maia!.map((r) => r.elo)).toEqual([1000, 1400, 1500, 1800, 2200, 2600]);
+  const odd = kept.filter((p) => ladderLoss(p.fen, p.maia!.find((r) => r.elo === 1500)!.moves[0]![0]) >= 6);
   expect(odd.length).toBeGreaterThan(0);
   await expect(page.getByTestId('storm-spread')).toContainText(`${odd.length} unintuitive`);
 
-  // The unintuitive storm deals those only; Maia's likeliest move played is not a good one.
+  // The Unintuitive focus (§5.100) deals those only; Maia's likeliest move played is not a good one.
+  const chip = page.getByRole('group', { name: 'Hard for you' }).getByRole('button', { name: /^Unintuitive/ });
+  await expect(chip).toHaveText(`Unintuitive ${odd.length}`);
+  await chip.click();
   await page.getByRole('button', { name: 'Unintuitive storm' }).click();
   await expect(page.locator('.study-title')).toContainText('Unintuitive storm');
   await expect(page.locator('.storm-card')).toBeVisible();
   const card = (await page.locator('.storm-card').getAttribute('data-card'))!;
   const p = odd.find((x) => x.card === card)!;
   expect(p).toBeTruthy();
-  await play(page, p.maia.find((r) => r.elo === 1500)!.moves[0]![0]);
+  await play(page, p.maia!.find((r) => r.elo === 1500)!.moves[0]![0]);
   await expect(page.getByTestId('storm-verdict')).toContainText(/Inaccuracy|Mistake|Blunder/);
   const note = page.getByTestId('storm-maia');
   await expect(note).toContainText('Difficulty');

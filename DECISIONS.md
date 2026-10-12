@@ -1563,3 +1563,18 @@ The technical calls, each with its reason:
   quizzed at its comment by "Quiz now" on the chip's card, the walk resuming where it was. Why:
   the owner's request; the quiz is practice, so the user decides when it is worth the time. The
   walk's move asked keeps its wrong moves and time across the quiz, so its grade is unchanged.
+
+## Revision of 2026-10-12 (kinds of storm position and the focus, PLAN.md §5.100)
+- **The storm gains a focus over tags, not a storm per idea**: the unintuitive storm (§5.82)
+  becomes one of twelve chips in three groups (hard for you, the move, the situation), any chip of
+  a group matching and every group chosen having to. Why: the owner asked for important decisions,
+  only moves and positional decisions; as tags they combine ("Critical + Quiet"), and each is
+  worked out from the list and Maia's policies already kept, so it costs no request.
+- **The gather keeps positions the classic storm refuses**, with a `kind` on the stored position
+  (only, punish, hold, convert), and one more request after an opponent's error. The classic storm
+  and set never deal them, so they stay as they were. The kind is on-device cache data (D5's
+  cache tier), not in the data repo; answers are ordinary `storm` events.
+- **The classic storm deals last the positions Maia at the user's rating finds easily** (85% of the
+  time). Why: they are mostly wasted cards; kept rather than dropped, since they feed the streak.
+- **Questions other than "find a move"** (two moves, who's better, what's the threat) are planned
+  in §5.101 for the next session.

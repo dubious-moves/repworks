@@ -96,6 +96,25 @@ export interface StormConfig {
   puzzleRatingMax: number;
   puzzlesPerAnchor: number;
   puzzleDropOn: readonly Band[];
+  /**
+   * Kinds of position beyond the classic storm's (PLAN.md §5.100): kept by the gather with a
+   * `kind`, dealt only when a focus asks for them. Hold: the user worse down to `holdLoCp`;
+   * convert and punish: better up to `convertHiCp`; each with a move in the top five that gives up
+   * `okWp` at least (something to get wrong).
+   */
+  holdLoCp: number;
+  convertHiCp: number;
+  /** Critical (§5.100): Maia's moves at the user's rating give up this much win% on average. */
+  criticalWp: number;
+  /** Level up: stronger players find a good move this much more often than the user's rating. */
+  levelRise: number;
+  /** At your level: a difficulty this far below to this far above the user's rating. */
+  levelBelow: number;
+  levelAbove: number;
+  /** Don't take: Maia's likelihood on captures at the user's rating, at least. */
+  takeShare: number;
+  /** Easy: Maia at the user's rating finds a good move this often; dealt last in the classic storm. */
+  easyShare: number;
 }
 
 /** A move's verdict (§16.2), `unknown` when nothing could grade it. */
@@ -165,6 +184,14 @@ export const STORM: StormConfig = {
   puzzleRatingMax: 2600,
   puzzlesPerAnchor: 200,
   puzzleDropOn: ['great', 'good'],
+  holdLoCp: -300,
+  convertHiCp: 600,
+  criticalWp: 8,
+  levelRise: 0.3,
+  levelBelow: 100,
+  levelAbove: 300,
+  takeShare: 0.25,
+  easyShare: 0.85,
 };
 
 /** The config with the user's ply range folded in (§14.9): the walks never learn a setting exists. */

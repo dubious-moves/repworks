@@ -3783,6 +3783,47 @@ a.button.primary {
   font-size: 0.85rem;
 }
 
+/* The focus (PLAN.md §5.100): three groups of chips, folded until one is chosen. */
+.storm-focus {
+  margin: 6px 0 8px;
+}
+
+.storm-focus summary {
+  min-height: 32px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.storm-focus-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin-top: 6px;
+}
+
+.storm-focus-label {
+  min-width: 7.5em;
+  font-size: 0.85rem;
+}
+
+.storm-focus .chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.storm-focus-n {
+  margin-left: 4px;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
+.storm-focus-about {
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+}
+
 .storm-gather-card > p {
   margin: 4px 0;
 }

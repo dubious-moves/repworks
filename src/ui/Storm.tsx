@@ -63,6 +63,7 @@ import { positionLineKey, positionLineLabel, storedList, type StoredPosition } f
 import { fenAfterUci, positionOf, uciToSan } from '../core/storm/walk.ts';
 import { themeLabel } from '../core/puzzles/dataset.ts';
 import { difficulty, difficultyWords, maiaLine } from '../core/storm/maia.ts';
+import { focusAbout, focusTitle, FOCUS_GROUPS, FOCUS_LABEL, positionTags, tagWords, type Focus } from '../core/storm/kinds.ts';
 import { maiaDialog, maiaElo, maiaState } from '../app/maia.ts';
 import { Board } from './Board.tsx';
 import { useWakeLock } from './Train.tsx';
@@ -102,6 +103,23 @@ function facts(p: StoredPosition): CardFacts {
 function maiaWords(p: StoredPosition, elo: number): string {
   const pos = positionOf(p.fen);
   return maiaLine(p.maia, elo, storedList(p), (u) => (pos ? uciToSan(pos, u) : ''), STORM);
+}
+
+/** What a position is, once answered (§5.100): "Only move · Quiet · Punish". */
+function KindsNote(props: { p: StoredPosition; elo: number }) {
+  const words = tagWords(positionTags(props.p, storedList(props.p), props.elo, STORM));
+  return words ? (
+    <p class="muted storm-kinds" data-testid="storm-kinds">
+      {words}
+    </p>
+  ) : null;
+}
+
+/** A session's name: the classic storm or set, or its focus ("Quiet + Retreat storm"). */
+function sessionName(s: StormSession): string {
+  const what = s.mode === 'storm' ? 'storm' : `set of ${STORM.setSize}`;
+  if (s.focus?.length) return `${focusTitle(s.focus)} ${what}`;
+  return s.mode === 'storm' ? 'Storm' : `Set of ${STORM.setSize}`;
 }
 
 /** How far past the line a card is, in words: a claim about a game, or about an invented line, or an uncovered reply. */
@@ -162,7 +180,7 @@ export function StormScreen(props: { where: StormWhere }) {
         />
         <div class="titles">
           <span class="study-title">
-            {s ? (s.unintuitive ? 'Unintuitive storm' : s.mode === 'storm' ? 'Storm' : `Set of ${STORM.setSize}`) : 'Storm'} · {scope.title}
+            {s ? sessionName(s) : 'Storm'} · {scope.title}
           </span>
         </div>
       </div>
@@ -194,8 +212,9 @@ function Home(props: { scope: StormScopeData; where: StormWhere }) {
     if (prefs.maia && home && home.rated < home.ready && !maiaRating.value) void rateWithMaia(scope);
   }, [prefs.maia, home?.ready, home?.rated, home?.maiaHere, maiaKind === 'ready']);
   // Positions, or puzzles when they are dealt.
-  const puzzlesReady = prefs2.share > 0 ? (puzzleState.value?.ready ?? 0) : 0;
-  const canStart = !!home?.ready || puzzlesReady > 0;
+  const focus = prefs.focus;
+  const puzzlesReady = prefs2.share > 0 && !focus.length ? (puzzleState.value?.ready ?? 0) : 0;
+  const canStart = !!home?.matching || puzzlesReady > 0;
   const ends = scope.frontiers.length;
   const plies = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
   return (
@@ -206,7 +225,8 @@ function Home(props: { scope: StormScopeData; where: StormWhere }) {
           <p class="storm-count" data-testid="storm-count">
             {home ? (
               <>
-                <strong>{home.ready}</strong> position{home.ready === 1 ? '' : 's'} ready{home.done ? ` · ${home.done} done for now` : ''}
+                <strong>{home.matching}</strong> position{home.matching === 1 ? '' : 's'} ready{focus.length ? ` for ${focusTitle(focus)}` : ''}
+                {home.done ? ` · ${home.done} done for now` : ''}
               </>
             ) : (
               '…'
@@ -217,38 +237,23 @@ function Home(props: { scope: StormScopeData; where: StormWhere }) {
               from {plural(home.lines, 'line end')}
               {ends > 0 && home.lines < Math.min(ends, 6) ? ' · gather more for variety' : ''}
               {puzzlesReady ? ` · ${plural(puzzlesReady, 'puzzle')} at ${prefs2.share}%` : ''}
-              {home.maiaHere && home.unintuitive > 0 ? ` · ${home.unintuitive} unintuitive` : ''}
+              {home.maiaHere && home.tags.unintuitive > 0 ? ` · ${home.tags.unintuitive} unintuitive` : ''}
             </p>
           )}
         </div>
+        {home && <FocusPicker scope={scope} home={home} disabled={!!g?.running} />}
         <div class="actions storm-start">
-          <button type="button" class="primary" disabled={!canStart || g?.running} onClick={() => void startStorm(scope, 'storm')}>
-            Start storm
+          <button type="button" class="primary" disabled={!canStart || g?.running} onClick={() => void startStorm(scope, 'storm', { focus })}>
+            {focus.length ? `${focusTitle(focus)} storm` : 'Start storm'}
           </button>
-          <button type="button" class="secondary" disabled={!canStart || g?.running} onClick={() => void startStorm(scope, 'set')}>
+          <button type="button" class="secondary" disabled={!canStart || g?.running} onClick={() => void startStorm(scope, 'set', { focus })}>
             Set of {STORM.setSize}
           </button>
-          {home?.maiaHere && (
-            <button
-              type="button"
-              class="secondary"
-              disabled={!home.unintuitive || g?.running}
-              title={`A storm of the positions where Maia’s likeliest move at ${home.elo} isn’t a good one${home.unintuitive ? '' : ': none found yet'}`}
-              onClick={() => void startStorm(scope, 'storm', { unintuitive: true })}
-            >
-              Unintuitive storm
-            </button>
-          )}
         </div>
         <p class="muted storm-about">
           <strong>Storm:</strong> {STORM.sessionMs / 60000} minutes; the clock runs only while a position waits for your move. <strong>Set:</strong> {STORM.setSize} positions, no clock, a
           mistake held until you find a good move. A move is graded by how much of the game it gives up against the best: within {STORM.greatWp}% is great, within {STORM.goodWp}% good.
-          {home?.maiaHere && (
-            <>
-              {' '}
-              <strong>Unintuitive:</strong> a storm of the positions where the move Maia expects of a {home.elo} player isn’t a good one.
-            </>
-          )}
+          {focus.length ? ` With a focus, only the positions that match it are dealt, and no puzzles.` : ''}
         </p>
       </section>
 
@@ -352,6 +357,59 @@ function Home(props: { scope: StormScopeData; where: StormWhere }) {
       {record && data && where.sid && !where.cid && <Breakdown title="By chapter" head="Chapter" rows={byChapter(data, record, where.sid)} />}
       {shown && shown.puzzles.answered > 0 && <Record r={shown.puzzles} title="Puzzles" />}
     </div>
+  );
+}
+
+/**
+ * The focus (§5.100): chips in three groups, any chip of a group matching and every group chosen
+ * having to. A chip shows how many ready positions have its tag; the Maia group needs Maia's files.
+ */
+function FocusPicker(props: { scope: StormScopeData; home: NonNullable<typeof stormHome.value>; disabled: boolean }) {
+  const focus = stormPrefs.value.focus;
+  const home = props.home;
+  const toggle = (f: Focus) => {
+    setStormPrefs({ focus: focus.includes(f) ? focus.filter((x) => x !== f) : [...focus, f] });
+    void refreshHome(props.scope);
+  };
+  return (
+    <details class="storm-focus" open={focus.length > 0} data-testid="storm-focus">
+      <summary>Focus{focus.length ? `: ${focusTitle(focus)}` : ''}</summary>
+      {FOCUS_GROUPS.filter((g) => g.id !== 'maia' || home.maiaHere).map((g) => (
+        <div class="storm-focus-group" key={g.id} role="group" aria-label={g.label}>
+          <span class="muted storm-focus-label">{g.label}</span>
+          <div class="chips">
+            {g.items.map((f) => {
+              const on = focus.includes(f);
+              return (
+                <button
+                  type="button"
+                  key={f}
+                  class={`chip-toggle${on ? ' on' : ''}`}
+                  aria-pressed={on}
+                  disabled={props.disabled || (!on && !home.tags[f])}
+                  title={focusAbout(f, home.elo, STORM)}
+                  onClick={() => toggle(f)}
+                >
+                  {FOCUS_LABEL[f]} <span class="storm-focus-n">{home.tags[f]}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+      <p class="muted storm-focus-about">
+        {focus.length ? (
+          <>
+            {focus.map((f) => focusAbout(f, home.elo, STORM)).join(' ')}{' '}
+            <button type="button" class="link" disabled={props.disabled} onClick={() => (setStormPrefs({ focus: [] }), void refreshHome(props.scope))}>
+              Clear
+            </button>
+          </>
+        ) : (
+          'Deal only one kind of position: hard for you, a kind of move, or a situation. Hold, Convert and Punish come from gathers made since they were added.'
+        )}
+      </p>
+    </details>
   );
 }
 
@@ -848,7 +906,8 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
             {bestLine(v, f)}
           </p>
         )}
-        {v && showBest && !item.puzzle && v.band !== 'unanswered' && <MaiaNote p={item.card} elo={s.unintuitive ?? maiaElo.value} />}
+        {v && showBest && !item.puzzle && v.band !== 'unanswered' && <MaiaNote p={item.card} elo={s.elo} />}
+        {v && showBest && !item.puzzle && v.band !== 'unanswered' && <KindsNote p={item.card} elo={s.elo} />}
         {v && showBest && item.puzzle && (
           <p class="muted storm-best" data-testid="puzzle-facts">
             Solution: {solution(item.puzzle)} · {puzzleFacts(item.puzzle)}
@@ -1043,10 +1102,10 @@ function Review(props: { s: StormSession; scope: StormScopeData }) {
           </div>
         </div>
         <div class="actions">
-          <button type="button" class="primary" onClick={() => void startStorm(props.scope, s.mode, { unintuitive: !!s.unintuitive })}>
+          <button type="button" class="primary" onClick={() => void startStorm(props.scope, s.mode, { focus: s.focus ?? [] })}>
             {again}
           </button>
-          <button type="button" class="secondary" onClick={() => void startStorm(props.scope, s.mode === 'storm' ? 'set' : 'storm')}>
+          <button type="button" class="secondary" onClick={() => void startStorm(props.scope, s.mode === 'storm' ? 'set' : 'storm', { focus: s.focus ?? [] })}>
             {s.mode === 'storm' ? `Set of ${STORM.setSize}` : 'Storm'}
           </button>
           <button type="button" class="secondary" onClick={() => (stormSession.value = undefined)}>
@@ -1098,7 +1157,8 @@ function Review(props: { s: StormSession; scope: StormScopeData }) {
                 {item.puzzle ? `Solution: ${solution(item.puzzle)}` : bestLine(item.answer, facts(item.card))}
               </p>
             )}
-            {shown && item.answer && !item.puzzle && <MaiaNote p={item.card} elo={s.unintuitive ?? maiaElo.value} />}
+            {shown && item.answer && !item.puzzle && <MaiaNote p={item.card} elo={s.elo} />}
+            {shown && item.answer && !item.puzzle && <KindsNote p={item.card} elo={s.elo} />}
             <div class="actions">
               <button type="button" class="secondary" onClick={() => toggleShown(at)}>
                 {shown ? 'Hide best move' : 'Best move'} <kbd>B</kbd>

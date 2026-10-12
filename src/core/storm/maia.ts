@@ -12,7 +12,7 @@ export const MAIA_LADDER: readonly number[] = [1000, 1400, 1800, 2200, 2600];
 /** Moves Maia gives less than this are not kept. */
 const KEEP_PROB = 0.005;
 /** A share needs this much of Maia's likelihood on moves the list can judge. */
-const JUDGED_MIN = 0.6;
+export const JUDGED_MIN = 0.6;
 
 /** Maia's policy at one rating, as kept: standard UCI and likelihood, the most likely first. */
 export interface MaiaRating {

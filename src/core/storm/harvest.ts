@@ -18,7 +18,7 @@ import { moverCp, userEval, type ScoredList, type ScoredMove } from './grade.ts'
 import { gamesFromPgn } from './games.ts';
 import type { Coverage, DecisionPoint, ExplorerReply, Frontier, LineRef } from './sources.ts';
 import { lineRefKey, lineTail, uncoveredMoves } from './sources.ts';
-import { candidate, fenAfterUci, pickGames, positionOf, randomLine, walkGame, type Arrival, type Ask, type Candidate } from './walk.ts';
+import { candidate, fenAfterUci, pickGames, positionOf, randomLine, walkGame, type Arrival, type Ask, type Candidate, type StoredKind } from './walk.ts';
 import { positionKeyOf } from '../chess/positionKey.ts';
 import type { MaiaRating } from './maia.ts';
 
@@ -157,6 +157,8 @@ export async function harvestDecision(d: DecisionPoint, io: HarvestIo, c: StormC
     }
     out.replies.push({ san: g.san, share: g.share, games: g.games });
     const cand = candidate({ fen, pos: after, scored, ply: 1, userSide: d.side, arrived: { san: g.san, uci: g.uci, before: d.fen } }, c);
+    // A reply that leaves the user clearly better was a mistake to punish (§5.100).
+    if (cand.kind === 'convert') cand.kind = 'punish';
     out.candidates.push(Object.assign(cand, { unc: { san: g.san, share: g.share, games: g.games } }));
   }
   return out;
@@ -188,6 +190,8 @@ export interface StoredPosition {
   at: number;
   /** Maia's policy at the ratings it was rated at (§5.82), added in the background. */
   maia?: MaiaRating[];
+  /** A kind beyond the classic storm's (§5.100); absent for a classic position. */
+  kind?: StoredKind;
 }
 
 export function storedPosition(cand: Candidate & { unc?: StoredPosition['unc'] }, from: { lines: LineRef[]; names: string[]; games?: number | null }, at: number): StoredPosition | null {
@@ -210,6 +214,7 @@ export function storedPosition(cand: Candidate & { unc?: StoredPosition['unc'] }
     unc: cand.unc || null,
     games: from.games ?? null,
     at,
+    ...(cand.kind ? { kind: cand.kind } : {}),
   };
 }
 

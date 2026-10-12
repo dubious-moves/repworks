@@ -5916,3 +5916,79 @@ Tests: `trainer.test.ts` ("comment lines": "Quiz lines" at the end, "Next line" 
 the end waiting even with `holdLineEnd` off at the last line, show and grade at the end, "Quiz now"
 mid-walk resuming at the move asked, after a wrong move keeping its grade, at the end with the
 rest left to "Quiz lines"); `test/e2e/commentLines.spec.ts` on desktop and the emulated phone.
+
+#### 5.100 Kinds of storm position, and the focus that deals them (the owner's request, 2026-10-12)
+
+The owner: beside the unintuitive storm, positions that are important decisions, only moves and
+positional decisions; more conditions on the storm's selection, or new storms. Built as one focus
+over tags (`core/storm/kinds.ts`) rather than a storm per idea, so they combine:
+
+- **Tags worked out from what a stored position keeps** (its list, Maia's policies, a gathered
+  kind), so a deepened list or a new rating re-tags it with no request. Three groups; within a
+  group any chip chosen matches, across groups all must:
+  - **Hard for you** (Maia at the user's rating; shown once Maia is here): *Unintuitive* (§5.82),
+    *Critical* (Maia's moves there give up 8% or more on average, a move outside the list counted
+    as its last line), *Level up* (Maia finds a good move less than half the time at the user's
+    rating and 30 points more often at some ladder rating above it), *Your level* (the difficulty
+    from 100 below to 300 above the rating).
+  - **The move**, read from the moves a list that may judge (§5.84) counts as good (great or
+    good), only when the list names them all (its last line isn't good): *Only move* (one good
+    move), *Quiet* (every good move without a capture, check or promotion), *Retreat* (every good
+    move a piece, not a pawn or the king, moved towards its own side), *Pawn break* (every good
+    move a pawn push into diagonal contact with an enemy pawn), *Don't take* (no good move
+    captures, and a capture tempts: Maia at the rating gives captures 25%, or, unrated, one is in
+    the list's top three).
+  - **The situation**, kept by the gather as the position's `kind`: *Punish* (the position an
+    opponent's error of 150 cp or more left in a real game, or an uncovered reply that leaves the
+    user clearly better; from losing 1 to +6), *Hold* (the user worse, −1 to −3), *Convert* (the
+    user better, +2 to +6). Each needs a move in the top five that gives up 10% (something to get
+    wrong) and is never a forced recapture.
+- **The gather keeps more.** Where the pick rules refuse a position the classic storm doesn't want,
+  it is kept with a kind: a hard only move (a gap of more than 300 cp to the second, or in check
+  with the second a mistake), a hold or a convert (outside the −1…+2 band, including the position
+  where the walk stops as decided), and one more request after an opponent's error for the
+  position it left (punish; the walk still stops there). The classic storm and set deal none of
+  them; a focus does, the situations only when one of them is chosen.
+- **The classic storm deals easy positions last**: those where Maia at the user's rating finds a
+  good move 85% of the time or more.
+- **The home**: "Focus" under the count, folded until a chip is on; each chip with how many ready
+  positions have its tag; the count and the start buttons follow the focus ("Quiet storm",
+  "14 positions ready for Quiet"); the focus is kept per device. "Unintuitive storm" is now the
+  Unintuitive chip. A focus deals no puzzles. A position's tags show with Maia's line once
+  answered, and in the review with the best move ("Only move · Quiet").
+- Answers are ordinary `storm` events: the record and the progress log are unchanged. Positions
+  gathered before this have no kind and are classic; Punish, Hold and Convert come from gathers
+  made since.
+
+Numbers in `STORM` (`holdLoCp`, `convertHiCp`, `criticalWp`, `levelRise`, `levelBelow`,
+`levelAbove`, `takeShare`, `easyShare`), first guesses until the owner's positions show how many
+each leaves.
+
+Tests: `test/unit/core/storm/kinds.test.ts` (a move's facts; the good moves; each tag; Maia's
+expected loss; the focus's groups; easy; the gather's kinds by `specialKind` and the candidate
+builder; the walk keeping a punish and a convert), with three controls in its header;
+`storm.spec.ts` (desktop and phone: the Quiet chip's count checked against the test's own reading
+of the kept lists, the choice kept, only its positions dealt, the card naming it once answered;
+the unintuitive storm now through its chip).
+
+#### 5.101 Questions other than "find a move" (planned 2026-10-12, with §5.100)
+
+From the same request; for positional decisions, where calculation matters less than judgement.
+Each a mode of the storm's session over the same kept positions and focus, its answers `storm`
+events with the band they earned (so the record stays one), dealt from the home beside Start storm
+and Set:
+
+- **Two moves**: the best move and Maia's likeliest at the user's rating when that isn't good
+  (else the list's best move that is a mistake or worse), as two arrows in random colours; the
+  user picks one (click the arrow's destination or a button). Right is `great`, wrong the other
+  move's band. Positions without such a pair are not dealt.
+- **Who's better**: the position before a move, the user picks −, = or + (the user's eval worse
+  than −0.7, within, or better than +0.7, from the list's best); right is `great`, one step off
+  `bad`, two `blunder`.
+- **What's the threat**: the opponent's best move if it were their turn (a search of the position
+  with the side to move swapped, when legal, run in the deepening and kept as `threat`); the user
+  plays it on the board as the opponent's move. Only positions whose threat gives up 10% or more
+  for the user (it matters).
+
+Tests in core for the pair, the eval steps and the threat's position; e2e for each mode on desktop
+and phone.

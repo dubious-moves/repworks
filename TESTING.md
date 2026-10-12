@@ -117,6 +117,16 @@ fixes them and updates this file.
   difficulty shown after each answer believable against how hard the position felt? Is "an
   inaccuracy or worse" the right bar, or should it be a mistake or worse?
 
+## Kinds of storm position and the focus (§5.100)
+
+- Desktop and phone: Gather again (Punish, Hold and Convert come only from new gathers), let
+  Stockfish and Maia finish, open Focus. How many positions does each chip have? Any chip with
+  almost none, or almost all, needs its number changed (`STORM` in `core/storm/config.ts`).
+- Try a storm per chip, and a pair (Critical + Quiet): do the positions feel like the kind named?
+  Only move: one good move? Punish: did the opponent just err? Don't take: was the capture
+  tempting? The tags shown after each answer: right?
+- The classic storm: does it feel easier or harder than before (easy positions now come last)?
+
 ## Stockfish alone judges a storm move, at depth 24 (22 on a phone) while you think (§5.84)
 
 - Desktop (Stockfish 19, 4 threads) and phone: the storm's home with "Stockfish re-scores the
