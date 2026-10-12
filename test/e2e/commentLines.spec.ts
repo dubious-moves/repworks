@@ -108,6 +108,8 @@ test('comment lines: offered in the counters\' row, left out of a comment shown,
   await expect(phase(page)).toHaveAttribute('data-phase', 'ask');
   await expect(page.locator('.train-line')).toContainText('(2. c3)');
   await play(page, 'g8', 'f6');
+  // 3. e5 played (the phase was 'ask' before Nf6 too, so it alone doesn't say the move went in).
+  await expect(page.locator('.train-line')).toContainText('(2. c3 Nf6 3. e5)');
   await expect(phase(page)).toHaveAttribute('data-phase', 'ask');
   await play(page, 'f6', 'd5');
 
