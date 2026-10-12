@@ -75,7 +75,7 @@ test('time travel: a move taught now is due at +4 hours, and its review recorded
 test('the per-device settings: defaults, each field checked', () => {
   assert.deepEqual(parsePrefs(null), DEFAULT_PREFS);
   assert.deepEqual(parsePrefs('not json'), DEFAULT_PREFS);
-  assert.deepEqual(parsePrefs(JSON.stringify({ newMoves: 'sequence', sequenceLength: 8, lineEnd: 'go', startQueue: 'ask', startLearn: 'first', autoPlay: 'session', repetitions: 3, mistakeRetries: 0 })), {
+  assert.deepEqual(parsePrefs(JSON.stringify({ newMoves: 'sequence', sequenceLength: 8, lineEnd: 'go', startQueue: 'ask', startLearn: 'first', autoPlay: 'session', repetitions: 3, mistakeRetries: 0, comments: 'important' })), {
     newMoves: 'sequence',
     sequenceLength: 8,
     lineEnd: 'go',
@@ -84,8 +84,11 @@ test('the per-device settings: defaults, each field checked', () => {
     autoPlay: 'session',
     repetitions: 3,
     mistakeRetries: 0,
+    comments: 'important',
   });
-  assert.deepEqual(parsePrefs(JSON.stringify({ autoPlay: 'always', startQueue: 3, sequenceLength: 0, repetitions: 0, mistakeRetries: 1.5 })), DEFAULT_PREFS);
+  assert.deepEqual(parsePrefs(JSON.stringify({ autoPlay: 'always', startQueue: 3, sequenceLength: 0, repetitions: 0, mistakeRetries: 1.5, comments: 'some' })), DEFAULT_PREFS);
+  // Lines from the comments quizzed in review by default (§5.98).
+  assert.equal(DEFAULT_PREFS.comments, 'all');
   // Repetitions 2 and mistakes retried twice in a row by default (the owner's request, 2026-10-08).
   assert.equal(DEFAULT_PREFS.repetitions, 2);
   assert.equal(DEFAULT_PREFS.mistakeRetries, 2);
@@ -94,10 +97,11 @@ test('the per-device settings: defaults, each field checked', () => {
 test('each session kind runs with its settings: the queue starts as set for it, the queue and Learn wait or go on, retry and the views keep their walk', () => {
   const prefs = { ...DEFAULT_PREFS, newMoves: 'try' as const, startQueue: 'ask' as const, repetitions: 3, mistakeRetries: 1 };
   const common = { autoPlay: 'due', tryNew: true, sequence: 0, repetitions: 3, retryMistakes: 1 };
-  assert.deepEqual(optionsFor({ kind: 'queue' }, prefs), { ...common, lineStart: 'ask', holdLineEnd: true });
+  // The lines from the comments in review: the queue and a line picked (§5.98).
+  assert.deepEqual(optionsFor({ kind: 'queue' }, prefs), { ...common, lineStart: 'ask', holdLineEnd: true, comments: 'all' });
   assert.deepEqual(optionsFor({ kind: 'show', scope: 's' }, prefs), { ...common, lineStart: 'ask', holdLineEnd: true });
   assert.equal(optionsFor({ kind: 'queue' }, { ...prefs, lineEnd: 'go' }).holdLineEnd, false);
-  assert.deepEqual(optionsFor({ kind: 'line', sid: 's', cid: 'c', at: ['e4'] }, prefs), { ...common, lineStart: 'auto' });
+  assert.deepEqual(optionsFor({ kind: 'line', sid: 's', cid: 'c', at: ['e4'] }, prefs), { ...common, lineStart: 'auto', comments: 'all' });
   assert.deepEqual(optionsFor({ kind: 'learn', sid: 's', cid: 'c' }, prefs), { ...common, lineStart: 'auto', holdLineEnd: true, lineEndPaces: 4 });
   assert.deepEqual(optionsFor({ kind: 'learn', sid: 's', cid: 'c' }, { ...prefs, lineEnd: 'go' }).holdLineEnd, false);
   const sequence = optionsFor({ kind: 'queue' }, { ...prefs, newMoves: 'sequence', sequenceLength: 3 });

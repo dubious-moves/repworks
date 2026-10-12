@@ -15,7 +15,8 @@ import { indexStudies, type Line, type RepertoireIndex } from '../../../../src/c
 import { interactivePlan, planSession, type PlannedLine, type SessionPlan } from '../../../../src/core/train/plan.ts';
 import { statusOf, todaysQueue, type Day } from '../../../../src/core/train/queue.ts';
 import { DEFAULT_TRAIN } from '../../../../src/core/train/settings.ts';
-import { AUTO_PLAYS, LINE_STARTS, MIN_PACE_MS, Trainer, type TrainerCommand, type TrainerEffect, type TrainerOptions, type TrainerRecord, type TrainerView } from '../../../../src/core/train/trainer.ts';
+import { quizLinesOf } from '../../../../src/core/train/commentQuiz.ts';
+import { AUTO_PLAYS, LINE_STARTS, MIN_PACE_MS, Trainer, type CommentQuiz, type TrainerCommand, type TrainerEffect, type TrainerOptions, type TrainerRecord, type TrainerView } from '../../../../src/core/train/trainer.ts';
 import type { Chapter } from '../../../../src/core/study/model.ts';
 import { lineThrough, startPosition } from '../../../../src/core/study/tree.ts';
 import { mulberry32 } from '../../../support/random.ts';
@@ -879,4 +880,146 @@ test('repetitions on a line picked (every own move asked): the next pass plays t
     return right(view, n);
   });
   assert.deepEqual(asked, ['teach:Nf6', 'ask:Nf6']);
+});
+
+// ---- Lines from the comments quizzed in review (the owner's request, 2026-10-12) ----------------
+
+/** A queue's trainer with the lines from the comments of a Black repertoire, quizzed as `comments` says. */
+const quizzing = (w: World, plan: SessionPlan, states: Map<string, CardState>, extra: TrainerOptions = {}) =>
+  new Trainer({
+    index: w.ix,
+    plan,
+    states,
+    startOf: startOf(w),
+    paceMs: 600,
+    lineStart: 'first',
+    comments: 'all' satisfies CommentQuiz,
+    commentLines: (line) => quizLinesOf(w.chapters.get(line.cid)!, line.path, 'black', w.ix),
+    ...extra,
+  });
+/** The repertoire's move, or the comment's line's on the board. */
+const either: Answerer = (view, n) => (view.aside ? { type: 'move', uci: view.aside.line.ucis[view.aside.ply]!, now: 0 } : right(view, n));
+const due = (w: World) => new Map<string, CardState>([...w.ix.cards.keys()].map((c) => [c, dueNow]));
+const SICILIAN = '1. e4 c5 2. Nf3 { White can also play (2. c3 Nf6 3. e5 Nd5) } 2... d6 3. d4 cxd4';
+
+test('comment lines: offered as the walk reaches them, quizzed at its end on the board, nothing recorded', () => {
+  const w = world(chapter('Chapter1', 'black', SICILIAN));
+  const states = due(w);
+  const t = quizzing(w, planOf(w, states), states);
+  const views: TrainerView[] = [];
+  const { effects, records } = run(t, (view, n) => (views.push(view), either(view, n)));
+  // Asked: c5 (before the branch: nothing offered yet), d6 and cxd4 (offered), then Nf6 and Nd5.
+  assert.deepEqual(views.map((v) => v.comments?.map((c) => `${c.line.label}:${c.on}`)), [undefined, ['2. c3:true'], ['2. c3:true'], ['2. c3:true'], ['2. c3:true']]);
+  assert.deepEqual(views.map((v) => v.aside && `${v.aside.n}/${v.aside.of} ${v.path.join(' ')}`), [undefined, undefined, undefined, '1/1 e4 c5', '1/1 e4 c5']);
+  assert.ok(views[3]!.commentsSettled);
+  assert.deepEqual(plays(effects), ['opponent:e4', 'user:c5', 'opponent:Nf3', 'user:d6', 'opponent:d4', 'user:cxd4', 'opponent:c3', 'user:Nf6', 'opponent:e5', 'user:Nd5']);
+  // The board goes back to where the line starts, and to the line's end after it.
+  const backs = effects.flatMap((e) => (e.type === 'takeback' ? [e.path.join(' ')] : []));
+  assert.deepEqual(backs, ['e4 c5', 'e4 c5 Nf3 d6 d4 cxd4']);
+  assert.deepEqual(records.map((r) => r.k), ['review', 'review', 'review']);
+  assert.deepEqual(notes(effects).filter((n) => n.kind === 'asides' || n.kind === 'aside')[0], { kind: 'asides', count: 1 });
+  assert.deepEqual(t.view.asides, { lines: 1, moves: 2, right: 2 });
+  // The session's own numbers count the repertoire's moves alone.
+  assert.equal(effects.filter((e) => e.type === 'answer').length, 3);
+});
+
+test('comment lines: off offers none; important quizzes the ones marked ! or !!; pick only those picked', () => {
+  const w = world(chapter('Chapter1', 'black', '1. e4 c5 2. Nf3 { (2. c3 Nf6 3. e5 Nd5) (2. Nc3! Nc6 3. g3) } 2... d6 3. d4 cxd4'));
+  const states = due(w);
+  const off = run(quizzing(w, planOf(w, states), states, { comments: 'off' }), (view, n) => {
+    assert.equal(view.comments, undefined);
+    return either(view, n);
+  });
+  assert.deepEqual(plays(off.effects).slice(6), []);
+  const important = quizzing(w, planOf(w, states), states, { comments: 'important' });
+  const offered: string[][] = [];
+  const quiz = run(important, (view, n) => (offered.push(view.comments?.map((c) => `${c.line.label}:${c.on}`) ?? []), either(view, n)));
+  assert.deepEqual(offered[1], ['2. c3:false', '2. Nc3!:true']);
+  assert.deepEqual(plays(quiz.effects).slice(6), ['opponent:Nc3', 'user:Nc6', 'opponent:g3']);
+  // Pick: the first one picked from the offer, while the walk goes on.
+  const pick = quizzing(w, planOf(w, states), states, { comments: 'pick' });
+  const picked = run(pick, (view, n) => {
+    if (n === 1) pick.send({ type: 'pickComment', key: view.comments![0]!.line.key, on: true });
+    return either(view, n);
+  });
+  assert.deepEqual(plays(picked.effects).slice(6), ['opponent:c3', 'user:Nf6', 'opponent:e5', 'user:Nd5']);
+});
+
+test('comment lines: none on a walk that teaches a move (learning, not review)', () => {
+  const w = world(chapter('Chapter1', 'black', SICILIAN));
+  const states = new Map<string, CardState>();
+  const { effects } = run(quizzing(w, planOf(w, states, 20), states), (view, n) => {
+    assert.equal(view.comments, undefined);
+    return either(view, n);
+  });
+  assert.deepEqual(plays(effects), ['opponent:e4', 'user:c5', 'opponent:Nf3', 'user:d6', 'opponent:d4', 'user:cxd4']);
+});
+
+test('comment lines: met only from where the user is first asked, unless every move is asked from the start', () => {
+  const w = world(chapter('Chapter1', 'black', '1. e4 { (1. d4 Nf6 2. c4 e6) } 1... c5 2. Nf3 d6 3. d4 cxd4'));
+  const states = due(w);
+  states.set(card('e4 c5'), notDue);
+  states.set(card('e4 c5 Nf3 d6'), notDue);
+  const first = run(quizzing(w, planOf(w, states), states), either);
+  assert.deepEqual(plays(first.effects), ['opponent:d4', 'user:cxd4']);
+  const fromStart = run(quizzing(w, planOf(w, states), states, { lineStart: 'ask' }), either);
+  assert.deepEqual(plays(fromStart.effects).slice(6), ['opponent:d4', 'user:Nf6', 'opponent:c4', 'user:e6']);
+});
+
+test('comment lines: a wrong move is taken back, a second shows the move, Hint shows it; another line\'s move there is not wrong', () => {
+  const w = world(chapter('Chapter1', 'black', '1. e4 c5 2. Nf3 { (2. c3 Nf6 3. e5 Nd5) (2. c3 d5 3. exd5 Qxd5) } 2... d6'));
+  const states = due(w);
+  const t = quizzing(w, planOf(w, states), states);
+  const views: TrainerView[] = [];
+  // In the first line: d5 (the other line's), e5, a6 (wrong twice: shown), then Nf6; Hint at Nd5.
+  const answers: (TrainerCommand | undefined)[] = [undefined, undefined, { type: 'move', uci: 'd7d5', now: 0 }, { type: 'move', uci: 'e7e5', now: 0 }, { type: 'move', uci: 'a7a6', now: 0 }, undefined, { type: 'hint', now: 0 }];
+  const { effects, records } = run(t, (view, n) => (views.push(view), answers[n] ?? either(view, n)));
+  assert.deepEqual(views.map((v) => v.phase), ['ask', 'ask', 'ask', 'ask', 'wrong', 'shown', 'ask', 'shown', 'ask', 'ask']);
+  const said = notes(effects).map((n) => n.kind).filter((k) => k.startsWith('aside') || k === 'shown');
+  assert.deepEqual(said, ['asides', 'aside', 'asideAlso', 'asideWrong', 'shown', 'aside', 'shown', 'aside', 'aside', 'aside', 'aside']);
+  assert.ok(effects.some((e) => e.type === 'arrow' && e.uci === 'g8f6'));
+  assert.deepEqual(records.map((r) => r.k), ['review', 'review']);
+  assert.deepEqual(t.view.asides, { lines: 2, moves: 4, right: 2 });
+});
+
+test('comment lines: quizzed once a session; Skip moves on from the one on the board', () => {
+  const w = world(chapter('Chapter1', 'black', '1. e4 c5 2. Nf3 { (2. c3 Nf6 3. e5 Nd5) (2. Nc3 Nc6 3. g3 g6) } 2... d6 (2... Nc6 3. d4) 3. d4 cxd4'));
+  const states = due(w);
+  const plan = planOf(w, states);
+  assert.equal(plan.lines.length, 2);
+  const once = run(quizzing(w, plan, states), either);
+  assert.equal(plays(once.effects).filter((p) => p === 'opponent:c3').length, 1);
+  const t = quizzing(w, plan, states);
+  const skipped = run(t, (view, n) => {
+    if (view.aside?.line.sans[0] === 'c3') return { type: 'skipComment', now: 0 };
+    return either(view, n);
+  });
+  assert.ok(!plays(skipped.effects).includes('user:Nf6'));
+  assert.ok(plays(skipped.effects).includes('user:g6'));
+});
+
+test('comment lines: show and grade turned on before they start leaves them', () => {
+  const w = world(chapter('Chapter1', 'black', SICILIAN));
+  const states = due(w);
+  const t = quizzing(w, planOf(w, states), states);
+  const effects: TrainerEffect[] = [];
+  let wait: { id: number } | undefined;
+  const send = (c: TrainerCommand) => {
+    const out = t.send(c);
+    effects.push(...out);
+    for (const e of out) if (e.type === 'wait') wait = e;
+  };
+  send({ type: 'start', now: 0 });
+  for (let guard = 0; guard < 100 && t.view.phase !== 'sessionDone'; guard++) {
+    const phase = t.view.phase;
+    if (phase === 'ask') send({ type: 'move', uci: expected(t.view), now: 0 });
+    else if (phase === 'again') {
+      // The pause before the lines from the comments: show and grade turned on.
+      t.setSelfGrade(true);
+      send({ type: 'tick', id: wait!.id, now: 0 });
+    } else send({ type: 'tick', id: wait!.id, now: 0 });
+  }
+  assert.ok(notes(effects).some((n) => n.kind === 'asides'));
+  assert.ok(!plays(effects).includes('opponent:c3'));
+  assert.equal(t.view.phase, 'sessionDone');
 });

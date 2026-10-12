@@ -5816,3 +5816,69 @@ page's parent when opened from outside) and Home (`Stuck` in `ui/Back.tsx`). Hom
 page, is on every page but the start page: next to ← on a screen 900px wide or more, in the top bar's
 right on a narrower one, where the head has no room to spare. The installed app on a desktop hides
 the top bar but is wide, so it gets the head's.
+
+#### 5.98 Lines from the comments quizzed in review (the owner's request, 2026-10-12)
+
+The owner: quiz the clickable lines in review (not when learning); a small notice that a line is
+there, with a miniature board on hover, rather than popups coming and going; only lines starting
+with the opponent's move; none where an own move is marked `?`, `?!` or `??`; a first move marked
+`!` or `!!` stands out as important. "You decide, then we'll iterate." lichessable's §18 (its
+`DESIGN-continuation-review.md`, read for this) is the reference: its heads-up, its rules, and what
+an extension couldn't do. Decided:
+
+- **Which lines** (`core/train/commentQuiz.ts`, `quizLinesOf`): a comment's line (§5.12, placed as
+  there) on a move of the line walked, or before its first move, starting with the opponent's move.
+  Dropped when any own move as written is marked `?`, `??` or `?!` (its first character is `?`;
+  `!?` is kept, and an opponent's `?` is the premise of the line). The moves quizzed go as far as
+  the line is one line: up to a pass (a plan, not moves), a move whose printed number isn't the
+  position's (`… alt. 16... Rfe8`: another branch), an illegal move, or an own move where the
+  repertoire plays another (the quiz never drills against the repertoire). At least one own move
+  must be left, and the line is left out when every own move of it is a card already (the
+  repertoire trains it). Important: the first move marked `!` or `!!` (`$1`, `$3`). The parser
+  (`lines.ts`) now keeps each move's glyph (written on it or standing after it) and its printed
+  number.
+- **When**: on a walk of the day's queue or of a line picked that teaches nothing (a walk that
+  teaches is learning). Lines starting where the user is first asked (the opponent's move before
+  it) to the walk's end are met as the walk reaches them; from the start, asked, from the walk's
+  start. At the walk's end, after its mistakes, the lines on are played on the main board, one
+  after another, then the line is done as before. Each line once a session. Not in Learn, show and
+  grade, retry, drill, the pins or the Interactive view.
+- **The quiz takes over the board**, as the mistakes retried at a walk's end do: the board goes
+  back to where the line starts, the opponent's first move comes after two paces, the rest at the
+  pace; the user finds their moves. A wrong move is taken back ("Not the comment's move"), a second
+  or Hint shows it with an arrow; a move another quizzed line or the repertoire plays there isn't
+  wrong. Nothing is graded or recorded: the lines come back whenever the moves around them are
+  reviewed, so they follow their line's schedule. "Skip this line" moves on.
+- **The notice** (`ui/CommentOffer.tsx`): a chip in the counters' row ("Comment lines 2", "Lines 2"
+  on a phone), in the comment lines' blue, gold with a `!` when one is important. It appears when
+  the walk reaches a line's start and only grows; nothing else moves. Hovering it, a tap or the
+  keyboard opens a card under the row: each line's start on a small board with its first move as
+  an arrow, the move as written (`2. Nc3!`), "Important" in gold, how many moves are to find, and
+  "Quiz it". Lines not yet reached are never shown (they would give the line's own moves away).
+- **No spoilers in a comment shown mid-walk** (after a wrong move): a line still to be quizzed is
+  shown as `(…)`.
+- **Setting** (this device, training settings): quiz each one (default) / quiz the important ones,
+  offer the rest / offer them, quiz the ones I pick / off.
+- **Feedback**: "Next, 2 lines from the comments", then "Line from the comments · 1 of 2" (gold:
+  "Important line …"); the line's moves so far after the line's name, in parentheses; the
+  session's end counts them ("2 lines from the comments, 3 of 4 moves found first time").
+
+Better than lichessable's, because the trainer is the site's own: one board (no overlay), no
+second reader to agree with the first, no network check for lines in the course (the index
+answers), a notice that never covers anything, and the quiz runs where the line is reviewed rather
+than on request.
+
+Not done, for the owner to say: grading the lines (cards of their own, which would be a new
+progress event and a decision on the data format); combining a line written in shorthand from a
+fork (`(15. Nxd4 cxd4 16. b3 Qf5 alt. 16...Rfe8)`: the quiz takes the first branch); quizzing a
+plan written with passes.
+
+Tests: `test/unit/core/train/commentQuiz.test.ts` (each rule), `lines.test.ts` (glyphs and printed
+numbers), `trainer.test.ts` ("comment lines": offered as reached and not before, quizzed at the
+walk's end with nothing recorded, the board's path, off / important / pick, none on a walk that
+teaches, where the walk meets them, wrong / shown / Hint / another line's move, once a session,
+Skip), `timeTravel.test.ts` (the setting), `test/e2e/commentLines.spec.ts` on desktop and the
+emulated phone (the chip and its board, `(…)` in a comment shown, both lines quizzed, only the
+review pushed, picked off, Skip, the setting).
+
+Live: TESTING.md.

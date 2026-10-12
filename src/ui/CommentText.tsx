@@ -19,20 +19,25 @@ export interface CommentPositions {
 }
 
 type Piece = { text: string } | { text: string; line: number; move: number };
-/** Plain text, or a run of a line group (its moves clickable). Words written in a line are plain. */
-type Segment = { text: string } | { group: Piece[] };
+/** Plain text, or a run of a line group (its moves clickable), or a line left out. Words written in a line are plain. */
+type Segment = { text: string } | { group: Piece[] } | { masked: true };
 
 /**
  * The comment cut into text and lines. With the lines played (`played`), a line that fits neither
  * position stays text, as in q_extension; without them every group is drawn as a line. A line's
  * words are plain text between runs of the line, so they read as the comment around it.
  */
-function segments(text: string, played: readonly PlayedLine[] | undefined): Segment[] {
+function segments(text: string, played: readonly PlayedLine[] | undefined, hidden?: (line: PlayedLine) => boolean): Segment[] {
   const out: Segment[] = [];
   let at = 0;
   parseCommentLines(text).forEach((line, i) => {
     if (played && !played[i]?.placed) return;
     if (line.from > at) out.push({ text: text.slice(at, line.from) });
+    if (played && hidden?.(played[i]!)) {
+      out.push({ masked: true });
+      at = line.to;
+      return;
+    }
     const marks = [...line.moves.map((m, j) => ({ ...m, move: j })), ...line.words.map((w) => ({ ...w, move: -1 }))].sort((a, b) => a.from - b.from);
     let group: Piece[] = [];
     let g = line.from;
@@ -63,6 +68,8 @@ export function CommentText(props: {
   positions: () => CommentPositions | undefined;
   /** Before the preview starts (the chapter view shows the commented move first). */
   onOpen?: () => void;
+  /** A line left out of the text, as `(…)`: training's lines from the comments still to be quizzed (§5.98). */
+  hidden?: (line: PlayedLine) => boolean;
 }) {
   // Played once per comment, so a line that fits neither position is text and the moves past
   // the legal ones are struck through (q_extension's rules). Only for a comment with a group.
@@ -71,10 +78,10 @@ export function CommentText(props: {
     const at = props.positions();
     return at ? playedLines(props.text, at.after, at.before) : undefined;
   }, [props.text, props.id]);
-  const parts = useMemo(() => segments(props.text, played), [props.text, played]);
+  const parts = useMemo(() => segments(props.text, played, props.hidden), [props.text, played, props.hidden]);
   const shown = previewOf(props.owner);
   const mine = shown?.key === props.id ? shown.cursor : undefined;
-  if (!parts.some((p) => 'group' in p)) return <>{props.text}</>;
+  if (!parts.some((p) => 'group' in p || 'masked' in p)) return <>{props.text}</>;
   const open = (line: number, move: number) => (e: Event) => {
     e.stopPropagation();
     const at = props.positions();
@@ -112,7 +119,11 @@ export function CommentText(props: {
   return (
     <>
       {parts.map((p, i) =>
-        'group' in p ? (
+        'masked' in p ? (
+          <span key={i} class="comment-line masked" title="A line from the comments: quizzed on the board when the line ends">
+            (…)
+          </span>
+        ) : 'group' in p ? (
           <span key={i} class="comment-line">
             {p.group.map(piece)}
           </span>

@@ -1,7 +1,7 @@
 // The training settings kept per device (PLAN.md §5.17), beside the pace and speech: none of them
 // changes a card's state, so none needs syncing. In localStorage, read once and written on change.
 import { signal } from '@preact/signals';
-import { AUTO_PLAYS, LINE_STARTS, type AutoPlay, type LineStart } from '../core/train/trainer.ts';
+import { AUTO_PLAYS, COMMENT_QUIZZES, LINE_STARTS, type AutoPlay, type CommentQuiz, type LineStart } from '../core/train/trainer.ts';
 
 export interface TrainPrefs {
   /**
@@ -20,9 +20,11 @@ export interface TrainPrefs {
   repetitions: number;
   /** At a line's end, each move missed on it is asked until right this many times in a row (0–5; 0: not). */
   mistakeRetries: number;
+  /** In review, the lines from the comments quizzed at a line's end (the owner's request, 2026-10-12). */
+  comments: CommentQuiz;
 }
 
-export const DEFAULT_PREFS: TrainPrefs = { newMoves: 'show', sequenceLength: 5, lineEnd: 'wait', startQueue: 'first', startLearn: 'auto', autoPlay: 'due', repetitions: 2, mistakeRetries: 2 };
+export const DEFAULT_PREFS: TrainPrefs = { newMoves: 'show', sequenceLength: 5, lineEnd: 'wait', startQueue: 'first', startLearn: 'auto', autoPlay: 'due', repetitions: 2, mistakeRetries: 2, comments: 'all' };
 
 const KEY = 'repworks.trainPrefs';
 
@@ -46,6 +48,7 @@ export function parsePrefs(raw: string | null): TrainPrefs {
     autoPlay: pick(v.autoPlay, AUTO_PLAYS, DEFAULT_PREFS.autoPlay),
     repetitions: whole(v.repetitions, 1, 5, DEFAULT_PREFS.repetitions),
     mistakeRetries: whole(v.mistakeRetries, 0, 5, DEFAULT_PREFS.mistakeRetries),
+    comments: pick(v.comments, COMMENT_QUIZZES, DEFAULT_PREFS.comments),
   };
 }
 

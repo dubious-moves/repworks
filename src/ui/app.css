@@ -2060,6 +2060,7 @@ table.cards td {
 
 /* The counters, and at their end the session's small ⋯ menu (Train.tsx's TrainMenu). */
 .train-counters-row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -2073,6 +2074,167 @@ table.cards td {
   flex: none;
   min-width: 40px;
   padding: 0 10px;
+}
+
+/* The lines from the comments offered in review (CommentOffer.tsx, PLAN.md §5.98): a quiet chip in
+   the counters' row, in the comment lines' blue, gold when one is important. Its card of small
+   boards opens on a hover, a tap or the keyboard: under the row and as wide as it, over the panel,
+   never the board. */
+.comment-offer {
+  flex: none;
+}
+
+button.comment-offer-chip {
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: transparent;
+  border: 1px solid var(--comment-line);
+  color: var(--comment-line);
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+button.comment-offer-chip.off {
+  opacity: 0.65;
+}
+
+button.comment-offer-chip.important {
+  border-color: var(--must);
+  color: var(--must);
+}
+
+.comment-offer-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 1.2em;
+  height: 1.2em;
+  margin-right: 4px;
+  border-radius: 50%;
+  background: var(--must);
+  color: var(--on-warn);
+  font-size: 0.8em;
+}
+
+.comment-offer-count {
+  font-variant-numeric: tabular-nums;
+}
+
+/* A shorter name on a phone, where the counters' row is narrow. */
+.comment-offer-short {
+  display: none;
+}
+
+@media (max-width: 599px) {
+  .comment-offer-word {
+    display: none;
+  }
+
+  .comment-offer-short {
+    display: inline;
+  }
+}
+
+.comment-offer-card {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 60;
+  padding: 8px 10px 10px;
+  background: var(--menu-bg);
+  border: 1px solid rgb(var(--ink) / 14%);
+  border-radius: var(--radius-card);
+  box-shadow: 0 6px 24px rgb(var(--shadow) / 45%);
+}
+
+.comment-offer-lead {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.comment-offer-card ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.comment-offer-line {
+  display: grid;
+  gap: 4px;
+  width: 168px;
+  font-size: 0.9rem;
+}
+
+.comment-offer-line strong {
+  color: var(--comment-line);
+}
+
+.comment-offer-line.important strong,
+.comment-offer-tag {
+  color: var(--must);
+}
+
+.comment-offer-line.important .mini-board {
+  outline: 3px solid var(--must);
+  outline-offset: 1px;
+}
+
+.comment-offer-tag {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.comment-offer-pick {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.mini-board {
+  width: 168px;
+  aspect-ratio: 1;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.mini-board .cg-host {
+  width: 100%;
+  height: 100%;
+}
+
+/* A line from the comments on the board: its moves after the line's, and its notes, in its blue. */
+.train-aside-moves {
+  color: var(--comment-line);
+  font-weight: 600;
+}
+
+.train-feedback.note-asides,
+.train-feedback.note-aside {
+  color: var(--comment-line);
+}
+
+.train-feedback.note-aside.important {
+  color: var(--must);
+}
+
+.train-feedback.note-asideWrong {
+  color: var(--error);
+}
+
+/* A comment's line still to be quizzed, left out of the comment shown (§5.98). */
+.comment-line.masked {
+  font-weight: 400;
+  opacity: 0.7;
 }
 
 @media (min-width: 900px) {

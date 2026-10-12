@@ -237,3 +237,13 @@ test('↓ ↑ between a comment’s lines, at each line’s first move', () => {
   assert.deepEqual(switchLine(lines, { line: 2, ply: 3 }, -1), { line: 0, ply: 1 });
   assert.equal(switchLine(lines, { line: 0, ply: 2 }, -1), undefined);
 });
+
+test('a move keeps its glyph, written on it or standing after it, and the number printed before it', () => {
+  const [line] = parseCommentLines('(7. Bc4! Qa5?! 8. O-O $1 b5 !? 9. Bb3 ?? Words 9... Ne4 $14)');
+  assert.deepEqual(line!.moves.map((m) => [m.san, m.glyph ?? '']), [['Bc4', '!'], ['Qa5', '?!'], ['O-O', '!'], ['b5', '!?'], ['Bb3', '??'], ['Ne4', '']]);
+  assert.deepEqual(line!.moves.map((m) => (m.printed ? `${m.printed.number}${m.printed.turn === 'white' ? '.' : '...'}` : '')), ['7.', '', '8.', '', '9.', '9...']);
+  // A glyph on a move with one already is text; the move's place leaves its glyph out.
+  const text = '(3. Bb5+! Bd7 !!)';
+  const [b] = parseCommentLines(text);
+  assert.deepEqual(b!.moves.map((m) => [text.slice(m.from, m.to), m.glyph ?? '']), [['Bb5+', '!'], ['Bd7', '!!']]);
+});

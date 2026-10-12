@@ -25,7 +25,8 @@ import { interactivePlan, planSession, withoutAnswered, type SessionPlan } from 
 import { ShowGrade, type Press, type ShowGradeEffect } from '../core/train/showGrade.ts';
 import { todaysQueue, type DailyQueue, type Day } from '../core/train/queue.ts';
 import { SETTINGS_FILE, trainSettings, type TrainSettings } from '../core/train/settings.ts';
-import { Trainer, type Note, type Summary, type TrainerCommand, type TrainerEffect, type TrainerOptions } from '../core/train/trainer.ts';
+import { quizLinesOf, type QuizLine } from '../core/train/commentQuiz.ts';
+import { Trainer, type Note, type Summary, type TrainerCommand, type TrainerEffect, type TrainerOptions, type TrainerView } from '../core/train/trainer.ts';
 import type { IdbStore } from '../platform/idbStore.ts';
 import { say, stopSpeaking } from '../platform/speech.ts';
 import { decidingNow } from './time.ts';
@@ -206,6 +207,11 @@ export interface SessionView {
   /** A line walked again (repetitions), and the mistakes retried at a walk's end (§5.77). */
   pass?: { n: number; of: number };
   retry?: { left: number; streak: number; need: number };
+  /** The lines from the comments offered on this walk, the one on the board, and the session's count (§5.98). */
+  comments?: TrainerView['comments'];
+  commentsSettled?: true;
+  aside?: TrainerView['aside'];
+  asides?: TrainerView['asides'];
   /** After a wrong move, the move "Save as alternative" saves; an alternative just saved (§5.18). */
   wrongMove?: string;
   savedAlt?: string;
@@ -313,6 +319,8 @@ export async function startSession(store: IdbStore, record: (event: Parameters<I
     },
     paceMs: PACES[pace.peek()],
     alternatives: data.alternatives,
+    // In review, the lines from the comments along the line (§5.98): the queue's and a line picked.
+    ...(of.kind === 'queue' || of.kind === 'line' ? { commentLines: commentLinesOf(data) } : {}),
     ...optionsFor(of, trainPrefs.peek()),
   });
   trainer = t;
@@ -322,6 +330,21 @@ export async function startSession(store: IdbStore, record: (event: Parameters<I
   if (listed !== undefined) view.scope = listed;
   session.value = view;
   send({ type: 'start', now });
+}
+
+/** The lines from the comments a line's walk can quiz (§5.98), read from its chapter once a session. */
+function commentLinesOf(data: TrainData): (line: Line) => readonly QuizLine[] {
+  const known = new Map<Line, QuizLine[]>();
+  return (line) => {
+    let lines = known.get(line);
+    if (!lines) {
+      const c = data.chapters.get(`${line.sid}/${line.cid}`);
+      const side = c && header(c, 'Orientation') === 'black' ? 'black' : 'white';
+      lines = c ? quizLinesOf(c, line.path, side, data.index) : [];
+      known.set(line, lines);
+    }
+    return lines;
+  };
 }
 
 /**
@@ -341,10 +364,11 @@ export function optionsFor(of: SessionKind, prefs: TrainPrefs): TrainerOptions {
   };
   switch (of.kind) {
     case 'queue':
+      return { ...common, lineStart: prefs.startQueue, holdLineEnd: prefs.lineEnd === 'wait', comments: prefs.comments };
     case 'show':
       return { ...common, lineStart: prefs.startQueue, holdLineEnd: prefs.lineEnd === 'wait' };
     case 'line':
-      return { ...common, lineStart: prefs.startLearn };
+      return { ...common, lineStart: prefs.startLearn, comments: prefs.comments };
     case 'learn':
       return { ...common, lineStart: prefs.startLearn, holdLineEnd: prefs.lineEnd === 'wait', lineEndPaces: 4 };
     default:
@@ -370,7 +394,8 @@ export function isGraded(of: SessionKind): boolean {
 export function setSelfGrade(on: boolean): void {
   const t = trainer;
   const s = session.peek();
-  if (!t || !s || s.done || s.selfGrade === on || t.awaitingGrade) return;
+  // Not in a line from the comments either: it is played on the board, not shown and graded.
+  if (!t || !s || s.done || s.selfGrade === on || t.awaitingGrade || t.inAside) return;
   t.setSelfGrade(on);
   shower = on ? new ShowGrade(t, speech.peek() ? { speech: true } : {}) : undefined;
   session.value = { ...s, selfGrade: on, tick: s.tick + 1 };
@@ -424,8 +449,14 @@ export function readLine(ply: number | undefined): void {
 }
 
 /** A command from the screen, with the time now. */
-export function command(type: 'hint' | 'suspend' | 'skipLine' | 'stop' | 'next' | 'ready' | 'saveAlt' | 'unsaveAlt'): void {
+export function command(type: 'hint' | 'suspend' | 'skipLine' | 'stop' | 'next' | 'ready' | 'saveAlt' | 'unsaveAlt' | 'skipComment'): void {
   send({ type, now: Date.now() });
+}
+/** A line from the comments offered: quizzed at the line's end, or not (§5.98). */
+export function pickComment(key: string, on: boolean): void {
+  const t = trainer;
+  // Nothing to play: the screen reads the offer again.
+  if (t) apply(t, t.send({ type: 'pickComment', key, on }), true);
 }
 /** Show sequence: the board at a ply of the sequence shown. */
 export function seekSequence(ply: number): void {
@@ -500,9 +531,9 @@ export function setSpeech(on: boolean): void {
   }
 }
 
-function apply(t: Trainer, effects: readonly ShowGradeEffect[]): void {
+function apply(t: Trainer, effects: readonly ShowGradeEffect[], always = false): void {
   const s = session.peek();
-  if (!s || effects.length === 0) return;
+  if (!s || (effects.length === 0 && !always)) return;
   const next: SessionView = { ...s, tick: s.tick + 1 };
   let suspendedCard: CardId | undefined;
   for (const e of effects) {
@@ -596,6 +627,10 @@ function apply(t: Trainer, effects: readonly ShowGradeEffect[]): void {
   else delete next.wrongMove;
   if (v.savedAlt) next.savedAlt = v.savedAlt.san;
   else delete next.savedAlt;
+  for (const k of ['comments', 'commentsSettled', 'aside', 'asides'] as const) {
+    if (v[k]) (next as unknown as Record<string, unknown>)[k] = v[k];
+    else delete next[k];
+  }
   next.dueLeft = s.plan.lines.flatMap((l) => l.ask).filter((c) => !answered.has(c)).length;
   next.newLeft = s.plan.lines.flatMap((l) => l.teach).filter((c) => !answered.has(c)).length;
   session.value = next;

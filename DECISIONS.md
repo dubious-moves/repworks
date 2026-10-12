@@ -1546,3 +1546,13 @@ The technical calls, each with its reason:
 - **↓ on a move whose comment has a line enters it**, ahead of ↓'s next variation, and ↑ ↓ move
   between the comment's lines; ↑ on the first leaves. The owner asked for "like selecting a
   branch"; the variation stays one ← → away.
+
+## Revision of 2026-10-12 (lines from the comments quizzed in review, PLAN.md §5.98)
+- **D16 / §5.12: the clickable lines in comments are quizzed in review**, on the main board at a
+  review walk's end, as the walk's mistakes are retried: only lines starting with the opponent's
+  move, none where an own move is marked `?`, `?!` or `??`, a first move marked `!` or `!!`
+  important (the owner's rules). Practice only: no grade, no event, so the progress log's format is
+  unchanged and the lines come back with the moves around them. Why the main board: one board to
+  play on, with the trainer's pace, keys and arrows. Why a chip rather than a popup: the owner
+  found popups coming and going annoying; the chip only appears and grows, and shows the small
+  boards when asked. Grading the lines as cards of their own is left to the owner (a data format).

@@ -1,0 +1,133 @@
+// The lines from the comments offered in review (PLAN.md §5.98): a small notice in the counters'
+// row, there from the moment the walk reaches a position a comment's line starts from, its count
+// growing as it reaches more. Nothing pops up by itself: hovering it (or a tap, or the keyboard)
+// shows each line's start on a small board, the opponent's first move as an arrow, with a switch
+// for whether it is quizzed when the line ends. A line whose first move is marked ! or !! is
+// important, in gold.
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
+import { Chessground } from '@lichess-org/chessground';
+import type { Api } from '@lichess-org/chessground/api';
+import type { Key } from '@lichess-org/chessground/types';
+import { makeFen } from 'chessops/fen';
+import type { Position } from 'chessops/chess';
+import { pickComment, type SessionView } from '../app/train.ts';
+import type { QuizLine } from '../core/train/commentQuiz.ts';
+
+/** A board to look at: a position and an arrow, no moves, no coordinates. */
+export function MiniBoard(props: { position: Position; orientation: 'white' | 'black'; arrow?: string; lastMove?: [Key, Key] | undefined }) {
+  const el = useRef<HTMLDivElement>(null);
+  const api = useRef<Api | undefined>(undefined);
+  const config = () => ({
+    fen: makeFen(props.position.toSetup()),
+    orientation: props.orientation,
+    turnColor: props.position.turn,
+    lastMove: props.lastMove,
+    drawable: { autoShapes: props.arrow ? [{ orig: props.arrow.slice(0, 2) as Key, dest: props.arrow.slice(2, 4) as Key, brush: 'blue' }] : [] },
+  });
+  useEffect(() => {
+    api.current = Chessground(el.current!, { ...config(), viewOnly: true, coordinates: false, animation: { enabled: false }, drawable: { ...config().drawable, enabled: false, visible: true } });
+    return () => api.current?.destroy();
+  }, []);
+  useLayoutEffect(() => {
+    api.current?.set(config());
+  });
+  return (
+    <div class="mini-board">
+      <div class="cg-host" ref={el} />
+    </div>
+  );
+}
+
+const sq = (uci: string, i: number) => uci.slice(i, i + 2) as Key;
+
+/** The notice, and its card of lines while hovered, focused or opened by a tap. */
+export function CommentOffer(props: { s: SessionView }) {
+  const { s } = props;
+  const offered = s.comments ?? [];
+  const [open, setOpen] = useState(false);
+  const [hover, setHover] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  // A press outside closes the card opened by a tap; so do Escape and a new line.
+  useEffect(() => {
+    if (!open) return;
+    const outside = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const escape = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.stopPropagation();
+      setOpen(false);
+    };
+    document.addEventListener('pointerdown', outside, true);
+    document.addEventListener('keydown', escape, true);
+    return () => {
+      document.removeEventListener('pointerdown', outside, true);
+      document.removeEventListener('keydown', escape, true);
+    };
+  }, [open]);
+  const lineKey = s.line && `${s.line.sid}/${s.line.cid}/${s.line.path.join(' ')}/${s.number}`;
+  useEffect(() => setOpen(false), [lineKey]);
+  if (offered.length === 0) return null;
+  const on = offered.filter((o) => o.on);
+  const important = offered.some((o) => o.line.important);
+  const settled = !!s.commentsSettled;
+  const title = `${offered.length === 1 ? 'A line' : `${offered.length} lines`} from the comments${settled ? '' : on.length ? `: ${on.length === offered.length ? '' : `${on.length} `}quizzed when the line ends` : ': none quizzed (pick them here)'}`;
+  return (
+    <div class="comment-offer" ref={ref} onPointerEnter={(e) => e.pointerType === 'mouse' && setHover(true)} onPointerLeave={(e) => e.pointerType === 'mouse' && setHover(false)}>
+      <button
+        type="button"
+        class={`comment-offer-chip${important ? ' important' : ''}${on.length === 0 ? ' off' : ''}`}
+        aria-expanded={open || hover}
+        aria-label={title}
+        title={title}
+        onClick={() => setOpen(!open)}
+      >
+        {important && (
+          <span class="comment-offer-mark" aria-hidden="true">
+            !
+          </span>
+        )}
+        <span class="comment-offer-word">Comment lines</span>
+        <span class="comment-offer-short">Lines</span> <span class="comment-offer-count">{on.length === offered.length ? offered.length : `${on.length}/${offered.length}`}</span>
+      </button>
+      {(open || hover) && (
+        <div class="comment-offer-card" role="group" aria-label="Lines from the comments">
+          <p class="comment-offer-lead">{settled ? 'From the comments, on this line' : 'From the comments: quizzed on the board when the line ends'}</p>
+          <ul>
+            {offered.map(({ line, on }) => (
+              <OfferedLine key={line.key} line={line} on={on} settled={settled} side={s.side} />
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OfferedLine(props: { line: QuizLine; on: boolean; settled: boolean; side: 'white' | 'black' }) {
+  const { line } = props;
+  const first = line.ucis[0]!;
+  return (
+    <li class={`comment-offer-line${line.important ? ' important' : ''}`}>
+      <MiniBoard position={line.positions[0]!} orientation={props.side} arrow={first} lastMove={undefined} />
+      <span class="comment-offer-move">
+        {line.important && <span class="comment-offer-tag">Important</span>}
+        <strong>{line.label}</strong>
+        <span class="muted"> {line.own.filter(Boolean).length === 1 ? '1 move to find' : `${line.own.filter(Boolean).length} moves to find`}</span>
+      </span>
+      {!props.settled && (
+        <label class="comment-offer-pick">
+          <input type="checkbox" checked={props.on} onChange={(e) => pickComment(line.key, e.currentTarget.checked)} /> Quiz it
+        </label>
+      )}
+    </li>
+  );
+}
+
+/** The last move of a line from the comments on the board, for the board's highlight. */
+export function asideLastMove(s: SessionView): [Key, Key] | undefined {
+  const a = s.aside;
+  if (!a || a.ply === 0) return undefined;
+  const uci = a.line.ucis[a.ply - 1]!;
+  return [sq(uci, 0), sq(uci, 2)];
+}

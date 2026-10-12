@@ -1,8 +1,8 @@
 // The training settings dialog (PLAN.md §5.2, §5.16, §5.17): the daily limit of new moves, the
 // retention and the learning step, shared by every device through the data repo's
 // `settings.json`; then this device's: new moves shown, tried first or shown as a sequence, the
-// repetitions and the mistakes retried (§5.77), a line's end, where a line starts, auto-play; and
-// time travel, for this tab. Opened by ⚙ on the home screen's training
+// repetitions and the mistakes retried (§5.77), a line's end, where a line starts, auto-play, the
+// lines from the comments quizzed in review (§5.98); and time travel, for this tab. Opened by ⚙ on the home screen's training
 // card and on the training screen.
 import { decidingNow } from '../app/time.ts';
 import { signal } from '@preact/signals';
@@ -13,7 +13,7 @@ import { saveTrainSettings } from '../app/trainSettings.ts';
 import { configureSession } from '../app/train.ts';
 import { saveTrainPrefs, trainPrefs, type TrainPrefs } from '../app/trainPrefs.ts';
 import { DEFAULT_TRAIN } from '../core/train/settings.ts';
-import type { AutoPlay, LineStart } from '../core/train/trainer.ts';
+import type { AutoPlay, CommentQuiz, LineStart } from '../core/train/trainer.ts';
 import { TimeControl } from './TimeTravel.tsx';
 
 const STARTS: Record<LineStart, string> = { first: 'At its first new or due move', auto: 'From the start, played', ask: 'From the start, asked' };
@@ -22,6 +22,13 @@ const AUTO: Record<AutoPlay, string> = {
   session: 'Moves answered right this session',
   difficult: 'As above, but difficult moves are always asked',
   off: 'Off: every move is asked',
+};
+
+const COMMENTS: Record<CommentQuiz, string> = {
+  all: 'Quiz each one when the line ends',
+  important: 'Quiz the important ones (first move ! or !!), offer the rest',
+  pick: 'Offer them: quiz the ones I pick',
+  off: 'Off',
 };
 
 const shown = signal(false);
@@ -142,6 +149,17 @@ function Dialog() {
             ))}
           </select>
         </label>
+        <label>
+          Lines from the comments, in review
+          <select name="comment-lines" value={prefs.comments} onChange={(e) => set('comments', e.currentTarget.value as CommentQuiz)}>
+            {(Object.keys(COMMENTS) as CommentQuiz[]).map((k) => (
+              <option key={k} value={k}>
+                {COMMENTS[k]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p class="muted">The clickable lines in the comments that start with your opponent's move, played on the board after the line, nothing graded. A line where one of your moves is marked ?, ?! or ?? is never quizzed.</p>
         <label>
           At a line's end
           <select name="line-end" value={prefs.lineEnd} onChange={(e) => set('lineEnd', e.currentTarget.value as TrainPrefs['lineEnd'])}>

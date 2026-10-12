@@ -34,6 +34,9 @@ import { openTrainSettings } from './TrainSettings.tsx';
 import { Back, Stuck } from './Back.tsx';
 import { LineReader } from './Read.tsx';
 import { FloatingMenu } from './MoveMenu.tsx';
+import { asideLastMove, CommentOffer } from './CommentOffer.tsx';
+import { positionKeyOf } from '../core/chess/positionKey.ts';
+import type { PlayedLine } from '../core/repertoire/lines.ts';
 
 const ASKING = new Set(['ask', 'teach', 'wrong', 'shown']);
 const COMMENTS_SHOWN = new Set(['teach', 'wrong', 'shown', 'lineDone']);
@@ -78,6 +81,14 @@ export function noteText(note: Note | undefined): string {
       return `The line again: ${note.pass} of ${note.of}`;
     case 'missedAgain':
       return 'Missed earlier: once more';
+    case 'asides':
+      return note.count === 1 ? 'Next, a line from the comments' : `Next, ${note.count} lines from the comments`;
+    case 'aside':
+      return `${note.important ? 'Important line' : 'Line'} from the comments${note.of > 1 ? ` · ${note.n} of ${note.of}` : ''}`;
+    case 'asideWrong':
+      return 'Not the comment’s move: try again';
+    case 'asideAlso':
+      return 'The comments play that here too, in another line: find this one’s';
   }
 }
 
@@ -281,6 +292,12 @@ function Done(props: { s: SessionView; inline?: boolean }) {
         <p>
           {done.lines} line{done.lines === 1 ? '' : 's'} · {done.reviews} move{done.reviews === 1 ? '' : 's'} reviewed, {done.good} right first time · {done.taught} new
           {done.suspended > 0 && <> · {done.suspended} always played for you</>}
+          {props.s.asides && (
+            <>
+              {' '}
+              · {props.s.asides.lines} line{props.s.asides.lines === 1 ? '' : 's'} from the comments, {props.s.asides.right} of {props.s.asides.moves} moves found first time
+            </>
+          )}
         </p>
       )}
       {after && trainPrefs.value.lineEnd === 'go' && <GoingOn line={after.line} number={after.number} data={trainData.value ?? props.s.data} from={props.s.line} />}
@@ -380,6 +397,8 @@ function Session(props: { s: SessionView }) {
         if (m) lastMove = chessgroundMove(m) as [Key, Key];
       }
     }
+    // A line from the comments (§5.98): its own last move, once one is played.
+    if (s.aside && s.aside.ply > 0) lastMove = asideLastMove(s);
     return { fen: makeFen(pos.toSetup()), dests: chessgroundDests(pos) as Map<Key, Key[]>, lastMove, check: pos.isCheck() };
     // The tick sets the board again after a takeback, to the same position.
   }, [pos, s.tick]);
@@ -407,9 +426,20 @@ function Session(props: { s: SessionView }) {
   // Comments of the move reached only where they are read (the owner's request, 2026-10-11): a
   // move taught or shown, after a wrong move, and at the line's end. While the moves go by and
   // one is asked they stay hidden: they came and went with each move, and could give it away.
-  const comments = s.done || COMMENTS_SHOWN.has(s.phase) ? (node?.comments ?? []) : [];
+  // Not while a line from the comments is on the board: the comment there writes its moves.
+  const comments = s.aside ? [] : s.done || COMMENTS_SHOWN.has(s.phase) ? (node?.comments ?? []) : [];
+  // A line of a comment shown that is still to be quizzed is left out of its text (§5.98).
+  const toQuiz = s.commentsSettled ? [] : (s.comments ?? []).filter((c) => c.on).map((c) => c.line);
+  const quizzedLater = (l: PlayedLine) => {
+    const start = l.positions[0];
+    if (!start || !toQuiz.length) return false;
+    const key = positionKeyOf(start);
+    return toQuiz.some((q) => q.key.startsWith(`${key}|`) && q.ucis.every((u, i) => l.ucis[i] === u));
+  };
   const start = s.chapter ? startPosition(s.chapter) : undefined;
   const moves = start ? numbered(start, s.path) : s.path.join(' ');
+  const aside = s.aside;
+  const asideMoves = aside && aside.ply > 0 ? numbered(aside.line.positions[0]!, aside.line.sans.slice(0, aside.ply)) : '';
   const chapterName = s.chapter ? (header(s.chapter, 'ChapterName') ?? s.chapter.id) : '';
   const commentPositions = () => {
     const after = s.chapter && positionAt(s.chapter, s.path);
@@ -441,7 +471,7 @@ function Session(props: { s: SessionView }) {
         )}
         <PreviewBar owner="train" />
         {/* One line, always its height, so the board never moves (§5.17). */}
-        <p class={`feedback train-feedback note-${holding ? 'next' : (s.note?.kind ?? 'none')}`} role="status">
+        <p class={`feedback train-feedback note-${holding ? 'next' : (s.note?.kind ?? 'none')}${s.note?.kind === 'aside' && s.note.important ? ' important' : ''}`} role="status">
           {s.done ? '' : holding ? `Line done · Next: ${upcoming}` : noteText(s.note)}
         </p>
       </div>
@@ -464,10 +494,17 @@ function Session(props: { s: SessionView }) {
             </>
           )}
         </p>
-        <TrainMenu graded={isGraded(s.of)} suspend={!s.done && asking} skip={!s.done && s.of.kind !== 'play' && s.of.kind !== 'line'} />
+        <CommentOffer s={s} />
+        <TrainMenu graded={isGraded(s.of)} suspend={!s.done && asking && !aside} skip={!s.done && s.of.kind !== 'play' && s.of.kind !== 'line'} />
         </div>
         <p class="train-line">
           <strong>{chapterName}</strong> <span class="muted train-moves">{moves}</span>
+          {aside && (
+            <span class="train-aside-moves">
+              {' '}
+              ({asideMoves || '…'})
+            </span>
+          )}
         </p>
         {s.of.kind === 'line' && s.line?.paused && <PausedLine line={s.line} />}
         {s.done && <Done s={s} inline />}
@@ -507,7 +544,7 @@ function Session(props: { s: SessionView }) {
               Play the moves
             </button>
           ) : (
-            <button type="button" class="secondary" onClick={() => setSelfGrade(true)} title="Show each move and grade it yourself, by 2 and 4">
+            <button type="button" class="secondary" disabled={!!aside} onClick={() => setSelfGrade(true)} title="Show each move and grade it yourself, by 2 and 4">
               Show and grade <span class="muted">(1)</span>
             </button>
           )}
@@ -519,8 +556,13 @@ function Session(props: { s: SessionView }) {
           </button>
         </div>
         )}
-        {!s.done && ((show && waits) || (s.wrongMove && !show) || s.savedAlt || s.missed || s.suspended) && (
+        {!s.done && ((show && waits) || (s.wrongMove && !show) || s.savedAlt || s.missed || s.suspended || aside) && (
         <div class="actions train-actions train-extra">
+          {aside && (
+            <button type="button" class="secondary" onClick={() => command('skipComment')} title="On to the next line from the comments, or back to the line's end">
+              Skip this line
+            </button>
+          )}
           {show && waits && (
             <button type="button" onClick={() => command('next')}>
               Next line
@@ -552,7 +594,7 @@ function Session(props: { s: SessionView }) {
           <div class="train-comments">
             {comments.map((c, i) => (
               <p key={i}>
-                <CommentText text={c} owner="train" id={commentId(s.path.join(' '), c)} positions={commentPositions} />
+                <CommentText text={c} owner="train" id={commentId(s.path.join(' '), c)} positions={commentPositions} hidden={quizzedLater} />
               </p>
             ))}
           </div>

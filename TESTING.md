@@ -5,6 +5,18 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## Lines from the comments quizzed in review (§5.98)
+- In the day's queue (or a line picked that teaches nothing), on a line whose comments hold lines
+  starting with the opponent's move: the "Comment lines" chip appears in the counters' row when the
+  board reaches where one starts. Hover it (tap on the phone): each line's start on a small board,
+  its first move as an arrow; one marked `!` or `!!` in gold. Is the chip noticeable enough, and
+  quiet enough?
+- At the line's end the lines are played on the board: the opponent's moves played, yours asked. A
+  line where one of your moves is marked `?`, `?!` or `??` never comes. Nothing is graded.
+- Try the setting in the training settings (all / important / pick / off), and "Quiz it" on the chip.
+- On your real courses: do the lines quizzed stop where they should (a second branch written in the
+  same parentheses, words, passes)? Any line you'd expect that never comes, or one that shouldn't?
+
 ## ← and Home on every page (§5.97)
 - The installed desktop app: open a line that's gone from the repertoire (or any page): ← and the
   house beside it are in the head; the house goes to the start page. On the phone the house is at

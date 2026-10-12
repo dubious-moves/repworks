@@ -37,6 +37,12 @@
 //   it is answered right `retryMistakes` times in a row; the mistakes take turns. Nothing is graded.
 // - Missed again (`repeatMissed`: retry, drill and the pins): a move answered wrong has its line
 //   walked again after the plan's lines, until every one is answered right.
+// - Lines from the comments (`commentLines`, the owner's request, 2026-10-12; ./commentQuiz.ts says
+//   which): on a review's walk (one that teaches nothing), the clickable lines written in comments
+//   at the positions it passes are offered as they are reached (`view.comments`), and the ones on
+//   (`comments`: all, the important ones, or those picked) are played at the walk's end, after its
+//   mistakes: the board goes back to where each starts, the opponent's moves are played and the
+//   user finds their own. Nothing is graded or recorded; each line is quizzed once a session.
 import type { Position } from 'chessops/chess';
 import { makeSan, parseSan } from 'chessops/san';
 import { isNormal, type NormalMove } from 'chessops/types';
@@ -47,6 +53,7 @@ import type { Grade } from '../progress/events.ts';
 import type { CardState } from '../progress/replay.ts';
 import type { Line, RepertoireIndex } from '../repertoire/index.ts';
 import { grade, selfGrade } from './grade.ts';
+import type { QuizLine } from './commentQuiz.ts';
 import type { PlannedLine, SessionPlan } from './plan.ts';
 import { knownCardsOf, statusOf } from './queue.ts';
 
@@ -77,6 +84,13 @@ export const AUTO_PLAYS: readonly AutoPlay[] = ['off', 'session', 'due', 'diffic
  */
 export type LineStart = 'first' | 'auto' | 'ask';
 export const LINE_STARTS: readonly LineStart[] = ['first', 'auto', 'ask'];
+
+/**
+ * Which lines from the comments are quizzed at a review walk's end: every one met, the important
+ * ones (first move `!` or `!!`), only those picked from the offer, or none (and none offered).
+ */
+export type CommentQuiz = 'all' | 'important' | 'pick' | 'off';
+export const COMMENT_QUIZZES: readonly CommentQuiz[] = ['all', 'important', 'pick', 'off'];
 
 /** A card is difficult (§5.17's `difficult` mode) after two lapses, or with FSRS difficulty from 7. */
 export function isDifficult(state: CardState | undefined): boolean {
@@ -134,7 +148,15 @@ export type Note =
   /** At a line's end: it is walked again, pass `pass` of `of` (`repetitions`). */
   | { kind: 'repeat'; pass: number; of: number }
   /** A move missed in retry, drill or the pins, asked again (`repeatMissed`). */
-  | { kind: 'missedAgain' };
+  | { kind: 'missedAgain' }
+  /** At a walk's end: `count` lines from the comments are quizzed next. */
+  | { kind: 'asides'; count: number }
+  /** A line from the comments on the board, `n` of `of`. */
+  | { kind: 'aside'; n: number; of: number; important: boolean }
+  /** In a line from the comments: not its move. */
+  | { kind: 'asideWrong' }
+  /** In a line from the comments: a move another of them, or the repertoire, plays here; this one plays another. */
+  | { kind: 'asideAlso' };
 
 export type TrainerRecord =
   | { k: 'review'; card: CardId; g: Grade; ms: number; w?: string[]; h?: 1 }
@@ -195,6 +217,10 @@ export type TrainerCommand =
   | { type: 'saveAlt'; now: number }
   | { type: 'unsaveAlt'; now: number }
   | { type: 'skipLine'; now: number }
+  /** A line from the comments offered: quizzed at the walk's end or not. */
+  | { type: 'pickComment'; key: string; on: boolean }
+  /** The line from the comments on the board: on to the next, or back to the line's end. */
+  | { type: 'skipComment'; now: number }
   | { type: 'stop'; now: number };
 
 export interface TrainerSetup {
@@ -243,10 +269,14 @@ export interface TrainerSetup {
   retryMistakes?: number;
   /** Retry, drill, the pins: a move answered wrong has its line walked again at the end, until answered right. */
   repeatMissed?: boolean;
+  /** The lines from the comments along a line that can be quizzed (./commentQuiz.ts); none without. */
+  commentLines?(line: Line): readonly QuizLine[];
+  /** Which of them are quizzed (default `off`). */
+  comments?: CommentQuiz;
 }
 
 /** The options a running session can change (the training settings, §5.17). */
-export type TrainerOptions = Pick<TrainerSetup, 'autoPlay' | 'tryNew' | 'sequence' | 'lineStart' | 'holdLineEnd' | 'lineEndPaces' | 'repetitions' | 'retryMistakes'>;
+export type TrainerOptions = Pick<TrainerSetup, 'autoPlay' | 'tryNew' | 'sequence' | 'lineStart' | 'holdLineEnd' | 'lineEndPaces' | 'repetitions' | 'retryMistakes' | 'comments'>;
 
 interface Ply {
   san: string;
@@ -298,6 +328,14 @@ export interface TrainerView {
   pass?: { n: number; of: number };
   /** Mistakes retried at a walk's end: how many are left, and the one asked's streak of `need`. */
   retry?: { left: number; streak: number; need: number };
+  /** The lines from the comments met on this walk so far (none before it reaches them), and whether each is quizzed. */
+  comments?: { line: QuizLine; on: boolean }[];
+  /** Their quiz has begun or passed: picking no longer changes anything. */
+  commentsSettled?: true;
+  /** A line from the comments on the board: `n` of `of`, with `ply` of its moves played. */
+  aside?: { line: QuizLine; n: number; of: number; ply: number };
+  /** The lines from the comments quizzed in the session, and their own moves asked and found first time. */
+  asides?: { lines: number; moves: number; right: number };
   summary: Summary;
 }
 
@@ -309,6 +347,17 @@ interface Retry {
 }
 
 type Kind = 'ask' | 'teach' | 'auto';
+
+/** The lines from the comments quizzed at a walk's end, and the one on the board. */
+interface Aside {
+  items: QuizLine[];
+  at: number;
+  /** Moves of the line on the board played so far. */
+  ply: number;
+  wrong: string[];
+  hint: boolean;
+  shown: boolean;
+}
 
 export class Trainer {
   private readonly setup: TrainerSetup;
@@ -358,14 +407,24 @@ export class Trainer {
   /** The mistakes retried at a walk's end, and which one is asked. */
   private retrying: { items: Retry[]; at: number } | undefined;
   /** What the pause at a walk's end (`again`) leads to. */
-  private afterPause: 'retry' | 'pass' = 'retry';
+  private afterPause: 'retry' | 'pass' | 'aside' = 'retry';
+  /** The lines from the comments this walk can meet, and how far it has gone (the first pass's furthest ply). */
+  private quiz: QuizLine[] = [];
+  private reached = 0;
+  /** This walk's lines from the comments were quizzed (or none was on): the offer is settled. */
+  private quizSettled = false;
+  /** Lines from the comments offered in the session (by key), and the user's picks among them. */
+  private readonly offered = new Set<string>();
+  private readonly picks = new Map<string, boolean>();
+  private aside: Aside | undefined;
+  private readonly asideCounts = { lines: 0, moves: 0, right: 0 };
   /** Planned lines added for moves missed in retry, drill or the pins (`repeatMissed`). */
   private readonly redo = new Set<PlannedLine>();
 
   constructor(setup: TrainerSetup) {
     this.setup = setup;
-    const { autoPlay, tryNew, sequence, lineStart, holdLineEnd, lineEndPaces, repetitions, retryMistakes } = setup;
-    this.options = { autoPlay, tryNew, sequence, lineStart, holdLineEnd, lineEndPaces, repetitions, retryMistakes };
+    const { autoPlay, tryNew, sequence, lineStart, holdLineEnd, lineEndPaces, repetitions, retryMistakes, comments } = setup;
+    this.options = { autoPlay, tryNew, sequence, lineStart, holdLineEnd, lineEndPaces, repetitions, retryMistakes, comments };
     this.pace = Math.max(MIN_PACE_MS, setup.paceMs);
     this.record = setup.record ?? true;
     this.lines = [...setup.plan.lines];
@@ -388,6 +447,11 @@ export class Trainer {
     this.selfGrading = on;
   }
 
+  /** A line from the comments is on the board: show and grade waits for it to end. */
+  get inAside(): boolean {
+    return this.aside !== undefined && this.aside.at >= 0;
+  }
+
   /** Show and grade: a move is shown and waits for its verdict (`tell`). */
   get awaitingGrade(): boolean {
     return this.waiting !== undefined;
@@ -400,16 +464,24 @@ export class Trainer {
 
   get view(): TrainerView {
     const line = this.lines[this.at];
+    const a = this.aside;
+    const aside = a && a.at >= 0 ? a.items[a.at] : undefined;
     const v: TrainerView = {
       phase: this.phase,
       number: this.at + 1,
       total: this.lines.length,
-      path: line ? line.line.path.slice(0, this.ply) : [],
+      // A line from the comments starts on the line's board: its moves are the aside's.
+      path: line ? line.line.path.slice(0, aside ? aside.ply : this.ply) : [],
       summary: this.summary(),
     };
     if (line) v.line = line;
-    const position = this.positions[this.ply];
+    const position = aside ? aside.positions[a!.ply] : this.positions[this.ply];
     if (position) v.position = position;
+    if (aside) v.aside = { line: aside, n: a!.at + 1, of: a!.items.length, ply: a!.ply };
+    const met = this.quiz.filter((q) => q.ply <= this.reached);
+    if (met.length) v.comments = met.map((q) => ({ line: q, on: this.quizzes(q) }));
+    if (met.length && this.quizSettled) v.commentsSettled = true;
+    if (this.asideCounts.lines > 0) v.asides = { ...this.asideCounts };
     if (this.phase === 'lineDone' && this.upcoming) v.upcoming = this.lines[this.upcoming.at]!;
     if (this.seq && !this.seq.replay) v.sequence = { from: this.seq.from, to: this.seq.to };
     const p = this.pending;
@@ -477,10 +549,19 @@ export class Trainer {
         out.push({ type: 'arrow' });
         this.nextLine(command.now, out);
         break;
+      case 'pickComment':
+        this.picks.set(command.key, command.on);
+        break;
+      case 'skipComment':
+        if (!this.inAside) break;
+        this.waitId++;
+        this.nextAside(command.now, out);
+        break;
       case 'stop':
         this.waitId++;
         this.pending = undefined;
         this.waiting = undefined;
+        this.aside = undefined;
         this.finish(out);
         break;
     }
@@ -580,6 +661,9 @@ export class Trainer {
     this.missedOnLine.clear();
     this.retrying = undefined;
     this.askAgain = new Set();
+    this.aside = undefined;
+    this.quiz = [];
+    this.quizSettled = false;
     // The last line's end is the session's: the board stays on it (§5.17).
     if (!found) return this.finish(out);
     const lines = this.lines;
@@ -609,6 +693,8 @@ export class Trainer {
     let ply = start === undefined ? shared : start === 'first' ? Math.max(Math.min(shared, this.prefix), this.prefix - 1, 0) : 0;
     ply = Math.max(ply, Math.min(planned.from ?? 0, this.end));
     this.ply = ply;
+    this.reached = ply;
+    this.quiz = this.quizOf(planned);
     if (!this.redo.has(planned)) this.walked++;
     out.push({ type: 'line', line: planned.line, number: this.at + 1, total: lines.length, kind: planned.kind, path: planned.line.path.slice(0, this.ply) });
     this.advance(now, out);
@@ -640,10 +726,33 @@ export class Trainer {
     return this.lines[this.at]!.line.path.slice(0, upTo);
   }
 
+  /**
+   * The lines from the comments a walk can meet: on a review's walk (nothing on it taught), those
+   * starting from where the user is first asked (the opponent's move before it) to the walk's end,
+   * not offered earlier in the session. From the start, asked: from the walk's start.
+   */
+  private quizOf(planned: PlannedLine): QuizLine[] {
+    const lines = this.setup.commentLines;
+    if (!lines || (this.options.comments ?? 'off') === 'off' || this.redo.has(planned)) return [];
+    if (this.plies.some((p, i) => i < this.end && p.card !== undefined && this.needs(p.card) === 'teach')) return [];
+    const from = this.options.lineStart === 'ask' ? this.ply : Math.max(this.ply, this.prefix - 1);
+    return lines(planned.line).filter((q) => q.ply >= from && q.ply <= this.end && !this.offered.has(q.key));
+  }
+
+  /** Whether a line from the comments is quizzed: the user's pick, else the setting's. */
+  private quizzes(q: QuizLine): boolean {
+    const picked = this.picks.get(q.key);
+    if (picked !== undefined) return picked;
+    const mode = this.options.comments ?? 'off';
+    return mode === 'all' || (mode === 'important' && q.important);
+  }
+
   /** From the board's position: the next move, an ask, or the line's end. */
   private advance(now: number, out: TrainerEffect[]) {
     this.pending = undefined;
     this.waiting = undefined;
+    // The furthest the walk has gone (its first pass): the lines from the comments met.
+    if (!this.retrying && this.pass === 1) this.reached = Math.max(this.reached, this.ply);
     if (this.ply >= this.end) {
       // Its mistakes asked again, then the line walked again, before the line is done.
       if (this.walkEnd(out)) return;
@@ -720,10 +829,21 @@ export class Trainer {
       out.push({ type: 'note', note: { kind: 'repeat', pass: this.pass, of: passes } });
       return this.pause('pass', out);
     }
+    // The lines from the comments met: offered once a session, the ones on quizzed now.
+    if (this.quizSettled) return false;
+    this.quizSettled = true;
+    const met = this.quiz.filter((q) => q.ply <= this.reached);
+    for (const q of met) this.offered.add(q.key);
+    const items = met.filter((q) => this.quizzes(q));
+    if (items.length > 0) {
+      this.aside = { items, at: -1, ply: 0, wrong: [], hint: false, shown: false };
+      out.push({ type: 'note', note: { kind: 'asides', count: items.length } });
+      return this.pause('aside', out);
+    }
     return false;
   }
 
-  private pause(then: 'retry' | 'pass', out: TrainerEffect[]): true {
+  private pause(then: 'retry' | 'pass' | 'aside', out: TrainerEffect[]): true {
     this.phase = 'again';
     this.afterPause = then;
     out.push({ type: 'arrow' });
@@ -841,9 +961,97 @@ export class Trainer {
     this.advance(now, out);
   }
 
+  /** The next line from the comments, from where it starts on the line; after the last, back to the line's end. */
+  private nextAside(now: number, out: TrainerEffect[]) {
+    const a = this.aside!;
+    a.at++;
+    out.push({ type: 'arrow' });
+    // Show and grade turned on meanwhile: the lines are played on the board, so they are left.
+    const q = this.selfGrading ? undefined : a.items[a.at];
+    if (!q) {
+      this.aside = undefined;
+      out.push({ type: 'takeback', path: this.path() });
+      return this.advance(now, out);
+    }
+    a.ply = 0;
+    this.asideCounts.lines++;
+    out.push({ type: 'takeback', path: this.path(q.ply) });
+    out.push({ type: 'note', note: { kind: 'aside', n: a.at + 1, of: a.items.length, important: q.important } });
+    this.asideStep(now, out);
+  }
+
+  /** In a line from the comments: the opponent's move after the pace (the first after two), an ask, or its end. */
+  private asideStep(now: number, out: TrainerEffect[]) {
+    const a = this.aside!;
+    const q = a.items[a.at]!;
+    if (a.ply >= q.sans.length) {
+      // A look at where it ends, then the next.
+      this.phase = 'again';
+      this.afterPause = 'aside';
+      this.wait(this.pace * 2, out);
+      return;
+    }
+    if (!q.own[a.ply]) {
+      this.phase = 'opponent';
+      this.wait(a.ply === 0 ? this.pace * 2 : this.pace, out);
+      return;
+    }
+    a.wrong = [];
+    a.hint = false;
+    a.shown = false;
+    this.phase = 'ask';
+  }
+
+  /** In a line from the comments: its move, or another the comments or the repertoire play here (not wrong), or a wrong one. */
+  private asideMove(uci: string, now: number, out: TrainerEffect[]) {
+    const a = this.aside!;
+    const q = a.items[a.at]!;
+    const back = () => out.push({ type: 'takeback', path: this.path(q.ply) });
+    if (this.phase !== 'ask' && this.phase !== 'wrong' && this.phase !== 'shown') return void back();
+    const before = q.positions[a.ply]!;
+    const move = parseUciMove(before, uci);
+    if (!move) return void back();
+    const played = standardUci(before, move);
+    if (played === q.ucis[a.ply]) {
+      this.asideCounts.moves++;
+      if (a.wrong.length === 0 && !a.hint) this.asideCounts.right++;
+      if (a.shown) out.push({ type: 'arrow' });
+      out.push({ type: 'play', uci: played, san: q.sans[a.ply]!, path: this.path(q.ply), by: 'user' });
+      a.ply++;
+      out.push({ type: 'note', note: { kind: 'aside', n: a.at + 1, of: a.items.length, important: q.important } });
+      return this.asideStep(now, out);
+    }
+    back();
+    const key = positionKeyOf(before);
+    const also = this.setup.index.positions.get(key)?.own.has(played) || a.items.some((o) => o.positions.some((p, i) => o.own[i] && o.ucis[i] === played && positionKeyOf(p) === key));
+    if (also) return void out.push({ type: 'note', note: { kind: 'asideAlso' } });
+    if (!a.wrong.includes(played)) a.wrong.push(played);
+    if (a.shown || a.wrong.length >= 2) this.showAside(out);
+    else {
+      this.phase = 'wrong';
+      out.push({ type: 'note', note: { kind: 'asideWrong' } });
+    }
+  }
+
+  private showAside(out: TrainerEffect[]) {
+    const a = this.aside!;
+    const q = a.items[a.at]!;
+    a.shown = true;
+    this.phase = 'shown';
+    out.push({ type: 'arrow', uci: q.ucis[a.ply]! });
+    out.push({ type: 'note', note: { kind: 'shown', san: q.sans[a.ply]! } });
+  }
+
   private tick(now: number, out: TrainerEffect[]) {
     if (this.phase === 'lineDone') return this.nextLine(now, out);
-    if (this.phase === 'again') return this.afterPause === 'retry' ? this.nextRetry(now, out) : this.nextPass(now, out);
+    if (this.phase === 'again') return this.afterPause === 'retry' ? this.nextRetry(now, out) : this.afterPause === 'pass' ? this.nextPass(now, out) : this.nextAside(now, out);
+    if (this.phase === 'opponent' && this.inAside) {
+      const a = this.aside!;
+      const q = a.items[a.at]!;
+      out.push({ type: 'play', uci: q.ucis[a.ply]!, san: q.sans[a.ply]!, path: this.path(q.ply), by: 'opponent' });
+      a.ply++;
+      return this.asideStep(now, out);
+    }
     if (this.phase === 'preview') {
       const q = this.seq!;
       const p = this.plies[this.ply]!;
@@ -861,6 +1069,7 @@ export class Trainer {
   }
 
   private move(uci: string, now: number, out: TrainerEffect[]) {
+    if (this.inAside) return this.asideMove(uci, now, out);
     const p = this.pending;
     if (!p) {
       // Not the user's turn: the board goes back.
@@ -1091,6 +1300,14 @@ export class Trainer {
   }
 
   private hint(out: TrainerEffect[]) {
+    if (this.inAside) {
+      const a = this.aside!;
+      if ((this.phase === 'ask' || this.phase === 'wrong') && !a.shown) {
+        a.hint = true;
+        this.showAside(out);
+      }
+      return;
+    }
     const p = this.pending;
     if (!p || p.shown) return;
     p.hint = true;

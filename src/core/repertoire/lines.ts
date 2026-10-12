@@ -18,6 +18,8 @@
 //   struck through.
 // - Line jumping (q_extension v1.13.1): a cursor runs through a comment's lines end to end,
 //   skipping lines whose first move is illegal; stepping back before the first line leaves.
+// - Each move keeps its glyph (`Nf6?!`, or `Nf6 $6` standing after it) and the move number printed
+//   before it, for the lines quizzed in review (src/core/train/commentQuiz.ts, PLAN.md §5.98).
 import type { Position } from 'chessops/chess';
 import { makeSan, parseSan } from 'chessops/san';
 import type { Color } from 'chessops/types';
@@ -29,6 +31,10 @@ export interface CommentMove {
   /** Where the move is written in the comment: `text.slice(from, to)`. */
   from: number;
   to: number;
+  /** The glyph written on the move (`!`, `?!`…), or standing after it (`!?`, `$2` as `?`). */
+  glyph?: string;
+  /** The move number printed before the move (`13.`, `16...`), when one is. */
+  printed?: { number: number; turn: Color };
 }
 
 export interface CommentLine {
@@ -50,6 +56,8 @@ export const NULL_UCI = '0000';
 const NUMBER = /^(\d+)(\.\.\.|…|\.)(.*)$/;
 const SAN = /^(?:[NBRQK][a-h]?[1-8]?x?[a-h][1-8]|[a-h](?:x[a-h])?[1-8](?:=?[NBRQ])?|O-O(?:-O)?|0-0(?:-0)?)[+#]?[!?]*$/;
 const GLYPH = /^(?:[!?]{1,2}|\$\d{1,3})$/;
+/** The move glyphs a NAG stands for (`$1`–`$6`); the others (`$14`, ±) say nothing about the move. */
+const NAG_GLYPHS: Record<string, string> = { $1: '!', $2: '?', $3: '!!', $4: '??', $5: '!?', $6: '?!' };
 
 const clean = (token: string) => token.replace(/[!?]+$/, '').replace(/[+#]$/, '').replace(/^0-0-0$/, 'O-O-O').replace(/^0-0$/, 'O-O');
 
@@ -60,6 +68,8 @@ function parseGroup(inner: string, at: number): Omit<CommentLine, 'from' | 'to'>
   let first: { number: number; turn: Color } | undefined;
   // In words: the line goes on only at a move number.
   let prose = false;
+  // The number printed before the next move.
+  let printed: { number: number; turn: Color } | undefined;
   // A word joins the run before it when only spaces are between them.
   const word = (from: number, to: number) => {
     const last = words.at(-1);
@@ -73,6 +83,7 @@ function parseGroup(inner: string, at: number): Omit<CommentLine, 'from' | 'to'>
     if (numbered) {
       const turn: Color = numbered[2] === '.' ? 'white' : 'black';
       if (!first && moves.length === 0) first = { number: Number(numbered[1]), turn };
+      printed = { number: Number(numbered[1]), turn };
       prose = false;
       token = numbered[3]!;
       offset += numbered[1]!.length + numbered[2]!.length;
@@ -80,11 +91,19 @@ function parseGroup(inner: string, at: number): Omit<CommentLine, 'from' | 'to'>
     } else if (!first) return undefined;
     // A comma, colon or semicolon after a move is text.
     const move = prose ? '' : token.replace(/[,;:]+$/, '');
-    if (move && GLYPH.test(move)) continue;
+    if (move && GLYPH.test(move)) {
+      // A glyph standing after a move is the move's, unless it has one written on it.
+      const last = moves.at(-1);
+      const glyph = move.startsWith('$') ? NAG_GLYPHS[move] : move;
+      if (last && !last.glyph && glyph && !printed) last.glyph = glyph;
+      continue;
+    }
     if (move === NULL_SAN || SAN.test(move)) {
       // The glyphs written on a move stay text; the move is the rest.
       const bare = move.replace(/[!?]+$/, '');
-      moves.push({ san: move === NULL_SAN ? NULL_SAN : clean(move), from: offset, to: offset + bare.length });
+      const glyph = move === NULL_SAN ? '' : move.slice(bare.length);
+      moves.push({ san: move === NULL_SAN ? NULL_SAN : clean(move), from: offset, to: offset + bare.length, ...(glyph ? { glyph } : {}), ...(printed ? { printed } : {}) });
+      printed = undefined;
       if (move.length < token.length) word(offset + move.length, offset + token.length);
       continue;
     }
