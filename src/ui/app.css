@@ -5274,3 +5274,14 @@ a.button.disabled {
     padding-top: 24px;
   }
 }
+
+/* The deepening's progress (§5.104). */
+.storm-deep-progress summary {
+  cursor: pointer;
+}
+.storm-deep-progress ul {
+  margin: 0.25rem 0 0.5rem;
+  padding-left: 1.25rem;
+  font-size: 0.9em;
+  overflow-wrap: anywhere;
+}

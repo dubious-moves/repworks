@@ -22,6 +22,7 @@ import {
   endStorm,
   endStormSession,
   deepen,
+  deepenStats,
   stopDeepening,
   deepening,
   deepenTarget,
@@ -59,7 +60,7 @@ import {
   type StormWhere,
 } from '../app/storm.ts';
 import { STORM } from '../core/storm/config.ts';
-import { focusedWidth, stormEngineWidth } from '../app/stormEngine.ts';
+import { focusedWidth, stormEngineProgress, stormEngineWidth } from '../app/stormEngine.ts';
 import { averageWp, blankRow, foundShare, recordOver, type RecordRow } from '../core/storm/record.ts';
 import { setTally } from '../core/storm/set.ts';
 import { bestLine, formatWp, gapNote, sourceTitle, verdictLine, type CardFacts } from '../core/storm/verdict.ts';
@@ -329,6 +330,7 @@ function Home(props: { scope: StormScopeData; where: StormWhere }) {
             {deepening.value ? (stormEngineWidth() > 1 ? ` · scoring, ${stormEngineWidth()} at once…` : ' · scoring…') : ''}
           </p>
         )}
+        {home && home.stored > 0 && deepenStats.value && <DeepenProgress />}
         {home && home.stored > 0 && prefs.maia && (
           <p class="muted storm-maia-count" data-testid="storm-maia-count">
             {home.maiaHere ? (
@@ -1249,5 +1251,60 @@ function Review(props: { s: StormSession; scope: StormScopeData }) {
         </div>
       )}
     </div>
+  );
+}
+
+const seconds = (ms: number) => `${Math.round(ms / 1000)} s`;
+const duration = (ms: number) => (ms < 90_000 ? seconds(ms) : ms < 90 * 60_000 ? `${Math.round(ms / 60_000)} min` : `${(ms / 3_600_000).toFixed(1)} h`);
+
+/**
+ * The deepening's progress (§5.104): the run's count, pace and time left, each engine's search as
+ * it stands (redrawn every second), and the positions searched last.
+ */
+function DeepenProgress() {
+  const st = deepenStats.value;
+  const [, tick] = useState(0);
+  const running = deepening.value;
+  useEffect(() => {
+    if (!running) return;
+    const t = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [running]);
+  if (!st) return null;
+  const elapsed = Date.now() - st.startedAt;
+  const left = st.total - st.done;
+  const pace = st.done ? elapsed / st.done : undefined;
+  const lanes = running ? stormEngineProgress() : [];
+  return (
+    <details class="storm-deep-progress muted" data-testid="storm-deep-progress">
+      <summary>
+        {running ? 'Scoring' : 'Last scoring'}: {st.done} of {st.total} searched
+        {pace ? ` · ${seconds(pace)} a position` : ''}
+        {running && pace && left > 0 ? ` · about ${duration(pace * left)} left` : ''}
+      </summary>
+      <p>
+        {st.kept} kept, {st.short} stopped by the {seconds(STORM.deepenMs)} limit short of the depth, {st.failed} with no answer · {st.width}{' '}
+        {st.width === 1 ? 'engine' : 'engines at once'} · {duration(elapsed)} so far
+      </p>
+      {lanes.length > 0 && (
+        <ul class="storm-deep-lanes" data-testid="storm-deep-lanes">
+          {lanes.map((l, i) => (
+            <li key={i}>
+              Engine {i + 1}:{' '}
+              {l ? `${st.active.get(l.fen) ?? 'a position'} · depth ${l.depth} of ${l.target} · ${seconds(l.ms)}${l.nps ? ` · ${(l.nps / 1e6).toFixed(1)}M nodes/s` : ''}` : 'idle'}
+            </li>
+          ))}
+        </ul>
+      )}
+      {st.recent.length > 0 && (
+        <ul class="storm-deep-recent" data-testid="storm-deep-recent">
+          {st.recent.map((d) => (
+            <li key={d.card}>
+              {d.label}: depth {d.depth} of {d.target} in {seconds(d.ms)}, {d.result}
+            </li>
+          ))}
+        </ul>
+      )}
+    </details>
   );
 }

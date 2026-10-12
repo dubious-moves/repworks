@@ -93,6 +93,8 @@ export interface StormConfig {
   /** The depth the deepening and a session's look-ahead aim for, per device (§5.84). */
   deepenDepth: { desktop: number; mobile: number };
   deepenMultipv: number;
+  /** The longest a deepening search runs, ms; taken at the depth it reached (§14.23, §5.104). */
+  deepenMs: number;
   engineDepth: { desktop: number; mobile: number };
   enginePhaseMs: number;
   /** Puzzles (DESIGN-storm-puzzles.md §3): the anchor band, the ratings, per anchor, the drop list. */
@@ -184,6 +186,7 @@ export const STORM: StormConfig = {
   judgeDepth: 20,
   deepenDepth: { desktop: 24, mobile: 22 },
   deepenMultipv: 12,
+  deepenMs: 120_000,
   engineDepth: { desktop: 20, mobile: 20 },
   enginePhaseMs: 8000,
   puzzleAnchorMinPly: 12,

@@ -6071,3 +6071,21 @@ to the owner: about 1.6 times faster). Six positions at MultiPV 12 on a 4-core c
 Tests: `storm.spec.ts` (desktop and phone, `hardwareConcurrency` 4: three workers, each with a
 64 MB hash and no Threads option, every position searched once at the device's depth; a session
 starts no focused worker). Live: TESTING.md.
+
+
+#### 5.104 The deepening's progress, and two minutes a position (the owner's request, 2026-10-12)
+- **A deepening search runs up to 120 s** (`deepenMs`; was 60 s), the look-ahead's too; one that
+  runs out is taken at the depth it reached, as before (§14.23). An overnight pass scores for at
+  least that long.
+- **"Scoring: n of m searched" under the Stockfish line**, a fold that opens on: how many kept,
+  how many stopped by the limit short of the target depth, how many with no answer; the engines;
+  the time so far, the pace a position and the time left; each engine's position (its line's name
+  and plies on), depth so far of the target, seconds and nodes a second, redrawn every second;
+  and the last 12 positions searched (depth reached, seconds, kept or not). After the run it
+  stays as "Last scoring" until the next starts.
+- **The console logs each run and each position** (`[storm deepen]`: depth, seconds, result,
+  FEN), for debugging on a device.
+
+Tests: `storm.spec.ts` (desktop and phone: `go depth … movetime 120000`; the focused test reads
+the fold: every position searched and kept, three engines, the last one at the target depth).
+Live: TESTING.md.

@@ -21,6 +21,8 @@ interface Job {
   lines: number;
   depth: number;
   movetime: number;
+  /** When a worker took it, ms (`performance.now`). */
+  startedAt?: number;
   resolve(a: EngineAnswer | null): void;
 }
 
@@ -115,6 +117,7 @@ async function next(): Promise<void> {
   const lane = lanes.find((l) => !l.job);
   if (!lane || !queue.length) return;
   const job = queue.shift()!;
+  job.startedAt = performance.now();
   lane.job = job;
   // Another free lane takes the next position while this one starts.
   void next();
@@ -143,6 +146,27 @@ export function stormSearchSoFar(fen: string): EngineAnswer | null {
   const now = lane?.search?.current();
   if (!now || now.fen !== fen || !now.lines.length) return null;
   return { lines: now.lines, depth: Math.min(...now.lines.map((l) => l.depth)) };
+}
+
+/** A worker's search as it stands (§5.104): what the deepening's progress shows. */
+export interface LaneProgress {
+  fen: string;
+  /** The best line's depth so far, and the depth asked for. */
+  depth: number;
+  target: number;
+  ms: number;
+  nps?: number;
+}
+
+/** Each worker's search now, null for an idle one. */
+export function stormEngineProgress(): (LaneProgress | null)[] {
+  return lanes.map((l) => {
+    const j = l.job;
+    if (!j) return null;
+    const now = l.search?.current();
+    const on = now && now.fen === j.fen ? now : undefined;
+    return { fen: j.fen, depth: on?.depth ?? 0, target: j.depth, ms: performance.now() - (j.startedAt ?? performance.now()), nps: on?.nps };
+  });
 }
 
 /** Stockfish's MultiPV lines for a position, to `depth` or `movetime` ms; null when it can't. */

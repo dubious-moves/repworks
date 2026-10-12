@@ -437,7 +437,7 @@ export async function gather(s: StormScopeData, overnight = false): Promise<void
         o.doing = 'scoring';
         g.note = '';
         show();
-        await deepen(s, { gather: true, untilMs: Date.now() + Math.max(60_000, Date.now() - passStart) });
+        await deepen(s, { gather: true, untilMs: Date.now() + Math.max(STORM.deepenMs, Date.now() - passStart) });
         if (stopGather) break;
         await shareOwn(stormStore());
         const all = await stormStore().positions();
@@ -523,6 +523,39 @@ export async function clearGathered(s: StormScopeData): Promise<number> {
 export const deepening = signal(false);
 let deepenRun = 0;
 
+/** A position the deepening searched (§5.104): how deep, how long, and whether its list was kept. */
+export interface DeepenDone {
+  card: string;
+  label: string;
+  depth: number;
+  target: number;
+  ms: number;
+  result: 'kept' | 'not kept' | 'no answer';
+}
+/** The deepening's run as it goes (§5.104), kept after it ends until the next starts. */
+export interface DeepenStats {
+  /** Positions to search when the run started, and those searched since. */
+  total: number;
+  done: number;
+  kept: number;
+  /** Stopped by the time limit before the target depth. */
+  short: number;
+  failed: number;
+  width: number;
+  startedAt: number;
+  /** The latest first, at most `RECENT_DONE`. */
+  recent: DeepenDone[];
+  /** The positions being searched now, by FEN: their labels, for each engine's row. */
+  active: Map<string, string>;
+}
+export const deepenStats = signal<DeepenStats | null>(null);
+const RECENT_DONE = 12;
+
+/** A stored position in a few words: its first line's name and the plies past its end. */
+export function positionLabel(p: StoredPosition): string {
+  return `${p.names[0] ?? 'a line'}${p.ply ? `, ${p.ply} ${p.ply === 1 ? 'ply' : 'plies'} on` : ''}`;
+}
+
 const phone = () => typeof matchMedia !== 'undefined' && matchMedia('(max-width: 768px)').matches;
 /** The depth the deepening and the look-ahead aim for on this device (§5.84). */
 export const deepenTarget = (): number => (phone() ? STORM.deepenDepth.mobile : STORM.deepenDepth.desktop);
@@ -560,13 +593,32 @@ export async function deepen(s: StormScopeData, o: { gather?: boolean; untilMs?:
     // Focused (§5.103): as many positions at once as there are engines, each taken in turn.
     const width = stormPrefs.value.focused ? focusedWidth() : 1;
     setStormEngineWidth(width);
+    const target = deepenTarget();
+    deepenStats.value = { total: order.length, done: 0, kept: 0, short: 0, failed: 0, width, startedAt: Date.now(), recent: [], active: new Map() };
+    console.info(`[storm deepen] ${order.length} positions to depth ${target}, MultiPV ${STORM.deepenMultipv}, ${width} at once, ${STORM.deepenMs / 1000} s each at most`);
     const one = async (): Promise<void> => {
       for (let p = order.shift(); p; p = order.shift()) {
         if (busy()) return;
-        const a = await analyseForStorm(p.fen, STORM.deepenMultipv, deepenTarget(), 60_000);
+        const t0 = Date.now();
+        deepenStats.value?.active.set(p.fen, positionLabel(p));
+        const a = await analyseForStorm(p.fen, STORM.deepenMultipv, target, STORM.deepenMs);
         if (busy()) return;
         const pos = positionOf(p.fen);
         const d = pos && a ? deepenedPosition(p, engineList(a.lines, pos.turn, a.depth, STORM), STORM) : null;
+        const done: DeepenDone = { card: p.card, label: positionLabel(p), depth: a?.depth ?? 0, target, ms: Date.now() - t0, result: !a ? 'no answer' : d ? 'kept' : 'not kept' };
+        const st = deepenStats.value;
+        st?.active.delete(p.fen);
+        if (st && run === deepenRun) {
+          deepenStats.value = {
+            ...st,
+            done: st.done + 1,
+            kept: st.kept + (d ? 1 : 0),
+            short: st.short + (a && a.depth < target ? 1 : 0),
+            failed: st.failed + (a ? 0 : 1),
+            recent: [done, ...st.recent].slice(0, RECENT_DONE),
+          };
+        }
+        console.info(`[storm deepen] ${done.label}: depth ${done.depth} of ${target} in ${(done.ms / 1000).toFixed(1)} s, ${done.result} (${p.fen})`);
         if (d) {
           await stormStore().updatePosition(d.card, (cur) => ({ ...cur, scored: d.scored, src: d.src, depth: d.depth }));
           if (!p.from) shareSoon(stormStore());
@@ -666,7 +718,7 @@ async function lookAhead(): Promise<void> {
       if (!p) return;
       lookTried.add(p.card);
       lookCard = p;
-      const a = await analyseForStorm(p.fen, STORM.deepenMultipv, deepenTarget(), 60_000);
+      const a = await analyseForStorm(p.fen, STORM.deepenMultipv, deepenTarget(), STORM.deepenMs);
       lookCard = undefined;
       if (run !== lookRun) {
         // Stopped by a move: tried again later.

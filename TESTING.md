@@ -474,6 +474,10 @@ explorer's Eval column too far from the move (§5.67).
   full (it was about half); how many positions an hour against the setting off (the home's count
   before and after ten minutes, each way); the page stays responsive; memory with n engines. Then a
   storm: it starts at once, and Task Manager shows the engines gone back to one.
+- §5.104 (desktop): with positions to score, open "Scoring: n of m searched": each engine's row
+  counting up its depth and seconds, the last positions listed as they finish, the time left
+  plausible after a few minutes; how many are stopped by the 120 s limit at depth 24 on this
+  machine (focused on and off). The console's `[storm deepen]` lines.
 
 ## Phase 5
 

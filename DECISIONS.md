@@ -1607,3 +1607,10 @@ The technical calls, each with its reason:
   saw the computer at half its CPU while positions waited; independent positions in parallel scale
   with the cores better than one search on many threads, and need no isolated page. Sessions keep
   the one engine. MultiPV stays 12.
+
+## Revision of 2026-10-12 (the deepening's progress, PLAN.md §5.104)
+- **A deepening search runs up to 120 s** (was 60 s), the look-ahead's too. Why: the owner asked;
+  at MultiPV 12 a position takes about 19 s a thread at depth 20 and more at 24, so a minute cut
+  slow devices short of the target.
+- **The storm's home shows the deepening's progress** (the run, each engine, the last positions)
+  and the console logs it. Why: the owner wants to see what the re-scoring is doing.
