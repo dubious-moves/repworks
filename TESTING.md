@@ -7,8 +7,8 @@ fixes them and updates this file.
 
 ## Clickable lines: words, null moves, ↓ (§5.96)
 - Write a comment like `( 12.Ng5 Ndf6 taking the e6-pawn under control 13.Nxe6 Bxe6)` and one like
-  `(7.-- Bg7, 8.-- O-O, and 9.-- a5)`: the words in plain comment style, the moves clickable, the
-  passes leaving the board as it is but for the side to move.
+  `(7.-- Bg7, 8.-- O-O, and 9.-- a5)`: the words in plain comment style, the moves clickable, and
+  each → in the second showing one of Black's moves, the passes stepped over.
 - On a move with such a comment, ↓ enters the line; ← → along it, ↓ ↑ between the comment's lines,
   ↑ on the first goes back. Is ↓ going to the line before the next variation right for you?
 

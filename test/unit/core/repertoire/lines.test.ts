@@ -213,6 +213,17 @@ test('null moves: one side’s plan, move after move', () => {
   assert.deepEqual(played!.sans, ['--', 'Bg7', '--', 'O-O', '--', 'a5']);
   assert.deepEqual(played!.ucis.filter((u) => u === '0000').length, 3);
   assert.equal(makeFen(played!.positions.at(-1)!.toSetup()), 'rnbq1rk1/1pppppbp/5np1/p7/2PP4/2N5/PP2PPPP/R1BQKBNR w KQ - 0 10');
+  // Stepping passes over the passes: each step a black move, and back out before the first.
+  const one = [played!];
+  const walk = [firstCursor(one)!];
+  for (let i = 0; i < 3; i++) walk.push(stepCursor(one, walk.at(-1)!, 1)!);
+  assert.deepEqual(walk.map((c) => c.ply), [2, 4, 6, 6]);
+  assert.deepEqual(stepCursor(one, { line: 0, ply: 4 }, -1), { line: 0, ply: 2 });
+  assert.equal(stepCursor(one, { line: 0, ply: 2 }, -1), undefined);
+  // A pass clicked shows the move after it; one at a line's end is shown.
+  assert.deepEqual(cursorAt(one, 0, 2), { line: 0, ply: 4 });
+  const end = playedLines('(7... Bg7 --)', startPosition(chapter('{ x } 7. e4', `[SetUp "1"]\n[FEN "${fen.replace(' w ', ' b ')}"]`))!, undefined);
+  assert.deepEqual(stepCursor(end, { line: 0, ply: 1 }, 1), { line: 0, ply: 2 });
   // Not out of check: the line stops there.
   const check = chapter('1. e4 e5 2. Qh5 Nc6 3. Qxf7+ { (3... -- Kxf7) }');
   assert.deepEqual(linesAt(check, ['e4', 'e5', 'Qh5', 'Nc6', 'Qxf7+'])[0]!.sans, []);

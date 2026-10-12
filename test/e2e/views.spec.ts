@@ -390,26 +390,28 @@ test('a line with words and null moves; ↓ enters a move’s lines, ↑ ↓ bet
   await expect(written.locator('.comment-line', { hasText: 'then' })).toHaveCount(0);
 
   const bar = page.getByRole('group', { name: 'Line from the comment' });
+  const shown = bar.locator('strong');
+  // Each step a move of the plan: the passes are stepped over.
   await page.keyboard.press('ArrowDown');
-  await expect(bar).toContainText('From the comment: --');
-  // A pass moves nothing: no last move on the board (chessground hides the squares it leaves).
-  await expect(page.locator('cg-board square.last-move:visible')).toHaveCount(0);
+  await expect(shown).toHaveText('-- Nf6');
+  await expect(written.locator('.line-move.current')).toHaveText('Nf6');
+  await expect(page.locator('cg-board square.last-move:visible')).toHaveCount(2);
   await page.keyboard.press('ArrowRight');
-  await expect(bar).toContainText('From the comment: -- Nf6');
+  await expect(shown).toHaveText('-- Nf6 -- g6');
   await page.keyboard.press('ArrowRight');
-  await page.keyboard.press('ArrowRight');
-  await expect(bar).toContainText('From the comment: -- Nf6 -- g6');
+  await expect(shown).toHaveText('-- Nf6 -- g6 -- Bg7');
+  await page.keyboard.press('ArrowLeft');
+  await expect(shown).toHaveText('-- Nf6 -- g6');
   // ↓ the next line, at its first move; ↓ again stays; ↑ back to the first, ↑ out.
   await page.keyboard.press('ArrowDown');
-  await expect(bar).toContainText('From the comment: d4');
+  await expect(shown).toHaveText('d4');
   await expect(written.locator('.line-move.current')).toHaveText('d4');
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('ArrowRight');
   await page.keyboard.press('ArrowRight');
-  await expect(bar).toContainText('From the comment: d4 cxd4 Nxd4');
+  await expect(shown).toHaveText('d4 cxd4 Nxd4');
   await page.keyboard.press('ArrowUp');
-  await expect(bar).toContainText('From the comment: --');
-  await expect(written.locator('.line-move.current')).toHaveText('--');
+  await expect(shown).toHaveText('-- Nf6');
   await page.keyboard.press('ArrowUp');
   await expect(bar).toHaveCount(0);
   await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 d6');

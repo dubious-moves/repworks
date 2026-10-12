@@ -9,7 +9,8 @@
 //   text, and the line goes on at the next move number, so a square or a move named in the words
 //   is never read as a move. A comma, colon or semicolon after a move is text too.
 // - `--` is a null move: the side to move passes, so a plan can be shown as one side's moves,
-//   `(7. -- Bg7 8. -- O-O)`. It can't be played in check.
+//   `(7. -- Bg7 8. -- O-O)`. It can't be played in check. Stepping through a line passes over
+//   it, so each step shows one of the moves of the plan.
 // - A line starts at the commented move's position when its first move number and side are that
 //   position's, or at the position before the move (it replaces the move) when they are that
 //   one's. The two differ by a ply, so at most one fits; a line that fits neither stays text, as
@@ -170,32 +171,52 @@ export interface Cursor {
 
 const legal = (l: PlayedLine | undefined) => l?.ucis.length ?? 0;
 
-/** The first move of the first line that has one legal move, if any. */
+/**
+ * A cursor past the passes: on a null move it goes on in `dir` to the move the pass lets be
+ * played, so each step shows a real move. A pass at the line's end is shown (nothing follows it);
+ * undefined when only passes are before it, going back.
+ */
+function land(lines: readonly PlayedLine[], c: Cursor, dir: 1 | -1): Cursor | undefined {
+  const l = lines[c.line]!;
+  let ply = c.ply;
+  while (l.sans[ply - 1] === NULL_SAN) {
+    if (ply + dir < 1) return undefined;
+    if (ply + dir > l.sans.length) break;
+    ply += dir;
+  }
+  return { line: c.line, ply };
+}
+
+/** The first move of the first line that has one legal move, if any (past passes). */
 export function firstCursor(lines: readonly PlayedLine[]): Cursor | undefined {
   const i = lines.findIndex((l) => legal(l) > 0);
-  return i < 0 ? undefined : { line: i, ply: 1 };
+  return i < 0 ? undefined : land(lines, { line: i, ply: 1 }, 1);
 }
 
 /**
  * One step through a comment's lines end to end: within a line, then on from its last move to the
  * next line's first, or back from its first move to the previous line's last. Lines with no
- * legal move are skipped. Undefined: stepping back from the first line's first move (leave the
- * lines). At the last line's last move, → stays.
+ * legal move are skipped, and passes (`--`) are stepped over. Undefined: stepping back from the
+ * first line's first move (leave the lines). At the last line's last move, → stays.
  */
 export function stepCursor(lines: readonly PlayedLine[], c: Cursor, dir: 1 | -1): Cursor | undefined {
   const ply = c.ply + dir;
-  if (ply >= 1 && ply <= legal(lines[c.line])) return { line: c.line, ply };
+  if (ply >= 1 && ply <= legal(lines[c.line])) {
+    const next = land(lines, { line: c.line, ply }, dir);
+    if (next) return next;
+  }
   for (let i = c.line + dir; i >= 0 && i < lines.length; i += dir) {
     const n = legal(lines[i]);
-    if (n > 0) return { line: i, ply: dir === 1 ? 1 : n };
+    const next = n > 0 ? land(lines, { line: i, ply: dir === 1 ? 1 : n }, dir) : undefined;
+    if (next) return next;
   }
   return dir === 1 ? c : undefined;
 }
 
-/** The cursor at a move of the comment's text (its line and index), clamped to what is legal. */
+/** The cursor at a move of the comment's text (its line and index), clamped to what is legal; a pass clicked shows the move after it. */
 export function cursorAt(lines: readonly PlayedLine[], line: number, move: number): Cursor | undefined {
   const n = legal(lines[line]);
-  return n === 0 ? undefined : { line, ply: Math.min(move + 1, n) };
+  return n === 0 ? undefined : land(lines, { line, ply: Math.min(move + 1, n) }, 1);
 }
 
 /**
@@ -203,6 +224,6 @@ export function cursorAt(lines: readonly PlayedLine[], line: number, move: numbe
  * previous line that has a legal one. Undefined when there is none that way.
  */
 export function switchLine(lines: readonly PlayedLine[], c: Cursor, dir: 1 | -1): Cursor | undefined {
-  for (let i = c.line + dir; i >= 0 && i < lines.length; i += dir) if (legal(lines[i]) > 0) return { line: i, ply: 1 };
+  for (let i = c.line + dir; i >= 0 && i < lines.length; i += dir) if (legal(lines[i]) > 0) return land(lines, { line: i, ply: 1 }, 1);
   return undefined;
 }

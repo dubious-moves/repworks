@@ -1541,7 +1541,8 @@ The technical calls, each with its reason:
   the group a remark (q_extension's rule). Why: the owner writes explanations inside a line, and
   resuming only at a number keeps squares and moves named in the words from being played.
 - **`--` is a null move in a comment's line**, played as a pass and never out of check, so a plan
-  shows one side's moves in a row.
+  shows one side's moves in a row. Stepping through the line passes over the passes (the owner's
+  note), so each → shows a move of the plan.
 - **↓ on a move whose comment has a line enters it**, ahead of ↓'s next variation, and ↑ ↓ move
   between the comment's lines; ↑ on the first leaves. The owner asked for "like selecting a
   branch"; the variation stays one ← → away.

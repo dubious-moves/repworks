@@ -5789,8 +5789,10 @@ Live: TESTING.md.
   the line's bold blue. `(1. e4 is best)` was a remark and is now a line of one move.
 - **Null moves**: `--` passes, `(7.-- Bg7, 8.-- O-O, and 9.-- a5)` shows Black's plan move after
   move. Played as a pass (the side to move changes, no en passant), never out of check: the line
-  stops there, as at an illegal move. The board shows no last move for a pass; the bar under it
-  shows `--`.
+  stops there, as at an illegal move. Stepping a line passes over its passes (the owner's note,
+  the same day): → from the start shows `Nf6` after `--`, each → the next move of the plan, ←
+  back the same way, and a click on `--` shows the move after it. A pass at a line's end is shown
+  (with no last move on the board). The bar under the board keeps the `--`s.
 - **↓ enters a move's lines**, in the chapter view and the Read view, as it would choose a branch:
   the first line of the move's comments, at its first move, wherever the move is (→ still enters
   them only at a line's end). In the chapter view it goes before the next variation (`move('down')`),
@@ -5799,7 +5801,7 @@ Live: TESTING.md.
   first line leaves, as ← before its first move and Escape do. The training screen keeps ← → only.
 
 Tests: `lines.test.ts` (the owner's two examples, a5 in the words, `(1. is best)` a remark, a pass
-in check, ↓ ↑ between lines), `views.spec.ts` (a comment with words and passes on 2... d6, which has
+in check, passes stepped over both ways and when clicked, ↓ ↑ between lines), `views.spec.ts` (a comment with words and passes on 2... d6, which has
 a variation: ↓ enters its line, no last move for a pass, ↓ ↑ between lines, ↑ out; ↓ ↑ in the Read
 view).
 
