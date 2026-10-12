@@ -608,7 +608,7 @@ test('Stockfish’s standard: the kept positions searched with MultiPV 12 to dep
   const w = await setUp(page, { deepen: true });
   const ready = await gathered(page, w);
   await expect(page.getByTestId('storm-deep')).toContainText(`scored to depth ${depth}`);
-  await expect.poll(() => commands(site.requests).filter((c) => c === `go depth ${depth} movetime 120000`).length, { timeout: 15_000 }).toBeGreaterThan(1);
+  await expect.poll(() => commands(site.requests).filter((c) => c === `go depth ${depth} movetime 300000`).length, { timeout: 15_000 }).toBeGreaterThan(1);
   expect(commands(site.requests)).toContain('setoption name MultiPV value 12');
   await expect(page.getByTestId('storm-deep')).toContainText(`${ready} of ${ready} scored`, { timeout: 30_000 });
   // Every position deepened: the session's look-ahead has nothing left to search, so a move is
@@ -633,7 +633,7 @@ test('focused scoring: an engine a core but one, each searching a position of it
   // Three workers, single-threaded, each with a hash of its own; every position searched once.
   expect(mine().filter((c) => c === 'setoption name Hash value 64').length).toBe(3);
   expect(mine().filter((c) => c.startsWith('setoption name Threads'))).toEqual([]);
-  expect(mine().filter((c) => c === `go depth ${depth} movetime 120000`).length).toBe(ready);
+  expect(mine().filter((c) => c === `go depth ${depth} movetime 300000`).length).toBe(ready);
   // The progress (§5.104): the run counted, each position named with its depth and result.
   const progress = page.getByTestId('storm-deep-progress');
   await expect(progress.locator('summary')).toContainText(`Last scoring: ${ready} of ${ready} searched`);
@@ -660,7 +660,7 @@ test('a storm’s look-ahead: the card on the board searched first, MultiPV 12 a
   await expect(page.locator('.storm-card')).toBeVisible();
   const fen = fen4(await cardFen(page));
   await expect.poll(() => fresh().find((c) => c.startsWith('position fen ')) ?? '').toContain(fen);
-  await expect.poll(() => fresh()).toContain(`go depth ${depth} movetime 120000`);
+  await expect.poll(() => fresh()).toContain(`go depth ${depth} movetime 300000`);
   // Searched to the depth: the move is graded from that list, with no search of its own.
   await page.waitForTimeout(800);
   const before = site.requests.length;

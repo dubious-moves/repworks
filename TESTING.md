@@ -476,7 +476,7 @@ explorer's Eval column too far from the move (§5.67).
   storm: it starts at once, and Task Manager shows the engines gone back to one.
 - §5.104 (desktop): with positions to score, open "Scoring: n of m searched": each engine's row
   counting up its depth and seconds, the last positions listed as they finish, the time left
-  plausible after a few minutes; how many are stopped by the 120 s limit at depth 24 on this
+  plausible after a few minutes; how many are stopped by the 300 s limit (it should be few or none) at depth 24 on this
   machine (focused on and off). The console's `[storm deepen]` lines.
 
 ## Phase 5

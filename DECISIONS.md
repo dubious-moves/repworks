@@ -1614,3 +1614,5 @@ The technical calls, each with its reason:
   slow devices short of the target.
 - **The storm's home shows the deepening's progress** (the run, each engine, the last positions)
   and the console logs it. Why: the owner wants to see what the re-scoring is doing.
+- **300 s, not 120 s** (the owner, the same day): 120 s still left positions short of the target
+  depth, and they would rather the deepening be slow than the depths uneven.

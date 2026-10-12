@@ -186,7 +186,7 @@ export const STORM: StormConfig = {
   judgeDepth: 20,
   deepenDepth: { desktop: 24, mobile: 22 },
   deepenMultipv: 12,
-  deepenMs: 120_000,
+  deepenMs: 300_000,
   engineDepth: { desktop: 20, mobile: 20 },
   enginePhaseMs: 8000,
   puzzleAnchorMinPly: 12,
