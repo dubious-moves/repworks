@@ -44,6 +44,12 @@ async function setUp(page: Page): Promise<FakeGit> {
 const feedback = (page: Page) => page.locator('.train-feedback');
 const phase = (page: Page) => page.locator('.train-grid');
 const chip = (page: Page) => page.locator('.comment-offer-chip');
+const desktop = () => test.info().project.name === 'desktop';
+/** The chip's card: shown by hovering on the desktop (a click there is "Quiz now"), by a tap on the phone. */
+async function openCard(page: Page) {
+  if (desktop()) await chip(page).hover();
+  else await chip(page).click();
+}
 async function play(page: Page, from: string, to: string) {
   await clickSquare(page, from, 'black');
   await clickSquare(page, to, 'black');
@@ -67,7 +73,7 @@ test('comment lines: offered in the counters\' row, left out of a comment shown,
   // 1... c5 asked: the line on 1. e4 (an alternative to it, from the start) is offered already.
   await expect(chip(page)).toHaveClass(/important/);
   await expect(chip(page)).toContainText('1');
-  await chip(page).click();
+  await openCard(page);
   const card = page.getByRole('group', { name: 'Lines from the comments' });
   await expect(card.locator('.mini-board')).toHaveCount(1);
   await expect(card).toContainText('Important');
@@ -75,8 +81,8 @@ test('comment lines: offered in the counters\' row, left out of a comment shown,
   await expect(card.locator('.mini-board cg-board piece')).toHaveCount(32);
   await expect(card.getByRole('checkbox', { name: 'At the end' })).toBeChecked();
   await expect(card.getByRole('button', { name: 'Quiz now' })).toBeEnabled();
-  // Pressed again, and the pointer away: it goes.
-  await chip(page).click();
+  // Pressed again (on the phone), and the pointer away: it goes.
+  if (!desktop()) await chip(page).click();
   await page.mouse.move(0, 0);
   await expect(card).toHaveCount(0);
 
@@ -131,7 +137,7 @@ test('comment lines: "Quiz now" mid-walk, the move asked waiting after it; "Next
   await page.goto(`${site.url}#/train`);
   await expect(phase(page)).toHaveAttribute('data-phase', 'ask');
   // 1... c5 asked: the line on 1. e4 quizzed now, from the chip.
-  await chip(page).click();
+  await openCard(page);
   await page.getByRole('group', { name: 'Lines from the comments' }).getByRole('button', { name: 'Quiz now' }).click();
   await expect(page.getByRole('group', { name: 'Lines from the comments' })).toHaveCount(0);
   await expect(feedback(page)).toHaveText('Important line from the comments');
@@ -146,7 +152,7 @@ test('comment lines: "Quiz now" mid-walk, the move asked waiting after it; "Next
   await expect(feedback(page)).toHaveText('');
   await play(page, 'e7', 'e5');
   await expect(page.locator('.train-comments')).toContainText('1. d4! Nf6 2. c4 e6');
-  await chip(page).click();
+  await openCard(page);
   await expect(page.getByRole('group', { name: 'Lines from the comments' }).getByRole('button', { name: 'Quiz again' })).toBeVisible();
   await page.locator('.train-board').click({ position: { x: 5, y: 5 } });
   await page.mouse.move(0, 0);
@@ -158,13 +164,34 @@ test('comment lines: "Quiz now" mid-walk, the move asked waiting after it; "Next
   await expect(page.locator('.train-aside-moves')).toHaveCount(0);
 });
 
+test('comment lines: on the desktop, a click on the chip is "Quiz now" on the line met last', async ({ page }) => {
+  test.skip(!desktop(), 'a pointer that hovers');
+  await walkOnce(page);
+  await setUp(page);
+  await page.goto(`${site.url}#/train`);
+  await expect(phase(page)).toHaveAttribute('data-phase', 'ask');
+  await expect(chip(page)).toHaveAttribute('title', /Click: quiz 1\. d4! now$/);
+  await chip(page).click();
+  await expect(feedback(page)).toHaveText('Important line from the comments');
+  await expect(page.getByRole('group', { name: 'Lines from the comments' })).toHaveCount(0);
+  await expect(page.locator('.train-line')).toContainText('(1. d4)');
+  await page.mouse.move(0, 0);
+  await play(page, 'g8', 'f6');
+  await expect(page.locator('.train-line')).toContainText('(1. d4 Nf6 2. c4)');
+  await play(page, 'e7', 'e6');
+  await expect(page.locator('.train-line')).not.toContainText('(');
+  await expect(phase(page)).toHaveAttribute('data-phase', 'ask');
+  // Quizzed: a click quizzes it again, the only line met.
+  await expect(chip(page)).toHaveAttribute('title', /Click: quiz 1\. d4! now$/);
+});
+
 test('comment lines: picked off from the chip, Skip, and the setting', async ({ page }) => {
   await walkOnce(page);
   await setUp(page);
   await page.goto(`${site.url}#/train`);
   await expect(phase(page)).toHaveAttribute('data-phase', 'ask');
   // Picked off from the chip: only the line met at the end is quizzed.
-  await chip(page).click();
+  await openCard(page);
   await page.getByRole('group', { name: 'Lines from the comments' }).getByRole('checkbox', { name: 'At the end' }).uncheck();
   await expect(chip(page)).toContainText('0/1');
   // A press on the board closes it.

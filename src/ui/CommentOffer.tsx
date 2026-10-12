@@ -1,7 +1,8 @@
 // The lines from the comments offered in review (PLAN.md §5.98): a small notice in the counters'
 // row, there from the moment the walk reaches a position a comment's line starts from, its count
 // growing as it reaches more. Nothing pops up by itself: hovering it (or a tap, or the keyboard)
-// shows each line's start on a small board, the opponent's first move as an arrow, "Quiz now" (the
+// shows the card of lines; where the pointer hovers (a desktop), a click on the chip is "Quiz now"
+// on the line met last (the one nearest the board) not quizzed yet. The card shows each line's start on a small board, the opponent's first move as an arrow, "Quiz now" (the
 // line played on the board from where it starts, the walk resuming after it), and a switch for
 // whether "Quiz lines" plays it at the line's end. A line whose first move is marked ! or !! is
 // important, in gold.
@@ -41,6 +42,9 @@ export function MiniBoard(props: { position: Position; orientation: 'white' | 'b
 
 const sq = (uci: string, i: number) => uci.slice(i, i + 2) as Key;
 
+/** A pointer that hovers (a mouse or trackpad): the card shows on hover, so a click can do more. */
+const canHover = () => typeof matchMedia === 'function' && matchMedia('(hover: hover) and (pointer: fine)').matches;
+
 /** The notice, and its card of lines while hovered, focused or opened by a tap. */
 export function CommentOffer(props: { s: SessionView }) {
   const { s } = props;
@@ -77,6 +81,13 @@ export function CommentOffer(props: { s: SessionView }) {
     setHover(false);
     quizComments(key);
   };
+  // A click's line, where the card shows on hover: the last met not quizzed, else the last.
+  const clickable = s.canQuiz && canHover() ? ([...offered].reverse().find((o) => !o.done) ?? offered.at(-1)) : undefined;
+  const click = (e: MouseEvent) => {
+    // A click by the mouse over the chip (the card already shown by hovering): "Quiz now". A tap or the keyboard opens the card.
+    if (clickable && hover && e.detail > 0) return quiz(clickable.line.key);
+    setOpen(!open);
+  };
   return (
     <div class="comment-offer" ref={ref} onPointerEnter={(e) => e.pointerType === 'mouse' && setHover(true)} onPointerLeave={(e) => e.pointerType === 'mouse' && setHover(false)}>
       <button
@@ -84,8 +95,8 @@ export function CommentOffer(props: { s: SessionView }) {
         class={`comment-offer-chip${important ? ' important' : ''}${on.length === 0 ? ' off' : ''}`}
         aria-expanded={open || hover}
         aria-label={title}
-        title={title}
-        onClick={() => setOpen(!open)}
+        title={clickable ? `${title} · Click: quiz ${clickable.line.label} now` : title}
+        onClick={click}
       >
         {important && (
           <span class="comment-offer-mark" aria-hidden="true">

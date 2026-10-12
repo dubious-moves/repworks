@@ -5903,6 +5903,10 @@ end optional, not started by itself: the user picks "Next line" or "Quiz lines".
   back to the line's end, which then goes on as set. "Next line" leaves them: the lines met on a
   walk are offered once a session, as before. The pause and its note "Next, 2 lines from the
   comments" are gone.
+- **On a desktop** (a pointer that hovers: the card already shows on hover), a click on the chip
+  is "Quiz now" on the line met last that isn't quizzed yet (the one nearest the board; all
+  quizzed, the last again), named in the chip's tooltip. A tap (the phone) or the keyboard still
+  opens the card. (The owner's request, 2026-10-12.)
 - **The checkbox** in the card is now "At the end" (in "Quiz lines" or not); the setting's words
   follow: each one / the important ones / the ones I pick in "Quiz lines" / off.
 - `(…)` in a comment shown: a line still to be quizzed at the end (on, not quizzed); once quizzed,

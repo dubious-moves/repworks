@@ -17,6 +17,7 @@ fixes them and updates this file.
 - §5.99: at the line's end nothing starts by itself: "Next line" or "Quiz lines (n)". Open the chip
   mid-line and press "Quiz now" on a line: it is played from where it starts, then the move you were
   asked is asked again. Is "Quiz now" easy to reach on the phone (tap the chip)?
+  On the desktop a click on the chip itself quizzes the line met last (its tooltip names it).
 - On your real courses: do the lines quizzed stop where they should (a second branch written in the
   same parentheses, words, passes)? Any line you'd expect that never comes, or one that shouldn't?
 
