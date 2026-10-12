@@ -1616,3 +1616,4 @@ The technical calls, each with its reason:
   and the console logs it. Why: the owner wants to see what the re-scoring is doing.
 - **300 s, not 120 s** (the owner, the same day): 120 s still left positions short of the target
   depth, and they would rather the deepening be slow than the depths uneven.
+- **600 s, not 300 s** (the owner, the same day): 300 s still left some short.

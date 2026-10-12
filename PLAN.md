@@ -6074,8 +6074,8 @@ starts no focused worker). Live: TESTING.md.
 
 
 #### 5.104 The deepening's progress, and two minutes a position (the owner's request, 2026-10-12)
-- **A deepening search runs up to 300 s** (`deepenMs`; was 60 s, then 120 s, which the owner
-  found not enough: they would rather it be slow than the depths uneven), the look-ahead's too; one that
+- **A deepening search runs up to 600 s** (`deepenMs`; was 60 s, then 120 s and 300 s, which the
+  owner found not enough: they would rather it be slow than the depths uneven), the look-ahead's too; one that
   runs out is taken at the depth it reached, as before (§14.23). An overnight pass scores for at
   least that long.
 - **"Scoring: n of m searched" under the Stockfish line**, a fold that opens on: how many kept,
@@ -6084,9 +6084,13 @@ starts no focused worker). Live: TESTING.md.
   and plies on), depth so far of the target, seconds and nodes a second, redrawn every second;
   and the last 12 positions searched (depth reached, seconds, kept or not). After the run it
   stays as "Last scoring" until the next starts.
+- **A list not kept says why**: below depth 20, no deeper than the list the position has, or too
+  few moves.
+- **An overnight pass's scoring that runs out of its time keeps the searches under way**: no new
+  one starts, but one that finishes is stored (it was thrown away, up to a whole search an engine).
 - **The console logs each run and each position** (`[storm deepen]`: depth, seconds, result,
   FEN), for debugging on a device.
 
-Tests: `storm.spec.ts` (desktop and phone: `go depth … movetime 300000`; the focused test reads
+Tests: `storm.spec.ts` (desktop and phone: `go depth … movetime 600000`; the focused test reads
 the fold: every position searched and kept, three engines, the last one at the target depth).
 Live: TESTING.md.

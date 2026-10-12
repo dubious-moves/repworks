@@ -530,7 +530,15 @@ export interface DeepenDone {
   depth: number;
   target: number;
   ms: number;
-  result: 'kept' | 'not kept' | 'no answer';
+  /** 'kept', 'no answer', or why the list wasn't kept. */
+  result: string;
+}
+
+/** Why a search's list wasn't kept (`deepenedPosition`'s reasons), in a few words. */
+function notKept(p: StoredPosition, depth: number, lines: number): string {
+  if (depth < STORM.judgeDepth) return `not kept: below depth ${STORM.judgeDepth}`;
+  if (p.src === 'sf' && depth <= p.depth) return `not kept: no deeper than the ${p.depth} it has`;
+  return lines ? 'not kept: too few moves' : 'not kept: no move';
 }
 /** The deepening's run as it goes (§5.104), kept after it ends until the next starts. */
 export interface DeepenStats {
@@ -575,10 +583,13 @@ export async function deepen(s: StormScopeData, o: { gather?: boolean; untilMs?:
   if (deepening.value || (!o.gather && !stormPrefs.value.deepen)) return;
   const run = ++deepenRun;
   deepening.value = true;
-  const busy = () =>
+  // Stopped: a search under way is answered with nothing. Out of time (an overnight pass's
+  // share): no new search starts, but one that finishes is kept.
+  const stopped = () =>
     run !== deepenRun ||
-    (o.gather ? stopGather || (o.untilMs !== undefined && Date.now() > o.untilMs) : !!gathering.value?.running || !stormPrefs.value.deepen) ||
+    (o.gather ? stopGather : !!gathering.value?.running || !stormPrefs.value.deepen) ||
     (!!stormSession.value && stormSession.value.phase !== 'done');
+  const busy = () => stopped() || (o.untilMs !== undefined && Date.now() > o.untilMs);
   try {
     const data = trainData.value;
     const h = data ? histories(data) : new Map<string, StormHistory>();
@@ -602,10 +613,10 @@ export async function deepen(s: StormScopeData, o: { gather?: boolean; untilMs?:
         const t0 = Date.now();
         deepenStats.value?.active.set(p.fen, positionLabel(p));
         const a = await analyseForStorm(p.fen, STORM.deepenMultipv, target, STORM.deepenMs);
-        if (busy()) return;
+        if (stopped()) return;
         const pos = positionOf(p.fen);
         const d = pos && a ? deepenedPosition(p, engineList(a.lines, pos.turn, a.depth, STORM), STORM) : null;
-        const done: DeepenDone = { card: p.card, label: positionLabel(p), depth: a?.depth ?? 0, target, ms: Date.now() - t0, result: !a ? 'no answer' : d ? 'kept' : 'not kept' };
+        const done: DeepenDone = { card: p.card, label: positionLabel(p), depth: a?.depth ?? 0, target, ms: Date.now() - t0, result: !a ? 'no answer' : d ? 'kept' : notKept(p, a.depth, a.lines.length) };
         const st = deepenStats.value;
         st?.active.delete(p.fen);
         if (st && run === deepenRun) {
