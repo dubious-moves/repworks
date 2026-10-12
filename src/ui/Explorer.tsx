@@ -2,26 +2,27 @@
 // the settings, a header row (Move, Eval, Games, Score, ⇅ sort), a row per move with ChessDB's eval,
 // the move's share and count of games and its results as a bar, ChessDB's other moves as novelty
 // rows, and Σ. A click on a row plays the move. A move the chapter plays here is on a lighter
-// band; a move other repertoire chapters play here carries their count, which lists them.
+// band; so is a move whose position the chapter reaches by another order, with a ⇄ mark listing
+// those orders; a move whose position other repertoire chapters reach (played here or by
+// transposition) carries their count, which lists them.
 // As Qchess's, the panel keeps its height between positions (§5.23, the owner's notes): a handle
 // on its top edge drags it, saved per device, and the last position's rows stay, faded, until the
 // next answer.
 import { signal } from '@preact/signals';
 import { useEffect, useMemo, useRef } from 'preact/hooks';
 import { makeFen } from 'chessops/fen';
-import { makeSan } from 'chessops/san';
-import { positionKeyOf } from '../core/chess/positionKey.ts';
-import { parseUciMove } from '../core/chess/uci.ts';
 import { localAddress } from '../core/explorer/providers.ts';
 import type { ExplorerTab } from '../core/explorer/service.ts';
 import { barLabel, buildTable, evalTone, formatCount, formatEval, formatShare, SORT_LABELS, type SortMode, type Table, type TableInput, type TableRow } from '../core/explorer/table.ts';
 import { filterLabel, practicalDetails, preparedDetails, previewDetails, type DetailOptions } from '../core/explorer/details.ts';
 import { autoRows, bestOf } from '../core/explorer/rows.ts';
-import { expectedScore, type RowResult, type Split } from '../core/explorer/search.ts';
+import { expectedScore, moveKey, type RowResult, type Split } from '../core/explorer/search.ts';
 import { cellOf, computeRow, excludedAt, practicalAt, practicalOff, practicalVersion, practicalView, previewOn, showsMaia, toggleExclude, type CellState } from '../app/practical.ts';
+import type { PositionKey } from '../core/chess/positionKey.ts';
 import type { Occurrence } from '../core/repertoire/index.ts';
 import type { Chapter } from '../core/study/model.ts';
 import { nodeAt, positionAt, type Path } from '../core/study/tree.ts';
+import { movesFrom, transposedFrom, transpositions } from '../core/study/transpositions.ts';
 import { play, side as chapterSide, study } from '../app/editor.ts';
 import { lookAt, lookup, pausedUntil, prefs, retryLookup, setPrefs } from '../app/explorer.ts';
 import { maiaElo, maiaKey, maiaPrefs, maiaSeen, maiaState, requestPolicy, requestScores } from '../app/maia.ts';
@@ -99,31 +100,39 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
 
   const s = study.value;
   const data = trainData.value;
-  // The moves the repertoire plays here, by SAN: the other chapters, transpositions included.
+  // Each legal move's position, so a move counts wherever its position is reached (the owner,
+  // 2026-10-12: transpositions included).
+  const moves = useMemo(() => (pos ? movesFrom(pos) : new Map<string, PositionKey>()), [pos]);
+  // The other repertoire chapters reaching each move's position, by `moveKey`: one place each.
   const repertoire = useMemo(() => {
     const out = new Map<string, Occurrence[]>();
-    const here = pos && data?.index.positions.get(positionKeyOf(pos));
-    if (!pos || !here) return out;
-    for (const map of [here.own, here.opponent]) {
-      for (const [uci, places] of map) {
-        const move = parseUciMove(pos, uci);
-        if (!move) continue;
-        const san = makeSan(pos, move);
-        const seen = new Set((out.get(san) ?? []).map((o) => `${o.sid}/${o.cid}`));
-        for (const o of places) {
-          const where = `${o.sid}/${o.cid}`;
-          if ((o.sid === s?.sid && o.cid === s?.cid) || seen.has(where)) continue;
-          seen.add(where);
-          out.set(san, [...(out.get(san) ?? []), o]);
-        }
+    if (!data) return out;
+    for (const [san, key] of moves) {
+      const seen = new Set<string>();
+      const places: Occurrence[] = [];
+      for (const o of data.index.reached.get(key) ?? []) {
+        const where = `${o.sid}/${o.cid}`;
+        if ((o.sid === s?.sid && o.cid === s?.cid) || seen.has(where)) continue;
+        seen.add(where);
+        places.push(o);
       }
+      if (places.length) out.set(moveKey(san), places);
     }
     return out;
-  }, [pos, data, s?.sid, s?.cid]);
+  }, [moves, data, s?.sid, s?.cid]);
+  // The moves the chapter doesn't play here whose position it reaches by another order, by `moveKey`.
+  const chapterOrders = useMemo(() => transpositions(props.chapter), [props.chapter]);
+  const transposed = useMemo(() => {
+    const out = new Map<string, Path[]>();
+    if (!pos) return out;
+    const played = nodeAt(props.chapter, props.path)?.children.map((c) => c.san) ?? [];
+    for (const [san, paths] of transposedFrom(chapterOrders, pos, props.path, played)) out.set(moveKey(san), paths);
+    return out;
+  }, [chapterOrders, pos, props.chapter, props.path]);
 
   if (!p.on || !pos || !fen) return null;
   const node = nodeAt(props.chapter, props.path);
-  const covered = new Set(node?.children.map((c) => c.san) ?? []);
+  const covered = new Set([...(node?.children.map((c) => c.san) ?? []), ...transposed.keys()]);
   const l = lookup.value?.fen === fen && lookup.value.tab === p.tab ? lookup.value : undefined;
   const side = chapterSide.value === 'black' ? 'b' : 'w';
   const input: TableInput = {
@@ -351,7 +360,8 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
                 row={r}
                 games={games}
                 cols={cols}
-                others={repertoire.get(r.san) ?? []}
+                others={repertoire.get(moveKey(r.san)) ?? []}
+                orders={transposed.get(moveKey(r.san)) ?? []}
                 path={props.path}
                 {...(prac
                   ? {
@@ -515,7 +525,7 @@ interface MaiaCells {
   turn: 'w' | 'b';
 }
 
-function Row(props: { row: TableRow; games: boolean; cols: Cols; others: Occurrence[]; path: Path; practical?: preact.JSX.Element; prepared?: Prepared; faded?: boolean; maia?: MaiaCells }) {
+function Row(props: { row: TableRow; games: boolean; cols: Cols; others: Occurrence[]; orders: Path[]; path: Path; practical?: preact.JSX.Element; prepared?: Prepared; faded?: boolean; maia?: MaiaCells }) {
   const r = props.row;
   const title = r.novelty ? 'Engine suggested move (novelty)' : r.maiaOnly ? 'Maia suggested move' : r.rating ? `Average rating: ${Math.round(r.rating)}` : undefined;
   const m = props.maia;
@@ -536,7 +546,7 @@ function Row(props: { row: TableRow; games: boolean; cols: Cols; others: Occurre
   );
   return (
     <div
-      class={`ex-row${r.covered ? ' covered' : ''}${r.novelty ? ' novelty' : ''}${r.maiaOnly ? ' maia-only' : ''}`}
+      class={`ex-row${r.covered ? ' covered' : ''}${props.orders.length ? ' transposed' : ''}${r.novelty ? ' novelty' : ''}${r.maiaOnly ? ' maia-only' : ''}`}
       role="listitem"
       title={title}
       tabIndex={0}
@@ -545,11 +555,25 @@ function Row(props: { row: TableRow; games: boolean; cols: Cols; others: Occurre
     >
       <span class="ex-move">
         <span class="ex-san">{r.san}</span>
+        {props.orders.length > 0 && (
+          <button
+            type="button"
+            class="ex-tr"
+            title={`Not played here, but the chapter reaches this position by ${props.orders.length === 1 ? 'another move order' : `${props.orders.length} other move orders`}`}
+            aria-label={`${r.san}: transposes, ${props.orders.length} move order${props.orders.length === 1 ? '' : 's'}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              openTranspositions([...props.path, r.san], { orders: props.orders, chapters: [] }, e.currentTarget);
+            }}
+          >
+            ⇄
+          </button>
+        )}
         {props.others.length > 0 && (
           <button
             type="button"
             class="ex-rep"
-            title={`Played here in ${props.others.length} other repertoire chapter${props.others.length === 1 ? '' : 's'}`}
+            title={`Its position is reached in ${props.others.length} other repertoire chapter${props.others.length === 1 ? '' : 's'}`}
             aria-label={`${r.san}: in ${props.others.length} other chapter${props.others.length === 1 ? '' : 's'}`}
             onClick={(e) => {
               e.stopPropagation();

@@ -2857,6 +2857,11 @@ a.button.primary {
   background: rgb(var(--ink) / 13%);
 }
 
+/* Covered by another move order: the same band, edged in the notation's transposition colour. */
+.ex-row.transposed {
+  box-shadow: inset 3px 0 0 var(--warn);
+}
+
 .ex-row .ex-move {
   white-space: nowrap;
   overflow: hidden;
@@ -2868,6 +2873,19 @@ a.button.primary {
 
 .ex-row.novelty .ex-move {
   color: var(--novelty);
+}
+
+.ex-tr {
+  min-height: 0;
+  height: 16px;
+  padding: 0 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 14px;
+  border-radius: var(--radius-card);
+  border: 0;
+  background: var(--warn);
+  color: var(--on-warn);
 }
 
 .ex-rep {

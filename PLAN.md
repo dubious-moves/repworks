@@ -3357,9 +3357,11 @@ notation):
   orientation.
 - **Rows**: a click plays the move, as a move on the board does (it extends the line or goes to
   the move the chapter has). A move the chapter has at this position is on Qchess's lighter band;
-  a move of the repertoire here (from the index, §5.1: any repertoire chapter, transpositions
-  included) carries a mark with its count of chapters, whose list opens as the transposition
-  list does (§5.11) and leads to each chapter at that move. "Only show repertoire moves" is in
+  so is a move the chapter doesn't play here whose position it reaches by another order (the
+  owner, 2026-10-12), edged in the transposition colour and marked ⇄, whose list (§5.11's) leads
+  to those move orders. A move whose position other repertoire chapters reach (from the index,
+  §5.1: played here or by transposition) carries a mark with its count of chapters, whose list
+  opens as the transposition list does (§5.11) and leads to each chapter at that move. "Only show repertoire moves" is in
   the sort menu, as in Qchess.
 - **Asking**: after 280 ms on a position (Qchess's debounce), the shown tab's lookup only; a
   position left before its answer drops its queued request. The ChessDB tab and the Eval column

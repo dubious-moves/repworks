@@ -2,7 +2,7 @@
 // Lichess explorer and ChessDB and the fixture repertoire (Main line: 1. e4 c5 2. Nf3 d6 …, and
 // Alapin: 1. e4 c5 2. c3 Nf6, both Black's).
 import { test, expect, type Page } from '@playwright/test';
-import { REPO, TOKEN } from '../support/syncWorld.ts';
+import { CH1, REPO, TOKEN } from '../support/syncWorld.ts';
 import { studyMenu } from './board.ts';
 import { fakeExplorer, lichessLogin, serveExplorer, serveLocalExplorer, type FakeExplorer } from './explorer.ts';
 import { serveGithub, world } from './github.ts';
@@ -18,6 +18,7 @@ test.afterAll(async () => {
 
 const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -';
 const AFTER_C5 = 'rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq -';
+const AFTER_NF3_C5 = 'rnbqkbnr/pp1ppppp/8/2p5/8/5N2/PPPPPPPP/RNBQKB1R w KQkq -';
 
 function positions(): FakeExplorer {
   const fake = fakeExplorer();
@@ -39,11 +40,16 @@ function positions(): FakeExplorer {
     ['Nf3', 33],
     ['c3', 15],
   ]);
+  fake.games.set(AFTER_NF3_C5, [
+    { san: 'c4', white: 40, draws: 30, black: 30 },
+    { san: 'e4', white: 30, draws: 20, black: 20 },
+  ]);
   return fake;
 }
 
-async function setUp(page: Page, options: { login?: boolean } = {}): Promise<FakeExplorer> {
-  const { github } = world();
+async function setUp(page: Page, options: { login?: boolean; edit?: (pgn: string) => string } = {}): Promise<FakeExplorer> {
+  const { git, github } = world();
+  if (options.edit) git.commitIfHead(git.head, 'Edited', new Map([[CH1, options.edit(git.textsOf().get(CH1)!)]]), []);
   if (options.login !== false) await lichessLogin(page);
   await serveGithub(page, github);
   const fake = await serveExplorer(page, positions());
@@ -195,6 +201,21 @@ test('a move other repertoire chapters play is marked, and its list opens the ot
   await page.getByRole('menuitem', { name: /Alapin/ }).click();
   await expect(page).toHaveURL(/#\/study\/Rep0Najd\/Ch2Alapn/);
   await expect(page.locator('.move.current')).toHaveText(/c3/);
+});
+
+test('a move whose position the chapter reaches by another order is covered, marked ⇄, and its mark leads there', async ({ page }) => {
+  // 1. Nf3 c5, where 2. e4 isn't played but reaches the main line's 1. e4 c5 2. Nf3.
+  await setUp(page, { edit: (pgn) => pgn.replace('1. e4 c5', '1. e4 (1. Nf3 c5) 1... c5') });
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf`);
+  await page.locator('.move[data-path="Nf3 c5"]').click({ position: { x: 6, y: 8 } });
+  await expect(rows(page)).toHaveText(['c4', 'e4']);
+  const e4 = panel(page).locator('.ex-row', { hasText: 'e4' });
+  await expect(e4).toHaveClass(/covered/);
+  await expect(e4).toHaveClass(/transposed/);
+  await expect(panel(page).locator('.ex-row', { hasText: 'c4' })).not.toHaveClass(/covered/);
+  await e4.locator('.ex-tr').click();
+  await page.getByRole('menuitem', { name: '1. e4 c5 2. Nf3' }).click();
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3');
 });
 
 test('no Lichess login: the games tab says so and offers it, with ChessDB’s moves under it', async ({ page }) => {

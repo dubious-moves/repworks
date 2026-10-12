@@ -7,9 +7,9 @@ import { parseChapterFile } from '../../../../src/core/pgn/parse.ts';
 import { indexStudies } from '../../../../src/core/repertoire/index.ts';
 import type { Chapter } from '../../../../src/core/study/model.ts';
 import { addMove, continuation, linePgn } from '../../../../src/core/study/ops.ts';
-import { otherOrders, transpositions } from '../../../../src/core/study/transpositions.ts';
+import { movesFrom, otherOrders, transposedFrom, transpositions } from '../../../../src/core/study/transpositions.ts';
 import { positionKeyOf } from '../../../../src/core/chess/positionKey.ts';
-import { positionAt } from '../../../../src/core/study/tree.ts';
+import { nodeAt, positionAt } from '../../../../src/core/study/tree.ts';
 
 function chapter(movetext: string, headers = '', cid = 'Chapter1'): Chapter {
   const parsed = parseChapterFile(`[Event "Test"]\n${headers}\n${movetext} *\n`, cid);
@@ -78,6 +78,27 @@ test('transpositions ignore move counters, and keep an en passant square only wh
   const capture = transpositions(chapter('1. e4 Nf6 (1... d5 2. e5 Nf6) 2. e5 d5'));
   assert.deepEqual(otherOrders(capture, ['e4', 'Nf6', 'e5', 'd5']), []);
   assert.notEqual(capture.keyOf.get('e4 Nf6 e5 d5'), capture.keyOf.get('e4 d5 e5 Nf6'));
+});
+
+test('the explorer’s transposition marks: moves not played here whose position the chapter reaches another way', () => {
+  // The Ruy Lopez's position, and the Italian's by another order.
+  const c = chapter('1. e4 e5 (1... Nc6 2. Nf3 e5 3. Bc4) 2. Nf3 Nc6 3. Bb5');
+  const t = transpositions(c);
+  const at = (path: string[]) => {
+    const pos = positionAt(c, path)!;
+    return transposedFrom(t, pos, path, nodeAt(c, path)!.children.map((ch) => ch.san));
+  };
+  // After 1. e4 e5 2. Nf3, 2... Nc6 is played; nothing else of Black's reaches a chapter position.
+  assert.deepEqual([...at(['e4', 'e5', 'Nf3'])], []);
+  // After 1. e4 Nc6 2. Nf3 e5, 3. Bb5 is not played but 1. e4 e5 2. Nf3 Nc6 3. Bb5 reaches its
+  // position; 3. Bc4 is played there, so not marked.
+  assert.deepEqual([...at(['e4', 'Nc6', 'Nf3', 'e5'])], [['Bb5', [['e4', 'e5', 'Nf3', 'Nc6', 'Bb5']]]]);
+  // And the other way: after 1. e4 e5 2. Nf3 Nc6, 3. Bc4 transposes; 3. Bb5 is played.
+  assert.deepEqual([...at(['e4', 'e5', 'Nf3', 'Nc6'])], [['Bc4', [['e4', 'Nc6', 'Nf3', 'e5', 'Bc4']]]]);
+  // Every legal move once: 20 at the start, promotions four each.
+  assert.equal(movesFrom(positionAt(c, [])!).size, 20);
+  const promo = chapter('', '[SetUp "1"]\n[FEN "8/P7/8/8/8/8/8/k6K w - - 0 1"]');
+  assert.deepEqual([...movesFrom(positionAt(promo, [])!).keys()].filter((s) => s.startsWith('a8')).sort(), ['a8=B', 'a8=N', 'a8=Q+', 'a8=R+']);
 });
 
 test('copy continuation: from the branch’s first move to the end of the line, numbered from its position', () => {
