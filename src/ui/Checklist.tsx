@@ -18,7 +18,7 @@ import { makeSanAndPlay } from 'chessops/san';
 import { MoveBoard, PracticeBoard } from './Practice.tsx';
 import { winRateColor } from './RepertoireCheck.tsx';
 import { isoDay } from './day.ts';
-import { Back } from './Back.tsx';
+import { Back, Stuck } from './Back.tsx';
 
 const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
@@ -180,7 +180,7 @@ export function ChecklistDrill(props: { sid: string; i: number; preset: Preset }
     return undefined;
   }, [k, v]);
   useEffect(() => () => leavePractice(), []);
-  if (!list || !v) return <p class="warn">That checklist line isn’t on this device: make the checklist again.</p>;
+  if (!list || !v) return <Stuck parent={{ name: 'repCheck' }}>That checklist line isn’t on this device: make the checklist again.</Stuck>;
   const back = (
     <div class="chapter-head">
       <Back parent={{ name: 'repCheck' }} />

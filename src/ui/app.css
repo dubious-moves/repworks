@@ -786,6 +786,53 @@ textarea.script {
   border-color: var(--accent-hover-border);
 }
 
+/* Home (§5.97): next to ← on a wide screen, quieter than it; on a narrow one in the top bar, where
+   the head has no room to spare. The installed app on a desktop hides the top bar, so the head's. */
+.home-link {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.chapter-head .head-home {
+  min-width: 44px;
+  min-height: 44px;
+  border: 1px solid var(--control-border);
+  border-radius: 10px;
+  background: var(--control-bg);
+  color: var(--control-text);
+}
+
+.chapter-head .head-home:hover,
+.chapter-head .head-home:focus-visible {
+  border-color: var(--control-border-strong);
+}
+
+.topbar-home {
+  min-width: 40px;
+  min-height: 40px;
+  margin-right: -8px;
+  color: var(--accent-text);
+}
+
+@media (max-width: 899px) {
+  .chapter-head .head-home {
+    display: none;
+  }
+}
+
+@media (min-width: 900px) {
+  .topbar-home {
+    display: none;
+  }
+}
+
+.stuck .chapter-head {
+  margin-bottom: 12px;
+}
+
 .chapter-head .titles {
   display: flex;
   flex-direction: column;

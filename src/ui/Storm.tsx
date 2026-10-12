@@ -67,7 +67,7 @@ import { maiaDialog, maiaElo, maiaState } from '../app/maia.ts';
 import { Board } from './Board.tsx';
 import { useWakeLock } from './Train.tsx';
 import { collect, fillBodies, puzzlePrefs, puzzleState, refreshPuzzles, setPuzzlePrefs, SHARD_MB, SHARES, SHARDS_PER_COLLECT, stopPuzzles, WORKING_SET } from '../app/puzzles.ts';
-import { Back } from './Back.tsx';
+import { Back, Stuck } from './Back.tsx';
 import { NoteButton } from './CardNote.tsx';
 
 const PUZZLE_WORD: Record<string, string> = { great: 'Solved', blunder: 'Not the solution', unanswered: 'Not answered' };
@@ -149,7 +149,8 @@ export function StormScreen(props: { where: StormWhere }) {
   const s = stormSession.value;
   useWakeLock(!!gathering.value?.running || (!!s && s.phase !== 'done'));
   if (!data) return <p class="muted">Reading the repertoire…</p>;
-  if (typeof scope === 'string' || !scope) return <p class="warn">{scope ?? 'Reading the repertoire…'}</p>;
+  if (typeof scope === 'string') return <Stuck parent={{ name: 'list' }}>{scope}</Stuck>;
+  if (!scope) return <p class="muted">Reading the repertoire…</p>;
   const live = !!s && s.phase !== 'done';
   return (
     <div class="train storm">

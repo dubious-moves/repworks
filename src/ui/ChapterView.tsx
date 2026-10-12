@@ -39,7 +39,7 @@ import { TranspositionList } from './Transpositions.tsx';
 import { Explorer } from './Explorer.tsx';
 import { EnginePanel, EvalBar, useEngineArrows } from './Engine.tsx';
 import { analysePosition, setThreat, threat } from '../app/engine.ts';
-import { Back } from './Back.tsx';
+import { Back, Stuck } from './Back.tsx';
 
 const BRUSH_NAMES: Brush[] = ['green', 'red', 'blue', 'yellow'];
 
@@ -142,7 +142,7 @@ export function ChapterView() {
   // Another chapter opens at the board, wherever the page was scrolled.
   useEffect(() => scrollTo({ top: 0 }), [s?.sid, s?.cid]);
 
-  if (!s) return <p class="muted">{problem.value ?? 'Opening…'}</p>;
+  if (!s) return problem.value ? <Stuck parent={{ name: 'list' }}>{problem.value}</Stuck> : <p class="muted">Opening…</p>;
   const node = c ? nodeAt(c, path) : undefined;
   const shownLine = previewBoard('chapter');
 

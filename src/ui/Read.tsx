@@ -21,7 +21,7 @@ import { lineThrough, nodeAt, positionAt, startPosition } from '../core/study/tr
 import { pathKey } from '../core/study/notation.ts';
 import { Board } from './Board.tsx';
 import { CommentText, endPreviewOnBoard, PreviewBar, previewBoard } from './CommentText.tsx';
-import { Back } from './Back.tsx';
+import { Back, Stuck } from './Back.tsx';
 
 type Loaded = { chapter: Chapter; line: string[] } | { problem: string };
 
@@ -71,7 +71,7 @@ export function ReadView(props: { sid: string; cid: string; at: string[]; from?:
   const toChapter = () => open({ name: 'chapter', sid, cid, at: path });
 
   if (!loaded) return <p class="muted">Opening…</p>;
-  if (!ok) return <p class="warn">{'problem' in loaded ? loaded.problem : ''}</p>;
+  if (!ok) return <Stuck parent={{ name: 'chapter', sid, cid }}>{'problem' in loaded ? loaded.problem : ''}</Stuck>;
   return (
     <div class="train read">
       <div class="chapter-head">

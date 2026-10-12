@@ -5806,3 +5806,13 @@ a variation: ↓ enters its line, no last move for a pass, ↓ ↑ between lines
 view).
 
 Live: TESTING.md.
+
+#### 5.97 ← on every page, and Home (the owner's request, 2026-10-12)
+
+A page that can't be shown (a line gone from the repertoire, a study or checklist line not on this
+device, a chapter that won't open) said why and nothing else: in the installed app on a desktop,
+which has no top bar and no browser back button, a dead end. It now keeps the head's ← (to the
+page's parent when opened from outside) and Home (`Stuck` in `ui/Back.tsx`). Home, to the start
+page, is on every page but the start page: next to ← on a screen 900px wide or more, in the top bar's
+right on a narrower one, where the head has no room to spare. The installed app on a desktop hides
+the top bar but is wide, so it gets the head's.

@@ -17,7 +17,7 @@ import type { StudyChapters } from '../core/repertoire/files.ts';
 import { header } from '../core/study/model.ts';
 import { startPosition } from '../core/study/tree.ts';
 import { movesFrom } from './LineList.tsx';
-import { Back } from './Back.tsx';
+import { Back, Stuck } from './Back.tsx';
 
 const SEVERITY: Record<Severity, { label: string; help: string }> = {
   hole: { label: 'Hole', help: 'Your move, and the repertoire has none here' },
@@ -37,7 +37,7 @@ export function CoverageView(props: { sid: string }) {
   }, [version]);
   if (!studies) return <p class="muted">Reading the studies…</p>;
   const here = studies.find((s) => s.sid === props.sid);
-  if (!here) return <p class="warn">That study isn’t on this device.</p>;
+  if (!here) return <Stuck parent={{ name: 'list' }}>That study isn’t on this device.</Stuck>;
   return <Report here={here} studies={studies} />;
 }
 

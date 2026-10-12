@@ -31,7 +31,7 @@ import { CommentText, endPreviewOnBoard, PreviewBar, previewBoard } from './Comm
 import { firstNewLine, LineList, nextLine } from './LineList.tsx';
 import { setMark } from '../app/lineMarks.ts';
 import { openTrainSettings } from './TrainSettings.tsx';
-import { Back } from './Back.tsx';
+import { Back, Stuck } from './Back.tsx';
 import { LineReader } from './Read.tsx';
 import { FloatingMenu } from './MoveMenu.tsx';
 
@@ -182,7 +182,10 @@ export function TrainScreen(props: { of: SessionKind }) {
     return () => keys.stop();
   }, [showing]);
 
-  if (sessionProblem.value) return <p class="warn">{sessionProblem.value}</p>;
+  if (sessionProblem.value) {
+    const p = props.of;
+    return <Stuck parent={p.kind === 'play' ? { name: 'chapter', sid: p.sid, cid: p.cid, at: p.at } : { name: 'list' }}>{sessionProblem.value}</Stuck>;
+  }
   if (!s) return <p class="muted">Reading the repertoire…</p>;
   const of = s.of;
   const chapterName = (sid: string, cid: string) => {

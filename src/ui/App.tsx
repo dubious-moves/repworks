@@ -22,6 +22,7 @@ import { Guard } from './Guard.tsx';
 import { ImportScreen } from './Import.tsx';
 import { SetupForm } from './Setup.tsx';
 import { SyncBanners, SyncChip } from './Sync.tsx';
+import { HomeLink } from './Back.tsx';
 import { MistakesView } from './Mistakes.tsx';
 import { ReadView } from './Read.tsx';
 import { TrainPick, TrainScreen } from './Train.tsx';
@@ -41,6 +42,7 @@ export function App() {
         <img class="topbar-icon" src={`${import.meta.env.BASE_URL}icons/icon.svg`} alt="" width={28} height={28} />
         <h1>Repworks</h1>
         {!wide.value && <SyncStatus />}
+        {mode.value.name !== 'list' && <HomeLink class="topbar-home" />}
       </header>
       {updateReady.value && (
         <div class="banner" role="status">

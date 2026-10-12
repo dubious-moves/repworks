@@ -5,6 +5,11 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## ← and Home on every page (§5.97)
+- The installed desktop app: open a line that's gone from the repertoire (or any page): ← and the
+  house beside it are in the head; the house goes to the start page. On the phone the house is at
+  the top bar's right.
+
 ## Clickable lines: words, null moves, ↓ (§5.96)
 - Write a comment like `( 12.Ng5 Ndf6 taking the e6-pawn under control 13.Nxe6 Bxe6)` and one like
   `(7.-- Bg7, 8.-- O-O, and 9.-- a5)`: the words in plain comment style, the moves clickable, and

@@ -66,3 +66,21 @@ test('← on a page opened from outside the app goes up to its parent', async ({
   await other.locator('.chapter-head .back').click();
   await expect(other.locator('.study-card').first()).toBeVisible();
 });
+
+test('a line gone from the repertoire keeps ← and Home; Home is on every page (§5.97)', async ({ page, isMobile }) => {
+  await setUp(page);
+  await expect(page.getByRole('link', { name: 'Home' })).toHaveCount(0);
+  await page.goto(`${site.url}#/train/Rep0Najd/Ch1Najdf?at=a4,a5,h4,h5`);
+  await expect(page.locator('.warn')).toHaveText(/isn’t in the repertoire any more/);
+  await expect(back(page)).toBeVisible();
+  // In the head on a wide screen; in the top bar on a phone, where the head has no room.
+  const home = page.getByRole('link', { name: 'Home' });
+  await expect(home).toHaveCount(1);
+  await expect(page.locator(isMobile ? '.topbar .home-link' : '.chapter-head .home-link')).toBeVisible();
+  await home.click();
+  await expect(page.locator('.study-card').first()).toBeVisible();
+  await page.getByRole('link', { name: 'Test repertoire', exact: true }).click();
+  await expect(page).toHaveURL(/#\/study\/Rep0Najd/);
+  await page.getByRole('link', { name: 'Home' }).click();
+  await expect(page.locator('.study-card').first()).toBeVisible();
+});
