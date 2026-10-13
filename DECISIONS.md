@@ -1625,3 +1625,13 @@ The technical calls, each with its reason:
   finish).
 - **A position Maia at the user's rating solves 95% of the time or more is never dealt** (kept in
   the store). Why: the owner's call, 95% their suggestion; 85% stays "easy, dealt last".
+
+## Revision of 2026-10-13 (review lines to their end, every first answer graded, PLAN.md §5.106)
+- **A move reviewed before is graded the first time it is asked in a session, due or not.** Was
+  (§5.78, 2026-10-09): asked moves not due were practice, ungraded. Why: a miss on such a move is
+  evidence of forgetting and was lost; Chessable's Overstudy counts it too. The owner chose that
+  right answers count as well (option B over A), so a line's moves come due together. A move in
+  its learning step is still graded only when due.
+- **Review lines go past their last due move to their end** (short of a move never answered).
+  Was (§5.4): a review line ended at its last due move. The owner sees value in the cut (a hard
+  move at ply 12 can make the rest obvious); noted in §5.106 for later, not built.

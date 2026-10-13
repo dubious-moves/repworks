@@ -140,7 +140,8 @@ test('a due card is asked; right first time is Good, with the time taken', () =>
   const states = new Map<string, CardState>([...w.ix.cards.keys()].map((c) => [c, notDue]));
   states.set(card('e4 e5 Nf3'), dueNow);
   const { effects, records } = run(trainer(w, planOf(w, states), states), right);
-  assert.deepEqual(plays(effects), ['auto:e4', 'opponent:e5', 'user:Nf3']);
+  // The line goes on to its end past its last due move (§5.106); Bb5, not due, is played.
+  assert.deepEqual(plays(effects), ['auto:e4', 'opponent:e5', 'user:Nf3', 'opponent:Nc6', 'auto:Bb5']);
   assert.deepEqual(records, [{ k: 'review', card: card('e4 e5 Nf3'), g: 3, ms: 1000 }]);
   assert.ok(effects.some((e) => e.type === 'note' && e.note.kind === 'correct'));
 });
@@ -483,8 +484,8 @@ test('auto-play difficult: a move with lapses is asked even when not due; an eas
   assert.deepEqual(plays(easy.effects), ['auto:e4', 'opponent:e5', 'auto:Nf3', 'opponent:Nc6', 'user:Bb5']);
   const { effects, records } = run(trainer(w, plan, states, { autoPlay: 'difficult' }), right);
   assert.deepEqual(plays(effects), ['auto:e4', 'opponent:e5', 'user:Nf3', 'opponent:Nc6', 'user:Bb5']);
-  // Nf3 is practice: only Bb5 is graded.
-  assert.deepEqual(records.map((r) => r.card), [card('e4 e5 Nf3 Nc6 Bb5')]);
+  // Nf3, reviewed and asked, is graded too (§5.106).
+  assert.deepEqual(records.map((r) => r.card), [card('e4 e5 Nf3'), card('e4 e5 Nf3 Nc6 Bb5')]);
 });
 
 test('auto-play session: a move taught is asked when met again; one found unaided is played', () => {
@@ -596,8 +597,9 @@ test('show sequence: a due move ends the sequence before it, so it is not given 
       const { effects, records } = run(trainer(w, planOf(w, states), states, { lineStart: start as TrainerOptions['lineStart'] }), right);
       assert.deepEqual(effects.find((e) => e.type === 'line')?.type === 'line' && (effects.find((e) => e.type === 'line') as { path: string[] }).path, path);
       assert.deepEqual(plays(effects), expectedPlays);
-      // Only the due moves are graded; the moves asked before them are practice.
-      assert.deepEqual(records.map((r) => r.card), [card('e4 e5 Nf3 Nc6 Bb5'), card('e4 e5 Nf3 Nc6 Bb5 a6 Ba4')]);
+      // The due moves are graded; asked from the start, the reviewed moves before them too (§5.106).
+      const before = start === 'ask' ? [card('e4'), card('e4 e5 Nf3')] : [];
+      assert.deepEqual(records.map((r) => r.card), [...before, card('e4 e5 Nf3 Nc6 Bb5'), card('e4 e5 Nf3 Nc6 Bb5 a6 Ba4')]);
     });
   }
 
@@ -701,8 +703,8 @@ test('random repertoires under every auto-play mode, line start, repetitions and
     assert.equal(new Set(taught).size, taught.length, `${what}: a card taught twice`);
     for (const c of plan.lines.flatMap((l) => l.ask)) assert.ok(reviewed_.includes(c), `${what}: ask ${c} not graded`);
     for (const c of plan.lines.flatMap((l) => l.teach)) assert.ok(taught.includes(c), `${what}: teach ${c} not taught`);
-    // Nothing is graded that the plan doesn't ask (a picked line's and auto-play off's asks are practice).
-    for (const c of reviewed_) assert.ok(plan.lines.some((l) => l.ask.includes(c)) || statusOf(states.get(c)) === 'fresh' || [...w.ix.positions.values()].some((p) => p.own.size > 1), `${what}: ${c} graded though not asked`);
+    // Nothing in its learning step is graded unless the plan asks it (§5.106).
+    for (const c of reviewed_) assert.ok(plan.lines.some((l) => l.ask.includes(c)) || statusOf(states.get(c)) !== 'learning' || [...w.ix.positions.values()].some((p) => p.own.size > 1), `${what}: ${c} graded though not asked`);
     for (const e of a.effects) if (e.type === 'wait') assert.ok(e.ms >= MIN_PACE_MS, what);
   }
 });
@@ -756,7 +758,7 @@ test('repetitions: the next pass starts as a line does, at its first move taught
   assert.deepEqual(plays(effects), ['opponent:Nc6', 'user:Bb5', 'opponent:Nc6', 'user:Bb5']);
 });
 
-test('from the start, asked: every own move is asked on every pass, whatever the auto-play mode; nothing more graded', () => {
+test('from the start, asked: every own move is asked on every pass, whatever the auto-play mode; each graded once', () => {
   // The owner's report (2026-10-09): the second pass auto-played the moves answered on the first.
   const w = world(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 Nc6 3. Bb5'));
   const states = new Map<string, CardState>([[card('e4'), notDue], [card('e4 e5 Nf3'), notDue]]);
@@ -764,7 +766,8 @@ test('from the start, asked: every own move is asked on every pass, whatever the
     const { effects, records } = run(trainer(w, planOf(w, states, 20), states, { repetitions: 2, lineStart: 'ask', autoPlay }), right);
     const user = ['user:e4', 'opponent:e5', 'user:Nf3', 'opponent:Nc6', 'user:Bb5'];
     assert.deepEqual(plays(effects), [...user, ...user], autoPlay);
-    assert.deepEqual(records.map((r) => r.k), ['taught'], autoPlay);
+    // e4 and Nf3, reviewed, are graded on their first ask (§5.106); Bb5 is taught.
+    assert.deepEqual(records.map((r) => [r.k, r.card]), [['review', card('e4')], ['review', card('e4 e5 Nf3')], ['taught', card('e4 e5 Nf3 Nc6 Bb5')]], autoPlay);
   }
 });
 

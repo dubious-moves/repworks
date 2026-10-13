@@ -5,6 +5,15 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## Review lines to their end; every first answer graded (§5.106)
+- In the day's queue with "From the start, asked": a review line now goes on past its last due
+  move to its end (or stops after your last move before a move you've never been taught). Every
+  move you're asked for the first time in the session counts: a miss shows up in the session's
+  numbers and the move comes back soon. Does a session feel too long now? If so, say so: the cut
+  at the last due move can come back as a setting (§5.106, "Kept for later").
+- With "At its first new or due move" and auto-play on, the moves after the last due one are
+  played for you at the pace: worth keeping, or would you rather the line stopped there?
+
 ## Lines from the comments quizzed in review (§5.98)
 - In the day's queue (or a line picked that teaches nothing), on a line whose comments hold lines
   starting with the opponent's move: the "Comment lines" chip appears in the counters' row when the

@@ -1,7 +1,9 @@
 // The line planner (PLAN.md §5.4): which lines today's session walks, and what each one asks.
 // - Review lines first: going through the lines in the index's order, each line that holds a due
-//   card not yet covered is taken, up to its last such card (nothing after it would be asked).
-//   Consecutive lines then share prefixes, so the board's positions follow on from each other.
+//   card not yet covered is taken, and walked on past its last such card to its end (the owner's
+//   choice, 2026-10-13, §5.106: the moves after it are asked too, and graded); short of a move
+//   never answered there, which waits for its own day as new material. Consecutive lines then
+//   share prefixes, so the board's positions follow on from each other.
 // - Then today's new lines (§5.3), walked whole; then the known pool, line by line, each up to
 //   its last card never reviewed.
 // On the way, a card never answered is taught where it is first met (§5.6), or asked if it is
@@ -66,11 +68,27 @@ export function planSession(index: RepertoireIndex, queue: DailyQueue, states: R
     return end;
   };
 
+  /**
+   * A review line's walk past its last due card: to its end, or to its last own move before a move
+   * never answered (taught on its own day, within the daily limit), never short of `end`.
+   */
+  const tailEnd = (line: Line, end: number) => {
+    let to = line.path.length;
+    for (let i = 0; i < line.cards.length; i++) {
+      const card = line.cards[i]!;
+      const ply = line.plies[i]!;
+      if (ply < end || handled.has(card) || !unanswered(card) || known.has(card)) continue;
+      to = ply - 1;
+      break;
+    }
+    return Math.max(end, to);
+  };
+
   for (const line of lines) {
     // A paused line is never walked (§5.70): a due card on it lies on an active line too.
     if (line.paused) continue;
     const end = endAt(line, (c) => due.has(c));
-    if (end > 0) walk('review', line, end);
+    if (end > 0) walk('review', line, tailEnd(line, end));
   }
   for (const line of queue.newLines) walk('new', line, line.path.length);
   for (const line of queue.knownLines) {
@@ -95,8 +113,8 @@ export function interactivePlan(lines: readonly Line[], path: readonly string[],
 /**
  * A session taken up again after a visit to the study (§5.15): its plan made afresh from the
  * edited repertoire, less the cards the session already answered, so it carries on rather than
- * asking them twice. A line left with nothing to ask or teach goes; one that lost its last ask
- * ends at its last card left (a new line is still walked whole).
+ * asking them twice. A line left with nothing to ask or teach goes; a known line that lost its
+ * last ask ends at its last card left (new and review lines are still walked whole).
  */
 export function withoutAnswered(plan: SessionPlan, answered: ReadonlySet<string>): SessionPlan {
   if (answered.size === 0) return plan;
@@ -114,7 +132,7 @@ export function withoutAnswered(plan: SessionPlan, answered: ReadonlySet<string>
     p.line.cards.forEach((card, i) => {
       if (left.has(card) && p.line.plies[i]! < p.end) last = Math.max(last, p.line.plies[i]! + 1);
     });
-    lines.push({ ...p, ask, teach, end: p.kind === 'new' ? p.end : last });
+    lines.push({ ...p, ask, teach, end: p.kind === 'known' ? last : p.end });
   }
   return { lines };
 }

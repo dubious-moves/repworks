@@ -132,7 +132,7 @@ test('the line through a study\'s move: the topmost through it, or the one shari
   assert.equal(lineThrough(ix, 'Study001', 'Nowhere1', ['e4']), undefined);
 });
 
-test('a picked line: due moves graded, new ones taught, the rest asked with no record, suspended ones played', () => {
+test('a picked line: due moves graded, new ones taught, the rest asked (graded if reviewed, §5.106), suspended ones played', () => {
   const line = findLine(ix, 'Study001', 'Chapter1', ['e4', 'e5', 'Nf3', 'Nc6', 'Bb5', 'a6', 'Bxc6', 'dxc6', 'O-O'])!;
   assert.ok(line);
   assert.equal(findLine(ix, 'Study001', 'Chapter1', ['e4', 'e5']), undefined);
@@ -144,12 +144,14 @@ test('a picked line: due moves graded, new ones taught, the rest asked with no r
   ]);
   const plan = pickedPlan(ix, states, DEFAULT_TRAIN, day, line);
   assert.deepEqual(plan.lines.map((l) => [l.kind, l.end, l.ask, l.teach]), [['pick', 9, [card('e4 e5 Nf3')], [card('e4 e5 Nf3 Nc6 Bb5 a6 Bxc6 dxc6 O-O')]]]);
-  // e4 (not due) answered wrong first: asked again, nothing recorded for it.
+  // e4 (reviewed, not due) answered wrong first: Again, as a due move would be; Bb5, in its
+  // learning step, asked with no record.
   const { effects, records, answers } = run(trainer(plan, states, { practice: true }), (n) => (n === 0 ? 'wrong' : 'right'));
   assert.deepEqual(answers, [card('e4'), card('e4 e5 Nf3'), card('e4 e5 Nf3 Nc6 Bb5')]);
   assert.deepEqual(
     records.map((r) => [r.k, r.card, r.k === 'review' ? r.g : undefined]),
     [
+      ['review', card('e4'), 1],
       ['review', card('e4 e5 Nf3'), 3],
       ['taught', card('e4 e5 Nf3 Nc6 Bb5 a6 Bxc6 dxc6 O-O'), undefined],
     ],

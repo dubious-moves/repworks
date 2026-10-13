@@ -122,7 +122,8 @@ test('comment lines: offered in the counters\' row, left out of a comment shown,
   // Back at the line's end: nothing left to quiz.
   await expect(feedback(page)).toHaveText(/^Line done · Next: /);
   await expect(page.getByRole('button', { name: /^Quiz lines/ })).toHaveCount(0);
-  await expect(page.locator('.train-line')).toHaveText(/Main line\s*1\. e4 c5$/);
+  // The review line goes on past 1... c5 to its end (§5.106), 2... d6 played for the user.
+  await expect(page.locator('.train-line')).toHaveText(/Main line\s*1\. e4 c5 2\. Nf3 d6$/);
   await page.getByRole('button', { name: 'Stop' }).click();
   await expect(page.getByRole('region', { name: 'Session done' })).toContainText('2 lines from the comments, 3 of 4 moves found first time');
   // Only 1... c5's review reaches the data repo, with the next sync.

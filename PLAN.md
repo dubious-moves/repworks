@@ -6111,3 +6111,38 @@ Live: TESTING.md.
   teaches nothing.
 
 Tests: `kinds.test.ts` (90% easy, not too easy; 96% both). Live: TESTING.md.
+#### 5.106 Review lines walked to their end; every first answer graded (the owner's choice, 2026-10-13)
+The owner's report: a review line in today's queue stopped at 10...a5, its last due move, though
+the line goes on six plies. With "From the start, asked", each later move then brings the line's
+start back on its own day, and a miss on a move asked but not due was lost: nothing recorded it.
+- **Other platforms** (from search summaries of their help pages; their sites can't be opened
+  from the cloud container): Chessable's "whole variation" review plays the moves leading to the
+  due ones and asks them as Overstudy: a right answer changes nothing, a **wrong one resets the
+  move's timer**. Its "randomized" review asks each due move alone, in its position. ChessTempo
+  doesn't ask moves it judges well learned by default (an option asks all). Chessbook (FSRS, one
+  card a move, as here) schedules moves, not lines, and varies the move order to a position.
+  Listudy resets a move's card on a wrong answer.
+- Two options were put to the owner: A, misses count and right answers don't (Chessable's
+  Overstudy); B, every first answer in a session counts, and review lines go to their end. **The
+  owner chose B.**
+- **Graded**: a move reviewed before, asked for the first time in a session, is graded, due or
+  not, in every session that records (the queue, show and grade, a line picked, Learn). FSRS takes
+  the time since the last review (`fsrs.ts`), so an early Good raises stability little and a miss
+  is an ordinary lapse; the moves of a line drift towards falling due together, so a line's start
+  is walked about once a cycle rather than once a move. Later asks in the session (passes,
+  retries, a shared prefix met again) stay ungraded. A move in its learning step is graded only
+  when due (a review that early would cut the step short); a miss on it still counts for the
+  session (auto-play, mistakes retried).
+- **Review lines** are walked past their last due move to their end, or to their last own move
+  before a move never answered (that move is new material, taught on its own day within the
+  daily limit). Whether the moves after are asked or played follows the auto-play mode and the
+  line start, as before. Known lines still end at their last ask; a session taken up again (§5.15)
+  keeps a review line's end.
+- **Kept for later** (the owner, 2026-10-13): stopping at the last due move has value too. A hard
+  move at ply 12 may make the moves after it obvious, and walking them costs time for little. If
+  sessions grow too long, a setting (or a rule: stop when every move after the last due one has
+  been answered right N times running) could bring the cut back. Not built.
+
+Tests: `plan.test.ts` (a review line to its end; short of a move never answered; random plans),
+`trainer.test.ts` and `browse.test.ts` (reviewed moves graded on first ask; learning ones not).
+Live: TESTING.md.

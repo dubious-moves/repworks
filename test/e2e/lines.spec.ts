@@ -1,8 +1,8 @@
 // The training screen's line list and the owner's first Phase 1 testing round (PLAN.md §5.16), on
 // a desktop viewport and an emulated phone, with the fixture repertoire of train.spec.ts (a Black
 // Sicilian: 1... c5 due, 2... d6 suspended, three new moves). A line picked from the list is
-// trained at once: its due move graded, its new move taught; picked again, its moves are asked
-// with nothing recorded. The daily limit changed from the site and written to settings.json; the
+// trained at once: its due move graded, its new move taught; picked again, its moves are asked,
+// a miss on a reviewed one recorded (§5.106). The daily limit changed from the site and written to settings.json; the
 // day with nothing left, which still offers the next line and the study; show and grade switched
 // on by "1" in the middle of a session and off again.
 import { test, expect, type Page } from '@playwright/test';
@@ -63,7 +63,7 @@ const shot = async (page: Page, name: string) => {
   if (process.env['REPWORKS_SHOTS']) await page.screenshot({ path: `${process.env['REPWORKS_SHOTS']}/${name}-${page.viewportSize()!.width}.png` });
 };
 
-test('the line list: a line picked and trained, then practised again with nothing recorded', async ({ page }) => {
+test('the line list: a line picked and trained, then practised again, a miss recorded', async ({ page }) => {
   await walkOnce(page);
   const git = await setUp(page);
   await page.goto(`${site.url}#/train/Rep0Najd`);
@@ -102,8 +102,8 @@ test('the line list: a line picked and trained, then practised again with nothin
     ['taught', NC6, undefined],
   ]);
 
-  // Again: nothing on it is due now, and every move is asked anyway, a wrong one included, with
-  // nothing recorded.
+  // Again: nothing on it is due now, and every move is asked anyway. A miss on 1... c5, reviewed
+  // before, is recorded (§5.106); 2... Nc6, in its learning step, is not graded.
   await done.getByRole('button', { name: 'Again' }).click();
   await asked(page);
   await play(page, 'e7', 'e5');
@@ -114,7 +114,11 @@ test('the line list: a line picked and trained, then practised again with nothin
   await expect(done).toContainText('Line done');
   await page.locator('.chip').click();
   await expect(page.locator('.chip')).toHaveText(/^synced/);
-  expect(pushed(git)).toHaveLength(2);
+  expect(pushed(git).map((e) => [e['k'], e['card'], e['g']])).toEqual([
+    ['review', C5, 3],
+    ['taught', NC6, undefined],
+    ['review', C5, 1],
+  ]);
 
   // Line 2 in the list is now learned, due again after its learning step.
   await expect((await lines(page)).locator('.line-list-line').nth(1)).toContainText(/Due/);

@@ -11,7 +11,8 @@
 //   records `taught`, never a review. A known move answered wrong records Again and no `taught`:
 //   the daily limit counts `taught` events, and known moves never use it (§5.3).
 // - Auto-play (§5.17, lichessable's modes): an own move the plan doesn't need graded or taught is
-//   played for the user or asked without a grade, by the `autoPlay` mode (`plays`). Suspended
+//   played for the user or asked, by the `autoPlay` mode (`plays`). Asked, a move reviewed before
+//   is graded the first time in the session, due or not (§5.106); a later ask isn't. Suspended
 //   moves are always played. Where a line starts (`lineStart`) decides the moves before its first
 //   move the plan needs: skipped, or played at the pace; or, `ask`, every own move is asked.
 // - Conflicting moves (D3): every own move of the position is accepted, and the one played is
@@ -66,7 +67,7 @@ export const MIN_PACE_MS = 450;
 /**
  * Which own moves the plan doesn't need are played for the user (§5.17, after lichessable's
  * auto-play and its "difficult moves only"):
- * - `off`: none; every one is asked, with no grade.
+ * - `off`: none; every one is asked (graded the first time if reviewed before, §5.106).
  * - `session`: moves answered right first time earlier in the session (lichessable's auto-play);
  *   a move answered wrong is asked again, ungraded.
  * - `due` (the default, the trainer as it was): moves answered earlier in the session, right or
@@ -83,7 +84,8 @@ export const AUTO_PLAYS: readonly AutoPlay[] = ['off', 'session', 'due', 'diffic
  *   is when the line shares its moves;
  * - `auto`: at the chapter's start, those moves played at the pace, own moves included;
  * - `ask`: at the chapter's start, and every own move of the line asked, whatever the auto-play
- *   mode, on every pass (ungraded unless due); only suspended moves are played.
+ *   mode, on every pass (graded the first time in the session if reviewed before, §5.106); only
+ *   suspended moves are played.
  */
 export type LineStart = 'first' | 'auto' | 'ask';
 export const LINE_STARTS: readonly LineStart[] = ['first', 'auto', 'ask'];
@@ -247,7 +249,7 @@ export interface TrainerSetup {
   selfGrade?: boolean;
   /**
    * A line picked from the list (§5.16): an own move the plan neither asks nor teaches, and that
-   * would be played for the user, is asked too, with no grade (unless suspended).
+   * would be played for the user, is asked too (unless suspended), graded as any ask (§5.106).
    */
   practice?: boolean;
   /**
@@ -1217,11 +1219,16 @@ export class Trainer {
   }
 
   /**
-   * Whether an answer on the card is graded: only the plan's asks and known moves never answered,
-   * and once a session. Any other move asked (a line picked, or auto-play off) is practice.
+   * Whether an answer is recorded: the first in the session of a move the plan asks, a known move
+   * never answered, or any reviewed move asked, due or not (the owner's choice, 2026-10-13, §5.106:
+   * a miss on a move not due is news; FSRS weighs an early answer by the time since the last one).
+   * A move in its learning step is graded only when due.
    */
   private graded(card: CardId) {
-    return this.record && !this.answered.has(card) && (this.toAsk.has(card) || (statusOf(this.state(card)) === 'fresh' && this.known.has(card)));
+    if (!this.record || this.answered.has(card)) return false;
+    if (this.toAsk.has(card)) return true;
+    const status = statusOf(this.state(card));
+    return status === 'review' || (status === 'fresh' && this.known.has(card));
   }
 
   /** A move asked was answered: right first time or not, for auto-play's `session` and `difficult`. */

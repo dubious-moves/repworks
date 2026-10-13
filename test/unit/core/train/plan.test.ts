@@ -51,15 +51,29 @@ const plan = (ix: RepertoireIndex, states: Map<string, CardState>, newPerDay = 0
 };
 const show = (p: SessionPlan) => p.lines.map((l) => `${l.kind}: ${l.line.path.slice(0, l.end).join(' ')} | ask ${l.ask.length} teach ${l.teach.length}`);
 
-test('review lines in the index order, each ending at its last due card', () => {
+test('review lines in the index order, each walked on past its last due card to its end', () => {
   const ix = index(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 (4. Bxc6) 4... Nf6 5. O-O'));
   const all = [...ix.cards.keys()];
   const states = new Map<string, CardState>(all.map((c) => [c, notDue]));
   states.set(card('e4 e5 Nf3'), dueNow);
   states.set(card('e4 e5 Nf3 Nc6 Bb5 a6 Bxc6'), dueNow);
   const { plan: p } = plan(ix, states);
-  // Nf3 is on the first line, which ends there; Bxc6 is on the second.
-  assert.deepEqual(show(p), ['review: e4 e5 Nf3 | ask 1 teach 0', 'review: e4 e5 Nf3 Nc6 Bb5 a6 Bxc6 | ask 1 teach 0']);
+  // Nf3 is on the first line, walked to its end (§5.106); Bxc6 is on the second.
+  assert.deepEqual(show(p), ['review: e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O | ask 1 teach 0', 'review: e4 e5 Nf3 Nc6 Bb5 a6 Bxc6 | ask 1 teach 0']);
+});
+
+test('a review line stops short of a move never answered after its last due card: new material waits for its day', () => {
+  const ix = index(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O'));
+  const states = new Map<string, CardState>([
+    [card('e4'), notDue],
+    [card('e4 e5 Nf3'), dueNow],
+    [card('e4 e5 Nf3 Nc6 Bb5'), notDue],
+  ]);
+  // Ba4 was never answered: the walk ends after Bb5, its last own move before it.
+  assert.deepEqual(show(plan(ix, states).plan), ['review: e4 e5 Nf3 Nc6 Bb5 | ask 1 teach 0']);
+  // A never-answered move before the last due one is still taught there.
+  states.set(card('e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O'), dueNow);
+  assert.deepEqual(show(plan(ix, states).plan), ['review: e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O | ask 2 teach 1']);
 });
 
 test('a due card on a transposition is asked once, on the first line that reaches it', () => {
@@ -163,8 +177,17 @@ test('random repertoires: every due card asked exactly once, on a review line; n
       // Every ask and teach lies on the walked part of the line.
       const walked = new Set(l.line.cards.filter((_, i) => l.line.plies[i]! < l.end));
       for (const c of [...l.ask, ...l.teach]) assert.ok(walked.has(c), `seed ${seed}`);
-      // A review or known line ends at a card it asks.
-      if (l.kind !== 'new') {
+      // A known line ends at a card it asks; a review line at its leaf, or short of a move never
+      // answered, past its asks (§5.106).
+      if (l.kind === 'review') {
+        const lastAsk = Math.max(...l.ask.map((c) => l.line.plies[l.line.cards.indexOf(c)]!));
+        assert.ok(l.end > lastAsk, `seed ${seed}`);
+        if (l.end < l.line.path.length) {
+          const next = l.line.cards.findIndex((_, i) => l.line.plies[i]! >= l.end);
+          assert.ok(next >= 0 && statusOf(states.get(l.line.cards[next]!)) === 'fresh', `seed ${seed}: review line cut short of ${l.line.path.length}`);
+        }
+      }
+      if (l.kind === 'known') {
         const last = l.line.cards.findLastIndex((c, i) => l.line.plies[i]! < l.end);
         assert.ok(l.ask.includes(l.line.cards[last]!), `seed ${seed}: ${l.kind} line ends past its last ask`);
       }
@@ -172,7 +195,7 @@ test('random repertoires: every due card asked exactly once, on a review line; n
   }
 });
 
-test('a session taken up again leaves out what it answered: shorter lines, emptied ones gone', () => {
+test('a session taken up again leaves out what it answered: emptied lines gone, review lines still walked to their end', () => {
   const ix = index(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 (4. Bxc6) 4... Nf6 5. O-O'), chapter('Chapter2', 'white', '1. d4 d5 2. c4'));
   const states = new Map<string, CardState>([...ix.cards.keys()].map((c) => [c, dueNow]));
   const { plan: p } = plan(ix, states, 20);
@@ -184,7 +207,7 @@ test('a session taken up again leaves out what it answered: shorter lines, empti
   // Answered before the visit: the first line's first three asks, and Bxc6; O-O missed and due
   // again within the minute, which the session doesn't ask twice.
   const answered = new Set<string>([card('e4'), card('e4 e5 Nf3'), card('e4 e5 Nf3 Nc6 Bb5'), card('e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O'), card('e4 e5 Nf3 Nc6 Bb5 a6 Bxc6')]);
-  assert.deepEqual(show(withoutAnswered(p, answered)), ['review: e4 e5 Nf3 Nc6 Bb5 a6 Ba4 | ask 1 teach 0', 'review: d4 d5 c4 | ask 2 teach 0']);
+  assert.deepEqual(show(withoutAnswered(p, answered)), ['review: e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O | ask 1 teach 0', 'review: d4 d5 c4 | ask 2 teach 0']);
   // Nothing answered: the same plan.
   assert.equal(withoutAnswered(p, new Set()), p);
 });
@@ -193,4 +216,11 @@ test('a new line taken up again is still walked whole', () => {
   const ix = index(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 Nc6 3. Bb5'));
   const { plan: p } = plan(ix, new Map(), 20);
   assert.deepEqual(show(withoutAnswered(p, new Set([card('e4')]))), ['new: e4 e5 Nf3 Nc6 Bb5 | ask 0 teach 2']);
+});
+
+test('a known line taken up again ends at its last card left', () => {
+  const ix = index(chapter('Known001', 'white', '1. e4 e5 2. Nf3 Nc6 3. Bb5', true));
+  const { plan: p } = plan(ix, new Map());
+  assert.deepEqual(show(p), ['known: e4 e5 Nf3 Nc6 Bb5 | ask 3 teach 0']);
+  assert.deepEqual(show(withoutAnswered(p, new Set([card('e4 e5 Nf3 Nc6 Bb5')]))), ['known: e4 e5 Nf3 | ask 2 teach 0']);
 });
