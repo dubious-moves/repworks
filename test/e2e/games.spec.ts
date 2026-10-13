@@ -376,6 +376,8 @@ test('a note on a game card: written on its position with a line and an arrow, s
   // A line played on the board, into the words with its move numbers.
   await click('f3');
   await click('e5');
+  // Chessground reports a move a tick later (setTimeout): till then Black's pieces don't move.
+  await expect(dialog.getByTestId('note-line')).toContainText('Line: 4. Nxe5');
   await click('d8');
   await click('g5');
   await expect(dialog.getByTestId('note-line')).toContainText('Line: 4. Nxe5 Qg5');
