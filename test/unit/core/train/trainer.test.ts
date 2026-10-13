@@ -471,6 +471,28 @@ const notes = (effects: TrainerEffect[]) => effects.flatMap((e) => (e.type === '
   }
 }
 
+{
+  // Three lines sharing 1. e4 e5 2. Nf3, every own move due; Nf3 missed on the first line.
+  const w = world(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 Nc6 3. Bb5 (3. Bc4 Bc5 4. c3) (3. d4) *'));
+  const states = () => new Map<string, CardState>([...w.ix.cards.keys()].map((c) => [c, dueNow]));
+  const lineStarts = (effects: TrainerEffect[]) => effects.flatMap((e, i) => (e.type === 'line' ? [i] : []));
+  test('auto-play session: a miss answered right on a later line is played after it', () => {
+    const s = states();
+    const { effects } = run(trainer(w, planOf(w, s), s, { autoPlay: 'session' }), wrongFirstOn('Nf3'));
+    const [, second, third] = lineStarts(effects);
+    assert.deepEqual(plays(effects.slice(second, third)), ['user:Nf3', 'opponent:Nc6', 'user:Bc4', 'opponent:Bc5', 'user:c3']);
+    assert.deepEqual(plays(effects.slice(third)), ['user:d4']);
+  });
+  test('auto-play session: a miss answered right when retried is played on the next line', () => {
+    const s = states();
+    const { effects, records } = run(trainer(w, planOf(w, s), s, { autoPlay: 'session', retryMistakes: 1 }), wrongFirstOn('Nf3'));
+    const [, second, third] = lineStarts(effects);
+    assert.deepEqual(plays(effects.slice(second, third)), ['user:Bc4', 'opponent:Bc5', 'user:c3']);
+    // Still graded once, Again.
+    assert.deepEqual(records.filter((r) => r.k === 'review' && r.card === card('e4 e5 Nf3')).map((r) => (r.k === 'review' ? r.g : 0)), [1]);
+  });
+}
+
 test('auto-play difficult: a move with lapses is asked even when not due; an easy one is played', () => {
   const w = world(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 Nc6 3. Bb5'));
   const hard: CardState = { ...notDue, card: { ...notDue.card, lapses: 2 } };

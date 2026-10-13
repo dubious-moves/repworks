@@ -1635,3 +1635,9 @@ The technical calls, each with its reason:
 - **Review lines go past their last due move to their end** (short of a move never answered).
   Was (§5.4): a review line ended at its last due move. The owner sees value in the cut (a hard
   move at ply 12 can make the rest obvious); noted in §5.106 for later, not built.
+
+## Revision of 2026-10-13 (auto-play `session`: the latest answer counts, PLAN.md §5.107)
+- **A miss answered right later in the session is played again in `session` mode, a mistake
+  retried included.** Was (§5.77): a mistake retried stayed a mistake for auto-play, so the move
+  was asked on every line for the rest of the session. Why: the owner's request; a right answer
+  after the miss shows the move is known again. `difficult` keeps a missed move asked.

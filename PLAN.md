@@ -6146,3 +6146,21 @@ start back on its own day, and a miss on a move asked but not due was lost: noth
 Tests: `plan.test.ts` (a review line to its end; short of a move never answered; random plans),
 `trainer.test.ts` and `browse.test.ts` (reviewed moves graded on first ask; learning ones not).
 Live: TESTING.md.
+
+#### 5.107 Auto-play "answered right this session": the latest answer counts (the owner's request, 2026-10-13)
+
+The owner asked whether only a move's first attempt counts for auto-play's `session` mode, and
+asked that a later right answer correct a miss. As built (§5.17), auto-play is per move, not per
+line: a miss on one move never stops the others being played. A missed move met again on a later
+line was already asked and, answered right, played after that; but a mistake retried at the line's
+end (§5.77) "stayed a mistake", so with retries on, the move was asked on every line all session.
+- **The latest answer counts** for `session`, retries included (`answer` in
+  `core/train/trainer.ts`). A miss still grades Again once; nothing about grading changes.
+- **`difficult` is unchanged**: a move missed this session stays asked there, which is that mode's
+  point.
+- **"From the start, asked" overrides auto-play** (§5.78, the owner's request): every own move is
+  asked whatever the mode. The settings' help under Auto-play now says so, and no longer says
+  "graded only when due", which §5.106 made untrue.
+
+Tests: `trainer.test.ts` (a miss answered right on a later line, then played; a miss answered
+right when retried, played on the next line, graded once). Live: TESTING.md.

@@ -392,7 +392,7 @@ export class Trainer {
   private readonly answered = new Set<CardId>();
   private readonly taughtNow = new Set<CardId>();
   private readonly suspendedNow = new Set<CardId>();
-  /** Cards answered right first time in this session, and answered wrong (§5.17's modes). */
+  /** Cards whose latest answer this session was right first time, and cards missed (§5.17's modes). */
   private readonly right = new Set<CardId>();
   private readonly missedNow = new Set<CardId>();
   private phase: Phase = 'ready';
@@ -1231,16 +1231,17 @@ export class Trainer {
     return status === 'review' || (status === 'fresh' && this.known.has(card));
   }
 
-  /** A move asked was answered: right first time or not, for auto-play's `session` and `difficult`. */
+  /**
+   * A move asked was answered: right first time or not, for auto-play's `session` and `difficult`.
+   * The latest answer counts for `session`, a mistake retried included: a miss answered right later
+   * is played again (the owner's request, 2026-10-13, §5.107). A miss stays one for `difficult`.
+   */
   private answer(card: CardId, ok: boolean, out: TrainerEffect[]) {
     this.answered.add(card);
-    // A mistake retried stays a mistake for auto-play.
-    if (!this.retrying) {
-      if (ok) this.right.add(card);
-      else {
-        this.right.delete(card);
-        this.missedNow.add(card);
-      }
+    if (ok) this.right.add(card);
+    else {
+      this.right.delete(card);
+      this.missedNow.add(card);
     }
     out.push(this.repeating() ? { type: 'answer', card, ok, repeat: true } : { type: 'answer', card, ok });
   }

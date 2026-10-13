@@ -128,7 +128,7 @@ function Dialog() {
             ))}
           </select>
         </label>
-        <p class="muted">Moves played for you; the others are asked, graded only when due. Moves set to “always play this for me” are always played.</p>
+        <p class="muted">Moves played for you; the others are asked. With “answered right”, a move’s latest answer this session counts. A line starting “From the start, asked” asks every move whatever this says. Moves set to “always play this for me” are always played.</p>
         <label>
           A line starts, in the day's queue
           <select name="start-queue" value={prefs.startQueue} onChange={(e) => set('startQueue', e.currentTarget.value as LineStart)}>

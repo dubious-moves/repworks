@@ -5,6 +5,13 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## Auto-play: the latest answer counts (§5.107)
+- With Auto-play "Moves answered right this session", miss a move, then answer it right (in the
+  retries at the line's end, or on a later line): the next line through it should play it for
+  you. Note that a line set to start "From the start, asked" asks every move whatever auto-play
+  says (your choice of 2026-10-09); "From the start, played" or "At its first new or due move"
+  shows auto-play at work.
+
 ## Review lines to their end; every first answer graded (§5.106)
 - In the day's queue with "From the start, asked": a review line now goes on past its last due
   move to its end (or stops after your last move before a move you've never been taught). Every
