@@ -5,6 +5,11 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## Branches to clickable lines (§5.109)
+- In a study, right-click (long-press on the phone) a move with two or more moves after it →
+  Branches to clickable lines: the moves after it should go, and its comment should hold one blue
+  line per branch end, each clickable and stepped with ← →. Undo should bring the branches back.
+
 ## Export PGN for a chapter (§5.108)
 - In a study, ☰ → Export PGN: a file `<study> - <chapter>.pgn` should download, on the desktop and
   on the phone (on an iPhone Safari may show it first; Share → Save to Files keeps it). Import it

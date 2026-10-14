@@ -4,7 +4,7 @@
 import type { Position } from 'chessops/chess';
 import { makeSan, parseSan } from 'chessops/san';
 import type { Color } from 'chessops/types';
-import { dedupeShapes, sanitizeComment } from '../pgn/comment.ts';
+import { dedupeShapes, LICHESS_COMMENT_LIMIT, sanitizeComment } from '../pgn/comment.ts';
 import { glyphGroup } from '../pgn/nags.ts';
 import { emptyNodeData, header, type Chapter, type MoveNode, type Shape, type StudyKind, type StudyMeta } from './model.ts';
 import { liftStartingComments, lineThrough, nodeAt, positionAt, updateAt, type Path, type TreeNode } from './tree.ts';
@@ -216,12 +216,13 @@ export function linePgn(chapter: Chapter, path: Path): string {
 }
 
 /** Moves as bare SAN numbered from `pos` (`4... c5 5. d4 cxd4`); `pos` is played through. */
-function numberedMoves(pos: Position, moves: readonly string[]): string {
+function numberedMoves(pos: Position, moves: readonly string[], glyphs?: readonly string[]): string {
   const parts: string[] = [];
   for (const [i, san] of moves.entries()) {
     const number = pos.fullmoves;
-    if (pos.turn === 'white') parts.push(`${number}. ${san}`);
-    else parts.push(i === 0 ? `${number}... ${san}` : san);
+    const written = san + (glyphs?.[i] ?? '');
+    if (pos.turn === 'white') parts.push(`${number}. ${written}`);
+    else parts.push(i === 0 ? `${number}... ${written}` : written);
     pos.play(parseSan(pos, san)!);
   }
   return parts.join(' ');
@@ -245,6 +246,40 @@ export function continuation(chapter: Chapter, path: Path): string {
   const pos = positionAt(chapter, line.slice(0, from));
   return pos ? numberedMoves(pos, line.slice(from)) : '';
 }
+
+/**
+ * Branches to clickable lines (the owner's request, 2026-10-14): every line after the move at
+ * `path` (one per end, the first child's first) is written into its comment as a clickable line
+ * (PLAN.md §5.12), numbered from the move's position with each move's glyph, and the moves after
+ * it are deleted. Comments, shapes and other glyphs on those moves are not kept: `dropped` counts
+ * the moves that had any.
+ */
+export function branchesToComment(chapter: Chapter, path: Path): Edit<{ chapter: Chapter; dropped: number }> {
+  const node = nodeAt(chapter, path);
+  if (path.length === 0 || !node) return notFound(path);
+  if (node.children.length === 0) return fail('no moves after this one');
+  const lines: MoveNode[][] = [];
+  let dropped = 0;
+  const walk = (n: MoveNode, line: MoveNode[]) => {
+    if (n.comments.length || n.shapes.length || n.startingComments.length || n.nags.some((g) => !MOVE_GLYPH[g])) dropped++;
+    const through = [...line, n];
+    if (!n.children.length) lines.push(through);
+    for (const child of n.children) walk(child, through);
+  };
+  for (const child of node.children) walk(child, []);
+  const text = lines.map((line) => `(${numberedMoves(positionAt(chapter, path)!, line.map((n) => n.san), line.map(glyphOf))})`).join(' ');
+  const own = ownComment(node);
+  const comment = own ? `${own} ${text}` : text;
+  if (sanitizeComment(comment).tooLong) return fail(`the lines are over ${LICHESS_COMMENT_LIMIT.toLocaleString('en')} characters for one comment`);
+  const withComment = setComment(chapter, path, comment);
+  if (!withComment.ok) return withComment;
+  const next = updateAt(withComment.value, path, (n) => ({ ...n, children: [] }));
+  return next ? done({ chapter: next, dropped }) : notFound(path);
+}
+
+// The move glyphs a comment line carries on its moves (`b5!`); the others have no place there.
+const MOVE_GLYPH: Readonly<Record<number, string>> = { 1: '!', 2: '?', 3: '!!', 4: '??', 5: '!?', 6: '?!' };
+const glyphOf = (n: MoveNode) => n.nags.map((g) => MOVE_GLYPH[g]).find(Boolean) ?? '';
 
 // Study level: study.json and the chapter headers that repeat it.
 

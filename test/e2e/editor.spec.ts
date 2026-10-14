@@ -112,6 +112,25 @@ test('open a chapter, move through it, and edit it: variation, comment, glyph, a
   await expect(arrows).toHaveCount(1);
 });
 
+test('branches to comment lines: the lines after a move go into its comment, clickable there; undo brings them back', async ({ page }) => {
+  const git = await setUp(page);
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf?at=e4,c5,Nf3`);
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3');
+  await openMoveMenu(page, 'e4 c5 Nf3');
+  await page.getByRole('menuitem', { name: 'Branches to clickable lines' }).click();
+  await expect(page.locator('.notation .move[data-path="e4 c5 Nf3 d6"]')).toHaveCount(0);
+  const lines = page.locator('.notation .comment-line');
+  await expect(lines).toHaveCount(2);
+  await expect(lines.first()).toHaveText(/^\(2\.\.\. d6 3\. d4 cxd4/);
+  await expect(lines.nth(1)).toHaveText(/^\(2\.\.\. Nc6/);
+  await sync(page, git, (t) => /2\. Nf3 \{ A made-up comment \(2\.\.\. d6 3\. d4 cxd4[^)]*\) \(2\.\.\. Nc6[^)]*\) \}/.test(t));
+  // The menu shows it only on a move with more than one move after it.
+  await studyMenu(page, 'Undo');
+  await expect(page.locator('.notation .move[data-path="e4 c5 Nf3 d6"]')).toBeVisible();
+  await openMoveMenu(page, 'e4 c5');
+  await expect(page.getByRole('menuitem', { name: 'Branches to clickable lines' })).toHaveCount(0);
+});
+
 test('line actions: promote, make main line, delete from here', async ({ page }) => {
   const git = await setUp(page);
   await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf?at=e4,c5,Nf3,Nc6`);

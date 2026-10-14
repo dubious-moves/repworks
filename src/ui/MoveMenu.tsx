@@ -10,7 +10,7 @@ import { open } from '../app/mode.ts';
 import { moveCard } from './MoveCard.tsx';
 import { LICHESS_COMMENT_LIMIT, sanitizeComment } from '../core/pgn/comment.ts';
 import { GLYPHS, MOVE_GLYPHS, OBSERVATION_GLYPHS, POSITION_GLYPHS } from '../core/pgn/nags.ts';
-import { continuation, deletePath, linePgn, makeMainline, ownComment, promote, setComment, setNags, toggleGlyph, variationStart } from '../core/study/ops.ts';
+import { branchesToComment, continuation, deletePath, linePgn, makeMainline, ownComment, promote, setComment, setNags, toggleGlyph, variationStart } from '../core/study/ops.ts';
 import { nodeAt, type Path } from '../core/study/tree.ts';
 
 const GLYPH_ROWS: readonly (readonly number[])[] = [
@@ -59,6 +59,17 @@ async function copyLine(path: Path, how: 'line' | 'continuation') {
   }
 }
 
+function toCommentLines(path: Path) {
+  let dropped = 0;
+  const done = edit((ch) => {
+    const out = branchesToComment(ch, path);
+    if (!out.ok) return out;
+    dropped = out.value.dropped;
+    return { ok: true, value: out.value.chapter };
+  }, path);
+  if (done && dropped) feedback.value = `Lines in the comment; comments, arrows or glyphs on ${dropped === 1 ? '1 move' : `${dropped} moves`} of them were not kept (undo brings them back)`;
+}
+
 export function MoveMenu() {
   const m = menu.value;
   const c = chapter.value;
@@ -71,6 +82,8 @@ export function MoveMenu() {
   if (editable) items.push({ label: 'Comment', class: 'comment', run: () => (commenting.value = m.path) });
   if (editable && isMove && !first) items.push({ label: 'Promote', class: 'promote', run: () => edit((ch) => promote(ch, m.path)) });
   if (editable && variationStart(c, m.path)) items.push({ label: 'Make main line', class: 'promote', run: () => edit((ch) => makeMainline(ch, m.path)) });
+  // A move with branches: its lines into its comment, clickable there (the owner's request, 2026-10-14).
+  if (editable && isMove && (nodeAt(c, m.path)?.children.length ?? 0) > 1) items.push({ label: 'Branches to clickable lines', run: () => toCommentLines(m.path) });
   if (editable && isMove) items.push({ label: 'Delete from here', class: 'delete', run: () => edit((ch) => deletePath(ch, m.path), m.path.slice(0, -1)) });
   if (isMove) items.push({ label: 'Copy line as PGN', run: () => void copyLine(m.path, 'line') });
   // From the branch's first move to the line's end, numbered from there (§5.11).

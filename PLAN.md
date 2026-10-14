@@ -6176,3 +6176,33 @@ board has no Export PGN (it is not a chapter); the move menu's Copy line stays f
 
 Tests: `exportName.test.ts`; `views.spec.ts` (the download equals the stored file, and holds a
 move just played). Live: TESTING.md.
+
+#### 5.109 Branches to clickable lines (the owner's request, 2026-10-14)
+
+The owner: turn a move's branches into clickable lines in its comment, from the move's
+right-click menu (two screenshots: 16... Bd3 with 17. f3 and 17. b3 after it, then Bd3 with
+`(17. f3 b5 … Kd7)(17. b3 b5 18. e4 e6)` in its comment and no moves after it). Decided:
+- **The menu item** "Branches to clickable lines" is on a move with more than one move after it, in
+  an editable chapter, after Make main line. (Not "…comment lines": a menu item named with
+  "comment" would also match the tests' search for Comment.) It converts **every** move after it, the first one
+  (the line it continues) included, as the screenshots show; on a main-line move that cuts the
+  main line there. Undo brings everything back.
+- **One line per end** (`branchesToComment` in `core/study/ops.ts`): a branch with variations of
+  its own gives one line for each, each written from the move's position, since a comment line is
+  placed by its first move number and side (§5.12, §5.20) and nested groups are not lines. The
+  first child's lines come first, then the others in order. Numbered as Copy continuation numbers
+  (`17. f3 b5 18. e4`, `17... e5` for a black first move), with each move's glyph (`!`, `?`, `!!`,
+  `??`, `!?`, `?!`) written on it. Lines are separated by a space, and come after the move's own
+  comment, a space between.
+- **Not kept**: comments, arrows and circles, and glyphs other than those six on the converted
+  moves. The note under the board counts the moves that had any (undo brings them back). Writing
+  a move's comment into the line as words (§5.96) was left out: its own parentheses or a number in
+  it would break the line.
+- Over Lichess's 4,000 characters for the comment, nothing changes and the note under the board
+  says why.
+
+Tests: `ops.test.ts` (four ends from two levels of branches, glyphs, a comment dropped and counted,
+read back by `playedLines` from the move's position; a black first move after an own comment; a
+move with nothing after it refused),
+`editor.spec.ts` (the menu item on 2. Nf3, the two lines clickable in the notation, the synced
+file, undo, no item on a move with one continuation). Live: TESTING.md.

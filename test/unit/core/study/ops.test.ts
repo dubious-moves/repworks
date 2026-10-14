@@ -11,6 +11,7 @@ import { mulberry32 } from '../../../support/random.ts';
 import { pick, randomChapter } from '../../../support/randomTree.ts';
 import { makeSan } from 'chessops/san';
 import { positionAt } from '../../../../src/core/study/tree.ts';
+import { playedLines } from '../../../../src/core/repertoire/lines.ts';
 
 const HEAD = '[Event "Test"]\n[Result "*"]\n\n';
 function chapter(movetext: string, head = HEAD): Chapter {
@@ -233,4 +234,26 @@ test('toggleShape draws as chessground does: the same shape goes, another colour
   assert.deepEqual(ops.toggleShape([arrow, circle], arrow), [circle]);
   assert.deepEqual(ops.toggleShape([arrow, circle], { ...arrow, brush: 'blue' }), [circle, { ...arrow, brush: 'blue' }]);
   assert.deepEqual(ops.toggleShape([arrow], { brush: 'green', orig: 'e2' }), [arrow, { brush: 'green', orig: 'e2' }]);
+});
+
+test('branchesToComment: every line after a move becomes a clickable line in its comment', () => {
+  const c = chapter('1. e4 e5 2. Nf3 { Main } (2. Bc4 Nf6 3. d3 (3. Nc3!? Bb4) c6) (2. f4 exf4?) 2... Nc6 *');
+  const out = value(ops.branchesToComment(c, ['e4', 'e5']));
+  // One line per end, the first child's first, numbered from the move's position; the comment on
+  // Nf3 is not kept, and counted.
+  assert.equal(movetext(out.chapter), '1. e4 e5 { (2. Nf3 Nc6) (2. Bc4 Nf6 3. d3 c6) (2. Bc4 Nf6 3. Nc3!? Bb4) (2. f4 exf4?) } *');
+  assert.equal(out.dropped, 1);
+  valid(out.chapter);
+  // The lines are read back as the comment renderer reads them, from the move's position.
+  const comment = ops.ownComment(nodeAt(out.chapter, ['e4', 'e5'])!)!;
+  const played = playedLines(comment, positionAt(out.chapter, ['e4', 'e5'])!, positionAt(out.chapter, ['e4']));
+  assert.deepEqual(
+    played.map((l) => l.sans),
+    [['Nf3', 'Nc6'], ['Bc4', 'Nf6', 'd3', 'c6'], ['Bc4', 'Nf6', 'Nc3', 'Bb4'], ['f4', 'exf4']],
+  );
+  // Added after an own comment; a black first move is numbered `n...`.
+  const black = value(ops.branchesToComment(chapter('1. e4 { Best } e5 (1... c5) *'), ['e4']));
+  assert.equal(movetext(black.chapter), '1. e4 { Best (1... e5) (1... c5) } *');
+  assert.equal(black.dropped, 0);
+  assert.equal(ops.branchesToComment(c, ['e4', 'e5', 'Nf3', 'Nc6']).ok, false);
 });
