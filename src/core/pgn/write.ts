@@ -99,3 +99,11 @@ function commentBlocks(data: NodeData): string[] {
 // A "}" would end the comment early. Text read from PGN can't contain one, and edits are
 // sanitized, so this only guards against a bug elsewhere.
 const safe = (text: string) => text.replace(/\}/g, '');
+
+/** A file name for a chapter exported on its own: `<study> - <chapter>.pgn`, without the
+ *  characters Windows, macOS or a phone refuse in a name. */
+export function chapterExportName(studyName: string, chapterName: string): string {
+  const clean = (s: string) => s.replace(/[\\/:*?"<>|\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim();
+  const name = [clean(studyName), clean(chapterName)].filter(Boolean).join(' - ').slice(0, 120).trim();
+  return `${name.replace(/^\.+/, '') || 'chapter'}.pgn`;
+}

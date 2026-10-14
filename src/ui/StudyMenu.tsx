@@ -4,6 +4,7 @@
 // Below them the study's own (§5.88): New chapter and the chapter's and the study's settings,
 // which a phone's head had squeezed beside the chapter's name. Between the two, what starts from
 // the move shown (§5.90, out of the move's menu): Analyse, Storm, Practise and its plan card.
+// Export PGN downloads the open chapter as its file in the data repo, edits not yet synced included.
 import { signal } from '@preact/signals';
 import { makeFen } from 'chessops/fen';
 import { at, chapter, doc, feedback, redoEdit, side, study, undoEdit } from '../app/editor.ts';
@@ -12,6 +13,8 @@ import { open } from '../app/mode.ts';
 import { planEnrolled, setPlanCard } from '../app/plans.ts';
 import { trainData } from '../app/train.ts';
 import { positionKeyOf } from '../core/chess/positionKey.ts';
+import { chapterExportName, chapterFileText } from '../core/pgn/write.ts';
+import { header } from '../core/study/model.ts';
 import { nodeAt, positionAt } from '../core/study/tree.ts';
 import { copyFen, FloatingMenu } from './MoveMenu.tsx';
 
@@ -25,7 +28,7 @@ export function StudyMenuButton() {
       aria-label="More"
       aria-haspopup="menu"
       aria-expanded={Boolean(menu.value)}
-      title="The explorer, undo and redo, Copy FEN, from the move shown, the chapter and the study"
+      title="The explorer, undo and redo, Copy FEN, from the move shown, the chapter and the study, Export PGN"
       onClick={(e) => {
         if (menu.peek()) return close();
         const r = e.currentTarget.getBoundingClientRect();
@@ -41,10 +44,28 @@ export function StudyMenuButton() {
 export interface StudyActions {
   newChapter(): void;
   chapterSettings(): void;
+  exportPgn(): void;
   settings(): void;
 }
 
 /** Outside the frame, as the move menu is: its size containment would place a fixed menu inside it. */
+/** Downloads the open chapter as a PGN file: the text its file in the data repo holds. */
+export function exportChapterPgn(): void {
+  const s = study.peek();
+  const c = chapter.peek();
+  if (!s || !c) return;
+  const name = s.chapters.find((e) => e.id === s.cid)?.name ?? header(c, 'ChapterName') ?? '';
+  const url = URL.createObjectURL(new Blob([chapterFileText(c)], { type: 'application/x-chess-pgn' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = chapterExportName(s.meta.name, name);
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  feedback.value = 'PGN exported';
+}
+
 export function StudyMenu(props: { fen: string; study?: StudyActions }) {
   const m = menu.value;
   if (!m) return null;
@@ -82,6 +103,10 @@ export function StudyMenu(props: { fen: string; study?: StudyActions }) {
           <button type="button" role="menuitem" onClick={run(props.study.chapterSettings)}>
             <span class="menu-check" aria-hidden="true" />
             Chapter settings…
+          </button>
+          <button type="button" role="menuitem" title="Download this chapter as a PGN file" onClick={run(props.study.exportPgn)}>
+            <span class="menu-check" aria-hidden="true">⤓</span>
+            Export PGN
           </button>
           <button type="button" role="menuitem" onClick={run(props.study.settings)}>
             <span class="menu-check" aria-hidden="true" />

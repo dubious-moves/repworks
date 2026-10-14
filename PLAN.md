@@ -6164,3 +6164,15 @@ end (§5.77) "stayed a mistake", so with retries on, the move was asked on every
 
 Tests: `trainer.test.ts` (a miss answered right on a later line, then played; a miss answered
 right when retried, played on the next line, graded once). Live: TESTING.md.
+
+#### 5.108 Export PGN for a chapter (the owner's request, 2026-10-14)
+
+The study's ☰ menu has **Export PGN** in its chapter group, after Chapter settings. It downloads
+the open chapter as a `.pgn` file holding exactly what its file in the data repo holds
+(`chapterFileText`: Lichess's dialect, its headers, conflict markers if any), the edits made here
+included even before they sync. The file is named `<study> - <chapter>.pgn`, with characters a
+file system refuses turned into spaces (`chapterExportName` in `core/pgn/write.ts`). The analysis
+board has no Export PGN (it is not a chapter); the move menu's Copy line stays for a single line.
+
+Tests: `exportName.test.ts`; `views.spec.ts` (the download equals the stored file, and holds a
+move just played). Live: TESTING.md.

@@ -5,6 +5,11 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## Export PGN for a chapter (§5.108)
+- In a study, ☰ → Export PGN: a file `<study> - <chapter>.pgn` should download, on the desktop and
+  on the phone (on an iPhone Safari may show it first; Share → Save to Files keeps it). Import it
+  into Lichess or Qchess: the moves, comments and arrows should all be there.
+
 ## Auto-play: the latest answer counts (§5.107)
 - With Auto-play "Moves answered right this session", miss a move, then answer it right (in the
   retries at the line's end, or on a later line): the next line through it should play it for

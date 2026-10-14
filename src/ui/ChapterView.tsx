@@ -29,7 +29,7 @@ import { nodeAt, positionAt, samePath, type Path } from '../core/study/tree.ts';
 import { Board } from './Board.tsx';
 import { addAlternative, altAdding, AltAdding } from './MoveCard.tsx';
 import { CommentDialog, MoveMenu } from './MoveMenu.tsx';
-import { StudyMenu, StudyMenuButton } from './StudyMenu.tsx';
+import { exportChapterPgn, StudyMenu, StudyMenuButton } from './StudyMenu.tsx';
 import { BranchPicker, branchOpen, chooseBranch, closeBranches, stepOn } from './BranchPicker.tsx';
 import { CommentPanel, Notation } from './Notation.tsx';
 import { endPreviewOnBoard, PreviewBar, previewBoard } from './CommentText.tsx';
@@ -316,7 +316,7 @@ export function ChapterView() {
       {c && board && (
         <StudyMenu
           fen={shownLine?.fen ?? board.fen}
-          {...(scratch ? {} : { study: { settings: studySettings, chapterSettings: () => openChapterSettings(s.sid, s.cid), newChapter: openNewChapter } })}
+          {...(scratch ? {} : { study: { settings: studySettings, chapterSettings: () => openChapterSettings(s.sid, s.cid), exportPgn: exportChapterPgn, newChapter: openNewChapter } })}
         />
       )}
       <BranchPicker />

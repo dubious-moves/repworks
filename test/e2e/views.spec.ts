@@ -271,6 +271,27 @@ test('copy FEN: the board’s position from the ☰ menu (the owner’s request,
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2');
 });
 
+test('export PGN: the ☰ menu downloads the open chapter as its file, an edit not yet synced included', async ({ page }) => {
+  const git = await setUp(page);
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf?at=e4,c5`);
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5');
+  const stored = git.textsOf().get('studies/Rep0Najd/Ch1Najdf.pgn')!;
+  const first = page.waitForEvent('download');
+  await studyMenu(page, 'Export PGN');
+  const download = await first;
+  expect(download.suggestedFilename()).toMatch(/^[^\\/:*?"<>|]+ - [^\\/:*?"<>|]+\.pgn$/);
+  const text = async (d: typeof download) => (await d.createReadStream()).toArray().then((cs) => Buffer.concat(cs).toString('utf8'));
+  expect(await text(download)).toBe(stored);
+  await expect(page.locator('.cv-board .feedback')).toHaveText('PGN exported');
+  // A move just played is in the file at once.
+  await clickSquare(page, 'g2', 'black');
+  await clickSquare(page, 'g3', 'black');
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 g3');
+  const second = page.waitForEvent('download');
+  await studyMenu(page, 'Export PGN');
+  expect(await text(await second)).toContain('2. g3');
+});
+
 test('the ☰ menu: the explorer, undo and redo, Copy FEN, the study’s own; the bar keeps the moves (the owner’s notes, 2026-10-10)', async ({ page, isMobile }) => {
   await setUp(page);
   await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf?at=e4,c5`);
@@ -285,7 +306,7 @@ test('the ☰ menu: the explorer, undo and redo, Copy FEN, the study’s own; th
   await more.click();
   await expect(more).toHaveAttribute('aria-expanded', 'true');
   await expect(menu.getByRole('menuitemcheckbox')).toHaveAccessibleName('Explorer');
-  await expect(menu.getByRole('menuitem')).toHaveText([/^↶Undo/, /^↷Redo/, 'Copy FEN', 'Analyse from here', 'Storm from here', 'Practise from here', '+New chapter…', 'Chapter settings…', 'Study settings…']);
+  await expect(menu.getByRole('menuitem')).toHaveText([/^↶Undo/, /^↷Redo/, 'Copy FEN', 'Analyse from here', 'Storm from here', 'Practise from here', '+New chapter…', 'Chapter settings…', '⤓Export PGN', 'Study settings…']);
   await expect(menu.getByRole('menuitem', { name: 'Undo' })).toBeDisabled();
   await expect(menu.getByRole('menuitem', { name: 'Redo' })).toBeDisabled();
   // ☰ again closes it, as Escape does; the keys move along the line again afterwards.
