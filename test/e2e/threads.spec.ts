@@ -56,6 +56,8 @@ test('two threads: the page isolated from its next load, the threaded engine run
   await panel.getByRole('button', { name: 'Engine settings' }).click();
   await dialog.getByRole('group', { name: 'Threads' }).getByRole('button', { name: '1' }).click();
   await dialog.getByRole('button', { name: 'Save' }).click();
+  // Save clears the flag without waiting for it: the reload waits for it gone, as a person's would.
+  await page.waitForFunction(async () => !(await (await caches.open('repworks-flags')).match('isolate')));
   await page.reload();
   await expect(page.locator('.notation')).toContainText('A made-up comment');
   expect(await page.evaluate(() => crossOriginIsolated)).toBe(false);
