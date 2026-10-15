@@ -1409,8 +1409,8 @@ Which own moves are asked:
 - a card never taught or reviewed is never auto-played (lichessable's rule). On a new line it is
   taught. Met on a review line (a move added in the middle of a known line), it is taught there
   and counts towards today's new moves; in a chapter marked known, it is asked instead;
-- a card taught and still in its learning step is played for the user, with its arrow shown
-  first, so a line can pass through it before its first review.
+- a card taught and still in its learning step is played for the user, so a line can pass
+  through it before its first review; with no arrow before it (§5.110: it was, at first).
 
 Conflicting moves (D3), at a position with more than one own move:
 - the line's own move is the expected one, and every other own move there is accepted too;
@@ -6206,3 +6206,20 @@ read back by `playedLines` from the move's position; a black first move after an
 move with nothing after it refused),
 `editor.spec.ts` (the menu item on 2. Nf3, the two lines clickable in the notation, the synced
 file, undo, no item on a move with one continuation). Live: TESTING.md.
+
+#### 5.110 Pin while retrying, learning's mistakes retried, no arrow in auto-play (the owner's requests, 2026-10-15)
+
+- **Pin while retrying**: in Retry and Drill (the day's mistakes), "Pin this mistake" is offered
+  from the start of each mistake's line, for a mistake not pinned yet, and stays until pinned or
+  the next line (a right answer doesn't take it away). Pinned there, it isn't offered again when
+  its line comes back. The drill pinned already pins everything, so offers nothing.
+- **Mistakes retried when learning**: a new move counts as a mistake when a wrong move or Hint
+  came before it was played (tried first with no arrow, in a sequence replayed, or against the
+  arrow), and is retried at the walk's end like a due move's (§5.77). It was always counted right,
+  so a line learned retried only its later passes' misses. Still recorded once, as `taught`.
+- **No arrow in auto-play**: a move played for the user is never shown with an arrow first. Was
+  (§5.6): a move in its learning step got its arrow for a pace before it was played, which the
+  owner saw as a green arrow flashing during auto-play.
+
+Tests: `trainer.test.ts` (learning's mistakes retried, nothing recorded twice; no arrow before a
+move in its learning step); `train.spec.ts` (a mistake pinned from Retry). Live: TESTING.md.

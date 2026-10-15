@@ -1641,3 +1641,10 @@ The technical calls, each with its reason:
   retried included.** Was (§5.77): a mistake retried stayed a mistake for auto-play, so the move
   was asked on every line for the rest of the session. Why: the owner's request; a right answer
   after the miss shows the move is known again. `difficult` keeps a missed move asked.
+
+## Revision of 2026-10-15 (pin while retrying, learning's mistakes, no arrow, PLAN.md §5.110)
+- **A move played for the user never shows an arrow first.** Was (§5.6): a move in its learning
+  step got its arrow before being played. Why: the owner's request; it read as a green arrow
+  flashing during auto-play.
+- **A new move played after a wrong move or Hint is a mistake retried at the walk's end** (§5.77
+  applies to learning too). Was: a taught move always counted as right. Why: the owner's request.

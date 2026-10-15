@@ -221,7 +221,7 @@ export interface SessionView {
   newLeft: number;
   /** The last card suspended, for its undo. */
   suspended?: { card: CardId; san: string };
-  /** The last move answered wrong, which can be pinned (§5.8). */
+  /** The last move answered wrong, or in retry and drill the mistake on the board, which can be pinned (§5.8). */
   missed?: CardId;
   /** Moves asked and answered, and how many right first time (retry and drill record no reviews). */
   answers: number;
@@ -241,6 +241,8 @@ let timer: ReturnType<typeof setTimeout> | undefined;
 let recordEvent: ((event: Parameters<IdbStore['record']>[0]) => Promise<void>) | undefined;
 /** The cards the session asked or taught and that were answered: they are not asked again in it. */
 let answered = new Set<string>();
+/** The cards pinned in this session: retry and drill don't offer them again (their lines come back). */
+let pinnedNow = new Set<string>();
 
 /** Starts a session: today's queue, the day's mistakes, or the pins. */
 export async function startSession(store: IdbStore, record: (event: Parameters<IdbStore['record']>[0]) => Promise<void>, of: SessionKind): Promise<void> {
@@ -257,6 +259,7 @@ export async function startSession(store: IdbStore, record: (event: Parameters<I
   resuming = undefined;
   setLeft(undefined);
   answered = new Set(resume?.answered);
+  pinnedNow = new Set();
   let data: TrainData;
   try {
     data = await loadTraining(store);
@@ -480,10 +483,15 @@ export function undoSuspend(): void {
   session.value = { ...rest, tick: s.tick + 1 };
 }
 
-/** Pins the last move answered wrong; it comes due for a drill 30 minutes later. */
+function pinned(s: SessionView, card: CardId): boolean {
+  return pinnedNow.has(card) || s.data.pins.get(card)?.pinned === true;
+}
+
+/** Pins the last move answered wrong, or the mistake retried or drilled; it comes due for a drill 30 minutes later. */
 export function pinMissed(): void {
   const s = session.peek();
   if (!s?.missed) return;
+  pinnedNow.add(s.missed);
   void recordEvent?.({ t: new Date().toISOString(), k: 'pin', card: s.missed });
   const { missed: _, ...rest } = s;
   session.value = { ...rest, tick: s.tick + 1 };
@@ -541,6 +549,7 @@ function apply(t: Trainer, effects: readonly ShowGradeEffect[], always = false):
   if (!s || (effects.length === 0 && !always)) return;
   const next: SessionView = { ...s, tick: s.tick + 1 };
   let suspendedCard: CardId | undefined;
+  let newLine = false;
   for (const e of effects) {
     switch (e.type) {
       case 'line': {
@@ -551,6 +560,7 @@ function apply(t: Trainer, effects: readonly ShowGradeEffect[], always = false):
         delete next.arrow;
         delete next.suspended;
         delete next.missed;
+        newLine = true;
         break;
       }
       case 'play':
@@ -593,8 +603,8 @@ function apply(t: Trainer, effects: readonly ShowGradeEffect[], always = false):
         next.answers++;
         if (e.ok) {
           next.right++;
-          delete next.missed;
-        } else if (isGraded(s.of) && !s.data.pins.get(e.card)?.pinned) next.missed = e.card;
+          if (isGraded(s.of)) delete next.missed;
+        } else if (isGraded(s.of) && !pinned(s, e.card)) next.missed = e.card;
         // A drill answer on a pinned card is recorded for the pin's steps; nothing else is.
         if ((s.of.kind === 'drill' || s.of.kind === 'pinned') && s.data.pins.get(e.card)?.pinned) {
           void recordEvent?.({ t: new Date().toISOString(), k: 'drill', card: e.card, ok: e.ok });
@@ -613,6 +623,9 @@ function apply(t: Trainer, effects: readonly ShowGradeEffect[], always = false):
     }
   }
   const v = t.view;
+  // Retry and drill: the mistake a line asks can be pinned from the line's start, as it is met.
+  const asked = v.line?.ask[0];
+  if (newLine && (s.of.kind === 'retry' || s.of.kind === 'drill') && asked && !pinned(s, asked)) next.missed = asked;
   next.phase = v.phase;
   // At the session's end the trainer's view stays on the last line's moves, so the board and "back
   // to the chapter" stay at them (§5.17).

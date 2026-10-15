@@ -5,6 +5,13 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## Pin while retrying, learning's mistakes, no arrow in auto-play (§5.110)
+- Mistakes → Retry (or Drill) with a mistake not pinned: "Pin this mistake" should show from the
+  line's start; pressed, it goes, and the mistake should be under Pinned.
+- Learn a line with New moves "Try first" (or a sequence): play a wrong move or press Hint on a
+  new move; at the line's end it should be asked again ("Mistakes retried"), before any repetition.
+- Auto-play through moves learned today: no green arrow should flash before them.
+
 ## Branches to clickable lines (§5.109)
 - In a study, right-click (long-press on the phone) a move with two or more moves after it →
   Branches to clickable lines: the moves after it should go, and its comment should hold one blue

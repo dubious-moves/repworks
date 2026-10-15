@@ -232,6 +232,25 @@ test('mistakes: fail a move, pin it, see it, retry and drill it with nothing gra
   await expect(page.getByRole('region', { name: 'Pinned' }).locator('li')).toContainText('1 of 3 clean');
 });
 
+test('mistakes: a mistake not pinned can be pinned while it is retried (§5.110)', async ({ page }) => {
+  const git = await setUp(page);
+  await page.goto(`${site.url}#/train`);
+  await asked(page);
+  await play(page, 'e7', 'e5');
+  await play(page, 'c7', 'c5');
+  await page.getByRole('button', { name: 'Stop' }).click();
+  await page.goto(`${site.url}#/mistakes/retry`);
+  await expect(page.locator('.study-title')).toHaveText('Retry mistakes');
+  await asked(page);
+  await page.getByRole('button', { name: 'Pin this mistake' }).click();
+  await expect(page.getByRole('button', { name: 'Pin this mistake' })).toHaveCount(0);
+  await play(page, 'c7', 'c5');
+  await expect(page.getByRole('region', { name: 'Session done' })).toContainText('1 move, 1 right first time');
+  await page.locator('.chip').click();
+  await expect.poll(() => pushed(git).map((e) => e['k'])).toEqual(['review', 'pin']);
+  expect(pushed(git)[1]).toMatchObject({ card: C5 });
+});
+
 test('show and grade: a session run with 2 and 4 only, its review events checked', async ({ page }) => {
   // The queue goes on by itself at a line's end here (§5.17's "go on"); train.spec.ts covers "wait".
   await page.addInitScript(() => localStorage.setItem('repworks.trainPrefs', JSON.stringify({ lineEnd: 'go' })));

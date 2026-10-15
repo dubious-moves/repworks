@@ -5,7 +5,7 @@
 // - An own move is asked when its card is due today (the plan's asks) or is known and never
 //   answered; taught when it was never answered (the plan's teaches, and any such move met after
 //   a skipped line: a move never answered is never auto-played); else played for the user, with
-//   its arrow first while it is in its learning step. A card is asked or taught once a session.
+//   no arrow (§5.110). A card is asked or taught once a session.
 // - Right first time is Good; a wrong move or a hint is Again (§5.2). A first wrong move is taken
 //   back and the move asked again; a second, or Hint, shows it with an arrow. A taught move
 //   records `taught`, never a review. A known move answered wrong records Again and no `taught`:
@@ -36,6 +36,8 @@
 // - Mistakes retried (the owner's request, 2026-10-08): at the end of a walk, each own move asked on
 //   it and not answered right first time is asked again, from the opponent's move before it, until
 //   it is answered right `retryMistakes` times in a row; the mistakes take turns. Nothing is graded.
+//   A move taught counts when a wrong move or a hint came before it was played (§5.110): learning
+//   retries its mistakes as review does.
 // - Missed again (`repeatMissed`: retry, drill and the pins): a move answered wrong has its line
 //   walked again after the plan's lines, until every one is answered right.
 // - Lines from the comments (`commentLines`, the owner's request, 2026-10-12; ./commentQuiz.ts says
@@ -390,7 +392,6 @@ export class Trainer {
   private readonly known: Set<CardId>;
   /** Cards asked, taught or suspended in this session. */
   private readonly answered = new Set<CardId>();
-  private readonly taughtNow = new Set<CardId>();
   private readonly suspendedNow = new Set<CardId>();
   /** Cards whose latest answer this session was right first time, and cards missed (§5.17's modes). */
   private readonly right = new Set<CardId>();
@@ -640,10 +641,6 @@ export class Trainer {
     return this.plays(card) ? 'auto' : 'ask';
   }
 
-  private learning(card: CardId) {
-    return this.taughtNow.has(card) || statusOf(this.state(card)) === 'learning';
-  }
-
   private wait(ms: number, out: TrainerEffect[]) {
     out.push({ type: 'wait', ms, id: ++this.waitId });
   }
@@ -807,7 +804,7 @@ export class Trainer {
     const kind = this.kindOf(p.card, this.ply < this.prefix);
     if (kind === 'auto') {
       this.phase = 'auto';
-      if (this.learning(p.card)) out.push({ type: 'arrow', uci: p.uci });
+      // No arrow before it, even in its learning step: auto-play shows none (§5.110).
       this.wait(this.pace, out);
       return;
     }
@@ -1265,7 +1262,6 @@ export class Trainer {
     let ok = true;
     if (p.mode === 'teach') {
       this.answered.add(p.card);
-      this.taughtNow.add(p.card);
       this.taughtOnLine.push(p.card);
       if (this.record) {
         out.push({ type: 'record', event: { k: 'taught', card: p.card } });
@@ -1274,6 +1270,8 @@ export class Trainer {
       // Found unaided, it counts as answered right for auto-play's `session` mode.
       const found = !p.shown && p.wrong.length === 0 && !p.hint;
       if (found) this.right.add(p.card);
+      // A wrong move or a hint is a mistake, retried at the walk's end like a due move's (§5.110).
+      ok = p.wrong.length === 0 && !p.hint;
       out.push({ type: 'note', note: found ? { kind: 'taught', san: p.san, found } : { kind: 'taught', san: p.san } });
     } else {
       const g = this.review(p.card, p, now, out);
@@ -1308,7 +1306,6 @@ export class Trainer {
     this.waiting = undefined;
     let ok = true;
     if (w.mode === 'teach') {
-      this.taughtNow.add(w.card);
       this.taughtOnLine.push(w.card);
       if (this.record) {
         out.push({ type: 'record', event: { k: 'taught', card: w.card } });

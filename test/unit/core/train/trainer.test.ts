@@ -208,13 +208,11 @@ test('teaching: a wrong move is taken back with no record; each new card taught 
   assert.deepEqual(plays(effects), ['user:e4', 'opponent:e5', 'user:Nf3', 'opponent:Nc6', 'user:Bc4', 'opponent:Nf6']);
 });
 
-test('a card in its learning step is played for the user, with its arrow first', () => {
+test('a card in its learning step is played for the user, with no arrow (§5.110)', () => {
   const w = world(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3'));
   const states = new Map<string, CardState>([[card('e4'), learning], [card('e4 e5 Nf3'), dueNow]]);
   const { effects } = run(trainer(w, planOf(w, states), states), right);
-  const arrow = effects.findIndex((e) => e.type === 'arrow' && e.uci === 'e2e4');
-  const e4 = effects.findIndex((e) => e.type === 'play' && e.san === 'e4');
-  assert.ok(arrow >= 0 && arrow < e4);
+  assert.ok(!effects.some((e) => e.type === 'arrow' && e.uci === 'e2e4'));
   assert.deepEqual(plays(effects), ['auto:e4', 'opponent:e5', 'user:Nf3']);
 });
 
@@ -867,6 +865,20 @@ test('mistakes retried after a pass of repetitions: missed moves of the second p
     // The second line: Nc3 taught (e4 already answered and played), then its own second pass.
     'p1:teach:Nc3', 'p2:ask:Nc3',
   ]);
+});
+
+test('mistakes retried when learning: a new move tried wrong, or played after a hint, is asked again at the walk\'s end; nothing recorded twice (§5.110)', () => {
+  const w = world(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 Nc6 3. Bb5'));
+  const asked: string[] = [];
+  const { records } = run(trainer(w, planOf(w, new Map(), 20), new Map(), { tryNew: true, retryMistakes: 1 }), (view, n) => {
+    asked.push(`${view.retry ? 'r' : 'p1'}:${view.phase}:${view.line!.line.path[view.path.length]}`);
+    // e4 tried wrong, Nf3 hinted, Bb5 found.
+    if (n === 0) return { type: 'move', uci: 'd2d4', now: 0 };
+    if (n === 2) return { type: 'hint', now: 0 };
+    return right(view, n);
+  });
+  assert.deepEqual(asked, ['p1:ask:e4', 'p1:wrong:e4', 'p1:ask:Nf3', 'p1:shown:Nf3', 'p1:ask:Bb5', 'r:ask:e4', 'r:ask:Nf3']);
+  assert.deepEqual(records.map((r) => [r.k, r.card]), [['taught', card('e4')], ['taught', card('e4 e5 Nf3')], ['taught', card('e4 e5 Nf3 Nc6 Bb5')]]);
 });
 
 test('missed again (drill): a move answered wrong is asked again after the others, until each is right', () => {
