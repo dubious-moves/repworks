@@ -80,6 +80,8 @@ test('a line paused from the list: ⏸, out of the new moves, practised with not
   const alapin = list.locator('.line-list-chapter').filter({ hasText: 'Alapin' });
   await expect(alapin).toContainText('1 paused');
   await expect(alapin.getByRole('button', { name: /Learn/ })).toHaveCount(0);
+  // The mark stored before the sync is asked for, or it would wait for the next one.
+  await expect(page.locator('.chip')).toHaveText('1 change waiting');
   await sync(page);
   expect(pushed(git).map((e) => [e['k'], e['card'], e['mark']])).toEqual([['line', ALAPIN, 'paused']]);
 
@@ -99,6 +101,8 @@ test('a line paused from the list: ⏸, out of the new moves, practised with not
   await expect(page.locator('.train-grid')).toHaveAttribute('data-phase', 'ask');
   await clickSquare(page, 'c7', 'black');
   await clickSquare(page, 'c5', 'black');
+  // 2. c3 played for the opponent first: the ask still shown for c5 would pass at once.
+  await expect(page.locator('.train-line')).toContainText('2. c3');
   await expect(page.locator('.train-grid')).toHaveAttribute('data-phase', 'ask');
   await clickSquare(page, 'g8', 'black');
   await clickSquare(page, 'f6', 'black');
@@ -108,6 +112,7 @@ test('a line paused from the list: ⏸, out of the new moves, practised with not
 
   await page.locator('.train-paused').getByRole('button', { name: 'Unpause' }).click();
   await expect(page.locator('.train-paused')).toContainText('Unpaused');
+  await expect(page.locator('.chip')).toHaveText('1 change waiting');
   await sync(page);
   expect(pushed(git).map((e) => [e['k'], e['card'], e['mark']])).toEqual([
     ['line', ALAPIN, 'paused'],
