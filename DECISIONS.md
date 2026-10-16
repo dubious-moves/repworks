@@ -1668,3 +1668,10 @@ The technical calls, each with its reason:
   owner's report, a move never answered auto-played with "answered right this session".
 - **D16: a line picked has no rule of its own** for moves not answered (§5.16's `practice` goes):
   its auto-play setting decides. Why: with its own setting, the rule only overrode it.
+
+## Revision of 2026-10-16 (review chapters weakest first, PLAN.md §5.115)
+- **The planner orders review lines by chapter, the chapter whose weakest due card has the lowest
+  predicted recall first; within a chapter, tree order as before.** Was (§5.4): all review lines in
+  the index's order (studies by name, chapters in study order). Why: the owner's request to order
+  chapters by their due lines, settled with them on recall instead: a session stopped early then
+  leaves the safest moves for later. New and known lines keep the index's order.

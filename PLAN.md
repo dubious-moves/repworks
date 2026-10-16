@@ -1306,6 +1306,8 @@ with `test/support/randomTree.ts`) checks coverage and that no line is taken tha
   reviewed line is taught on the review line that passes it (§5.6), and a new line whose moves
   were all met earlier is dropped.
 - Review lines and known lines end at their last ask; new lines are walked to their leaf.
+- Review lines come chapter by chapter, the chapter with the weakest due card (lowest recall)
+  first, its lines in the index's order (§5.115, 2026-10-16).
 - Suspended cards and cards still in their learning step are played for the user: never asked
   or taught.
 - Tests: `test/unit/core/train/plan.test.ts`: hand-built cases (lines in order, each ending at
@@ -6323,3 +6325,22 @@ Built in `Trainer.alternativesHere` and `ShowGrade`'s `alternatives` press (`pre
 `showGrade.test.ts` (the alternatives of the move asked, then shown, then the next move's; none;
 spoken; the grades untouched); `alternatives.spec.ts` (Space in show and grade: the arrow in blue,
 away at a second press and when the move is shown, back for the move shown). Live: TESTING.md.
+
+#### 5.115 Review chapters weakest first (the owner's request, 2026-10-16)
+
+The owner asked for the queue's chapters sorted by how many lines are due; asked about it, they
+agreed to order them by recall instead. Decided:
+- **The review lines come chapter by chapter, the chapter whose weakest due move has the lowest
+  predicted recall first** (FSRS retrievability now). Was (§5.4): every review line in the index's
+  order, so studies by name and chapters in study order. Why: if a session stops early, what is
+  left should be what is safest to leave; a count says nothing about that, and a count of lines
+  overstates a chapter whose due move sits near the root of many.
+- A move taught and not yet reviewed (in its learning step) counts as recall 0: the weakest of all.
+- Within a chapter nothing changes: its lines in tree order, sibling variations one after another,
+  each due move asked once. Ties between chapters keep the index's order. A move shared by two
+  chapters counts for both and is asked in the first one walked.
+- New lines and the known pool keep the index's order: new material comes in the course's order.
+
+Built in `todaysQueue` (each due card's `recall`, `recallAt`) and `planSession` (`byRecall`).
+Tests: `plan.test.ts` (weakest chapter first across studies, a chapter kept as one block, a
+learning card first, ties in index order).

@@ -224,3 +224,38 @@ test('a known line taken up again ends at its last card left', () => {
   assert.deepEqual(show(p), ['known: e4 e5 Nf3 Nc6 Bb5 | ask 3 teach 0']);
   assert.deepEqual(show(withoutAnswered(p, new Set([card('e4 e5 Nf3 Nc6 Bb5')]))), ['known: e4 e5 Nf3 | ask 2 teach 0']);
 });
+
+test('review chapters come weakest first: the chapter whose due card has the lowest recall, ties in the index order (§5.115)', () => {
+  const ix = indexStudies([
+    { sid: 'Study001', kind: 'repertoire', chapters: [chapter('Chapter1', 'white', '1. d4 d5 2. c4 (2. Nf3) 2... e6 3. Nc3'), chapter('Chapter2', 'white', '1. e4 e5 2. Nf3 Nc6 3. Bb5')] },
+    { sid: 'Study002', kind: 'repertoire', chapters: [chapter('Chapter1', 'black', '1. c4 e5 2. Nc3 Nf6'), chapter('Chapter2', 'black', '1. Nf3 d5 2. g3 Nf6')] },
+  ]);
+  const states = new Map<string, CardState>([...ix.cards.keys()].map((c) => [c, notDue]));
+  // Study001's first chapter: two due cards, a day overdue. Study002's first: one, a week overdue.
+  states.set(card('d4 d5 c4'), dueNow);
+  states.set(card('d4 d5 Nf3'), dueNow);
+  states.set(card('c4 e5 Nc3 Nf6'), reviewed(start - 7 * DAY));
+  // Study001's second chapter: due within today, so recalled better than either.
+  states.set(card('e4 e5 Nf3'), reviewed(start + 2 * HOUR));
+  const { queue, plan: p } = plan(ix, states);
+  const recall = new Map(queue.due.map((d) => [d.card, d.recall]));
+  assert.ok(recall.get(card('c4 e5 Nc3 Nf6'))! < recall.get(card('d4 d5 c4'))!);
+  assert.ok(recall.get(card('d4 d5 c4'))! < recall.get(card('e4 e5 Nf3'))!);
+  // Each chapter stays one block, its lines in tree order; Study002's second chapter has nothing due.
+  assert.deepEqual(show(p), [
+    'review: c4 e5 Nc3 Nf6 | ask 1 teach 0',
+    'review: d4 d5 c4 e6 Nc3 | ask 1 teach 0',
+    'review: d4 d5 Nf3 | ask 1 teach 0',
+    'review: e4 e5 Nf3 Nc6 Bb5 | ask 1 teach 0',
+  ]);
+
+  // A card taught and not yet reviewed counts as the weakest of all: its chapter goes first.
+  states.set(card('e4 e5 Nf3'), { card: newCard(), suspended: false, reviews: 0, taught: start - DAY });
+  assert.equal(plan(ix, states).plan.lines[0]!.line.cid, 'Chapter2');
+  assert.equal(plan(ix, states).plan.lines[0]!.line.sid, 'Study001');
+
+  // Equal recall: the index's order.
+  states.set(card('e4 e5 Nf3'), notDue);
+  states.set(card('c4 e5 Nc3 Nf6'), dueNow);
+  assert.deepEqual(plan(ix, states).plan.lines.map((l) => `${l.line.sid}/${l.line.cid}`), ['Study001/Chapter1', 'Study001/Chapter1', 'Study002/Chapter1']);
+});

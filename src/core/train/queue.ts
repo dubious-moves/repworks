@@ -8,12 +8,14 @@
 //   teaching and the limit; their first answer is an ordinary review.
 // Core has no clock: the app passes in the day's bounds (the device's local midnights) and now.
 import type { CardId } from '../progress/cards.ts';
+import { retrievability } from '../progress/fsrs.ts';
 import type { CardState } from '../progress/replay.ts';
 import type { Line, RepertoireIndex } from '../repertoire/index.ts';
 import { heldCards } from './paused.ts';
 import type { TrainSettings } from './settings.ts';
 
 const HOUR_MS = 3_600_000;
+const DAY_MS = 86_400_000;
 
 /** Today, by the device's calendar, in ms since the epoch: [start, end), and the time now. */
 export interface Day {
@@ -46,6 +48,18 @@ export interface DueCard {
   due: number;
   /** Taught and not yet reviewed: this is its first review. */
   learning: boolean;
+  /**
+   * Its predicted recall now (FSRS retrievability, 0–1); 0 for a card in learning, which has no
+   * stability yet and is the likeliest to be forgotten. The planner orders chapters by it (§5.115).
+   */
+  recall: number;
+}
+
+/** A due card's predicted recall at `now`: see `DueCard.recall`. */
+export function recallAt(state: CardState, now: number): number {
+  const { stability, lastReview, due } = state.card;
+  if (due === undefined || lastReview === undefined || !(stability > 0)) return 0;
+  return retrievability(Math.max(0, (now - lastReview) / DAY_MS), stability);
 }
 
 export interface DailyQueue {
@@ -107,8 +121,8 @@ export function todaysQueue(index: RepertoireIndex, states: ReadonlyMap<string, 
     if (at === undefined) continue;
     const learning = statusOf(state) === 'learning';
     // A reviewed card is due for the whole of its due day; a learning step ends at its time.
-    if (learning ? at <= day.now : at < day.end) due.push({ card, due: at, learning });
-    else if (learning && at < day.end) later.push({ card, due: at, learning });
+    if (learning ? at <= day.now : at < day.end) due.push({ card, due: at, learning, recall: recallAt(state, day.now) });
+    else if (learning && at < day.end) later.push({ card, due: at, learning, recall: 0 });
   }
   const byDue = (a: DueCard, b: DueCard) => a.due - b.due || (a.card < b.card ? -1 : a.card > b.card ? 1 : 0);
   due.sort(byDue);

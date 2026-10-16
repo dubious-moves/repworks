@@ -70,7 +70,7 @@ test('a taught card comes due when its learning step has passed, and waits in `l
   const before = todaysQueue(ix, states, DEFAULT_TRAIN, day(start + 14 * HOUR - 1));
   assert.deepEqual([before.due.length, before.later.map((d) => d.card)], [0, [e4]]);
   const after = todaysQueue(ix, states, DEFAULT_TRAIN, day(start + 14 * HOUR));
-  assert.deepEqual(after.due, [{ card: e4, due: start + 14 * HOUR, learning: true }]);
+  assert.deepEqual(after.due, [{ card: e4, due: start + 14 * HOUR, learning: true, recall: 0 }]);
   assert.equal(after.later.length, 0);
   // Taught late in the evening: due tomorrow, not later today.
   const late = todaysQueue(ix, new Map([[e4, taught(start + 22 * HOUR)]]), DEFAULT_TRAIN, day(start + 23 * HOUR));

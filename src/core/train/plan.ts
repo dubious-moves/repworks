@@ -1,9 +1,12 @@
 // The line planner (PLAN.md §5.4): which lines today's session walks, and what each one asks.
-// - Review lines first: going through the lines in the index's order, each line that holds a due
-//   card not yet covered is taken, and walked on past its last such card to its end (the owner's
-//   choice, 2026-10-13, §5.106: the moves after it are asked too, and graded); short of a move
-//   never answered there, which waits for its own day as new material. Consecutive lines then
-//   share prefixes, so the board's positions follow on from each other.
+// - Review lines first, chapter by chapter: the chapter whose weakest due card has the lowest
+//   predicted recall first (§5.115: if the session stops early, what is left is what is safest to
+//   leave), ties in the index's order. Within a chapter, going through its lines in the index's
+//   order, each line that holds a due card not yet covered is taken, and walked on past its last
+//   such card to its end (the owner's choice, 2026-10-13, §5.106: the moves after it are asked
+//   too, and graded); short of a move never answered there, which waits for its own day as new
+//   material. Consecutive lines then share prefixes, so the board's positions follow on from each
+//   other.
 // - Then today's new lines (§5.3), walked whole; then the known pool, line by line, each up to
 //   its last card never reviewed.
 // On the way, a card never answered is taught where it is first met (§5.6), or asked if it is
@@ -84,11 +87,11 @@ export function planSession(index: RepertoireIndex, queue: DailyQueue, states: R
     return Math.max(end, to);
   };
 
-  for (const line of lines) {
-    // A paused line is never walked (§5.70): a due card on it lies on an active line too.
-    if (line.paused) continue;
-    const end = endAt(line, (c) => due.has(c));
-    if (end > 0) walk('review', line, tailEnd(line, end));
+  for (const chapter of byRecall(lines, queue)) {
+    for (const line of chapter) {
+      const end = endAt(line, (c) => due.has(c));
+      if (end > 0) walk('review', line, tailEnd(line, end));
+    }
   }
   for (const line of queue.newLines) walk('new', line, line.path.length);
   for (const line of queue.knownLines) {
@@ -96,6 +99,32 @@ export function planSession(index: RepertoireIndex, queue: DailyQueue, states: R
     if (end > 0) walk('known', line, end);
   }
   return { lines: out };
+}
+
+/**
+ * The active lines of the chapters holding a due card, grouped by chapter, the chapter whose
+ * weakest due card has the lowest recall first; ties, and the lines within a chapter, in the
+ * index's order. A card shared by chapters counts for each.
+ */
+function byRecall(lines: readonly Line[], queue: DailyQueue): Line[][] {
+  const recall = new Map<CardId, number>(queue.due.map((d) => [d.card, d.recall]));
+  const chapters = new Map<string, { lines: Line[]; weakest: number; at: number }>();
+  for (const line of lines) {
+    // A paused line is never walked (§5.70): a due card on it lies on an active line too.
+    if (line.paused) continue;
+    const key = `${line.sid}/${line.cid}`;
+    let chapter = chapters.get(key);
+    if (!chapter) chapters.set(key, (chapter = { lines: [], weakest: Infinity, at: chapters.size }));
+    chapter.lines.push(line);
+    for (const card of line.cards) {
+      const r = recall.get(card);
+      if (r !== undefined && r < chapter.weakest) chapter.weakest = r;
+    }
+  }
+  return [...chapters.values()]
+    .filter((c) => c.weakest !== Infinity)
+    .sort((a, b) => a.weakest - b.weakest || a.at - b.at)
+    .map((c) => c.lines);
 }
 
 /**
