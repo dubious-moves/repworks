@@ -10,7 +10,7 @@ import { open } from '../app/mode.ts';
 import { moveCard } from './MoveCard.tsx';
 import { LICHESS_COMMENT_LIMIT, sanitizeComment } from '../core/pgn/comment.ts';
 import { GLYPHS, MOVE_GLYPHS, OBSERVATION_GLYPHS, POSITION_GLYPHS } from '../core/pgn/nags.ts';
-import { branchesToComment, continuation, deletePath, linePgn, makeMainline, ownComment, promote, setComment, setNags, toggleGlyph, variationStart } from '../core/study/ops.ts';
+import { branchesToComment, branchPgn, continuation, deletePath, linePgn, makeMainline, ownComment, promote, setComment, setNags, toggleGlyph, variationStart } from '../core/study/ops.ts';
 import { nodeAt, type Path } from '../core/study/tree.ts';
 
 const GLYPH_ROWS: readonly (readonly number[])[] = [
@@ -48,12 +48,18 @@ export async function copyFen(fen: string): Promise<void> {
   }
 }
 
-async function copyLine(path: Path, how: 'line' | 'continuation') {
+const COPIES = {
+  line: { text: linePgn, done: 'Line copied' },
+  branch: { text: branchPgn, done: 'Branch copied' },
+  continuation: { text: continuation, done: 'Continuation copied' },
+};
+
+async function copyLine(path: Path, how: keyof typeof COPIES) {
   const c = chapter.peek();
   if (!c) return;
   try {
-    await navigator.clipboard.writeText(how === 'line' ? linePgn(c, path) : continuation(c, path));
-    feedback.value = how === 'line' ? 'Line copied' : 'Continuation copied';
+    await navigator.clipboard.writeText(COPIES[how].text(c, path));
+    feedback.value = COPIES[how].done;
   } catch {
     feedback.value = 'The browser did not allow copying';
   }
@@ -86,6 +92,8 @@ export function MoveMenu() {
   if (editable && isMove && (nodeAt(c, m.path)?.children.length ?? 0) > 1) items.push({ label: 'Branches to clickable lines', run: () => toCommentLines(m.path) });
   if (editable && isMove) items.push({ label: 'Delete from here', class: 'delete', run: () => edit((ch) => deletePath(ch, m.path), m.path.slice(0, -1)) });
   if (isMove) items.push({ label: 'Copy line as PGN', run: () => void copyLine(m.path, 'line') });
+  // The line to the move and everything after it, variations included (the owner's request, 2026-10-16).
+  if (isMove && (nodeAt(c, m.path)?.children.length ?? 0) > 0) items.push({ label: 'Copy branch as PGN', run: () => void copyLine(m.path, 'branch') });
   // From the branch's first move to the line's end, numbered from there (§5.11).
   if (isMove) items.push({ label: 'Copy continuation', run: () => void copyLine(m.path, 'continuation') });
   const s = study.value;

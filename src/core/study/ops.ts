@@ -6,6 +6,7 @@ import { makeSan, parseSan } from 'chessops/san';
 import type { Color } from 'chessops/types';
 import { dedupeShapes, LICHESS_COMMENT_LIMIT, sanitizeComment } from '../pgn/comment.ts';
 import { glyphGroup } from '../pgn/nags.ts';
+import { writeChapter } from '../pgn/write.ts';
 import { emptyNodeData, header, type Chapter, type MoveNode, type Shape, type StudyKind, type StudyMeta } from './model.ts';
 import { liftStartingComments, lineThrough, nodeAt, positionAt, updateAt, type Path, type TreeNode } from './tree.ts';
 
@@ -213,6 +214,23 @@ export function linePgn(chapter: Chapter, path: Path): string {
   const pos = positionAt(chapter, []);
   if (!pos || !nodeAt(chapter, path)) return '';
   return numberedMoves(pos, path);
+}
+
+/**
+ * Copy branch as PGN (the owner's request, 2026-10-16): the line from the start to the move at
+ * `path` and every move after it, variations included, as PGN in Lichess's dialect, with the
+ * comments, glyphs and shapes they carry. Variations before the move are left out; of the
+ * headers only FEN and SetUp are kept, which a non-standard start needs to be read back.
+ */
+export function branchPgn(chapter: Chapter, path: Path): string {
+  if (!nodeAt(chapter, path)) return '';
+  const prune = (node: TreeNode, rest: Path): TreeNode => {
+    if (!rest.length) return node;
+    const next = node.children.find((c) => c.san === rest[0])!;
+    return { ...node, children: [prune(next, rest.slice(1)) as MoveNode] };
+  };
+  const headers = chapter.headers.filter(([k]) => k === 'FEN' || k === 'SetUp');
+  return writeChapter({ ...chapter, headers, root: prune(chapter.root, path) });
 }
 
 /** Moves as bare SAN numbered from `pos` (`4... c5 5. d4 cxd4`); `pos` is played through. */

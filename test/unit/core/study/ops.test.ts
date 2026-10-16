@@ -177,6 +177,16 @@ test('linePgn copies the line to a move', () => {
   assert.equal(ops.linePgn(fen, ['Kd6', 'Kf5']), '40... Kd6 41. Kf5');
 });
 
+test('branchPgn copies the line to a move and every variation after it', () => {
+  const c = chapter('1. e4 { Best } c5 (1... e5 2. Nf3) 2. Nf3 d6! (2... Nc6 3. d4 (3. Bb5 { Rossolimo } g6) 3... cxd4) 3. d4 *');
+  assert.equal(ops.branchPgn(c, ['e4', 'c5', 'Nf3']), '1. e4 { Best } 1... c5 2. Nf3 d6! (2... Nc6 3. d4 (3. Bb5 { Rossolimo } 3... g6) 3... cxd4) 3. d4');
+  assert.equal(ops.branchPgn(c, ['e4', 'c5', 'Nf3', 'Nc6', 'Bb5', 'g6']), '1. e4 { Best } 1... c5 2. Nf3 Nc6 3. Bb5 { Rossolimo } 3... g6');
+  assert.equal(ops.branchPgn(c, ['e4', 'Nf6']), '');
+  // A non-standard start keeps FEN and SetUp, and only those.
+  const fen = chapter('40... Kd6 41. Kf5 (41. Kd3 Kd5) *', '[Event "T"]\n[Result "*"]\n[FEN "8/8/4k3/8/3PK3/8/8/8 b - - 0 40"]\n[SetUp "1"]\n\n');
+  assert.equal(ops.branchPgn(fen, ['Kd6']), '[FEN "8/8/4k3/8/3PK3/8/8/8 b - - 0 40"]\n[SetUp "1"]\n\n40... Kd6 41. Kf5 (41. Kd3 Kd5)');
+});
+
 test('edits share what they did not touch and leave their input alone', () => {
   const c = base();
   const before = writeChapter(c);

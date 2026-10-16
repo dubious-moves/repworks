@@ -249,6 +249,18 @@ test('copy continuation: from the variation’s first move to the end of its lin
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('2... d6 3. d4 cxd4');
 });
 
+test('copy branch as PGN: the line to the move and every variation after it', async ({ page, context, browserName }) => {
+  test.skip(browserName !== 'chromium', 'clipboard permissions are Chromium-only here');
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await setUp(page);
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf?at=e4,c5,Nf3`);
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3');
+  await openMoveMenu(page);
+  await page.getByRole('menuitem', { name: 'Copy branch as PGN' }).click();
+  await expect(page.locator('.cv-board .feedback')).toHaveText('Branch copied');
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toMatch(/^1\. e4 c5 2\. Nf3 .*\(2\.\.\. Nc6 3\. d4\)/);
+});
+
 test('copy FEN: the board’s position from the ☰ menu (the owner’s request, 2026-10-08)', async ({ page, context, browserName }) => {
   test.skip(browserName !== 'chromium', 'clipboard permissions are Chromium-only here');
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);

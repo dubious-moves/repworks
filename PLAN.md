@@ -6223,3 +6223,18 @@ file, undo, no item on a move with one continuation). Live: TESTING.md.
 
 Tests: `trainer.test.ts` (learning's mistakes retried, nothing recorded twice; no arrow before a
 move in its learning step); `train.spec.ts` (a mistake pinned from Retry). Live: TESTING.md.
+
+#### 5.111 Copy branch as PGN (the owner's request, 2026-10-16)
+
+The move menu has **Copy branch as PGN**, after Copy line as PGN, on a move with moves after it
+(in any chapter, editable or not). It copies the line from the start to the move and every move
+after it, variations included, as PGN (`branchPgn` in `core/study/ops.ts`, written by
+`writeChapter`, so in Lichess's dialect). Decided:
+- **Kept**: the comments, glyphs, arrows and circles of every move written, the moves leading to
+  it included, and the chapter's opening comment. Variations before the move are left out.
+- **Headers**: only FEN and SetUp, for a chapter with its own start (without them the text can't
+  be read back); none otherwise, and no result. The note under the board says "Branch copied".
+
+Tests: `ops.test.ts` (variations after the move kept and before it left out, a comment and a
+glyph kept, a path not in the chapter, a FEN chapter); `editor.spec.ts` (the item in the menu);
+`views.spec.ts` (the copied text). Live: TESTING.md.

@@ -5,6 +5,11 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## Copy branch as PGN (§5.111)
+- In a study, right-click (long-press on the phone) a move with moves after it → Copy branch as
+  PGN: "Branch copied" under the board. Paste it into Lichess's import (or a Qchess chapter): the
+  moves to it, and every variation after it with their comments and arrows, should be there.
+
 ## Pin while retrying, learning's mistakes, no arrow in auto-play (§5.110)
 - Mistakes → Retry (or Drill) with a mistake not pinned: "Pin this mistake" should show from the
   line's start; pressed, it goes, and the mistake should be under Pinned.
