@@ -17,7 +17,9 @@ decisions, with a revision log; `PLAN.md` §4 is Phase 0 in build order.
   from documentation.
 - Work that is ready goes straight to `main`: commit and push there, not to a feature branch or a
   pull request, whatever branch the session was started on. Ready means `npm run check`,
-  `npm test` and `npm run e2e` pass; never push to `main` otherwise. CI deploys `main` to GitHub
+  `npm test` and `npm run e2e` pass; never push to `main` otherwise. Playwright runs a failed
+  test once more and reports one that passes then as flaky: that is a race to fix (in the test,
+  or in the app if the app has it), not to leave. CI deploys `main` to GitHub
   Pages.
 - Working through the plan: when a task or phase is done and pushed, start the next cloud session
   (`create_session`, claude-code-remote tools) with a prompt naming the next part of `PLAN.md`

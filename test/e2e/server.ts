@@ -39,7 +39,17 @@ export interface SiteOptions {
    * [multipv, cp for the side to move, pv]; served at `__lines/<fen>`.
    */
   engineLines?: (fen: string) => [number, number, string][];
+  /**
+   * The explorer worker's clock run this many times faster (its `Date.now` and `setTimeout`): its
+   * Lichess rate limiter (16 requests a minute) then lets a long gather through in seconds. Only
+   * that worker's time changes; the page's, and every other request, are as built.
+   */
+  explorerClock?: number;
 }
+
+/** Prepended to the explorer worker's bundle: its clock `k` times faster from the moment it starts. */
+const fastClock = (k: number) =>
+  `{const n=Date.now.bind(Date),t0=n(),st=setTimeout;Date.now=()=>t0+(n()-t0)*${k};globalThis.setTimeout=(f,ms,...a)=>st(f,(ms??0)/${k},...a);}\n`;
 
 export async function serveSite(options: SiteOptions = {}): Promise<SiteServer> {
   const requests: string[] = [];
@@ -70,6 +80,7 @@ export async function serveSite(options: SiteOptions = {}): Promise<SiteServer> 
       if (file === 'sw.js' && workerVersion !== null) {
         body = body.toString('utf8').replace(/^const __VERSION__ = "[0-9a-f]+";$/m, `const __VERSION__ = "${workerVersion}";`);
       }
+      if (options.explorerClock && /^assets\/explorerWorker-[^/]*\.js$/.test(file)) body = fastClock(options.explorerClock) + body.toString('utf8');
       res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream', 'cache-control': 'max-age=600' });
       res.end(body);
     } catch {

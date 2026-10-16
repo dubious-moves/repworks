@@ -3,8 +3,18 @@ import type { Page } from '@playwright/test';
 
 /** The middle of a square on screen, the board seen from `orientation`. */
 export async function square(page: Page, name: string, orientation: 'white' | 'black'): Promise<{ x: number; y: number }> {
-  await page.locator('cg-board').scrollIntoViewIfNeeded();
-  const box = (await page.locator('cg-board').boundingBox())!;
+  // The board can be drawn anew between finding it and measuring it (chessground redraws on a
+  // new chapter or position): measured again on the board that replaced it.
+  let box: { x: number; y: number; width: number; height: number } | null = null;
+  for (let tries = 1; !box; tries++) {
+    try {
+      await page.locator('cg-board').scrollIntoViewIfNeeded();
+      box = await page.locator('cg-board').boundingBox();
+    } catch (e) {
+      if (tries >= 5 || !/not attached/.test(String(e))) throw e;
+    }
+    if (!box && tries >= 5) throw new Error('cg-board has no box');
+  }
   const file = name.charCodeAt(0) - 97;
   const rank = Number(name[1]) - 1;
   const col = orientation === 'white' ? file : 7 - file;

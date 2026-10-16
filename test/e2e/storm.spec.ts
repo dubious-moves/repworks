@@ -30,6 +30,9 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   await site.close();
 });
+// Each test's fake engine starts with nothing scored, so no test's lines depend on the tests run
+// before it in the same worker.
+test.beforeEach(() => scored.clear());
 
 const LADDER = [20, 5, -25, -40, -60, -80, -100, -120];
 /** The verdict's pause after a mistake (STORM.verdictMs). */
@@ -97,7 +100,7 @@ const firstWindow = () => {
   return `${Math.floor(m / 12)}-${String((m % 12) + 1).padStart(2, '0')}`;
 };
 
-async function setUp(page: Page, options: { deepen?: boolean; focused?: boolean; world?: ReturnType<typeof world>; name?: string } = {}): Promise<World> {
+async function setUp(page: Page, options: { deepen?: boolean; focused?: boolean; world?: ReturnType<typeof world>; name?: string; site?: SiteServer } = {}): Promise<World> {
   const { git, github } = options.world ?? world();
   await lichessLogin(page);
   // Stockfish's re-scoring of the kept positions (§5.45) has a test of its own.
@@ -130,7 +133,7 @@ async function setUp(page: Page, options: { deepen?: boolean; focused?: boolean;
     const moves = ranked(board).map((uci, i) => ({ uci, san: uci, score: LADDER[Math.min(i, LADDER.length - 1)] }));
     await route.fulfill({ status: 200, headers: cors, body: JSON.stringify({ status: 'ok', moves }) });
   });
-  await page.goto(`${site.url}#setup?repo=${encodeURIComponent(REPO)}&token=${TOKEN}&name=${options.name ?? 'desktop'}`);
+  await page.goto(`${(options.site ?? site).url}#setup?repo=${encodeURIComponent(REPO)}&token=${TOKEN}&name=${options.name ?? 'desktop'}`);
   await expect(page.locator('.chip')).toHaveText(/^synced/);
   return { git, requests };
 }
@@ -410,7 +413,11 @@ test('Analyse during a timed card (the owner’s request, 2026-10-16): the card 
 
 test('overnight (§5.102): the gather goes on over older games, Stockfish scoring between passes, the screen kept on, and the positions written to the data repo', async ({ page }) => {
   test.setTimeout(120_000);
-  const w = await setUp(page);
+  // Thirteen passes are some 40 explorer requests: at Lichess's pace (16 a minute, src/core/explorer/
+  // limiter.ts, with its own unit tests) over a minute of waiting, so the explorer worker's clock
+  // runs ten times faster here. What is asked, and in what order, is the same.
+  const fast = await serveSite({ engine: fakeEngine(undefined, {}, true), engineLines: ladderLines, explorerClock: 10 });
+  const w = await setUp(page, { site: fast });
   await page.addInitScript(() => {
     // The wake lock asked for, as the browser would grant it.
     (window as unknown as { locks: string[] }).locks = [];
@@ -447,6 +454,7 @@ test('overnight (§5.102): the gather goes on over older games, Stockfish scorin
   await page.locator('.chip').click();
   await expect.poll(() => [...sharedIn(w.git).values()].reduce((a, b) => a + b, 0), { timeout: 15_000 }).toBe(stored);
   expect(sharedIn(w.git).size).toBe(1);
+  await fast.close();
 });
 
 test('overnight: a failure is waited out, not the end; Stop ends it', async ({ page }) => {
@@ -635,20 +643,23 @@ test('the set: a mistake held, tried again, shown, and the second pass', async (
 
 test('Stockfish’s standard: the kept positions searched with MultiPV 12 to depth 24 (22 on a phone) while the home is open, then the storm’s card first', async ({ page, isMobile }) => {
   const depth = isMobile ? 22 : 24;
+  // Only this test's requests: the server is the file's.
+  const start = site.requests.length;
+  const mine = () => commands(site.requests.slice(start));
   const w = await setUp(page, { deepen: true });
   const ready = await gathered(page, w);
   await expect(page.getByTestId('storm-deep')).toContainText(`scored to depth ${depth}`);
-  await expect.poll(() => commands(site.requests).filter((c) => c === `go depth ${depth} movetime 600000`).length, { timeout: 15_000 }).toBeGreaterThan(1);
-  expect(commands(site.requests)).toContain('setoption name MultiPV value 12');
+  await expect.poll(() => mine().filter((c) => c === `go depth ${depth} movetime 600000`).length, { timeout: 15_000 }).toBeGreaterThan(1);
+  expect(mine()).toContain('setoption name MultiPV value 12');
   await expect(page.getByTestId('storm-deep')).toContainText(`${ready} of ${ready} scored`, { timeout: 30_000 });
   // Every position deepened: the session's look-ahead has nothing left to search, so a move is
   // graded at once from the stored list, the top move by rank.
   await page.getByRole('button', { name: 'Start storm' }).click();
   await expect(page.locator('.storm-card')).toBeVisible();
-  const before = commands(site.requests).filter((c) => c.startsWith('go ')).length;
+  const before = mine().filter((c) => c.startsWith('go ')).length;
   await play(page, ranked(await cardFen(page))[0]!);
   await expect(page.getByTestId('storm-verdict')).toContainText('the top move');
-  expect(commands(site.requests).filter((c) => c.startsWith('go ')).length).toBe(before);
+  expect(mine().filter((c) => c.startsWith('go ')).length).toBe(before);
 });
 
 test('focused scoring: an engine a core but one, each searching a position of its own, then one engine for a session (§5.103)', async ({ page, isMobile }) => {

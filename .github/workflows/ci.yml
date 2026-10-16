@@ -37,8 +37,8 @@ jobs:
         with:
           path: dist
 
-  # The browser tests, split by file into shards that run side by side on their own runners
-  # (about 7 minutes on one runner). Each shard builds the site itself: the build takes seconds.
+  # The browser tests, split by test (fullyParallel) into shards that run side by side on their own
+  # runners. Each shard builds the site itself: the build takes seconds.
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 20
