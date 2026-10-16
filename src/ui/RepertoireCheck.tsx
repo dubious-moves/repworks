@@ -3,7 +3,7 @@
 // the repertoire in a game, grouped by position: open its chapter, train the line, pin the
 // repertoire's move, dismiss) and the gaps (an opponent's reply the repertoire doesn't cover).
 import { useEffect, useState } from 'preact/hooks';
-import { open } from '../app/mode.ts';
+import { analyseFrom, open } from '../app/mode.ts';
 import { recordEvent } from '../app/state.ts';
 import { startGames } from '../app/games.ts';
 import { botSpots, dismissed, humanSpots, repertoireCheck, setDismissed } from '../app/repertoireCheck.ts';
@@ -106,7 +106,7 @@ function WeakSpots() {
                     · {r.w}–{r.l}–{r.d} over {r.total} · you play {r.userColor}
                   </span>
                   <span class="actions">
-                    <button type="button" class="link" onClick={() => open({ name: 'analysis', fen: r.fen, side: r.userColor })}>
+                    <button type="button" class="link" onClick={() => analyseFrom({ fen: r.fen, side: r.userColor })}>
                       Analyse
                     </button>{' '}
                     <button
@@ -147,7 +147,7 @@ function WeakSpots() {
                       }
                       return null;
                     })()}
-                    <button type="button" class="link" onClick={() => open({ name: 'analysis', fen: `${r.key} 0 1` })}>
+                    <button type="button" class="link" onClick={() => analyseFrom({ fen: `${r.key} 0 1` })}>
                       Analyse
                     </button>{' '}
                     <button type="button" class="link" onClick={() => open({ name: 'playOn', fen: `${r.key} 0 1` })}>

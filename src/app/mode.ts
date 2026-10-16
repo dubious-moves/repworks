@@ -96,3 +96,24 @@ export function goBack(parent: Mode): void {
   if (n <= here.rw) history.go(-n);
   else open(parent);
 }
+
+/**
+ * The entry shown, rewritten as `to` (the same page, a move or ply further on): before a screen
+ * whose place isn't in its address leaves it (Analyse), so coming back finds it there.
+ */
+export function keepHere(to: Mode): void {
+  const hash = modeHash(to);
+  if (location.hash === hash) return;
+  history.replaceState(here, '', location.pathname + location.search + hash);
+  mark(here.rw, to, false);
+  mode.value = to;
+}
+
+/**
+ * The analysis board opened from the page shown (Analyse): its "← Back to …" comes back here,
+ * and so does the browser's Back.
+ */
+export function analyseFrom(board: Omit<Extract<Mode, { name: 'analysis' }>, 'name' | 'back'>): void {
+  const m = mode.peek();
+  open({ name: 'analysis', ...board, ...(m.name === 'analysis' ? {} : { back: m }) });
+}

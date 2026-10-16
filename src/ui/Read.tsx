@@ -9,7 +9,7 @@ import { makeFen } from 'chessops/fen';
 import { parseSan } from 'chessops/san';
 import { chessgroundMove } from 'chessops/compat';
 import type { Key } from '@lichess-org/chessground/types';
-import { open } from '../app/mode.ts';
+import { analyseFrom, keepHere, mode, open } from '../app/mode.ts';
 import { commentId, endPreview, enterCommentLines, preview, stepPreview, switchPreviewLine } from '../app/preview.ts';
 import { localStore } from '../app/state.ts';
 import { dataVersion } from '../app/sync.ts';
@@ -46,7 +46,13 @@ export function ReadView(props: { sid: string; cid: string; at: string[]; from?:
   const [ply, setPly] = useState(props.from ?? props.at.length);
   const version = dataVersion.value;
 
-  useEffect(() => setPly(props.from ?? props.at.length), [sid, cid, atKey, props.from]);
+  // The move the view wrote into the address itself (below) isn't a move to go to: keys pressed
+  // since would be undone.
+  const wrote = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (props.from !== undefined && props.from === wrote.current) return;
+    setPly(props.from ?? props.at.length);
+  }, [sid, cid, atKey, props.from]);
   useEffect(() => {
     let live = true;
     const store = localStore();
@@ -69,6 +75,13 @@ export function ReadView(props: { sid: string; cid: string; at: string[]; from?:
   const shown = Math.min(ply, ok ? ok.line.length : 0);
   const path = ok ? ok.line.slice(0, shown) : [];
   const toChapter = () => open({ name: 'chapter', sid, cid, at: path });
+  // The move read is the address's (replaced, as a chapter's move shown is), so coming back to
+  // this entry, from the analysis board or any page, finds it.
+  useEffect(() => {
+    if (!ok || mode.peek().name !== 'read') return;
+    wrote.current = shown;
+    keepHere({ name: 'read', sid, cid, at: props.at, from: shown });
+  }, [shown, !!ok]);
 
   if (!loaded) return <p class="muted">Opening…</p>;
   if (!ok) return <Stuck parent={{ name: 'chapter', sid, cid }}>{'problem' in loaded ? loaded.problem : ''}</Stuck>;
@@ -86,6 +99,18 @@ export function ReadView(props: { sid: string; cid: string; at: string[]; from?:
         </button>
         <button type="button" class="secondary" onClick={toChapter}>
           Edit
+        </button>
+        <button
+          type="button"
+          class="secondary"
+          title="The analysis board at this move; ← comes back here"
+          onClick={() => {
+            const start = startPosition(ok.chapter);
+            if (!start) return;
+            analyseFrom({ fen: makeFen(start.toSetup()), ...(ok.line.length ? { line: [...ok.line], show: shown } : {}), side: header(ok.chapter, 'Orientation') === 'black' ? 'black' : 'white' });
+          }}
+        >
+          Analyse
         </button>
       </LineReader>
     </div>

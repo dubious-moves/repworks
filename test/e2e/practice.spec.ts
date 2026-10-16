@@ -339,6 +339,12 @@ test('practising from a position: the repertoire check, the hint, a premove, and
   await move('c7c5');
   await expect(game).toHaveAttribute('data-moves', '2');
   await expect(game).toHaveAttribute('data-phase', 'user');
+  // Analyse (the owner's request, 2026-10-16): the game's moves on the board; back, played on.
+  await game.getByRole('button', { name: 'Analyse', exact: true }).click();
+  await expect(page).toHaveURL(/#\/analysis\?.*line=c5,Nf3&.*back=%23%2Fpractice/);
+  await page.getByRole('button', { name: '← Back to the game' }).click();
+  await expect(game).toHaveAttribute('data-moves', '2');
+  await expect(game).toHaveAttribute('data-phase', 'user');
 
   // Off the repertoire: taken back, the study move named; the hint points at it.
   await move('e7e6');

@@ -34,6 +34,8 @@ export interface Verdict {
   /** One search after a stored engine list rather than two (§23). */
   oneSearch?: boolean;
   passed?: boolean;
+  /** Passed for the analysis board. */
+  analysed?: boolean;
   unanswered?: boolean;
   puzzle?: boolean;
 }
@@ -69,6 +71,7 @@ export function formatShare(share: number | null | undefined): string {
 /** The first line: the move, its place, the game it gave up, the points (signed). */
 export function verdictLine(v: Verdict, s: CardFacts): string {
   if (v.unanswered) return v.userSan ? v.userSan + ' — the storm ended before it was graded' : 'Not answered — the storm ended on this position';
+  if (v.analysed) return 'Analysed — no answer given';
   if (v.passed) return 'Passed — no answer given';
   if (v.verdict === 'unknown') return (v.userSan || 'that move') + ' — nothing could score it here';
   const bits = [v.userSan || 'your move'];

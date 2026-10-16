@@ -8,7 +8,7 @@ import { makeUci, parseSquare } from 'chessops/util';
 import type { Key } from '@lichess-org/chessground/types';
 import { isNormal, type Role, type SquareName } from 'chessops/types';
 import { standardUci } from '../core/chess/uci.ts';
-import { entryKey, goBack, open } from '../app/mode.ts';
+import { analyseFrom, entryKey, goBack, keepHere, mode, open } from '../app/mode.ts';
 import { recordEvent } from '../app/state.ts';
 import { trainData } from '../app/train.ts';
 import { explorerAt, historyReaches, openingNameOf, openings, forgetGames, gameById, gameDeck, gameQueueNow, gameRows, gamesPrefs, practiceHistory, refreshGames, refreshState, setGamesPrefs, startGames, type GameFilters, type GameRow, type Since } from '../app/games.ts';
@@ -372,6 +372,11 @@ function GameView(props: { id: string; ply?: number }) {
   const [ply, setPlyState] = useState(props.ply ?? 0);
   const total = played?.plies.length ?? 0;
   const setPly = (p: number) => setPlyState(Math.max(0, Math.min(total, p)));
+  // The ply shown is the address's (replaced), so coming back to this entry finds it.
+  useEffect(() => {
+    const m = mode.peek();
+    if (m.name === 'games' && m.id === props.id && (m.ply ?? 0) !== ply) keepHere({ name: 'games', id: props.id, ply });
+  }, [ply]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement | null)?.tagName === 'INPUT') return;
@@ -461,7 +466,7 @@ function GameView(props: { id: string; ply?: number }) {
                 {it.kind === 'mistake' && !dropped && (
                   <>
                     {' '}
-                    <button type="button" class="link" onClick={() => open({ name: 'analysis', fen: it.fenBefore, seq: it.pid, side: g.color })}>
+                    <button type="button" class="link" onClick={() => analyseFrom({ fen: it.fenBefore, seq: it.pid, side: g.color })}>
                       Make a sequence
                     </button>
                   </>
@@ -474,7 +479,16 @@ function GameView(props: { id: string; ply?: number }) {
           <button type="button" onClick={() => open({ name: 'playOn', fen, side: g.color })}>
             Practise from here
           </button>
-          <button type="button" class="secondary" onClick={() => open({ name: 'analysis', fen, side: g.color })}>
+          <button
+            type="button"
+            class="secondary"
+            title="The analysis board at this move, the game's moves on it; ← comes back here"
+            onClick={() => {
+              const start = played.plies[0]?.fenBefore;
+              const sans = played.plies.map((p) => p.san);
+              analyseFrom(start && sans.length <= 300 ? { fen: start, ...(sans.length ? { line: sans, show: ply } : {}), side: g.color } : { fen, side: g.color });
+            }}
+          >
             Analyse this position
           </button>
           {g.platform === 'lichess' && !g.id.startsWith('_') && (
@@ -644,6 +658,9 @@ function Card(props: { s: GameSession; r: CardRun }) {
             <a class="button secondary" href={`#/study/${n.places[0]!.sid}/${n.places[0]!.cid}${n.places[0]!.path.length ? `?at=${n.places[0]!.path.map(encodeURIComponent).join(',')}` : ''}`}>
               Open the chapter
             </a>
+            <button type="button" class="secondary" title="The analysis board at this position" onClick={() => analyseFrom({ fen: r.board, side: item.color })}>
+              Analyse
+            </button>
             <button type="button" class="secondary" title="Remove this plan card (the chapter’s move menu enrols it again)" onClick={() => (setPlanCard(item.key, item.color, false), continueSession())}>
               Remove the card
             </button>
@@ -780,12 +797,12 @@ function Card(props: { s: GameSession; r: CardRun }) {
               View the game
             </a>
           )}
-          <button type="button" class="secondary" onClick={() => open({ name: 'analysis', fen: r.board, side: item.color })}>
+          <button type="button" class="secondary" onClick={() => analyseFrom({ fen: r.board, side: item.color })}>
             Analyse
           </button>
           {answered && <NoteButton card={r.card.card} fen={r.fen} color={item.color} />}
           {item.kind === 'mistake' && (
-            <button type="button" class="secondary" title="Build the lines that refute it on the analysis board, and drill them as a sequence instead" onClick={() => open({ name: 'analysis', fen: item.fenBefore, seq: item.pid, side: item.color })}>
+            <button type="button" class="secondary" title="Build the lines that refute it on the analysis board, and drill them as a sequence instead" onClick={() => analyseFrom({ fen: item.fenBefore, seq: item.pid, side: item.color })}>
               Make a sequence
             </button>
           )}

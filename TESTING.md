@@ -5,6 +5,15 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## Analyse on every board (§5.112)
+- Training (the queue, desktop then phone): with a move asked, press Analyse: the board should show
+  the line to here, from your side. "← Back to training": the move shown with its arrow (it counts
+  as hinted); play it and go on. Again at a line's end, coming back by the phone's Back gesture.
+- The storm, timed: Analyse on a card before moving: back, the card says "Analysed — no answer
+  given", the clock stopped; Next goes on with the clock running.
+- A game (Games → a game, stepped to a move), the game cards, a practice game in play, and the
+  Read view: Analyse, then back: each should be where it was left.
+
 ## Copy branch as PGN (§5.111)
 - In a study, right-click (long-press on the phone) a move with moves after it → Copy branch as
   PGN: "Branch copied" under the board. Paste it into Lichess's import (or a Qchess chapter): the

@@ -351,12 +351,8 @@ export function takeUpPractice(entry: string): boolean {
     return false;
   }
   if (p.phase === 'over') return true;
-  const saved = savedPractice();
-  if (!saved) {
-    leavePractice();
-    return false;
-  }
-  resumePractice(saved);
+  // Played on from where it was left, from memory: a game of a move or none isn't kept on the device.
+  resumePractice({ savedAt: Date.now(), game: { setup: p.setup, moves: p.moves, track: p.track, claim: p.claim, ...(p.source ? { source: p.source } : {}), ...(p.repIgnored ? { repIgnored: true } : {}), ...(p.tried ? { tried: p.tried } : {}) } });
   return true;
 }
 

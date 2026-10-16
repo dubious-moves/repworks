@@ -8,7 +8,7 @@ import { at, chapter, feedback, goTo, openScratch, side } from '../app/editor.ts
 import { checkSequence, saveSequence, sourceMistake, type CheckResult } from '../app/sequence.ts';
 import type { Chapter } from '../core/study/model.ts';
 import { goBack, mode, open } from '../app/mode.ts';
-import type { Mode } from '../core/app/fsm.ts';
+import type { BackMode, Mode } from '../core/app/fsm.ts';
 import { positionAt } from '../core/study/tree.ts';
 import { Back } from './Back.tsx';
 
@@ -20,6 +20,37 @@ function parent(): Mode {
   return { name: 'list' };
 }
 const back = () => goBack(parent());
+
+/** The page the board goes back to, named on its button. */
+export function backTo(m: BackMode): string {
+  switch (m.name) {
+    case 'storm':
+      return 'Back to the storm';
+    case 'train':
+    case 'learn':
+    case 'show':
+    case 'practice':
+      return 'Back to training';
+    case 'play':
+      return 'Back to the quiz';
+    case 'read':
+      return 'Back to the line';
+    case 'games':
+      return m.id ? 'Back to the game' : 'Back to the games';
+    case 'gamesReview':
+      return 'Back to the game cards';
+    case 'playOn':
+      return 'Back to the game';
+    case 'history':
+      return 'Back to the review';
+    case 'checklist':
+      return 'Back to the checklist';
+    case 'chapter':
+      return 'Back to the study';
+    default:
+      return 'Back';
+  }
+}
 
 /** The FEN to start from, under the board: a long line of text has no place in the head. The position shown's is copied from the ☰ menu (§5.87), as on a study. */
 export function AnalysisFen() {
@@ -59,8 +90,8 @@ export function AnalysisHead() {
         <span class="study-title">Analysis board</span>
       </div>
       {m.name === 'analysis' && m.back && (
-        <button type="button" class="primary storm-back" title="Back to the storm, where you left it" onClick={back}>
-          ← Back to the storm
+        <button type="button" class="primary storm-back" title={`${backTo(m.back)}, where you left it`} onClick={back}>
+          ← {backTo(m.back)}
         </button>
       )}
       <button type="button" disabled={!line.length} title={line.length ? 'Add the line to the move shown to a chapter' : 'Play a move first'} onClick={() => setAdding(true)}>

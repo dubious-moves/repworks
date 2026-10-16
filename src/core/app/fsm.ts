@@ -20,7 +20,8 @@
 //                                       chapter's move (§5.35); `seq` saves its lines as a sequence
 //                                       (§5.56); `line` its main line from the FEN, shown after
 //                                       `show` moves; `side` the board's side (the FEN's side to
-//                                       move when none); `back` the storm it was opened from (its hash)
+//                                       move when none); `back` the page it was opened from (its
+//                                       hash): a storm, a training session, a game…
 //   #/storm[/<sid>[/<cid>[?at=e4,e5]]]  the storm (§5.43): the repertoire, a study, a chapter, or
 //                                       the lines through a chapter's move
 //   #/games                             the games and their cards (§5.54)
@@ -71,7 +72,7 @@ export type Mode =
    * `seq`, its lines can be saved as a sequence (§5.56): `seq` the mistake card's pid it replaces,
    * or `*` for none.
    */
-  | { name: 'analysis'; fen?: string; from?: { sid: string; cid: string; at: string[] }; seq?: string; line?: string[]; show?: number; side?: 'white' | 'black'; back?: StormMode }
+  | { name: 'analysis'; fen?: string; from?: { sid: string; cid: string; at: string[] }; seq?: string; line?: string[]; show?: number; side?: 'white' | 'black'; back?: BackMode }
   /** The storm (§5.43): over the repertoire, a study, a chapter, or the lines through `at`. */
   | StormMode
   /** The games (§5.54); with `id`, one game, at `ply` (0 the start). */
@@ -88,6 +89,9 @@ export type Mode =
   | { name: 'repCheck' }
   /** A study's checklist line `i` (as listed on this device), drilled at a preset (§5.62). */
   | { name: 'checklist'; sid: string; i: number; preset: 'easy' | 'medium' | 'hard' };
+
+/** A page the analysis board was opened from and goes back to: any but the board itself. */
+export type BackMode = Exclude<Mode, { name: 'analysis' }>;
 
 export type Practice = 'retry' | 'drill' | 'pinned' | 'pins';
 const PRACTICE_HASH: Record<Practice, string> = { retry: '#/mistakes/retry', drill: '#/mistakes/drill', pinned: '#/pinned', pins: '#/pinned/all' };
@@ -148,6 +152,8 @@ export function transition(mode: Mode, event: ModeEvent): Mode {
 }
 
 const SAN = /^[A-Za-z0-9+#=-]+$/;
+/** The longest line the analysis board's address takes: a training line from its chapter's start. */
+const MAX_LINE = 300;
 /** A game's id: Lichess's eight characters, `chesscom_<n>`, mistake-lab's `_practice_…`. */
 const GAME_ID = /^[A-Za-z0-9_]{1,60}$/;
 
@@ -235,17 +241,18 @@ export function parseHash(hash: string): Mode {
     if (seq && (seq === '*' || GAME_ID.test(seq))) mode.seq = seq;
     const line = query.split('&').find((q) => q.startsWith('line='))?.slice(5);
     const sans = line ? line.split(',').map(decode) : undefined;
-    if (sans && sans.length <= 40 && sans.every((san) => san !== undefined && SAN.test(san))) {
+    if (sans && sans.length <= MAX_LINE && sans.every((san) => san !== undefined && SAN.test(san))) {
       mode.line = sans as string[];
-      const show = /(?:^|&)show=(\d{1,2})(?:&|$)/.exec(query)?.[1];
+      const show = /(?:^|&)show=(\d{1,3})(?:&|$)/.exec(query)?.[1];
       if (show !== undefined && Number(show) < sans.length) mode.show = Number(show);
     }
     const side = /(?:^|&)side=(white|black)(?:&|$)/.exec(query)?.[1];
     if (side === 'white' || side === 'black') mode.side = side;
     const back = query.split('&').find((q) => q.startsWith('back='))?.slice(5);
     const to = back === undefined ? undefined : decode(back);
-    const parsed = to?.startsWith('#/storm') ? parseHash(to) : undefined;
-    if (parsed?.name === 'storm') mode.back = parsed;
+    // Any page of the app's but the board itself, and not the list a hash it can't read becomes.
+    const parsed = to?.startsWith('#/') && !to.startsWith('#/analysis') ? parseHash(to) : undefined;
+    if (parsed && parsed.name !== 'analysis' && (parsed.name !== 'list' || /^#\/?$/.test(to!))) mode.back = parsed;
     return mode;
   }
   if (parts[0] === 'learn' && parts.length === 3 && isId(parts[1]) && isId(parts[2])) return { name: 'learn', sid: parts[1], cid: parts[2] };

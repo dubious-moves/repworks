@@ -11,7 +11,7 @@ import { normalizeMove } from 'chessops/chess';
 import { makeUci, parseSquare } from 'chessops/util';
 import { isNormal, type Role, type SquareName } from 'chessops/types';
 import type { Key } from '@lichess-org/chessground/types';
-import { entryKey, open } from '../app/mode.ts';
+import { analyseFrom, entryKey, open } from '../app/mode.ts';
 import { recordEvent } from '../app/state.ts';
 import { openingNameOf, practiceHistory, savedDeck } from '../app/games.ts';
 import { analyse, claimVictory, clearPremove, detection, setFoundState, type FoundTactic, discardSaved, gameOfHistory, ignoreRepertoire, loadOpponent, practiceFeedback, practiceHint, resumePractice, setPracticeFeedback, showsFeedback, savedPractice, saveOpponent, judge, parkPractice, practice, practiceMove, takeUpPractice, practiceReview, setPremove, startPractice, stopPractice, type Opponent, type PracticeGame, type PracticeMove } from '../app/practice.ts';
@@ -204,6 +204,9 @@ export function PracticeBoard(props: { onNext?: () => void }) {
               Hint
             </button>
           )}
+          <button type="button" class="secondary" title="The analysis board at this position, the game's moves on it; ← comes back to the game" onClick={() => analyseFrom({ fen: s.fen, ...(p.moves.length && p.moves.length <= 300 ? { line: p.moves.map((m) => m.san) } : p.moves.length ? { fen } : {}), side: s.color })}>
+            Analyse
+          </button>
           <button type="button" class="secondary" onClick={stopPractice} title={userMoves < PRACTICE.reviewMinMoves ? `Kept in the history from ${PRACTICE.reviewMinMoves} of your moves` : 'End here and review the game'}>
             Stop{userMoves >= PRACTICE.reviewMinMoves ? ' & review' : ''}
           </button>
@@ -435,11 +438,23 @@ interface Retry {
   failed?: boolean;
 }
 
+/** The move a review was left at for the analysis board, by game: coming back finds it there. */
+const reviewLeftAt = new Map<string, number>();
+
 export function PracticeReview(props: { game: PracticeGame; onNext?: (() => void) | undefined }) {
   const g = props.game;
   const review = useMemo(() => practiceReview(g), [g]);
   const evals = useMemo(() => positionEvals(g.moves), [g]);
-  const [at, setAtState] = useState(g.moves.length - 1);
+  const reviewKey = `${g.gen}|${g.historyId ?? ''}|${g.moves.length}`;
+  const [at, setAtState] = useState(() => {
+    const was = reviewLeftAt.get(reviewKey);
+    reviewLeftAt.clear();
+    return was !== undefined && was < g.moves.length ? was : g.moves.length - 1;
+  });
+  // Left for another page (the analysis board, say): kept, for coming back.
+  const atNow = useRef(at);
+  atNow.current = at;
+  useEffect(() => () => void reviewLeftAt.set(reviewKey, atNow.current), [reviewKey]);
   const [retry, setRetry] = useState<Retry | undefined>(undefined);
   const [best, setBest] = useState(false);
   const [savedNote, setSavedNote] = useState<string | undefined>(undefined);
@@ -743,7 +758,7 @@ export function PracticeReview(props: { game: PracticeGame; onNext?: (() => void
                 💾 Save as a mistake
               </button>
             )}
-            <button type="button" class="secondary" title="Build the lines that refute it on the analysis board, and drill them as a sequence" onClick={() => open({ name: 'analysis', fen: mv.fenBefore, seq: '*', side: s.color })}>
+            <button type="button" class="secondary" title="Build the lines that refute it on the analysis board, and drill them as a sequence" onClick={() => analyseFrom({ fen: mv.fenBefore, seq: '*', side: s.color })}>
               🔍 Make a sequence
             </button>
           </div>
@@ -902,7 +917,7 @@ export function PracticeReview(props: { game: PracticeGame; onNext?: (() => void
               </button>
             )
           )}
-          <button type="button" class="secondary" onClick={() => open({ name: 'analysis', fen: board, side: s.color })}>
+          <button type="button" class="secondary" title="The analysis board at this position; ← comes back to the review" onClick={() => analyseFrom({ fen: board, side: s.color })}>
             Analyse
           </button>
         </div>

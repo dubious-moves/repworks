@@ -34,6 +34,11 @@ test('hashes parse to modes, and modes write back to the same hash', () => {
       { name: 'analysis', fen: '8/8/8/8/8/8/8/K6k w - - 0 1', line: ['Ka2', 'Kg2'], show: 1, side: 'black', back: { name: 'storm', sid: 'Rep0Najd', cid: 'Ch1Najdf', at: ['e4', 'c5'] } },
     ],
     ['#/analysis?fen=8%2F8%2F8%2F8%2F8%2F8%2F8%2FK6k%20w%20-%20-%200%201&line=Ka2&back=%23%2Fstorm', { name: 'analysis', fen: '8/8/8/8/8/8/8/K6k w - - 0 1', line: ['Ka2'], back: { name: 'storm' } }],
+    // From training, a game, a line read: the page it goes back to, whatever it is.
+    ['#/analysis?line=e4,c5&show=2&back=%23%2Ftrain%2FRep0Najd%2FCh1Najdf%3Fat%3De4%2Cc5', { name: 'analysis', line: ['e4', 'c5'], back: { name: 'train', sid: 'Rep0Najd', cid: 'Ch1Najdf', at: ['e4', 'c5'] } }],
+    ['#/analysis?back=%23%2Fgames%2Fabcd1234%3Fply%3D12', { name: 'analysis', back: { name: 'games', id: 'abcd1234', ply: 12 } }],
+    ['#/analysis?back=%23%2Fread%2FRep0Najd%2FCh1Najdf%3Fat%3De4%26from%3D0', { name: 'analysis', back: { name: 'read', sid: 'Rep0Najd', cid: 'Ch1Najdf', at: ['e4'], from: 0 } }],
+    ['#/analysis?back=%23%2Fmistakes%2Fdrill', { name: 'analysis', back: { name: 'practice', run: 'drill' } }],
     ['#/practice?fen=8%2F8%2F8%2F8%2F8%2F8%2F8%2FK6k%20w%20-%20-%200%201&side=black', { name: 'playOn', fen: '8/8/8/8/8/8/8/K6k w - - 0 1', side: 'black' }],
     ['#/practice?fen=8%2F8%2F8%2F8%2F8%2F8%2F8%2FK6k%20w%20-%20-%200%201', { name: 'playOn', fen: '8/8/8/8/8/8/8/K6k w - - 0 1' }],
     ['#/games/history/rev_1790000000000_ab12cd', { name: 'history', id: 'rev_1790000000000_ab12cd' }],
@@ -64,8 +69,10 @@ test('hashes parse to modes, and modes write back to the same hash', () => {
   // Anything else is the list: unknown pages, malformed IDs, a path with a stray character.
   for (const hash of ['#/mistakes/other', '#/pinned/x', '#/train/short', '#/train/Rep0Najd/x', '#/train/Rep0Najd/Ch1Najdf', '#/learn/Rep0Najd', '#/coverage', '#/coverage/bad', '#/nope', '#/study/short', '#/study/Rep0Najd/bad', '#/study/Rep0Najd/Ch1Najdf/x', '#/read/Rep0Najd', '#/play/Rep0Najd/bad']) assert.deepEqual(parseHash(hash), { name: 'list' }, hash);
   assert.deepEqual(parseHash('#/study/Rep0Najd/Ch1Najdf?at=e4,<script>'), { name: 'chapter', sid: 'Rep0Najd', cid: 'Ch1Najdf' });
-  // `back` names a storm and nothing else; a bad line is left out whole.
-  assert.deepEqual(parseHash('#/analysis?back=%23%2Fstudy%2FRep0Najd'), { name: 'analysis' });
+  // `back` names any page but the board itself, and none it can't read; a bad line is left out whole.
+  assert.deepEqual(parseHash('#/analysis?back=%23%2Fanalysis%3Ffen%3Dx'), { name: 'analysis' });
+  assert.deepEqual(parseHash('#/analysis?back=%23%2Fnope'), { name: 'analysis' });
+  assert.deepEqual(parseHash('#/analysis?back=https%3A%2F%2Fexample.com'), { name: 'analysis' });
   assert.deepEqual(parseHash('#/analysis?line=e4,<x>&show=1'), { name: 'analysis' });
   assert.deepEqual(parseHash('#/analysis?line=e4,e5&show=2'), { name: 'analysis', line: ['e4', 'e5'] });
 });

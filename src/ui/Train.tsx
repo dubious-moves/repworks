@@ -9,12 +9,12 @@ import { normalizeMove, type Position } from 'chessops/chess';
 import { makeUci, parseSquare, parseUci } from 'chessops/util';
 import type { Key } from '@lichess-org/chessground/types';
 import type { Role, SquareName } from 'chessops/types';
-import { open } from '../app/mode.ts';
+import { analyseFrom, entryKey, open } from '../app/mode.ts';
 import { commentId, endPreview, preview, stepPreview } from '../app/preview.ts';
 import { beginTraining } from '../app/state.ts';
 import { dataVersion } from '../app/sync.ts';
 import { decidingNow, timeOffset } from '../app/time.ts';
-import { command, endSession, seekSequence, isGraded, leaveForStudy, pace, PACES, pinMissed, playMove, press, queueOf, quizComments, readLine, readingAt, session, sessionProblem, setPace, setSelfGrade, setSpeech, speech, trainData, undoSuspend, type Pace, type SessionKind, type SessionView, type TrainData } from '../app/train.ts';
+import { analyseSession, command, leaveSession, resumeSession, seekSequence, isGraded, leaveForStudy, pace, PACES, pinMissed, playMove, press, queueOf, quizComments, readLine, readingAt, session, sessionProblem, setPace, setSelfGrade, setSpeech, speech, trainData, undoSuspend, type Pace, type SessionKind, type SessionView, type TrainData } from '../app/train.ts';
 import { trainPrefs } from '../app/trainPrefs.ts';
 import type { Line, RepertoireIndex } from '../core/repertoire/index.ts';
 import type { Mode } from '../core/app/fsm.ts';
@@ -131,13 +131,21 @@ export function useWakeLock(active: boolean) {
   }, [active]);
 }
 
+/** Analyse: the analysis board at the session's position, the session kept for this entry. */
+const analyse = () => {
+  const board = analyseSession();
+  if (board) analyseFrom(board);
+};
+
 const TITLES = { retry: 'Retry mistakes', drill: 'Drill mistakes', pinned: 'Drill pinned', show: 'Show and grade' } as const;
 
 export function TrainScreen(props: { of: SessionKind }) {
   const key = JSON.stringify(props.of);
   useEffect(() => {
-    void beginTraining(props.of);
-    return endSession;
+    // Come back to (from the analysis board, say): the session as it was left. Else a new one.
+    const entry = entryKey();
+    if (!resumeSession(props.of, entry)) void beginTraining(props.of);
+    return () => leaveSession(entry);
   }, [key]);
   const s = session.value;
   const running = !!s && !s.done;
@@ -311,6 +319,11 @@ function Done(props: { s: SessionView; inline?: boolean }) {
         {props.inline && props.s.line && (
           <button type="button" class="secondary" onClick={() => readLine(props.s.path.length)} title="Step through the whole line and its comments">
             Read
+          </button>
+        )}
+        {props.inline && props.s.position && (
+          <button type="button" class="secondary" onClick={analyse} title="The analysis board at this position">
+            Analyse
           </button>
         )}
         {(of.kind === 'line' || of.kind === 'learn') && (
@@ -559,6 +572,9 @@ function Session(props: { s: SessionView }) {
           <button type="button" class="secondary" disabled={!s.line} onClick={() => readLine(s.path.length)} title="Step through the whole line and its comments; the session waits">
             Read
           </button>
+          <button type="button" class="secondary" onClick={analyse} title={asking && !aside && (s.phase === 'ask' || s.phase === 'wrong') ? 'The analysis board at this position; the move asked counts as hinted, and the session waits' : 'The analysis board at this position; the session waits'}>
+            Analyse
+          </button>
           <button type="button" class="secondary" onClick={() => command('stop')}>
             Stop
           </button>
@@ -685,6 +701,9 @@ function ReadInSession(props: { s: SessionView; line: Line; ply: number }) {
     <LineReader chapter={props.s.chapter!} line={props.line.path} ply={props.ply} onPly={(n) => readLine(n)} onEscape={close}>
       <button type="button" onClick={close}>
         Back to training
+      </button>
+      <button type="button" class="secondary" onClick={analyse} title="The analysis board at the move read; the session waits">
+        Analyse
       </button>
     </LineReader>
   );
@@ -885,6 +904,11 @@ export function TrainPick(props: { sid: string; cid: string; at: string[] }) {
                   <button type="button" class={line ? 'secondary' : undefined} onClick={() => open({ name: 'train', sid })}>
                     Today's queue
                   </button>
+                  {pos && start && (
+                    <button type="button" class="secondary" title="The analysis board at this position" onClick={() => analyseFrom({ fen: makeFen(start.toSetup()), ...(shownPath.length ? { line: shownPath, show: shownPath.length } : {}), side: chapter && header(chapter, 'Orientation') === 'black' ? 'black' : 'white' })}>
+                      Analyse
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

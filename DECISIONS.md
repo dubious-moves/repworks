@@ -1648,3 +1648,12 @@ The technical calls, each with its reason:
   flashing during auto-play.
 - **A new move played after a wrong move or Hint is a mistake retried at the walk's end** (§5.77
   applies to learning too). Was: a taught move always counted as right. Why: the owner's request.
+
+## Revision of 2026-10-16 (Analyse on every board, PLAN.md §5.112)
+- **A timed storm card can be analysed: it is passed** (no points, the streak ends, the clock
+  stops). Was (§5.71): Analyse only in a set, or between a storm's cards. Why: the owner's request,
+  Analyse wherever a board is shown, "even when they are being quizzed on storm positions".
+- **The analysis board goes back to any page it was opened from**, not only the storm, and a
+  training session waits for its history entry whenever it is left, as the storm's did. Was: a
+  training session ended as soon as its screen went. Why: the same request, "make sure going back
+  and forth is working".

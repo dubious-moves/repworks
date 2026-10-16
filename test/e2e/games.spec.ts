@@ -154,6 +154,12 @@ test('games read from the Gist and Lichess, a game opened, the day’s cards ans
   await expect(page.getByTestId('game-item')).toHaveText(/Mistake at move 4 \(Nxe5/);
   await page.getByTestId('game-item').getByRole('button', { name: /Mistake at move 4/ }).click();
   await expect(page.locator('.game-view')).toHaveAttribute('data-ply', '6');
+  // Analyse: the game's moves on the board, at the ply shown; back to the game at it.
+  await page.getByRole('button', { name: 'Analyse this position' }).click();
+  await expect(page).toHaveURL(/#\/analysis\?.*show=6&.*back=%23%2Fgames%2FGameOne1%3Fply%3D6/);
+  await page.getByRole('button', { name: '← Back to the game' }).click();
+  await expect(page).toHaveURL(/#\/games\/GameOne1\?ply=6$/);
+  await expect(page.locator('.game-view')).toHaveAttribute('data-ply', '6');
   await page.locator('.back').click();
   await expect(page).toHaveURL(/#\/games$/);
 
@@ -163,6 +169,13 @@ test('games read from the Gist and Lichess, a game opened, the day’s cards ans
   const card = page.locator('.game-card');
   await expect(card).toHaveAttribute('data-card', 'm|GameOne1_7');
   await expect(card).toContainText('Find a better move than Nxe5');
+  // Analyse, and back to the card as it was.
+  await card.getByRole('button', { name: 'Analyse', exact: true }).click();
+  await expect(page).toHaveURL(/#\/analysis\?.*back=%23%2Fgames%2Freview/);
+  await page.getByRole('button', { name: '← Back to the game cards' }).click();
+  await expect(page).toHaveURL(/#\/games\/review$/);
+  await expect(card).toHaveAttribute('data-card', 'm|GameOne1_7');
+  await expect(card).toHaveAttribute('data-phase', 'asking');
   await play(page, 'f3d4');
   await expect(page.getByTestId('game-feedback')).toHaveText(/Best move/);
   await expect(card).toContainText('Recorded: Easy');
@@ -252,7 +265,7 @@ test('a mistake made into a sequence on the analysis board, checked, saved in it
   await page.getByTestId('game-row').filter({ hasText: 'Blackburne' }).click();
   await page.getByTestId('game-item').getByRole('button', { name: 'Make a sequence' }).click();
   // The board from the player's side (the owner's request, 2026-10-08).
-  await expect(page).toHaveURL(/#\/analysis\?fen=.*&seq=GameOne1_7&side=white$/);
+  await expect(page).toHaveURL(/#\/analysis\?fen=.*&seq=GameOne1_7&side=white&back=%23%2Fgames%2FGameOne1$/);
 
   // The refutation, and the castle that follows.
   for (const [from, to] of [['f3', 'd4'], ['e5', 'd4'], ['e1', 'g1']] as const) {

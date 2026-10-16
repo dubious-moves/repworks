@@ -892,7 +892,7 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
       else if (e.key === 'p' && now.phase === 'verdict' && now.nextAt !== undefined) pauseVerdict();
       else if (e.key === 't' && canTryAgain(now)) tryAgain();
       else if (e.key === 's' && (now.phase === 'held' || canTryAgain(now))) showMove();
-      else if (e.key === 'a' && now.mode === 'set' && now.item && (now.phase === 'held' || now.phase === 'verdict')) analyse(now.item, props.scope.route);
+      else if (e.key === 'a' && now.item && now.phase !== 'grading') analyse(now.item, props.scope.route);
       else return;
       e.preventDefault();
     };
@@ -985,16 +985,24 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
               Pause <kbd>P</kbd>
             </button>
           )}
-          {s.mode === 'set' && (held || phase === 'verdict') && (
-            <button
-              type="button"
-              class="secondary"
-              title={held && !s.revealed ? 'Show the move and open the analysis board; it counts as shown, and the position comes back in the second pass' : 'Open the analysis board here; the set waits'}
-              onClick={() => analyse(item, props.scope.route)}
-            >
-              Analyse <kbd>A</kbd>
-            </button>
-          )}
+          {/* Always there, so no button moves under a finger; not while a move is being graded. */}
+          <button
+            type="button"
+            class="secondary"
+            disabled={phase === 'grading'}
+            title={
+              s.mode === 'set'
+                ? (held || asking) && !s.revealed
+                  ? 'Show the move and open the analysis board; it counts as shown, and the position comes back in the second pass'
+                  : 'Open the analysis board here; the set waits'
+                : asking
+                  ? 'Pass this position and open the analysis board: no points, the streak ends, and the clock waits'
+                  : 'Open the analysis board here; the clock waits'
+            }
+            onClick={() => analyse(item, props.scope.route)}
+          >
+            Analyse <kbd>A</kbd>
+          </button>
           {v && (held || phase === 'verdict') && <SaveMistake item={item} />}
           <button type="button" aria-pressed={draw} aria-label="Draw mode" title="Draw arrows and circles to think with" class={`secondary touch-only storm-draw${draw ? ' on' : ''}`} onClick={() => setDraw(!draw)}>
             ✎

@@ -1211,10 +1211,29 @@ export function showMove(): void {
   // Found already, kept for more tries: the move shown, the outcome as it was.
   if (s.phase === 'verdict' && canTryAgain(s)) return update({ revealed: true });
   if (s.phase !== 'held') return;
+  reveal({ ...s, item: s.item });
+}
+
+/** A set card ended as shown: it comes back in the second pass. */
+function reveal(s: StormSession & { item: StormItem }): void {
   const outcome: SetOutcome = 'shown';
   const item: StormItem = { ...s.item, ...(s.pass === 1 ? { outcome } : { secondOutcome: outcome }) };
   if (s.pass === 1) secondPass.push(again(s.item));
   update({ item, revealed: true, history: s.history.map((h) => (h.card.card === item.card.card ? { ...h, ...item, answer: h.answer ?? item.answer, later: h.later } : h)) });
+  setPhase('verdict');
+}
+
+/**
+ * A card waiting for a move, left for the analysis board (the owner's request, 2026-10-16): a set's
+ * counts as shown, as a held one's does; a storm's is passed, no points and the streak over, the
+ * clock stopped and the next card waiting for Next.
+ */
+function giveUp(s: StormSession & { item: StormItem }): void {
+  gradeSeq++;
+  if (s.mode === 'set') return reveal(s);
+  const v: StormAnswer = { verdict: 'unanswered', band: 'unanswered', passed: true, analysed: true, points: 0, ...(s.item.puzzle ? { puzzle: true } : {}) };
+  const done: StormItem = { ...s.item, answer: v };
+  update({ item: done, history: s.history.map((h) => (h.card.card === done.card.card ? done : h)), streak: 0 });
   setPhase('verdict');
 }
 
@@ -1315,6 +1334,7 @@ export function analysisFor(item: StormItem, back: StormMode): Extract<Mode, { n
 export function analyse(item: StormItem, back: StormMode, reviewAt?: number): void {
   const s = stormSession.value;
   if (s?.phase === 'held' && s.item === item) showMove();
+  else if (s?.phase === 'solving' && s.item === item) giveUp({ ...s, item });
   if (reviewAt !== undefined) update({ reviewAt });
   open(analysisFor(item, back));
 }

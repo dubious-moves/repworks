@@ -2573,8 +2573,8 @@ release; Analyse lost the storm; the screens felt low effort. What was found, an
   that move and the one played as its line, shown at the card, from the user's side (`#/analysis`
   gains `line`, `show`, `side` and `back`). "← Back to the storm" (or the browser's Back) returns to
   the review at the same position, or to the set where it was; anywhere else ends the session. From
-  a held set card it shows the move first (lichessable §18.4: it counts as shown). Not during a
-  timed card.
+  a held set card it shows the move first (lichessable §18.4: it counts as shown). During a timed
+  card it passes the card (§5.112; was: not during one).
 - **The screens**: a card has a head (clock, points, the streak's bar to its next multiplier), a
   mark per answer so far, where the card is (the chapter and the line's last moves, "…6. Be2 e5
   7. Nb3", since a chapter holds many lines), and one status block (the band's word in its colour,
@@ -6238,3 +6238,36 @@ after it, variations included, as PGN (`branchPgn` in `core/study/ops.ts`, writt
 Tests: `ops.test.ts` (variations after the move kept and before it left out, a comment and a
 glyph kept, a path not in the chapter, a FEN chapter); `editor.spec.ts` (the item in the menu);
 `views.spec.ts` (the copied text). Live: TESTING.md.
+
+#### 5.112 Analyse on every board (the owner's request, 2026-10-16)
+
+**Analyse** opens the analysis board at the position shown, from every screen with a board, quizzed
+or not; the study keeps its ☰ "Analyse from here" (the owner: enough there). The board's head has
+"← Back to …" naming the page it came from (training, the storm, the line, the game, the game
+cards, the review, the checklist), and the address carries it (`#/analysis?…&back=<hash>`, any
+page but the board itself; a line up to 300 moves). That button, the app's ←, and the browser's
+Back and Forward all come back to the page as it was left. Decided:
+- **Where**: training (every kind: the queue, show and grade, a line, Learn, the Interactive view,
+  Retry, Drill, the pins), with the other buttons under the board, always there; its Read and its
+  end; the line selected (§5.83); the Read view; the storm, timed or a set; a game; the game
+  cards (plan cards too); a practice game in play and its review; the checklist's lead-up.
+- **What the board holds**: the line from its start where there is one (training's line from its
+  chapter's start, a game's moves, a practice game's, the line read), shown at the move on the
+  board; else the position. A line from a comment on the training board: its position.
+- **Quizzed**: a training move being asked counts as hinted (shown on return, graded Again), as
+  Hint would: the engine and the explorer give it away. A set's card counts as shown, as a held
+  one did (§5.71). A **timed storm card** is passed: no points, the streak ends, the clock stops,
+  and the card waits with "Analysed — no answer given" for Next. Was (§5.71): not during a
+  timed card. The game cards and practice games keep what they had (their hint is separate).
+- **Kept for the entry**: the training session waits for the history entry it ran on whenever its
+  screen is left (a move due held), and is taken up if that entry is come back to; opened anew,
+  training starts afresh. The Read view's move and a game's ply are written into the address as
+  they change (replaced, as a chapter's move is). A practice game in play is kept from memory (it
+  had needed two moves to be saved on the device); a review comes back at its move; the checklist
+  keeps its lead-up's move or its game.
+
+Tests: `fsm.test.ts` (any page as `back`, none the board or unreadable); `train.spec.ts` (asked,
+analysed, back as hinted; at the line's end by Back and Forward); `storm.spec.ts` (a timed card
+analysed: passed, the clock stopped, back by the button and by Back, Next); `views.spec.ts` (the
+Read view's move kept); `games.spec.ts` (a game's ply kept, a game card back as it was);
+`practice.spec.ts` (a game in play analysed and played on). Live: TESTING.md.

@@ -136,6 +136,45 @@ test('train: the counts, a due move asked, a wrong move taken back, new lines ta
   await expect(feedback(page)).toHaveText('');
 });
 
+test('Analyse (the owner’s request, 2026-10-16): the board at the move asked, counted as hinted, and back to the session as it was, by ← and by the browser’s Back', async ({ page }) => {
+  await walkOnce(page);
+  await setUp(page);
+  await page.locator('.train-card').getByRole('link', { name: 'Train' }).click();
+  await expect(page).toHaveURL(/#\/train$/);
+  await asked(page);
+  await expect(page.locator('.train-counters')).toContainText('1 due · 3 new');
+  const analyse = page.locator('.train-actions').getByRole('button', { name: 'Analyse', exact: true });
+  await analyse.click();
+  // The line from its start, at the move on the board, from the user's side.
+  await expect(page).toHaveURL(/#\/analysis\?.*line=e4&.*side=black&back=%23%2Ftrain/);
+  await expect(page.locator('.notation .move.current')).toHaveAttribute('data-path', 'e4');
+  await expect(page.locator('.cg-wrap')).toHaveClass(/orientation-black/);
+  await page.getByRole('button', { name: '← Back to training' }).click();
+  await expect(page).toHaveURL(/#\/train$/);
+  // The same session, the move asked now shown (it counts as hinted), its arrow on the board.
+  await expect(page.locator('.train-grid')).toHaveAttribute('data-phase', 'shown');
+  await expect(page.locator('.train-counters')).toContainText('1 due · 3 new');
+  await expect(page.locator('.train-line')).toContainText('1. e4');
+  await play(page, 'c7', 'c5');
+  await expect(feedback(page)).toHaveText(/^Line done · Next: /);
+  // At the line's end, by the browser's Back: still there, and Next line goes on.
+  await analyse.click();
+  // The line's end, where the board is: 2. Nf3 d6 played on after the move answered.
+  await expect(page).toHaveURL(/#\/analysis\?.*line=e4,c5,Nf3,d6&/);
+  await expect(page.locator('.notation .move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 d6');
+  await page.goBack();
+  await expect(page).toHaveURL(/#\/train$/);
+  await expect(page.locator('.train-grid')).toHaveAttribute('data-phase', 'lineDone');
+  await expect(page.locator('.train-counters')).toContainText('0 due · 3 new');
+  // …and forward to the board, and back again.
+  await page.goForward();
+  await expect(page).toHaveURL(/#\/analysis\?/);
+  await page.goBack();
+  await expect(page.locator('.train-grid')).toHaveAttribute('data-phase', 'lineDone');
+  await page.getByRole('button', { name: 'Next line' }).click();
+  await expect(page.locator('.train-line')).toContainText('2. Nf3');
+});
+
 test('train one study from the study list and Escape stops', async ({ page, isMobile }) => {
   await setUp(page);
   await page.getByRole('link', { name: 'Train Test repertoire' }).click();

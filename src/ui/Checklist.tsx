@@ -4,11 +4,11 @@
 // a line taken out (✕) is replaced from the reserve. The drill: the line's lead-up played from the
 // start (your moves asked, the opponent's played; a move off your prep is refused), then a game
 // from its end against the preset's opponent, won by mate or Claim victory.
-import { useEffect, useState } from 'preact/hooks';
-import { open } from '../app/mode.ts';
+import { useEffect, useRef, useState } from 'preact/hooks';
+import { analyseFrom, entryKey, open } from '../app/mode.ts';
 import { checklists, checklistStudies, excludedLeaves, excludeLine, generating, makeChecklist, restoreExcluded } from '../app/checklist.ts';
 import { lichessToken } from '../app/lichess.ts';
-import { leavePractice, practice, startPractice } from '../app/practice.ts';
+import { leavePractice, parkPractice, practice, startPractice, takeUpPractice } from '../app/practice.ts';
 import { practiceResults } from '../app/repertoireCheck.ts';
 import { completedPresets, PRESET_ORDER, PRESETS, presetOpen, presetStats, RANK_SPEEDS, type Preset, type Variation } from '../core/games/checklist.ts';
 import { parseUciMove } from '../core/chess/uci.ts';
@@ -21,6 +21,9 @@ import { isoDay } from './day.ts';
 import { Back, Stuck } from './Back.tsx';
 
 const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+
+/** The lead-up left for the analysis board: its entry and the move it was at. */
+let leadLeft: { entry: string; k: number } | undefined;
 
 /** "1. e4 e5 2. Nf3 Nc6", from the start. */
 function lineText(sans: readonly string[]): string {
@@ -154,7 +157,15 @@ function Line(props: { v: Variation; i: number; sid: string; results: { res: str
 export function ChecklistDrill(props: { sid: string; i: number; preset: Preset }) {
   const list = checklists.value[props.sid];
   const v = list?.variations[props.i];
-  const [k, setK] = useState(0);
+  // Come back to from the analysis board (the owner's request, 2026-10-16): the game played on, or
+  // the lead-up at the move it was left at.
+  const [entry] = useState(entryKey);
+  const [resumed] = useState(() => !!v && takeUpPractice(entry));
+  const [k, setK] = useState(() => {
+    const was = leadLeft;
+    leadLeft = undefined;
+    return resumed && v ? v.lineUci.length : was?.entry === entry ? was.k : 0;
+  });
   const [note, setNote] = useState<string | undefined>(undefined);
   const color = list?.color ?? 'white';
   const fenAt = (n: number) => {
@@ -169,6 +180,7 @@ export function ChecklistDrill(props: { sid: string; i: number; preset: Preset }
   useEffect(() => {
     if (!v) return;
     if (!inLeadUp) {
+      if (resumed && practice.peek()) return;
       const p = PRESETS[props.preset];
       startPractice({ kind: 'checklist', fen: v.leafFen, color, silent: true, title: lineText(v.lineSan), opponent: { ratings: [...p.ratings], speeds: [...RANK_SPEEDS], maiaElo: p.maiaElo, precision: p.precision }, preset: props.preset, leaf: v.leafKey });
       return;
@@ -179,7 +191,17 @@ export function ChecklistDrill(props: { sid: string; i: number; preset: Preset }
     }
     return undefined;
   }, [k, v]);
-  useEffect(() => () => leavePractice(), []);
+  const leading = useRef({ on: inLeadUp, k });
+  leading.current = { on: inLeadUp, k };
+  // Left for another page (the analysis board, say): the lead-up's move, or the game, kept for this entry.
+  useEffect(
+    () => () => {
+      if (!leading.current.on) return parkPractice(entry);
+      leavePractice();
+      leadLeft = { entry, k: leading.current.k };
+    },
+    [],
+  );
   if (!list || !v) return <Stuck parent={{ name: 'repCheck' }}>That checklist line isn’t on this device: make the checklist again.</Stuck>;
   const back = (
     <div class="chapter-head">
@@ -216,6 +238,16 @@ export function ChecklistDrill(props: { sid: string; i: number; preset: Preset }
           <p class="feedback train-feedback" role="status" data-testid="checklist-feedback">
             {note ?? (turn === color ? 'Your move: play your prep' : 'The opponent plays the line…')}
           </p>
+          <div class="actions train-actions">
+            <button
+              type="button"
+              class="secondary"
+              title="The analysis board at this position; ← comes back to the drill"
+              onClick={() => analyseFrom({ fen: START, ...(k ? { line: v.lineSan.slice(0, k), show: k } : {}), side: color })}
+            >
+              Analyse
+            </button>
+          </div>
         </div>
       </div>
     </div>

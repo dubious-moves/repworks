@@ -4,6 +4,7 @@
 // or continued on the other device with nothing saved beyond the log.
 import { signal } from '@preact/signals';
 import type { Position } from 'chessops/chess';
+import { makeFen } from 'chessops/fen';
 import type { Mode } from '../core/app/fsm.ts';
 import { chapterPath, classifyPath } from '../core/data/layout.ts';
 import { parseChapterFile } from '../core/pgn/parse.ts';
@@ -246,6 +247,7 @@ let pinnedNow = new Set<string>();
 
 /** Starts a session: today's queue, the day's mistakes, or the pins. */
 export async function startSession(store: IdbStore, record: (event: Parameters<IdbStore['record']>[0]) => Promise<void>, of: SessionKind): Promise<void> {
+  away = undefined;
   stopTimer();
   trainer = undefined;
   shower = undefined;
@@ -497,8 +499,73 @@ export function pinMissed(): void {
   session.value = { ...rest, tick: s.tick + 1 };
 }
 
+/**
+ * Analyse (the owner's request, 2026-10-16): the analysis board at the position on the board, the
+ * line's moves from its chapter's start. The session waits for the history entry it runs on
+ * (`leaveSession`), so ← (or the browser's Back) takes it up where it was. A move being asked
+ * counts as hinted (it is shown on return), as Hint would: the engine and the explorer give it away.
+ */
+export function analyseSession(): AnalysisBoard | undefined {
+  const s = session.peek();
+  if (!s?.position) return undefined;
+  if (!s.selfGrade && (s.phase === 'ask' || s.phase === 'wrong')) command('hint');
+  const now = session.peek() ?? s;
+  const read = readingAt.peek();
+  const side = now.side;
+  // A line from the comments on the board (§5.98): its position alone. Read in the session: the
+  // move read. Else the line from its chapter's start, at the move on the board.
+  const start = now.chapter ? startPosition(now.chapter) : undefined;
+  if (now.aside || !start || !now.chapter) return { fen: makeFen(now.position!.toSetup()), side };
+  const line = read !== undefined && now.line ? now.line.path : now.path;
+  const shown = read !== undefined ? Math.min(read, line.length) : now.path.length;
+  return { fen: makeFen(start.toSetup()), ...(line.length ? { line: [...line], show: shown } : {}), side };
+}
+
+/** Where the analysis board opens: its start, its main line, the moves of it shown, its side. */
+export interface AnalysisBoard {
+  fen: string;
+  line?: string[];
+  show?: number;
+  side: 'white' | 'black';
+}
+
+/** The session left for another page (the analysis board, say), and the entry it ran on. */
+let away: { key: string; entry: string } | undefined;
+
+/**
+ * The training screen gone, from the history entry `entry`: the session waits, a move due held,
+ * to be taken up again if that entry is come back to (by ←, or the browser's Back or Forward).
+ */
+export function leaveSession(entry: string): void {
+  const s = session.peek();
+  if (!s) return endSession();
+  away = { key: JSON.stringify(s.of), entry };
+}
+
+/**
+ * The training screen opened for `of` on the history entry `entry`: true when the session left
+ * there is taken up where it was (a move due meanwhile played now). Else any session left is let go.
+ */
+export function resumeSession(of: SessionKind, entry: string): boolean {
+  const was = away;
+  away = undefined;
+  const s = session.peek();
+  if (!was || !s || was.key !== JSON.stringify(of) || was.key !== JSON.stringify(s.of) || was.entry !== entry) {
+    if (was) endSession();
+    return false;
+  }
+  if (held !== undefined && readingAt.peek() === undefined) {
+    const id = held;
+    held = undefined;
+    send({ type: 'tick', id, now: Date.now() });
+  }
+  session.value = { ...s, tick: s.tick + 1 };
+  return true;
+}
+
 /** Leaves the screen: the timer stops; everything answered is already recorded. */
 export function endSession(): void {
+  away = undefined;
   stopTimer();
   readingAt.value = undefined;
   trainer = undefined;
@@ -591,8 +658,9 @@ function apply(t: Trainer, effects: readonly ShowGradeEffect[], always = false):
         stopTimer();
         timer = setTimeout(() => {
           timer = undefined;
-          // While the line is read the session waits: the tick comes when the reading ends.
-          if (readingAt.peek() !== undefined) held = e.id;
+          // While the line is read, or the board analysed, the session waits: the tick comes when
+          // the reading ends, or the session is come back to.
+          if (readingAt.peek() !== undefined || away) held = e.id;
           else send({ type: 'tick', id: e.id, now: Date.now() });
         }, e.ms);
         break;

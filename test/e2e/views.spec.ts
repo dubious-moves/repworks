@@ -71,6 +71,13 @@ test('read: a line stepped through with its comments, then back to the chapter a
   // A move of the line picked from the list.
   await page.locator('.read-step', { hasText: 'Nf3' }).click();
   await expect(move).toContainText('2. Nf3');
+  // Analyse (the owner's request, 2026-10-16): the board at the move read, and back to it.
+  await page.getByRole('button', { name: 'Analyse', exact: true }).click();
+  await expect(page).toHaveURL(/#\/analysis\?.*line=e4,c5,Nf3,d6,d4,cxd4&show=3&.*back=/);
+  await expect(page.locator('.notation .move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3');
+  await page.getByRole('button', { name: '← Back to the line' }).click();
+  await expect(page).toHaveURL(/#\/read\/Rep0Najd\/Ch1Najdf\?at=e4&from=3$/);
+  await expect(move).toContainText('2. Nf3');
 
   if (isMobile) await page.getByRole('button', { name: 'Edit' }).click();
   else await page.keyboard.press('Escape');

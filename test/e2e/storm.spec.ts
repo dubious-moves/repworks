@@ -378,6 +378,36 @@ const storedFens = (page: Page) =>
   );
 const storedOf = async (page: Page) => Number(/(\d+) stored from/.exec((await page.locator('.storm-gather').textContent()) ?? '')?.[1] ?? NaN);
 
+test('Analyse during a timed card (the owner’s request, 2026-10-16): the card passed, the clock stopped, and back to it; Next goes on', async ({ page }) => {
+  const w = await setUp(page);
+  await gathered(page, w);
+  await page.getByRole('button', { name: 'Start storm' }).click();
+  await expect(page.getByTestId('storm-verdict')).toContainText('Find a good move');
+  const first = await cardFen(page);
+  await page.getByRole('button', { name: /^Analyse/ }).click();
+  await expect(page).toHaveURL(/#\/analysis\?.*back=%23%2Fstorm/);
+  await page.getByRole('button', { name: '← Back to the storm' }).click();
+  await expect(page).toHaveURL(/#\/storm$/);
+  // The same card, passed: no points, the clock stopped, the next card waiting for Next.
+  expect(await cardFen(page)).toBe(first);
+  await expect(page.getByTestId('storm-verdict')).toContainText('Analysed — no answer given');
+  await expect(page.getByTestId('storm-points')).toHaveText('0');
+  await expect(page.getByTestId('storm-clock')).toHaveClass(/stopped/);
+  const clock = await page.getByTestId('storm-clock').textContent();
+  await page.waitForTimeout(1500);
+  await expect(page.getByTestId('storm-clock')).toHaveText(clock!);
+  expect(await cardFen(page)).toBe(first);
+  // By the browser's Back from the verdict too, then Next: a new card, the clock running.
+  await page.getByRole('button', { name: /^Analyse/ }).click();
+  await expect(page).toHaveURL(/#\/analysis\?/);
+  await page.goBack();
+  await expect(page.getByTestId('storm-verdict')).toContainText('Analysed — no answer given');
+  await page.getByRole('button', { name: /^Next/ }).click();
+  await expect.poll(() => cardFen(page)).not.toBe(first);
+  await expect(page.getByTestId('storm-verdict')).toContainText('Find a good move');
+  await expect(page.getByTestId('storm-clock')).not.toHaveClass(/stopped/);
+});
+
 test('overnight (§5.102): the gather goes on over older games, Stockfish scoring between passes, the screen kept on, and the positions written to the data repo', async ({ page }) => {
   test.setTimeout(120_000);
   const w = await setUp(page);
