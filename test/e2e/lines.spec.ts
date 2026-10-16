@@ -160,8 +160,10 @@ test('the daily limit: changed from the site, nothing left, the next line learne
   await shot(page, 'nothing');
   await done.getByRole('button', { name: 'Learn the next line' }).click();
   await expect(page).toHaveURL(/#\/train\/Rep0Najd\/Ch1Najdf\?at=e4,c5,Nf3,d6,d4,cxd4$/);
-  // A line picked starts auto-played (§5.17): 1... c5, just reviewed, and 2... d6, suspended, are
-  // played up to the new move.
+  // A line picked starts from the start, auto-play off (§5.113): 1... c5, reviewed in the session
+  // before, is asked; 2... d6, suspended, is played up to the new move.
+  await asked(page);
+  await play(page, 'c7', 'c5');
   await expect(feedback(page)).toHaveText('New move: play cxd4');
   await expect(page.locator('.train-line')).toContainText('1. e4 c5 2. Nf3 d6 3. d4');
   await page.getByRole('button', { name: 'Stop' }).click();

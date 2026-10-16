@@ -129,8 +129,8 @@ export function lineThrough(index: RepertoireIndex, sid: string, cid: string, at
 
 /**
  * One line picked from the list: walked whole; its due moves (and known moves never answered)
- * asked and graded, its moves never answered taught; the trainer asks the rest ungraded
- * (`practice`).
+ * asked and graded, its moves never answered taught; the rest played or asked as the
+ * auto-play mode for a line picked says (§5.113).
  */
 export function pickedPlan(index: RepertoireIndex, states: States, settings: TrainSettings, day: Day, line: Line): SessionPlan {
   if (line.paused) return { lines: [{ kind: 'pick', line, end: line.path.length, ask: [], teach: [] }] };

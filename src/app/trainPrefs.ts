@@ -15,7 +15,9 @@ export interface TrainPrefs {
   /** Where a line starts in the day's queue, and in a line picked or learned. */
   startQueue: LineStart;
   startLearn: LineStart;
-  autoPlay: AutoPlay;
+  /** Auto-play in the day's queue (and show and grade), and in a line picked or learned (§5.113). */
+  autoPlayQueue: AutoPlay;
+  autoPlayLearn: AutoPlay;
   /** How many times a line is walked when a move on it is learned (1–5): the owner's request, 2026-10-08. */
   repetitions: number;
   /** At a line's end, each move missed on it is asked until right this many times in a row (0–5; 0: not). */
@@ -24,11 +26,15 @@ export interface TrainPrefs {
   comments: CommentQuiz;
 }
 
-export const DEFAULT_PREFS: TrainPrefs = { newMoves: 'show', sequenceLength: 5, lineEnd: 'wait', startQueue: 'first', startLearn: 'auto', autoPlay: 'due', repetitions: 2, mistakeRetries: 2, comments: 'all' };
+export const DEFAULT_PREFS: TrainPrefs = { newMoves: 'show', sequenceLength: 5, lineEnd: 'wait', startQueue: 'first', startLearn: 'start', autoPlayQueue: 'due', autoPlayLearn: 'off', repetitions: 2, mistakeRetries: 2, comments: 'all' };
 
 const KEY = 'repworks.trainPrefs';
 
-/** The stored settings, each field checked: an unknown value is the default. */
+/**
+ * The stored settings, each field checked: an unknown value is the default. Settings stored before
+ * §5.113: one `autoPlay` for both, and a line starting from the start `auto` (played) or `ask`
+ * (asked), now "from the start" with auto-play off.
+ */
 export function parsePrefs(raw: string | null): TrainPrefs {
   let v: Record<string, unknown> = {};
   try {
@@ -38,14 +44,16 @@ export function parsePrefs(raw: string | null): TrainPrefs {
     // The defaults.
   }
   const pick = <T extends string>(value: unknown, allowed: readonly T[], fallback: T): T => (allowed.includes(value as T) ? (value as T) : fallback);
+  const start = (value: unknown, fallback: LineStart): LineStart => (value === 'auto' || value === 'ask' ? 'start' : pick(value, LINE_STARTS, fallback));
   const whole = (value: unknown, min: number, max: number, fallback: number) => (Number.isInteger(value) && (value as number) >= min && (value as number) <= max ? (value as number) : fallback);
   return {
     newMoves: pick(v.newMoves, ['show', 'try', 'sequence'], DEFAULT_PREFS.newMoves),
     sequenceLength: whole(v.sequenceLength, 1, 50, DEFAULT_PREFS.sequenceLength),
     lineEnd: pick(v.lineEnd, ['wait', 'go'], DEFAULT_PREFS.lineEnd),
-    startQueue: pick(v.startQueue, LINE_STARTS, DEFAULT_PREFS.startQueue),
-    startLearn: pick(v.startLearn, LINE_STARTS, DEFAULT_PREFS.startLearn),
-    autoPlay: pick(v.autoPlay, AUTO_PLAYS, DEFAULT_PREFS.autoPlay),
+    startQueue: start(v.startQueue, DEFAULT_PREFS.startQueue),
+    startLearn: start(v.startLearn, DEFAULT_PREFS.startLearn),
+    autoPlayQueue: v.startQueue === 'ask' ? 'off' : pick(v.autoPlayQueue ?? v.autoPlay, AUTO_PLAYS, DEFAULT_PREFS.autoPlayQueue),
+    autoPlayLearn: v.startLearn === 'ask' ? 'off' : pick(v.autoPlayLearn ?? v.autoPlay, AUTO_PLAYS, DEFAULT_PREFS.autoPlayLearn),
     repetitions: whole(v.repetitions, 1, 5, DEFAULT_PREFS.repetitions),
     mistakeRetries: whole(v.mistakeRetries, 0, 5, DEFAULT_PREFS.mistakeRetries),
     comments: pick(v.comments, COMMENT_QUIZZES, DEFAULT_PREFS.comments),

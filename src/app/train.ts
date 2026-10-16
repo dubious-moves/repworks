@@ -312,7 +312,6 @@ export async function startSession(store: IdbStore, record: (event: Parameters<I
     askOnly: !grading && !interactive,
     askAll: interactive,
     follow: interactive,
-    practice: of.kind === 'line',
     // Retry, drill and the pins: a move missed again comes back until it is right (§5.77).
     repeatMissed: !grading && !interactive,
     selfGrade: of.kind === 'show',
@@ -355,14 +354,14 @@ function commentLinesOf(data: TrainData): (line: Line) => readonly QuizLine[] {
 
 /**
  * The per-device settings a session runs with (§5.17): the queue's and show and grade's lines start
- * as `startQueue` says and wait at their end or go on after two paces; a line picked or learned
- * starts as `startLearn` says, and Learn's lines wait at their end or go on after four paces. A line
- * learned is walked `repetitions` times, and a walk's mistakes are asked again at its end (§5.77).
+ * and auto-play as `startQueue` and `autoPlayQueue` say (a line picked or learned: `startLearn` and
+ * `autoPlayLearn`, §5.113), and wait at their end or go on after two paces; Learn's lines wait at
+ * their end or go on after four paces. A line learned is walked `repetitions` times, and a walk's
+ * mistakes are asked again at its end (§5.77).
  * Retry, drill, the pins and the Interactive view keep their own walk.
  */
 export function optionsFor(of: SessionKind, prefs: TrainPrefs): TrainerOptions {
   const common: TrainerOptions = {
-    autoPlay: prefs.autoPlay,
     tryNew: prefs.newMoves === 'try',
     sequence: prefs.newMoves === 'sequence' ? prefs.sequenceLength : 0,
     repetitions: prefs.repetitions,
@@ -370,13 +369,13 @@ export function optionsFor(of: SessionKind, prefs: TrainPrefs): TrainerOptions {
   };
   switch (of.kind) {
     case 'queue':
-      return { ...common, lineStart: prefs.startQueue, holdLineEnd: prefs.lineEnd === 'wait', comments: prefs.comments };
+      return { ...common, autoPlay: prefs.autoPlayQueue, lineStart: prefs.startQueue, holdLineEnd: prefs.lineEnd === 'wait', comments: prefs.comments };
     case 'show':
-      return { ...common, lineStart: prefs.startQueue, holdLineEnd: prefs.lineEnd === 'wait' };
+      return { ...common, autoPlay: prefs.autoPlayQueue, lineStart: prefs.startQueue, holdLineEnd: prefs.lineEnd === 'wait' };
     case 'line':
-      return { ...common, lineStart: prefs.startLearn, comments: prefs.comments };
+      return { ...common, autoPlay: prefs.autoPlayLearn, lineStart: prefs.startLearn, comments: prefs.comments };
     case 'learn':
-      return { ...common, lineStart: prefs.startLearn, holdLineEnd: prefs.lineEnd === 'wait', lineEndPaces: 4 };
+      return { ...common, autoPlay: prefs.autoPlayLearn, lineStart: prefs.startLearn, holdLineEnd: prefs.lineEnd === 'wait', lineEndPaces: 4 };
     default:
       return {};
   }

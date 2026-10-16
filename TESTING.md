@@ -5,6 +5,15 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## Auto-play set apart for the queue and for Learn and a line picked (§5.113)
+- Training settings: Auto-play and "A line starts" twice, under "In the day's queue" and "When
+  learning, or a line picked". Your stored settings carry over: the old one auto-play setting in
+  both (so set the learn/pick one to Off), "From the start, played" as From the start, and
+  "asked" as From the start with that context's auto-play Off.
+- Queue on "Moves answered right this session", From the start: a move not answered yet in the
+  session is asked, before the first due move too; answered right, it is played the next time.
+- Learn and a line picked with auto-play Off: every move asked, on every pass.
+
 ## Analyse on every board (§5.112)
 - Training (the queue, desktop then phone): with a move asked, press Analyse: the board should show
   the line to here, from your side. "← Back to training": the move shown with its arrow (it counts

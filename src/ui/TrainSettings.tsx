@@ -16,7 +16,7 @@ import { DEFAULT_TRAIN } from '../core/train/settings.ts';
 import type { AutoPlay, CommentQuiz, LineStart } from '../core/train/trainer.ts';
 import { TimeControl } from './TimeTravel.tsx';
 
-const STARTS: Record<LineStart, string> = { first: 'At its first new or due move', auto: 'From the start, played', ask: 'From the start, asked' };
+const STARTS: Record<LineStart, string> = { first: 'At its first new or due move', start: 'From the start' };
 const AUTO: Record<AutoPlay, string> = {
   due: 'Moves not due, and moves answered this session',
   session: 'Moves answered right this session',
@@ -76,7 +76,7 @@ function Dialog() {
     close();
   };
   return (
-    <dialog ref={ref} class="study-dialog" aria-labelledby="dialog-train-settings" onCancel={(e) => (e.preventDefault(), close())}>
+    <dialog ref={ref} class="study-dialog train-settings" aria-labelledby="dialog-train-settings" onCancel={(e) => (e.preventDefault(), close())}>
       <form class="form" method="dialog" noValidate onSubmit={(e) => (e.preventDefault(), void save())}>
         <h2 id="dialog-train-settings">Training settings</h2>
         <p class="muted">Shared by all your devices.</p>
@@ -118,37 +118,17 @@ function Dialog() {
           Mistakes retried <span class="muted">(asked again when the line ends, until right this many times in a row, 0–5; 0: not)</span>
           <input type="number" name="mistake-retries" min={0} max={5} step={1} inputMode="numeric" value={retries} onInput={(e) => setRetries(e.currentTarget.value)} />
         </label>
-        <label>
-          Auto-play
-          <select name="auto-play" value={prefs.autoPlay} onChange={(e) => set('autoPlay', e.currentTarget.value as AutoPlay)}>
-            {(Object.keys(AUTO) as AutoPlay[]).map((k) => (
-              <option key={k} value={k}>
-                {AUTO[k]}
-              </option>
-            ))}
-          </select>
-        </label>
-        <p class="muted">Moves played for you; the others are asked. With “answered right”, a move’s latest answer this session counts. A line starting “From the start, asked” asks every move whatever this says. Moves set to “always play this for me” are always played.</p>
-        <label>
-          A line starts, in the day's queue
-          <select name="start-queue" value={prefs.startQueue} onChange={(e) => set('startQueue', e.currentTarget.value as LineStart)}>
-            {(Object.keys(STARTS) as LineStart[]).map((k) => (
-              <option key={k} value={k}>
-                {STARTS[k]}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          A line starts, when learning or picked
-          <select name="start-learn" value={prefs.startLearn} onChange={(e) => set('startLearn', e.currentTarget.value as LineStart)}>
-            {(Object.keys(STARTS) as LineStart[]).map((k) => (
-              <option key={k} value={k}>
-                {STARTS[k]}
-              </option>
-            ))}
-          </select>
-        </label>
+        <p class="muted">Auto-play: moves played for you; the others are asked, a move due or new whatever it says. With “answered right”, a move’s latest answer this session counts. Moves set to “always play this for me” are always played. A line starting from the start is played or asked from move 1 as auto-play says; at its first new or due move, the moves before it are skipped.</p>
+        <fieldset>
+          <legend>In the day's queue</legend>
+          <Choice name="auto-play-queue" label="Auto-play" value={prefs.autoPlayQueue} options={AUTO} onChange={(v) => set('autoPlayQueue', v)} />
+          <Choice name="start-queue" label="A line starts" value={prefs.startQueue} options={STARTS} onChange={(v) => set('startQueue', v)} />
+        </fieldset>
+        <fieldset>
+          <legend>When learning, or a line picked</legend>
+          <Choice name="auto-play-learn" label="Auto-play" value={prefs.autoPlayLearn} options={AUTO} onChange={(v) => set('autoPlayLearn', v)} />
+          <Choice name="start-learn" label="A line starts" value={prefs.startLearn} options={STARTS} onChange={(v) => set('startLearn', v)} />
+        </fieldset>
         <label>
           Lines from the comments, in review
           <select name="comment-lines" value={prefs.comments} onChange={(e) => set('comments', e.currentTarget.value as CommentQuiz)}>
@@ -184,5 +164,20 @@ function Dialog() {
         </div>
       </form>
     </dialog>
+  );
+}
+
+function Choice<K extends string>(props: { name: string; label: string; value: K; options: Record<K, string>; onChange: (value: K) => void }) {
+  return (
+    <label>
+      {props.label}
+      <select name={props.name} value={props.value} onChange={(e) => props.onChange(e.currentTarget.value as K)}>
+        {(Object.keys(props.options) as K[]).map((k) => (
+          <option key={k} value={k}>
+            {props.options[k]}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }

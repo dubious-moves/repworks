@@ -139,8 +139,10 @@ test('a drill: a move missed again comes back until it is right; Repetitions 1 w
   await dialog.getByRole('button', { name: 'Save' }).click();
   await expect(dialog).toHaveCount(0);
   expect(JSON.parse((await page.evaluate(() => localStorage.getItem('repworks.trainPrefs')))!)).toMatchObject({ repetitions: 1, mistakeRetries: 0 });
-  // The line picked starts played from its start, up to the new move.
+  // The line picked starts from its start, auto-play off (§5.113): 1... c5 asked, then the new move.
   await page.goto(`${site.url}#/train/Rep0Najd/Ch1Najdf?at=e4,c5,Nf3,d6,d4,cxd4`);
+  await asked(page);
+  await play(page, 'c7', 'c5');
   await expect(feedback(page)).toHaveText('New move: play cxd4');
   await play(page, 'c5', 'd4');
   await expect(page.getByRole('region', { name: 'Session done' })).toBeVisible();
@@ -153,7 +155,7 @@ test('from the start, asked: every own move asked on both passes; the last move\
   const ch1 = 'studies/Rep0Najd/Ch1Najdf.pgn';
   const text = git.textsOf().get(ch1)!.replace('3. d4 cxd4 *', '3. d4 cxd4 { [%cal Gf3d4] } *');
   git.commitIfHead(git.head, 'An arrow at the line\'s end', new Map([[ch1, text]]), []);
-  await page.addInitScript(() => localStorage.setItem('repworks.trainPrefs', JSON.stringify({ repetitions: 2, mistakeRetries: 0, startLearn: 'ask' })));
+  await page.addInitScript(() => localStorage.setItem('repworks.trainPrefs', JSON.stringify({ repetitions: 2, mistakeRetries: 0, startLearn: 'start', autoPlayLearn: 'off' })));
   await page.clock.install({ time: DAY });
   await serveGithub(page, github);
   await page.goto(`${site.url}#setup?repo=${encodeURIComponent(REPO)}&token=${TOKEN}&name=desktop`);

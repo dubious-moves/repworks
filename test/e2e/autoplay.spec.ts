@@ -3,7 +3,8 @@
 // 2... d6 suspended, three new moves). A picked line's end keeps the board and, set to go on,
 // moves to the next line by itself, which starts auto-played from the chapter's start; the
 // feedback line never says "Your move" or "Correct"; a new move tried first; time travel bringing
-// a move just taught due, its review recorded at the real time, and "Back to now".
+// a move just taught due, its review recorded at the real time, and "Back to now"; auto-play set
+// apart for the queue and for a line picked or learned (§5.113).
 import { test, expect, type Page } from '@playwright/test';
 import type { FakeGit } from '../support/fakeGit.ts';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
@@ -74,7 +75,8 @@ async function watch(page: Page) {
 const seen = (page: Page) => page.evaluate(() => (window as unknown as { seen: { feedback: string[]; moves: string[] } }).seen);
 
 test('a picked line ends with the board kept and goes on to the next line, which starts auto-played; the feedback stays quiet', async ({ page }) => {
-  await walkOnce(page);
+  // Auto-play for lines picked on, as in the queue (off by default, §5.113).
+  await walkOnce(page, { autoPlayLearn: 'due' });
   await setUp(page);
   await trainingSettings(page, (d) => d.getByLabel('At a line\'s end').selectOption('go'));
   await page.goto(`${site.url}#/train/Rep0Najd/Ch1Najdf?at=e4,c5,Nf3,d6,d4,cxd4`);
@@ -156,10 +158,10 @@ test('time travel: a new move tried first, then due at +4 hours, its review reco
 });
 
 test('Learn waits at each line\'s end with the board kept, and "Next line" goes on', async ({ page }) => {
-  await walkOnce(page);
+  await walkOnce(page, { autoPlayLearn: 'due' });
   await setUp(page);
   await page.goto(`${site.url}#/learn/Rep0Najd/Ch1Najdf`);
-  // Learn teaches: the moves up to the first new one are played from the chapter's start.
+  // Learn teaches: the moves up to the first new one are played from the chapter's start (auto-play on).
   await expect(feedback(page)).toHaveText('New move: play cxd4');
   await expect(page.locator('.train-line')).toContainText('1. e4 c5 2. Nf3 d6 3. d4');
   await play(page, 'c5', 'd4');
@@ -174,4 +176,29 @@ test('Learn waits at each line\'s end with the board kept, and "Next line" goes 
   await play(page, 'b8', 'c6');
   await expect(page.getByRole('region', { name: 'Session done' })).toContainText('2 lines');
   await expect(page.locator('cg-board')).toBeVisible();
+});
+
+test('auto-play set apart for the queue and for a line picked (§5.113): picked with "answered right this session", 1... c5 is asked', async ({ page }) => {
+  await walkOnce(page);
+  await setUp(page);
+  await trainingSettings(page, async (d) => {
+    await expect(d.locator('select[name="auto-play-queue"]')).toHaveValue('due');
+    await expect(d.locator('select[name="auto-play-learn"]')).toHaveValue('off');
+    await expect(d.locator('select[name="start-learn"] option')).toHaveText(['At its first new or due move', 'From the start']);
+    await d.locator('select[name="auto-play-learn"]').selectOption('session');
+  });
+  expect(JSON.parse((await page.evaluate(() => localStorage.getItem('repworks.trainPrefs')))!)).toMatchObject({ autoPlayQueue: 'due', autoPlayLearn: 'session', startLearn: 'start' });
+  // 1... c5 reviewed in the queue, so not due any more.
+  await page.goto(`${site.url}#/train`);
+  await expect(phase(page)).toHaveAttribute('data-phase', 'ask');
+  await play(page, 'c7', 'c5');
+  await expect(feedback(page)).toContainText('Line done');
+  // A line picked is a new session: 1... c5 isn't answered in it yet, so it is asked though not
+  // due; 2... d6, suspended, is played.
+  await page.goto(`${site.url}#/train/Rep0Najd/Ch1Najdf?at=e4,c5,Nf3,d6,d4,cxd4`);
+  await expect(phase(page)).toHaveAttribute('data-phase', 'ask');
+  await expect(page.locator('.train-line')).not.toContainText('c5');
+  await play(page, 'c7', 'c5');
+  await expect(feedback(page)).toHaveText('New move: play cxd4');
+  await expect(page.locator('.train-line')).toContainText('1. e4 c5 2. Nf3 d6 3. d4');
 });

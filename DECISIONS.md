@@ -1657,3 +1657,14 @@ The technical calls, each with its reason:
   training session waits for its history entry whenever it is left, as the storm's did. Was: a
   training session ended as soon as its screen went. Why: the same request, "make sure going back
   and forth is working".
+
+## Revision of 2026-10-16 (auto-play set apart for the queue and for Learn and a line picked, PLAN.md §5.113)
+- **D16: two auto-play settings, the queue's and Learn's and a line picked's; the latter `off` by
+  default.** Was (§5.17): one mode for every session, `due` by default. Why: the owner's request,
+  auto-play on in review and off when learning or picking a line, at once.
+- **D16: "A line starts" says only where the board starts** (first new or due move, or the start);
+  the auto-play mode decides every move from there. Was (§5.17): from the start, the moves before
+  the first need were all played ("played") or all asked ("asked"), whatever the mode. Why: the
+  owner's report, a move never answered auto-played with "answered right this session".
+- **D16: a line picked has no rule of its own** for moves not answered (§5.16's `practice` goes):
+  its auto-play setting decides. Why: with its own setting, the rule only overrode it.

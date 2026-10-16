@@ -6271,3 +6271,32 @@ analysed, back as hinted; at the line's end by Back and Forward); `storm.spec.ts
 analysed: passed, the clock stopped, back by the button and by Back, Next); `views.spec.ts` (the
 Read view's move kept); `games.spec.ts` (a game's ply kept, a game card back as it was);
 `practice.spec.ts` (a game in play analysed and played on). Live: TESTING.md.
+
+#### 5.113 Auto-play set apart for the queue and for Learn and a line picked (the owner's request, 2026-10-16)
+
+The owner's report: with Auto-play "Moves answered right this session" and a line starting "From
+the start, played", the moves before the line's first due move were played though none had been
+answered; with "From the start, asked", nothing was played whatever auto-play said. They expected
+auto-play to decide every move, and asked to "have auto-play enabled on review/queue and disabled
+on learn/pick simultaneously". (A session, for `session`, is one run of the trainer, from Train,
+Learn or a line picked to leaving the screen: no clock is involved, and an app started anew starts
+a new one.) Decided:
+- **Two auto-play settings**: *In the day's queue* (show and grade too) and *When learning, or a
+  line picked*, each with the four modes of §5.17, beside that context's *A line starts*. Default:
+  `due` for the queue, as before; **`off` for Learn and a line picked**, the owner's wish.
+- **A line starts** is only where the board starts: *At its first new or due move* (the moves
+  before it skipped, as before) or *From the start*, each move from move 1 played or asked as the
+  mode says, on every pass. "From the start, played" and "From the start, asked" go; asked is
+  From the start with auto-play off, and settings stored with them are read that way (`asked`:
+  that context's auto-play off).
+- **A line picked follows its mode like any other.** Was (§5.16, `practice`): a move not answered
+  in the session was never played on a line picked, whatever the mode. With its own setting the
+  rule isn't needed: `off` or `session` practise the line; `due` plays its moves not due.
+- The due moves, the known moves never answered and the new moves are asked or taught whatever
+  the mode, as before.
+
+Tests: `trainer.test.ts` (each start with `due`, `off` and `session`: the owner's case asks every
+move; repetitions with `off` and `session`); `timeTravel.test.ts` (each kind's settings; the old
+settings read); `browse.test.ts`; `autoplay.spec.ts` (the two settings in the dialog; a line picked
+with `session` asks a move not due), and the e2e specs of picked lines and Learn updated to the
+new default. Live: TESTING.md.

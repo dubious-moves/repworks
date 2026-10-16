@@ -86,13 +86,19 @@ test('a line paused from the list: ⏸, out of the new moves, practised with not
   // Picked, it is practised: its moves asked (a new one shown), nothing recorded.
   await row.locator('.line-list-line').click();
   await expect(page.locator('.train-paused')).toContainText('Paused: practice only');
-  // 1... c5 is played up to the line's first need; the move never learned is shown, as a new
-  // move is, but nothing is recorded for it.
+  // 1... c5 is asked (auto-play off for a line picked, §5.113); the move never learned is shown, as
+  // a new move is, but nothing is recorded for it.
+  await expect(page.locator('.train-grid')).toHaveAttribute('data-phase', 'ask');
+  await clickSquare(page, 'c7', 'black');
+  await clickSquare(page, 'c5', 'black');
   await expect(page.locator('.train-feedback')).toHaveText('New move: play Nf6');
   await clickSquare(page, 'g8', 'black');
   await clickSquare(page, 'f6', 'black');
-  // Walked a second time (Repetitions, 2 by default: §5.77), Nf6 asked; still nothing recorded.
+  // Walked a second time (Repetitions, 2 by default: §5.77), c5 and Nf6 asked; still nothing recorded.
   await expect(page.locator('.train-feedback')).toHaveText('The line again: 2 of 2');
+  await expect(page.locator('.train-grid')).toHaveAttribute('data-phase', 'ask');
+  await clickSquare(page, 'c7', 'black');
+  await clickSquare(page, 'c5', 'black');
   await expect(page.locator('.train-grid')).toHaveAttribute('data-phase', 'ask');
   await clickSquare(page, 'g8', 'black');
   await clickSquare(page, 'f6', 'black');

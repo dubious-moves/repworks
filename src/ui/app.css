@@ -3007,7 +3007,8 @@ a.button.primary {
 }
 
 /* The explorer's settings: chips for the filter, checkboxes in a row. */
-.explorer-settings fieldset {
+.explorer-settings fieldset,
+.train-settings fieldset {
   border: 1px solid rgb(var(--ink) / 15%);
   border-radius: var(--radius);
   margin: 10px 0;

@@ -13,8 +13,9 @@
 // - Auto-play (§5.17, lichessable's modes): an own move the plan doesn't need graded or taught is
 //   played for the user or asked, by the `autoPlay` mode (`plays`). Asked, a move reviewed before
 //   is graded the first time in the session, due or not (§5.106); a later ask isn't. Suspended
-//   moves are always played. Where a line starts (`lineStart`) decides the moves before its first
-//   move the plan needs: skipped, or played at the pace; or, `ask`, every own move is asked.
+//   moves are always played. Where a line starts (`lineStart`) decides only where the board starts:
+//   at the first move the plan needs (the moves before it skipped), or at the chapter's start, the
+//   mode deciding each move from there (the owner's request, 2026-10-16, §5.113).
 // - Conflicting moves (D3): every own move of the position is accepted, and the one played is
 //   graded on its own card if it is due. The line's own move is then asked in the same position,
 //   on its own card, so a sibling can't stay due for ever. The trainer only lets the user move
@@ -73,7 +74,7 @@ export const MIN_PACE_MS = 450;
  * - `session`: moves answered right first time earlier in the session (lichessable's auto-play);
  *   a move answered wrong is asked again, ungraded.
  * - `due` (the default, the trainer as it was): moves answered earlier in the session, right or
- *   wrong, and in the queue moves reviewed and not due. A line picked or learned asks the latter.
+ *   wrong, and moves reviewed and not due.
  * - `difficult`: as `due`, except that a difficult move (answered wrong in the session, or with
  *   lapses or a high FSRS difficulty) is asked whenever it is met.
  */
@@ -81,16 +82,14 @@ export type AutoPlay = 'off' | 'session' | 'due' | 'difficult';
 export const AUTO_PLAYS: readonly AutoPlay[] = ['off', 'session', 'due', 'difficult'];
 
 /**
- * Where a line starts (§5.17), for the moves before its first move the plan grades or teaches:
- * - `first`: there (one move before, so the opponent's move is seen), or where the board already
- *   is when the line shares its moves;
- * - `auto`: at the chapter's start, those moves played at the pace, own moves included;
- * - `ask`: at the chapter's start, and every own move of the line asked, whatever the auto-play
- *   mode, on every pass (graded the first time in the session if reviewed before, §5.106); only
- *   suspended moves are played.
+ * Where a line starts (§5.17, §5.113):
+ * - `first`: at its first move the plan grades or teaches (one move before, so the opponent's move
+ *   is seen), or where the board already is when the line shares its moves;
+ * - `start`: at the chapter's start, each own move played or asked as the auto-play mode says, on
+ *   every pass. With `off`, every own move but a suspended one is asked.
  */
-export type LineStart = 'first' | 'auto' | 'ask';
-export const LINE_STARTS: readonly LineStart[] = ['first', 'auto', 'ask'];
+export type LineStart = 'first' | 'start';
+export const LINE_STARTS: readonly LineStart[] = ['first', 'start'];
 
 /**
  * Which lines from the comments are quizzed at a review walk's end: every one met, the important
@@ -249,11 +248,6 @@ export interface TrainerSetup {
   askOnly?: boolean;
   /** Show and grade (§5.9): the user never moves; `show` plays the move, `tell` grades it. */
   selfGrade?: boolean;
-  /**
-   * A line picked from the list (§5.16): an own move the plan neither asks nor teaches, and that
-   * would be played for the user, is asked too (unless suspended), graded as any ask (§5.106).
-   */
-  practice?: boolean;
   /**
    * Interactive view (§5.10): an own move that another of the index's lines plays after the
    * board's moves is right, and the walk follows that line to its end.
@@ -623,8 +617,8 @@ export class Trainer {
       if (mode === 'session') return this.right.has(card);
       return !hard;
     }
-    // A move not answered yet: played in the queue when it isn't due, never in a line picked or learned.
-    if (mode === 'off' || mode === 'session' || this.setup.practice) return false;
+    // A move not answered yet: played when it isn't due (a line picked too, since §5.113).
+    if (mode === 'off' || mode === 'session') return false;
     return !hard;
   }
 
@@ -635,9 +629,8 @@ export class Trainer {
     if (this.suspended(card)) return 'auto';
     const need = this.needs(card);
     if (need) return need;
-    // From the start, asked (the owner's request, 2026-10-09): every own move, on every pass.
-    if (this.options.lineStart === 'ask') return 'ask';
-    if (prefix) return 'auto';
+    // Before the first move needed, at its first new or due move: the opponent's move before it.
+    if (prefix && this.options.lineStart === 'first') return 'auto';
     return this.plays(card) ? 'auto' : 'ask';
   }
 
@@ -665,9 +658,12 @@ export class Trainer {
     return undefined;
   }
 
-  /** The ply of the line's first move the plan needs, or else of its first own move asked; its end if none. */
+  /**
+   * The ply of the line's first move the plan needs, or else of its first own move asked; its end if
+   * none. From the start: of its first own move asked or taught.
+   */
   private prefixEnd(plies: readonly Ply[], end: number): number {
-    for (let i = 0; i < end; i++) if (plies[i]!.card && this.needs(plies[i]!.card!)) return i;
+    if (this.options.lineStart === 'first') for (let i = 0; i < end; i++) if (plies[i]!.card && this.needs(plies[i]!.card!)) return i;
     for (let i = 0; i < end; i++) if (plies[i]!.card && this.kindOf(plies[i]!.card!) !== 'auto') return i;
     return end;
   }
@@ -709,8 +705,7 @@ export class Trainer {
         shared++;
       }
     }
-    // §5.17: at the first move needed (one move before it, for the opponent's), from the start
-    // played, or from the start asked. A planned start (drill's lead-in) comes first when further on.
+    // §5.17: at the first move needed (one move before it, for the opponent's), or from the start. A planned start (drill's lead-in) comes first when further on.
     let ply = start === undefined ? shared : start === 'first' ? Math.max(Math.min(shared, this.prefix), this.prefix - 1, 0) : 0;
     ply = Math.max(ply, Math.min(planned.from ?? 0, this.end));
     this.ply = ply;
@@ -750,13 +745,13 @@ export class Trainer {
   /**
    * The lines from the comments a walk can meet: on a review's walk (nothing on it taught), those
    * starting from where the user is first asked (the opponent's move before it) to the walk's end,
-   * not offered earlier in the session. From the start, asked: from the walk's start.
+   * not offered earlier in the session.
    */
   private quizOf(planned: PlannedLine): QuizLine[] {
     const lines = this.setup.commentLines;
     if (!lines || (this.options.comments ?? 'off') === 'off' || this.redo.has(planned)) return [];
     if (this.plies.some((p, i) => i < this.end && p.card !== undefined && this.needs(p.card) === 'teach')) return [];
-    const from = this.options.lineStart === 'ask' ? this.ply : Math.max(this.ply, this.prefix - 1);
+    const from = Math.max(this.ply, this.prefix - 1);
     return lines(planned.line).filter((q) => q.ply >= from && q.ply <= this.end && !this.offered.has(q.key));
   }
 
@@ -922,7 +917,7 @@ export class Trainer {
     const taught = this.plies.findIndex((p, i) => i < this.end && p.card !== undefined && this.askAgain.has(p.card));
     const first = taught >= 0 ? taught : this.prefixEnd(this.plies, this.end);
     this.prefix = start === undefined ? 0 : first;
-    this.ply = start === 'auto' || start === 'ask' ? 0 : Math.max(0, first - 1);
+    this.ply = start === 'start' ? 0 : Math.max(0, first - 1);
     out.push({ type: 'arrow' });
     out.push({ type: 'takeback', path: this.path() });
     this.advance(now, out);

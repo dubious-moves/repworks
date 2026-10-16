@@ -65,7 +65,7 @@ const startOf = (w: World) => (line: Line) => {
   return c ? startPosition(c) : undefined;
 };
 const planOf = (w: World, states: Map<string, CardState>, newPerDay = 0) => planSession(w.ix, todaysQueue(w.ix, states, { ...DEFAULT_TRAIN, newPerDay }, day), states);
-const trainer = (w: World, plan: SessionPlan, states: Map<string, CardState>, extra: { record?: boolean; askAll?: boolean; follow?: boolean; practice?: boolean; paceMs?: number } & TrainerOptions = {}) =>
+const trainer = (w: World, plan: SessionPlan, states: Map<string, CardState>, extra: { record?: boolean; askAll?: boolean; follow?: boolean; paceMs?: number } & TrainerOptions = {}) =>
   new Trainer({ index: w.ix, plan, states, startOf: startOf(w), paceMs: extra.paceMs ?? 600, ...extra });
 
 /** Who answers an ask or a teach: a command, or undefined to stop the session. */
@@ -589,7 +589,7 @@ test('show sequence: a due move ends the sequence before it, so it is not given 
   const w = world(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 Nc6 3. Bb5'));
   const states = new Map<string, CardState>([[card('e4 e5 Nf3'), dueNow]]);
   const plan = planOf(w, states, 20);
-  const t = trainer(w, plan, states, { sequence: 5, lineStart: 'auto' });
+  const t = trainer(w, plan, states, { sequence: 5, lineStart: 'start' });
   const shown: unknown[] = [];
   const { effects, records } = run(t, (view, n) => (shown.push(view.sequence), right(view, n)));
   assert.deepEqual(plays(effects).filter((p) => p.startsWith('preview')), ['preview:e4', 'preview:e5', 'preview:Bb5']);
@@ -606,27 +606,32 @@ test('show sequence: a due move ends the sequence before it, so it is not given 
     [card('e4 e5 Nf3 Nc6 Bb5'), dueNow],
     [card('e4 e5 Nf3 Nc6 Bb5 a6 Ba4'), dueNow],
   ]);
-  const cases: [string, string[], string[]][] = [
-    // One move before the first due one, so the opponent's move is seen.
-    ['first', ['e4', 'e5', 'Nf3'], ['opponent:Nc6', 'user:Bb5', 'opponent:a6', 'user:Ba4']],
-    ['auto', [], ['auto:e4', 'opponent:e5', 'auto:Nf3', 'opponent:Nc6', 'user:Bb5', 'opponent:a6', 'user:Ba4']],
-    ['ask', [], ['user:e4', 'opponent:e5', 'user:Nf3', 'opponent:Nc6', 'user:Bb5', 'opponent:a6', 'user:Ba4']],
+  const asked = ['user:e4', 'opponent:e5', 'user:Nf3', 'opponent:Nc6', 'user:Bb5', 'opponent:a6', 'user:Ba4'];
+  const cases: [TrainerOptions, string[], string[]][] = [
+    // One move before the first due one, so the opponent's move is seen; whatever the mode.
+    [{ lineStart: 'first' }, ['e4', 'e5', 'Nf3'], ['opponent:Nc6', 'user:Bb5', 'opponent:a6', 'user:Ba4']],
+    [{ lineStart: 'first', autoPlay: 'session' }, ['e4', 'e5', 'Nf3'], ['opponent:Nc6', 'user:Bb5', 'opponent:a6', 'user:Ba4']],
+    // From the start, the mode decides each move before the first due one too (§5.113).
+    [{ lineStart: 'start' }, [], ['auto:e4', 'opponent:e5', 'auto:Nf3', 'opponent:Nc6', 'user:Bb5', 'opponent:a6', 'user:Ba4']],
+    [{ lineStart: 'start', autoPlay: 'off' }, [], asked],
+    // The owner's report (2026-10-16): with "answered right this session", a move not answered yet is asked.
+    [{ lineStart: 'start', autoPlay: 'session' }, [], asked],
   ];
-  for (const [start, path, expectedPlays] of cases) {
-    test(`a line starts ${start === 'first' ? 'at its first due move' : start === 'auto' ? 'auto-played from the start' : 'from the start, asked'}`, () => {
-      const { effects, records } = run(trainer(w, planOf(w, states), states, { lineStart: start as TrainerOptions['lineStart'] }), right);
+  for (const [options, path, expectedPlays] of cases) {
+    test(`a line starts ${options.lineStart === 'first' ? 'at its first due move' : 'from the start'}, auto-play ${options.autoPlay ?? 'due'}`, () => {
+      const { effects, records } = run(trainer(w, planOf(w, states), states, options), right);
       assert.deepEqual(effects.find((e) => e.type === 'line')?.type === 'line' && (effects.find((e) => e.type === 'line') as { path: string[] }).path, path);
       assert.deepEqual(plays(effects), expectedPlays);
-      // The due moves are graded; asked from the start, the reviewed moves before them too (§5.106).
-      const before = start === 'ask' ? [card('e4'), card('e4 e5 Nf3')] : [];
+      // The due moves are graded; the reviewed moves asked before them too (§5.106).
+      const before = expectedPlays === asked ? [card('e4'), card('e4 e5 Nf3')] : [];
       assert.deepEqual(records.map((r) => r.card), [...before, card('e4 e5 Nf3 Nc6 Bb5'), card('e4 e5 Nf3 Nc6 Bb5 a6 Ba4')]);
     });
   }
 
-  test('a line started auto-played goes back to the chapter\'s start even when the board shares its moves', () => {
+  test('a line started from the start goes back to the chapter\'s start even when the board shares its moves', () => {
     const w2 = world(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 Nc6 3. Bb5 (3. Bc4) *'));
     const s = new Map<string, CardState>([...w2.ix.cards.keys()].map((c) => [c, dueNow]));
-    const { effects } = run(trainer(w2, planOf(w2, s), s, { lineStart: 'auto' }), right);
+    const { effects } = run(trainer(w2, planOf(w2, s), s, { lineStart: 'start' }), right);
     const lines = effects.filter((e) => e.type === 'line');
     assert.equal(lines.length, 2);
     assert.deepEqual((lines[1] as { path: string[] }).path, []);
@@ -691,13 +696,12 @@ test('random repertoires under every auto-play mode, line start, repetitions and
       states.set(c, s);
     }
     const plan = planOf(w, states, Math.floor(random() * 12));
-    const options: TrainerOptions & { practice?: boolean } = {
+    const options: TrainerOptions = {
       autoPlay: AUTO_PLAYS[seed % 4]!,
-      lineStart: LINE_STARTS[Math.floor(seed / 4) % 3]!,
+      lineStart: LINE_STARTS[Math.floor(seed / 4) % 2]!,
       tryNew: random() < 0.5,
       sequence: random() < 0.3 ? 1 + Math.floor(random() * 5) : 0,
       holdLineEnd: random() < 0.5,
-      practice: random() < 0.3,
       repetitions: 1 + (seed % 3),
       retryMistakes: Math.floor(seed / 3) % 3,
     };
@@ -778,17 +782,18 @@ test('repetitions: the next pass starts as a line does, at its first move taught
   assert.deepEqual(plays(effects), ['opponent:Nc6', 'user:Bb5', 'opponent:Nc6', 'user:Bb5']);
 });
 
-test('from the start, asked: every own move is asked on every pass, whatever the auto-play mode; each graded once', () => {
+test('from the start with auto-play off: every own move is asked on every pass; each graded once', () => {
   // The owner's report (2026-10-09): the second pass auto-played the moves answered on the first.
   const w = world(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 Nc6 3. Bb5'));
   const states = new Map<string, CardState>([[card('e4'), notDue], [card('e4 e5 Nf3'), notDue]]);
-  for (const autoPlay of AUTO_PLAYS) {
-    const { effects, records } = run(trainer(w, planOf(w, states, 20), states, { repetitions: 2, lineStart: 'ask', autoPlay }), right);
-    const user = ['user:e4', 'opponent:e5', 'user:Nf3', 'opponent:Nc6', 'user:Bb5'];
-    assert.deepEqual(plays(effects), [...user, ...user], autoPlay);
-    // e4 and Nf3, reviewed, are graded on their first ask (§5.106); Bb5 is taught.
-    assert.deepEqual(records.map((r) => [r.k, r.card]), [['review', card('e4')], ['review', card('e4 e5 Nf3')], ['taught', card('e4 e5 Nf3 Nc6 Bb5')]], autoPlay);
-  }
+  const user = ['user:e4', 'opponent:e5', 'user:Nf3', 'opponent:Nc6', 'user:Bb5'];
+  const { effects, records } = run(trainer(w, planOf(w, states, 20), states, { repetitions: 2, lineStart: 'start', autoPlay: 'off' }), right);
+  assert.deepEqual(plays(effects), [...user, ...user]);
+  // e4 and Nf3, reviewed, are graded on their first ask (§5.106); Bb5 is taught.
+  assert.deepEqual(records.map((r) => [r.k, r.card]), [['review', card('e4')], ['review', card('e4 e5 Nf3')], ['taught', card('e4 e5 Nf3 Nc6 Bb5')]]);
+  // Answered right this session (§5.113): asked on the first pass, played on the second; Bb5 taught, then asked.
+  const session = run(trainer(w, planOf(w, states, 20), states, { repetitions: 2, lineStart: 'start', autoPlay: 'session' }), right);
+  assert.deepEqual(plays(session.effects), [...user, 'auto:e4', 'opponent:e5', 'auto:Nf3', 'opponent:Nc6', 'user:Bb5']);
 });
 
 test('mistakes retried: at the line\'s end the missed move is asked again from the opponent\'s move, until right twice in a row; graded once', () => {
@@ -823,10 +828,10 @@ test('mistakes retried take turns; a hint is a miss; a practice ask counts; not 
   const w = world(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 Nc6 3. Bb5'));
   const states = new Map<string, CardState>([[card('e4'), notDue], [card('e4 e5 Nf3'), dueNow], [card('e4 e5 Nf3 Nc6 Bb5'), notDue]]);
   const asked: string[] = [];
-  // A line picked: e4 right (a practice ask); Nf3 hinted; Bb5 (practice) wrong, then right.
+  // A line picked, auto-play off: e4 right (a practice ask); Nf3 hinted; Bb5 (practice) wrong, then right.
   const line = w.ix.lines[0]!;
   const picked: SessionPlan = { lines: [{ kind: 'pick', line, end: line.path.length, ask: [card('e4 e5 Nf3')], teach: [] }] };
-  run(trainer(w, picked, states, { retryMistakes: 2, practice: true }), (view, n) => {
+  run(trainer(w, picked, states, { retryMistakes: 2, autoPlay: 'off' }), (view, n) => {
     asked.push(`${view.phase}:${view.line!.line.path[view.path.length]}`);
     if (n === 1) return { type: 'hint', now: 0 };
     if (n === 3) return { type: 'move', uci: 'd2d4', now: 0 };
@@ -905,14 +910,14 @@ test('missed again (drill): a move answered wrong is asked again after the other
   assert.ok(done?.type === 'done' && done.summary.lines === 2);
 });
 
-test('repetitions on a line picked (every own move asked): the next pass plays the moves before the first move taught, as the first did', () => {
+test('repetitions on a line picked: the next pass plays the moves before the first move taught, as the first did', () => {
   const w = world(chapter('Chapter1', 'black', '1. e4 c5 2. c3 Nf6'));
   const states = new Map<string, CardState>([[card('e4 c5'), dueNow]]);
   const line = w.ix.lines[0]!;
-  // A paused line picked: nothing asked or taught on record, every own move asked as practice.
+  // A paused line picked: nothing asked or taught on record; c5, not due, played.
   const plan: SessionPlan = { lines: [{ kind: 'pick', line, end: line.path.length, ask: [], teach: [] }] };
   const asked: string[] = [];
-  run(trainer(w, plan, states, { practice: true, record: false, lineStart: 'auto', repetitions: 2 }), (view, n) => {
+  run(trainer(w, plan, states, { record: false, lineStart: 'start', repetitions: 2 }), (view, n) => {
     asked.push(`${view.phase}:${view.line!.line.path[view.path.length]}`);
     return right(view, n);
   });
@@ -1000,14 +1005,14 @@ test('comment lines: none on a walk that teaches a move (learning, not review)',
   assert.deepEqual(plays(effects), ['opponent:e4', 'user:c5', 'opponent:Nf3', 'user:d6', 'opponent:d4', 'user:cxd4']);
 });
 
-test('comment lines: met only from where the user is first asked, unless every move is asked from the start', () => {
+test('comment lines: met only from where the user is first asked, from the start too', () => {
   const w = world(chapter('Chapter1', 'black', '1. e4 { (1. d4 Nf6 2. c4 e6) } 1... c5 2. Nf3 d6 3. d4 cxd4'));
   const states = due(w);
   states.set(card('e4 c5'), notDue);
   states.set(card('e4 c5 Nf3 d6'), notDue);
   const first = runQuiz(quizzing(w, planOf(w, states), states), either);
   assert.deepEqual(plays(first.effects), ['opponent:d4', 'user:cxd4']);
-  const fromStart = runQuiz(quizzing(w, planOf(w, states), states, { lineStart: 'ask' }), either);
+  const fromStart = runQuiz(quizzing(w, planOf(w, states), states, { lineStart: 'start', autoPlay: 'off' }), either);
   assert.deepEqual(plays(fromStart.effects).slice(6), ['opponent:d4', 'user:Nf6', 'opponent:c4', 'user:e6']);
 });
 

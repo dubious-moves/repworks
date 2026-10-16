@@ -18,7 +18,7 @@ import type { SessionPlan } from '../../../../src/core/train/plan.ts';
 import type { Day } from '../../../../src/core/train/queue.ts';
 import { DEFAULT_TRAIN } from '../../../../src/core/train/settings.ts';
 import { ShowGrade } from '../../../../src/core/train/showGrade.ts';
-import { Trainer, type TrainerEffect } from '../../../../src/core/train/trainer.ts';
+import { Trainer, type AutoPlay, type TrainerEffect } from '../../../../src/core/train/trainer.ts';
 import type { Chapter } from '../../../../src/core/study/model.ts';
 import { startPosition } from '../../../../src/core/study/tree.ts';
 import { DAY } from '../../../support/reviewHistory.ts';
@@ -79,7 +79,7 @@ function run(t: Trainer, answer: (n: number) => 'right' | 'wrong' = () => 'right
   return { effects, records: effects.flatMap((e) => (e.type === 'record' ? [e.event] : [])), answers: effects.flatMap((e) => (e.type === 'answer' ? [e.card] : [])) };
 }
 
-const trainer = (plan: SessionPlan, states: Map<string, CardState>, extra: { practice?: boolean; selfGrade?: boolean } = {}) =>
+const trainer = (plan: SessionPlan, states: Map<string, CardState>, extra: { autoPlay?: AutoPlay; selfGrade?: boolean } = {}) =>
   new Trainer({ index: ix, plan, states, startOf: (l: Line) => startPosition(l.cid === 'Chapter1' ? MAIN : chapter('Chapter2', '1. d4 d5 2. c4', true)), paceMs: 600, ...extra });
 
 test('each chapter lists its lines in order, numbered, with their state and where each leaves the one before', () => {
@@ -132,7 +132,7 @@ test('the line through a study\'s move: the topmost through it, or the one shari
   assert.equal(lineThrough(ix, 'Study001', 'Nowhere1', ['e4']), undefined);
 });
 
-test('a picked line: due moves graded, new ones taught, the rest asked (graded if reviewed, §5.106), suspended ones played', () => {
+test('a picked line: due moves graded, new ones taught, the rest asked with auto-play off (graded if reviewed, §5.106), suspended ones played', () => {
   const line = findLine(ix, 'Study001', 'Chapter1', ['e4', 'e5', 'Nf3', 'Nc6', 'Bb5', 'a6', 'Bxc6', 'dxc6', 'O-O'])!;
   assert.ok(line);
   assert.equal(findLine(ix, 'Study001', 'Chapter1', ['e4', 'e5']), undefined);
@@ -146,7 +146,7 @@ test('a picked line: due moves graded, new ones taught, the rest asked (graded i
   assert.deepEqual(plan.lines.map((l) => [l.kind, l.end, l.ask, l.teach]), [['pick', 9, [card('e4 e5 Nf3')], [card('e4 e5 Nf3 Nc6 Bb5 a6 Bxc6 dxc6 O-O')]]]);
   // e4 (reviewed, not due) answered wrong first: Again, as a due move would be; Bb5, in its
   // learning step, asked with no record.
-  const { effects, records, answers } = run(trainer(plan, states, { practice: true }), (n) => (n === 0 ? 'wrong' : 'right'));
+  const { effects, records, answers } = run(trainer(plan, states, { autoPlay: 'off' }), (n) => (n === 0 ? 'wrong' : 'right'));
   assert.deepEqual(answers, [card('e4'), card('e4 e5 Nf3'), card('e4 e5 Nf3 Nc6 Bb5')]);
   assert.deepEqual(
     records.map((r) => [r.k, r.card, r.k === 'review' ? r.g : undefined]),
