@@ -4495,7 +4495,8 @@ position, the phone's time with the engine's share.
   the storm's own Stockfish client (one position at a time over core's search, a search out of time
   taken at the depth it reached), ended when the screen is left.
 - `src/app/storm.ts`: the scope's lines, ends and decision points from the repertoire chapters;
-  `gather` (line ends and replies in turn, each pass's positions stored, the requests counted:
+  `gather` (line ends and replies in turn, each from the chapter furthest behind its share (§5.116),
+  each pass's positions stored, the requests counted:
   explorer, game exports, ChessDB, Stockfish); Stop. The screen is kept on while it runs.
 - Tests: `harvest.test.ts` (games: one export, ChessDB's walk; ChessDB unknown → Stockfish 6PV
   d14; a ChessDB failure scoring nothing; no games → the invented line with no ChessDB; the band's
@@ -6344,3 +6345,24 @@ agreed to order them by recall instead. Decided:
 Built in `todaysQueue` (each due card's `recall`, `recallAt`) and `planSession` (`byRecall`).
 Tests: `plan.test.ts` (weakest chapter first across studies, a chapter kept as one block, a
 learning card first, ties in index order).
+
+#### 5.116 Gathering balanced across chapters (the owner's request, 2026-10-16)
+
+The owner adds new chapters to a repertoire that already has many gathered positions, and a
+"Whole repertoire" gather should fill them up rather than spread over the whole tree as before;
+gathering the new chapter alone overnight would skew the store the other way. Bigger chapters
+keeping more positions is fine. Decided:
+- **Each walk goes to the chapter furthest behind its share:** the fewest stored positions per
+  line, counting the positions not yet answered well (those are what storms draw from), re-read
+  from the store before every walk. A chapter's share is in proportion to its lines, so once
+  caught up the chapters advance together. A position counts for every chapter among its lines;
+  a line end or reply shared by chapters goes with the one furthest behind.
+- Within that chapter nothing changes: line ends drawn weighted by the lines ending there, replies
+  most lines first, a line end's second pass (the rest of its games) once the chapter's first is
+  done. Line ends and replies still take turns. Was: line ends weighted over the whole scope, the
+  second pass after every first, replies by lines over the whole scope.
+- Every scope and every overnight pass works this way; a chapter scope is unchanged by it.
+
+Built in `chapterShare`, `behind` and `drawBalanced` (`src/core/storm/sources.ts`) and `gather`.
+Tests: `sources.test.ts` (the share per line, the chapter furthest behind first, a shared item,
+the old chapter behind once it has fewer positions per line).

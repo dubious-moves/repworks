@@ -294,3 +294,30 @@ export function inScope<T extends { lines: LineRef[]; key: PositionKey }>(items:
   }
   return items.filter((it) => it.lines.some((r) => keep.has(r.sid + '/' + r.cid + '/' + r.path.join(' '))) && (s.kind !== 'position' || after.has(it.key)));
 }
+
+/**
+ * Each chapter's stored positions per line (§5.116): how far it is behind its share, a chapter's
+ * share being in proportion to its lines. A position counts once for every chapter among its lines.
+ */
+export function chapterShare(lines: readonly Pick<StormLine, 'sid' | 'cid'>[], stored: readonly { lines: readonly LineRef[] }[]): (r: LineRef) => number {
+  const lineCount = new Map<string, number>();
+  for (const l of lines) lineCount.set(l.sid + '/' + l.cid, (lineCount.get(l.sid + '/' + l.cid) ?? 0) + 1);
+  const storedCount = new Map<string, number>();
+  for (const p of stored) for (const c of new Set(p.lines.map((r) => r.sid + '/' + r.cid))) storedCount.set(c, (storedCount.get(c) ?? 0) + 1);
+  return (r) => (storedCount.get(r.sid + '/' + r.cid) ?? 0) / Math.max(1, lineCount.get(r.sid + '/' + r.cid) ?? 0);
+}
+
+/** How far behind an item is: its chapter furthest behind, by `share`. */
+export const behind = (it: { lines: readonly LineRef[] }, share: (r: LineRef) => number): number => it.lines.reduce((m, r) => Math.min(m, share(r)), Infinity);
+
+/**
+ * The next item from the chapter furthest behind its share (§5.116), removed from the pool: `pick`
+ * chooses among that chapter's items (and any as far behind).
+ */
+export function drawBalanced<T extends { lines: readonly LineRef[] }>(pool: T[], share: (r: LineRef) => number, pick: (among: T[]) => T): T | null {
+  if (!pool.length) return null;
+  const low = pool.reduce((m, it) => Math.min(m, behind(it, share)), Infinity);
+  const it = pick(pool.filter((x) => behind(x, share) === low));
+  pool.splice(pool.indexOf(it), 1);
+  return it;
+}

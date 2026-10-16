@@ -5,6 +5,12 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## Gathering balanced across chapters (§5.116)
+- In a repertoire with many gathered positions, add a chapter (or pick one with few), then gather
+  on "Whole repertoire": the first walks should name that chapter's lines, and other chapters
+  join once it has about as many positions per line as they do. Overnight, the store should stay
+  in proportion rather than fill from one chapter.
+
 ## Alternatives shown by Space in show and grade (§5.114)
 - Save an alternative somewhere in a line (a wrong move → "Save … as alternative", or the study's
   move menu → Add alternative…), then reach that move in show and grade and press Space on the

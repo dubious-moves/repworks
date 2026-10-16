@@ -15,7 +15,7 @@ import { positionKey } from '../../../../src/core/chess/positionKey.ts';
 import { parseChapterFile } from '../../../../src/core/pgn/parse.ts';
 import type { Chapter } from '../../../../src/core/study/model.ts';
 import { STORM as C } from '../../../../src/core/storm/config.ts';
-import { decisions, frontiers, inScope, stormLines, uncoveredMoves } from '../../../../src/core/storm/sources.ts';
+import { chapterShare, decisions, drawBalanced, frontiers, inScope, stormLines, uncoveredMoves } from '../../../../src/core/storm/sources.ts';
 import { START_FEN } from '../../../../src/core/storm/walk.ts';
 
 let n = 0;
@@ -149,4 +149,33 @@ test('scopes: a study, a chapter, the lines through a position and what lies pas
   assert.ok(past.some((p) => p.key === afterNf3));
   assert.ok(!past.some((p) => p.key === afterE4));
   assert.deepEqual(inScope(fs, lines, { kind: 'all' }).length, 3);
+});
+
+test('the gather draws from the chapter furthest behind its share (§5.116)', () => {
+  const ref = (cid: string, p = 'a') => ({ sid: 's', cid, path: [p] });
+  // An old chapter of four lines and ten positions; a new one of two lines and one position.
+  const lines = [...['a', 'b', 'c', 'd'].map(() => ({ sid: 's', cid: 'old' })), { sid: 's', cid: 'new' }, { sid: 's', cid: 'new' }];
+  const stored = [...Array.from({ length: 10 }, () => ({ lines: [ref('old')] })), { lines: [ref('new'), ref('new', 'b')] }];
+  const share = chapterShare(lines, stored);
+  assert.equal(share(ref('old')), 2.5);
+  assert.equal(share(ref('new')), 0.5);
+  assert.equal(share(ref('none')), 0);
+  const pool = [
+    { tag: 'old1', lines: [ref('old')] },
+    { tag: 'new1', lines: [ref('new')] },
+    { tag: 'both', lines: [ref('old'), ref('new')] },
+  ];
+  // The new chapter's items (one shared with the old chapter) first, `pick` choosing between them.
+  const first = drawBalanced(pool, share, (among) => {
+    assert.deepEqual(among.map((x) => x.tag), ['new1', 'both']);
+    return among[1]!;
+  });
+  assert.equal(first!.tag, 'both');
+  assert.deepEqual(pool.map((x) => x.tag), ['old1', 'new1']);
+  assert.equal(drawBalanced(pool, share, (among) => among[0]!)!.tag, 'new1');
+  assert.equal(drawBalanced(pool, share, (among) => among[0]!)!.tag, 'old1');
+  assert.equal(drawBalanced(pool, share, (among) => among[0]!), null);
+  // In proportion: the old chapter behind once it has fewer positions per line.
+  const even = chapterShare(lines, [...stored.slice(0, 3), { lines: [ref('new')] }, { lines: [ref('new')] }]);
+  assert.equal(drawBalanced([{ tag: 'n', lines: [ref('new')] }, { tag: 'o', lines: [ref('old')] }], even, (among) => among[0]!)!.tag, 'o');
 });

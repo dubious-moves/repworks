@@ -12,7 +12,7 @@ import { engineLoss, grade, moveLoss, moverCp, nextStreak, points, type ScoredLi
 import { cdbList, deepenedPosition, engineList, explorerUntil, harvestDecision, harvestFrontier, judges, needsDeepening, positionLineKey, storedList, storedPosition, type HarvestIo, type StoredPosition } from '../core/storm/harvest.ts';
 import { stormRecord, type StormRecord } from '../core/storm/record.ts';
 import { setHeld, setOutcome, type SetOutcome } from '../core/storm/set.ts';
-import { decisions, frontiers, inScope, lineInScope, stormLines, type DecisionPoint, type Frontier, type StormLine, type StormScope } from '../core/storm/sources.ts';
+import { behind, chapterShare, decisions, drawBalanced, frontiers, inScope, lineInScope, stormLines, type DecisionPoint, type Frontier, type StormLine, type StormScope } from '../core/storm/sources.ts';
 import { drawOrder, noteRecent, stormAnswer, stormHistories, takeSpread, type StormHistory } from '../core/storm/store.ts';
 import type { Verdict } from '../core/storm/verdict.ts';
 import { gameCard } from '../core/progress/cards.ts';
@@ -355,7 +355,7 @@ export async function gather(s: StormScopeData, overnight = false): Promise<void
   const ends = source === 'replies' ? [] : s.frontiers.slice();
   const points = source === 'ends' ? [] : s.decisions.slice().sort((a, b) => b.n - a.n);
   // Breadth first: one game at every line end, then (a second pass) the rest of each one's games.
-  const again: { f: Frontier; walked: Set<string> }[] = [];
+  const again: { f: Frontier; lines: Frontier['lines']; walked: Set<string> }[] = [];
   const more = Math.max(0, STORM.gatherGamesPerFrontier - 1);
   const of = ends.length + points.length;
   const g: Gathering = { running: true, frontiers: 0, of, stored: 0, spent, note: of ? '' : 'Nothing to walk: no line in this scope ends past 4 plies.' };
@@ -399,32 +399,38 @@ export async function gather(s: StormScopeData, overnight = false): Promise<void
       }
     }
   };
+  // Each chapter's positions not yet answered well per line, read before every walk (§5.116).
+  const shareNow = async () => chapterShare(s.lines, (await stormStore().positions()).filter((p) => !spare.has(p.card)));
+  const weighted = <T extends { n: number }>(among: T[]): T => drawFrontier(among.slice(), Math.random)!;
   try {
     let passStart = Date.now();
     while (!stopGather && (ends.length || points.length || again.length)) {
-      // Line ends and replies taken in turn, so a gather stopped early has some of each; the
-      // second pass over the line ends once the first is done.
-      if (ends.length && (!points.length || g.frontiers % 2 === 0)) {
-        const f = drawFrontier(ends, Math.random)!;
+      // Line ends and replies taken in turn, so a gather stopped early has some of each; each from
+      // the chapter furthest behind its share, a line end's second pass once its chapter's first is done.
+      const share = await shareNow();
+      const endsTurn = (ends.length || again.length) && (!points.length || g.frontiers % 2 === 0);
+      const lowAgain = again.reduce((m, a) => Math.min(m, behind(a, share)), Infinity);
+      if (endsTurn && ends.length && ends.some((f) => behind(f, share) <= lowAgain)) {
+        const f = drawBalanced(ends, share, weighted)!;
         await step(async () => {
           const h = await harvestFrontier(f, s.cont, io, c, more ? 1 : STORM.gatherGamesPerFrontier);
           reach.set(f.key, h.games ?? null);
           walked(f, h.walked);
           await keep(h.candidates, { lines: f.lines, names: f.names, games: h.games ?? null });
           if (more && h.walked?.length && (h.gameIds?.length ?? 0) > h.walked.length) {
-            again.push({ f, walked: new Set(h.walked) });
+            again.push({ f, lines: f.lines, walked: new Set(h.walked) });
             g.of++;
           }
         });
-      } else if (!points.length) {
-        const { f, walked: before } = again.splice(Math.floor(Math.random() * again.length), 1)[0]!;
+      } else if (endsTurn) {
+        const { f, walked: before } = drawBalanced(again, share, (among) => among[Math.floor(Math.random() * among.length)]!)!;
         await step(async () => {
           const h = await harvestFrontier(f, s.cont, io, c, more, before);
           walked(f, h.walked);
           await keep(h.candidates, { lines: f.lines, names: f.names, games: h.games ?? null });
         });
       } else {
-        const d = points.shift()!;
+        const d = drawBalanced(points, share, (among) => among[0]!)!;
         await step(async () => {
           const h = await harvestDecision(d, io, c);
           for (const cand of h.candidates) await keep([cand], { lines: d.lines, names: d.names, games: cand.unc?.games ?? null });
@@ -464,7 +470,7 @@ export async function gather(s: StormScopeData, overnight = false): Promise<void
         g.of = pool.length;
         show();
         while (pool.length && !stopGather) {
-          const f = drawFrontier(pool, Math.random)!;
+          const f = drawBalanced(pool, await shareNow(), weighted)!;
           await step(async () => {
             // Only games not walked yet: a line end whose window names none is passed for its one request.
             const h = await harvestFrontier(f, s.cont, older, c, STORM.gatherGamesPerFrontier, walkedBy.get(f.key) ?? new Set());
