@@ -9,7 +9,7 @@ import { makeFen } from 'chessops/fen';
 import { parseSan } from 'chessops/san';
 import { chessgroundMove } from 'chessops/compat';
 import type { Key } from '@lichess-org/chessground/types';
-import { analyseFrom, keepHere, mode, open } from '../app/mode.ts';
+import { analyseFrom, entryKey, keepHere, mode, open } from '../app/mode.ts';
 import { commentId, endPreview, enterCommentLines, preview, stepPreview, switchPreviewLine } from '../app/preview.ts';
 import { localStore } from '../app/state.ts';
 import { dataVersion } from '../app/sync.ts';
@@ -46,13 +46,10 @@ export function ReadView(props: { sid: string; cid: string; at: string[]; from?:
   const [ply, setPly] = useState(props.from ?? props.at.length);
   const version = dataVersion.value;
 
-  // The move the view wrote into the address itself (below) isn't a move to go to: keys pressed
-  // since would be undone.
-  const wrote = useRef<number | undefined>(undefined);
-  useEffect(() => {
-    if (props.from !== undefined && props.from === wrote.current) return;
-    setPly(props.from ?? props.at.length);
-  }, [sid, cid, atKey, props.from]);
+  // The move to start from is the address's when the entry is opened or come back to; the view's
+  // own rewrites of its entry (below) aren't moves to go to: keys pressed since would be undone.
+  const entry = entryKey();
+  useEffect(() => setPly(props.from ?? props.at.length), [sid, cid, atKey, entry]);
   useEffect(() => {
     let live = true;
     const store = localStore();
@@ -79,7 +76,6 @@ export function ReadView(props: { sid: string; cid: string; at: string[]; from?:
   // this entry, from the analysis board or any page, finds it.
   useEffect(() => {
     if (!ok || mode.peek().name !== 'read') return;
-    wrote.current = shown;
     keepHere({ name: 'read', sid, cid, at: props.at, from: shown });
   }, [shown, !!ok]);
 
