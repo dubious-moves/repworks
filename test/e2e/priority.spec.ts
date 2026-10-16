@@ -50,9 +50,14 @@ async function sync(page: Page) {
   await expect(page.locator('.chip')).toHaveText(/^synced/);
 }
 
-/** The list, unfolded on the phone (it is open beside the board on a wide screen). */
-async function lines(page: Page): Promise<Locator> {
+/**
+ * The list, opened. A session that starts folds it, on a wide screen too, an effect after its first
+ * move is asked: `started` (a session just started) waits for that fold first, or it could come
+ * after the list was opened.
+ */
+async function lines(page: Page, started = false): Promise<Locator> {
   const list = page.getByRole('complementary', { name: 'Lines to train' });
+  if (started) await expect(list.getByRole('button', { name: /Show lines/ })).toHaveAttribute('aria-expanded', 'false');
   if ((await list.getByRole('button', { name: /Show lines/ }).count()) > 0) await list.getByRole('button', { name: /Show lines/ }).click();
   return list;
 }
@@ -65,7 +70,7 @@ test('a line paused from the list: ⏸, out of the new moves, practised with not
 
   await page.goto(`${site.url}#/train/Rep0Najd`);
   await asked(page);
-  const list = await lines(page);
+  const list = await lines(page, true);
   await list.getByRole('button', { name: 'Alapin', exact: true }).click();
   const row = list.locator('.line-list-row').filter({ hasText: 'Nf6' });
   await row.getByRole('button', { name: 'Line menu' }).click();
@@ -108,7 +113,7 @@ test('a chapter paused as a whole and unpaused; the home screen counts the pause
   const git = await setUp(page);
   await page.goto(`${site.url}#/train/Rep0Najd`);
   await asked(page);
-  const list = await lines(page);
+  const list = await lines(page, true);
   const main = list.locator('.line-list-chapter').filter({ hasText: 'Main line' });
   await main.getByRole('button', { name: 'Chapter menu' }).click();
   await list.getByRole('button', { name: 'Pause all lines' }).click();
@@ -121,7 +126,7 @@ test('a chapter paused as a whole and unpaused; the home screen counts the pause
 
   await page.goto(`${site.url}#/train/Rep0Najd`);
   await asked(page);
-  const again = await lines(page);
+  const again = await lines(page, true);
   const head = again.locator('.line-list-chapter').filter({ hasText: 'Main line' });
   await head.getByRole('button', { name: 'Chapter menu' }).click();
   await again.getByRole('button', { name: 'Unpause all lines' }).click();
@@ -158,7 +163,7 @@ test('a study prioritized: ranked from the explorer, two lines kept, the third p
 
   await page.goto(`${site.url}#/train/Rep0Najd`);
   await asked(page);
-  const list = await lines(page);
+  const list = await lines(page, true);
   await list.getByRole('group', { name: 'Priority' }).getByRole('button', { name: 'Prioritize…' }).click();
   const dialog = page.getByRole('dialog', { name: /Prioritize: Test repertoire/ });
   await dialog.getByRole('button', { name: 'Rank 3 lines' }).click();

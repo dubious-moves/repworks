@@ -52,9 +52,14 @@ function pushed(git: FakeGit): Record<string, unknown>[] {
   return out.sort((a, b) => (a['n'] as number) - (b['n'] as number));
 }
 
-/** The list, unfolded on the phone (it is open beside the board on a wide screen). */
-async function lines(page: Page) {
+/**
+ * The list, opened. A session that starts folds it, on a wide screen too, an effect after its first
+ * move is asked: `started` (a session just started) waits for that fold first, or it could come
+ * after the list was opened.
+ */
+async function lines(page: Page, started = false) {
   const list = page.getByRole('complementary', { name: 'Lines to train' });
+  if (started) await expect(list.getByRole('button', { name: /Show lines/ })).toHaveAttribute('aria-expanded', 'false');
   if ((await list.getByRole('button', { name: /Show lines/ }).count()) > 0) await list.getByRole('button', { name: /Show lines/ }).click();
   return list;
 }
@@ -68,7 +73,7 @@ test('the line list: a line picked and trained, then practised again, a miss rec
   const git = await setUp(page);
   await page.goto(`${site.url}#/train/Rep0Najd`);
   await asked(page);
-  const list = await lines(page);
+  const list = await lines(page, true);
   await expect(list.locator('.line-list-chapter')).toHaveCount(2);
   await expect(list.locator('.line-list-chapter').first()).toContainText('Main line');
   await expect(list.locator('.line-list-chapter').first()).toContainText('Learn 0/2');
