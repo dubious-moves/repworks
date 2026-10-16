@@ -59,6 +59,7 @@ import { repertoireCard, type CardId } from '../progress/cards.ts';
 import type { Grade } from '../progress/events.ts';
 import type { CardState } from '../progress/replay.ts';
 import type { Line, RepertoireIndex } from '../repertoire/index.ts';
+import { alternativesAt } from './alternatives.ts';
 import { grade, selfGrade } from './grade.ts';
 import type { QuizLine } from './commentQuiz.ts';
 import type { PlannedLine, SessionPlan } from './plan.ts';
@@ -468,6 +469,23 @@ export class Trainer {
   /** Show and grade: a move is shown and waits for its verdict (`tell`). */
   get awaitingGrade(): boolean {
     return this.waiting !== undefined;
+  }
+
+  /**
+   * The alternatives saved (§5.18) where the user's move is asked or was just shown, by UCI and
+   * SAN in UCI order; undefined when no move is asked or shown (show and grade's Space, §5.114).
+   */
+  get alternativesHere(): { uci: string; san: string }[] | undefined {
+    if (this.inAside) return undefined;
+    const at = this.pending ? this.ply : this.waiting ? this.ply - 1 : -1;
+    const before = this.plies[at]?.before;
+    if (!before) return undefined;
+    const out: { uci: string; san: string }[] = [];
+    for (const uci of alternativesAt(this.alternatives, positionKeyOf(before))) {
+      const move = parseUciMove(before, uci);
+      if (move) out.push({ uci, san: makeSan(before, move) });
+    }
+    return out;
   }
 
   /** A new pace, from the next move played for the user. */

@@ -433,7 +433,12 @@ function Session(props: { s: SessionView }) {
   // At a line's end the study's arrows of its last move are drawn too (the owner's request,
   // 2026-10-09); before it they could give a move away.
   const atEnd = !!s.done || s.phase === 'lineDone';
-  const shapes = [...(arrow && 'from' in arrow ? [{ brush: 'green' as const, orig: sq(arrow.from), dest: sq(arrow.to) }] : []), ...(atEnd && !shownLine ? (node?.shapes ?? []) : [])];
+  // Show and grade's Space (§5.114): the alternatives saved here, in blue.
+  const alts = shownLine ? [] : (s.alts ?? []).flatMap((a) => {
+    const m = parseUci(a.uci);
+    return m && 'from' in m ? [{ brush: 'blue' as const, orig: sq(m.from), dest: sq(m.to) }] : [];
+  });
+  const shapes = [...(arrow && 'from' in arrow ? [{ brush: 'green' as const, orig: sq(arrow.from), dest: sq(arrow.to) }] : []), ...alts, ...(atEnd && !shownLine ? (node?.shapes ?? []) : [])];
   // Comments of the move reached only where they are read (the owner's request, 2026-10-11): a
   // move taught or shown, after a wrong move, and at the line's end. While the moves go by and
   // one is asked they stay hidden: they came and went with each move, and could give it away.
@@ -486,7 +491,7 @@ function Session(props: { s: SessionView }) {
         <PreviewBar owner="train" />
         {/* One line, always its height, so the board never moves (§5.17). */}
         <p class={`feedback train-feedback note-${holding ? 'next' : (s.note?.kind ?? 'none')}${s.note?.kind === 'aside' && s.note.important ? ' important' : ''}`} role="status">
-          {s.done ? '' : holding ? `Line done${upcoming ? ` · Next: ${upcoming}` : ''}` : noteText(s.note)}
+          {s.done ? '' : holding ? `Line done${upcoming ? ` · Next: ${upcoming}` : ''}` : s.alts ? (s.alts.length ? `Alternatives: ${s.alts.map((m) => m.san).join(', ')}` : 'No alternatives saved here') : noteText(s.note)}
         </p>
       </div>
       <div class="train-panel">
@@ -537,6 +542,9 @@ function Session(props: { s: SessionView }) {
               </button>
               <button type="button" class="press press-wrong" onClick={() => press('wrong')}>
                 Missed it <span class="muted">(4)</span>
+              </button>
+              <button type="button" class="secondary" disabled={!ASKING.has(s.phase)} onClick={() => press('alternatives')} title="The alternatives saved for this move, as blue arrows">
+                Alternatives <span class="muted">(Space)</span>
               </button>
               {speech.value && (
                 <button type="button" class="secondary" onClick={() => press('repeat')}>

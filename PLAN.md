@@ -6300,3 +6300,26 @@ move; repetitions with `off` and `session`); `timeTravel.test.ts` (each kind's s
 settings read); `browse.test.ts`; `autoplay.spec.ts` (the two settings in the dialog; a line picked
 with `session` asks a move not due), and the e2e specs of picked lines and Learn updated to the
 new default. Live: TESTING.md.
+
+#### 5.114 Alternatives shown by Space in show and grade (the owner's request, 2026-10-16)
+
+"When using Show and grade, we need a way to show alternative moves with a key bind. My main
+bluetooth ring has '1' and 'space' available, either works for me. When pressed, we should show the
+alternative moves with blue arrows (if there are any)." Decided:
+- **Space**, since `1` already repeats the spoken move in show and grade (§5.9). Outside show and
+  grade Space stays Hint, and `1` still switches to show and grade.
+- A press draws the alternatives saved (§5.18) for the move asked as blue arrows, and names them in
+  the feedback line ("Alternatives: e5", or "No alternatives saved here"). With the move shown and
+  waiting for its grade, they are those of the position it was asked in. A second press takes them
+  away, and so does the board moving. It grades nothing and changes nothing; while the board plays
+  the opponent's moves it does nothing. With speech on, they are spoken too ("alternatives: knight
+  f3", or "no alternatives"), for the ring with the screen off.
+- A button beside the two keys' ("Alternatives (Space)"), always there in show and grade so no
+  button moves; greyed out when no move is asked or shown.
+- Only the moves saved as alternatives: another repertoire move at the position is played and
+  graded as its own card (D3), not shown here.
+
+Built in `Trainer.alternativesHere` and `ShowGrade`'s `alternatives` press (`pressOf(' ')`). Tests:
+`showGrade.test.ts` (the alternatives of the move asked, then shown, then the next move's; none;
+spoken; the grades untouched); `alternatives.spec.ts` (Space in show and grade: the arrow in blue,
+away at a second press and when the move is shown, back for the move shown). Live: TESTING.md.

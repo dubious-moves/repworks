@@ -8,9 +8,11 @@
 // A press while the board is playing is queued, so a press between two moves isn't lost: `next`
 // only, one at a time, and only for three seconds; `wrong` clears the queue, since marking a move
 // failed before it is shown would grade the wrong move. Key repeats are never presses.
+// `alternatives` (Space) shows the alternatives saved for the move asked or shown, as blue arrows
+// (§5.114); it grades nothing and changes nothing.
 import { Trainer, type TrainerEffect } from './trainer.ts';
 
-export type Press = 'next' | 'wrong' | 'repeat';
+export type Press = 'next' | 'wrong' | 'repeat' | 'alternatives';
 
 /** How long a press waits for the board (§5.9). */
 export const QUEUE_MS = 3000;
@@ -26,6 +28,8 @@ export function pressOf(key: string): Press | undefined {
       return 'wrong';
     case '1':
       return 'repeat';
+    case ' ':
+      return 'alternatives';
     default:
       return undefined;
   }
@@ -49,7 +53,11 @@ export function spokenMove(san: string): string {
   return `${words.join(' ')}${suffix ? (suffix === '#' ? ', mate' : ', check') : ''}`;
 }
 
-export type ShowGradeEffect = TrainerEffect | { type: 'say'; text: string };
+export type ShowGradeEffect =
+  | TrainerEffect
+  | { type: 'say'; text: string }
+  /** The alternatives saved for the move asked or shown, to draw (none: say there are none). */
+  | { type: 'alternatives'; moves: { uci: string; san: string }[] };
 
 export interface ShowGradeOptions {
   /** Speak each move as it is shown (off by default, §5.9). */
@@ -88,6 +96,12 @@ export class ShowGrade {
 
   press(press: Press, now: number): ShowGradeEffect[] {
     if (press === 'repeat') return this.said !== undefined ? [{ type: 'say', text: spokenMove(this.said) }] : [];
+    if (press === 'alternatives') {
+      const moves = this.trainer.alternativesHere;
+      if (!moves) return [];
+      const text = moves.length ? `alternatives: ${moves.map((m) => spokenMove(m.san)).join('; ')}` : 'no alternatives';
+      return [{ type: 'alternatives', moves }, ...(this.options.speech ? [{ type: 'say' as const, text }] : [])];
+    }
     const phase = this.trainer.view.phase;
     // A move asked, taught, tried wrong, or shown by a hint before the keys took over (§5.16).
     if (phase === 'ask' || phase === 'teach' || phase === 'wrong' || (phase === 'shown' && !this.trainer.awaitingGrade)) {

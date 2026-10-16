@@ -217,6 +217,8 @@ export interface SessionView {
   /** After a wrong move, the move "Save as alternative" saves; an alternative just saved (§5.18). */
   wrongMove?: string;
   savedAlt?: string;
+  /** Show and grade's Space (§5.114): the alternatives saved for the move asked or shown, drawn in blue until the board moves. */
+  alts?: { uci: string; san: string }[];
   /** The planned asks and teaches not answered yet. */
   dueLeft: number;
   newLeft: number;
@@ -403,7 +405,8 @@ export function setSelfGrade(on: boolean): void {
   if (!t || !s || s.done || s.selfGrade === on || t.awaitingGrade || t.inAside) return;
   t.setSelfGrade(on);
   shower = on ? new ShowGrade(t, speech.peek() ? { speech: true } : {}) : undefined;
-  session.value = { ...s, selfGrade: on, tick: s.tick + 1 };
+  const { alts: _, ...rest } = s;
+  session.value = { ...rest, selfGrade: on, tick: s.tick + 1 };
 }
 
 /** Whether the board waits for a show-and-grade verdict (the toggle waits for it). */
@@ -624,6 +627,7 @@ function apply(t: Trainer, effects: readonly ShowGradeEffect[], always = false):
         if (c) next.chapter = c;
         next.side = c && header(c, 'Orientation') === 'black' ? 'black' : 'white';
         delete next.arrow;
+        delete next.alts;
         delete next.suspended;
         delete next.missed;
         newLine = true;
@@ -631,6 +635,12 @@ function apply(t: Trainer, effects: readonly ShowGradeEffect[], always = false):
       }
       case 'play':
         delete next.arrow;
+        delete next.alts;
+        break;
+      case 'alternatives':
+        // A second press takes them away again.
+        if (s.alts) delete next.alts;
+        else next.alts = e.moves;
         break;
       case 'arrow':
         if (e.uci) next.arrow = e.uci;

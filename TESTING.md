@@ -5,6 +5,13 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## Alternatives shown by Space in show and grade (§5.114)
+- Save an alternative somewhere in a line (a wrong move → "Save … as alternative", or the study's
+  move menu → Add alternative…), then reach that move in show and grade and press Space on the
+  ring: a blue arrow for each alternative, named under the board; Space again hides them. Also
+  once the move is shown (2), before grading it. Where none is saved: "No alternatives saved here".
+- Check that the ring's Space reaches the page as a key (not scrolling it or pressing a button).
+
 ## Auto-play set apart for the queue and for Learn and a line picked (§5.113)
 - Training settings: Auto-play and "A line starts" twice, under "In the day's queue" and "When
   learning, or a line picked". Your stored settings carry over: the old one auto-play setting in

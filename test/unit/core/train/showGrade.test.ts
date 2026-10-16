@@ -41,9 +41,9 @@ const notDue = reviewed(start + 5 * DAY);
 const ch = chapter('1. e4 e5 2. Nf3 Nc6 3. Bb5');
 const ix = indexStudies([{ sid: 'Study001', kind: 'repertoire', chapters: [ch] }]);
 
-function world(states: Map<string, CardState>, options: { speech?: boolean; newPerDay?: number } = {}) {
+function world(states: Map<string, CardState>, options: { speech?: boolean; newPerDay?: number; alternatives?: CardId[] } = {}) {
   const queue = todaysQueue(ix, states, { ...DEFAULT_TRAIN, newPerDay: options.newPerDay ?? 0 }, day);
-  const trainer = new Trainer({ index: ix, plan: planSession(ix, queue, states), states, startOf: () => startPosition(ch), paceMs: 600, selfGrade: true });
+  const trainer = new Trainer({ index: ix, plan: planSession(ix, queue, states), states, startOf: () => startPosition(ch), paceMs: 600, selfGrade: true, alternatives: options.alternatives ?? [] });
   const sg = new ShowGrade(trainer, options.speech ? { speech: true } : {});
   const effects: ShowGradeEffect[] = [];
   let wait: { id: number } | undefined;
@@ -154,7 +154,8 @@ test('keys: 2 and 4, the media keys of a ring, and 1 to hear the move again', ()
   assert.deepEqual(['2', 'MediaTrackNext'].map(pressOf), ['next', 'next']);
   assert.deepEqual(['4', 'MediaTrackPrevious'].map(pressOf), ['wrong', 'wrong']);
   assert.equal(pressOf('1'), 'repeat');
-  for (const key of ['3', 'a', 'Enter', ' ', 'ArrowRight']) assert.equal(pressOf(key), undefined, key);
+  assert.equal(pressOf(' '), 'alternatives');
+  for (const key of ['3', 'a', 'Enter', 'ArrowRight']) assert.equal(pressOf(key), undefined, key);
 });
 
 test('speech: each move shown is spoken when speech is on, and 1 repeats it', () => {
@@ -210,4 +211,38 @@ test('a line\'s end held for "Next line" (§5.17): the next press goes on', () =
   out = sg.press('next', (now += 1000));
   assert.equal(out[0]?.type, 'line');
   assert.equal(trainer.view.number, 2);
+});
+
+test('Space shows the alternatives saved for the move asked, and after it is shown; it grades nothing (§5.114)', () => {
+  const states = new Map<string, CardState>([[card('e4'), dueNow], [card('e4 e5 Nf3'), dueNow]]);
+  const w = world(states, { alternatives: [card('d4'), card('c4'), card('e4 e5 Bc4')], speech: true });
+  w.begin();
+  const alts = (out: ShowGradeEffect[]) => out.flatMap((e) => (e.type === 'alternatives' ? [e.moves.map((m) => `${m.uci} ${m.san}`)] : []));
+  const says = (out: ShowGradeEffect[]) => out.flatMap((e) => (e.type === 'say' ? [e.text] : []));
+  let out = w.press('alternatives');
+  assert.deepEqual(alts(out), [['c2c4 c4', 'd2d4 d4']]);
+  assert.deepEqual(says(out), ['alternatives: c4; d4']);
+  assert.equal(w.phase(), 'ask');
+  w.press('next');
+  assert.equal(w.phase(), 'shown');
+  // The move shown: the alternatives of the position it was asked in.
+  assert.deepEqual(alts(w.press('alternatives')), [['c2c4 c4', 'd2d4 d4']]);
+  assert.equal(w.phase(), 'shown');
+  w.press('next');
+  // The next move asked: its own.
+  w.run();
+  assert.equal(w.phase(), 'ask');
+  assert.deepEqual(alts(w.press('alternatives')), [['f1c4 Bc4']]);
+  w.press('next');
+  w.press('next');
+  w.run();
+  w.stop();
+  assert.deepEqual(w.records().map((e) => e.k === 'review' && e.g), [3, 3]);
+});
+
+test('Space where nothing is saved: an empty list, spoken as none', () => {
+  const w = world(new Map([[card('e4'), dueNow]]), { speech: true });
+  w.begin();
+  const out = w.press('alternatives');
+  assert.deepEqual(out, [{ type: 'alternatives', moves: [] }, { type: 'say', text: 'no alternatives' }]);
 });

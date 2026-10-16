@@ -1,7 +1,7 @@
 // Alternative moves (PLAN.md §5.18), on a desktop viewport and an emulated phone, with the fixture
 // repertoire of train.spec.ts (a Black Sicilian: 1... c5 due): a wrong move saved as an
 // alternative, then played again in the Interactive view and taken back for free; listed in the study's
-// card panel, and removed there.
+// card panel, and removed there; shown in blue by Space in show and grade (§5.114).
 import { test, expect, type Page } from '@playwright/test';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
 import { clickSquare, openMoveMenu } from './board.ts';
@@ -48,8 +48,29 @@ test('a wrong move saved as an alternative is free next time, and is listed and 
   await play(page, 'e7', 'e5');
   await expect(feedback(page)).toHaveText('e5: a good alternative, but your repertoire plays something else: try again');
   await expect(page.getByRole('button', { name: /^Save .* as alternative/ })).toHaveCount(0);
-  await play(page, 'c7', 'c5');
-  await expect(phase(page)).not.toHaveAttribute('data-phase', 'ask');
+
+  // Show and grade (1), then Space (§5.114): the alternative in blue, and gone at a second press.
+  const shapes = page.locator('.train-board cg-container svg.cg-shapes line');
+  await page.keyboard.press('1');
+  await expect(page.getByRole('button', { name: /^Alternatives/ })).toBeVisible();
+  await page.keyboard.press(' ');
+  await expect(feedback(page)).toHaveText('Alternatives: e5');
+  await expect(shapes).toHaveCount(1);
+  await expect(shapes).toHaveAttribute('stroke', '#003088');
+  await page.keyboard.press(' ');
+  await expect(shapes).toHaveCount(0);
+  // The move shown takes them away (the board moves); Space then shows them again, for the
+  // position the move was asked in.
+  await page.keyboard.press(' ');
+  await expect(shapes).toHaveCount(1);
+  await page.keyboard.press('2');
+  await expect(phase(page)).toHaveAttribute('data-phase', 'shown');
+  await expect(feedback(page)).toHaveText('Play c5');
+  await expect(shapes).toHaveCount(0);
+  await page.keyboard.press(' ');
+  await expect(feedback(page)).toHaveText('Alternatives: e5');
+  await expect(shapes).toHaveCount(1);
+  await expect(shapes).toHaveAttribute('stroke', '#003088');
 
   // The menu of 1... c5 in the study lists it; its item removes it.
   await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf?at=e4,c5`);
