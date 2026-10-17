@@ -1484,7 +1484,10 @@ pace delays never under 450 ms; every effect sequence is deterministic for a giv
   (Hint greyed out while nothing is asked, "Next line" in its place at a line's end; a moment's
   extras, such as an undo or Pin, in a row after them), the comments come after them, "Always
   play this for me", Skip line and the pace are in a small ⋯ menu by the counters, and a phone
-  shows the line's name without its moves.
+  shows the line's name without its moves. Since 2026-10-17 a phone also keeps two lines' room for
+  the feedback line and the counters, and the line's name on one line: a longer note ("Your
+  mistake again: each right 2 times in a row") or "mistakes left 1" wrapped and moved the buttons
+  by up to 37 px (measured on an emulated Pixel 7; `train.spec.ts` checks Hint's place).
 - The device's screen stays on during a session (Screen Wake Lock, D7's spec), and is released
   when the session stops or the app is hidden.
 - Keys: Space for Hint, Escape to stop.

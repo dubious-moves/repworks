@@ -5,6 +5,12 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## The buttons stay put on the phone (§5.7, 2026-10-17)
+- On the phone, train a line and miss a move: through "Not in your repertoire", the line's end
+  ("Your mistake again: each right 2 times in a row", "mistakes left 1") and the retry, Hint and
+  the buttons beside it should not move. The space under the board is a little taller now (two
+  lines kept for the feedback); say if it costs too much.
+
 ## A storm move graded over two depths (§5.120)
 - On newly gathered or deepened positions (the change doesn't reach lists kept before), play sets
   and storms as usual: verdicts near a band's edge should flip less. Report any that still look

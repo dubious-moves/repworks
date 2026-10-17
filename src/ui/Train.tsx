@@ -471,7 +471,7 @@ function Session(props: { s: SessionView }) {
   const nextLabel = s.upcoming ? 'Next line' : 'Finish';
   const upcoming = s.upcoming && `Line ${lineNumber(s.data.index, s.upcoming)}${s.line && s.upcoming.cid !== s.line.cid ? ` · ${chapterNameOf(s, s.upcoming)}` : ''}`;
   return (
-    <div class="train-grid" data-phase={s.done ? 'done' : s.phase}>
+    <div class="train-grid train-session" data-phase={s.done ? 'done' : s.phase}>
       <div class="train-board" onPointerDown={shownLine ? endPreviewOnBoard : undefined}>
         {board && (
           <Board

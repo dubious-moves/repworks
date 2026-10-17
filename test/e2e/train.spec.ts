@@ -175,6 +175,30 @@ test('Analyse (the owner’s request, 2026-10-16): the board at the move asked, 
   await expect(page.locator('.train-line')).toContainText('2. Nf3');
 });
 
+test('on a phone the buttons keep their place through a line, whatever the feedback line and the counters say', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'on a desktop the buttons are beside the board, not under it');
+  await walkOnce(page, { mistakeRetries: 2 });
+  await setUp(page);
+  await page.locator('.train-card').getByRole('link', { name: 'Train' }).click();
+  await asked(page);
+  // Hint's top, from the board's, read in one go with the feedback line's text.
+  const place = () =>
+    page.evaluate(() => {
+      const hint = [...document.querySelectorAll('.train-actions button')].find((b) => b.textContent === 'Hint')!;
+      return { text: document.querySelector('.train-feedback')!.textContent, y: hint.getBoundingClientRect().top - document.querySelector('cg-board')!.getBoundingClientRect().top };
+    });
+  const { y } = await place();
+  await play(page, 'e7', 'e5');
+  await expect.poll(place).toEqual({ text: 'Not in your repertoire: try again', y });
+  await play(page, 'c7', 'c5');
+  // At the line's end the mistake is asked again: the longest note, and a counter added.
+  await expect(feedback(page)).toHaveText('Your mistake again: each right 2 times in a row');
+  await expect.poll(place).toEqual({ text: 'Your mistake again: each right 2 times in a row', y });
+  await expect(page.locator('.train-counters')).toContainText('mistakes left 1');
+  await asked(page);
+  await expect.poll(place).toEqual({ text: 'Your mistake again: 0 of 2 right in a row', y });
+});
+
 test('train one study from the study list and Escape stops', async ({ page, isMobile }) => {
   await setUp(page);
   await page.getByRole('link', { name: 'Train Test repertoire' }).click();

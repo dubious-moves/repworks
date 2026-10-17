@@ -2022,6 +2022,29 @@ table.cards td {
   .train-line .train-moves {
     display: none;
   }
+
+  /* For the same reason the session's feedback line and counters keep room for two lines, and the
+     line's name one: a longer note ("Your mistake again: each right 2 times in a row", "Line done ·
+     Next: …") or a counter added mid-line ("mistakes left 1") wrapped, and moved the buttons by up
+     to 37 px on a Pixel 7 (2026-10-17). A note longer still is cut at two lines. */
+  .train-session .train-feedback {
+    min-height: 2.9em;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+  }
+
+  .train-session .train-counters-row {
+    min-height: calc(2.9em + 8px);
+  }
+
+  .train-session .train-line {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 }
 
 /* What a moment offers (an alternative, a pin, an undo), under the buttons that stay. */
