@@ -1687,3 +1687,9 @@ The technical calls, each with its reason:
   home; a rating off the ladder is asked of Maia besides.** Was (§5.100): less than half the time
   at the user's rating and 30 points more at a ladder rating above it. Why: the owner's request; at
   2150 the old rule left few positions.
+
+## Revision of 2026-10-17 (a sequence's alternative moves are a choice, PLAN.md §5.119)
+- **A tactic's or sequence's line that branches at the user's own move, the first move included, is
+  never asked once another is solved.** Was (§5.55, mistake-lab's rule): optional from the second
+  move on, but every alternative first move asked in turn. Why: the owner's report; alternatives
+  are there so either move is right, not to review them all.

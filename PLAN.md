@@ -6404,3 +6404,15 @@ the default pair whatever the user's rating does, an unrated rating, a list that
 another pair and gap, the read-back), `maia.test.ts` (level up's ratings wanted once each),
 `storm.spec.ts` (the Maia test: the weaker rating set to 1900 and the gap to 10, every kept
 position then rated at 1900, the chip's words and the setting kept).
+
+#### 5.119 A sequence's alternative moves are a choice (the owner's report, 2026-10-17)
+- **A line that leaves another at the user's own move is an alternative: either move is right, and
+  the drill doesn't ask the other one afterwards.** That held from the second move on (§5.55,
+  mistake-lab's optional lines), but at a sequence's first move every alternative was asked in
+  turn after the main line, as mistake-lab did; the owner meant alternatives as a free choice.
+- **A line that leaves at the opponent's move is still asked** ("Another line: the opponent answers
+  differently"), under whichever move the user chose; the replies to a move not chosen are not.
+
+Built in `nextLine` (`src/core/games/tactic.ts`), which serves the game cards' drill and the
+practice review's. Tests: `tactic.test.ts` (either first move solves the card; an opponent's other
+reply under the alternative chosen still asked).

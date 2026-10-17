@@ -2,8 +2,8 @@
 // alternative line still to solve, the common start with a solved line played for the user up to
 // where the opponent's reply differs. A move that isn't the active line's but is the next move of
 // another unsolved line with the same start switches to it (mistake-lab's `tryTacticLineSwitch`).
-// A line that leaves a solved one at the user's own move is not asked: mistake-lab offers those as
-// optional ("Find a stronger move"), outside the grade. Pure.
+// A line that leaves a solved one at the user's own move is an alternative the user may choose,
+// never asked besides (§5.119): at the first move too, where mistake-lab asked it. Pure.
 import type { TacticMove } from './record.ts';
 
 export interface TacticRun {
@@ -69,8 +69,8 @@ export function nextLine(run: TacticRun): { run: TacticRun; prefix: string[] } |
     let k = 0;
     for (const s of solved) k = Math.max(k, commonStart(line, run.lines[s]!));
     if (k >= line.length) continue; // a prefix of a solved line
-    if (line[k]!.user && k > 0) continue; // leaves a solved line at the user's own move: optional
-    const prefix = line.slice(0, k + (line[k]!.user ? 0 : 1)).map((m) => m.uci);
+    if (line[k]!.user) continue; // leaves a solved line at the user's own move: an alternative, not asked
+    const prefix = line.slice(0, k + 1).map((m) => m.uci);
     return { run: { lines: run.lines, solved, active: i, played: prefix }, prefix };
   }
   return undefined;

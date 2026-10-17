@@ -55,3 +55,26 @@ test('a move of another unsolved line with the same start switches to it', () =>
   // The other line leaves the solved one at the user's own move: optional, not asked.
   assert.equal(nextLine(run), undefined);
 });
+
+test('an alternative first move is accepted, and the other is not asked after it (§5.119)', () => {
+  const lineA = L('a2a3', 'h7h6', 'b2b3');
+  const lineB = L('c2c3', 'h7h6', 'd2d3');
+  for (const [first, then] of [['a2a3', 'b2b3'], ['c2c3', 'd2d3']] as const) {
+    const a = playUser(startTactic([lineA, lineB]), first);
+    assert.ok(a.ok);
+    const b = playUser(playReply(a.run, 'h7h6'), then);
+    assert.ok(b.ok && b.lineDone);
+    assert.equal(nextLine(b.run), undefined);
+  }
+});
+
+test('an opponent’s other reply under an alternative first move is still asked', () => {
+  const main = L('a2a3', 'h7h6', 'b2b3');
+  const alt = L('c2c3', 'h7h6', 'd2d3');
+  const altReply = L('c2c3', 'g7g6', 'e2e3');
+  const a = playUser(playReply((playUser(startTactic([main, alt, altReply]), 'c2c3') as { run: ReturnType<typeof startTactic> }).run, 'h7h6'), 'd2d3');
+  assert.ok(a.ok && a.lineDone);
+  const n = nextLine(a.run)!;
+  assert.deepEqual(n.prefix, ['c2c3', 'g7g6']);
+  assert.equal(nextLine((playUser(n.run, 'e2e3') as { run: ReturnType<typeof startTactic> }).run), undefined);
+});
