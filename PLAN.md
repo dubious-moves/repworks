@@ -5934,7 +5934,7 @@ over tags (`core/storm/kinds.ts`) rather than a storm per idea, so they combine:
   - **Hard for you** (Maia at the user's rating; shown once Maia is here): *Unintuitive* (§5.82),
     *Critical* (Maia's moves there give up 8% or more on average, a move outside the list counted
     as its last line), *Level up* (Maia finds a good move less than half the time at the user's
-    rating and 30 points more often at some ladder rating above it), *Your level* (the difficulty
+    rating and 30 points more often at some ladder rating above it; now §5.118), *Your level* (the difficulty
     from 100 below to 300 above the rating).
   - **The move**, read from the moves a list that may judge (§5.84) counts as good (great or
     good), only when the list names them all (its last line isn't good): *Only move* (one good
@@ -6379,3 +6379,28 @@ the old chapter behind once it has fewer positions per line).
 Built in `foundShare` and `judgeMove` (`src/core/storm/maia.ts`, the bands that count passed in)
 and `tooEasyAt`. Tests: `maia.test.ts` (the share over great moves), `kinds.test.ts` (96% on a
 good move: easy, not too easy).
+
+#### 5.118 Level up compares two Maia ratings, set on the home (the owner's request, 2026-10-17)
+- **Level up is Maia at a stronger rating finding a good move (great or good) at least a gap more
+  often than at a weaker one: 1800 against 2200, 25 points, by default.** Was (§5.100): Maia at the
+  user's rating finding one less than half the time, and some ladder rating above it 30 points
+  more often; at the owner's 2150 that left only 2200 and 2600 to compare with, and few positions.
+  The user's rating plays no part now: the tag is "what stronger players find", not "hard for you".
+- **The three numbers are set per device** on the home, under the Hard for you chips ("Level up:
+  Maia at 2200 finds a good move 25 points more often than at 1800"): either rating from 1000 to
+  2600 by 100, the stronger above the weaker; the gap 10–50. Kept in the storm's settings
+  (`levelUp`, read back by `cleanLevelUp`). Shown whenever the Maia group is, so a pair that tags
+  nothing can be changed without its chip on.
+- **A rating off the ladder is asked of Maia too**: the positions want the ladder's, the user's and
+  level up's two (`missingRatings`'s `extra`); changing them restarts the background rating, and
+  the home's "rated" count waits for them. The difficulty still reads the ladder only.
+- Both ratings must be judged (`foundShare` not null: a list that may judge, 60% of Maia's
+  likelihood on moves it can judge); a rating not rated yet tags nothing.
+
+Built in `levelUp`, `withLevelUp` and `cleanLevelUp` (`src/core/storm/kinds.ts`), `tagConfig` and
+`setLevelUp` (`src/app/storm.ts`), `LevelUpPicker` (`src/ui/Storm.tsx`). The gap's 25 is a first
+guess: the owner's positions will show how many it leaves. Tests: `kinds.test.ts` ("level up":
+the default pair whatever the user's rating does, an unrated rating, a list that can't judge,
+another pair and gap, the read-back), `maia.test.ts` (level up's ratings wanted once each),
+`storm.spec.ts` (the Maia test: the weaker rating set to 1900 and the gap to 10, every kept
+position then rated at 1900, the chip's words and the setting kept).

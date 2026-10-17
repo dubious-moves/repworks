@@ -31,7 +31,7 @@ import { analyseForStorm, cancelStormEngine, endStormEngine, focusedWidth, setSt
 import { trainData, type TrainData } from './train.ts';
 import { puzzlePrefs, readyPuzzles } from './puzzles.ts';
 import { keptPolicy, missingRatings, type MaiaRating } from '../core/storm/maia.ts';
-import { cleanFocus, easyAt, FOCUSES, tooEasyAt, matchesFocus, positionTags, type Focus } from '../core/storm/kinds.ts';
+import { cleanFocus, cleanLevelUp, easyAt, FOCUSES, LEVEL_DEFAULT, tooEasyAt, matchesFocus, positionTags, withLevelUp, type Focus, type LevelUp } from '../core/storm/kinds.ts';
 import { maiaElo, maiaPolicies, maiaStored } from './maia.ts';
 import type { ReadyPuzzle } from '../core/puzzles/puzzles.ts';
 
@@ -52,14 +52,16 @@ export interface StormPrefs {
   overnight: boolean;
   /** The deepening runs an engine a core, several positions at once (§5.103). */
   focused: boolean;
+  /** Level up's ratings and gap (§5.118). */
+  levelUp: LevelUp;
 }
 const PREFS_KEY = 'repworks-storm';
-const DEFAULT_PREFS: StormPrefs = { minPly: STORM.minPly, maxPly: STORM.maxPly, source: 'both', deepen: typeof matchMedia === 'undefined' || !matchMedia('(max-width: 768px)').matches, maia: true, focus: [], overnight: false, focused: false };
+const DEFAULT_PREFS: StormPrefs = { minPly: STORM.minPly, maxPly: STORM.maxPly, source: 'both', deepen: typeof matchMedia === 'undefined' || !matchMedia('(max-width: 768px)').matches, maia: true, focus: [], overnight: false, focused: false, levelUp: LEVEL_DEFAULT };
 
 function loadPrefs(): StormPrefs {
   try {
     const raw = JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}') as Partial<StormPrefs>;
-    return { ...DEFAULT_PREFS, ...raw, focus: cleanFocus(raw.focus) };
+    return { ...DEFAULT_PREFS, ...raw, focus: cleanFocus(raw.focus), levelUp: cleanLevelUp(raw.levelUp) };
   } catch {
     return DEFAULT_PREFS;
   }
@@ -74,6 +76,10 @@ export function setStormPrefs(patch: Partial<StormPrefs>): void {
   }
 }
 const config = (): StormConfig => withPlyRange(STORM, stormPrefs.value.minPly, stormPrefs.value.maxPly);
+/** The config the tags are worked out with: level up's ratings and gap as set (§5.118). */
+export const tagConfig = (): StormConfig => withLevelUp(STORM, stormPrefs.value.levelUp);
+/** The ratings Maia is asked besides the ladder's and the user's: level up's. */
+const levelElos = (): number[] => [stormPrefs.value.levelUp.from, stormPrefs.value.levelUp.to];
 
 /* ------------------------------------------------------------------ the store on this device */
 
@@ -272,7 +278,8 @@ export async function refreshHome(s: StormScopeData): Promise<void> {
   const ready = all.filter((p) => !h.get(p.card)?.done);
   const lines = new Set(ready.map(positionLineKey).filter(Boolean)).size;
   const elo = maiaElo.peek();
-  const rated = ready.filter((p) => !missingRatings(p.maia, elo).length).length;
+  const rated = ready.filter((p) => !missingRatings(p.maia, elo, levelElos()).length).length;
+  const tc = tagConfig();
   const tags = Object.fromEntries(FOCUSES.map((f) => [f, 0])) as Record<Focus, number>;
   const focus = stormPrefs.value.focus;
   let matching = 0;
@@ -282,7 +289,7 @@ export async function refreshHome(s: StormScopeData): Promise<void> {
       tooEasy++;
       continue;
     }
-    const t = positionTags(p, storedList(p), elo, STORM);
+    const t = positionTags(p, storedList(p), elo, tc);
     for (const f of t) tags[f]++;
     if (matchesFocus(t, p.kind, focus)) matching++;
   }
@@ -670,7 +677,7 @@ let maiaRun = 0;
 
 /**
  * While the storm's home is open, Maia's policy for the scope's kept positions not done, at the
- * ladder's ratings and the user's (core/storm/maia.ts), kept with each position: the difficulty
+ * ladder's ratings, the user's and level up's (core/storm/maia.ts), kept with each position: the difficulty
  * and the unintuitive storm come from it. Runs beside a gather and the deepening (Maia's worker is
  * a thread of its own), never during a session; only once Maia is downloaded. A position takes
  * about a second (one batch), against a minute for Stockfish's deepening.
@@ -686,10 +693,10 @@ export async function rateWithMaia(s: StormScopeData): Promise<void> {
     const data = trainData.value;
     const h = data ? histories(data) : new Map<string, StormHistory>();
     const elo = maiaElo.peek();
-    const todo = storedInScope(await stormStore().positions(), s).filter((p) => missingRatings(p.maia, elo).length && !h.get(p.card)?.done);
+    const todo = storedInScope(await stormStore().positions(), s).filter((p) => missingRatings(p.maia, elo, levelElos()).length && !h.get(p.card)?.done);
     for (const p of todo) {
       if (busy()) return;
-      const elos = missingRatings(p.maia, elo);
+      const elos = missingRatings(p.maia, elo, levelElos());
       const policies = await maiaPolicies(p.fen, elos);
       // Maia couldn't answer (stopped, or failed): tried again on the next visit.
       if (!policies) return;
@@ -710,6 +717,14 @@ export async function rateWithMaia(s: StormScopeData): Promise<void> {
 export function stopMaiaRating(): void {
   maiaRun++;
   maiaRating.value = false;
+}
+
+/** Sets level up (§5.118): the home re-counted, and Maia started again for a rating the positions lack. */
+export function setLevelUp(s: StormScopeData, l: LevelUp): void {
+  setStormPrefs({ levelUp: cleanLevelUp(l) });
+  void refreshHome(s);
+  if (maiaRating.value) stopMaiaRating();
+  if (!stormSession.value || stormSession.value.phase === 'done') void rateWithMaia(s);
 }
 
 /* ------------------------------------------------------------------ a set's look-ahead (§5.81) */
@@ -930,7 +945,7 @@ async function dealt(s: StormScopeData, focus: readonly Focus[], elo: number): P
   if (!data) return [];
   // Too easy (§5.105): left out whatever the focus.
   const all = storedInScope(await stormStore().positions(), s).filter(
-    (p) => !tooEasyAt(p.maia, elo, storedList(p), STORM) && matchesFocus(positionTags(p, storedList(p), elo, STORM), p.kind, focus),
+    (p) => !tooEasyAt(p.maia, elo, storedList(p), STORM) && matchesFocus(positionTags(p, storedList(p), elo, tagConfig()), p.kind, focus),
   );
   const items = all.map((p) => ({ ...p, deep: judges(p, STORM) }));
   const order = drawOrder(items, histories(data), Math.random, STORM.reachTop);

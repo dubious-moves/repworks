@@ -53,6 +53,8 @@ import {
   maiaRating,
   rateWithMaia,
   refreshShared,
+  setLevelUp,
+  tagConfig,
   type StormAnswer,
   type StormItem,
   type StormScopeData,
@@ -68,7 +70,7 @@ import { positionLineKey, positionLineLabel, storedList, type StoredPosition } f
 import { fenAfterUci, positionOf, uciToSan } from '../core/storm/walk.ts';
 import { themeLabel } from '../core/puzzles/dataset.ts';
 import { difficulty, difficultyWords, maiaLine } from '../core/storm/maia.ts';
-import { focusAbout, focusTitle, FOCUS_GROUPS, FOCUS_LABEL, positionTags, tagWords, type Focus } from '../core/storm/kinds.ts';
+import { focusAbout, focusTitle, FOCUS_GROUPS, FOCUS_LABEL, LEVEL_MAX, LEVEL_MIN, positionTags, tagWords, type Focus, type LevelUp } from '../core/storm/kinds.ts';
 import { maiaDialog, maiaElo, maiaState } from '../app/maia.ts';
 import { Board } from './Board.tsx';
 import { useWakeLock } from './Train.tsx';
@@ -112,7 +114,7 @@ function maiaWords(p: StoredPosition, elo: number): string {
 
 /** What a position is, once answered (§5.100): "Only move · Quiet · Punish". */
 function KindsNote(props: { p: StoredPosition; elo: number }) {
-  const words = tagWords(positionTags(props.p, storedList(props.p), props.elo, STORM));
+  const words = tagWords(positionTags(props.p, storedList(props.p), props.elo, tagConfig()));
   return words ? (
     <p class="muted storm-kinds" data-testid="storm-kinds">
       {words}
@@ -392,7 +394,7 @@ function Home(props: { scope: StormScopeData; where: StormWhere }) {
               </label>
             )}
             <label class="check">
-              <input type="checkbox" checked={prefs.maia} onChange={(e) => setStormPrefs({ maia: e.currentTarget.checked })} /> Maia rates the positions’ difficulty while this page is open (at {maiaElo.value} and from 1000 to 2600)
+              <input type="checkbox" checked={prefs.maia} onChange={(e) => setStormPrefs({ maia: e.currentTarget.checked })} /> Maia rates the positions’ difficulty while this page is open (at {maiaElo.value}, at level up’s {prefs.levelUp.from} and {prefs.levelUp.to}, and from 1000 to 2600)
             </label>
           </div>
         </details>
@@ -433,7 +435,7 @@ function FocusPicker(props: { scope: StormScopeData; home: NonNullable<typeof st
                   class={`chip-toggle${on ? ' on' : ''}`}
                   aria-pressed={on}
                   disabled={props.disabled || (!on && !home.tags[f])}
-                  title={focusAbout(f, home.elo, STORM)}
+                  title={focusAbout(f, home.elo, tagConfig())}
                   onClick={() => toggle(f)}
                 >
                   {FOCUS_LABEL[f]} <span class="storm-focus-n">{home.tags[f]}</span>
@@ -441,12 +443,13 @@ function FocusPicker(props: { scope: StormScopeData; home: NonNullable<typeof st
               );
             })}
           </div>
+          {g.id === 'maia' && <LevelUpPicker scope={props.scope} disabled={props.disabled} />}
         </div>
       ))}
       <p class="muted storm-focus-about">
         {focus.length ? (
           <>
-            {focus.map((f) => focusAbout(f, home.elo, STORM)).join(' ')}{' '}
+            {focus.map((f) => focusAbout(f, home.elo, tagConfig())).join(' ')}{' '}
             <button type="button" class="link" disabled={props.disabled} onClick={() => (setStormPrefs({ focus: [] }), void refreshHome(props.scope))}>
               Clear
             </button>
@@ -456,6 +459,32 @@ function FocusPicker(props: { scope: StormScopeData; home: NonNullable<typeof st
         )}
       </p>
     </details>
+  );
+}
+
+const LEVEL_ELOS = Array.from({ length: (LEVEL_MAX - LEVEL_MIN) / 100 + 1 }, (_, i) => LEVEL_MIN + i * 100);
+const LEVEL_RISES = [10, 15, 20, 25, 30, 35, 40, 50];
+
+/** Level up's ratings and gap (§5.118): Maia at the stronger rating against the weaker one. */
+function LevelUpPicker(props: { scope: StormScopeData; disabled: boolean }) {
+  const l = stormPrefs.value.levelUp;
+  const set = (patch: Partial<LevelUp>) => setLevelUp(props.scope, { ...l, ...patch });
+  const pick = (label: string, value: number, options: readonly number[], on: (v: number) => void, unit = '') => (
+    <select aria-label={label} value={value} disabled={props.disabled} onChange={(e) => on(Number(e.currentTarget.value))}>
+      {options.map((v) => (
+        <option key={v} value={v}>
+          {v}
+          {unit}
+        </option>
+      ))}
+    </select>
+  );
+  return (
+    <div class="muted storm-levelup" data-testid="storm-levelup">
+      Level up: Maia at {pick('Level up’s stronger rating', l.to, LEVEL_ELOS.filter((e) => e > l.from), (to) => set({ to }))} finds a good move{' '}
+      {pick('Level up’s gap', l.rise, LEVEL_RISES.includes(l.rise) ? LEVEL_RISES : [...LEVEL_RISES, l.rise].sort((a, b) => a - b), (rise) => set({ rise }))} points more often than at{' '}
+      {pick('Level up’s weaker rating', l.from, LEVEL_ELOS.filter((e) => e < l.to), (from) => set({ from }))}
+    </div>
   );
 }
 

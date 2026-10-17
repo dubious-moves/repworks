@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { STORM as C } from '../../../../src/core/storm/config.ts';
 import type { ScoredList, ScoredMove } from '../../../../src/core/storm/grade.ts';
 import { storedPosition } from '../../../../src/core/storm/harvest.ts';
-import { cleanFocus, easyAt, tooEasyAt, expectedLoss, focusTitle, goodMoves, matchesFocus, moveFacts, positionTags, tagWords, type Focus } from '../../../../src/core/storm/kinds.ts';
+import { cleanFocus, cleanLevelUp, easyAt, focusAbout, withLevelUp, tooEasyAt, expectedLoss, focusTitle, goodMoves, matchesFocus, moveFacts, positionTags, tagWords, type Focus } from '../../../../src/core/storm/kinds.ts';
 import type { MaiaRating } from '../../../../src/core/storm/maia.ts';
 import { candidate, fenAfterUci, kept, positionOf, sanToUci, specialKind, START_FEN, walkGame } from '../../../../src/core/storm/walk.ts';
 import { positionKey } from '../../../../src/core/chess/positionKey.ts';
@@ -70,6 +70,28 @@ test('the move’s tags: only move, quiet, retreat, pawn break, don’t take', (
   assert.ok(positionTags({ fen: RUY, kind: 'only' }, sf([{ uci: 'b5a4', score: 0 }, ...rest(-10)], 14), 1500, C).has('only'));
 });
 
+test('level up (§5.118): Maia at the stronger rating against the weaker, as set', () => {
+  const list = sf([{ uci: 'b5a4', score: 0 }, { uci: 'b5c6', score: -200 }, ...rest(-210)]);
+  const at = (elo: number, found: number) => rating(elo, [['b5a4', found], ['b5c6', Math.round((1 - found) * 100) / 100]]);
+  const tags = (maia: MaiaRating[], c = C) => positionTags({ fen: RUY, maia }, list, 2150, c).has('levelup');
+  // 1800 → 2200 by 25 points or more, whatever Maia does at the user's rating.
+  assert.equal(tags([at(1800, 0.4), at(2150, 0.9), at(2200, 0.65)]), true);
+  assert.equal(tags([at(1800, 0.4), at(2200, 0.6)]), false);
+  assert.equal(tags([at(1800, 0.7), at(2200, 0.95)]), true);
+  // A rating not rated yet, or a list that can't judge: not tagged.
+  assert.equal(tags([at(2200, 0.9)]), false);
+  assert.equal(positionTags({ fen: RUY, maia: [at(1800, 0.1), at(2200, 0.9)] }, sf([...list], 14), 2150, C).has('levelup'), false);
+  // Set on the home: other ratings, another gap.
+  const c = withLevelUp(C, { from: 1400, to: 2600, rise: 40 });
+  assert.equal(tags([at(1400, 0.2), at(1800, 0.2), at(2200, 0.9), at(2600, 0.55)], c), false);
+  assert.equal(tags([at(1400, 0.2), at(2600, 0.6)], c), true);
+  assert.equal(focusAbout('levelup', 2150, c), 'Maia at 2600 finds a good move at least 40 points more often than at 1400.');
+  // Read back: by 100 in Maia's range, the stronger above the weaker.
+  assert.deepEqual(cleanLevelUp(undefined), { from: 1800, to: 2200, rise: 25 });
+  assert.deepEqual(cleanLevelUp({ from: 2240, to: 1900, rise: 3 }), { from: 2200, to: 2300, rise: 5 });
+  assert.deepEqual(cleanLevelUp({ from: 400, to: 3000, rise: 'x' }), { from: 1000, to: 2600, rise: 25 });
+});
+
 test('Maia’s expected loss, and the tags hard for you: unintuitive, critical, level up, your level', () => {
   const list = sf([{ uci: 'b5a4', score: 0 }, { uci: 'b5c6', score: -200 }, ...rest(-210)]);
   const lost = expectedLoss(rating(1500, [['b5c6', 0.6], ['b5a4', 0.4]]), list, C)!;
@@ -82,14 +104,15 @@ test('Maia’s expected loss, and the tags hard for you: unintuitive, critical, 
     rating(1000, [['b5c6', 0.9], ['b5a4', 0.1]]),
     rating(1400, [['b5c6', 0.7], ['b5a4', 0.3]]),
     rating(1500, [['b5c6', 0.7], ['b5a4', 0.3]]),
-    rating(1800, [['b5a4', 0.8], ['b5c6', 0.2]]),
+    rating(1800, [['b5a4', 0.5], ['b5c6', 0.5]]),
+    rating(2200, [['b5a4', 0.8], ['b5c6', 0.2]]),
   ];
   const t = positionTags({ fen: RUY, maia }, list, 1500, C);
   for (const f of ['unintuitive', 'critical', 'levelup', 'level'] as Focus[]) assert.ok(t.has(f), f);
   // Maia at the user's rating finding it: none of them; easy.
   const finds = maia.map((r) => (r.elo === 1500 ? rating(1500, [['b5a4', 0.9], ['b5c6', 0.1]]) : r));
   const u = positionTags({ fen: RUY, maia: finds }, list, 1500, C);
-  for (const f of ['unintuitive', 'critical', 'levelup'] as Focus[]) assert.ok(!u.has(f), f);
+  for (const f of ['unintuitive', 'critical'] as Focus[]) assert.ok(!u.has(f), f);
   assert.equal(easyAt(finds, 1500, list, C), true);
   assert.equal(easyAt(maia, 1500, list, C), false);
   assert.equal(easyAt(undefined, 1500, list, C), false);

@@ -554,6 +554,10 @@ explorer's Eval column too far from the move (§5.67).
 - §5.117 (desktop): the home says "Maia at n finds a great move 95%…", and "n too easy" is fewer
   than before (232 on 2026-10-17's Whole repertoire); a card may now say "finds a good move 96%"
   where that good move isn't great.
+- §5.118 (desktop and phone): under Hard for you, "Level up: Maia at 2200 finds a good move 25
+  points more often than at 1800"; the Level up chip counts more positions than the old rule did.
+  Changing a rating to one off the ladder (1900, say): "Maia: n of n rated" drops and climbs back as
+  Maia rates them there; the count follows. Whether 25 points is a good default.
 
 ## Phase 5
 

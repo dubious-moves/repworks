@@ -114,7 +114,12 @@ export interface StormConfig {
   convertHiCp: number;
   /** Critical (§5.100): Maia's moves at the user's rating give up this much win% on average. */
   criticalWp: number;
-  /** Level up: stronger players find a good move this much more often than the user's rating. */
+  /**
+   * Level up (PLAN.md §5.118): Maia at `levelTo` finds a good move `levelRise` (a share) more often
+   * than at `levelFrom`. Defaults; the storm's home sets all three per device.
+   */
+  levelFrom: number;
+  levelTo: number;
   levelRise: number;
   /** At your level: a difficulty this far below to this far above the user's rating. */
   levelBelow: number;
@@ -202,7 +207,9 @@ export const STORM: StormConfig = {
   holdLoCp: -300,
   convertHiCp: 600,
   criticalWp: 8,
-  levelRise: 0.3,
+  levelFrom: 1800,
+  levelTo: 2200,
+  levelRise: 0.25,
   levelBelow: 100,
   levelAbove: 300,
   takeShare: 0.25,

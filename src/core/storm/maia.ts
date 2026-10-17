@@ -29,9 +29,9 @@ export function keptPolicy(elo: number, policy: readonly { uci: string; prob: nu
   return { elo, moves };
 }
 
-/** The ratings a position still wants: the ladder's and the user's, those it has left out. */
-export function missingRatings(have: readonly MaiaRating[] | undefined, userElo: number): number[] {
-  const want = MAIA_LADDER.includes(userElo) ? MAIA_LADDER : [...MAIA_LADDER, userElo];
+/** The ratings a position still wants: the ladder's, the user's and `extra` (level up's, §5.118), those it has left out. */
+export function missingRatings(have: readonly MaiaRating[] | undefined, userElo: number, extra: readonly number[] = []): number[] {
+  const want = [...new Set([...MAIA_LADDER, userElo, ...extra])];
   return want.filter((e) => !have?.some((r) => r.elo === e));
 }
 

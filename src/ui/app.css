@@ -3838,6 +3838,15 @@ a.button.primary {
   font-variant-numeric: tabular-nums;
 }
 
+.storm-levelup {
+  flex-basis: 100%;
+  font-size: 0.85rem;
+}
+
+.storm-levelup select {
+  margin: 0 2px;
+}
+
 .storm-focus-about {
   margin: 6px 0 0;
   font-size: 0.85rem;

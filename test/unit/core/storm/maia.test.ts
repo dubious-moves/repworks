@@ -102,6 +102,8 @@ test('a policy as kept, the ratings still wanted, and a deepened list keeping th
   assert.deepEqual(missingRatings(undefined, 1800), [...MAIA_LADDER]);
   assert.deepEqual(missingRatings(undefined, 2150), [...MAIA_LADDER, 2150]);
   assert.deepEqual(missingRatings([rating(1000, []), rating(2150, [])], 2150), [1400, 1800, 2200, 2600]);
+  // Level up's ratings (§5.118), once each.
+  assert.deepEqual(missingRatings([rating(1000, []), rating(2150, [])], 2150, [1900, 2200]), [1400, 1800, 2200, 2600, 1900]);
   const p = { card: 's|x', fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', scored: [{ u: 'e2e4', s: 0 }], src: 'cdb', depth: 0, maia: [rating(1800, [['e2e4', 1]])] } as unknown as StoredPosition;
   const d = deepenedPosition(p, sf(20), C)!;
   assert.deepEqual(d.maia, p.maia);

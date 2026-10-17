@@ -1680,3 +1680,10 @@ The technical calls, each with its reason:
 - **Too easy: Maia at the user's rating finds a great move (under 3% win given up) 95% of the time
   or more.** Was (§5.105): a great or good move (under 6%). Why: the owner's request, stricter, so
   fewer positions are left out. Easy (85%) and the card's share still count great and good.
+
+## Revision of 2026-10-17 (level up compares two Maia ratings, PLAN.md §5.118)
+- **Level up: Maia at a stronger rating finds a good move at least a gap more often than at a
+  weaker one, 1800 against 2200 by 25 points by default, all three set per device on the storm's
+  home; a rating off the ladder is asked of Maia besides.** Was (§5.100): less than half the time
+  at the user's rating and 30 points more at a ladder rating above it. Why: the owner's request; at
+  2150 the old rule left few positions.

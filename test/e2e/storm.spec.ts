@@ -791,7 +791,7 @@ const ladderLoss = (fen: string, uci: string) => {
 };
 
 test('Maia: got from the storm’s page, the kept positions rated, and an unintuitive storm of those whose likeliest move isn’t good', async ({ page }) => {
-  test.setTimeout(240_000);
+  test.setTimeout(360_000);
   // Maia's switch stays off: the storm asks it all the same once its files are here.
   await page.addInitScript(() => localStorage.setItem('repworks-maia', JSON.stringify({ on: false, rating: 1500 })));
   // Only a list Stockfish has deepened may judge a move (§5.84), so the deepening runs too.
@@ -820,6 +820,16 @@ test('Maia: got from the storm’s page, the kept positions rated, and an unintu
   const odd = kept.filter((p) => ladderLoss(p.fen, p.maia!.find((r) => r.elo === 1500)!.moves[0]![0]) >= 6);
   expect(odd.length).toBeGreaterThan(0);
   await expect(page.getByTestId('storm-spread')).toContainText(`${odd.length} unintuitive`);
+
+  // Level up (§5.118): its weaker rating set to one off the ladder, Maia rates the positions there too.
+  const level = page.getByTestId('storm-levelup');
+  await expect(page.getByRole('group', { name: 'Hard for you' }).getByRole('button', { name: /^Level up/ })).toHaveAttribute('title', 'Maia at 2200 finds a good move at least 25 points more often than at 1800.');
+  await level.getByLabel('Level up’s weaker rating').selectOption('1900');
+  await level.getByLabel('Level up’s gap').selectOption('10');
+  await expect(page.getByRole('group', { name: 'Hard for you' }).getByRole('button', { name: /^Level up/ })).toHaveAttribute('title', 'Maia at 2200 finds a good move at least 10 points more often than at 1900.');
+  await expect(count).toContainText(`Maia: ${ready} of ${ready} rated`, { timeout: 120_000 });
+  await expect.poll(async () => (await keptPositions(page)).every((x) => x.maia!.some((r) => r.elo === 1900)), { timeout: 120_000 }).toBe(true);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('repworks-storm')!).levelUp)).toEqual({ from: 1900, to: 2200, rise: 10 });
 
   // The Unintuitive focus (§5.100) deals those only; Maia's likeliest move played is not a good one.
   const chip = page.getByRole('group', { name: 'Hard for you' }).getByRole('button', { name: /^Unintuitive/ });

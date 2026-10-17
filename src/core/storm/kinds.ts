@@ -3,7 +3,8 @@
 // a stored position already keeps (its list, Maia's policies, the kind the gather gave it), so a
 // deepened list or a new rating re-tags it for free. Pure.
 //
-// - Hard for you (Maia at the user's rating): unintuitive (§5.82), critical, level up, your level.
+// - Hard for you (Maia at the user's rating): unintuitive (§5.82), critical, your level; and level
+//   up, Maia at a stronger rating against a weaker one, both set on the home (§5.118).
 // - The move: only move, quiet, retreat, pawn break, don't take. Read from the moves a list that
 //   may judge counts as good (great or good, as the storm counts found), and only when the list
 //   names them all (its last line isn't good).
@@ -13,9 +14,9 @@ import { pawnAttacks } from 'chessops/attacks';
 import { squareRank } from 'chessops/util';
 import type { Color } from 'chessops/types';
 import { parseUciMove } from '../chess/uci.ts';
-import type { StormConfig } from './config.ts';
+import { STORM, type StormConfig } from './config.ts';
 import { grade, wpLoss, type ScoredList } from './grade.ts';
-import { difficulty, foundShare, JUDGED_MIN, listJudges, MAIA_LADDER, unintuitive, type MaiaRating } from './maia.ts';
+import { difficulty, foundShare, JUDGED_MIN, listJudges, unintuitive, type MaiaRating } from './maia.ts';
 import { positionOf, type StoredKind } from './walk.ts';
 
 export type Focus = 'unintuitive' | 'critical' | 'levelup' | 'level' | 'only' | 'quiet' | 'retreat' | 'break' | 'notake' | 'punish' | 'hold' | 'convert';
@@ -53,7 +54,7 @@ export function focusAbout(f: Focus, elo: number, c: StormConfig): string {
     case 'critical':
       return `Players at ${elo} usually go wrong: Maia’s moves give up ${c.criticalWp}% or more on average.`;
     case 'levelup':
-      return `Stronger players find a good move much more often than players at ${elo}.`;
+      return `Maia at ${c.levelTo} finds a good move at least ${Math.round(c.levelRise * 100)} points more often than at ${c.levelFrom}.`;
     case 'level':
       return `Maia’s difficulty is from ${elo - c.levelBelow} to ${elo + c.levelAbove}.`;
     case 'only':
@@ -143,6 +144,40 @@ export function expectedLoss(r: MaiaRating, list: ScoredList, c: StormConfig): n
   return mass >= JUDGED_MIN ? sum / mass : null;
 }
 
+/** Level up's ratings and gap (§5.118), as the storm's home keeps them. */
+export interface LevelUp {
+  from: number;
+  to: number;
+  /** Points of the share (0–100). */
+  rise: number;
+}
+export const LEVEL_MIN = 1000;
+export const LEVEL_MAX = 2600;
+export const LEVEL_DEFAULT: LevelUp = { from: STORM.levelFrom, to: STORM.levelTo, rise: Math.round(STORM.levelRise * 100) };
+
+/** A stored level up as read back: ratings by 100 in Maia's range, the higher above the lower, a gap of 5–80. */
+export function cleanLevelUp(v: unknown): LevelUp {
+  const o = (v && typeof v === 'object' ? v : {}) as Partial<Record<keyof LevelUp, unknown>>;
+  const num = (x: unknown, d: number, lo: number, hi: number, step: number) => (typeof x === 'number' && Number.isFinite(x) ? Math.min(hi, Math.max(lo, Math.round(x / step) * step)) : d);
+  const from = num(o.from, LEVEL_DEFAULT.from, LEVEL_MIN, LEVEL_MAX - 100, 100);
+  const to = num(o.to, LEVEL_DEFAULT.to, LEVEL_MIN + 100, LEVEL_MAX, 100);
+  return { from, to: Math.max(to, from + 100), rise: num(o.rise, LEVEL_DEFAULT.rise, 5, 80, 5) };
+}
+
+/** The config with a level up folded in. */
+export const withLevelUp = (c: StormConfig, l: LevelUp): StormConfig => ({ ...c, levelFrom: l.from, levelTo: l.to, levelRise: l.rise / 100 });
+
+/** Level up (§5.118): both ratings judged, and Maia at `levelTo` finding a good move `levelRise` more often. */
+export function levelUp(ratings: readonly MaiaRating[] | undefined, list: ScoredList, c: StormConfig): boolean {
+  const at = (elo: number) => {
+    const r = ratings?.find((x) => x.elo === elo);
+    return r ? foundShare(r, list, c) : null;
+  };
+  const lo = at(c.levelFrom);
+  const hi = at(c.levelTo);
+  return lo !== null && hi !== null && hi - lo >= c.levelRise - 1e-9;
+}
+
 /** What a position's tags are worked out from. */
 export interface Taggable {
   fen: string;
@@ -173,16 +208,12 @@ export function positionTags(p: Taggable, list: ScoredList, elo: number, c: Stor
     }
   }
   const ratings = p.maia;
+  if (levelUp(ratings, list, c)) tags.add('levelup');
   const mine = ratings?.find((r) => r.elo === elo);
   if (ratings && mine && listJudges(list, c)) {
     if (unintuitive(ratings, elo, list, c)) tags.add('unintuitive');
     const loss = expectedLoss(mine, list, c);
     if (loss !== null && loss >= c.criticalWp) tags.add('critical');
-    const share = foundShare(mine, list, c);
-    if (share !== null && share < 0.5) {
-      const above = ratings.filter((r) => r.elo > elo && MAIA_LADDER.includes(r.elo)).map((r) => foundShare(r, list, c) ?? 0);
-      if (above.some((s) => s >= share + c.levelRise)) tags.add('levelup');
-    }
     const d = difficulty(ratings, list, c);
     if (d && !d.edge && d.elo >= elo - c.levelBelow && d.elo <= elo + c.levelAbove) tags.add('level');
   }
