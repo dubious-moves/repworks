@@ -551,6 +551,9 @@ explorer's Eval column too far from the move (§5.67).
   running until "n of n scored" before the next pass walks. On the home, with Maia's ratings in,
   "n too easy, left out" in the count; a storm deals none whose card says Maia at your rating finds
   a good move 95% or more.
+- §5.117 (desktop): the home says "Maia at n finds a great move 95%…", and "n too easy" is fewer
+  than before (232 on 2026-10-17's Whole repertoire); a card may now say "finds a good move 96%"
+  where that good move isn't great.
 
 ## Phase 5
 

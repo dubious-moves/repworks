@@ -6107,7 +6107,7 @@ Live: TESTING.md.
   position at the standard than more passes; focused, scoring keeps up.
 - **Too easy: never dealt** (`tooEasyShare` 0.95): a position where Maia at the user's rating
   finds a good move 95% of the time or more (the share `easyAt` measures, over the moves the list
-  can judge) is left out of every storm and set, whatever the focus; it stays stored, so a higher
+  can judge; a great move since §5.117) is left out of every storm and set, whatever the focus; it stays stored, so a higher
   rating can bring it back. 85–95% stays easy: dealt last in the classic storm (§5.100). Unrated
   positions are dealt. The home's count says how many were left out ("n too easy, left out").
   Why: the owner saw "Maia at 2150 finds a good move 100% of the time" on a card; such a position
@@ -6366,3 +6366,16 @@ keeping more positions is fine. Decided:
 Built in `chapterShare`, `behind` and `drawBalanced` (`src/core/storm/sources.ts`) and `gather`.
 Tests: `sources.test.ts` (the share per line, the chapter furthest behind first, a shared item,
 the old chapter behind once it has fewer positions per line).
+
+#### 5.117 Too easy counts great moves only (the owner's request, 2026-10-17)
+- **Too easy (§5.105) is Maia at the user's rating finding a great move 95% of the time or more**:
+  a move giving up under 3% win against the best (`tooEasyOn: ['great']`). Was: great or good
+  (under 6%), the same share as "easy" and the card's "finds a good move". Why: the owner's
+  request, stricter; a position where Maia mostly plays a good but not great move is dealt.
+- Unchanged: "easy" (85%, dealt last in the classic storm), the tags and the card's difficulty
+  words still count great and good. A move outside the list counts as not great when the list's
+  last line isn't great, and isn't judged otherwise, as before for good.
+
+Built in `foundShare` and `judgeMove` (`src/core/storm/maia.ts`, the bands that count passed in)
+and `tooEasyAt`. Tests: `maia.test.ts` (the share over great moves), `kinds.test.ts` (96% on a
+good move: easy, not too easy).

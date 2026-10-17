@@ -1675,3 +1675,8 @@ The technical calls, each with its reason:
   the index's order (studies by name, chapters in study order). Why: the owner's request to order
   chapters by their due lines, settled with them on recall instead: a session stopped early then
   leaves the safest moves for later. New and known lines keep the index's order.
+
+## Revision of 2026-10-17 (too easy counts great moves only, PLAN.md §5.117)
+- **Too easy: Maia at the user's rating finds a great move (under 3% win given up) 95% of the time
+  or more.** Was (§5.105): a great or good move (under 6%). Why: the owner's request, stricter, so
+  fewer positions are left out. Easy (85%) and the card's share still count great and good.

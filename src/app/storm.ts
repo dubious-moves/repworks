@@ -244,7 +244,7 @@ export interface StormHome {
   matching: number;
   /** Kept positions gathered on other devices (§5.102). */
   shared: number;
-  /** Ready positions too easy to deal (§5.105): Maia at the user's rating finds a good move almost always. */
+  /** Ready positions too easy to deal (§5.105): Maia at the user's rating finds a great move almost always. */
   tooEasy: number;
 }
 export const stormHome = signal<StormHome | undefined>(undefined);

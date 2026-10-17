@@ -52,6 +52,9 @@ test('Maia’s share of good moves: over the moves the list can judge, none when
   assert.equal(foundShare(rating(1500, [['a2a3', 0.3], ['e2e4', 0.35], ['d2d4', 0.35]]), top, C), 1);
   assert.equal(foundShare(rating(1500, [['a2a3', 0.5], ['e2e4', 0.5]]), top, C), null);
   assert.equal(foundShare(rating(1500, [['e2e4', 0.3], ['c2c4', 0.5], ['g1f3', 0.2]]), cdb(), C), null);
+  // Great moves only (§5.117): g1f3 (good) is not found; outside a list ending in a good move, not judged.
+  assert.equal(foundShare(rating(1500, [['e2e4', 0.3], ['d2d4', 0.3], ['g1f3', 0.4]]), sf(20), C, ['great']), 0.6);
+  assert.deepEqual(judgeMove(sf(20, MOVES.slice(0, 3)), 'a2a3', C, ['great']), { clean: false });
 });
 
 /** A ladder whose shares of good moves are `shares` (e2e4 good, c2c4 not). */

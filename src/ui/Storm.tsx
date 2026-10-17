@@ -240,7 +240,7 @@ function Home(props: { scope: StormScopeData; where: StormWhere }) {
               <>
                 <strong>{home.matching}</strong> position{home.matching === 1 ? '' : 's'} ready{focus.length ? ` for ${focusTitle(focus)}` : ''}
                 {home.done ? ` · ${home.done} done for now` : ''}
-                {home.tooEasy ? ` · ${home.tooEasy} too easy, left out (Maia at ${home.elo} finds a good move ${Math.round(STORM.tooEasyShare * 100)}% of the time or more)` : ''}
+                {home.tooEasy ? ` · ${home.tooEasy} too easy, left out (Maia at ${home.elo} finds a great move ${Math.round(STORM.tooEasyShare * 100)}% of the time or more)` : ''}
               </>
             ) : (
               '…'

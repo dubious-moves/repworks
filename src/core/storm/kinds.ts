@@ -205,15 +205,15 @@ export function matchesFocus(tags: ReadonlySet<Focus>, kind: StoredKind | undefi
 }
 
 /** Easy at `elo` (§5.100): Maia there finds a good move `easyShare` of the time; the classic storm deals these last. */
-export function easyAt(ratings: readonly MaiaRating[] | undefined, elo: number, list: ScoredList, c: StormConfig, at = c.easyShare): boolean {
+export function easyAt(ratings: readonly MaiaRating[] | undefined, elo: number, list: ScoredList, c: StormConfig, at = c.easyShare, on = c.storeDropOn): boolean {
   const mine = ratings?.find((r) => r.elo === elo);
-  const share = mine ? foundShare(mine, list, c) : null;
+  const share = mine ? foundShare(mine, list, c, on) : null;
   return share !== null && share >= at;
 }
 
-/** Too easy at `elo` (§5.105): Maia there finds a good move `tooEasyShare` of the time; never dealt. */
+/** Too easy at `elo` (§5.105, §5.117): Maia there finds a great move `tooEasyShare` of the time; never dealt. */
 export const tooEasyAt = (ratings: readonly MaiaRating[] | undefined, elo: number, list: ScoredList, c: StormConfig): boolean =>
-  easyAt(ratings, elo, list, c, c.tooEasyShare);
+  easyAt(ratings, elo, list, c, c.tooEasyShare, c.tooEasyOn);
 
 /** A position's tags in words, for a card once answered: "Only move · Quiet · Punish". */
 export function tagWords(tags: ReadonlySet<Focus>): string {

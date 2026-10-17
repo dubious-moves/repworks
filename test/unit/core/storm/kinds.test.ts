@@ -98,6 +98,12 @@ test('Maia’s expected loss, and the tags hard for you: unintuitive, critical, 
   const always = maia.map((r) => (r.elo === 1500 ? rating(1500, [['b5a4', 0.96], ['b5c6', 0.04]]) : r));
   assert.equal(tooEasyAt(always, 1500, list, C), true);
   assert.equal(easyAt(always, 1500, list, C), true);
+  // Too easy counts great moves only (§5.117): 96% on a good move, not a great one, is easy only.
+  const near = sf([{ uci: 'b5a4', score: 0 }, { uci: 'b5e2', score: -40 }, ...rest(-210)]);
+  const second = [rating(1500, [['b5e2', 0.96], ['b5a4', 0.04]])];
+  assert.equal(easyAt(second, 1500, near, C), true);
+  assert.equal(tooEasyAt(second, 1500, near, C), false);
+  assert.equal(tooEasyAt([rating(1500, [['b5a4', 0.96], ['b5e2', 0.04]])], 1500, near, C), true);
   // Unrated at the user's rating: nothing from Maia.
   assert.equal(positionTags({ fen: RUY, maia }, list, 1600, C).has('critical'), false);
 });

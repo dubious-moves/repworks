@@ -51,27 +51,28 @@ export interface MoveJudged {
  * A move judged by the position's list alone, a Stockfish list deep enough to judge (§5.84). A move
  * outside it is no better than its last line, so it is not clean when that line isn't.
  */
-export function judgeMove(list: ScoredList, uci: string, c: StormConfig): MoveJudged {
+export function judgeMove(list: ScoredList, uci: string, c: StormConfig, on: readonly Band[] = c.storeDropOn): MoveJudged {
   if (!listJudges(list, c)) return { clean: null };
   const best = list[0]!.score;
   const m = list.find((x) => x.uci === uci);
   if (m) {
     const band = grade(wpLoss(best, m.score, c), c);
-    return band === 'unknown' ? { clean: null } : { clean: c.storeDropOn.includes(band), band };
+    return band === 'unknown' ? { clean: null } : { clean: on.includes(band), band };
   }
   const last = grade(wpLoss(best, list[list.length - 1]!.score, c), c);
-  return { clean: last === 'unknown' || c.storeDropOn.includes(last) ? null : false };
+  return { clean: last === 'unknown' || on.includes(last) ? null : false };
 }
 
 /**
  * How often Maia at one rating plays a good move here: its likelihood on clean moves over its
- * likelihood on moves the list can judge. Null when too little of it can be judged.
+ * likelihood on moves the list can judge. Null when too little of it can be judged. `on`: the bands
+ * that count as found (too easy counts great moves only, §5.117).
  */
-export function foundShare(r: MaiaRating, list: ScoredList, c: StormConfig): number | null {
+export function foundShare(r: MaiaRating, list: ScoredList, c: StormConfig, on: readonly Band[] = c.storeDropOn): number | null {
   let clean = 0;
   let judged = 0;
   for (const [uci, p] of r.moves) {
-    const j = judgeMove(list, uci, c);
+    const j = judgeMove(list, uci, c, on);
     if (j.clean === null) continue;
     judged += p;
     if (j.clean) clean += p;
