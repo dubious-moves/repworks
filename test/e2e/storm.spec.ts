@@ -232,8 +232,8 @@ test('the storm: positions gathered, a great move and a mistake scored, the revi
   // 140 cp behind at +0.20, a mistake. Pause keeps it on the board until Next.
   await expect.poll(() => cardFen(page)).not.toBe(first);
   await expect(page.getByTestId('storm-verdict')).toContainText('Find a good move');
-  // The arrow was the last card's.
-  expect(await shapes(page)).toBe(0);
+  // The arrow was the last card's (chessground redraws its shapes a frame after the position).
+  await expect.poll(() => shapes(page)).toBe(0);
   lines.push(await cardLine(page));
   const second = await cardFen(page);
   const moves = ranked(second);
