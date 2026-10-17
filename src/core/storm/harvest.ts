@@ -12,9 +12,9 @@
 import type { Color } from 'chessops/types';
 import type { PositionKey } from '../chess/positionKey.ts';
 import type { ChessdbAnswer } from '../explorer/search.ts';
-import type { EngineLine } from '../engine/search.ts';
+import type { DepthScores, EngineLine } from '../engine/search.ts';
 import type { StormConfig } from './config.ts';
-import { moverCp, userEval, type ScoredList, type ScoredMove } from './grade.ts';
+import { moverCp, settledCp, userEval, type ScoredList, type ScoredMove } from './grade.ts';
 import { gamesFromPgn } from './games.ts';
 import type { Coverage, DecisionPoint, ExplorerReply, Frontier, LineRef } from './sources.ts';
 import { lineRefKey, lineTail, uncoveredMoves } from './sources.ts';
@@ -31,18 +31,23 @@ export function cdbList(a: ChessdbAnswer | null | undefined): ScoredList | null 
   return Object.assign(moves, { source: 'cdb' as const });
 }
 
-/** The engine's MultiPV lines as a scored list from the mover's side, best first. */
-export function engineList(lines: readonly EngineLine[], turn: Color, depth: number, c: StormConfig): ScoredList | null {
+/**
+ * The engine's MultiPV lines as a scored list from the mover's side, best first. Given the search's
+ * scores by depth (§5.120), each move scores the mean of its last two depths that every line has
+ * finished: lines stopped mid-iteration are compared at one depth, which is the list's depth.
+ */
+export function engineList(lines: readonly EngineLine[], turn: Color, depth: number, c: StormConfig, scores?: DepthScores): ScoredList | null {
+  const at = scores && lines.length ? Math.min(...lines.map((l) => l.depth)) : depth;
   const moves: ScoredMove[] = [];
   for (const l of lines) {
     const uci = l.pv[0];
-    const score = moverCp(l.score, turn, c);
+    const score = (uci && scores ? settledCp(scores.get(uci), at, turn, c) : null) ?? moverCp(l.score, turn, c);
     if (!uci || score === null) continue;
     moves.push({ uci, score });
   }
   if (!moves.length) return null;
   moves.sort((x, y) => y.score - x.score);
-  return Object.assign(moves, { source: 'sf' as const, depth });
+  return Object.assign(moves, { source: 'sf' as const, depth: Math.min(depth, at) });
 }
 
 export interface HarvestIo {

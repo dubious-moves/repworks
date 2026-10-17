@@ -12,8 +12,9 @@
 // - `points` multiplying a penalty → "the flat penalty" fails.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import type { Score } from '../../../../src/core/engine/uci.ts';
 import { STORM as C } from '../../../../src/core/storm/config.ts';
-import { engineLoss, grade, moveLoss, moverCp, nextStreak, points, userEval, winPct, wpLoss, type ScoredMove } from '../../../../src/core/storm/grade.ts';
+import { engineLoss, grade, moveLoss, moverCp, nextStreak, points, settledCp, settledValue, userEval, winPct, wpLoss, type ScoredMove } from '../../../../src/core/storm/grade.ts';
 
 test('the perspective flip: ChessDB’s mover score read for the repertoire by the side to move', () => {
   assert.equal(userEval(180, 'black', 'white'), -180);
@@ -152,4 +153,32 @@ test('the engine tier: both numbers from one evaluator, from the mover’s side'
   assert.equal(r.score, -120);
   assert.equal(r.loss, 80);
   assert.equal(engineLoss({ cp: 40 }, {} as never, 'black', C), null);
+});
+
+test('over two depths (§5.120): a move’s score the mean of its depth and the one before; a position’s value its best line’s with the best before', () => {
+  const e5 = new Map([[23, { cp: -60 }], [24, { cp: -21 }]]);
+  // Black's side: the mean of 60 and 21, rounded.
+  assert.equal(settledCp(e5, 24, 'black', C), 41);
+  assert.equal(settledCp(e5, 23, 'black', C), 60);
+  assert.equal(settledCp(e5, 25, 'black', C), null);
+  assert.equal(settledCp(undefined, 24, 'black', C), null);
+  assert.equal(settledCp(new Map([[23, { mate: -4 }], [24, { cp: -500 }]]), 24, 'black', C), 500);
+  // A position, White to move: its best at 20 averaged with White's best at 19, whichever move that
+  // was; a move getting mated at 19 is not the best.
+  const white = new Map<string, Map<number, Score>>([
+    ['e2e4', new Map([[19, { cp: 10 }], [20, { cp: 30 }]])],
+    ['d2d4', new Map([[19, { cp: 50 }]])],
+    ['g2g4', new Map([[19, { mate: -2 }]])],
+  ]);
+  assert.deepEqual(settledValue({ cp: 30 }, 20, white, 'white', C), { cp: 40 });
+  // Black to move: Black's best at 19 is the lowest for White; a mate there leaves the value as it is.
+  const black = new Map<string, Map<number, Score>>([
+    ['e7e5', new Map([[19, { cp: -10 }], [20, { cp: -30 }]])],
+    ['c7c5', new Map([[19, { cp: 20 }]])],
+  ]);
+  assert.deepEqual(settledValue({ cp: -30 }, 20, black, 'black', C), { cp: -20 });
+  black.set('d8h4', new Map([[19, { mate: -3 }]]));
+  assert.deepEqual(settledValue({ cp: -30 }, 20, black, 'black', C), { cp: -30 });
+  assert.deepEqual(settledValue({ mate: 2 }, 20, white, 'white', C), { mate: 2 });
+  assert.deepEqual(settledValue({ cp: 30 }, 20, new Map(), 'white', C), { cp: 30 });
 });

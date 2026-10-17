@@ -6416,3 +6416,58 @@ position then rated at 1900, the chip's words and the setting kept).
 Built in `nextLine` (`src/core/games/tactic.ts`), which serves the game cards' drill and the
 practice review's. Tests: `tactic.test.ts` (either first move solves the card; an opponent's other
 reply under the alternative chosen still asked).
+
+#### 5.120 A storm move graded over the search's last two depths (the owner's report, 2026-10-17)
+
+The owner reported two verdicts they judged wrong: 9...Nb4 an Inaccuracy (7.2%) where the analysis
+board had it best at depth 24, and 18...Bxh4 an Inaccuracy (6.7%) at −4.21 against 18...e4's −4.93
+(3.5% by those numbers: Good). Measured with the vendored Stockfish 19 lite run in Node, not on the
+owner's devices:
+- **Both verdicts are inside the engine's own wobble.** Nb4: the best move from depth 17 to 24 on
+  one thread; on four threads (the desktop storm's engine), the best in two runs of three and 2.2%
+  behind in the third. Bxh4: 3.2–8.0% behind e4 at depths 20–26 across MultiPV 12 and 3, a
+  head-to-head search and three repeated four-thread runs (6.1, 5.0 and 4.6% at depth 24), so on
+  either side of the 6% line.
+- **Over 51 middlegame positions** (the games fixture's distinct positions at plies 18, 24 and
+  30), MultiPV 12 to depth 22 on one thread: the best move changed between depth 21 and 22 in 8 of
+  them, 14% of the moves within 20% of the best changed band, and 17 of the 80 graded Inaccuracy
+  at 22 were Great or Good at 21.
+- **Against a deeper, independent reference** (each move and the best searched alone to depth 25)
+  over the 348 distinct moves the depth-22 list put between 1% and 15%: the list's band matched
+  74–78% of them. Each move's score averaged over depths 21 and 22 put 19–21 of them right for
+  7–9 it put wrong, under each of three references (depth 24, depth 25, the mean of 23–25); three
+  depths did about as well against two references and no better than one depth against the third,
+  four did worse against all three. A head-to-head search of the move against the best
+  (`go … searchmoves best move`), taken when the list said Inaccuracy or worse, turned wrong
+  Inaccuracies into wrong Goods without matching more bands, at a few seconds a miss, so it is not
+  built. MultiPV 12 showed no sizeable bias against its lower lines (the list's loss minus the
+  head-to-head's at the same depth: within half a point at the median).
+
+What changed:
+- **The engine's search keeps each root move's exact score at every depth** (`Analysis.scores`,
+  the last at each depth, by move rather than by line); bounds and a stopped search's lines are not
+  kept.
+- **A storm list scores each move as the mean of its last two depths that every line finished**
+  (`engineList` given the scores, `settledCp`): lines stopped mid-iteration (the look-ahead's search
+  kept on a move, a search that ran out of time) are compared at one depth, which is the list's
+  depth. A mate is never averaged; a move new to the list at the last depth keeps that depth's score.
+- **A position's value from the grade's searches** (one search after the move, or two) is its best
+  line's averaged with the best any move scored one depth before (`settledValue`).
+- Every list the storm makes goes this way: the walk's, the deepening's, the look-ahead's and the
+  grade's; Maia's tags and the focus read the same lists. Lists kept before stay as they are (a
+  position is scored again only to a greater depth), so the change reaches positions gathered or
+  deepened from now on. The stored format is unchanged (`scored[].s` holds the mean).
+- Unchanged: the bands (3, 6, 10 and 20% of win given up), Lichess's curve, the depths.
+
+Found, left to the owner (no change): the Bxh4 position is +4.6 to +4.9 for the user at depth 24,
+outside the classic storm's band (−1 to +2, `userLoCp`/`userHiCp`), which the gather checks only
+against its first, shallow list; a deepened list is never checked against it again.
+
+Tests: `search.test.ts` (scores by move and depth; bounds and a stopped search's lines left out),
+`harvest.test.ts` (the list over two depths: one depth for every line, a mate and a new move as
+they are; no scores, as before), `grade.test.ts` (`settledCp`, `settledValue` for either side),
+`storm.spec.ts` (desktop and phone: the fake engine gives the depth before the target with its
+second line 30 higher, and a deepened card grades that move "#2 of 12 · level with the best").
+Controls, each failing its test: bounds kept (`search.test.ts`); no averaging (`grade.test.ts`,
+`harvest.test.ts`); each line read at its own depth (`harvest.test.ts`); the deepening's list made
+without the scores (`storm.spec.ts`).

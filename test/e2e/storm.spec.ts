@@ -662,6 +662,24 @@ test('Stockfish’s standard: the kept positions searched with MultiPV 12 to dep
   expect(mine().filter((c) => c.startsWith('go ')).length).toBe(before);
 });
 
+test('a list over two depths (§5.120): each move scored the mean of the depth searched to and the one before', async ({ page }) => {
+  // The engine's second line scores 30 more at the depth before: 5 and 35 average to 20, level with
+  // the first line's 20, where the last depth alone puts it 15 behind.
+  const two = await serveSite({ engine: fakeEngine(undefined, {}, true, { 2: 30 }), engineLines: ladderLines });
+  try {
+    const w = await setUp(page, { deepen: true, site: two });
+    const ready = await gathered(page, w);
+    await expect(page.getByTestId('storm-deep')).toContainText(`${ready} of ${ready} scored`, { timeout: 30_000 });
+    await page.getByRole('button', { name: 'Start storm' }).click();
+    await expect(page.locator('.storm-card')).toBeVisible();
+    await play(page, ranked(await cardFen(page))[1]!);
+    // One look: a scored move's verdict stays only STORM.verdictFastMs before the next card.
+    await expect(page.getByTestId('storm-verdict')).toContainText(/Great move.*#2 of 12 · level with the best/);
+  } finally {
+    await two.close();
+  }
+});
+
 test('focused scoring: an engine a core but one, each searching a position of its own, then one engine for a session (§5.103)', async ({ page, isMobile }) => {
   const depth = isMobile ? 22 : 24;
   const start = site.requests.length;

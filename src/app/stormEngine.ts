@@ -5,7 +5,7 @@
 // the storm's screen is left (`endStormEngine`). Focused scoring (§5.103) runs several workers at
 // once, one position each: a lane per worker, the waiting positions dealt to the free ones.
 import { positionKeyOf } from '../core/chess/positionKey.ts';
-import { createSearch, type Analysis, type EngineLine, type Search } from '../core/engine/search.ts';
+import { createSearch, type Analysis, type DepthScores, type EngineLine, type Search } from '../core/engine/search.ts';
 import { positionOf } from '../core/storm/walk.ts';
 import { ensure } from '../platform/blobs.ts';
 import { startStockfish, stockfishFiles, type EngineProcess } from '../platform/stockfish.ts';
@@ -14,7 +14,12 @@ import { enginePrefs, runningThreads } from './engine.ts';
 export interface EngineAnswer {
   lines: EngineLine[];
   depth: number;
+  /** Each root move's exact score by depth (§5.120), copied when the answer is taken. */
+  scores: DepthScores;
 }
+
+/** A search's answer as it stands, its scores copied: the search keeps adding to its own. */
+const answerOf = (a: Analysis, depth = a.depth): EngineAnswer => ({ lines: a.lines, depth, scores: new Map([...a.scores].map(([uci, byDepth]) => [uci, new Map(byDepth)])) });
 
 interface Job {
   fen: string;
@@ -102,7 +107,7 @@ function crash(lane: Lane): void {
 
 function onUpdate(lane: Lane, a: Analysis): void {
   if (!lane.job || a.fen !== lane.job.fen) return;
-  if (a.done || a.noMove) finish(lane, { lines: a.lines, depth: a.depth });
+  if (a.done || a.noMove) finish(lane, answerOf(a));
 }
 
 function finish(lane: Lane, a: EngineAnswer | null): void {
@@ -132,7 +137,7 @@ async function next(): Promise<void> {
     if (lane.job !== job) return;
     const now = search.current();
     search.stop();
-    finish(lane, now && now.fen === job.fen && now.lines.length ? { lines: now.lines, depth: now.depth } : null);
+    finish(lane, now && now.fen === job.fen && now.lines.length ? answerOf(now) : null);
   }, job.movetime + 4000);
   search.analyse({ fen: job.fen, key: positionKeyOf(pos), turn: pos.turn, depth: job.depth, movetime: job.movetime, lines: job.lines, legal });
 }
@@ -145,7 +150,7 @@ export function stormSearchSoFar(fen: string): EngineAnswer | null {
   const lane = lanes.find((l) => l.job?.fen === fen);
   const now = lane?.search?.current();
   if (!now || now.fen !== fen || !now.lines.length) return null;
-  return { lines: now.lines, depth: Math.min(...now.lines.map((l) => l.depth)) };
+  return answerOf(now, Math.min(...now.lines.map((l) => l.depth)));
 }
 
 /** A worker's search as it stands (§5.104): what the deepening's progress shows. */

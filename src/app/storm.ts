@@ -8,7 +8,7 @@ import { positionKeyOf } from '../core/chess/positionKey.ts';
 import type { FromWorker, ToWorker } from '../core/explorer/service.ts';
 import type { DeviceEvent } from '../core/progress/replay.ts';
 import { STORM, withPlyRange, type Band, type StormConfig } from '../core/storm/config.ts';
-import { engineLoss, grade, moveLoss, moverCp, nextStreak, points, type ScoredList } from '../core/storm/grade.ts';
+import { engineLoss, grade, moveLoss, moverCp, nextStreak, points, settledValue, type ScoredList } from '../core/storm/grade.ts';
 import { cdbList, deepenedPosition, engineList, explorerUntil, harvestDecision, harvestFrontier, judges, needsDeepening, positionLineKey, storedList, storedPosition, type HarvestIo, type StoredPosition } from '../core/storm/harvest.ts';
 import { stormRecord, type StormRecord } from '../core/storm/record.ts';
 import { setHeld, setOutcome, type SetOutcome } from '../core/storm/set.ts';
@@ -156,7 +156,7 @@ function harvestIo(spent: Spent, tick: () => void, guard: <T>(p: Promise<T>) => 
       count('searches');
       const a = await guard(analyseForStorm(fen, lines, depth, 8000));
       const pos = positionOf(fen);
-      return a && pos ? engineList(a.lines, pos.turn, a.depth, STORM) : null;
+      return a && pos ? engineList(a.lines, pos.turn, a.depth, STORM, a.scores) : null;
     },
     rnd: Math.random,
   };
@@ -636,7 +636,7 @@ export async function deepen(s: StormScopeData, o: { gather?: boolean; untilMs?:
         const a = await analyseForStorm(p.fen, STORM.deepenMultipv, target, STORM.deepenMs);
         if (stopped()) return;
         const pos = positionOf(p.fen);
-        const d = pos && a ? deepenedPosition(p, engineList(a.lines, pos.turn, a.depth, STORM), STORM) : null;
+        const d = pos && a ? deepenedPosition(p, engineList(a.lines, pos.turn, a.depth, STORM, a.scores), STORM) : null;
         const done: DeepenDone = { card: p.card, label: positionLabel(p), depth: a?.depth ?? 0, target, ms: Date.now() - t0, result: !a ? 'no answer' : d ? 'kept' : notKept(p, a.depth, a.lines.length) };
         const st = deepenStats.value;
         st?.active.delete(p.fen);
@@ -766,7 +766,7 @@ async function lookAhead(): Promise<void> {
         return;
       }
       const pos = positionOf(p.fen);
-      const d = pos && a ? deepenedPosition(p, engineList(a.lines, pos.turn, a.depth, STORM), STORM) : null;
+      const d = pos && a ? deepenedPosition(p, engineList(a.lines, pos.turn, a.depth, STORM, a.scores), STORM) : null;
       if (d) {
         swapIn(d);
         await stormStore().updatePosition(d.card, (cur) => ({ ...cur, scored: d.scored, src: d.src, depth: d.depth }));
@@ -795,7 +795,7 @@ async function keepSearchSoFar(card: StoredPosition): Promise<StoredPosition> {
   if (!lookBusy || lookCard?.card !== card.card) return card;
   const a = stormSearchSoFar(card.fen);
   const pos = positionOf(card.fen);
-  const d = pos && a ? deepenedPosition(card, engineList(a.lines, pos.turn, a.depth, STORM), STORM) : null;
+  const d = pos && a ? deepenedPosition(card, engineList(a.lines, pos.turn, a.depth, STORM, a.scores), STORM) : null;
   if (!d) return card;
   swapIn(d);
   await stormStore().updatePosition(d.card, (cur) => ({ ...cur, scored: d.scored, src: d.src, depth: d.depth }));
@@ -1423,7 +1423,8 @@ async function engineScore(fen: string): Promise<{ score: Score; san: string; de
   const l = a?.lines[0];
   const pos = positionOf(fen);
   if (!a || !l || !pos) return null;
-  return { score: l.score, san: l.pv[0] ? uciToSan(pos, l.pv[0]) : '', depth: a.depth };
+  // The position's value over its last two depths, as a list's moves are (§5.120).
+  return { score: settledValue(l.score, l.depth, a.scores, pos.turn, STORM), san: l.pv[0] ? uciToSan(pos, l.pv[0]) : '', depth: a.depth };
 }
 
 /**

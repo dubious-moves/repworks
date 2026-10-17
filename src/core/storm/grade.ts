@@ -10,6 +10,7 @@
 // - Stockfish's scores here are from White's side (core/engine/uci.ts), the other way round, so
 //   `moverCp` turns them to the mover's.
 import type { Color } from 'chessops/types';
+import type { DepthScores } from '../engine/search.ts';
 import type { Score } from '../engine/uci.ts';
 import type { Band, StormConfig } from './config.ts';
 
@@ -90,6 +91,35 @@ export function moverCp(score: Partial<Score> | null | undefined, mover: Color, 
     return m > 0 ? c.engineMateCp - m : -c.engineMateCp - m;
   }
   return typeof score.cp === 'number' ? sign * score.cp : null;
+}
+
+/**
+ * A move's score for `mover` at `depth`, averaged with its score one depth before (§5.120): one
+ * depth's score swings between odd and even depths by more than a band is wide. Null when the
+ * search gave the move no exact score at `depth`; that depth's alone when there is none before it
+ * or either is a mate.
+ */
+export function settledCp(byDepth: ReadonlyMap<number, Score> | undefined, depth: number, mover: Color, c: StormConfig): number | null {
+  const now = byDepth?.get(depth);
+  const before = byDepth?.get(depth - 1);
+  const cp = moverCp(now, mover, c);
+  if (cp === null || !before || now!.mate !== undefined || before.mate !== undefined) return cp;
+  return Math.round((cp + moverCp(before, mover, c)!) / 2);
+}
+
+/**
+ * A position's value from a search, from White's side: its best line's score (at `depth`), averaged
+ * with the best any move scored one depth before (§5.120); as it is when either is a mate or the
+ * search kept no depth before it.
+ */
+export function settledValue(best: Score, depth: number, scores: DepthScores, turn: Color, c: StormConfig): Score {
+  if (best.mate !== undefined) return best;
+  let top: Score | undefined;
+  for (const byDepth of scores.values()) {
+    const s = byDepth.get(depth - 1);
+    if (s && (!top || moverCp(s, turn, c)! > moverCp(top, turn, c)!)) top = s;
+  }
+  return !top || top.mate !== undefined ? best : { cp: Math.round((best.cp + top.cp) / 2) };
 }
 
 /** How a move was graded: by the position's list, by the position after it, or by two searches. */

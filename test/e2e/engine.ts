@@ -1,7 +1,8 @@
 // A fake Stockfish for the browser tests (PLAN.md §5.31), served in place of the build's script
 // (serveSite's `engine`): it answers the handshake, then for each `go` gives the lines scripted
 // for its position (or, with `ask`, those serveSite's `engineLines` gives for it), a shallow depth
-// at once and the depth asked for (when it is from 21 to 30, else 20) after `SLOW` ms, then `bestmove`;
+// at once (with `before`, the depth before the target too) and the depth asked for (when it is from
+// 21 to 30, else 20) after `SLOW` ms, then `bestmove`;
 // `stop` ends a search at once. Every command it receives is requested from the site as
 // `__engine/<command>`, so a test reads them from the server's request log. Scores are the side
 // to move's, as the engine writes them.
@@ -29,12 +30,15 @@ export const SLOW = 400;
 
 /**
  * `slow`: how long a search takes to reach its depth, in ms; `extra`: more positions' lines; `ask`:
- * a position with none scripted asks the site for its lines (serveSite's `engineLines`).
+ * a position with none scripted asks the site for its lines (serveSite's `engineLines`); `before`:
+ * the depth before the one asked for is given too, each line's score shifted by its entry (by
+ * MultiPV, 0 when none), as a real engine's scores move between depths.
  */
-export function fakeEngine(slow = SLOW, extra: Record<string, [number, number, string][]> = {}, ask = false): string {
+export function fakeEngine(slow = SLOW, extra: Record<string, [number, number, string][]> = {}, ask = false, before?: Record<number, number>): string {
   return `
 const LINES = ${JSON.stringify({ ...LINES, ...extra })};
 const ASK = ${ask};
+const BEFORE = ${JSON.stringify(before ?? null)};
 const linesOf = (f) => {
   if (LINES[f] || !ASK) return;
   const x = new XMLHttpRequest();
@@ -53,9 +57,9 @@ const finish = () => {
   if (searching) postMessage('bestmove ' + ((LINES[fen] || [])[0] ? LINES[fen][0][2].split(' ')[0] : '(none)'));
   searching = false;
 };
-const emit = (depth) => {
+const emit = (depth, shift = {}) => {
   for (const [multipv, cp, pv] of LINES[fen] || []) {
-    postMessage('info depth ' + depth + ' seldepth ' + (depth + 3) + ' multipv ' + multipv + ' score cp ' + cp + ' nodes 1000 nps 650000 time 10 pv ' + pv);
+    postMessage('info depth ' + depth + ' seldepth ' + (depth + 3) + ' multipv ' + multipv + ' score cp ' + (cp + (shift[multipv] || 0)) + ' nodes 1000 nps 650000 time 10 pv ' + pv);
   }
 };
 onmessage = (e) => {
@@ -70,8 +74,10 @@ onmessage = (e) => {
   if (c.startsWith('go')) {
     searching = true;
     const asked = Number((/depth (\\d+)/.exec(c) || [])[1]);
+    const target = asked > 20 && asked <= 30 ? asked : 20;
     timers.push(setTimeout(() => emit(8), 20));
-    timers.push(setTimeout(() => emit(asked > 20 && asked <= 30 ? asked : 20), ${slow}));
+    if (BEFORE) timers.push(setTimeout(() => emit(target - 1, BEFORE), ${slow} / 2));
+    timers.push(setTimeout(() => emit(target), ${slow}));
     timers.push(setTimeout(finish, ${slow} + 20));
   }
   if (c === 'stop') finish();

@@ -4,6 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseChapterFile } from '../../../../src/core/pgn/parse.ts';
+import type { Score } from '../../../../src/core/engine/uci.ts';
 import { STORM as C } from '../../../../src/core/storm/config.ts';
 import type { ScoredList, ScoredMove } from '../../../../src/core/storm/grade.ts';
 import { cdbList, deepenedPosition, engineList, harvestDecision, harvestFrontier, judges, needsDeepening, positionLineKey, positionLineLabel, storedList, storedPosition, type HarvestIo } from '../../../../src/core/storm/harvest.ts';
@@ -129,6 +130,40 @@ test('lists: ChessDB’s unscored moves dropped and sorted; the engine’s lines
     ],
   );
   assert.deepEqual([e.source, e.depth], ['sf', 14]);
+});
+
+test('the engine’s list over two depths (§5.120): each move the mean of its last two finished depths, compared at one depth', () => {
+  // Black to move; the engine's scores from White's side, as the search keeps them.
+  const scores = new Map<string, Map<number, Score>>([
+    ['e7e5', new Map([[23, { cp: -60 }], [24, { cp: -20 }], [25, { cp: -10 }]])],
+    ['c7c5', new Map([[23, { cp: -50 }], [24, { cp: -50 }]])],
+    // Entered the list at 24: that depth alone.
+    ['g8f6', new Map([[24, { cp: 15 }]])],
+    // A mate is never averaged.
+    ['d8h4', new Map([[23, { cp: 900 }], [24, { mate: 3 }]])],
+  ]);
+  const lines = [
+    // Line 1 is into depth 25, the rest still at 24: all four are read at 24.
+    { multipv: 1, depth: 25, score: { cp: -10 }, pv: ['e7e5'] },
+    { multipv: 2, depth: 24, score: { cp: -50 }, pv: ['c7c5'] },
+    { multipv: 3, depth: 24, score: { cp: 15 }, pv: ['g8f6'] },
+    { multipv: 4, depth: 24, score: { mate: 3 }, pv: ['d8h4'] },
+  ];
+  const e = engineList(lines, 'black', 25, C, scores)!;
+  assert.deepEqual(
+    e.map((m) => [m.uci, m.score]),
+    [
+      ['c7c5', 50],
+      ['e7e5', 40],
+      ['g8f6', -15],
+      ['d8h4', -C.engineMateCp + 3],
+    ],
+  );
+  assert.equal(e.depth, 24);
+  // With no scores by depth, each line's own score (line 1's at 25), at the depth given.
+  const plain = engineList(lines, 'black', 25, C)!;
+  assert.deepEqual(plain.slice(0, 2).map((m) => [m.uci, m.score]), [['c7c5', 50], ['e7e5', 10]]);
+  assert.equal(plain.depth, 25);
 });
 
 test('a stored position keeps every scored move and comes back as the same list', async () => {

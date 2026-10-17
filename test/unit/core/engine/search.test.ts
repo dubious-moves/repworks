@@ -96,6 +96,32 @@ test('a line never goes back to a shallower depth; bounds are not shown', () => 
   assert.equal(w.last().done, false);
 });
 
+test('each root move’s exact score is kept by depth, the last at each; bounds and a stopped search’s lines are not', () => {
+  const w = world();
+  w.search.analyse(req(START));
+  w.info(17, 1, 30, 'e2e4 e7e5');
+  w.info(17, 2, 20, 'd2d4 d7d5');
+  w.info(18, 1, 40, 'e2e4 e7e5', ' lowerbound');
+  w.info(18, 1, 36, 'e2e4 c7c5');
+  // Line 2 not yet searched at 18: the engine prints it again at 17, as it was.
+  w.info(17, 2, 20, 'd2d4 d7d5');
+  w.info(18, 2, 24, 'd2d4 g8f6');
+  // The best changes at 19: the same depth for both moves, by move, not by line.
+  w.info(19, 1, 28, 'd2d4 g8f6');
+  w.info(19, 2, 26, 'e2e4 e7e5');
+  // Depth 20 begins with a fail high: no score yet.
+  w.info(20, 1, 60, 'e2e4 e7e5', ' lowerbound');
+  const s = w.last().scores;
+  assert.deepEqual([...s.get('e2e4')!].map(([d, sc]) => [d, sc.cp]), [[17, 30], [18, 36], [19, 26]]);
+  assert.deepEqual([...s.get('d2d4')!].map(([d, sc]) => [d, sc.cp]), [[17, 20], [18, 24], [19, 28]]);
+  w.search.analyse(req(E4));
+  w.info(20, 1, 50, 'e2e4 e7e5');
+  assert.equal(w.search.current()!.scores.size, 0);
+  w.search.receive('bestmove e2e4');
+  w.search.analyse(req(START));
+  assert.equal(w.last().scores.get('e2e4')!.get(20), undefined);
+});
+
 test('a position searched far enough answers from the cache with nothing sent', () => {
   const w = world();
   w.search.analyse(req(START));

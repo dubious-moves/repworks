@@ -46,11 +46,22 @@ export interface Analysis {
   done: boolean;
   /** The engine found no move: mate or stalemate on the board. */
   noMove: boolean;
+  /**
+   * Each root move's exact score at each depth the engine gave one (from White's side, the last
+   * at that depth): the storm averages a move over two depths (§5.120). The position's own map,
+   * read as it stands.
+   */
+  scores: ReadonlyMap<string, ReadonlyMap<number, Score>>;
 }
+
+/** Root moves' exact scores by depth. */
+export type DepthScores = Analysis['scores'];
+const NO_SCORES: DepthScores = new Map();
 
 interface Entry {
   fen: string;
   lines: Map<number, EngineLine>;
+  scores: Map<string, Map<number, Score>>;
   /** The longest search this position had, in milliseconds. */
   millis: number;
   noMove: boolean;
@@ -103,7 +114,7 @@ export function createSearch(o: SearchOptions): Search {
       cache.set(req.key, e);
       return e;
     }
-    e = { fen: req.fen, lines: new Map(), millis: 0, noMove: false };
+    e = { fen: req.fen, lines: new Map(), scores: new Map(), millis: 0, noMove: false };
     cache.set(req.key, e);
     if (cache.size > max) cache.delete(cache.keys().next().value!);
     return e;
@@ -132,6 +143,7 @@ export function createSearch(o: SearchOptions): Search {
       nps: running ? nps : undefined,
       done: !running && !!e && satisfies(e, req),
       noMove: !!e?.noMove,
+      scores: e?.scores ?? NO_SCORES,
     };
   };
 
@@ -213,6 +225,9 @@ export function createSearch(o: SearchOptions): Search {
       if (info.nps !== undefined) nps = info.nps;
       if (info.bound || !info.pv.length) return;
       const e = entryFor(active.req);
+      let byDepth = e.scores.get(info.pv[0]!);
+      if (!byDepth) e.scores.set(info.pv[0]!, (byDepth = new Map()));
+      byDepth.set(info.depth, info.score);
       const prev = e.lines.get(info.multipv);
       // Never a shallower line in place of a deeper one (a deeper search going over a warm hash).
       if (prev && prev.depth > info.depth) return;

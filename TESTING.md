@@ -5,6 +5,13 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## A storm move graded over two depths (§5.120)
+- On newly gathered or deepened positions (the change doesn't reach lists kept before), play sets
+  and storms as usual: verdicts near a band's edge should flip less. Report any that still look
+  wrong as before, with the analysis board beside it; the board shows one depth's score, the storm
+  the mean of two, so their numbers differ a little.
+- Nothing should be slower: the deepening's times in "Scoring" and the verdicts' waits as before.
+
 ## Gathering balanced across chapters (§5.116)
 - In a repertoire with many gathered positions, add a chapter (or pick one with few), then gather
   on "Whole repertoire": the first walks should name that chapter's lines, and other chapters

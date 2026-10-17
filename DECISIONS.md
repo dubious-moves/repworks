@@ -1693,3 +1693,11 @@ The technical calls, each with its reason:
   never asked once another is solved.** Was (§5.55, mistake-lab's rule): optional from the second
   move on, but every alternative first move asked in turn. Why: the owner's report; alternatives
   are there so either move is right, not to review them all.
+
+## Revision of 2026-10-17 (a storm move graded over two depths, PLAN.md §5.120)
+- **A storm list's move scores, and the grade's position values, are the mean of the search's last
+  two finished depths.** Was (§5.39, §5.84): the last depth's score alone. Why: the owner's report
+  of two verdicts they judged wrong; measured, one depth's score swings by more than a band is
+  wide, and the two-depth mean matched a deeper search more often (PLAN.md §5.120). The bands, the
+  curve and the depths are unchanged; the stored format too (`scored[].s` holds the mean), and lists
+  already kept are not scored again.
