@@ -28,6 +28,9 @@
 //   Again, no arrow). After a wrong move, `saveAlt` saves the last one as an alternative and
 //   takes it out of the ask's wrong moves, as if never played; `unsaveAlt` undoes that until the
 //   next move. Saving is the owner's choice about the position, recorded even with grading off.
+// - Misclicks (the owner's request, 2026-10-18): after a wrong move, `misclick` takes it out of the
+//   ask's wrong moves as `saveAlt` does, saving nothing: a slip of the hand, not a miss. Only until
+//   the move asked is played (its answer is recorded then).
 // - Show sequence (`sequence`, Chessable's way with new moves): at a new move, the line's next
 //   moves up to the n-th new own move (or a due one) are played for the user to watch, at twice
 //   the pace; the user steps within them (`seek`) and, when ready, replays them from their start,
@@ -152,6 +155,8 @@ export type Note =
   | { kind: 'alternative'; san: string }
   /** The last wrong move was saved as an alternative (§5.18). */
   | { kind: 'altSaved'; san: string }
+  /** The last wrong move was a misclick: taken out of the ask's wrong moves. */
+  | { kind: 'misclick'; san: string }
   | { kind: 'suspended'; san: string }
   /** At a walk's end: `count` moves missed on it are asked again, each until right `need` times in a row. */
   | { kind: 'retryMistakes'; count: number; need: number }
@@ -226,6 +231,8 @@ export type TrainerCommand =
   /** After a wrong move: save it as an alternative for the position (§5.18); and its undo. */
   | { type: 'saveAlt'; now: number }
   | { type: 'unsaveAlt'; now: number }
+  /** After a wrong move: it was a misclick, as if never played. */
+  | { type: 'misclick'; now: number }
   | { type: 'skipLine'; now: number }
   /** A line from the comments offered: in the walk's end quiz or not. */
   | { type: 'pickComment'; key: string; on: boolean }
@@ -579,6 +586,9 @@ export class Trainer {
         break;
       case 'unsaveAlt':
         this.unsaveAlt(out);
+        break;
+      case 'misclick':
+        this.misclick(out);
         break;
       case 'skipLine':
         if (this.phase === 'ready') break;
@@ -1376,17 +1386,31 @@ export class Trainer {
     if (!p || !w) return;
     const card = repertoireCard(positionKeyOf(this.plies[this.ply]!.before), w.uci);
     this.alternatives.add(card);
-    p.wrong = p.wrong.filter((m) => m !== w.uci);
-    delete p.lastWrong;
     p.saved = { ...w, shown: p.shown };
     out.push({ type: 'record', event: { k: 'alt', card, on: true } });
+    this.unwrong(p, w.uci, out);
+    out.push({ type: 'note', note: { kind: 'altSaved', san: w.san } });
+  }
+
+  /** The last wrong move was a misclick: out of the ask's wrong moves, nothing saved or recorded. */
+  private misclick(out: TrainerEffect[]) {
+    const p = this.pending;
+    const w = p?.lastWrong;
+    if (!p || !w) return;
+    this.unwrong(p, w.uci, out);
+    out.push({ type: 'note', note: { kind: 'misclick', san: w.san } });
+  }
+
+  /** Takes a wrong move out of the ask, as if it was never played. */
+  private unwrong(p: Pending, uci: string, out: TrainerEffect[]) {
+    p.wrong = p.wrong.filter((m) => m !== uci);
+    delete p.lastWrong;
     // Shown by that move alone (a second wrong move): asked again as if it was never played.
     if (p.shown && !p.hint && p.wrong.length < 2) {
       p.shown = false;
       out.push({ type: 'arrow' });
     }
     if (!p.shown) this.phase = p.wrong.length > 0 ? 'wrong' : 'ask';
-    out.push({ type: 'note', note: { kind: 'altSaved', san: w.san } });
   }
 
   /** Undoes the save: the move is a wrong move of this ask again, as it was. */

@@ -6545,3 +6545,25 @@ the stages, chapters weakest first, a move missed twice, the forecast day by day
 break; paused moves), `fsm.test.ts` (the address), `progress.spec.ts` (desktop and phone: opened
 from the training card, every section on the fixture with two misses added, the move pinned and
 opened in its chapter).
+
+#### 5.123 A misclick taken back (the owner's request, 2026-10-18)
+
+"Let's implement a way to counter misclicks (or missed drags), they happen regularly if you're
+trying to go fast. In case of a mistake, show a button that resets the mistake." Decided:
+- **Misclick**, shown after a wrong move while the move asked is still to be played (where *Save …
+  as alternative* shows, §5.18): the last wrong move is taken out of the ask's wrong moves, as if
+  never played. Nothing is recorded or saved: the move stays wrong the next time. Shown by that
+  move alone (a second wrong move), the arrow goes and the move is asked again; after a Hint, it
+  stays shown (the Hint still makes it Again). Right next, the move is Good, and not a mistake
+  retried at the walk's end.
+- **Where:** on a desktop, in the panel beside *Save … as alternative* ("Misclick: take e5 back"),
+  and by **Backspace**; on a phone, beside the note under the board ("Misclick"), since the
+  panel's buttons are below the fold there. The feedback row keeps its height (§5.7).
+- **Only until the move asked is played**: its answer is recorded then. A misclick followed at
+  once by the right move stays Again; taking an answer back after it is recorded is left for a
+  later request if wanted.
+- Lines from the comments (§5.98) keep their own wrong moves: not graded, so no Misclick there.
+
+Tests: `alternatives.test.ts` (nothing recorded, Good next, wrong again next time; after a second
+wrong move and after a Hint; not retried), `alternatives.spec.ts` (desktop and phone: the button,
+then Backspace, then right first time; still wrong in the Interactive view). Live: TESTING.md.

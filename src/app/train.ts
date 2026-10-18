@@ -457,7 +457,7 @@ export function readLine(ply: number | undefined): void {
 }
 
 /** A command from the screen, with the time now. */
-export function command(type: 'hint' | 'suspend' | 'skipLine' | 'stop' | 'next' | 'ready' | 'saveAlt' | 'unsaveAlt' | 'skipComment'): void {
+export function command(type: 'hint' | 'suspend' | 'skipLine' | 'stop' | 'next' | 'ready' | 'saveAlt' | 'unsaveAlt' | 'misclick' | 'skipComment'): void {
   send({ type, now: Date.now() });
 }
 /** A line from the comments met quizzed now, the walk resuming after it; without a key, at a line's end, the lines on (§5.98). */

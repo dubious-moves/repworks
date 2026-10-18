@@ -1993,6 +1993,15 @@ table.cards td {
 
 /* The training screen (PLAN.md §5.7): the board first, then the feedback and the actions. */
 
+/* The feedback's row is the note alone, but on a phone (below): there it holds Misclick too. */
+.train-feedback-row {
+  display: contents;
+}
+
+.train-misclick-near {
+  display: none;
+}
+
 .train-feedback {
   font-size: 1.1rem;
   font-weight: 600;
@@ -2034,6 +2043,25 @@ table.cards td {
     -webkit-line-clamp: 2;
     line-clamp: 2;
     overflow: hidden;
+  }
+
+  .train-session .train-feedback-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .train-session .train-feedback-row .train-feedback {
+    flex: 1;
+  }
+
+  .train-session .train-misclick-near {
+    display: inline-block;
+    flex: none;
+  }
+
+  .train-session .train-misclick-panel {
+    display: none;
   }
 
   .train-session .train-counters-row {

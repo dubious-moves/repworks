@@ -179,3 +179,57 @@ test('saving is recorded with grading off (a retry or the Interactive view): the
   t.send({ type: 'move', uci: 'b1c3', now: day.now + 1 });
   assert.deepEqual(records(t.send({ type: 'saveAlt', now: day.now + 2 })), [{ k: 'alt', card: card('e4 e5 Nc3'), on: true }]);
 });
+
+test('a misclick: the wrong move is taken out of `w` with nothing recorded or saved; Good when right next', () => {
+  const t = trainerWith();
+  atNf3(t);
+  t.send({ type: 'move', uci: 'b1c3', now: day.now + 1 });
+  assert.deepEqual(t.view.wrongMove, { uci: 'b1c3', san: 'Nc3' });
+  const out = t.send({ type: 'misclick', now: day.now + 2 });
+  assert.deepEqual(records(out), []);
+  assert.deepEqual(notes(out), [{ kind: 'misclick', san: 'Nc3' }]);
+  assert.equal(t.view.phase, 'ask');
+  assert.equal(t.view.wrongMove, undefined);
+  assert.equal(t.view.savedAlt, undefined, 'nothing to undo: nothing was saved');
+  assert.deepEqual(records(t.send({ type: 'misclick', now: day.now + 3 })), [], 'a second press does nothing');
+  const right = t.send({ type: 'move', uci: 'g1f3', now: day.now + 4 });
+  assert.deepEqual(records(right).map((r) => (r.k === 'review' ? [r.g, r.w] : r.k)), [[3, undefined]]);
+  // Not an alternative: wrong again next time.
+  const again = trainerWith();
+  atNf3(again);
+  assert.deepEqual(notes(again.send({ type: 'move', uci: 'b1c3', now: day.now + 5 })), [{ kind: 'wrong' }]);
+});
+
+test('a misclick after a second wrong move: the arrow goes, the first still counts; after a hint it stays shown', () => {
+  const t = trainerWith();
+  atNf3(t);
+  t.send({ type: 'move', uci: 'd2d4', now: day.now + 1 });
+  t.send({ type: 'move', uci: 'b1c3', now: day.now + 2 });
+  assert.equal(t.view.phase, 'shown');
+  const out = t.send({ type: 'misclick', now: day.now + 3 });
+  assert.deepEqual(out.find((e) => e.type === 'arrow'), { type: 'arrow' });
+  assert.equal(t.view.phase, 'wrong');
+  assert.equal(t.view.shown, undefined);
+  assert.equal(t.view.wrongMove, undefined, 'only the last wrong move can be taken back');
+  const right = t.send({ type: 'move', uci: 'g1f3', now: day.now + 4 });
+  assert.deepEqual(records(right).map((r) => (r.k === 'review' ? [r.g, r.w] : r.k)), [[1, ['d2d4']]]);
+
+  const hinted = trainerWith();
+  atNf3(hinted);
+  hinted.send({ type: 'hint', now: day.now + 1 });
+  hinted.send({ type: 'move', uci: 'b1c3', now: day.now + 2 });
+  hinted.send({ type: 'misclick', now: day.now + 3 });
+  assert.equal(hinted.view.phase, 'shown');
+  const after = hinted.send({ type: 'move', uci: 'g1f3', now: day.now + 4 });
+  assert.deepEqual(records(after).map((r) => (r.k === 'review' ? [r.g, r.w] : r.k)), [[1, undefined]]);
+});
+
+test('a misclick is not a mistake retried at the walk’s end', () => {
+  const t = new Trainer({ index: ix, plan, states, startOf: () => startPosition(chapter), paceMs: 600, record: true, alternatives: [], lineStart: 'first', retryMistakes: 2 });
+  atNf3(t);
+  t.send({ type: 'move', uci: 'b1c3', now: day.now + 1 });
+  t.send({ type: 'misclick', now: day.now + 2 });
+  const right = t.send({ type: 'move', uci: 'g1f3', now: day.now + 3 });
+  assert.ok(right.some((e) => e.type === 'answer' && e.ok));
+  assert.equal(t.view.retry, undefined);
+});

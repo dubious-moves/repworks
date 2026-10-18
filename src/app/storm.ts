@@ -459,7 +459,11 @@ export async function gather(s: StormScopeData, overnight = false): Promise<void
         show();
         // Focused (§5.105): every position scored before the next pass; else for as long as the pass took.
         await deepen(s, { gather: true, untilMs: stormPrefs.value.focused ? undefined : Date.now() + Math.max(STORM.deepenMs, Date.now() - passStart) });
-        if (stopGather) break;
+        // Stopped while scoring: the note was cleared for it.
+        if (stopGather) {
+          g.note = 'Stopped.';
+          break;
+        }
         await shareOwn(stormStore());
         const all = await stormStore().positions();
         spare = doneCards();

@@ -71,6 +71,8 @@ export function noteText(note: Note | undefined): string {
       return `${note.san}: a good alternative, but your repertoire plays something else: try again`;
     case 'altSaved':
       return `${note.san} saved as an alternative: try again`;
+    case 'misclick':
+      return `${note.san} taken back as a misclick: try again`;
     case 'suspended':
       return `${note.san} will always be played for you`;
     case 'retryMistakes':
@@ -185,6 +187,8 @@ export function TrainScreen(props: { of: SessionKind }) {
       // "1" switches a session to show and grade, as in Chessable (§5.16).
       else if (!showing && !e.repeat && e.key === '1') setSelfGrade(true);
       else if (!showing && e.key === ' ' && !(target && target.tagName === 'BUTTON')) command('hint');
+      // Backspace: the last wrong move was a misclick (nothing when there is none).
+      else if (!showing && e.key === 'Backspace') command('misclick');
       else return;
       e.preventDefault();
     };
@@ -490,9 +494,17 @@ function Session(props: { s: SessionView }) {
         )}
         <PreviewBar owner="train" />
         {/* One line, always its height, so the board never moves (§5.17). */}
+        <div class="train-feedback-row">
         <p class={`feedback train-feedback note-${holding ? 'next' : (s.note?.kind ?? 'none')}${s.note?.kind === 'aside' && s.note.important ? ' important' : ''}`} role="status">
           {s.done ? '' : holding ? `Line done${upcoming ? ` · Next: ${upcoming}` : ''}` : s.alts ? (s.alts.length ? `Alternatives: ${s.alts.map((m) => m.san).join(', ')}` : 'No alternatives saved here') : noteText(s.note)}
         </p>
+        {/* On a phone the panel's buttons are below the fold: a misclick is taken back beside the note. */}
+        {!s.done && s.wrongMove && !show && (
+          <button type="button" class="secondary train-misclick-near" onClick={() => command('misclick')} title={`A slip of the hand: ${s.wrongMove} isn’t counted as wrong`}>
+            Misclick
+          </button>
+        )}
+        </div>
       </div>
       <div class="train-panel">
         <div class="train-counters-row">
@@ -598,6 +610,11 @@ function Session(props: { s: SessionView }) {
           {show && waits && (
             <button type="button" onClick={() => command('next')}>
               {nextLabel}
+            </button>
+          )}
+          {s.wrongMove && !show && (
+            <button type="button" class="secondary train-misclick-panel" onClick={() => command('misclick')} title={`A slip of the hand: ${s.wrongMove} isn’t counted as wrong (Backspace)`}>
+              Misclick: take {s.wrongMove} back
             </button>
           )}
           {s.wrongMove && !show && (

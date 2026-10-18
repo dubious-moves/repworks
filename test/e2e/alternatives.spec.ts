@@ -1,7 +1,8 @@
 // Alternative moves (PLAN.md §5.18), on a desktop viewport and an emulated phone, with the fixture
 // repertoire of train.spec.ts (a Black Sicilian: 1... c5 due): a wrong move saved as an
 // alternative, then played again in the Interactive view and taken back for free; listed in the study's
-// card panel, and removed there; shown in blue by Space in show and grade (§5.114).
+// card panel, and removed there; shown in blue by Space in show and grade (§5.114). A misclick taken
+// back, by its button and by Backspace.
 import { test, expect, type Page } from '@playwright/test';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
 import { clickSquare, openMoveMenu } from './board.ts';
@@ -80,6 +81,38 @@ test('a wrong move saved as an alternative is free next time, and is listed and 
   await expect(page.locator('.cv-board .feedback')).toHaveText('e5 removed from the alternatives: it counts as a wrong move again');
   await openMoveMenu(page);
   await expect(page.getByRole('menuitem', { name: /^Remove alternative/ })).toHaveCount(0);
+});
+
+test('a misclick is taken back: not counted wrong, not saved as an alternative', async ({ page }) => {
+  const { github } = world();
+  await page.clock.install({ time: new Date('2026-12-01T10:00:00Z') });
+  await serveGithub(page, github);
+  await page.goto(`${site.url}#setup?repo=${encodeURIComponent(REPO)}&token=${TOKEN}&name=desktop`);
+  await expect(page.locator('.chip')).toHaveText(/^synced/);
+
+  // 1... c5 is asked: 1... e5 by the button, then 1... d5 by Backspace, are misclicks; c5 then is right first time.
+  await page.goto(`${site.url}${LINE}`);
+  await expect(phase(page)).toHaveAttribute('data-phase', 'ask');
+  await play(page, 'e7', 'e5');
+  await expect(feedback(page)).toHaveText('Not in your repertoire: try again');
+  // Beside the note on a phone (the panel's buttons are below the fold), in the panel on a desktop.
+  await page.getByRole('button', { name: test.info().project.name === 'phone' ? 'Misclick' : 'Misclick: take e5 back', exact: true }).click();
+  await expect(feedback(page)).toHaveText('e5 taken back as a misclick: try again');
+  await expect(page.getByRole('button', { name: /^Misclick/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^Undo: e5/ })).toHaveCount(0);
+  await play(page, 'd7', 'd5');
+  await expect(phase(page)).toHaveAttribute('data-phase', 'wrong');
+  await page.keyboard.press('Backspace');
+  await expect(feedback(page)).toHaveText('d5 taken back as a misclick: try again');
+  await expect(phase(page)).toHaveAttribute('data-phase', 'ask');
+  await play(page, 'c7', 'c5');
+  await expect(page.getByRole('button', { name: 'Pin this mistake' })).toHaveCount(0);
+
+  // e5 is no alternative: wrong again in the Interactive view.
+  await page.goto(`${site.url}#/play/Rep0Najd/Ch1Najdf?at=e4`);
+  await expect(phase(page)).toHaveAttribute('data-phase', 'ask');
+  await play(page, 'e7', 'e5');
+  await expect(feedback(page)).toHaveText('Not in your repertoire: try again');
 });
 
 test('an alternative is added from the study: the move played on the board is saved, and the chapter is not changed', async ({ page }) => {

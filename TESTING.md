@@ -5,6 +5,13 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## A misclick taken back (§5.123, 2026-10-18)
+- Train fast and slip: after a wrong move, "Misclick" (beside the note under the board on the
+  phone; "Misclick: take … back" in the panel, or Backspace, on a desktop) should take it back,
+  and the right move next should count as right first time. Is the button where your thumb is
+  when it happens? Does a misclick followed straight away by the right move (too fast to press
+  it) happen often enough that you'd want to take back an answer already recorded?
+
 ## The progress page (§5.122, 2026-10-18)
 - Open Progress from the training card (its line of links, before the mistakes). On your real
   history: does "right" sit near "the scheduler expected", and is the verdict believable? Are the
