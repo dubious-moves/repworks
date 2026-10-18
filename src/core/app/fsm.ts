@@ -31,6 +31,7 @@
 //   #/practice?fen=…[&side=black]       playing on from a position (§5.57), as the side given
 //                                       (the side to move when none)
 //   #/repertoire-check                  deviations, gaps and weak spots from the games (§5.58–§5.60)
+//   #/progress                          what the log says of the training: recall, chapters, misses, workload (§5.122)
 //   #/checklist/<sid>/<n>?preset=easy   a checklist line's drill at a difficulty (§5.62)
 //   #/migrate                           the migration from mistake-lab (§5.64)
 // A setup link (#setup?…) is read and removed before any of this (src/app/setup.ts).
@@ -87,6 +88,8 @@ export type Mode =
   | { name: 'history'; id: string }
   /** What the games say about the repertoire (§5.58–§5.60). */
   | { name: 'repCheck' }
+  /** What the log says of the training (§5.122). */
+  | { name: 'progress' }
   /** A study's checklist line `i` (as listed on this device), drilled at a preset (§5.62). */
   | { name: 'checklist'; sid: string; i: number; preset: 'easy' | 'medium' | 'hard' };
 
@@ -205,6 +208,7 @@ export function parseHash(hash: string): Mode {
   if (parts[0] === 'coverage' && parts.length === 2 && isId(parts[1])) return { name: 'coverage', sid: parts[1] };
   if (parts.length === 1 && parts[0] === 'migrate') return { name: 'migrate' };
   if (parts.length === 1 && parts[0] === 'repertoire-check') return { name: 'repCheck' };
+  if (parts.length === 1 && parts[0] === 'progress') return { name: 'progress' };
   if (parts[0] === 'checklist' && parts.length === 3 && isId(parts[1]) && /^\d{1,3}$/.test(parts[2]!)) {
     const preset = /(?:^|&)preset=(easy|medium|hard)(?:&|$)/.exec(query)?.[1] as 'easy' | 'medium' | 'hard' | undefined;
     return { name: 'checklist', sid: parts[1], i: Number(parts[2]), preset: preset ?? 'easy' };
@@ -311,6 +315,8 @@ export function modeHash(mode: Mode): string {
       return `#/games/history/${mode.id}`;
     case 'repCheck':
       return '#/repertoire-check';
+    case 'progress':
+      return '#/progress';
     case 'checklist':
       return `#/checklist/${mode.sid}/${mode.i}?preset=${mode.preset}`;
     case 'storm':

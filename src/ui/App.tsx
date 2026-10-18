@@ -24,6 +24,7 @@ import { SetupForm } from './Setup.tsx';
 import { SyncBanners, SyncChip } from './Sync.tsx';
 import { HomeLink } from './Back.tsx';
 import { MistakesView } from './Mistakes.tsx';
+import { ProgressView } from './Progress.tsx';
 import { ReadView } from './Read.tsx';
 import { TrainPick, TrainScreen } from './Train.tsx';
 import { TrainCard } from './TrainCard.tsx';
@@ -182,6 +183,8 @@ function Screen() {
       return <HistoryScreen id={mode.value.id} />;
     case 'repCheck':
       return <RepertoireCheckScreen />;
+    case 'progress':
+      return <ProgressView />;
     case 'checklist':
       return <ChecklistDrill key={`${mode.value.sid}/${mode.value.i}/${mode.value.preset}`} sid={mode.value.sid} i={mode.value.i} preset={mode.value.preset} />;
     case 'list':

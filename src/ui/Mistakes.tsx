@@ -17,7 +17,7 @@ import { Back } from './Back.tsx';
 const clock = (ms: number) => new Date(ms).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' });
 
 /** Where a card's move is played: its chapter, the moves up to it, and its position before. */
-function where(data: TrainData, card: CardId) {
+export function where(data: TrainData, card: CardId) {
   const at = cardLine(data.index, card)?.at;
   const chapter = at && data.chapters.get(`${at.sid}/${at.cid}`);
   if (!at || !chapter) return undefined;
@@ -26,7 +26,7 @@ function where(data: TrainData, card: CardId) {
   return { at, chapter, name: header(chapter, 'ChapterName') ?? chapter.id, moves: start ? numbered(start, at.path) : at.path.join(' '), before };
 }
 
-function PinButton(props: { data: TrainData; card: CardId }) {
+export function PinButton(props: { data: TrainData; card: CardId }) {
   const pinned = props.data.pins.get(props.card)?.pinned === true;
   return (
     <button

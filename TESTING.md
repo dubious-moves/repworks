@@ -5,6 +5,14 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## The progress page (§5.122, 2026-10-18)
+- Open Progress from the training card (its line of links, before the mistakes). On your real
+  history: does "right" sit near "the scheduler expected", and is the verdict believable? Are the
+  weakest chapters and the moves missed again and again the ones you'd name yourself? Does the
+  forecast's next few days match what the training card shows as each day comes?
+- Say what you'd want on it that isn't there, or what you never look at. Opening it on the phone
+  should feel instant; say if it doesn't.
+
 ## A line in the queue starting where it branches from the last (§5.121)
 - Training settings → In the day's queue → A line starts: "Where it branches from the last line".
   Then train a day with several due lines in one chapter: the chapter's first line starts at move 1;

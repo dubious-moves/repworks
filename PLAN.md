@@ -6503,3 +6503,45 @@ Tests: `trainer.test.ts` (the second line starts after the shared moves, with au
 skipped short of the split; the random repertoires under every line start);
 `timeTravel.test.ts` (the setting stored, refused for Learn); `autoplay.spec.ts` (the queue's
 three choices in the dialog, stored). Live: TESTING.md.
+
+#### 5.122 The progress page (the owner's choice, 2026-10-18)
+
+From the review of 2026-10-17 (proposal 3 of ten, the owner's pick to build first): nothing showed
+whether training works. The log holds it all, so a page reads it (`#/progress`, linked from the
+training card's line of links; `core/train/stats.ts`, `ui/Progress.tsx`). Nothing new is stored.
+- **Recall, last 30 days**: the share of reviews answered right beside the share FSRS expected:
+  each review's predicted recall (its retrievability at that moment, from the card's state
+  before) summed, so early reviews (§5.106: a line walked to its end grades moves not yet due)
+  count at their own higher prediction rather than against the 0.9 target. A move's first answer
+  (after teaching, or in a known chapter) has no prediction and is shown apart. A verdict line:
+  in line when the gap is within two standard errors of the expected share; "you remember more"
+  (intervals shorter than needed) or "less" otherwise; under 50 reviews, too few to judge. All
+  time, by predicted recall in four bands (under 70%, 70–85, 85–95, 95 and over): reviews,
+  expected, right. This is what fitting FSRS's weights to the owner's answers (proposal 5) would
+  start from.
+- **Moves**: mature (stability of 21 days or more, Anki's line), young, taught and not yet
+  reviewed, not started; suspended and paused-only moves counted apart.
+- **Reviews ahead**: the reviews due on each of the next 14 days, today taking the overdue ones,
+  each move answered right on its day and counted again if it comes back within the fortnight.
+  Misses and new moves are left out (said under the chart): the live forecast beside "New moves a
+  day" (proposal 4) is where those belong.
+- **Last 14 days**: minutes trained each day, from the gaps between answers and moves taught (a gap
+  over five minutes is a break), with the reviews and new moves. The time before a session's first
+  answer (its first auto-played moves) isn't counted.
+- **Chapters, weakest first**: each started chapter's mean predicted recall now over its reviewed
+  moves, its answers right in 30 days, moves started of all; eight shown, "Show all" for the rest.
+  A move played in two chapters counts in both.
+- **Missed again and again**: moves answered wrong twice or more in 30 days, the most misses
+  first (then the higher share, then the latest), each with its line, the move, the moves last
+  tried, Pin (§5.8) and Study; twenty shown.
+
+Measured (headless, not on the owner's devices): on the 293-move test repertoire with three weeks
+of simulated history the page opens in under 200 ms on an emulated Pixel 7; the counting alone
+takes 130–300 ms in Node for 2,535 moves and 30,000 reviews (it runs once per opening, and again
+only when the data changes).
+
+Tests: `stats.test.ts` (an answer's prediction, first answers and a forget; the window, the bands,
+the stages, chapters weakest first, a move missed twice, the forecast day by day, the minutes and a
+break; paused moves), `fsm.test.ts` (the address), `progress.spec.ts` (desktop and phone: opened
+from the training card, every section on the fixture with two misses added, the move pinned and
+opened in its chapter).
