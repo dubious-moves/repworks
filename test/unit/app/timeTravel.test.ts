@@ -78,6 +78,8 @@ test('the per-device settings: defaults, each field checked', () => {
   const stored = { newMoves: 'sequence', sequenceLength: 8, lineEnd: 'go', startQueue: 'start', startLearn: 'first', autoPlayQueue: 'session', autoPlayLearn: 'off', repetitions: 3, mistakeRetries: 0, comments: 'important' };
   assert.deepEqual(parsePrefs(JSON.stringify(stored)), stored);
   assert.deepEqual(parsePrefs(JSON.stringify({ autoPlayQueue: 'always', autoPlayLearn: 1, startQueue: 3, sequenceLength: 0, repetitions: 0, mistakeRetries: 1.5, comments: 'some' })), DEFAULT_PREFS);
+  // Where a line branches from the last: the queue's only (§5.121).
+  assert.deepEqual(parsePrefs(JSON.stringify({ startQueue: 'branch', startLearn: 'branch' })), { ...DEFAULT_PREFS, startQueue: 'branch' });
   // Lines from the comments quizzed in review by default (§5.98).
   assert.equal(DEFAULT_PREFS.comments, 'all');
   // Repetitions 2 and mistakes retried twice in a row by default (the owner's request, 2026-10-08).

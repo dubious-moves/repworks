@@ -14,8 +14,9 @@
 //   played for the user or asked, by the `autoPlay` mode (`plays`). Asked, a move reviewed before
 //   is graded the first time in the session, due or not (§5.106); a later ask isn't. Suspended
 //   moves are always played. Where a line starts (`lineStart`) decides only where the board starts:
-//   at the first move the plan needs (the moves before it skipped), or at the chapter's start, the
-//   mode deciding each move from there (the owner's request, 2026-10-16, §5.113).
+//   at the first move the plan needs (the moves before it skipped), at the chapter's start, or
+//   where it branches from the line walked before it (§5.121), the mode deciding each move from
+//   there (the owner's request, 2026-10-16, §5.113).
 // - Conflicting moves (D3): every own move of the position is accepted, and the one played is
 //   graded on its own card if it is due. The line's own move is then asked in the same position,
 //   on its own card, so a sibling can't stay due for ever. The trainer only lets the user move
@@ -88,9 +89,13 @@ export const AUTO_PLAYS: readonly AutoPlay[] = ['off', 'session', 'due', 'diffic
  *   is seen), or where the board already is when the line shares its moves;
  * - `start`: at the chapter's start, each own move played or asked as the auto-play mode says, on
  *   every pass. With `off`, every own move but a suspended one is asked.
+ * - `branch` (§5.121): as `start`, but from the position after the last move the line shares with
+ *   the line walked before it (as far as that walk went), in the same chapter; at the chapter's
+ *   start when there is none. Never past a move still to be asked or taught. Later passes start
+ *   there too.
  */
-export type LineStart = 'first' | 'start';
-export const LINE_STARTS: readonly LineStart[] = ['first', 'start'];
+export type LineStart = 'first' | 'start' | 'branch';
+export const LINE_STARTS: readonly LineStart[] = ['first', 'start', 'branch'];
 
 /**
  * Which lines from the comments are quizzed at a review walk's end: every one met, the important
@@ -400,6 +405,8 @@ export class Trainer {
   private ply = 0;
   /** Where the line's first move the plan needs is: the moves before it are its prefix. */
   private prefix = 0;
+  /** The ply the line's walk started at: its later passes start there too with `branch`. */
+  private lineFrom = 0;
   /** At a line's end: the next line found, and its moves. */
   private upcoming: { at: number; plies: Ply[]; positions: Position[] } | undefined;
   private pending: Pending | undefined;
@@ -704,6 +711,8 @@ export class Trainer {
     const lines = this.lines;
     const board = this.at >= 0 ? lines[this.at] : undefined;
     const boardPath = board ? board.line.path.slice(0, this.ply) : [];
+    // The moves the walk before went through, to where it went furthest (§5.121).
+    const walkedPath = board ? board.line.path.slice(0, this.reached) : [];
     this.at = found.at;
     const planned = lines[this.at]!;
     // A missed move's line walked again asks that move, though it was answered.
@@ -723,15 +732,33 @@ export class Trainer {
         shared++;
       }
     }
-    // §5.17: at the first move needed (one move before it, for the opponent's), or from the start. A planned start (drill's lead-in) comes first when further on.
-    let ply = start === undefined ? shared : start === 'first' ? Math.max(Math.min(shared, this.prefix), this.prefix - 1, 0) : 0;
+    // §5.17: at the first move needed (one move before it, for the opponent's), from the start, or
+    // where it branches (§5.121). A planned start (drill's lead-in) comes first when further on.
+    let ply = start === undefined ? shared : start === 'first' ? Math.max(Math.min(shared, this.prefix), this.prefix - 1, 0) : start === 'branch' ? this.branchPoint(board, walkedPath, planned) : 0;
     ply = Math.max(ply, Math.min(planned.from ?? 0, this.end));
     this.ply = ply;
+    this.lineFrom = ply;
     this.reached = ply;
     this.quiz = this.quizOf(planned);
     if (!this.redo.has(planned)) this.walked++;
     out.push({ type: 'line', line: planned.line, number: this.at + 1, total: lines.length, kind: planned.kind, path: planned.line.path.slice(0, this.ply) });
     this.advance(now, out);
+  }
+
+  /**
+   * Where a line starts with `branch` (§5.121): after the last move it shares with the walk before
+   * it in the same chapter, but never past a move still to be asked or taught (one move before it
+   * then, for the opponent's); else at its start.
+   */
+  private branchPoint(board: PlannedLine | undefined, walked: readonly string[], planned: PlannedLine): number {
+    if (!board || board.line.sid !== planned.line.sid || board.line.cid !== planned.line.cid) return 0;
+    let split = 0;
+    while (split < walked.length && split < this.end && walked[split] === planned.line.path[split]) split++;
+    for (let i = 0; i < split; i++) {
+      const card = this.plies[i]!.card;
+      if (card && (this.askAgain.has(card) || this.needs(card))) return Math.max(0, i - 1);
+    }
+    return split < this.end ? split : 0;
   }
 
   /** The line's moves as positions and UCI, as far as they are legal. */
@@ -925,7 +952,8 @@ export class Trainer {
 
   /**
    * The line's next pass, its moves taught asked: from where a line starts (§5.17), the first move
-   * taught taking the place of the first move needed, so the moves before it go as they went.
+   * taught taking the place of the first move needed, so the moves before it go as they went; with
+   * `branch`, from where its first pass started (§5.121).
    */
   private nextPass(now: number, out: TrainerEffect[]) {
     this.askAgain = new Set(this.taughtOnLine);
@@ -935,7 +963,7 @@ export class Trainer {
     const taught = this.plies.findIndex((p, i) => i < this.end && p.card !== undefined && this.askAgain.has(p.card));
     const first = taught >= 0 ? taught : this.prefixEnd(this.plies, this.end);
     this.prefix = start === undefined ? 0 : first;
-    this.ply = start === 'start' ? 0 : Math.max(0, first - 1);
+    this.ply = start === 'start' ? 0 : start === 'branch' ? this.lineFrom : Math.max(0, first - 1);
     out.push({ type: 'arrow' });
     out.push({ type: 'takeback', path: this.path() });
     this.advance(now, out);

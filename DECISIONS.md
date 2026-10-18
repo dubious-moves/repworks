@@ -1701,3 +1701,9 @@ The technical calls, each with its reason:
   wide, and the two-depth mean matched a deeper search more often (PLAN.md §5.120). The bands, the
   curve and the depths are unchanged; the stored format too (`scored[].s` holds the mean), and lists
   already kept are not scored again.
+
+## Revision of 2026-10-18 (a line in the queue starting where it branches, PLAN.md §5.121)
+- **D16: "A line starts" in the day's queue has a third choice, where the line branches from the
+  line walked before it** (from the start for a chapter's first line; later passes from the same
+  place). Learn and a line picked keep the two. Why: the owner's request; the queue's review lines
+  of a chapter follow each other in tree order, so the board need not go back to move 1.

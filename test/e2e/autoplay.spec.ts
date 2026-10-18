@@ -4,7 +4,8 @@
 // moves to the next line by itself, which starts auto-played from the chapter's start; the
 // feedback line never says "Your move" or "Correct"; a new move tried first; time travel bringing
 // a move just taught due, its review recorded at the real time, and "Back to now"; auto-play set
-// apart for the queue and for a line picked or learned (§5.113).
+// apart for the queue and for a line picked or learned (§5.113), and the queue's lines starting where
+// they branch from the last (§5.121).
 import { test, expect, type Page } from '@playwright/test';
 import type { FakeGit } from '../support/fakeGit.ts';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
@@ -185,9 +186,12 @@ test('auto-play set apart for the queue and for a line picked (§5.113): picked 
     await expect(d.locator('select[name="auto-play-queue"]')).toHaveValue('due');
     await expect(d.locator('select[name="auto-play-learn"]')).toHaveValue('off');
     await expect(d.locator('select[name="start-learn"] option')).toHaveText(['At its first new or due move', 'From the start']);
+    // Where a line branches from the last: the queue's only (§5.121).
+    await expect(d.locator('select[name="start-queue"] option')).toHaveText(['At its first new or due move', 'From the start', 'Where it branches from the last line']);
     await d.locator('select[name="auto-play-learn"]').selectOption('session');
+    await d.locator('select[name="start-queue"]').selectOption('branch');
   });
-  expect(JSON.parse((await page.evaluate(() => localStorage.getItem('repworks.trainPrefs')))!)).toMatchObject({ autoPlayQueue: 'due', autoPlayLearn: 'session', startLearn: 'start' });
+  expect(JSON.parse((await page.evaluate(() => localStorage.getItem('repworks.trainPrefs')))!)).toMatchObject({ autoPlayQueue: 'due', autoPlayLearn: 'session', startLearn: 'start', startQueue: 'branch' });
   // 1... c5 reviewed in the queue, so not due any more.
   await page.goto(`${site.url}#/train`);
   await expect(phase(page)).toHaveAttribute('data-phase', 'ask');

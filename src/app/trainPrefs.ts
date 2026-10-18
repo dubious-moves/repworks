@@ -12,9 +12,9 @@ export interface TrainPrefs {
   sequenceLength: number;
   /** At a line's end (a line picked, Learn): wait for "Next line", or go on by itself. */
   lineEnd: 'wait' | 'go';
-  /** Where a line starts in the day's queue, and in a line picked or learned. */
+  /** Where a line starts in the day's queue, and in a line picked or learned (`branch` only in the queue, §5.121). */
   startQueue: LineStart;
-  startLearn: LineStart;
+  startLearn: LearnStart;
   /** Auto-play in the day's queue (and show and grade), and in a line picked or learned (§5.113). */
   autoPlayQueue: AutoPlay;
   autoPlayLearn: AutoPlay;
@@ -25,6 +25,10 @@ export interface TrainPrefs {
   /** In review, the lines from the comments quizzed at a line's end (the owner's request, 2026-10-12). */
   comments: CommentQuiz;
 }
+
+/** Where a line picked or learned can start: where it branches is only for the day's queue (§5.121). */
+export type LearnStart = Exclude<LineStart, 'branch'>;
+const LEARN_STARTS: readonly LearnStart[] = ['first', 'start'];
 
 export const DEFAULT_PREFS: TrainPrefs = { newMoves: 'show', sequenceLength: 5, lineEnd: 'wait', startQueue: 'first', startLearn: 'start', autoPlayQueue: 'due', autoPlayLearn: 'off', repetitions: 2, mistakeRetries: 2, comments: 'all' };
 
@@ -44,14 +48,14 @@ export function parsePrefs(raw: string | null): TrainPrefs {
     // The defaults.
   }
   const pick = <T extends string>(value: unknown, allowed: readonly T[], fallback: T): T => (allowed.includes(value as T) ? (value as T) : fallback);
-  const start = (value: unknown, fallback: LineStart): LineStart => (value === 'auto' || value === 'ask' ? 'start' : pick(value, LINE_STARTS, fallback));
+  const start = <T extends LineStart>(value: unknown, fallback: T, allowed: readonly T[]): T => (value === 'auto' || value === 'ask' ? ('start' as T) : pick(value, allowed, fallback));
   const whole = (value: unknown, min: number, max: number, fallback: number) => (Number.isInteger(value) && (value as number) >= min && (value as number) <= max ? (value as number) : fallback);
   return {
     newMoves: pick(v.newMoves, ['show', 'try', 'sequence'], DEFAULT_PREFS.newMoves),
     sequenceLength: whole(v.sequenceLength, 1, 50, DEFAULT_PREFS.sequenceLength),
     lineEnd: pick(v.lineEnd, ['wait', 'go'], DEFAULT_PREFS.lineEnd),
-    startQueue: start(v.startQueue, DEFAULT_PREFS.startQueue),
-    startLearn: start(v.startLearn, DEFAULT_PREFS.startLearn),
+    startQueue: start(v.startQueue, DEFAULT_PREFS.startQueue, LINE_STARTS),
+    startLearn: start(v.startLearn, DEFAULT_PREFS.startLearn, LEARN_STARTS),
     autoPlayQueue: v.startQueue === 'ask' ? 'off' : pick(v.autoPlayQueue ?? v.autoPlay, AUTO_PLAYS, DEFAULT_PREFS.autoPlayQueue),
     autoPlayLearn: v.startLearn === 'ask' ? 'off' : pick(v.autoPlayLearn ?? v.autoPlay, AUTO_PLAYS, DEFAULT_PREFS.autoPlayLearn),
     repetitions: whole(v.repetitions, 1, 5, DEFAULT_PREFS.repetitions),

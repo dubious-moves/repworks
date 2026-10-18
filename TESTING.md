@@ -5,6 +5,16 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## A line in the queue starting where it branches from the last (§5.121)
+- Training settings → In the day's queue → A line starts: "Where it branches from the last line".
+  Then train a day with several due lines in one chapter: the chapter's first line starts at move 1;
+  each next one starts after the last move it shares with the line before (the board doesn't jump
+  back to move 1), and the moves from there are played or asked as Auto-play says. A line of
+  another chapter starts at move 1.
+- With Repetitions on and a new move on such a line, the second pass starts at the same place.
+- Say whether starting right after the shared move (no replay of the move before it) reads well,
+  or whether you'd rather see one move earlier.
+
 ## The buttons stay put on the phone (§5.7, 2026-10-17)
 - On the phone, train a line and miss a move: through "Not in your repertoire", the line's end
   ("Your mistake again: each right 2 times in a row", "mistakes left 1") and the retry, Hint and

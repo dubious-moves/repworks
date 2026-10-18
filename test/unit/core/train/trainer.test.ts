@@ -639,6 +639,66 @@ test('show sequence: a due move ends the sequence before it, so it is not given 
   });
 }
 
+// ---- A line starting where it branches from the last (the owner's request, 2026-10-18, §5.121) ----
+
+{
+  // Two lines branching after 1... e5: 2. Nf3 Nc6 3. Bb5, and 2. Bc4 Nf6 3. d3. Bb5 and d3 due.
+  const w = world(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 (2. Bc4 Nf6 3. d3) 2... Nc6 3. Bb5'));
+  const states = new Map<string, CardState>([
+    [card('e4'), notDue],
+    [card('e4 e5 Nf3'), notDue],
+    [card('e4 e5 Nf3 Nc6 Bb5'), dueNow],
+    [card('e4 e5 Bc4'), notDue],
+    [card('e4 e5 Bc4 Nf6 d3'), dueNow],
+  ]);
+  const linePaths = (effects: TrainerEffect[]) => effects.flatMap((e) => (e.type === 'line' ? [e.path] : []));
+
+  test('where it branches: the chapter\'s first line from the start, the next from the last move the two share, the mode deciding each move', () => {
+    const { effects, records } = run(trainer(w, planOf(w, states), states, { lineStart: 'branch' }), right);
+    assert.deepEqual(linePaths(effects), [[], ['e4', 'e5']]);
+    assert.deepEqual(plays(effects), ['auto:e4', 'opponent:e5', 'auto:Nf3', 'opponent:Nc6', 'user:Bb5', 'auto:Bc4', 'opponent:Nf6', 'user:d3']);
+    assert.deepEqual(records.map((r) => r.card), [card('e4 e5 Nf3 Nc6 Bb5'), card('e4 e5 Bc4 Nf6 d3')]);
+    // With auto-play off, the moves from where it branches are asked.
+    const off = run(trainer(w, planOf(w, states), states, { lineStart: 'branch', autoPlay: 'off' }), right);
+    assert.deepEqual(plays(off.effects).slice(5), ['user:Bc4', 'opponent:Nf6', 'user:d3']);
+    // At its first due move, the second line skips 2. Bc4 (one move before d3).
+    const first = run(trainer(w, planOf(w, states), states, { lineStart: 'first' }), right);
+    assert.deepEqual(linePaths(first.effects)[1], ['e4', 'e5', 'Bc4']);
+  });
+
+  test('where it branches: a line of another chapter starts from its start', () => {
+    const w2 = world(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3'), chapter('Chapter2', 'white', '1. e4 c5 2. Nf3'));
+    const s = new Map<string, CardState>([[card('e4'), notDue], [card('e4 e5 Nf3'), dueNow], [card('e4 c5 Nf3'), dueNow]]);
+    const { effects } = run(trainer(w2, planOf(w2, s), s, { lineStart: 'branch' }), right);
+    assert.deepEqual(linePaths(effects), [[], []]);
+    assert.deepEqual(plays(effects), ['auto:e4', 'opponent:e5', 'user:Nf3', 'auto:e4', 'opponent:c5', 'user:Nf3']);
+  });
+
+  test('where it branches: a later pass starts where the first did', () => {
+    // 3. d3 never answered: taught, then asked on the second pass.
+    const s = new Map(states);
+    s.delete(card('e4 e5 Bc4 Nf6 d3'));
+    const { effects } = run(trainer(w, planOf(w, s, 20), s, { lineStart: 'branch', repetitions: 2 }), right);
+    assert.deepEqual(effects.find((e) => e.type === 'takeback'), { type: 'takeback', path: ['e4', 'e5'] });
+    assert.deepEqual(plays(effects).slice(5), ['auto:Bc4', 'opponent:Nf6', 'user:d3', 'auto:Bc4', 'opponent:Nf6', 'user:d3']);
+  });
+
+  test('where it branches: only as far as the last walk went, so a line skipped short of the split shares less', () => {
+    // The first line skipped at 2. Nf3 (due): the next shares only 1. e4 e5 with what was walked.
+    const w3 = world(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 Nc6 3. Bb5 (3. Bc4)'));
+    const s = new Map<string, CardState>([[card('e4'), notDue], [card('e4 e5 Nf3'), dueNow], [card('e4 e5 Nf3 Nc6 Bb5'), dueNow], [card('e4 e5 Nf3 Nc6 Bc4'), dueNow]]);
+    let skipped = false;
+    const { effects } = run(trainer(w3, planOf(w3, s), s, { lineStart: 'branch' }), (view, n) => {
+      if (skipped) return right(view, n);
+      skipped = true;
+      return { type: 'skipLine', now: 0 };
+    });
+    assert.deepEqual(linePaths(effects), [[], ['e4', 'e5']]);
+    // 2. Nf3, never answered in the session, is asked on the next line.
+    assert.deepEqual(plays(effects), ['auto:e4', 'opponent:e5', 'user:Nf3', 'opponent:Nc6', 'user:Bc4']);
+  });
+}
+
 test('a line\'s end held: no timer, the next line named, and `next` goes on; the last line ends the session at once', () => {
   const w = world(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 (2. Nc3) *'));
   const plan = planOf(w, new Map(), 20);
@@ -698,7 +758,7 @@ test('random repertoires under every auto-play mode, line start, repetitions and
     const plan = planOf(w, states, Math.floor(random() * 12));
     const options: TrainerOptions = {
       autoPlay: AUTO_PLAYS[seed % 4]!,
-      lineStart: LINE_STARTS[Math.floor(seed / 4) % 2]!,
+      lineStart: LINE_STARTS[Math.floor(seed / 4) % LINE_STARTS.length]!,
       tryNew: random() < 0.5,
       sequence: random() < 0.3 ? 1 + Math.floor(random() * 5) : 0,
       holdLineEnd: random() < 0.5,

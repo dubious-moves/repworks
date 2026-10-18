@@ -11,12 +11,14 @@ import { mode } from '../app/mode.ts';
 import { queueOf, trainData } from '../app/train.ts';
 import { saveTrainSettings } from '../app/trainSettings.ts';
 import { configureSession } from '../app/train.ts';
-import { saveTrainPrefs, trainPrefs, type TrainPrefs } from '../app/trainPrefs.ts';
+import { saveTrainPrefs, trainPrefs, type LearnStart, type TrainPrefs } from '../app/trainPrefs.ts';
 import { DEFAULT_TRAIN } from '../core/train/settings.ts';
 import type { AutoPlay, CommentQuiz, LineStart } from '../core/train/trainer.ts';
 import { TimeControl } from './TimeTravel.tsx';
 
-const STARTS: Record<LineStart, string> = { first: 'At its first new or due move', start: 'From the start' };
+const STARTS: Record<LearnStart, string> = { first: 'At its first new or due move', start: 'From the start' };
+// Where a line branches from the last one: only the day's queue walks a chapter's lines in turn (§5.121).
+const QUEUE_STARTS: Record<LineStart, string> = { ...STARTS, branch: 'Where it branches from the last line' };
 const AUTO: Record<AutoPlay, string> = {
   due: 'Moves not due, and moves answered this session',
   session: 'Moves answered right this session',
@@ -118,11 +120,11 @@ function Dialog() {
           Mistakes retried <span class="muted">(asked again when the line ends, until right this many times in a row, 0–5; 0: not)</span>
           <input type="number" name="mistake-retries" min={0} max={5} step={1} inputMode="numeric" value={retries} onInput={(e) => setRetries(e.currentTarget.value)} />
         </label>
-        <p class="muted">Auto-play: moves played for you; the others are asked, a move due or new whatever it says. With “answered right”, a move’s latest answer this session counts. Moves set to “always play this for me” are always played. A line starting from the start is played or asked from move 1 as auto-play says; at its first new or due move, the moves before it are skipped.</p>
+        <p class="muted">Auto-play: moves played for you; the others are asked, a move due or new whatever it says. With “answered right”, a move’s latest answer this session counts. Moves set to “always play this for me” are always played. A line starting from the start is played or asked from move 1 as auto-play says; at its first new or due move, the moves before it are skipped; where it branches from the last line, it starts after the last move the two share, played or asked from there as auto-play says (from move 1 for a chapter’s first line).</p>
         <fieldset>
           <legend>In the day's queue</legend>
           <Choice name="auto-play-queue" label="Auto-play" value={prefs.autoPlayQueue} options={AUTO} onChange={(v) => set('autoPlayQueue', v)} />
-          <Choice name="start-queue" label="A line starts" value={prefs.startQueue} options={STARTS} onChange={(v) => set('startQueue', v)} />
+          <Choice name="start-queue" label="A line starts" value={prefs.startQueue} options={QUEUE_STARTS} onChange={(v) => set('startQueue', v)} />
         </fieldset>
         <fieldset>
           <legend>When learning, or a line picked</legend>

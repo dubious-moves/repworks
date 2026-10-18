@@ -6474,3 +6474,32 @@ second line 30 higher, and a deepened card grades that move "#2 of 12 · level w
 Controls, each failing its test: bounds kept (`search.test.ts`); no averaging (`grade.test.ts`,
 `harvest.test.ts`); each line read at its own depth (`harvest.test.ts`); the deepening's list made
 without the scores (`storm.spec.ts`).
+
+#### 5.121 A line in the queue starting where it branches from the last (the owner's request, 2026-10-18)
+
+"I want to add a new setting for 'A line starts' (today's queue). It should take branches into
+account. The first time, it should start from the beginning. After that it should start from the
+latest shared branching point from the previous line. This assumes branches are queued together."
+The details, proposed to the owner and accepted as defaults:
+- **A third choice for *A line starts* in the day's queue** (and show and grade, which shares its
+  settings): *Where it branches from the last line* (`branch`). Not offered for Learn and a line
+  picked; a stored `branch` there reads as the default.
+- **Where:** the position after the last move the line shares with the line walked before it, so
+  the first thing that happens is the move where they part (the opponent's, played; or the user's,
+  played or asked as auto-play says). From there on, as *From the start*: each move as auto-play
+  says. No move before the split is replayed.
+- **From the start** when there is no line before it in the session, or the line before is of
+  another chapter (two lines of one chapter always share at least its start).
+- **The line before** counts as far as its walk went (the trainer's `reached`): a line skipped
+  midway shares only what was walked. Never past a move still to be asked or taught (then one
+  move before it, as at the first due move); with the planner's lines that doesn't happen.
+- **Later passes** (Repetitions) start where the first did, not at move 1.
+- **The queue's order** is unchanged: review lines go chapter by chapter in tree order (§5.4,
+  §5.115), so branches follow each other; new and known lines keep the index's order, so they
+  start from move 1 more often. Ordering them by the tree too is left for a later request.
+
+Tests: `trainer.test.ts` (the second line starts after the shared moves, with auto-play `due` and
+`off`, against *At its first due move*; another chapter's line from the start; a later pass; a line
+skipped short of the split; the random repertoires under every line start);
+`timeTravel.test.ts` (the setting stored, refused for Learn); `autoplay.spec.ts` (the queue's
+three choices in the dialog, stored). Live: TESTING.md.
