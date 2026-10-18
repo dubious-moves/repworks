@@ -1707,3 +1707,9 @@ The technical calls, each with its reason:
   line walked before it** (from the start for a chapter's first line; later passes from the same
   place). Learn and a line picked keep the two. Why: the owner's request; the queue's review lines
   of a chapter follow each other in tree order, so the board need not go back to move 1.
+
+## Revision of 2026-10-18 (difficult lines, overstudy, PLAN.md §5.124)
+- **A session over the lines through difficult moves, which grades only due moves**: everything
+  else it asks is practice, with no event. Every other recording session keeps §5.106's rule (any
+  reviewed move's first answer graded). Why: the owner's request; overstudy ahead of time should
+  change no schedule, and a due move answered there counts as it would in the queue.

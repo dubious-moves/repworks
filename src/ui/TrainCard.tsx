@@ -1,8 +1,8 @@
 // The home screen's training card (PLAN.md §5.3, §5.7): "Train: 23 due · 18 new", the moves
 // whose learning step ends later today, the known pool still to review, and a line of links: the
-// progress page (§5.122), the day's mistakes and the pins.
+// progress page (§5.122), the day's mistakes and the pins, and the difficult lines (§5.124).
 import { decidingNow } from '../app/time.ts';
-import { mistakesOf, pinnedOf, queueOf, trainData } from '../app/train.ts';
+import { difficultOf, mistakesOf, pinnedOf, queueOf, trainData } from '../app/train.ts';
 import { openTrainSettings } from './TrainSettings.tsx';
 
 const clock = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -15,6 +15,7 @@ export function TrainCard() {
   const queue = queueOf(data, now);
   const mistakes = mistakesOf(data, Date.now()).length;
   const pins = pinnedOf(data, now);
+  const difficult = difficultOf(data, now).lines.length;
   return (
     <section class="card train-card" aria-label="Training">
       <div class="card-head">
@@ -62,6 +63,14 @@ export function TrainCard() {
           <>
             {' · '}
             <a href="#/pinned">Drill pinned ({pins.due.length})</a>
+          </>
+        )}
+        {difficult > 0 && (
+          <>
+            {' · '}
+            <a href="#/difficult" title="Overstudy the lines through your difficult moves: only the moves due are graded">
+              Difficult lines ({difficult})
+            </a>
           </>
         )}
       </p>

@@ -139,7 +139,7 @@ const analyse = () => {
   if (board) analyseFrom(board);
 };
 
-const TITLES = { retry: 'Retry mistakes', drill: 'Drill mistakes', pinned: 'Drill pinned', show: 'Show and grade' } as const;
+const TITLES = { retry: 'Retry mistakes', drill: 'Drill mistakes', pinned: 'Drill pinned', show: 'Show and grade', difficult: 'Difficult lines' } as const;
 
 export function TrainScreen(props: { of: SessionKind }) {
   const key = JSON.stringify(props.of);
@@ -288,6 +288,22 @@ function Done(props: { s: SessionView; inline?: boolean }) {
   }
   // Show and grade records its grades; retry, drill and the pins never do.
   const practice = !isGraded(of);
+  if (of.kind === 'difficult' && plan.lines.length === 0) {
+    return (
+      <section class={cls} aria-label="Session done">
+        <h2>No difficult moves</h2>
+        <p>A move is difficult after two lapses, or when it keeps being missed (FSRS difficulty 7 or more). None is now.</p>
+        <div class="actions">
+          <button type="button" onClick={() => open({ name: 'train' })}>
+            Today's queue
+          </button>
+          <button type="button" class="secondary" onClick={() => open({ name: 'list' })}>
+            Home
+          </button>
+        </div>
+      </section>
+    );
+  }
   if (!practice && plan.lines.length === 0) return <NothingToTrain s={props.s} />;
   const after = of.kind === 'line' ? nextLine(trainData.value ?? props.s.data, props.s.scope, { sid: of.sid, cid: of.cid, path: of.at }) : undefined;
   return (
@@ -298,7 +314,12 @@ function Done(props: { s: SessionView; inline?: boolean }) {
           {props.s.answers} move{props.s.answers === 1 ? '' : 's'}, {props.s.right} right first time. Nothing graded: these moves keep their schedule.
         </p>
       )}
-      {!practice && plan.lines.length > 0 && (
+      {of.kind === 'difficult' && plan.lines.length > 0 && (
+        <p>
+          {done.lines} line{done.lines === 1 ? '' : 's'} · {props.s.answers} move{props.s.answers === 1 ? '' : 's'} asked, {props.s.right} right first time · {done.reviews} due graded, the rest practice
+        </p>
+      )}
+      {!practice && of.kind !== 'difficult' && plan.lines.length > 0 && (
         <p>
           {done.lines} line{done.lines === 1 ? '' : 's'} · {done.reviews} move{done.reviews === 1 ? '' : 's'} reviewed, {done.good} right first time · {done.taught} new
           {done.suspended > 0 && <> · {done.suspended} always played for you</>}
@@ -318,7 +339,7 @@ function Done(props: { s: SessionView; inline?: boolean }) {
           </button>
         )}
         <button type="button" class={after ? 'secondary' : undefined} onClick={() => void beginTraining(of)}>
-          {practice || of.kind === 'line' ? 'Again' : 'Train again'}
+          {practice || of.kind === 'line' || of.kind === 'difficult' ? 'Again' : 'Train again'}
         </button>
         {props.inline && props.s.line && (
           <button type="button" class="secondary" onClick={() => readLine(props.s.path.length)} title="Step through the whole line and its comments">
@@ -328,6 +349,11 @@ function Done(props: { s: SessionView; inline?: boolean }) {
         {props.inline && props.s.position && (
           <button type="button" class="secondary" onClick={analyse} title="The analysis board at this position">
             Analyse
+          </button>
+        )}
+        {of.kind === 'difficult' && (
+          <button type="button" class="secondary" onClick={() => open({ name: 'train' })}>
+            Today's queue
           </button>
         )}
         {(of.kind === 'line' || of.kind === 'learn') && (
@@ -470,7 +496,7 @@ function Session(props: { s: SessionView }) {
   // line" when it waits for it. With lines from the comments to quiz it always waits, for "Next
   // line" or "Quiz lines" (§5.98), at the session's last line too.
   const endQuiz = !s.done && s.phase === 'lineDone' ? (s.endQuiz ?? 0) : 0;
-  const holding = (!s.done && s.phase === 'lineDone' && s.upcoming !== undefined && (s.of.kind === 'learn' || s.of.kind === 'queue' || s.of.kind === 'show')) || endQuiz > 0;
+  const holding = (!s.done && s.phase === 'lineDone' && s.upcoming !== undefined && (s.of.kind === 'learn' || s.of.kind === 'queue' || s.of.kind === 'show' || s.of.kind === 'difficult')) || endQuiz > 0;
   const waits = holding && (trainPrefs.value.lineEnd === 'wait' || endQuiz > 0);
   const nextLabel = s.upcoming ? 'Next line' : 'Finish';
   const upcoming = s.upcoming && `Line ${lineNumber(s.data.index, s.upcoming)}${s.line && s.upcoming.cid !== s.line.cid ? ` · ${chapterNameOf(s, s.upcoming)}` : ''}`;

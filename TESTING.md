@@ -5,6 +5,12 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## Difficult lines (§5.124, 2026-10-18)
+- On the training card, "Difficult lines (n)" when any move has two lapses or FSRS difficulty 7 or
+  more. Are the lines it walks the ones you find hard? Is the count sensible on your real history
+  (too many, too few)? A move not due answered there must leave its "Due …" in the line list
+  unchanged; a due one is graded as in the queue.
+
 ## A misclick taken back (§5.123, 2026-10-18)
 - Train fast and slip: after a wrong move, "Misclick" (beside the note under the board on the
   phone; "Misclick: take … back" in the panel, or Backspace, on a desktop) should take it back,

@@ -21,7 +21,7 @@ import { cardLine, drillLines, retryLines, todaysMistakes, type Mistake } from '
 import { pinsOf, type PinState } from '../core/train/pins.ts';
 import { alternativesOf } from '../core/train/alternatives.ts';
 import { lineMarksOf, markLines } from '../core/train/paused.ts';
-import { findLine, learnPlan, pickedPlan } from '../core/train/browse.ts';
+import { difficultPlan, findLine, learnPlan, pickedPlan } from '../core/train/browse.ts';
 import { interactivePlan, planSession, withoutAnswered, type SessionPlan } from '../core/train/plan.ts';
 import { ShowGrade, type Press, type ShowGradeEffect } from '../core/train/showGrade.ts';
 import { todaysQueue, type DailyQueue, type Day } from '../core/train/queue.ts';
@@ -136,6 +136,11 @@ export function pinnedOf(data: TrainData, now: number): { pinned: CardId[]; due:
   return { pinned, due: pinned.filter((c) => data.pins.get(c)!.due <= now) };
 }
 
+/** Difficult lines (§5.124) at `now`: the plan, whose lines the home card counts. */
+export function difficultOf(data: TrainData, now: number): SessionPlan {
+  return difficultPlan(data.index, data.states, data.settings, dayOf(now));
+}
+
 export function queueOf(data: TrainData, now: number, scope?: string): DailyQueue {
   return todaysQueue(data.index, data.states, data.settings, dayOf(now), scope === undefined ? {} : { scope });
 }
@@ -179,6 +184,8 @@ export type SessionKind =
   | { kind: 'line'; sid: string; cid: string; at: string[] }
   /** A chapter's lines with new moves, learned past the daily limit (§5.16). */
   | { kind: 'learn'; sid: string; cid: string }
+  /** Difficult lines (§5.124): the lines through difficult moves, asked due or not; only due moves graded. */
+  | { kind: 'difficult' }
   /** The Interactive view (§5.10): a chapter's line through a move, every own move asked, nothing recorded. */
   | { kind: 'play'; sid: string; cid: string; at: string[]; from?: number };
 
@@ -297,6 +304,7 @@ export async function startSession(store: IdbStore, record: (event: Parameters<I
     // A paused line is practised (§5.70): nothing graded or taught on record.
     if (line.paused) pausedPick = true;
   } else if (of.kind === 'learn') plan = learnPlan(data.index, data.states, of.sid, of.cid);
+  else if (of.kind === 'difficult') plan = difficultOf(data, now);
   else if (of.kind === 'retry') plan = { lines: retryLines(mistakesOf(data, Date.now())) };
   else if (of.kind === 'drill') plan = { lines: drillLines(mistakesOf(data, Date.now())) };
   else {
@@ -327,7 +335,7 @@ export async function startSession(store: IdbStore, record: (event: Parameters<I
     paceMs: PACES[pace.peek()],
     alternatives: data.alternatives,
     // In review, the lines from the comments along the line (§5.98): the queue's and a line picked.
-    ...(of.kind === 'queue' || of.kind === 'line' ? { commentLines: commentLinesOf(data) } : {}),
+    ...(of.kind === 'queue' || of.kind === 'line' || of.kind === 'difficult' ? { commentLines: commentLinesOf(data) } : {}),
     ...optionsFor(of, trainPrefs.peek()),
   });
   trainer = t;
@@ -374,6 +382,9 @@ export function optionsFor(of: SessionKind, prefs: TrainPrefs): TrainerOptions {
       return { ...common, autoPlay: prefs.autoPlayQueue, lineStart: prefs.startQueue, holdLineEnd: prefs.lineEnd === 'wait', comments: prefs.comments };
     case 'show':
       return { ...common, autoPlay: prefs.autoPlayQueue, lineStart: prefs.startQueue, holdLineEnd: prefs.lineEnd === 'wait' };
+    // Difficult lines walk as the queue's: its difficult moves are asked whatever auto-play says.
+    case 'difficult':
+      return { ...common, autoPlay: prefs.autoPlayQueue, lineStart: prefs.startQueue, holdLineEnd: prefs.lineEnd === 'wait', comments: prefs.comments };
     case 'line':
       return { ...common, autoPlay: prefs.autoPlayLearn, lineStart: prefs.startLearn, comments: prefs.comments };
     case 'learn':
@@ -389,9 +400,9 @@ export function configureSession(): void {
   if (trainer && s) trainer.configure(optionsFor(s.of, trainPrefs.peek()));
 }
 
-/** Sessions whose answers are graded and recorded: the queue's, and lines picked from the list. */
+/** Sessions whose answers are graded and recorded: the queue's, lines picked from the list, and difficult lines' due moves. */
 export function isGraded(of: SessionKind): boolean {
-  return of.kind === 'queue' || of.kind === 'show' || of.kind === 'line' || of.kind === 'learn';
+  return of.kind === 'queue' || of.kind === 'show' || of.kind === 'line' || of.kind === 'learn' || of.kind === 'difficult';
 }
 
 /**
@@ -781,6 +792,8 @@ export function sessionMode(of: SessionKind): Mode {
       return { name: 'train', sid: of.sid, cid: of.cid, at: of.at };
     case 'learn':
       return { name: 'learn', sid: of.sid, cid: of.cid };
+    case 'difficult':
+      return { name: 'difficult' };
   }
 }
 

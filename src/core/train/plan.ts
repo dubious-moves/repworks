@@ -36,6 +36,8 @@ export interface PlannedLine {
 
 export interface SessionPlan {
   lines: PlannedLine[];
+  /** Difficult lines (§5.124): only these cards are graded; every other answer is practice, with no event. */
+  gradeOnly?: CardId[];
 }
 
 export function planSession(index: RepertoireIndex, queue: DailyQueue, states: ReadonlyMap<string, CardState>): SessionPlan {
@@ -163,5 +165,5 @@ export function withoutAnswered(plan: SessionPlan, answered: ReadonlySet<string>
     });
     lines.push({ ...p, ask, teach, end: p.kind === 'known' ? last : p.end });
   }
-  return { lines };
+  return { ...plan, lines };
 }

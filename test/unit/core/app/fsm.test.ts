@@ -44,6 +44,7 @@ test('hashes parse to modes, and modes write back to the same hash', () => {
     ['#/games/history/rev_1790000000000_ab12cd', { name: 'history', id: 'rev_1790000000000_ab12cd' }],
     ['#/repertoire-check', { name: 'repCheck' }],
     ['#/progress', { name: 'progress' }],
+    ['#/difficult', { name: 'difficult' }],
     ['#/checklist/Rep0Najd/3?preset=hard', { name: 'checklist', sid: 'Rep0Najd', i: 3, preset: 'hard' }],
     ['#/show', { name: 'show' }],
     ['#/show/Rep0Najd', { name: 'show', sid: 'Rep0Najd' }],

@@ -6567,3 +6567,35 @@ trying to go fast. In case of a mistake, show a button that resets the mistake."
 Tests: `alternatives.test.ts` (nothing recorded, Good next, wrong again next time; after a second
 wrong move and after a Hint; not retried), `alternatives.spec.ts` (desktop and phone: the button,
 then Backspace, then right first time; still wrong in the Interactive view). Live: TESTING.md.
+
+#### 5.124 Difficult lines: overstudy, graded only where due (the owner's request, 2026-10-18)
+
+"If it doesn't exist already: Add a way to review/overstudy difficult lines. In case the line is
+not due, it shouldn't be graded. In case it's due, it can be graded." It didn't exist: "difficult"
+was only an auto-play mode (§5.17), which asks difficult moves when the queue meets them; nothing
+started a session over them. Decided:
+- **A session, Difficult lines** (`#/difficult`, `difficultPlan` in `core/train/browse.ts`), linked
+  from the training card's line of links as "Difficult lines (n)" while there are any. A move is
+  difficult as auto-play's mode says (`isDifficult`: two lapses or more, or FSRS difficulty from 7);
+  suspended moves and paused lines are left out.
+- **Which lines**: in the index's order, each line through a difficult move not yet covered, walked
+  to its end, or to its last own move before a move never answered (new material stays with the
+  queue and Learn). Every difficult move on the walked part is asked, whatever auto-play says,
+  once in the session; so is every due move there. The other own moves follow the queue's
+  auto-play mode and line start, as do the line's end (wait or go on), repetitions, mistakes
+  retried and the lines from the comments.
+- **Graded only where due** (`SessionPlan.gradeOnly`, checked in the trainer's `graded`): a due
+  move's first answer is graded as in the queue; every other answer is practice with no event,
+  a move reviewed and not due included. This is narrower than §5.106 (the queue, a line picked
+  and Learn grade every first answer of a reviewed move): overstudy ahead of time changes no
+  schedule. A line holding a due move is therefore graded on that move only.
+- **The end**: lines walked, moves asked and right first time, how many due moves were graded;
+  "Again", "Today's queue", Mistakes and Home. With no difficult move: "No difficult moves",
+  with why a move counts as one.
+
+Tests: `browse.test.ts` (the lines and asks, the cut before a move never answered, `gradeOnly`; run
+under auto-play `due` and `off`: a difficult move missed and a reviewed move asked, not due, record
+nothing, the due ones are graded; nothing without a difficult move or in another study),
+`fsm.test.ts` (the address), `difficult.spec.ts` (desktop and phone: the fixture's c5 made difficult
+by two misses, opened from the training card, asked and graded while due; "Again", now not due,
+missed with nothing recorded). Live: TESTING.md.

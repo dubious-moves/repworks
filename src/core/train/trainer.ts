@@ -17,6 +17,8 @@
 //   at the first move the plan needs (the moves before it skipped), at the chapter's start, or
 //   where it branches from the line walked before it (§5.121), the mode deciding each move from
 //   there (the owner's request, 2026-10-16, §5.113).
+// - Difficult lines (§5.124): a plan's `gradeOnly` names the only cards graded (its due ones); every
+//   other answer is practice.
 // - Conflicting moves (D3): every own move of the position is accepted, and the one played is
 //   graded on its own card if it is due. The line's own move is then asked in the same position,
 //   on its own card, so a sibling can't stay due for ever. The trainer only lets the user move
@@ -395,6 +397,8 @@ export class Trainer {
   /** The plan's lines; with `follow`, the line walked is replaced by the one the user chose. */
   private readonly lines: PlannedLine[];
   private readonly toAsk = new Set<CardId>();
+  /** The plan's `gradeOnly` (§5.124): when set, no other card is graded. */
+  private readonly gradeOnly: ReadonlySet<CardId> | undefined;
   private readonly toTeach = new Set<CardId>();
   private readonly known: Set<CardId>;
   /** Cards asked, taught or suspended in this session. */
@@ -456,6 +460,7 @@ export class Trainer {
     this.pace = Math.max(MIN_PACE_MS, setup.paceMs);
     this.record = setup.record ?? true;
     this.lines = [...setup.plan.lines];
+    if (setup.plan.gradeOnly) this.gradeOnly = new Set(setup.plan.gradeOnly);
     for (const l of setup.plan.lines) {
       for (const c of l.ask) this.toAsk.add(c);
       for (const c of l.teach) this.toTeach.add(c);
@@ -1270,10 +1275,11 @@ export class Trainer {
    * Whether an answer is recorded: the first in the session of a move the plan asks, a known move
    * never answered, or any reviewed move asked, due or not (the owner's choice, 2026-10-13, §5.106:
    * a miss on a move not due is news; FSRS weighs an early answer by the time since the last one).
-   * A move in its learning step is graded only when due.
+   * A move in its learning step is graded only when due. Difficult lines grade only their due moves.
    */
   private graded(card: CardId) {
     if (!this.record || this.answered.has(card)) return false;
+    if (this.gradeOnly && !this.gradeOnly.has(card)) return false;
     if (this.toAsk.has(card)) return true;
     const status = statusOf(this.state(card));
     return status === 'review' || (status === 'fresh' && this.known.has(card));

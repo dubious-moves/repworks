@@ -11,12 +11,15 @@
 //   is not saved). Suspended moves are still played for the user.
 // - A paused line (§5.70) is listed as paused, outside the chapter's count; picked, it is practised:
 //   every own move asked, nothing graded or taught.
+// - Difficult lines (§5.124, overstudy): the lines through difficult moves, each one asked whether
+//   it is due or not; only the moves due are graded, so a line not due changes no schedule.
 import type { CardId } from '../progress/cards.ts';
 import type { CardState } from '../progress/replay.ts';
 import type { Line, RepertoireIndex } from '../repertoire/index.ts';
-import { planSession, type SessionPlan } from './plan.ts';
+import { planSession, type PlannedLine, type SessionPlan } from './plan.ts';
 import { dueAt, knownCardsOf, statusOf, type DailyQueue, type Day } from './queue.ts';
 import type { TrainSettings } from './settings.ts';
+import { isDifficult } from './trainer.ts';
 
 export type LineState = 'new' | 'due' | 'learning' | 'learned' | 'paused';
 
@@ -154,4 +157,43 @@ export function learnPlan(index: RepertoireIndex, states: States, sid: string, c
   const newLines = index.lines.filter((l) => l.sid === sid && l.cid === cid && !l.known && !l.paused && l.cards.some((c) => !known.has(c) && fresh(states.get(c))));
   const queue: DailyQueue = { due: [], later: [], taughtToday: 0, room: 0, newLines, newCards: [], knownLines: [], knownCards: [], orphaned: [], pausedLines: 0 };
   return planSession(index, queue, states);
+}
+
+/**
+ * Difficult lines (§5.124): overstudy of the moves `isDifficult` names (two lapses or more, or
+ * FSRS difficulty from 7), in the repertoire or one study. In the index's order, each active line
+ * through a difficult move not yet covered is taken, walked to its end or to its last own move
+ * before a move never answered (new material waits for the queue or Learn). On its walked part
+ * its difficult moves and its due moves are asked, each once in the plan; only the due ones are
+ * graded (`gradeOnly`), as the queue would; the rest is practice, recorded nowhere.
+ */
+export function difficultPlan(index: RepertoireIndex, states: States, settings: TrainSettings, day: Day, scope?: string): SessionPlan {
+  const lines: PlannedLine[] = [];
+  const handled = new Set<CardId>();
+  const due: CardId[] = [];
+  for (const line of index.lines) {
+    if (line.paused || (scope !== undefined && line.sid !== scope)) continue;
+    let end = line.path.length;
+    line.cards.forEach((card, i) => {
+      if (fresh(states.get(card))) end = Math.min(end, line.plies[i]!);
+    });
+    const ask: CardId[] = [];
+    let hard = false;
+    line.cards.forEach((card, i) => {
+      if (line.plies[i]! >= end || handled.has(card) || ask.includes(card)) return;
+      const state = states.get(card);
+      if (state?.suspended) return;
+      const difficult = isDifficult(state);
+      if (!difficult && !isDue(state, settings, day)) return;
+      if (difficult) hard = true;
+      ask.push(card);
+    });
+    if (!hard) continue;
+    for (const card of ask) {
+      handled.add(card);
+      if (isDue(states.get(card), settings, day)) due.push(card);
+    }
+    lines.push({ kind: 'review', line, end, ask, teach: [] });
+  }
+  return { lines, gradeOnly: due };
 }

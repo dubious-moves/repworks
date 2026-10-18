@@ -29,6 +29,7 @@ export function backTo(m: BackMode): string {
     case 'train':
     case 'learn':
     case 'show':
+    case 'difficult':
     case 'practice':
       return 'Back to training';
     case 'play':

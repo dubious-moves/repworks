@@ -38,7 +38,7 @@ import { confirmDeleteStudy, openNewStudy, openStudySettings, StudyDialogs } fro
 
 export function App() {
   return (
-    <div class={`shell${mode.value.name === 'chapter' || mode.value.name === 'analysis' ? ' shell-chapter' : ''}${['train', 'learn', 'practice', 'show', 'read', 'play', 'storm', 'gamesReview', 'playOn', 'history', 'checklist'].includes(mode.value.name) || (mode.value.name === 'games' && !!mode.value.id) ? ' shell-train' : ''}`}>
+    <div class={`shell${mode.value.name === 'chapter' || mode.value.name === 'analysis' ? ' shell-chapter' : ''}${['train', 'learn', 'practice', 'show', 'difficult', 'read', 'play', 'storm', 'gamesReview', 'playOn', 'history', 'checklist'].includes(mode.value.name) || (mode.value.name === 'games' && !!mode.value.id) ? ' shell-train' : ''}`}>
       <header class="topbar">
         <img class="topbar-icon" src={`${import.meta.env.BASE_URL}icons/icon.svg`} alt="" width={28} height={28} />
         <h1>Repworks</h1>
@@ -153,6 +153,8 @@ function Screen() {
       return <TrainScreen of={{ kind: 'learn', sid: mode.value.sid, cid: mode.value.cid }} />;
     case 'show':
       return <TrainScreen of={mode.value.sid ? { kind: 'show', scope: mode.value.sid } : { kind: 'show' }} />;
+    case 'difficult':
+      return <TrainScreen of={{ kind: 'difficult' }} />;
     case 'mistakes':
       return <MistakesView />;
     case 'read':

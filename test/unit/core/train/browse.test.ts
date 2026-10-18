@@ -1,6 +1,7 @@
 // The training screen's line list (PLAN.md §5.16): each line's state, a line picked and trained
 // whatever the queue says (due moves graded, new ones taught, the rest practised ungraded), a
-// chapter's new lines learned past the limit, and show and grade switched on mid-session.
+// chapter's new lines learned past the limit, difficult lines overstudied (only due moves graded,
+// §5.124), and show and grade switched on mid-session.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Chess } from 'chessops/chess';
@@ -13,7 +14,7 @@ import { newCard, State } from '../../../../src/core/progress/fsrs.ts';
 import type { CardState } from '../../../../src/core/progress/replay.ts';
 import { parseChapterFile } from '../../../../src/core/pgn/parse.ts';
 import { indexStudies, type Line } from '../../../../src/core/repertoire/index.ts';
-import { chapterRows, findLine, learnPlan, lineThrough, pickedPlan } from '../../../../src/core/train/browse.ts';
+import { chapterRows, difficultPlan, findLine, learnPlan, lineThrough, pickedPlan } from '../../../../src/core/train/browse.ts';
 import type { SessionPlan } from '../../../../src/core/train/plan.ts';
 import type { Day } from '../../../../src/core/train/queue.ts';
 import { DEFAULT_TRAIN } from '../../../../src/core/train/settings.ts';
@@ -157,6 +158,45 @@ test('a picked line: due moves graded, new ones taught, the rest asked with auto
     ],
   );
   assert.ok(effects.some((e) => e.type === 'play' && e.by === 'auto' && e.san === 'Bxc6'));
+});
+
+test('difficult lines: the lines through difficult moves, every difficult move asked, only the due ones graded (§5.124)', () => {
+  const hard = (base: CardState, lapses: number, difficulty: number): CardState => ({ ...base, card: { ...base.card, lapses, difficulty } });
+  const main = 'e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O';
+  const states = new Map<string, CardState>([...ix.cards.keys()].map((c) => [c, notDue]));
+  // The main line's last move never answered: the walk stops short of it (new material).
+  states.delete(card(main));
+  states.set(card('e4'), dueNow);
+  // Ba4: two lapses, not due. Bxc6: FSRS difficulty 8, due. Nothing difficult in Chapter2.
+  states.set(card('e4 e5 Nf3 Nc6 Bb5 a6 Ba4'), hard(notDue, 2, 5));
+  states.set(card('e4 e5 Nf3 Nc6 Bb5 a6 Bxc6'), hard(dueNow, 0, 8));
+  const plan = difficultPlan(ix, states, DEFAULT_TRAIN, day);
+  assert.deepEqual(
+    plan.lines.map((l) => [l.line.path.join(' '), l.end, l.ask, l.teach]),
+    [
+      [main, 8, [card('e4'), card('e4 e5 Nf3 Nc6 Bb5 a6 Ba4')], []],
+      ['e4 e5 Nf3 Nc6 Bb5 a6 Bxc6 dxc6 O-O', 9, [card('e4 e5 Nf3 Nc6 Bb5 a6 Bxc6')], []],
+    ],
+  );
+  assert.deepEqual(plan.gradeOnly, [card('e4'), card('e4 e5 Nf3 Nc6 Bb5 a6 Bxc6')]);
+  // Ba4 missed: asked, no event. e4 and Bxc6, due: graded. A move reviewed and not due, met on
+  // the way (auto-play off), is practice too, against §5.106's queue.
+  for (const autoPlay of ['due', 'off'] as const) {
+    const { records, answers } = run(trainer(plan, states, { autoPlay }), (n) => (n === 1 ? 'wrong' : 'right'));
+    assert.ok(answers.includes(card('e4 e5 Nf3 Nc6 Bb5 a6 Ba4')));
+    if (autoPlay === 'off') assert.ok(answers.includes(card('e4 e5 Nf3')));
+    assert.deepEqual(
+      records.map((r) => [r.k, r.card, r.k === 'review' ? r.g : undefined]),
+      [
+        ['review', card('e4'), 3],
+        ['review', card('e4 e5 Nf3 Nc6 Bb5 a6 Bxc6'), 3],
+      ],
+      autoPlay,
+    );
+  }
+  // No difficult move, or another study: nothing.
+  assert.deepEqual(difficultPlan(ix, new Map([...ix.cards.keys()].map((c) => [c, dueNow])), DEFAULT_TRAIN, day).lines, []);
+  assert.deepEqual(difficultPlan(ix, states, DEFAULT_TRAIN, day, 'Nowhere0').lines, []);
 });
 
 test('learning a chapter takes every line with new moves, past the limit, each new move taught once', () => {

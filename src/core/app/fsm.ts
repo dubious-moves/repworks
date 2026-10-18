@@ -9,6 +9,7 @@
 //   #/train/<sid>/<cid>?at=e4,e5&pick   the line through a study's move, selected, not started (§5.83)
 //   #/learn/<sid>/<cid>                 a chapter's new lines, past the daily limit (§5.16)
 //   #/show[/<sid>]                      show and grade, by two keys (§5.9)
+//   #/difficult                         the lines through difficult moves, overstudied: only due moves graded (§5.124)
 //   #/mistakes                          the day's mistakes and the pins (§5.8)
 //   #/mistakes/retry, #/mistakes/drill  the day's mistakes retried, or drilled
 //   #/pinned, #/pinned/all              the pins due, or every pin, drilled
@@ -56,6 +57,8 @@ export type Mode =
   | { name: 'learn'; sid: string; cid: string }
   /** Show and grade (§5.9): the same queue, run with two keys. */
   | { name: 'show'; sid?: string }
+  /** Difficult lines (§5.124): the lines through difficult moves; only their due moves graded. */
+  | { name: 'difficult' }
   | { name: 'mistakes' }
   /**
    * A chapter's line through the move `at` (to the end of the main line below it), read move by
@@ -124,6 +127,7 @@ export function pageOf(mode: Mode): string {
     case 'train':
     case 'learn':
     case 'show':
+    case 'difficult':
       return 'train';
     case 'read':
     case 'play':
@@ -259,6 +263,7 @@ export function parseHash(hash: string): Mode {
     if (parsed && parsed.name !== 'analysis' && (parsed.name !== 'list' || /^#\/?$/.test(to!))) mode.back = parsed;
     return mode;
   }
+  if (parts[0] === 'difficult' && parts.length === 1) return { name: 'difficult' };
   if (parts[0] === 'learn' && parts.length === 3 && isId(parts[1]) && isId(parts[2])) return { name: 'learn', sid: parts[1], cid: parts[2] };
   const practice = (Object.keys(PRACTICE_HASH) as Practice[]).find((p) => PRACTICE_HASH[p] === `#/${parts.join('/')}`);
   if (practice) return { name: 'practice', run: practice };
@@ -297,6 +302,8 @@ export function modeHash(mode: Mode): string {
       return `#/learn/${mode.sid}/${mode.cid}`;
     case 'show':
       return mode.sid ? `#/show/${mode.sid}` : '#/show';
+    case 'difficult':
+      return '#/difficult';
     case 'mistakes':
       return '#/mistakes';
     case 'practice':
