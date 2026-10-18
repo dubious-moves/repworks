@@ -5,6 +5,11 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## Puzzles in a focused storm (§5.125, 2026-10-18)
+- On the storm's page, pick a focus chip, tick "Puzzles too" under the chips, and start: puzzles
+  should come among the focus's positions at your share of cards. Is the checkbox easy to find
+  there, and is the mix right, or should a focus have its own share?
+
 ## Difficult lines (§5.124, 2026-10-18)
 - On the training card, "Difficult lines (n)" when any move has two lapses or FSRS difficulty 7 or
   more. Are the lines it walks the ones you find hard? Is the count sensible on your real history

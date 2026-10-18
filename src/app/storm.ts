@@ -48,6 +48,8 @@ export interface StormPrefs {
   maia: boolean;
   /** The focus a session deals (§5.100): none is the classic storm. */
   focus: Focus[];
+  /** A focused session deals puzzles too, at their share (§5.125). */
+  focusPuzzles: boolean;
   /** Gather keeps going until stopped (§5.102). */
   overnight: boolean;
   /** The deepening runs an engine a core, several positions at once (§5.103). */
@@ -56,7 +58,7 @@ export interface StormPrefs {
   levelUp: LevelUp;
 }
 const PREFS_KEY = 'repworks-storm';
-const DEFAULT_PREFS: StormPrefs = { minPly: STORM.minPly, maxPly: STORM.maxPly, source: 'both', deepen: typeof matchMedia === 'undefined' || !matchMedia('(max-width: 768px)').matches, maia: true, focus: [], overnight: false, focused: false, levelUp: LEVEL_DEFAULT };
+const DEFAULT_PREFS: StormPrefs = { minPly: STORM.minPly, maxPly: STORM.maxPly, source: 'both', deepen: typeof matchMedia === 'undefined' || !matchMedia('(max-width: 768px)').matches, maia: true, focus: [], focusPuzzles: false, overnight: false, focused: false, levelUp: LEVEL_DEFAULT };
 
 function loadPrefs(): StormPrefs {
   try {
@@ -963,10 +965,10 @@ let sessionEntry: string | undefined;
 export const stormEntry = (): string | undefined => sessionEntry;
 
 /**
- * Starts a timed storm or a set. `focus` (§5.100): only the positions that match it, and no
- * puzzles; none is the classic storm.
+ * Starts a timed storm or a set. `focus` (§5.100): only the positions that match it, and puzzles
+ * only with `puzzles` (§5.125); none is the classic storm, puzzles at their share.
  */
-export async function startStorm(s: StormScopeData, mode: SessionMode, o: { focus?: readonly Focus[] } = {}): Promise<void> {
+export async function startStorm(s: StormScopeData, mode: SessionMode, o: { focus?: readonly Focus[]; puzzles?: boolean } = {}): Promise<void> {
   endStormSession();
   sessionEntry = entryKey();
   stopDeepening();
@@ -980,7 +982,7 @@ export async function startStorm(s: StormScopeData, mode: SessionMode, o: { focu
   const elo = maiaElo.peek();
   const focus = cleanFocus(o.focus ?? []);
   queue = await dealt(s, focus, elo);
-  share = focus.length ? 0 : puzzlePrefs.value.share;
+  share = focus.length && !o.puzzles ? 0 : puzzlePrefs.value.share;
   const data = trainData.value;
   const ready = share > 0 ? await readyPuzzles(s) : [];
   puzzleQueue = data ? drawOrder(ready.map((p) => ({ card: 'z|' + p.id, p })), histories(data), Math.random, STORM.reachTop).map((x) => x.p) : [];

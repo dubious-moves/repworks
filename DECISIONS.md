@@ -1713,3 +1713,9 @@ The technical calls, each with its reason:
   else it asks is practice, with no event. Every other recording session keeps §5.106's rule (any
   reviewed move's first answer graded). Why: the owner's request; overstudy ahead of time should
   change no schedule, and a due move answered there counts as it would in the queue.
+
+## Revision of 2026-10-18 (puzzles in a focused storm, PLAN.md §5.125)
+- **A focus may deal puzzles**, revising §5.100's "a focus deals no puzzles": a per-device
+  "Puzzles too" in the focus's panel, off by default, deals them at the share of cards. Why: the
+  owner asked for it. Puzzles aren't filtered by the focus, since the tags need a list and Maia's
+  policies a puzzle doesn't have.

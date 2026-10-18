@@ -5962,7 +5962,7 @@ over tags (`core/storm/kinds.ts`) rather than a storm per idea, so they combine:
 - **The home**: "Focus" under the count, folded until a chip is on; each chip with how many ready
   positions have its tag; the count and the start buttons follow the focus ("Quiet storm",
   "14 positions ready for Quiet"); the focus is kept per device. "Unintuitive storm" is now the
-  Unintuitive chip. A focus deals no puzzles. A position's tags show with Maia's line once
+  Unintuitive chip. A focus deals no puzzles (unless asked, since §5.125). A position's tags show with Maia's line once
   answered, and in the review with the best move ("Only move · Quiet").
 - Answers are ordinary `storm` events: the record and the progress log are unchanged. Positions
   gathered before this have no kind and are classic; Punish, Hold and Convert come from gathers
@@ -6599,3 +6599,19 @@ nothing, the due ones are graded; nothing without a difficult move or in another
 `fsm.test.ts` (the address), `difficult.spec.ts` (desktop and phone: the fixture's c5 made difficult
 by two misses, opened from the training card, asked and graded while due; "Again", now not due,
 missed with nothing recorded). Live: TESTING.md.
+
+#### 5.125 Puzzles in a focused storm (the owner's request, 2026-10-18)
+
+"Currently in storm when you have a focus selected, puzzles are automatically disabled. Add a way
+to include puzzles in a focused storm." Decided:
+- **"Puzzles too"**, a checkbox in the focus's panel once a chip is on (per device, off by default,
+  so a focus stays as it was): the session deals the focus's positions and puzzles at the share of
+  cards set under Puzzles, the same way the classic storm and set do (§5.48). With the share at
+  0% it says to set one there.
+- **Puzzles aren't filtered by the focus**: the tags are worked out from a Stockfish list and
+  Maia's policies that a puzzle doesn't have. A focus with no ready position can still start when
+  puzzles are on and ready (only puzzles, then).
+- The count's line ("· 3 puzzles at 25%") and the storm's note follow the setting.
+
+Tests: `puzzles.spec.ts` (desktop and phone: a Quiet focus with no position ready can't start;
+with Puzzles too it does, at 100%, and deals a puzzle). Live: TESTING.md.

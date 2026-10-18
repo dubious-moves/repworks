@@ -3,7 +3,7 @@
 // meta.json, an index that lists three real puzzles at every position of the chapter, and the
 // real bodies cut from the published set), the size said before a collect, the collect, puzzles
 // dealt in a storm with the disguise, one solved through the opponent's replies and one missed,
-// the review, and the answers synced as `z|` events.
+// the review, the answers synced as `z|` events, and puzzles in a focused storm (§5.125).
 import { test, expect, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { Chess } from 'chessops/chess';
@@ -65,7 +65,7 @@ async function setUp(page: Page): Promise<World> {
     [],
   );
   await lichessLogin(page);
-  await page.addInitScript(() => localStorage.setItem('repworks-storm', JSON.stringify({ deepen: false })));
+  await page.addInitScript(() => localStorage.getItem('repworks-storm') ?? localStorage.setItem('repworks-storm', JSON.stringify({ deepen: false })));
   await serveGithub(page, github);
   await serveExplorer(page, fakeExplorer());
   const requests: World['requests'] = [];
@@ -161,6 +161,18 @@ test('puzzles: the size asked first, collected, dealt with the disguise, solved 
       return [texts.includes(`"card":"z|${first}","b":"great"`), texts.includes(`"card":"z|${second}","b":"blunder"`)];
     }, { timeout: 15_000 })
     .toEqual([true, true]);
+
+  // A focus deals no puzzles unless asked (§5.125). No position of this chapter is gathered, so its
+  // chips can't be pressed: the focus is chosen in the kept settings.
+  await page.evaluate(() => localStorage.setItem('repworks-storm', JSON.stringify({ deepen: false, focus: ['quiet'] })));
+  await page.reload();
+  const focus = page.getByTestId('storm-focus');
+  await expect(page.getByRole('button', { name: 'Quiet storm' })).toBeDisabled();
+  await focus.getByTestId('storm-focus-puzzles').check();
+  await expect(focus).toContainText('Puzzles too, at 100% of cards');
+  await page.getByRole('button', { name: 'Quiet storm' }).click();
+  await expect(page.locator('.study-title')).toContainText('Quiet storm');
+  await expect(page.locator('.storm-card')).toHaveAttribute('data-card', /^z\|/);
   const wide = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(wide).toBeLessThanOrEqual(0);
 });

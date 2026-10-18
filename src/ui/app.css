@@ -3903,6 +3903,11 @@ a.button.primary {
   font-size: 0.85rem;
 }
 
+.storm-focus-puzzles {
+  display: block;
+  margin-top: 4px;
+}
+
 .storm-gather-card > p {
   margin: 4px 0;
 }

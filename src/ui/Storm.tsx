@@ -228,7 +228,7 @@ function Home(props: { scope: StormScopeData; where: StormWhere }) {
   }, [prefs.maia, home?.ready, home?.rated, home?.maiaHere, maiaKind === 'ready']);
   // Positions, or puzzles when they are dealt.
   const focus = prefs.focus;
-  const puzzlesReady = prefs2.share > 0 && !focus.length ? (puzzleState.value?.ready ?? 0) : 0;
+  const puzzlesReady = prefs2.share > 0 && (!focus.length || prefs.focusPuzzles) ? (puzzleState.value?.ready ?? 0) : 0;
   const canStart = !!home?.matching || puzzlesReady > 0;
   const ends = scope.frontiers.length;
   const plies = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
@@ -259,17 +259,17 @@ function Home(props: { scope: StormScopeData; where: StormWhere }) {
         </div>
         {home && <FocusPicker scope={scope} home={home} disabled={!!g?.running} />}
         <div class="actions storm-start">
-          <button type="button" class="primary" disabled={!canStart || g?.running} onClick={() => void startStorm(scope, 'storm', { focus })}>
+          <button type="button" class="primary" disabled={!canStart || g?.running} onClick={() => void startStorm(scope, 'storm', { focus, puzzles: prefs.focusPuzzles })}>
             {focus.length ? `${focusTitle(focus)} storm` : 'Start storm'}
           </button>
-          <button type="button" class="secondary" disabled={!canStart || g?.running} onClick={() => void startStorm(scope, 'set', { focus })}>
+          <button type="button" class="secondary" disabled={!canStart || g?.running} onClick={() => void startStorm(scope, 'set', { focus, puzzles: prefs.focusPuzzles })}>
             Set of {STORM.setSize}
           </button>
         </div>
         <p class="muted storm-about">
           <strong>Storm:</strong> {STORM.sessionMs / 60000} minutes; the clock runs only while a position waits for your move. <strong>Set:</strong> {STORM.setSize} positions, no clock, a
           mistake held until you find a good move. A move is graded by how much of the game it gives up against the best: within {STORM.greatWp}% is great, within {STORM.goodWp}% good.
-          {focus.length ? ` With a focus, only the positions that match it are dealt, and no puzzles.` : ''}
+          {focus.length ? ` With a focus, only the positions that match it are dealt${prefs.focusPuzzles && prefs2.share > 0 ? `, and puzzles at ${prefs2.share}%` : ', and no puzzles'}.` : ''}
         </p>
       </section>
 
@@ -453,6 +453,10 @@ function FocusPicker(props: { scope: StormScopeData; home: NonNullable<typeof st
             <button type="button" class="link" disabled={props.disabled} onClick={() => (setStormPrefs({ focus: [] }), void refreshHome(props.scope))}>
               Clear
             </button>
+            <label class="storm-focus-puzzles">
+              <input type="checkbox" data-testid="storm-focus-puzzles" checked={stormPrefs.value.focusPuzzles} onChange={(e) => setStormPrefs({ focusPuzzles: e.currentTarget.checked })} /> Puzzles too
+              {stormPrefs.value.focusPuzzles ? (puzzlePrefs.value.share > 0 ? `, at ${puzzlePrefs.value.share}% of cards` : ': set their share of cards under Puzzles') : ''}
+            </label>
           </>
         ) : (
           'Deal only one kind of position: hard for you, a kind of move, or a situation. Hold, Convert and Punish come from gathers made since they were added.'
