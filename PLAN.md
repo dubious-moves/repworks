@@ -6684,3 +6684,30 @@ database alone, cached, nothing after a drop), `table.test.ts` (the score order 
 row, the positions asked with the token, the sort, kept after a reload, the switch's order; the
 prepared bar corrected and the one with nothing rated after it), `games.spec.ts` (the column and
 its title). Live: TESTING.md.
+
+#### 5.127 Show and grade retries its mistakes (the owner's request, 2026-10-19)
+
+"When using show and grade (review/queue, not learn) - we should let the user "retry" their
+mistakes at the end of the variation. No need for "two correct in a row", one is fine. It needs to
+be clear that we're showing a mistake, not starting a new variation."
+
+- **The trainer** (`retryShown`, a session option): in show and grade, at a walk's end, each move
+  failed on it (4, or shown after a wrong move or Hint) is shown again from the opponent's move
+  before it, the mistakes taking turns, until known once (2, 2). A miss starts it again. Nothing
+  is graded or recorded: the card was graded on the walk (§5.77's rule). With *Mistakes retried*
+  at 0 nothing is retried, as elsewhere; the setting's number is not used here, one is enough.
+  Repetitions stay out of show and grade.
+- **Where**: the queue's show and grade, show and grade switched on in the queue, a line picked or
+  difficult lines (§5.16). Not in Learn, which keeps §5.77's walk as it was in show and grade
+  (nothing retried) and its own retries when moves are played.
+- **Said on the screen**: the pause at the walk's end reads "Not a new line: your mistake again"
+  (or "your 2 mistakes"), the ask "Your mistake again: show it", the move shown "Your mistake
+  again: c5"; the feedback line is in the warning colour throughout the retries, and the counters
+  keep the line's number with "mistakes left n". No new line is announced (no `line` effect), and
+  the board goes back on the same line's moves.
+
+Tests: `trainer.test.ts` (show and grade with `retryShown`: the failed move shown again from the
+move before, a miss and then known once, graded once, no new line; nothing without `retryShown` or
+with retries off), `timeTravel.test.ts` (each session kind's options: not Learn), `train.spec.ts`
+(desktop and phone: c5 missed by 4, shown again at the line's end with the notes, the colour and
+the counters, known once, the four events unchanged). Live: TESTING.md.

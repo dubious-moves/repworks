@@ -43,10 +43,21 @@ const COMMENTS_SHOWN = new Set(['teach', 'wrong', 'shown', 'lineDone']);
 
 /**
  * What the feedback line says (§5.7): only what asks something of the user (§5.17). "Your move"
- * and "Correct" say nothing: the board shows both.
+ * and "Correct" say nothing: the board shows both. `shownRetry`: show and grade is retrying a
+ * line's mistakes, which the line says throughout, so the board going back isn't taken for a new line.
  */
-export function noteText(note: Note | undefined): string {
+export function noteText(note: Note | undefined, shownRetry = false): string {
   if (!note) return '';
+  if (shownRetry) {
+    switch (note.kind) {
+      case 'retryMistakes':
+        return `Not a new line: ${note.count === 1 ? 'your mistake' : `your ${note.count} mistakes`} again`;
+      case 'retry':
+        return 'Your mistake again: show it';
+      case 'shown':
+        return `Your mistake again: ${note.san}`;
+    }
+  }
   switch (note.kind) {
     case 'yourMove':
     case 'correct':
@@ -521,8 +532,8 @@ function Session(props: { s: SessionView }) {
         <PreviewBar owner="train" />
         {/* One line, always its height, so the board never moves (§5.17). */}
         <div class="train-feedback-row">
-        <p class={`feedback train-feedback note-${holding ? 'next' : (s.note?.kind ?? 'none')}${s.note?.kind === 'aside' && s.note.important ? ' important' : ''}`} role="status">
-          {s.done ? '' : holding ? `Line done${upcoming ? ` · Next: ${upcoming}` : ''}` : s.alts ? (s.alts.length ? `Alternatives: ${s.alts.map((m) => m.san).join(', ')}` : 'No alternatives saved here') : noteText(s.note)}
+        <p class={`feedback train-feedback note-${holding ? 'next' : (s.note?.kind ?? 'none')}${s.note?.kind === 'aside' && s.note.important ? ' important' : ''}${s.retry && !holding ? ' retrying' : ''}`} role="status">
+          {s.done ? '' : holding ? `Line done${upcoming ? ` · Next: ${upcoming}` : ''}` : s.alts ? (s.alts.length ? `Alternatives: ${s.alts.map((m) => m.san).join(', ')}` : 'No alternatives saved here') : noteText(s.note, show && !!s.retry)}
         </p>
         {/* On a phone the panel's buttons are below the fold: a misclick is taken back beside the note. */}
         {!s.done && s.wrongMove && !show && (

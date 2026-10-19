@@ -65,7 +65,7 @@ const startOf = (w: World) => (line: Line) => {
   return c ? startPosition(c) : undefined;
 };
 const planOf = (w: World, states: Map<string, CardState>, newPerDay = 0) => planSession(w.ix, todaysQueue(w.ix, states, { ...DEFAULT_TRAIN, newPerDay }, day), states);
-const trainer = (w: World, plan: SessionPlan, states: Map<string, CardState>, extra: { record?: boolean; askAll?: boolean; follow?: boolean; paceMs?: number } & TrainerOptions = {}) =>
+const trainer = (w: World, plan: SessionPlan, states: Map<string, CardState>, extra: { record?: boolean; askAll?: boolean; follow?: boolean; paceMs?: number; selfGrade?: boolean } & TrainerOptions = {}) =>
   new Trainer({ index: w.ix, plan, states, startOf: startOf(w), paceMs: extra.paceMs ?? 600, ...extra });
 
 /** Who answers an ask or a teach: a command, or undefined to stop the session. */
@@ -909,6 +909,41 @@ test('mistakes retried take turns; a hint is a miss; a practice ask counts; not 
   };
   assert.equal(plain({ retryMistakes: 0 }), 2);
   assert.equal(plain({ retryMistakes: 2, selfGrade: true }), 2);
+});
+
+test('show and grade with retryShown: a walk\'s failed moves shown again at its end from the move before, each until known once; nothing graded twice', () => {
+  const w = world(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 Nc6 3. Bb5'));
+  const states = new Map<string, CardState>([[card('e4'), notDue], [card('e4 e5 Nf3'), dueNow], [card('e4 e5 Nf3 Nc6 Bb5'), dueNow]]);
+  const views: TrainerView[] = [];
+  // Nf3 failed, Bb5 known; then Nf3's retries: failed, known.
+  const tells = [false, true, false, true];
+  let told = 0;
+  const { effects, records } = run(trainer(w, planOf(w, states), states, { retryMistakes: 2, retryShown: true, selfGrade: true }), (view) => {
+    views.push(view);
+    return view.phase === 'shown' ? { type: 'tell', knew: tells[told++]!, now: 0 } : { type: 'show' };
+  });
+  assert.equal(told, 4);
+  assert.deepEqual(records.map((r) => [r.card, r.k === 'review' && r.g]), [[card('e4 e5 Nf3'), 1], [card('e4 e5 Nf3 Nc6 Bb5'), 3]]);
+  // One known show is enough: the note says once, and the streak needs one.
+  assert.ok(notes(effects).some((n) => n.kind === 'retryMistakes' && n.count === 1 && n.need === 1));
+  assert.ok(notes(effects).some((n) => n.kind === 'retry' && n.need === 1));
+  // The retries are on the same line, from 1. e4 e5: no new line starts.
+  assert.equal(effects.filter((e) => e.type === 'line').length, 1);
+  const retries = views.filter((v) => v.retry);
+  assert.ok(retries.length > 0 && retries.every((v) => v.number === 1 && v.path.slice(0, 2).join(' ') === 'e4 e5'));
+  assert.deepEqual(answersOf(effects).map((a) => [a.ok, a.repeat ?? false]), [[false, false], [true, false], [false, true], [true, true]]);
+  assert.equal(effects.at(-1)!.type, 'done');
+  // Without retryShown (Learn), or with retries off, nothing is shown again.
+  const shows = (opts: TrainerOptions) => {
+    let n = 0;
+    run(new Trainer({ index: w.ix, plan: planOf(w, states), states, startOf: startOf(w), paceMs: 600, selfGrade: true, ...opts }), (view) => {
+      n++;
+      return view.phase === 'shown' ? { type: 'tell', knew: false, now: 0 } : { type: 'show' };
+    });
+    return n;
+  };
+  assert.equal(shows({ retryMistakes: 2 }), 4);
+  assert.equal(shows({ retryMistakes: 0, retryShown: true }), 4);
 });
 
 test('mistakes retried after a pass of repetitions: missed moves of the second pass are asked again before the next line', () => {

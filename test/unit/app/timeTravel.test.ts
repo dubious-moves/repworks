@@ -99,10 +99,11 @@ test('each session kind runs with its settings: the queue starts as set for it, 
   const common = { tryNew: true, sequence: 0, repetitions: 3, retryMistakes: 1 };
   // The lines from the comments in review: the queue and a line picked (§5.98). Auto-play set apart
   // for the queue and for a line picked or learned (§5.113).
-  assert.deepEqual(optionsFor({ kind: 'queue' }, prefs), { ...common, autoPlay: 'session', lineStart: 'start', holdLineEnd: true, comments: 'all' });
-  assert.deepEqual(optionsFor({ kind: 'show', scope: 's' }, prefs), { ...common, autoPlay: 'session', lineStart: 'start', holdLineEnd: true });
+  assert.deepEqual(optionsFor({ kind: 'queue' }, prefs), { ...common, retryShown: true, autoPlay: 'session', lineStart: 'start', holdLineEnd: true, comments: 'all' });
+  assert.deepEqual(optionsFor({ kind: 'show', scope: 's' }, prefs), { ...common, retryShown: true, autoPlay: 'session', lineStart: 'start', holdLineEnd: true });
   assert.equal(optionsFor({ kind: 'queue' }, { ...prefs, lineEnd: 'go' }).holdLineEnd, false);
-  assert.deepEqual(optionsFor({ kind: 'line', sid: 's', cid: 'c', at: ['e4'] }, prefs), { ...common, autoPlay: 'off', lineStart: 'start', comments: 'all' });
+  assert.deepEqual(optionsFor({ kind: 'line', sid: 's', cid: 'c', at: ['e4'] }, prefs), { ...common, retryShown: true, autoPlay: 'off', lineStart: 'start', comments: 'all' });
+  // Show and grade retries a review's mistakes, not Learn's (the owner's request, 2026-10-19).
   assert.deepEqual(optionsFor({ kind: 'learn', sid: 's', cid: 'c' }, prefs), { ...common, autoPlay: 'off', lineStart: 'start', holdLineEnd: true, lineEndPaces: 4 });
   assert.deepEqual(optionsFor({ kind: 'learn', sid: 's', cid: 'c' }, { ...prefs, lineEnd: 'go' }).holdLineEnd, false);
   const sequence = optionsFor({ kind: 'queue' }, { ...prefs, newMoves: 'sequence', sequenceLength: 3 });

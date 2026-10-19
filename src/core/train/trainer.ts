@@ -45,6 +45,9 @@
 //   it is answered right `retryMistakes` times in a row; the mistakes take turns. Nothing is graded.
 //   A move taught counts when a wrong move or a hint came before it was played (§5.110): learning
 //   retries its mistakes as review does.
+//   In show and grade (`retryShown`: review, not Learn; the owner's request, 2026-10-19) each move
+//   failed on the walk is shown again at its end, from the opponent's move before it, until known
+//   once; the notes say it is a mistake again, not a new line.
 // - Missed again (`repeatMissed`: retry, drill and the pins): a move answered wrong has its line
 //   walked again after the plan's lines, until every one is answered right.
 // - Lines from the comments (`commentLines`, the owner's request, 2026-10-12; ./commentQuiz.ts says
@@ -286,6 +289,8 @@ export interface TrainerSetup {
   repetitions?: number;
   /** At a walk's end, each move missed on it is asked until right this many times in a row (default 0: not). */
   retryMistakes?: number;
+  /** Show and grade retries a walk's mistakes too (with `retryMistakes` above 0), each until known once. */
+  retryShown?: boolean;
   /** Retry, drill, the pins: a move answered wrong has its line walked again at the end, until answered right. */
   repeatMissed?: boolean;
   /** The lines from the comments along a line that can be quizzed (./commentQuiz.ts); none without. */
@@ -295,7 +300,7 @@ export interface TrainerSetup {
 }
 
 /** The options a running session can change (the training settings, §5.17). */
-export type TrainerOptions = Pick<TrainerSetup, 'autoPlay' | 'tryNew' | 'sequence' | 'lineStart' | 'holdLineEnd' | 'lineEndPaces' | 'repetitions' | 'retryMistakes' | 'comments'>;
+export type TrainerOptions = Pick<TrainerSetup, 'autoPlay' | 'tryNew' | 'sequence' | 'lineStart' | 'holdLineEnd' | 'lineEndPaces' | 'repetitions' | 'retryMistakes' | 'retryShown' | 'comments'>;
 
 interface Ply {
   san: string;
@@ -455,8 +460,8 @@ export class Trainer {
 
   constructor(setup: TrainerSetup) {
     this.setup = setup;
-    const { autoPlay, tryNew, sequence, lineStart, holdLineEnd, lineEndPaces, repetitions, retryMistakes, comments } = setup;
-    this.options = { autoPlay, tryNew, sequence, lineStart, holdLineEnd, lineEndPaces, repetitions, retryMistakes, comments };
+    const { autoPlay, tryNew, sequence, lineStart, holdLineEnd, lineEndPaces, repetitions, retryMistakes, retryShown, comments } = setup;
+    this.options = { autoPlay, tryNew, sequence, lineStart, holdLineEnd, lineEndPaces, repetitions, retryMistakes, retryShown, comments };
     this.pace = Math.max(MIN_PACE_MS, setup.paceMs);
     this.record = setup.record ?? true;
     this.lines = [...setup.plan.lines];
@@ -900,9 +905,11 @@ export class Trainer {
     return { kind: 'yourMove' };
   }
 
-  /** Right answers in a row a mistake retried needs. */
+  /** Right answers in a row a mistake retried needs: in show and grade, one (none without `retryShown`). */
   private need(): number {
-    return Math.max(0, Math.round(this.options.retryMistakes ?? 0));
+    const n = Math.max(0, Math.round(this.options.retryMistakes ?? 0));
+    if (!this.selfGrading) return n;
+    return this.options.retryShown ? Math.min(n, 1) : 0;
   }
 
   /** Whether the move asked is asked again: a mistake retried, a later pass, a missed line again. */
@@ -913,9 +920,9 @@ export class Trainer {
   /**
    * At a walk's end: a pause before its mistakes are asked again (each until right `need` times in
    * a row), or before the line's next pass when a move was taught on it. False when the line is done.
+   * Show and grade retries its mistakes (`retryShown`) but walks a line once.
    */
   private walkEnd(out: TrainerEffect[]): boolean {
-    if (this.selfGrading) return false;
     const need = this.need();
     if (need > 0 && this.missedOnLine.size > 0) {
       const items = [...this.missedOnLine].sort((a, b) => a[0] - b[0]).map(([ply, card]): Retry => ({ ply, card, streak: 0 }));
@@ -924,6 +931,7 @@ export class Trainer {
       out.push({ type: 'note', note: { kind: 'retryMistakes', count: items.length, need } });
       return this.pause('retry', out);
     }
+    if (this.selfGrading) return false;
     const passes = Math.max(1, Math.round(this.options.repetitions ?? 1));
     if (this.pass < passes && this.taughtOnLine.length > 0) {
       this.pass++;

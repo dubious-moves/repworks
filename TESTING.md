@@ -5,6 +5,13 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## Show and grade retries its mistakes (§5.127, 2026-10-19)
+- Show and grade from the training card: miss a move with 4 (or the ring). At the line's end the
+  board goes back to the move before it, the note reads "Not a new line: your mistake again" in
+  the warning colour, then "Your mistake again: show it"; 2 shows it, 2 again (known) ends it. Is
+  it clear enough that this is the mistake and not a new line? Learn in show and grade should not
+  retry.
+
 ## Scores at equal ratings (§5.126, 2026-10-19)
 - Explorer: click the Score header once: "Equal Elo", dashed bars. Hover one (the phone has no
   hover: say if you want its details on a tap, as the Practical cells have): its score, the games',

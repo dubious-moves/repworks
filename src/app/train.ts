@@ -367,7 +367,8 @@ function commentLinesOf(data: TrainData): (line: Line) => readonly QuizLine[] {
  * and auto-play as `startQueue` and `autoPlayQueue` say (a line picked or learned: `startLearn` and
  * `autoPlayLearn`, §5.113), and wait at their end or go on after two paces; Learn's lines wait at
  * their end or go on after four paces. A line learned is walked `repetitions` times, and a walk's
- * mistakes are asked again at its end (§5.77).
+ * mistakes are asked again at its end (§5.77). In show and grade a review's mistakes are shown
+ * again at its end, each until known once; Learn's are not (the owner's request, 2026-10-19).
  * Retry, drill, the pins and the Interactive view keep their own walk.
  */
 export function optionsFor(of: SessionKind, prefs: TrainPrefs): TrainerOptions {
@@ -379,14 +380,14 @@ export function optionsFor(of: SessionKind, prefs: TrainPrefs): TrainerOptions {
   };
   switch (of.kind) {
     case 'queue':
-      return { ...common, autoPlay: prefs.autoPlayQueue, lineStart: prefs.startQueue, holdLineEnd: prefs.lineEnd === 'wait', comments: prefs.comments };
+      return { ...common, retryShown: true, autoPlay: prefs.autoPlayQueue, lineStart: prefs.startQueue, holdLineEnd: prefs.lineEnd === 'wait', comments: prefs.comments };
     case 'show':
-      return { ...common, autoPlay: prefs.autoPlayQueue, lineStart: prefs.startQueue, holdLineEnd: prefs.lineEnd === 'wait' };
+      return { ...common, retryShown: true, autoPlay: prefs.autoPlayQueue, lineStart: prefs.startQueue, holdLineEnd: prefs.lineEnd === 'wait' };
     // Difficult lines walk as the queue's: its difficult moves are asked whatever auto-play says.
     case 'difficult':
-      return { ...common, autoPlay: prefs.autoPlayQueue, lineStart: prefs.startQueue, holdLineEnd: prefs.lineEnd === 'wait', comments: prefs.comments };
+      return { ...common, retryShown: true, autoPlay: prefs.autoPlayQueue, lineStart: prefs.startQueue, holdLineEnd: prefs.lineEnd === 'wait', comments: prefs.comments };
     case 'line':
-      return { ...common, autoPlay: prefs.autoPlayLearn, lineStart: prefs.startLearn, comments: prefs.comments };
+      return { ...common, retryShown: true, autoPlay: prefs.autoPlayLearn, lineStart: prefs.startLearn, comments: prefs.comments };
     case 'learn':
       return { ...common, autoPlay: prefs.autoPlayLearn, lineStart: prefs.startLearn, holdLineEnd: prefs.lineEnd === 'wait', lineEndPaces: 4 };
     default:

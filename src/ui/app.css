@@ -2016,6 +2016,11 @@ table.cards td {
   color: var(--error);
 }
 
+/* A line's mistakes asked or shown again at its end: not a new line (the owner's request, 2026-10-19). */
+.train-feedback.retrying {
+  color: var(--warn);
+}
+
 .train-counters {
   margin: 4px 0;
   font-variant-numeric: tabular-nums;

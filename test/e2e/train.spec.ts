@@ -332,9 +332,25 @@ test('show and grade: a session run with 2 and 4 only, its review events checked
   await page.keyboard.press('2');
   await expect(feedback(page)).toHaveText('That’s the move: it comes back soon');
 
+  // At the line's end the missed c5 is shown again (the owner's request, 2026-10-19), said to be
+  // the mistake and not a new line: the board back to 1. e4, the line's number the same. Known
+  // once is enough, and nothing is graded again.
+  await expect(feedback(page)).toHaveText('Not a new line: your mistake again');
+  await expect(feedback(page)).toHaveClass(/retrying/);
+  await expect(page.locator('.train-counters')).toContainText('line 1 of');
+  await expect(page.locator('.train-counters')).toContainText('mistakes left 1');
+  await asked(page);
+  await expect(feedback(page)).toHaveText('Your mistake again: show it');
+  await expect(page.locator('.train-line')).toContainText('1. e4');
+  await expect(page.locator('.train-line')).not.toContainText('c5');
+  await page.keyboard.press('2');
+  await expect(feedback(page)).toHaveText('Your mistake again: c5');
+  await page.keyboard.press('2');
+
   // The new moves are shown and learned by two presses each, with no grade.
   for (const expected of ['New move: play cxd4', 'New move: play Nc6', 'New move: play Nf6']) {
     await expect(feedback(page)).toHaveText(expected);
+    await expect(feedback(page)).not.toHaveClass(/retrying/);
     await page.keyboard.press('2');
     await page.keyboard.press('2');
   }

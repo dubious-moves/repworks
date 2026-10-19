@@ -1732,3 +1732,10 @@ The technical calls, each with its reason:
   panel's, so the Practical values still match q_extension's and the prepared bars no longer do
   while the setting is on.
 - **The games' own explorer shows each move's score against the ratings' prediction** ("± Elo").
+
+## Revision of 2026-10-19 (show and grade retries its mistakes, PLAN.md §5.127)
+- **Show and grade retries a walk's failed moves at its end, each until known once,** in review
+  (the queue, a line picked, difficult lines), not in Learn. Was (§5.77): "Show and grade does
+  neither: a move shown can't be found again." Why: the owner's request; one known show is enough
+  there. Still graded once a session; repetitions stay out of show and grade; *Mistakes retried*
+  at 0 turns it off too.
