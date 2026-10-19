@@ -166,7 +166,14 @@ export const savedDeck = computed<SavedItem[]>(() => {
 
 /** The practice games kept (§5.57), newest first, from their `played` events. */
 /** The games' own explorer (§6, item 4): the games kept, indexed by position, built when first read. */
-export const openings = computed<OpeningIndex>(() => openingIndex((gameRows.value ?? []).map((r) => ({ id: r.game.id, color: r.game.color, result: resultFor(r.game), opening: r.game.opening, played: playedOf(r.game) }))));
+export const openings = computed<OpeningIndex>(() =>
+  openingIndex(
+    (gameRows.value ?? []).map((r) => {
+      const [me, opp] = r.game.color === 'white' ? [r.game.white, r.game.black] : [r.game.black, r.game.white];
+      return { id: r.game.id, color: r.game.color, result: resultFor(r.game), opening: r.game.opening, played: playedOf(r.game), rating: me.rating, opponentRating: opp.rating };
+    }),
+  ),
+);
 
 /** The opening name most of the games reaching this position carry (mistake-lab's `lookupOpeningName`), or ''. */
 export function openingNameOf(fen: string): string {

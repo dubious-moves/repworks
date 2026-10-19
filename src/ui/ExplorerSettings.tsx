@@ -150,6 +150,10 @@ function Dialog() {
             <input type="checkbox" name="maiaPreview" checked={draft.maiaPreview} onChange={(e) => setDraft({ ...draft, maiaPreview: e.currentTarget.checked })} />
             Maia’s preview beside it (the Prac title switches to it)
           </label>
+          <label class="check">
+            <input type="checkbox" name="preparedEqual" checked={draft.preparedEqual} onChange={(e) => setDraft({ ...draft, preparedEqual: e.currentTarget.checked })} />
+            Prepared results at equal ratings: the rating gap between the move’s players and their opponents taken out
+          </label>
           {NUMBERS.filter((n) => !n.advanced).map(numberField)}
           <details>
             <summary>Advanced</summary>

@@ -73,6 +73,8 @@ export interface TableInput {
   repertoire?: ReadonlyMap<string, number>;
   /** The Practical column's values by SAN, for the `prac` order (the side to move's expected score). */
   practical?: ReadonlyMap<string, number>;
+  /** The side to move's scores at equal ratings by SAN (§5.126), for the `score` order in place of the games' own. */
+  scores?: ReadonlyMap<string, number>;
   /** Maia's likelihoods by SAN (Qchess shows its top 20), and its top four, added as rows when missing. */
   maia?: { probs: ReadonlyMap<string, number>; top: readonly string[] };
 }
@@ -212,7 +214,9 @@ export function buildTable(input: TableInput): Table {
     const played = out.filter((r) => !r.novelty && !r.maiaOnly);
     const novel = out.filter((r) => r.novelty).sort(byEval);
     const maiaOnly = out.filter((r) => r.maiaOnly).sort((a, b) => (b.maia ?? 0) - (a.maia ?? 0));
-    played.sort(input.sort === 'score' ? (a, b) => moverScore(b, turn) - moverScore(a, turn) || byGames(a, b) : byGames);
+    const scores = new Map([...(input.scores ?? [])].map(([san, v]) => [moveKey(san), v] as const));
+    const score = (r: TableRow) => scores.get(moveKey(r.san)) ?? moverScore(r, turn);
+    played.sort(input.sort === 'score' ? (a, b) => score(b) - score(a) || byGames(a, b) : byGames);
     out = [...played, ...novel, ...maiaOnly];
   }
   return total ? { rows: out, total } : { rows: out };

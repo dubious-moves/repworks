@@ -316,6 +316,11 @@ test('the games’ own explorer: moves and results by position, the list filtere
   await expect(rows.locator('tbody tr')).toHaveCount(2);
   await expect(rows.locator('tbody tr').first()).toContainText('e4');
   await expect(rows.locator('tbody tr').first()).toContainText('3');
+  // Each move's score against what the two ratings predicted (§5.126): 1800 against 1850 here.
+  await expect(rows.locator('th').last()).toHaveText('± Elo');
+  const vs = rows.locator('tbody tr').first().locator('td.vs-expected');
+  await expect(vs).toHaveText(/^([+−]\d+|0)$/);
+  await expect(vs).toHaveAttribute('title', /^You scored \d+% in 3 games with both ratings, where the ratings predicted 43%: [+−]?\d+\. Performance \d+ against opponents averaging 1850\. Few games/);
   await rows.getByRole('button', { name: 'e4' }).click();
   await expect(page.getByTestId('games-count')).toHaveText('3 of 4 reaching the explorer’s position');
   await rows.getByRole('button', { name: 'e5' }).click();

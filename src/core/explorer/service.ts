@@ -69,7 +69,13 @@ export type ToWorker =
   /** ChessDB's scored moves for the storm's walk, under every other lookup. */
   | { type: 'scores'; id: number; fen: string }
   /** Practice's opponent (§5.57): a position's Lichess games at the practice filter, above the search. */
-  | { type: 'practiceGames'; id: number; fen: string; speeds: string[]; ratings: number[] };
+  | { type: 'practiceGames'; id: number; fen: string; speeds: string[]; ratings: number[] }
+  /**
+   * The panel's scores at equal ratings (§5.126): the games at the position after one of its moves,
+   * on the panel's tab, for its opponents' ratings. Under the panel's own lookups, above coverage
+   * and the search (which asks the same positions for its rows, and then finds them cached).
+   */
+  | { type: 'childGames'; id: number; tab: ExplorerTab; fen: string };
 
 export interface LookupError {
   message: string;
@@ -95,7 +101,9 @@ export type FromWorker =
   | { type: 'scores'; id: number; evals: ChessdbAnswer }
   | { type: 'scores'; id: number; error: LookupError }
   | { type: 'practiceGames'; id: number; games: CompactExplorer }
-  | { type: 'practiceGames'; id: number; error: LookupError };
+  | { type: 'practiceGames'; id: number; error: LookupError }
+  | { type: 'childGames'; id: number; games: CompactExplorer }
+  | { type: 'childGames'; id: number; error: LookupError };
 
 export interface ServiceOptions {
   http: Http;
@@ -188,6 +196,10 @@ export function createExplorerService(o: ServiceOptions): ExplorerService {
     return { message: `${source} didn’t answer: ${e.message || String(e)}` };
   }
 
+  /** The database a tab's games come from: Masters, or the Lichess filter (or the local explorer). */
+  const filterFor = (tab: ExplorerTab): ExplorerFilter => (tab === 'masters' ? { db: 'masters' } : { ...config.filter, db: 'lichess' });
+  const sourceFor = (tab: ExplorerTab) => (tab === 'masters' || !localAddress(config.local) ? 'Lichess' : 'The local explorer');
+
   function lookup(id: number, tab: ExplorerTab, fen: string) {
     live.add(id);
     const isStale = () => dropped.has(id);
@@ -200,13 +212,11 @@ export function createExplorerService(o: ServiceOptions): ExplorerService {
     const pending = new Set<string>();
     if (tab !== 'chessdb') {
       pending.add('games');
-      const filter: ExplorerFilter = tab === 'masters' ? { db: 'masters' } : { ...config.filter, db: 'lichess' };
-      const source = tab === 'masters' || !localAddress(config.local) ? 'Lichess' : 'The local explorer';
       providers
-        .explorer(fen, filter, isStale, { priority: 1000 })
+        .explorer(fen, filterFor(tab), isStale, { priority: 1000 })
         .then(
           (games) => !isStale() && o.post({ type: 'games', id, games }),
-          (e: PeError) => !isStale() && !e?.cancelled && o.post({ type: 'games', id, error: reasonOf(e, source) }),
+          (e: PeError) => !isStale() && !e?.cancelled && o.post({ type: 'games', id, error: reasonOf(e, sourceFor(tab)) }),
         )
         .finally(() => (pending.delete('games'), settle()));
     }
@@ -228,6 +238,21 @@ export function createExplorerService(o: ServiceOptions): ExplorerService {
         (e: PeError) => !isStale() && !e?.cancelled && o.post({ type: 'evals', id, error: reasonOf(e, 'ChessDB') }),
       )
       .finally(() => (pending.delete('evals'), settle()));
+  }
+
+  function childGames(id: number, tab: ExplorerTab, fen: string) {
+    live.add(id);
+    const isStale = () => dropped.has(id);
+    providers
+      .explorer(fen, filterFor(tab), isStale, { priority: 600 })
+      .then(
+        (games) => !isStale() && o.post({ type: 'childGames', id, games }),
+        (e: PeError) => !isStale() && !e?.cancelled && o.post({ type: 'childGames', id, error: reasonOf(e, sourceFor(tab)) }),
+      )
+      .finally(() => {
+        live.delete(id);
+        dropped.delete(id);
+      });
   }
 
   function counts(id: number, fen: string) {
@@ -444,6 +469,8 @@ export function createExplorerService(o: ServiceOptions): ExplorerService {
           return drop(msg.id);
         case 'counts':
           return counts(msg.id, msg.fen);
+        case 'childGames':
+          return childGames(msg.id, msg.tab, msg.fen);
         case 'search':
           return searchRows(msg);
         case 'stormGames':

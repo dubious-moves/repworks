@@ -10,11 +10,14 @@
 // next answer.
 import { signal } from '@preact/signals';
 import { useEffect, useMemo, useRef } from 'preact/hooks';
+import type { Position } from 'chessops/chess';
 import { makeFen } from 'chessops/fen';
+import { parseSan } from 'chessops/san';
 import { localAddress } from '../core/explorer/providers.ts';
 import type { ExplorerTab } from '../core/explorer/service.ts';
 import { barLabel, buildTable, evalTone, formatCount, formatEval, formatShare, SORT_LABELS, type SortMode, type Table, type TableInput, type TableRow } from '../core/explorer/table.ts';
 import { filterLabel, practicalDetails, preparedDetails, previewDetails, type DetailOptions } from '../core/explorer/details.ts';
+import { equalDetails, equalPrepared, equalPreparedLine, equalScore, type EqualScore } from '../core/explorer/equal.ts';
 import { autoRows, bestOf } from '../core/explorer/rows.ts';
 import { expectedScore, moveKey, type RowResult, type Split } from '../core/explorer/search.ts';
 import { cellOf, computeRow, excludedAt, practicalAt, practicalOff, practicalVersion, practicalView, previewOn, showsMaia, toggleExclude, type CellState } from '../app/practical.ts';
@@ -24,7 +27,7 @@ import type { Chapter } from '../core/study/model.ts';
 import { nodeAt, positionAt, type Path } from '../core/study/tree.ts';
 import { movesFrom, transposedFrom, transpositions } from '../core/study/transpositions.ts';
 import { play, side as chapterSide, study } from '../app/editor.ts';
-import { lookAt, lookup, pausedUntil, prefs, retryLookup, setPrefs } from '../app/explorer.ts';
+import { askChildren, childAnswers, childKey, lookAt, lookup, pausedUntil, prefs, retryLookup, setPrefs, type ScoreView } from '../app/explorer.ts';
 import { maiaElo, maiaKey, maiaPrefs, maiaSeen, maiaState, requestPolicy, requestScores } from '../app/maia.ts';
 import { logInWithLichess } from '../app/lichess.ts';
 import { trainData } from '../app/train.ts';
@@ -66,6 +69,43 @@ const MAIA_ROWS = 4;
 
 /** Qchess's `fmtProb`: one decimal under 10%. */
 export const formatProb = (p: number): string => (p * 100 < 9.95 ? `${(p * 100).toFixed(1)}%` : `${Math.round(p * 100)}%`);
+
+/** Scores at equal ratings (§5.126) for the rows over this share of the games, at most this many, and the chapter's own moves. */
+const EQUAL_SHARE = 0.02;
+const EQUAL_ROWS = 8;
+
+const SCORE_LABELS: Record<ScoreView, string> = { games: 'Score', equal: 'Equal Elo', prepared: 'Prepared' };
+
+const NEXT_TEXT: Record<ScoreView, string> = { games: 'the games’ own results', equal: 'the results at equal ratings', prepared: 'the prepared results (following the Practical choices at your moves)' };
+
+/** The Score header's next view: the games, at equal ratings, then prepared when the Practical column is on. */
+const nextView = (v: ScoreView, prac: boolean): ScoreView => (v === 'games' ? 'equal' : v === 'equal' && prac ? 'prepared' : 'games');
+
+/** The FEN after `san` at `pos` (the panel's position, `fen`), memoized: the panel asks the games there (§5.126). */
+const afterMemo = new Map<string, string | undefined>();
+function fenAfter(pos: Position, fen: string, san: string): string | undefined {
+  const k = `${fen}|${san}`;
+  if (afterMemo.has(k)) return afterMemo.get(k);
+  const move = parseSan(pos, san);
+  let out: string | undefined;
+  if (move) {
+    const next = pos.clone();
+    next.play(move);
+    out = makeFen(next.toSetup());
+  }
+  afterMemo.set(k, out);
+  if (afterMemo.size > 2000) afterMemo.delete(afterMemo.keys().next().value!);
+  return out;
+}
+
+/** Why a row's bar isn't at equal ratings (§5.126): its title over the games' own bar, faded. */
+function equalMissing(r: TableRow, state: 'asking' | 'failed' | 'none' | undefined): string {
+  if (typeof r.rating !== 'number') return 'Not at equal ratings: this database gives no ratings. The games’ own results.';
+  if (state === 'asking') return 'Asking for the games after this move, for its opponents’ ratings… The games’ own results until then.';
+  if (state === 'failed') return 'Not at equal ratings: the games after this move didn’t come. The games’ own results.';
+  if (state === 'none') return 'Not at equal ratings: no rated games after this move. The games’ own results.';
+  return `Not at equal ratings: under ${EQUAL_SHARE * 100}% of the games here. The games’ own results.`;
+}
 
 /** The last position's rows, shown faded while the next position is asked. */
 interface Shown {
@@ -173,11 +213,50 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
   // Green in Maia's view: the best among its values (q_extension's peRenderMaia).
   const maiaBest = bestOf([...cells.values()].filter((c) => !c.excluded && c.maia?.state === 'value').map((c) => c.maia!));
   const detail: DetailOptions = { replyThreshold: p.replyThreshold, minGames: p.minGames, filter: filterLabel(p.speeds, p.ratings), analyse: p.analyse };
-  // The prepared bars: the Score header's switch, on rows with a prepared split.
-  const preparedOn = prac && p.prepared && mine;
+  // The Score header's switch: the games' own results, at equal ratings (§5.126), or the prepared
+  // split on the chapter's side's rows that have one. Prepared without the Practical column is the games.
+  const view: ScoreView = p.scoreView === 'prepared' && !prac ? 'games' : p.scoreView;
+  const preparedOn = view === 'prepared' && mine;
+  const equalOn = games && view === 'equal';
+  // At equal ratings each row needs the games after its move, whose replies' ratings are its
+  // opponents'. Prepared splits are Lichess's: the Masters tab's ratings can't correct them, and
+  // their rows' positions are the search's own, already asked.
+  const prepEqual = preparedOn && p.preparedEqual && p.tab === 'lichess';
+  const rated = table.rows.filter((r) => !r.novelty && !r.maiaOnly && r.games > 0 && typeof r.rating === 'number');
+  const wanted = new Set<string>();
+  if (equalOn) {
+    for (const r of rated.filter((r) => r.share >= EQUAL_SHARE).sort((a, b) => b.games - a.games).slice(0, EQUAL_ROWS)) wanted.add(r.san);
+    for (const r of rated) if (r.covered) wanted.add(r.san);
+  }
+  if (prepEqual) for (const r of rated) if (cells.get(r.san)?.result?.prep) wanted.add(r.san);
+  const kids = childAnswers.value;
+  const equalOf = new Map<string, EqualScore>();
+  const childState = new Map<string, 'asking' | 'failed' | 'none'>();
+  const wantedFens: string[] = [];
+  for (const r of rated) {
+    if (!wanted.has(r.san)) continue;
+    const at = fenAfter(pos, fen, r.san);
+    if (!at) continue;
+    wantedFens.push(at);
+    const answer = kids.get(childKey(p.tab, at));
+    const eq = answer && answer !== 'failed' ? equalScore(r, answer, turn) : undefined;
+    if (eq) equalOf.set(r.san, eq);
+    else childState.set(r.san, answer === 'failed' ? 'failed' : answer ? 'none' : 'asking');
+  }
+  if (equalOn && p.sort === 'score' && equalOf.size) {
+    table = buildTable({ ...input, scores: new Map([...equalOf].map(([san, eq]) => [san, eq.score] as const)) });
+    cells = cellsOf(table);
+  }
+  const prepSplit = (res: RowResult, san: string): Split => {
+    const eq = prepEqual ? equalOf.get(san) : undefined;
+    return eq ? equalPrepared(res.prep!, res.prior ?? 0, eq, turn) : res.prep!;
+  };
   let bestPrep: number | null = null;
   if (preparedOn) {
-    const scores = [...best.cmp].filter((r) => r.prep).map((r) => Math.round(expectedScore(r.prep, turn)! * 100));
+    const scores = table.rows.flatMap((r) => {
+      const res = cells.get(r.san)?.result;
+      return res?.prep && best.cmp.has(res) ? [Math.round(expectedScore(prepSplit(res, r.san), turn)! * 100)] : [];
+    });
     if (scores.length >= 2) bestPrep = Math.max(...scores);
   }
   const paused = pausedUntil.value > Date.now();
@@ -274,6 +353,7 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
         </button>
       </div>
       {prac && <PracticalDriver fen={fen} mine={mine} rows={table.rows} turn={turn} shares={shares} excludedKey={[...excludedAt(fen)].join()} />}
+      {wantedFens.length > 0 && <ChildDriver tab={p.tab} fens={wantedFens} filter={filter} />}
       <div class="explorer-head">
         <span class="ex-move">Move</span>
         {cols.eval && sortBy('eval', 'Eval', 'ex-eval', 'Sort by eval')}
@@ -318,19 +398,22 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
           </span>
         )}
         <span class="ex-last">
-          {cols.bar &&
-            (prac ? (
-              <button
-                type="button"
-                class={`ex-score link-like${p.prepared ? ' on' : ''}`}
-                title={p.prepared ? 'Prepared: the results if you follow the Practical choices at your moves while opponents play their real replies. Click for the games’ own results.' : 'Score: the games’ own results. Click for the prepared results (following the Practical choices at your moves).'}
-                onClick={() => setPrefs({ prepared: !p.prepared })}
-              >
-                {p.prepared ? 'Prepared' : 'Score'}
-              </button>
-            ) : (
-              sortBy('score', 'Score', 'ex-score', 'Sort by score')
-            ))}
+          {cols.bar && (
+            <button
+              type="button"
+              class={`ex-score link-like${view !== 'games' ? ' on' : ''}`}
+              title={
+                (view === 'prepared'
+                  ? `Prepared: the results if you follow the Practical choices at your moves while opponents play their real replies${p.preparedEqual ? ', at equal ratings' : ''}.`
+                  : view === 'equal'
+                    ? `Equal Elo: the results with the rating gap between each move’s players and their opponents taken out. The opponents’ ratings come from the position after the move, asked for the moves over ${EQUAL_SHARE * 100}% of the games and the chapter’s own.`
+                    : 'Score: the games’ own results.') + ` Click for ${NEXT_TEXT[nextView(view, prac)]}.`
+              }
+              onClick={() => setPrefs({ scoreView: nextView(view, prac) })}
+            >
+              {SCORE_LABELS[view]}
+            </button>
+          )}
           {/* Qchess's "⇅ Sort", as ⇅ alone to leave the bar its room: the select lies over it. */}
           <label class="ex-sort" title={`Sort order: ${SORT_LABELS[p.sort]}`}>
             <span aria-hidden="true">⇅</span>
@@ -354,6 +437,23 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
             const cell = cells.get(r.san)!;
             const res = cell.result;
             const usable = preparedOn && !cell.excluded && res?.state === 'value' && res.prep ? res : undefined;
+            let bar: BarView | undefined;
+            let faded: string | undefined;
+            if (usable) {
+              const split = prepSplit(usable, r.san);
+              const eq = prepEqual ? equalOf.get(r.san) : undefined;
+              const lines = preparedDetails(usable, turn, detail);
+              if (eq) lines.splice(2, 0, equalPreparedLine(usable.prep!, split, usable.prior ?? 0, eq, turn));
+              else if (preparedOn && p.preparedEqual) lines.splice(2, 0, p.tab === 'lichess' ? equalMissing(r, childState.get(r.san)) : 'Not at equal ratings: the prepared split is Lichess’s, and these ratings are Masters’.');
+              const top = bestPrep != null && best.cmp.has(usable) && Math.round(expectedScore(split, turn)! * 100) === bestPrep;
+              bar = { split, class: `prep${(usable.prior ?? 0) >= 0.5 ? ' prep-muted' : ''}${top ? ' prep-best' : ''}`, title: lines.join('\n') };
+            } else if (preparedOn && !r.novelty) {
+              faded = 'No prepared split for this move: the games’ own results.';
+            } else if (equalOn && !r.novelty && !r.maiaOnly) {
+              const eq = equalOf.get(r.san);
+              if (eq) bar = { split: eq.split, class: 'equal', title: equalDetails(eq, turn).join('\n') };
+              else faded = equalMissing(r, childState.get(r.san));
+            }
             return (
               <Row
                 key={r.san}
@@ -380,8 +480,8 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
                       ),
                     }
                   : {})}
-                {...(usable ? { prepared: { split: usable.prep!, muted: (usable.prior ?? 0) >= 0.5, best: bestPrep != null && best.cmp.has(usable) && Math.round(expectedScore(usable.prep, turn)! * 100) === bestPrep, title: preparedDetails(usable, turn, detail).join('\n') } } : {})}
-                faded={preparedOn && !usable && !r.novelty}
+                {...(bar ? { bar } : {})}
+                {...(faded ? { faded } : {})}
                 {...(maiaOn ? { maia: { elo, ms: i < MAIA_ROWS ? (seen?.scores[r.san] ?? (seen?.asked.has(r.san) ? 'asking' : undefined)) : undefined, turn } } : {})}
               />
             );
@@ -511,10 +611,10 @@ function Bar(props: { white: number; draws: number; black: number; class?: strin
   );
 }
 
-interface Prepared {
+/** A bar in place of the games' own: the prepared split (§5.24) or the split at equal ratings (§5.126). */
+interface BarView {
   split: Split;
-  muted: boolean;
-  best: boolean;
+  class: string;
   title: string;
 }
 
@@ -525,7 +625,8 @@ interface MaiaCells {
   turn: 'w' | 'b';
 }
 
-function Row(props: { row: TableRow; games: boolean; cols: Cols; others: Occurrence[]; orders: Path[]; path: Path; practical?: preact.JSX.Element; prepared?: Prepared; faded?: boolean; maia?: MaiaCells }) {
+/** `faded`: the games' own bar shown faded, with this title (no prepared split, or not at equal ratings). */
+function Row(props: { row: TableRow; games: boolean; cols: Cols; others: Occurrence[]; orders: Path[]; path: Path; practical?: preact.JSX.Element; bar?: BarView; faded?: string; maia?: MaiaCells }) {
   const r = props.row;
   const title = r.novelty ? 'Engine suggested move (novelty)' : r.maiaOnly ? 'Maia suggested move' : r.rating ? `Average rating: ${Math.round(r.rating)}` : undefined;
   const m = props.maia;
@@ -595,16 +696,10 @@ function Row(props: { row: TableRow; games: boolean; cols: Cols; others: Occurre
           <span class="ex-bar ex-novelty ex-maia">Maia</span>
         ) : r.novelty ? (
           <span class="ex-bar ex-novelty">novelty</span>
-        ) : props.prepared ? (
-          <Bar
-            white={props.prepared.split.w}
-            draws={props.prepared.split.d}
-            black={props.prepared.split.b}
-            class={`prep${props.prepared.muted ? ' prep-muted' : ''}${props.prepared.best ? ' prep-best' : ''}`}
-            title={props.prepared.title}
-          />
+        ) : props.bar ? (
+          <Bar white={props.bar.split.w} draws={props.bar.split.d} black={props.bar.split.b} class={props.bar.class} title={props.bar.title} />
         ) : (
-          <Bar white={r.white} draws={r.draws} black={r.black} {...(props.faded ? { class: 'prep-raw', title: 'No prepared split for this move: the games’ own results.' } : {})} />
+          <Bar white={r.white} draws={r.draws} black={r.black} {...(props.faded ? { class: 'prep-raw', title: props.faded } : {})} />
         ))}
     </div>
   );
@@ -678,6 +773,14 @@ function PracticalDriver(props: { fen: string; mine: boolean; rows: readonly Tab
   const key = auto.join(' ');
   useEffect(() => practicalAt(props.fen, props.mine, auto, props.shares), [props.fen, props.mine, key]);
   useEffect(() => () => practicalOff(), []);
+  return null;
+}
+
+/** Asks the worker for the games after the rows' moves, for the scores at equal ratings (§5.126); those not come are dropped when it goes. */
+function ChildDriver(props: { tab: ExplorerTab; fens: readonly string[]; filter: string }) {
+  const key = props.fens.join('|');
+  useEffect(() => askChildren(props.tab, props.fens), [props.tab, key, props.filter]);
+  useEffect(() => () => askChildren(props.tab, []), []);
   return null;
 }
 

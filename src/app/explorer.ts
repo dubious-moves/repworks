@@ -24,8 +24,13 @@ export interface ExplorerPrefs {
   recent: boolean;
   /** The Practical column (§5.24). */
   practical: boolean;
-  /** The Score column's bars show the prepared split (§5.24). */
-  prepared: boolean;
+  /**
+   * What the Score column's bars show: the games' own results, the results at equal ratings
+   * (§5.126), or the prepared split (§5.24).
+   */
+  scoreView: ScoreView;
+  /** The prepared split with the row's rating gap taken out of its games' part (§5.126). */
+  preparedEqual: boolean;
   riskAversion: number;
   budget: number;
   /** q_extension's advanced options; shares in percent, as its popup has them. */
@@ -52,6 +57,8 @@ export interface ExplorerPrefs {
 
 export type ExplorerColumn = 'eval' | 'share' | 'games' | 'ml' | 'ms' | 'score';
 
+export type ScoreView = 'games' | 'equal' | 'prepared';
+
 // Qchess's defaults for the filter and the sort; q_extension's for the rest.
 export const DEFAULT_PREFS: ExplorerPrefs = {
   on: true,
@@ -61,7 +68,8 @@ export const DEFAULT_PREFS: ExplorerPrefs = {
   ratings: [1600, 1800, 2000, 2200, 2500],
   recent: false,
   practical: true,
-  prepared: false,
+  scoreView: 'games',
+  preparedEqual: true,
   riskAversion: 0.05,
   budget: 60,
   replyThreshold: 3,
@@ -85,9 +93,12 @@ const LIMITER_KEY = 'repworks-explorer-limiter';
 function loadPrefs(): ExplorerPrefs {
   try {
     const raw = localStorage.getItem(PREFS_KEY);
-    const saved = raw ? (JSON.parse(raw) as Partial<ExplorerPrefs>) : {};
+    const saved = raw ? (JSON.parse(raw) as Partial<ExplorerPrefs> & { prepared?: boolean }) : {};
     // ChessDB's own tab is gone: its evals are the games tabs' Eval column and novelties.
     if ((saved.tab as string | undefined) === 'chessdb') delete saved.tab;
+    // The Score switch had two states before §5.126.
+    if (saved.scoreView === undefined && saved.prepared) saved.scoreView = 'prepared';
+    delete saved.prepared;
     return { ...DEFAULT_PREFS, ...saved };
   } catch {
     return { ...DEFAULT_PREFS };
@@ -309,6 +320,8 @@ function receive(m: FromWorker) {
       remember(kept);
       return;
     }
+    case 'childGames':
+      return receiveChild(m.id, 'games' in m ? m.games : 'failed');
     case 'paused':
       pausedUntil.value = Date.now() + m.ms;
       return;
@@ -320,6 +333,61 @@ function receive(m: FromWorker) {
       }
       return;
   }
+}
+
+/* ------------------------------------------------- the games after the panel's moves (§5.126) */
+
+/**
+ * The answers at the positions after the panel's moves, by `childKey`, for the scores at equal
+ * ratings: the replies' ratings there are the opponents'. 'failed' when the request failed; asked
+ * again once the panel has left the position.
+ */
+export const childAnswers = signal<ReadonlyMap<string, CompactExplorer | 'failed'>>(new Map());
+const childPending = new Map<number, string>();
+const CHILDREN_KEPT = 600;
+
+/** The key of the answer at `fen` on `tab`, under this device's filter. */
+export const childKey = (tab: ExplorerTab, fen: string): string => keyOf(tab, fen, prefs.peek());
+
+/**
+ * Asks the games at `fens` (positions after the panel's moves) not known yet. Requests for other
+ * positions that haven't come are dropped, as the panel's own lookup is when it moves on.
+ */
+export function askChildren(tab: ExplorerTab, fens: readonly string[]): void {
+  const p = prefs.peek();
+  const want = new Set(fens.map((f) => keyOf(tab, f, p)));
+  for (const [id, key] of childPending) {
+    if (want.has(key)) continue;
+    post({ type: 'drop', id });
+    childPending.delete(id);
+  }
+  const known = childAnswers.peek();
+  const failed = [...known].filter(([key, a]) => a === 'failed' && !want.has(key));
+  if (failed.length) {
+    const next = new Map(known);
+    for (const [key] of failed) next.delete(key);
+    childAnswers.value = next;
+  }
+  const pending = new Set(childPending.values());
+  for (const fen of fens) {
+    const key = keyOf(tab, fen, p);
+    if (childAnswers.peek().has(key) || pending.has(key)) continue;
+    const id = nextId++;
+    childPending.set(id, key);
+    pending.add(key);
+    post({ type: 'childGames', id, tab, fen });
+  }
+}
+
+function receiveChild(id: number, answer: CompactExplorer | 'failed') {
+  const key = childPending.get(id);
+  if (!key) return;
+  childPending.delete(id);
+  const next = new Map(childAnswers.peek());
+  next.delete(key);
+  next.set(key, answer);
+  if (next.size > CHILDREN_KEPT) next.delete(next.keys().next().value!);
+  childAnswers.value = next;
 }
 
 /* ------------------------------------------------------------- the local explorer (§5.25) */

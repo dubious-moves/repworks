@@ -5,6 +5,19 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## Scores at equal ratings (§5.126, 2026-10-19)
+- Explorer: click the Score header once: "Equal Elo", dashed bars. Hover one (the phone has no
+  hover: say if you want its details on a tap, as the Practical cells have): its score, the games',
+  both averages and the gap. Do the reorderings on lines you know make sense (e.g. 1.e4 Nf6 losing
+  its lead, 1.e4 c5 2.d3 gaining)? Stepping through a line in this view asks Lichess for up to
+  about ten more positions each time the first time: is the wait for the bars acceptable, and does
+  the Practical column feel slower beside it?
+- Click again: Prepared, now at equal ratings (Explorer settings → Practical column → "Prepared
+  results at equal ratings"). The bar's title has an "At equal ratings" line. Untick it to compare
+  with q_extension's prepared bars, which it should then match again.
+- Games page → Explorer: the "± Elo" column on your real games. Do the moves it marks red feel like
+  the ones that cost you? Its title has the performance.
+
 ## Puzzles in a focused storm (§5.125, 2026-10-18)
 - On the storm's page, pick a focus chip, tick "Puzzles too" under the chips, and start: puzzles
   should come among the focus's positions at your share of cards. Is the checkbox easy to find

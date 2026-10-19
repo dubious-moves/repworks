@@ -259,6 +259,28 @@ test('coverage counts (§5.26): the games alone, at the filter, once and then fr
   assert.ok(refused && 'error' in refused && refused.error.login);
 });
 
+test('the games after a move (§5.126): the tab’s database alone, no ChessDB, cached; a dropped one answers nothing', async () => {
+  const w = world();
+  w.service.handle({ type: 'childGames', id: 3, tab: 'lichess', fen: START });
+  w.service.handle({ type: 'childGames', id: 4, tab: 'masters', fen: START });
+  await settle();
+  assert.deepEqual(w.urls.map((u) => u.split('?')[0]), ['https://explorer.lichess.org/lichess', 'https://explorer.lichess.org/masters'], 'no ChessDB request');
+  assert.match(w.urls[0]!, /speeds=blitz&ratings=2000/);
+  for (const id of [3, 4]) {
+    const m = w.posts.find((p) => p.type === 'childGames' && p.id === id);
+    assert.ok(m && 'games' in m && m.games.total === 1650);
+  }
+  w.service.handle({ type: 'childGames', id: 5, tab: 'lichess', fen: START });
+  await settle();
+  assert.equal(w.urls.length, 2, 'from the cache');
+
+  const slow = world({ explorer: () => new Promise<HttpResponse>(() => {}) });
+  slow.service.handle({ type: 'childGames', id: 6, tab: 'lichess', fen: START });
+  slow.service.handle({ type: 'drop', id: 6 });
+  await settle();
+  assert.ok(!slow.posts.some((m) => m.type === 'childGames'));
+});
+
 /* Maia (§5.34): q_extension's fill-in of thin positions, and its preview beside the search. */
 
 // Every position thin: two moves with 15 games each, under the 50 games a node needs.

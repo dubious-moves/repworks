@@ -259,13 +259,18 @@ test('the Practical column on the chapter’s moves: rows by rounds, green, a cl
   const fake = await setUp(page);
   // After 1. e4, Black's move (the chapter is Black's): c5 and e5 picked, b6 (under 2%, no eval) not.
   fake.games.set(AFTER_E4, [
-    { san: 'c5', white: 250, draws: 150, black: 200 },
-    { san: 'e5', white: 120, draws: 100, black: 80 },
+    { san: 'c5', white: 250, draws: 150, black: 200, averageRating: 1950 },
+    { san: 'e5', white: 120, draws: 100, black: 80, averageRating: 1990 },
     { san: 'b6', white: 3, draws: 1, black: 1 },
   ]);
   fake.evals.set(AFTER_E4, [
     ['c5', -25],
     ['e5', -30],
+  ]);
+  // c5's players 50 below their opponents (the replies' ratings after it); none after e5.
+  fake.games.set(AFTER_C5, [
+    { san: 'Nf3', white: 50, draws: 30, black: 20, averageRating: 2000 },
+    { san: 'c3', white: 20, draws: 20, black: 10, averageRating: 2000 },
   ]);
   fake.games.set(AFTER_E5, [{ san: 'Nf3', white: 150, draws: 100, black: 50 }]);
   fake.evals.set(AFTER_E5, [['Nf3', 40]]);
@@ -293,13 +298,59 @@ test('the Practical column on the chapter’s moves: rows by rounds, green, a cl
   await expect(cell('e5')).toHaveText('×');
   await cell('e5').click({ button: 'right' });
   await expect(cell('e5')).toHaveText(/^\d+%$/);
-  // The Score header switches the bars to the prepared split.
+  // The Score header switches the bars to the results at equal ratings, then to the prepared split,
+  // itself at equal ratings where the games after the move have ratings (§5.126).
   await panel(page).getByRole('button', { name: 'Score' }).click();
+  await panel(page).getByRole('button', { name: 'Equal Elo' }).click();
   await expect(panel(page).getByRole('button', { name: 'Prepared' })).toBeVisible();
   await expect(panel(page).locator('.ex-bar.prep')).toHaveCount(2);
   await expect(panel(page).locator('.ex-bar.prep').first()).toHaveAttribute('title', /^Prepared \d+ \/ \d+ \/ \d+/);
+  const bar = (san: string) => panel(page).locator('.ex-row', { has: page.locator('.ex-san', { hasText: new RegExp(`^${san}$`) }) }).locator('.ex-bar');
+  await expect(bar('c5')).toHaveAttribute('title', /At equal ratings: \d+% \(\d+% before\)\. The move’s players averaged 1950, their opponents 2000 \(−50\)/);
+  await expect(bar('e5')).toHaveAttribute('title', /Not at equal ratings: no rated games after this move/);
   // Lichess's data, with the token, for the search too.
   expect(fake.requests.filter((r) => r.url.includes(encodeURIComponent('4p3/4P3')) && r.url.startsWith('https://explorer.lichess.org/lichess')).length).toBeGreaterThan(0);
+});
+
+const AFTER_D4 = 'rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq -';
+
+test('Equal Elo: each row’s results with its players’ rating gap taken out, from the replies after it; sorted by it; kept', async ({ page }) => {
+  const fake = await setUp(page);
+  // e4's players averaged 2101 against 2033 after it: 67% in the games, 57% at equal ratings. d4's,
+  // 1980 against 2030: 60%, then 67%. Nothing rated after c4.
+  fake.games.set(START, [
+    { san: 'e4', white: 300, draws: 200, black: 100, averageRating: 2101 },
+    { san: 'd4', white: 120, draws: 120, black: 60, averageRating: 1980 },
+    { san: 'c4', white: 40, draws: 40, black: 20, averageRating: 2050 },
+  ]);
+  fake.games.set(AFTER_E4, [
+    { san: 'c5', white: 250, draws: 150, black: 0, averageRating: 2050 },
+    { san: 'e5', white: 100, draws: 50, black: 50, averageRating: 2000 },
+  ]);
+  fake.games.set(AFTER_D4, [{ san: 'Nf6', white: 120, draws: 120, black: 60, averageRating: 2030 }]);
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf`);
+  await expect(rows(page)).toHaveText(['e4', 'd4', 'Nf3', 'c4']);
+  const bar = (san: string) => panel(page).locator('.ex-row', { has: page.locator('.ex-san', { hasText: new RegExp(`^${san}$`) }) }).locator('.ex-bar');
+  await panel(page).getByRole('button', { name: 'Score' }).click();
+  await expect(panel(page).getByRole('button', { name: 'Equal Elo' })).toBeVisible();
+  await expect(bar('e4')).toHaveClass(/equal/);
+  await expect(bar('e4')).toHaveAttribute('title', /^At equal ratings: 57% for White \(the games: 67%\)\nIts players averaged 2101, their opponents 2033 \(\+68\), which predicts 60%\./);
+  await expect(bar('d4')).toHaveAttribute('title', /^At equal ratings: 67% for White \(the games: 60%\)/);
+  await expect(bar('c4')).toHaveClass(/prep-raw/);
+  await expect(bar('c4')).toHaveAttribute('title', /no rated games after this move/);
+  // The positions after the moves were asked of the explorer, at the filter, with the token.
+  for (const fen of [AFTER_E4, AFTER_D4]) expect(fake.requests.some((r) => r.url.startsWith('https://explorer.lichess.org/lichess') && r.url.includes(encodeURIComponent(fen.split(' ')[0]!)) && r.auth === 'Bearer lip_e2e')).toBe(true);
+  // Sorted by score: by the scores at equal ratings (c4 by its games' own), ChessDB's novelty last.
+  await panel(page).getByRole('combobox', { name: 'Sort' }).selectOption('score');
+  await expect(rows(page)).toHaveText(['d4', 'c4', 'e4', 'Nf3']);
+  // Kept on this device; the next click goes to Prepared (the Practical column is on), then back.
+  await page.reload();
+  await expect(panel(page).getByRole('button', { name: 'Equal Elo' })).toBeVisible();
+  await expect(bar('e4')).toHaveClass(/equal/);
+  await panel(page).getByRole('button', { name: 'Equal Elo' }).click();
+  await panel(page).getByRole('button', { name: 'Prepared' }).click();
+  await expect(panel(page).getByRole('button', { name: 'Score' })).toBeVisible();
+  await expect(bar('e4')).not.toHaveClass(/equal|prep/);
 });
 
 test('the local explorer: its address tested, then the Lichess tab answered by it with no login; Masters stays Lichess’s', async ({ page }) => {

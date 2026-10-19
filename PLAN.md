@@ -6615,3 +6615,72 @@ to include puzzles in a focused storm." Decided:
 
 Tests: `puzzles.spec.ts` (desktop and phone: a Quiet focus with no position ready can't start;
 with Puzzles too it does, at 100%, and deals a puzzle). Live: TESTING.md.
+
+#### 5.126 Scores at equal ratings (the owner's request, 2026-10-19)
+
+The owner asked whether "PETER" ("Performance Evaluation Tracking Elo Rating": lines that "tend to
+result in the highest rating gains", accounting for rating differences in the online databases)
+was relevant here. No published description of it was found; as quoted it is a move's score with
+the rating gap between its players and their opponents taken out, which is what a performance
+rating does (ChessBase's Perf; Lichess's player explorer computes one per move). Found, and asked
+for in all three parts below ("build all three"):
+
+- **The data is there.** lila-openingexplorer (read at its HEAD, 2026-10-18) files a Lichess game
+  under the band of the two ratings' midpoint and records each move's `averageRating` as the
+  rating of the player who made it (`Stats::new_single(outcome, mover_rating)`; Masters likewise).
+  So the replies' ratings at the position after a move are its players' opponents'. The local
+  explorer (q_extension's explorerdb) records no ratings.
+- **It matters.** Measured live from a cloud container against explorer.lichess.org with a token
+  (blitz and rapid, five positions, bands 1800–2000 and 1400–1600): a position's moves differ by
+  10–30 points in their players' gap, which moves the score by 1.5–4.5 points, as much as the
+  differences the Score bars show. 1.e4 Nf6 at 1800–2000: 51.7%, the best of Black's ten replies,
+  is 49.0% at equal ratings (its players +19); 1.e4 c5 2.d3: 48.2% (8th of 9) is 52.5% (3rd,
+  −30). At 1400–1600, 1.d4 Nf6 2.c4 c5 / e5 / g6 score 53.1 / 51.5 / 50.3 and all 49.8 at equal
+  ratings. The first moves' spread, 51.2–54.0, is 51.6–52.4.
+- **The arithmetic** (`core/explorer/equal.ts`): the opponents' average is the replies' ratings
+  weighted by games; the gap gives Elo's expected score `1 / (1 + 10^(−gap/400))`; the score at
+  equal ratings is `raw − (expected − ½)`, taken from the mover's wins and given to its losses
+  (draws kept, clamped). The gap of the averages stands in for the average of each game's gap:
+  the curve is close to straight over tens of points. Limits, said in the titles and here: only
+  the measured gap comes out (strength a rating misses stays in); the position after a move also
+  counts games reaching it by another order.
+
+**(1) The explorer's Equal Elo view.** The Score header is now a switch of three on every games
+tab: Score (the games' own results) → Equal Elo → Prepared (with the Practical column on) →
+Score; `scoreView` per device replaces `prepared` (a saved `prepared: true` reads as Prepared).
+Sort by score stays in ⇅; at equal ratings it sorts by the adjusted scores (rows without one by
+their own). The bars of Equal Elo are dashed, each titled with its score, the games', both
+averages and the gap, the split and the games. The games after a move come from a new worker
+request, `childGames` (the tab's database alone, no ChessDB, priority 600: under the panel's
+lookup and practice, above coverage and the search, which asks the same positions for its rows
+and then finds them cached), asked by the panel (`askChildren`) for the rows over 2% of the games
+(8 at most) and the chapter's own moves, and dropped when the panel moves on. Each costs one
+request of Lichess's 16 a minute the first time; the explorer cache keeps them 30 days. A row not
+asked, still asked, failed, with nothing rated after it, or on a database without ratings keeps
+the games' bar, faded, with the reason in its title.
+
+**(2) The prepared split at equal ratings** (a setting, "Prepared results at equal ratings", on by
+default). Only the split's games' part, `1 − prior`, carries the gap (its Practical part comes from
+engine evals), so it moves by `(expected − ½)(1 − prior)`, with the row's gap standing in for every
+leaf's: the leaves' games are the row's games split by the replies. Done in the panel, not in the
+search: q_extension's port (§5.21) stays as it was, so its Practical values still match
+q_extension's; the prepared bars don't while the setting is on. The row's position is the search's
+own first node, so its games come from the cache. On the Masters tab it is left alone (the split is
+Lichess's, the ratings Masters'), and the bar's title says so. The green best follows the corrected
+splits.
+
+**(3) The games' own explorer** (§6, item 4) gets a "± Elo" column: the user's score in the games
+through each move against what each game's two ratings predicted, in points (`expectedOf`,
+`expectedCell`, `expectedTitle` in `core/games/openings.ts`), green above, red below, faded under
+10 games. Its title adds the performance: the opponents' average plus `400·log10(s/(1−s))`, ±800 at
+0 and 100%. Games missing a rating are left out of it; with none, "–".
+
+Tests: `equal.test.ts` (Elo's curve, the opponents' average, the shift and its clamp, 1.e4 Nf6 as
+measured, a weaker side's score going up, nothing without games, a rating or rated replies, the
+prepared split's games' part, the details), `service.test.ts` (the games after a move: the tab's
+database alone, cached, nothing after a drop), `table.test.ts` (the score order at equal ratings),
+`openings.test.ts` (the column over rated games, the performance and its ends, the cell and title),
+`explorer.spec.ts` (desktop and phone: Equal Elo's bars and titles worked out by hand, the faded
+row, the positions asked with the token, the sort, kept after a reload, the switch's order; the
+prepared bar corrected and the one with nothing rated after it), `games.spec.ts` (the column and
+its title). Live: TESTING.md.

@@ -15,7 +15,7 @@ import { Chess } from 'chessops/chess';
 import { parseSan } from 'chessops/san';
 import { parseFen } from 'chessops/fen';
 import { positionKeyOf } from '../../../../src/core/chess/positionKey.ts';
-import { explorerRows, openingIndex, openingNameAt, reaches, type IndexedGame } from '../../../../src/core/games/openings.ts';
+import { expectedCell, expectedOf, expectedTitle, explorerRows, openingIndex, openingNameAt, reaches, type IndexedGame } from '../../../../src/core/games/openings.ts';
 import { replay } from '../../../../src/core/games/positions.ts';
 
 const j = JSON.parse(readFileSync(new URL('../../../fixtures/games/openings.json', import.meta.url), 'utf8')) as {
@@ -69,4 +69,32 @@ test('the explorer’s rows: most played first, results from White’s side, a c
   assert.equal(explorerRows(index, start)[0]!.count, 7);
   assert.equal(reaches(index, 'G6', after3), true, 'a game from a position reaches it');
   assert.equal(reaches(index, 'G9', start), false, 'an empty game reaches nothing');
+});
+
+test('a move’s score against the ratings’ prediction (§5.126): over the games with both ratings; the performance', () => {
+  const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+  const rated: IndexedGame[] = [
+    // e4: a win against 100 points more, a draw at even ratings, a loss against 200 less; one without ratings.
+    { id: 'r1', color: 'white', result: 'win', played: replay({ moves: ['e4', 'e5'] }), rating: 1900, opponentRating: 2000 },
+    { id: 'r2', color: 'white', result: 'draw', played: replay({ moves: ['e4', 'c5'] }), rating: 1950, opponentRating: 1950 },
+    { id: 'r3', color: 'white', result: 'loss', played: replay({ moves: ['e4', 'e6'] }), rating: 2000, opponentRating: 1800 },
+    { id: 'r4', color: 'white', result: 'win', played: replay({ moves: ['e4', 'd5'] }), rating: 2000 },
+    { id: 'r5', color: 'white', result: 'win', played: replay({ moves: ['d4'] }) },
+  ];
+  const rows = explorerRows(openingIndex(rated), keyAfter(START, []));
+  const e4 = rows.find((r) => r.san === 'e4')!;
+  const e = e4.expected!;
+  assert.equal(e.games, 3);
+  assert.equal(e.score, 0.5);
+  const predicted = (1 / (1 + 10 ** (100 / 400)) + 0.5 + 1 / (1 + 10 ** (-200 / 400))) / 3;
+  assert.ok(Math.abs(e.expected - predicted) < 1e-12);
+  assert.ok(Math.abs(e.opponents - 1916.6667) < 1e-3);
+  assert.ok(Math.abs(e.performance - e.opponents) < 1e-9, '50%: the opponents’ average');
+  assert.equal(rows.find((r) => r.san === 'd4')!.expected, undefined, 'no ratings, nothing to say');
+  assert.equal(expectedCell(e), `−${Math.round((predicted - 0.5) * 100)}`);
+  assert.equal(expectedTitle(e), `You scored 50% in 3 games with both ratings, where the ratings predicted ${Math.round(predicted * 100)}%: ${expectedCell(e)}. Performance 1917 against opponents averaging 1917. Few games: read it as a hint.`);
+  // All won, all lost: ±800 from the opponents' average.
+  assert.equal(expectedOf([{ id: 'a', color: 'black', result: 'win', rating: 1500, opponentRating: 1600 }])!.performance, 2400);
+  assert.equal(expectedOf([{ id: 'a', color: 'black', result: 'loss', rating: 1500, opponentRating: 1600 }])!.performance, 800);
+  assert.equal(expectedCell({ games: 20, score: 0.6, expected: 0.6, opponents: 1, performance: 1 }), '0');
 });

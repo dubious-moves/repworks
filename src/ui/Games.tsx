@@ -28,7 +28,7 @@ import { positionOf } from '../core/storm/walk.ts';
 import { Board } from './Board.tsx';
 import { EngineLinePanel } from './EngineLinePanel.tsx';
 import { MoveBoard, PracticeBoard, ResumeBanner } from './Practice.tsx';
-import { explorerRows, openingNameAt, reaches } from '../core/games/openings.ts';
+import { expectedCell, expectedTitle, explorerRows, openingNameAt, reaches } from '../core/games/openings.ts';
 import { keyFen } from '../core/chess/positionKey.ts';
 import { fenAfterUci, START_FEN, uciToSan } from '../core/storm/walk.ts';
 import { discardSaved, resumePractice, savedPractice } from '../app/practice.ts';
@@ -877,6 +877,7 @@ function GamesExplorer() {
                     <th>Move</th>
                     <th>Games</th>
                     <th>White · draw · Black</th>
+                    <th title="Your score in these games against what your rating and your opponent’s predicted, in points (Elo’s expected score)">± Elo</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -897,6 +898,9 @@ function GamesExplorer() {
                         <span class="muted">
                           {r.whiteWins} · {r.draws} · {r.blackWins}
                         </span>
+                      </td>
+                      <td class={`vs-expected${r.expected ? ` ${r.expected.score > r.expected.expected + 0.005 ? 'plus' : r.expected.score < r.expected.expected - 0.005 ? 'minus' : ''}${r.expected.games < 10 ? ' few' : ''}` : ''}`} title={r.expected ? expectedTitle(r.expected) : 'No ratings in these games'}>
+                        {r.expected ? expectedCell(r.expected) : '–'}
                       </td>
                     </tr>
                   ))}

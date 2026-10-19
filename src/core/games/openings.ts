@@ -3,8 +3,9 @@
 // `lookupOpeningName`): every game's positions (before each move, and the last), each position's
 // moves with their games and results, the games reaching a position (by its key, so transpositions
 // count), and the opening name most games reaching a position carry (to title practice games and
-// saved items). Pure.
+// saved items). Pure. Each move's score against what the players' ratings predicted (§5.126).
 import type { PositionKey } from '../chess/positionKey.ts';
+import { eloExpected } from '../explorer/equal.ts';
 import type { Replayed } from './positions.ts';
 import type { Color } from './record.ts';
 
@@ -15,6 +16,18 @@ export interface IndexedGame {
   opening?: string | undefined;
   /** The game replayed; undefined when its start can't be read. */
   played: Replayed | undefined;
+  /** The user's rating and the opponent's when the game was played, when the record has them. */
+  rating?: number | undefined;
+  opponentRating?: number | undefined;
+}
+
+/** A game through a move: its result for the user, and both ratings when known. */
+export interface MoveGame {
+  id: string;
+  color: Color;
+  result: 'win' | 'loss' | 'draw';
+  rating?: number;
+  opponentRating?: number;
 }
 
 export interface MoveStats {
@@ -24,7 +37,7 @@ export interface MoveStats {
   whiteWins: number;
   blackWins: number;
   draws: number;
-  games: { id: string; color: Color; result: 'win' | 'loss' | 'draw' }[];
+  games: MoveGame[];
 }
 
 export interface OpeningIndex {
@@ -57,7 +70,12 @@ export function openingIndex(games: readonly IndexedGame[]): OpeningIndex {
       if (winner === 'white') e.whiteWins++;
       else if (winner === 'black') e.blackWins++;
       else e.draws++;
-      e.games.push({ id: g.id, color: g.color, result: g.result });
+      const entry: MoveGame = { id: g.id, color: g.color, result: g.result };
+      if (g.rating !== undefined && g.opponentRating !== undefined) {
+        entry.rating = g.rating;
+        entry.opponentRating = g.opponentRating;
+      }
+      e.games.push(entry);
     }
   }
   return { fens, moves, order: games };
@@ -71,6 +89,39 @@ export interface ExplorerRow {
   blackWins: number;
   draws: number;
   games: string[];
+  /** The user's score against what the ratings predicted, over the games with both (§5.126). */
+  expected?: Expected;
+}
+
+export interface Expected {
+  /** The games with both ratings. */
+  games: number;
+  /** The user's score in them and what the rating gaps predicted, 0 to 1. */
+  score: number;
+  expected: number;
+  /** The opponents' average rating, and the rating whose expected score against it is the score (±800 at 0 and 100%). */
+  opponents: number;
+  performance: number;
+}
+
+/** The user's score against Elo's prediction from each game's two ratings; undefined with no rated game. */
+export function expectedOf(games: readonly MoveGame[]): Expected | undefined {
+  let n = 0;
+  let score = 0;
+  let expected = 0;
+  let opponents = 0;
+  for (const g of games) {
+    if (g.rating === undefined || g.opponentRating === undefined) continue;
+    n++;
+    score += g.result === 'win' ? 1 : g.result === 'draw' ? 0.5 : 0;
+    expected += eloExpected(g.rating - g.opponentRating);
+    opponents += g.opponentRating;
+  }
+  if (!n) return undefined;
+  const s = score / n;
+  const avg = opponents / n;
+  const dp = s <= 0 ? -800 : s >= 1 ? 800 : Math.max(-800, Math.min(800, 400 * Math.log10(s / (1 - s))));
+  return { games: n, score: s, expected: expected / n, opponents: avg, performance: avg + dp };
 }
 
 /**
@@ -92,9 +143,24 @@ export function explorerRows(index: OpeningIndex, key: PositionKey, color?: Colo
       else if (g.result === 'loss') g.color === 'white' ? blackWins++ : whiteWins++;
       else draws++;
     }
-    rows.push({ san, uci: e.uci, count: games.length, whiteWins, blackWins, draws, games: games.map((g) => g.id) });
+    const row: ExplorerRow = { san, uci: e.uci, count: games.length, whiteWins, blackWins, draws, games: games.map((g) => g.id) };
+    const expected = expectedOf(games);
+    if (expected) row.expected = expected;
+    rows.push(row);
   }
   return rows.sort((a, b) => b.count - a.count);
+}
+
+/** The points the user scored above (or below) the ratings' prediction, as the column writes them: `+6`, `−4`, `0`. */
+export function expectedCell(e: Expected): string {
+  const d = Math.round((e.score - e.expected) * 100);
+  return d > 0 ? `+${d}` : d < 0 ? `−${-d}` : '0';
+}
+
+/** The column's title: the score, the prediction and the performance, over the games with both ratings. */
+export function expectedTitle(e: Expected): string {
+  const pct = (f: number) => Math.round(f * 100);
+  return `You scored ${pct(e.score)}% in ${e.games} game${e.games === 1 ? '' : 's'} with both ratings, where the ratings predicted ${pct(e.expected)}%: ${expectedCell(e)}. Performance ${Math.round(e.performance)} against opponents averaging ${Math.round(e.opponents)}.${e.games < 10 ? ' Few games: read it as a hint.' : ''}`;
 }
 
 /** Whether a game reaches the position (`applyOpeningFilterFromBoard`'s filter). */

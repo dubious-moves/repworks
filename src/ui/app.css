@@ -3201,6 +3201,12 @@ a.button.primary {
   opacity: 0.55;
 }
 
+/* Bars at equal ratings (§5.126): dashed; rows not adjusted keep the games' bar, faded. */
+.ex-bar.equal {
+  outline: 1px dashed var(--info);
+  outline-offset: -1px;
+}
+
 .ex-details {
   position: relative;
   margin: 4px 8px 6px;
@@ -4961,6 +4967,20 @@ a.button.disabled {
 }
 .explorer-games tbody tr {
   cursor: pointer;
+}
+/* Your score against the ratings' prediction (§5.126): green above, red below, faded under 10 games. */
+.explorer-games .vs-expected {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.explorer-games .vs-expected.plus {
+  color: var(--plus);
+}
+.explorer-games .vs-expected.minus {
+  color: var(--minus);
+}
+.explorer-games .vs-expected.few {
+  opacity: 0.6;
 }
 .result-bar {
   display: inline-flex;

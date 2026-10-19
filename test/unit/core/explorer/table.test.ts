@@ -121,3 +121,13 @@ test('counts are short: three figures and k, M or B', () => {
     ['0', '7', '999', '1k', '1.23k', '12.3k', '900k', '999k', '1M', '2.51M', '800M', '1.52B', '872M'],
   );
 });
+
+test('the score order at equal ratings (§5.126): the scores given in place of the games’ own, the rest by theirs', () => {
+  // Black's own: Nf6 .458, d5 .45, f5 .15. At equal ratings d5 .47 and f5 .1; Nf6 has none.
+  const scores = new Map([
+    ['d5', 0.47],
+    ['f5', 0.1],
+  ]);
+  assert.deepEqual(sans(buildTable({ turn: 'b', games, evals, sort: 'score', side: 'w', scores })), ['d5', 'Nf6', 'f5', 'e5', 'g5']);
+  assert.deepEqual(sans(buildTable({ turn: 'b', games, evals, sort: 'popularity', side: 'w', scores })), ['Nf6', 'd5', 'f5', 'e5', 'g5']);
+});

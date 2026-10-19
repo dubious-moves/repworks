@@ -1719,3 +1719,16 @@ The technical calls, each with its reason:
   "Puzzles too" in the focus's panel, off by default, deals them at the share of cards. Why: the
   owner asked for it. Puzzles aren't filtered by the focus, since the tags need a list and Maia's
   policies a puzzle doesn't have.
+
+## Revision of 2026-10-19 (scores at equal ratings, PLAN.md §5.126)
+- **The explorer's Score header switches between three views**: the games' own results, the results
+  at equal ratings (the rating gap between each move's players and their opponents taken out, the
+  opponents' ratings read at the position after the move), and the prepared split. Was (§5.24):
+  Score and Prepared, and without the Practical column the header sorted by score (now in ⇅ only).
+  Why: the owner asked for it after the "PETER" question; measured, the gap between a position's
+  moves moves their scores as much as the differences the bars show.
+- **The prepared split is shown at equal ratings by default** (a setting turns it off), its games'
+  part moved by the row's gap. The search, q_extension's port, is unchanged: the correction is the
+  panel's, so the Practical values still match q_extension's and the prepared bars no longer do
+  while the setting is on.
+- **The games' own explorer shows each move's score against the ratings' prediction** ("± Elo").
