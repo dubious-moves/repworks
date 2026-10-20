@@ -1761,3 +1761,20 @@ The technical calls, each with its reason:
 - **Idea cards will be keyed by chapter (`i|<sid>|<cid>`), not by position.** Was: plan cards
   (§5.61), keyed by position, which gather every comment at that position from every study. Why:
   a deck's card should show what the deck says, not the repertoire's notes mixed in.
+
+## Revision of 2026-10-20 (opening ideas: the owner's three rules, PLAN.md §5.128)
+- **The repertoire is right: an idea deck teaches it and never reviews it.** At a repertoire
+  position, the card's answer and its main line's move are the repertoire's move. It is never
+  marked `?`, and no side line beside it grades better (`check --rep`). Was: the skill graded
+  every move and reported gaps and improvements. In the pilot, card 12b taught 6...Qb6 where the
+  repertoire plays 6...Bc5. Why: the owner, 2026-10-20: the builder chose each move for a
+  reason (practical eval, ease of learning, transpositions, recurring moves); the feature isn't
+  for finding better moves.
+- **Maia is read at 2000 or more.** Was: 1100, 1500 and 1900 by default. Why: the owner: Maia
+  plays a little below its number.
+- **An idea deck starts with development: where each piece goes, and when.** There is one card
+  per square, the condition taken from the development map and confirmed on the board. Was:
+  ideas in the order they come up, starting with what the gambit buys. Why: the owner asked for
+  it ("define when the f8 bishop should develop to e7, d6, c5 and why"). Decided within it: the
+  rules of thumb are split into two overview chapters (where the pieces go; plans and tactics),
+  each under 1500 characters, and the duplicate-position warning counts cards only.

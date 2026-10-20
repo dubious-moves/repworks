@@ -15,7 +15,7 @@ export type Player = { kind: 'sf'; depth: number; spread: number } | { kind: 'ma
 
 export function parsePlayer(text: string): Player {
   const [kind, a, b] = text.split(':');
-  if (kind === 'maia') return { kind: 'maia', elo: Number(a ?? 1500) };
+  if (kind === 'maia') return { kind: 'maia', elo: Number(a ?? 2000) };
   if (kind === 'sf') return { kind: 'sf', depth: Number(a ?? 12), spread: Number(b ?? 0) };
   throw new Error(`a player is sf:<depth>[:<spread cp>] or maia:<elo>, not ${text}`);
 }

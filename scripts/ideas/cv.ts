@@ -6,11 +6,13 @@
 //   node scripts/ideas/cv.ts engine  <pos> [--depth 18] [--lines 4] [--side black]
 //   node scripts/ideas/cv.ts threat  <pos> [--depth 16]
 //   node scripts/ideas/cv.ts grade   <pos> <move>... [--depth 18]
-//   node scripts/ideas/cv.ts maia    <pos> [--elo 1100,1500,1900] [--grade 14]
+//   node scripts/ideas/cv.ts squares <pos> <square> [--depth 18]
+//   node scripts/ideas/cv.ts maia    <pos> [--elo 2000,2200] [--grade 14]
 //   node scripts/ideas/cv.ts tree    <repertoire.pgn> [--side black] [--min 1] [--ours] [--leaves]
 //   node scripts/ideas/cv.ts profile <repertoire.pgn> [--side black] [--engine 16] [--top 10]
-//   node scripts/ideas/cv.ts playout <pos> [--n 6] [--plies 24] [--white maia:1500] [--black sf:12[:30]] [--seed 1] [--judge 14]
-//   node scripts/ideas/cv.ts check   <deck.pgn> [--depth 16] [--no-engine] [--verbose]
+//   node scripts/ideas/cv.ts develop <repertoire.pgn> [--side black] [--piece f8-bishop]
+//   node scripts/ideas/cv.ts playout <pos> [--n 6] [--plies 24] [--white maia:2000] [--black sf:12[:30]] [--seed 1] [--judge 14]
+//   node scripts/ideas/cv.ts check   <deck.pgn> [--rep repertoire.pgn] [--depth 16] [--no-engine] [--verbose]
 //
 // <pos> is a FEN, `startpos`, or movetext from the start ("1. e4 d5 2. exd5 c6"). Moves are SAN or
 // UCI. Stockfish is the vendored lite build unless STOCKFISH names a native binary; searches are
@@ -20,13 +22,14 @@ import { Chess, type Position } from 'chessops/chess';
 import { makeFen } from 'chessops/fen';
 import { makeSan, parseSan } from 'chessops/san';
 import type { Color } from 'chessops/types';
+import { parseSquare } from 'chessops/util';
 import { parseUciMove } from '../../src/core/chess/uci.ts';
 import { legalMoves } from '../../src/core/maia/encode.ts';
 import { checkDeck, gradeMoves } from './check.ts';
 import { Engine, positionOf, scoreText, whiteWinPct } from './engine.ts';
-import { maia } from './maia.ts';
+import { maia, MAIA_FLOOR } from './maia.ts';
 import { parsePlayer, playouts } from './playout.ts';
-import { numbered, profile, readRepertoire } from './tree.ts';
+import { development, moveText, numbered, profile, readRepertoire, trunkOf, type DevMove } from './tree.ts';
 import { look, lookText, passTurn } from './vision.ts';
 
 const BOOLEAN = new Set(['full', 'no-engine', 'verbose', 'ours', 'leaves']);
@@ -141,9 +144,47 @@ async function main(): Promise<number> {
       for (const g of graded) console.log(`  ${g.san}: ${g.band}, gives up ${g.loss.toFixed(1)}% (${scoreText({ cp: g.cp })}); line ${numbered(g.pv, p.fullmoves, p.turn)}`);
       return 0;
     }
+    case 'squares': {
+      const p = readPosition(args.slice(0, -1).join(' '));
+      const from = args.at(-1) ?? '';
+      const square = parseSquare(from);
+      const piece = square === undefined ? undefined : p.board.get(square);
+      const sans = legalMoves(p).filter((m) => m.uci.startsWith(from)).map((m) => m.san);
+      if (!piece || !sans.length) throw new Error(`no ${p.turn} piece on ${from} can move (${p.turn} to move)`);
+      const engine = new Engine();
+      const graded = (await gradeMoves(engine, p, sans, depth(18))).sort((a, b) => a.loss - b.loss);
+      engine.quit();
+      console.log(`Every move of the ${piece.color} ${piece.role} on ${from}, graded at depth ${depth(18)} from the mover's side; the position's best is ${graded[0]?.bestSan} ${scoreText({ cp: graded[0]?.bestCp ?? 0 })}:`);
+      for (const g of graded) console.log(`  ${g.san}: ${g.band}, gives up ${g.loss.toFixed(1)}% (${scoreText({ cp: g.cp })}); line ${numbered(g.pv.slice(0, 8), p.fullmoves, p.turn)}`);
+      return 0;
+    }
+    case 'develop': {
+      const rep = readRepertoire(readFileSync(args[0]!, 'utf8'), flags.has('side') ? sideOf(flags) : undefined);
+      const only = flags.get('piece');
+      const all = development(rep);
+      const maps = all.filter((m) => !only || m.piece === only);
+      if (!maps.length) throw new Error(`no piece named ${only}: ${all.map((m) => m.piece).join(', ')}`);
+      const trunk = trunkOf(rep);
+      // The trunk's own moves are shown whole.
+      const text = (x: DevMove) => moveText(x, x.sans.length >= trunk.length ? trunk.length : 0);
+      console.log(`Development for ${rep.side}: where each of our pieces and pawns goes first, by square, in the order they come out. Reach is the share of games, summed over the positions where it goes there; "with" names what stands on the board there more than at the piece's other first squares (share here, share elsewhere).${trunk.length ? ` Lines are shown after the trunk every line starts with, ${numbered(trunk, 1, 'white')}.` : ''}`);
+      for (const m of maps) {
+        const head = m.squares.map((s) => `${s.to} ${pct(s.reach)}`).join(' · ');
+        console.log(`\n${m.piece}: ${head || 'never moves'}${m.home ? `  (still at home at ${pct(m.home)} of line ends)` : ''}`);
+        for (const s of m.squares) {
+          const shown = only ? s.moves : s.moves.slice(0, 4);
+          console.log(`  → ${s.to} ${pct(s.reach)}, in ${s.moves.length} position${s.moves.length === 1 ? '' : 's'}: ${shown.map((x) => `${text(x)} (${pct(x.reach)})`).join(' | ')}${s.moves.length > shown.length ? ` | +${s.moves.length - shown.length} more` : ''}`);
+          if (only) for (const x of s.moves) console.log(`      ${text(x)}: FEN ${x.fen}\n        setup: ${x.setup.join(', ')}`);
+          if (s.with.length) console.log(`      with: ${s.with.map(([f, a, b]) => `${f} (${pct(a)}, ${pct(b)})`).join('; ')}`);
+          if (s.without.length) console.log(`      without: ${s.without.map(([f, a, b]) => `${f} (${pct(a)}, ${pct(b)})`).join('; ')}`);
+        }
+        if (m.routes.length) console.log(`  routes at the line ends: ${m.routes.map(([r, w]) => `${r} ${pct(w)}`).join(', ')}`);
+      }
+      return 0;
+    }
     case 'maia': {
       const p = readPosition(args.join(' '));
-      const elos = (flags.get('elo') ?? '1100,1500,1900').split(',').map(Number);
+      const elos = (flags.get('elo') ?? `${MAIA_FLOOR},2200`).split(',').map(Number);
       const gradeDepth = flags.get('grade');
       const engine = gradeDepth ? new Engine() : undefined;
       for (const elo of elos) {
@@ -223,11 +264,12 @@ async function main(): Promise<number> {
     }
     case 'check': {
       const engine = flags.has('no-engine') ? undefined : new Engine();
-      const r = await checkDeck(readFileSync(args[0]!, 'utf8'), { engine, depth: depth(16), log: flags.has('verbose') ? (l) => console.log(l) : undefined });
+      const rep = flags.get('rep') ? readRepertoire(readFileSync(flags.get('rep')!, 'utf8')) : undefined;
+      const r = await checkDeck(readFileSync(args[0]!, 'utf8'), { engine, depth: depth(16), rep, log: flags.has('verbose') ? (l) => console.log(l) : undefined });
       engine?.quit();
       for (const f of r.findings) console.log(`${f.level === 'error' ? 'ERROR' : 'warn '} ${f.chapter}: ${f.text}`);
       const errors = r.findings.filter((f) => f.level === 'error').length;
-      console.log(`${r.chapters} chapters: ${errors} errors, ${r.findings.length - errors} warnings${engine ? `, moves graded at depth ${depth(16)}` : ', no engine'}.`);
+      console.log(`${r.chapters} chapters: ${errors} errors, ${r.findings.length - errors} warnings${engine ? `, moves graded at depth ${depth(16)}` : ', no engine'}${rep ? `; ${r.onRepertoire} cards start at a repertoire position` : ''}.`);
       return errors ? 1 : 0;
     }
     default:

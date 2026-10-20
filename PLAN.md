@@ -6723,6 +6723,20 @@ few model games. "We can put much effort into making skills or in any way improv
 vision/wisdom." The owner approved the shape and the deck format the same day: a pilot, then the
 skill and its tools, then idea cards in the app.
 
+- **The owner's three rules** (2026-10-20, after reading the pilot deck):
+  1. **The repertoire is right.** "The purpose of this feature isn't to find better moves. Even if
+     you find a 'better move', the original move was chosen for a reason": practical eval, ease
+     of learning, transpositions and moves that recur. So at a repertoire position, the card's
+     answer and its main line's move are the repertoire's move, never marked `?`. No card offers
+     a better move, and the skill reports no gaps or improvements. The engine explains the
+     repertoire's moves (why the other squares are worse there) and judges moves beyond its
+     line ends.
+  2. **Maia at 2000 or more**, since Maia plays a little below its number. The tools refuse a
+     lower rating, and read 2000 and 2200 by default.
+  3. **Development first.** The first ideas say where each piece develops and when, with pawn
+     moves: "define when the f8 bishop should develop to e7, d6, c5 and why". There is one card
+     for each square, at a position where the repertoire plays it, all asking where the piece
+     goes there and why, so that a piece's cards teach the condition by contrast.
 - **Why tools.** Claude knows a lot of chess and explains it well, but misreads boards. So the
   skill's rule is that every concrete claim rests on a tool output: a move good or bad, a piece
   loose, a square weak, a tactic that works, a legal line, a frequency. Knowledge decides what
@@ -6740,10 +6754,21 @@ skill and its tools, then idea cards in the app.
       (read with the turn passed)
   - `engine.ts` runs Stockfish under Node: the vendored lite build, or a native binary named by
     `STOCKFISH`. Searches are cached on disk, shared between agents.
-  - `maia.ts` runs Maia 3 on onnxruntime-web.
+  - `maia.ts` runs Maia 3 on onnxruntime-web, at 2000 or more.
   - `tree.ts` builds the repertoire's positions merged across transpositions, with each one's
-    reach (the opponent's `{ 45% }` shares multiplied along the way), and the profile: our moves,
-    our pieces at the line ends, structures, material and kings, all weighted by reach.
+    reach (the opponent's `{ 45% }` shares multiplied along the way). It also gives the profile:
+    our moves, our pieces at the line ends, structures, material and kings, all weighted by
+    reach. And it gives the development map (`develop`), which follows each of our pieces and
+    pawns, named by its home square, through every line:
+    - its first squares by reach, in the order the pieces come out
+    - the positions where it goes to each square
+    - the setup features that stand there more than at its other squares, a player's words for
+      the condition (the f8-bishop in the pilot: d6 "with White Bb5", 86% there and 0% at its
+      other squares; c5 with Nc3; e7 with Be2)
+    - its routes to the line ends
+
+    `squares` grades every move of one piece at a position: why the repertoire's square and not
+    another.
   - `playout.ts` plays seeded short games, Maia or Stockfish on each side.
   - `check.ts` is the deck's check.
   - `cv.ts` is the command line. A move that is illegal or ambiguous is refused, and the legal
@@ -6759,40 +6784,54 @@ skill and its tools, then idea cards in the app.
 
   The comment before the first move is the explanation, with its arrows (green: our plan; red:
   their threat; blue: a second option; yellow circles: key squares). The main line plays the idea
-  out. A side line marked `?` shows where it fails. Chapter 0, "Rules of thumb", lists the rules,
-  rule n summing up idea n. More positions of the same idea are their own chapters ("3b. …",
-  "3d. … (where it fails)"). A card's answers are its first move and any first move marked `!`
-  beside it; an unmarked side line at the start is a playable move that isn't the answer. The
+  out. A side line marked `?` shows where it fails. The rules of thumb are overview chapters at
+  the opening's start, rule n summing up idea n: "0. Rules of thumb: where the pieces go" and
+  "0b. Rules of thumb: plans and tactics", each under 1500 characters (two since 2026-10-20: the
+  development rules would have made one too long to read). More positions of the same idea are
+  their own chapters ("3b. …", "3d. … (where it fails)"). A card's answers are its first move and
+  any first move marked `!` beside it; an unmarked side line at the start is a playable move that
+  isn't the answer. At a repertoire position, the answer is the repertoire's move. A side line of
+  ours beside it shows why another square is worse there, and never grades better. The
   site keeps the headers as imported, so no format changes: a deck imports today as a reference
   study (§4.10, §5.76).
-- **The check** fails the run on any of these:
+- **The check** (`check <deck> --rep <repertoire>`) fails the run on any of these:
+  - at a repertoire position: a card's answer, or a main line's move, that isn't the
+    repertoire's move, or the repertoire's move marked `?`
   - a missing header or an unknown kind
   - no explanation
   - an illegal move
   - a comment over Lichess's limit
   - a chapter that doesn't come back unchanged from the site's writer
-  - a move of the deck's side that Stockfish grades `bad` or worse, unless marked `?`
+  - a move of the deck's side beyond the repertoire that Stockfish grades `bad` or worse, unless
+    marked `?` (the repertoire's own moves aren't graded)
   - a `?` that isn't `bad` or worse, a `??` that isn't a blunder, a `!` that isn't `great`
 
   It warns on:
   - an arrow that starts on an empty square, unless it continues a route
   - an opponent's blunder that isn't marked
-  - a card's own move that isn't `great`
+  - beyond the repertoire, a card's own move that isn't `great`
+  - at a repertoire position, a side line of ours that grades better than the repertoire's move
   - a `?!` that is `great` or `good`
-  - two chapters at the same position
+  - two cards at the same position (the overview chapters make no cards)
+  - an overview chapter with a question or moves: it would make no card (the first pilot's
+    idea 1 was two such chapters)
 - **The skill** (`.claude/skills/opening-ideas/SKILL.md`):
-  1. Read the repertoire (`tree`, `profile` with the engine on the most reached line ends).
-  2. Find ideas through four lenses: structure and material; where the pieces go; tactics,
-     traps and attack (`maia --grade`: the opponent's natural moves that lose); move orders and
-     the opponent's choices.
-  3. Curate 10–14 ideas, one rule each, in the order they come up in a game, covering every
-     opponent setup with 5% or more reach.
+  1. Read the repertoire (`tree`, `profile` with the engine on the most reached line ends,
+     `develop`).
+  2. Find ideas through five lenses, development first:
+     - development of the pieces: each first square with 3% or more reach, its condition from
+       `develop` confirmed on the board, and its reason from `squares`
+     - development of the pawns, the king and the rooks
+     - structure and material
+     - tactics, traps and attack (`maia --grade`: the opponent's natural moves that lose)
+     - move orders and the opponent's choices
+  3. Curate 12–18 ideas, one rule each: the development ideas first, in the order the pieces
+     come out (one card per square), then the rest in the order they come up in a game. Cover
+     every opponent setup with 5% or more reach.
   4. Verify each idea as a skeptic.
-  5. Write the deck, and check it to zero errors.
+  5. Write the deck, and check it against the repertoire to zero errors.
   6. Review as a critic, fix, and check again.
-  7. Report the repertoire notes (gaps, improvements, the owner's own notes checked) apart from
-     the deck.
-  8. Deliver the deck as a file. Decks and repertoires never go in this public repository.
+  7. Deliver the deck as a file. Decks and repertoires never go in this public repository.
 
   With workflows opted into, steps 2–6 run as the saved workflow `opening-ideas-deck`
   (`.claude/workflows/opening-ideas-deck.js`).
@@ -6807,6 +6846,11 @@ skill and its tools, then idea cards in the app.
   The deck has 47 chapters, and its check reports 0 errors and 0 warnings at depth 18. It took
   11 agents and about 1.3 million tokens, on the single-threaded lite Stockfish. It also gave
   repertoire notes for the owner: gaps, a few improvements, and the owner's 8...h6 note checked.
+  The owner read it (2026-10-20) and set the three rules above. Checked against the repertoire,
+  it had one card answering with a better move than the repertoire's: 12b, 6...Qb6 for the
+  repertoire's 6...Bc5.
+- **The second pilot** (2026-10-20): the same repertoire through the updated workflow, with the
+  three rules. Its results are added here when it is done.
 - **Idea cards in the app** (built 2026-10-20, as built below):
   - **The card:** one chapter is one card (`i|<sid>|<cid>`), enrolled for a whole study at once
     from its ☰ menu, by `idea` events as plan cards' `plan` events (§5.61). The overview chapter
@@ -6899,6 +6943,13 @@ Tests of the skill's tools: `test/unit/scripts/ideas.test.ts`. It covers:
 - an ambiguous move refused with the legal moves named
 - the reach multiplied and merged across a transposition, a guess marked
 - the deck's static check, with two chapters at one position
-- grades and the deck's check with Stockfish at depth 8: the marks, a card's own move, a `!`
+- the development map on a small repertoire: the f8-bishop's three squares each with its setup,
+  the order the pieces come out, castling's king and rook routes, the trunk left out
+- Maia refused below 2000
+- the deck against a repertoire: its move answers, a side line beside it, another move as the
+  answer, its move marked `?`, a main line leaving it, two overview chapters at one position, an
+  overview chapter that asks a question
+- grades and the deck's check with Stockfish at depth 8: the marks, a card's own move, a `!`; and
+  against a repertoire, its blunder not graded and a better move beside it warned
 
 Live: TESTING.md (the owner reads the pilot deck, then trains it as idea cards).

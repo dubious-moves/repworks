@@ -1,6 +1,7 @@
 // The opening-ideas skill's chess vision (PLAN.md §5.128, scripts/ideas): the position's facts on
-// positions whose answers are known, the repertoire's reach and profile on a small built tree, and
-// the deck's check, statically and with Stockfish at a low depth.
+// positions whose answers are known, the repertoire's reach, profile and development map on small
+// built trees, and the deck's check, statically and with Stockfish at a low depth, alone and
+// against a repertoire (whose moves are right by definition).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync } from 'node:fs';
@@ -11,7 +12,9 @@ import { parseSquare } from 'chessops/util';
 import { checkDeck, gradeMoves } from '../../../scripts/ideas/check.ts';
 import { play, readPosition, tokens } from '../../../scripts/ideas/cv.ts';
 import { Engine, positionOf } from '../../../scripts/ideas/engine.ts';
-import { numbered, profile, readRepertoire } from '../../../scripts/ideas/tree.ts';
+import { maia } from '../../../scripts/ideas/maia.ts';
+import { parsePlayer } from '../../../scripts/ideas/playout.ts';
+import { development, moveText, numbered, profile, readRepertoire, setupOf, trunkOf } from '../../../scripts/ideas/tree.ts';
 import { breaks, captureGain, forcing, kingSafety, look, lookText, outposts, passTurn, pawnFacts, pins, see } from '../../../scripts/ideas/vision.ts';
 import { parseUciMove } from '../../../src/core/chess/uci.ts';
 
@@ -111,6 +114,46 @@ test('the repertoire: reach multiplies the shares, transpositions merge, a guess
   assert.deepEqual(pr.materialAtLeaves.map(([k]) => k).sort(), ['level', 'we are down 1']);
 });
 
+// The f8-bishop's three squares, each against its own setup: d6 against Bb5, c5 against Bc4, e7 against Be2.
+const DEV = `[Orientation "black"]
+
+1. e4 d5 2. exd5 c6 3. dxc6 Nxc6 4. Nf3 { 60% } (4. Nc3 { 40% } 4... e5 5. Bc4 { 100% } 5... Bc5) 4... e5 5. Bb5 { 50% } (5. Be2 { 50% } 5... Nf6 6. O-O { 100% } 6... Be7 7. d3 { 100% } 7... O-O) 5... Bd6 6. O-O { 100% } 6... Ne7 *`;
+
+test('the development map: each piece’s first squares, what sets them apart, and its routes', () => {
+  const rep = readRepertoire(DEV);
+  assert.deepEqual(trunkOf(rep), ['e4', 'd5', 'exd5', 'c6', 'dxc6', 'Nxc6']);
+  const maps = development(rep);
+  const piece = (name: string) => maps.find((m) => m.piece === name)!;
+  // The order they come out: the gambit's pawns and knight, then ...e5, the bishop, the knight.
+  assert.deepEqual(
+    maps.map((m) => m.piece).slice(0, 6),
+    ['d-pawn', 'c-pawn', 'b8-knight', 'e-pawn', 'f8-bishop', 'g8-knight'],
+  );
+  const bishop = piece('f8-bishop');
+  const sq = (to: string) => bishop.squares.find((s) => s.to === to)!;
+  assert.deepEqual(bishop.squares.map((s) => [s.to, s.reach]), [['c5', 0.4], ['d6', 0.3], ['e7', 0.3]]);
+  assert.deepEqual(sq('d6').with[0], ['White Bb5', 1, 0]);
+  assert.ok(sq('c5').with.some(([f, a, b]) => f === 'White Bc4' && a === 1 && b === 0));
+  assert.ok(sq('e7').with.some(([f]) => f === 'White Be2'));
+  assert.ok(sq('d6').without.some(([f]) => f === 'White Nc3'));
+  assert.equal(moveText(sq('d6').moves[0]!, 6), '… 4. Nf3 e5 5. Bb5 Bd6');
+  assert.equal(moveText(sq('c5').moves[0]!, 6), '… 4. Nc3 e5 5. Bc4 Bc5');
+  // Castling moves the king and the h8-rook: their routes at the line ends, and their share still at home.
+  assert.deepEqual(piece('king').routes, [['e8 → g8', 0.3]]);
+  assert.ok(Math.abs(piece('king').home - 0.7) < 1e-9);
+  assert.deepEqual(piece('h8-rook').routes, [['h8 → f8', 0.3]]);
+  assert.deepEqual(piece('e-pawn').squares.map((s) => [s.to, s.moves.length]), [['e5', 2]]);
+  assert.deepEqual(
+    setupOf(readPosition('1. e4 d5 2. exd5 c6 3. dxc6 Nxc6 4. Bb5 e5 5. Bxc6+ bxc6')).sort(),
+    ['Black c6', 'Black e5', 'Black: a knight fewer', 'Black: no b-pawn', 'Black: no d-pawn', 'White: no e-pawn', 'White: no light-squared bishop'],
+  );
+});
+
+test('Maia is read at 2000 or more', async () => {
+  await assert.rejects(maia(Chess.default(), 1500), /2000 or more/);
+  assert.deepEqual(parsePlayer('maia'), { kind: 'maia', elo: 2000 });
+});
+
 const DECK = `[ChapterName "1. Hit the base of the chain: ...c5"]
 [Orientation "black"]
 [FEN "rnbqkbnr/ppp2ppp/4p3/3pP3/3P4/8/PPP2PPP/RNBQKBNR b KQkq - 0 3"]
@@ -154,6 +197,42 @@ test('the deck: headers, explanation and arrows checked without the engine', asy
   );
 });
 
+// Cards against the DEV repertoire: its moves are the answers and the main line's, never a mistake.
+const card = (name: string, fen: string, kind: string, movetext: string, question = kind === 'overview' ? '' : 'Where does the f8-bishop go?') => `[ChapterName "${name}"]
+[Orientation "black"]
+[FEN "${fen}"]
+[SetUp "1"]
+[IdeaKind "${kind}"]
+${question ? `[IdeaQuestion "${question}"]\n` : ''}[IdeaSource "test"]
+
+{ Bb5 pins the knight and Nf3 hits e5. [%cal Gf8d6] } ${movetext}
+`;
+const BB5 = 'r1bqkbnr/pp3ppp/2n5/1B2p3/8/5N2/PPPP1PPP/RNBQK2R b KQkq - 1 5';
+const NF3 = 'r1bqkbnr/pp2pppp/2n5/8/8/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 4';
+const AGAINST = [
+  card('0. Rules of thumb', 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', 'overview', '*'),
+  card('0b. More rules', 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', 'overview', '*'),
+  card('1. Guard e5', BB5, 'placement', '5... Bd6 6. O-O Ne7 ( 6... Bc5 { also a square, not the answer } ) *'),
+  card('2. Another square', BB5, 'placement', '5... Bc5 *'),
+  card('3. Called a mistake', BB5, 'placement', '5... Bd6? *'),
+  card('4. Off the line', NF3, 'placement', '4... e5 5. Be2 Nf6 6. O-O Bd6 *'),
+  card('5. What the pawn buys', NF3, 'overview', '4... e5 *', 'Name three things'),
+].join('\n');
+
+test('the deck against the repertoire: its moves answer, the main line keeps to it, nothing calls it a mistake', async () => {
+  const { findings, onRepertoire } = await checkDeck(AGAINST, { depth: 8, rep: readRepertoire(DEV) });
+  const texts = findings.map((f) => `${f.level} ${f.chapter.split(' ')[0]} ${f.text}`);
+  // The rules of thumb make no card: two at the opening's start are no duplicate.
+  assert.ok(!texts.some((t) => t.includes('#2 ') || t.startsWith('warning #1')), texts.join('\n'));
+  assert.ok(!texts.some((t) => t.split(' ')[1] === '#3'), 'Bd6 is the repertoire’s; Bc5 beside it is a side line');
+  assert.ok(texts.includes('error #4 Bc5 answers the card, but the repertoire plays Bd6 here: the answer is the repertoire\'s move'));
+  assert.ok(texts.some((t) => t.startsWith("error #5 Bd6? is the repertoire's move, marked ?")));
+  assert.ok(texts.includes('error #6 the main line leaves the repertoire at e5 Be2 Nf6 O-O Bd6: it plays Be7 here'));
+  // An overview makes no card in repworks: one that asks a question is a card lost.
+  assert.ok(texts.includes('warning #7 an overview chapter makes no card, yet this one asks a question or has moves: give it another kind'));
+  assert.equal(onRepertoire, 4);
+});
+
 const MARKS = `[ChapterName "1. Take the queen"]
 [Orientation "white"]
 [FEN "rnb1kbnr/pppp1ppp/8/4p3/3q4/5N2/PPPPPPPP/RNBQKB1R w KQkq - 0 3"]
@@ -182,6 +261,11 @@ test('the deck and the grades with Stockfish', { timeout: 120_000 }, async () =>
     assert.ok(marks.findings.some((f) => f.level === 'error' && f.text.startsWith('h3! (side line) is marked ! but is blunder')));
     assert.ok(marks.findings.some((f) => f.level === 'warning' && f.text.startsWith("the card's move a3 is blunder")));
     assert.ok(!marks.findings.some((f) => f.text.startsWith('Nxd4')));
+    // Against a repertoire that plays a3 there, a3 is right whatever its grade, and Nxd4 beside it is too good to show.
+    const rep = readRepertoire(`[Orientation "white"]\n[FEN "rnb1kbnr/pppp1ppp/8/4p3/3q4/5N2/PPPPPPPP/RNBQKB1R w KQkq - 0 3"]\n[SetUp "1"]\n\n3. a3 *`);
+    const against = await checkDeck(MARKS.replace(' ( 3. h3! )', ''), { engine, depth: 8, rep });
+    assert.equal(against.findings.length, 1);
+    assert.ok(against.findings[0]!.text.startsWith("Nxd4 (side line) grades great, better than the repertoire's a3 (blunder)"));
   } finally {
     engine.quit();
   }

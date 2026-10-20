@@ -25,16 +25,12 @@ fixes them and updates this file.
 - Is 5 new idea cards a day the right default? On the phone, is the answer screen too long
   (grades below the line and its side lines)?
 
-## Opening ideas: the pilot deck (§5.128, 2026-10-20)
-- The Scandinavian Gambit idea deck made from your repertoire (sent in the chat, never in the
-  repo): Home → Import → PGN file → "Reference (read only, never trained)". Read its 47 chapters
-  as a learner would. Are these the ideas that matter in this opening? Are they right as far as
-  you can judge? Does each question have one clear answer on the board, and do the arrows show
-  what the text says? Is it too many chapters (14 ideas, about 3 positions each)? Are chapter 0's
-  rules short enough to remember? Say what to change before idea cards are built (§5.128's plan,
-  next), above all how a card should be asked.
-- The repertoire notes (in the chat): do the gaps and improvements look right, and would you feed
-  them to your repertoire builder?
+## Opening ideas: the second deck (§5.128, 2026-10-20)
+- The owner read the first deck and set three rules: the repertoire is right, Maia at 2000 or
+  more, development first. The skill and its tools keep them now (the check against the
+  repertoire, the development map). A second Scandinavian Gambit deck is being made with them and
+  will be sent in the chat (never in the repo); this item says what to check once it is.
+- The repertoire notes are dropped: the skill no longer reviews the repertoire.
 
 ## Show and grade retries its mistakes (§5.127, 2026-10-19)
 - Show and grade from the training card: miss a move with 4 (or the ring). At the line's end the

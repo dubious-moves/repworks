@@ -4,9 +4,12 @@
 // owner's repertoire builder writes them, `{ 45% }`); a move without one keeps its parent's reach
 // and marks the position approximate. The profile sums what we play, where our pieces stand and
 // which pawn structures we reach, weighted by that reach: the raw material of the rules of thumb.
+// The development map follows each of our pieces and pawns through every line: where it goes first,
+// in which positions, and what in the setup sets those positions apart (the owner's ask: the
+// first ideas say where each piece develops, and when).
 import type { Position } from 'chessops/chess';
 import { makeFen } from 'chessops/fen';
-import { parseSan } from 'chessops/san';
+import { makeSan, parseSan } from 'chessops/san';
 import type { Color, Role } from 'chessops/types';
 import { isNormal } from 'chessops/types';
 import { makeSquare, squareFile, squareRank } from 'chessops/util';
@@ -40,6 +43,7 @@ export interface Repertoire {
   /** The comments that name a transposition, with where they stand. */
   transpositions: { at: string; text: string }[];
   problems: string[];
+  chapters: Chapter[];
 }
 
 const SHARE = /^\s*(\d+(?:\.\d+)?)\s*%/;
@@ -124,7 +128,7 @@ export function readRepertoire(text: string, side?: Color): Repertoire {
     }
     visit(start.clone(), start, [], 1, false, chapter.root);
   }
-  return { side: us, positions, transpositions, problems };
+  return { side: us, positions, transpositions, problems, chapters };
 }
 
 const LETTER: Record<Role, string> = { pawn: '', knight: 'N', bishop: 'B', rook: 'R', queen: 'Q', king: 'K' };
@@ -213,4 +217,203 @@ export function profile(rep: Repertoire, positionOf: (fen: string) => Position):
     materialAtLeaves: top(norm(mat, leafReach)),
     kingsAtLeaves: top(norm(kings, leafReach)),
   };
+}
+
+/** One of our moves in the repertoire, with the piece that made it (named by its square at the line's start). */
+export interface DevMove {
+  piece: string;
+  san: string;
+  to: string;
+  /** The piece's first move in the line. */
+  first: boolean;
+  key: string;
+  fen: string;
+  /** The moves reaching the position (one move order), from the start of its chapter at `startPly`. */
+  sans: string[];
+  startPly: number;
+  /** The position's reach (every move order). */
+  reach: number;
+  ply: number;
+  /** The setup at the decision: pieces and pawns off their home squares, files without a pawn, pieces gone. */
+  setup: string[];
+}
+
+export interface Square {
+  to: string;
+  /** The reach of the positions where the piece first goes there; 1 is once a game. */
+  reach: number;
+  moves: DevMove[];
+  /** Setup features by how much more often they stand with this square than with the piece's other first squares: [feature, share here, share elsewhere]. */
+  with: [string, number, number][];
+  /** Features that stand elsewhere and not here. */
+  without: [string, number, number][];
+}
+
+export interface PieceMap {
+  piece: string;
+  squares: Square[];
+  /** Line ends' share where it never moved. */
+  home: number;
+  /** Its squares in order at the line ends, by share. */
+  routes: [string, number][];
+  /** The ply of its first move, averaged by reach: the order the pieces come out. */
+  order: number;
+}
+
+const HOME: Record<Role, (s: number, c: Color) => boolean> = {
+  pawn: (s, c) => squareRank(s) === (c === 'white' ? 1 : 6),
+  knight: (s, c) => s === (c === 'white' ? 1 : 57) || s === (c === 'white' ? 6 : 62),
+  bishop: (s, c) => s === (c === 'white' ? 2 : 58) || s === (c === 'white' ? 5 : 61),
+  rook: (s, c) => s === (c === 'white' ? 0 : 56) || s === (c === 'white' ? 7 : 63),
+  queen: (s, c) => s === (c === 'white' ? 3 : 59),
+  king: (s, c) => s === (c === 'white' ? 4 : 60),
+};
+const NAME: Record<Color, string> = { white: 'White', black: 'Black' };
+
+/** What stands where, as a player would name it: `White Bb5`, `Black e5`, `White: no e-pawn`, `White: no light-squared bishop`. */
+export function setupOf(pos: Position): string[] {
+  const out: string[] = [];
+  for (const c of ['white', 'black'] as const) {
+    const count = new Map<string, number>();
+    for (const s of pos.board[c]) {
+      const role = pos.board.getRole(s)!;
+      const kind = role === 'bishop' ? `${isDark(s) ? 'dark' : 'light'}-squared bishop` : role;
+      count.set(kind, (count.get(kind) ?? 0) + 1);
+      if (!HOME[role](s, c)) out.push(`${NAME[c]} ${LETTER[role]}${makeSquare(s)}`);
+    }
+    for (const [kind, n] of [['knight', 2], ['light-squared bishop', 1], ['dark-squared bishop', 1], ['rook', 2], ['queen', 1]] as const) {
+      const have = count.get(kind) ?? 0;
+      if (have < n) out.push(`${NAME[c]}: ${n - have === 1 && n === 2 ? 'a' : 'no'} ${kind}${n === 2 && have === 1 ? ' fewer' : ''}`);
+    }
+    for (let f = 0; f < 8; f++) if (![...pos.board.pieces(c, 'pawn')].some((s) => squareFile(s) === f)) out.push(`${NAME[c]}: no ${'abcdefgh'[f]}-pawn`);
+  }
+  return out;
+}
+
+/** Our pieces named by where they stand at a line's start: `king`, `queen`, `f8-bishop`, `g8-knight`, `e-pawn`. */
+function names(pos: Position, us: Color): Map<number, string> {
+  const out = new Map<number, string>();
+  const queens = [...pos.board.pieces(us, 'queen')].length;
+  for (const s of pos.board[us]) {
+    const role = pos.board.getRole(s)!;
+    out.set(s, role === 'king' || (role === 'queen' && queens === 1) ? role : role === 'pawn' ? `${'abcdefgh'[squareFile(s)]}-pawn` : `${makeSquare(s)}-${role}`);
+  }
+  return out;
+}
+
+/** The move in movetext after the moves reaching it, leaving out the first `skip` plies (`… 4. Nf3 e5`). */
+export function moveText(m: DevMove, skip = 0): string {
+  const all = [...m.sans, m.san].slice(skip);
+  const ply = m.startPly + Math.min(skip, m.sans.length);
+  return `${skip ? '… ' : ''}${numbered(all, Math.floor(ply / 2) + 1, ply % 2 ? 'black' : 'white')}`;
+}
+
+/** The moves every line of the repertoire starts with, while there is one move only: the opening's trunk. */
+export function trunkOf(rep: Repertoire): string[] {
+  let common: string[] | undefined;
+  for (const chapter of rep.chapters) {
+    const line: string[] = [];
+    for (let node = chapter.root; node.children.length === 1; node = node.children[0]!) line.push(node.children[0]!.san);
+    const differ = common ? common.findIndex((san, i) => line[i] !== san) : -1;
+    common = common ? (differ < 0 ? common : common.slice(0, differ)) : line;
+  }
+  return common ?? [];
+}
+
+/** Each of our pieces and pawns through the repertoire: where it goes first, against what, and where it ends up. */
+export function development(rep: Repertoire): PieceMap[] {
+  const us = rep.side;
+  const moves = new Map<string, DevMove>();
+  const routes = new Map<string, Map<string, number>>();
+  const home = new Map<string, number>();
+  let ends = 0;
+  const visit = (pos: Position, start: Position, sans: string[], reach: number, who: Map<number, string>, trail: Map<string, string[]>, node: { children: MoveNode[] }) => {
+    const key = positionKeyOf(pos);
+    const entry = rep.positions.get(key);
+    if (!node.children.length) {
+      if (!entry?.leaf) return;
+      ends += reach;
+      for (const name of new Set(who.values())) {
+        const squares = trail.get(name);
+        if (!squares) home.set(name, (home.get(name) ?? 0) + reach);
+        else {
+          if (!routes.has(name)) routes.set(name, new Map());
+          add(routes.get(name)!, squares.join(' → '), reach);
+        }
+      }
+      return;
+    }
+    for (const child of node.children) {
+      const move = parseSan(pos, child.san);
+      if (!move || !isNormal(move)) continue;
+      const next = pos.clone();
+      next.play(move);
+      const nextWho = new Map(who);
+      const nextTrail = new Map(trail);
+      let share = 1;
+      if (pos.turn === us) {
+        const san = makeSan(pos, move);
+        const castle = san.startsWith('O-O');
+        const name = who.get(move.from) ?? '?';
+        // chessops moves a castling king onto its rook: the squares they end on are read from the board after.
+        const to = castle ? (squareFile(move.to) > squareFile(move.from) ? 6 : 2) + squareRank(move.from) * 8 : move.to;
+        const first = !trail.has(name);
+        const id = `${key}|${san}`;
+        if (entry && !moves.has(id)) moves.set(id, { piece: name, san, to: makeSquare(to), first, key, fen: entry.fen, sans, startPly: (start.fullmoves - 1) * 2 + (start.turn === 'black' ? 1 : 0), reach: entry.reach, ply: entry.ply, setup: setupOf(pos) });
+        nextWho.delete(move.from);
+        nextWho.set(to, name);
+        nextTrail.set(name, [...(trail.get(name) ?? [makeSquare(move.from)]), makeSquare(to)]);
+        if (castle) {
+          const rookTo = (squareFile(move.to) > squareFile(move.from) ? 5 : 3) + squareRank(move.from) * 8;
+          const rook = who.get(move.to);
+          nextWho.delete(move.to);
+          if (rook) {
+            nextWho.set(rookTo, rook);
+            nextTrail.set(rook, [...(trail.get(rook) ?? [makeSquare(move.to)]), makeSquare(rookTo)]);
+          }
+        }
+      } else {
+        nextWho.delete(move.to);
+        if (move.promotion === undefined && pos.board.getRole(move.from) === 'pawn' && pos.epSquare === move.to) nextWho.delete(move.to + (us === 'white' ? 8 : -8));
+        share = shareOf(child) ?? 1;
+      }
+      visit(next, start, [...sans, child.san], reach * share, nextWho, nextTrail, child);
+    }
+  };
+  for (const chapter of rep.chapters) {
+    const start = startPosition(chapter);
+    if (start) visit(start.clone(), start, [], 1, names(start, us), new Map(), chapter.root);
+  }
+  const byPiece = new Map<string, DevMove[]>();
+  for (const m of moves.values()) if (m.first) byPiece.set(m.piece, [...(byPiece.get(m.piece) ?? []), m]);
+  const out: PieceMap[] = [];
+  for (const piece of new Set([...byPiece.keys(), ...home.keys(), ...routes.keys()])) {
+    const firsts = byPiece.get(piece) ?? [];
+    const total = firsts.reduce((t, m) => t + m.reach, 0);
+    const groups = new Map<string, DevMove[]>();
+    for (const m of firsts) groups.set(m.to, [...(groups.get(m.to) ?? []), m]);
+    const squares: Square[] = [...groups.entries()].map(([to, ms]) => {
+      const here = ms.reduce((t, m) => t + m.reach, 0);
+      const share = (set: DevMove[], sum: number, f: string) => (sum ? set.filter((m) => m.setup.includes(f)).reduce((t, m) => t + m.reach, 0) / sum : 0);
+      const others = firsts.filter((m) => m.to !== to);
+      const features = new Set(firsts.flatMap((m) => m.setup));
+      const rows = [...features].map((f) => [f, share(ms, here, f), share(others, total - here, f)] as [string, number, number]);
+      return {
+        to,
+        reach: here,
+        moves: ms.sort((a, b) => b.reach - a.reach),
+        with: others.length ? rows.filter(([, a, b]) => a >= 0.5 && a - b >= 0.3).sort((x, y) => y[1] - y[2] - (x[1] - x[2])).slice(0, 6) : [],
+        without: others.length ? rows.filter(([, a, b]) => b - a >= 0.3 && a <= 0.5).sort((x, y) => y[2] - y[1] - (x[2] - x[1])).slice(0, 4) : [],
+      };
+    });
+    squares.sort((a, b) => b.reach - a.reach);
+    out.push({
+      piece,
+      squares,
+      home: ends ? (home.get(piece) ?? 0) / ends : 0,
+      routes: top(new Map([...(routes.get(piece) ?? new Map<string, number>()).entries()].map(([k, v]) => [k, ends ? v / ends : 0])), 6),
+      order: total ? firsts.reduce((t, m) => t + m.ply * m.reach, 0) / total : Infinity,
+    });
+  }
+  return out.sort((a, b) => a.order - b.order);
 }

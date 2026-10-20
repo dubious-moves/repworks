@@ -1,13 +1,16 @@
 // Maia 3 for the opening-ideas skill (PLAN.md §5.128): what people at a rating play in a position,
 // on onnxruntime-web under Node with the site's own encoding (as test/unit/engine/maia.test.ts
 // runs it). The skill reads it for the moves the opponent will really meet us with, and for the
-// natural moves that lose (the traps).
+// natural moves that lose (the traps). Never below 2000: Maia plays weaker than its number, and
+// the owner wants the opponent read at 2000 or more (2026-10-20).
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Position } from 'chessops/chess';
 import { makeFen } from 'chessops/fen';
 import * as ort from 'onnxruntime-web';
 import { clampElo, expectedScore, maiaTokens, policyFrom, type MaiaMove } from '../../src/core/maia/encode.ts';
+
+export const MAIA_FLOOR = 2000;
 
 let session: Promise<ort.InferenceSession> | undefined;
 
@@ -27,6 +30,7 @@ export interface MaiaRead {
 }
 
 export async function maia(pos: Position, elo: number): Promise<MaiaRead> {
+  if (elo < MAIA_FLOOR) throw new Error(`Maia at ${elo}: read it at ${MAIA_FLOOR} or more (it plays weaker than its number)`);
   const s = await model();
   const e = clampElo(elo);
   const out = await s.run({

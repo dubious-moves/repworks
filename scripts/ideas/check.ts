@@ -4,11 +4,17 @@
 // explanation, with its arrows; the main line plays the idea out; a side line marked `?` shows where
 // it fails. Every chapter is read by the site's own parser and must come back unchanged from its
 // writer; every arrow must start on a piece (or where an earlier arrow of the same comment ends, a
-// route); every move of the deck's side is graded by Stockfish on the storm's scale: unmarked
-// moves must be at worst `ok`, a `?` must be `bad` or worse, a `??` a blunder, a `!` great. A card's
-// answers are its first move and any first move marked `!` beside it; an unmarked side line is a
-// playable move that isn't the answer. Two chapters that start at the same position are one card
-// asked twice: a warning.
+// route). A card's answers are its first move and any first move marked `!` beside it; an unmarked
+// side line is a playable move that isn't the answer. Two cards that start at the same position are
+// one card asked twice: a warning.
+//
+// The repertoire is right by definition (the owner, 2026-10-20: its moves were chosen for practical
+// eval, ease of learning, transpositions and recurring moves). Where the deck's side is to move at
+// a position of the repertoire, the repertoire's move is the answer and the main line's move, it is
+// never marked `?`, and it isn't graded; another move of ours there is a side line (why not
+// there?) that never grades better than the repertoire's. Every other move of the deck's side is graded by Stockfish on the storm's scale: unmarked
+// moves must be at worst `ok`, a `?` must be `bad` or worse, a `??` a blunder, a `!` great, and a
+// card's answer beyond the repertoire the best move or as good.
 import type { Position } from 'chessops/chess';
 import { makeFen } from 'chessops/fen';
 import { parseSan } from 'chessops/san';
@@ -25,6 +31,7 @@ import { grade as band, wpLoss } from '../../src/core/storm/grade.ts';
 import { header, type Chapter, type MoveNode, type Shape } from '../../src/core/study/model.ts';
 import { startPosition } from '../../src/core/study/tree.ts';
 import { cpOf, scoreText, type Engine } from './engine.ts';
+import type { Repertoire } from './tree.ts';
 
 export const KINDS = ['overview', 'structure', 'break', 'placement', 'maneuver', 'king', 'exchange', 'tactic', 'trap', 'move-order', 'endgame'] as const;
 
@@ -69,6 +76,8 @@ export interface Finding {
   text: string;
 }
 
+const STORM_ORDER: readonly Band[] = ['great', 'good', 'ok', 'bad', 'blunder'];
+
 const glyphs = (n: MoveNode) => n.nags.map((x) => ({ 1: '!', 2: '?', 3: '!!', 4: '??', 5: '!?', 6: '?!' })[x] ?? '').join('');
 
 function arrowProblems(pos: Position, shapes: readonly Shape[]): string[] {
@@ -83,8 +92,24 @@ function arrowProblems(pos: Position, shapes: readonly Shape[]): string[] {
   return out;
 }
 
-export async function checkDeck(text: string, o: { engine?: Engine; depth: number; log?: (line: string) => void }): Promise<{ findings: Finding[]; chapters: number }> {
+/** Our moves at a position of the repertoire (as UCI), or undefined where it has none. */
+function repertoireMoves(rep: Repertoire | undefined, pos: Position): Map<string, string> | undefined {
+  const at = rep?.positions.get(positionKeyOf(pos));
+  if (!at?.ours || !at.moves.length) return undefined;
+  const out = new Map<string, string>();
+  for (const m of at.moves) {
+    const move = parseSan(pos, m.san);
+    if (move && isNormal(move)) out.set(standardUci(pos, move), m.san);
+  }
+  return out;
+}
+
+export async function checkDeck(
+  text: string,
+  o: { engine?: Engine; depth: number; rep?: Repertoire; log?: (line: string) => void },
+): Promise<{ findings: Finding[]; chapters: number; onRepertoire: number }> {
   const findings: Finding[] = [];
+  let onRepertoire = 0;
   let n = 0;
   const parsed = parseGames(text, () => `c${++n}`);
   const starts = new Map<string, string>();
@@ -107,6 +132,8 @@ export async function checkDeck(text: string, o: { engine?: Engine; depth: numbe
     if (side !== 'white' && side !== 'black') err('Orientation is not white or black');
     if (!kind || !(KINDS as readonly string[]).includes(kind)) err(`IdeaKind "${kind ?? ''}" is not one of ${KINDS.join(', ')}`);
     if (kind !== 'overview' && !header(ch, 'IdeaQuestion')) err('no IdeaQuestion');
+    // repworks makes no idea card of an overview chapter: only the rules of thumb are one.
+    if (kind === 'overview' && (header(ch, 'IdeaQuestion') || ch.root.children.length)) warn('an overview chapter makes no card, yet this one asks a question or has moves: give it another kind');
     if (!header(ch, 'IdeaSource')) err('no IdeaSource');
     if (!ch.root.comments.join('').trim()) err('no explanation (a comment before the first move)');
     const again = parseGames(writeChapter(ch), () => 'x')[0];
@@ -116,13 +143,19 @@ export async function checkDeck(text: string, o: { engine?: Engine; depth: numbe
       err('the start position is not legal');
       continue;
     }
-    const key = positionKeyOf(start);
-    const twin = starts.get(key);
-    if (twin) warn(`starts at the same position as ${twin}: merge them (one card, both side lines)`);
-    else starts.set(key, label);
+    // The rules of thumb make no card: several may stand at the opening's start.
+    if (kind !== 'overview') {
+      const key = positionKeyOf(start);
+      const twin = starts.get(key);
+      if (twin) warn(`starts at the same position as ${twin}: merge them (one card, both side lines)`);
+      else starts.set(key, label);
+      if (o.rep?.positions.has(key)) onRepertoire++;
+    }
+    const rep = o.rep && o.rep.side === side ? o.rep : undefined;
     for (const t of arrowProblems(start, ch.root.shapes)) warn(`at the start: ${t}`);
     if (kind !== 'overview' && !ch.root.shapes.length) warn('no arrow or circle at the start');
-    const walk = async (pos: Position, children: readonly MoveNode[], line: string[]) => {
+    const walk = async (pos: Position, children: readonly MoveNode[], line: string[], main: boolean) => {
+      const ours = repertoireMoves(rep, pos);
       for (const [k, node] of children.entries()) {
         const move = parseSan(pos, node.san);
         if (!move) continue;
@@ -130,30 +163,43 @@ export async function checkDeck(text: string, o: { engine?: Engine; depth: numbe
         next.play(move);
         const here = [...line, node.san];
         for (const t of arrowProblems(next, node.shapes)) warn(`after ${here.join(' ')}: ${t}`);
+        const mark = glyphs(node);
+        const where = `${here.join(' ')}${mark}${k > 0 ? ' (side line)' : ''}`;
+        // The card's answers: its first move, unless marked ?, and any first move marked ! beside it.
+        const answer = !line.length && (k === 0 ? !mark.includes('?') : mark.includes('!') && !mark.includes('?'));
+        const inRepertoire = ours && isNormal(move) ? ours.has(standardUci(pos, move)) : false;
+        const theirs = ours ? [...ours.values()].join(' or ') : '';
+        if (ours && side && pos.turn === side) {
+          if (inRepertoire && mark.includes('?')) err(`${where} is the repertoire's move, marked ${mark}: the deck teaches the repertoire, never calls its move a mistake`);
+          else if (!inRepertoire && answer) err(`${where} answers the card, but the repertoire plays ${theirs} here: the answer is the repertoire's move`);
+          else if (!inRepertoire && main && k === 0) err(`the main line leaves the repertoire at ${where}: it plays ${theirs} here`);
+        }
         if (o.engine && side) {
           const [g] = await gradeMoves(o.engine, pos, [node.san], o.depth);
           if (g) {
-            const mark = glyphs(node);
-            const where = `${here.join(' ')}${mark}${k > 0 ? ' (side line)' : ''}`;
             const detail = `${g.band}, gives up ${g.loss.toFixed(1)}% (${scoreText({ cp: g.cp })} against ${g.bestSan} ${scoreText({ cp: g.bestCp })}, mover's view)`;
-            o.log?.(`  ${label}: ${where}: ${detail}`);
-            if (pos.turn === side) {
-              // The card's answers: its first move, and any first move marked ! beside it.
-              if (!line.length && k === 0 && g.band !== 'great') warn(`the card's move ${where} is ${detail}: its answer should be the best move or as good`);
+            o.log?.(`  ${label}: ${where}: ${detail}${inRepertoire ? ' (the repertoire’s move)' : ''}`);
+            if (ours && pos.turn === side && !inRepertoire && !mark.includes('?')) {
+              // Another square shown beside the repertoire's move is fine (why not there?), a better one is not.
+              const [r] = await gradeMoves(o.engine, pos, [ours.values().next().value!], o.depth);
+              if (r && STORM_ORDER.indexOf(g.band) < STORM_ORDER.indexOf(r.band)) warn(`${where} grades ${g.band}, better than the repertoire's ${r.san} (${r.band}): the deck teaches the repertoire's move and offers no better one; leave it out`);
+            }
+            if (pos.turn === side && !inRepertoire) {
+              if (!ours && !line.length && k === 0 && g.band !== 'great') warn(`the card's move ${where} is ${detail}: beyond the repertoire, its answer should be the best move or as good`);
               if (mark.includes('!') && !mark.includes('?') && g.band !== 'great') err(`${where} is marked ${mark} but is ${detail}`);
               else if (mark.includes('??') && g.band !== 'blunder') err(`${where} is marked ?? but is ${detail}`);
               else if (mark === '?' && g.band !== 'bad' && g.band !== 'blunder') err(`${where} is marked ? but is ${detail}`);
               else if (mark === '?!' && (g.band === 'great' || g.band === 'good')) warn(`${where} is marked ?! but is ${detail}`);
               else if (!mark.includes('?') && (g.band === 'bad' || g.band === 'blunder')) err(`${where} is not a good move for the deck's side: ${detail}`);
-            } else if (g.band === 'blunder' && !mark.includes('?')) {
+            } else if (pos.turn !== side && g.band === 'blunder' && !mark.includes('?')) {
               warn(`the opponent's ${where} is a blunder (${detail}); mark it ? if the line shows a trap, or give a better reply`);
             }
           }
         }
-        await walk(next, node.children, here);
+        await walk(next, node.children, here, main && k === 0);
       }
     };
-    await walk(start, ch.root.children, []);
+    await walk(start, ch.root.children, [], true);
   }
-  return { findings, chapters: parsed.length };
+  return { findings, chapters: parsed.length, onRepertoire };
 }
