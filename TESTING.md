@@ -5,6 +5,20 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## Opening ideas: the pilot deck (§5.128, 2026-10-20)
+- The Scandinavian Gambit idea deck made from your repertoire (sent in the chat, never in the
+  repo): Home → Import → PGN file → "Reference (read only, never trained)". Read its 47 chapters
+  as a learner would. Are these the ideas that matter in this opening? Are they right as far as
+  you can judge? Does each question have one clear answer on the board, and do the arrows show
+  what the text says? Is it too many chapters (14 ideas, about 3 positions each)? Are chapter 0's
+  rules short enough to remember? Say what to change before idea cards are built (§5.128's plan,
+  next), above all how a card should be asked.
+- Until then a chapter's start can be a plan card (its move menu → "Make a plan card", §5.61);
+  from the code, not checked live. A plan card also shows other studies' comments at the
+  position.
+- The repertoire notes (in the chat): do the gaps and improvements look right, and would you feed
+  them to your repertoire builder?
+
 ## Show and grade retries its mistakes (§5.127, 2026-10-19)
 - Show and grade from the training card: miss a move with 4 (or the ring). At the line's end the
   board goes back to the move before it, the note reads "Not a new line: your mistake again" in

@@ -1739,3 +1739,25 @@ The technical calls, each with its reason:
   neither: a move shown can't be found again." Why: the owner's request; one known show is enough
   there. Still graded once a session; repetitions stay out of show and grade; *Mistakes retried*
   at 0 turns it off too.
+
+## Revision of 2026-10-19 (opening ideas, PLAN.md §5.128)
+- **An idea deck is a PGN file of chapters, one idea each, with `IdeaKind`, `IdeaQuestion` and
+  `IdeaSource` headers.** The comment before the first move is the explanation with its arrows,
+  the main line plays the idea out, and a side line marked `?` shows where it fails. Chapter 0
+  holds the rules of thumb. It is a data format the owner's real data will be written in, so the
+  owner approved it first (2026-10-19, with the plan's shape: a pilot, the skill and its tools,
+  then idea cards in the app). It needs no change to the site: headers are kept as imported
+  (§4.4), and a deck imports today as a reference study. Decided after the pilot, within that
+  format: rule n of chapter 0 sums up idea n, and a card's answers are its first move and any
+  first move marked `!` beside it, an unmarked side line being playable but not the answer. Why:
+  the pilot's rules were numbered apart from its ideas, and its unmarked second-best moves would
+  otherwise count as right.
+- **Claude's claims about positions rest on tools, never on picturing the board.** The skill
+  (`.claude/skills/opening-ideas`) and its tools (`scripts/ideas`) compute a position's facts, run
+  Stockfish and Maia under Node, read a repertoire's reach from its move shares, and check a deck.
+  They reuse core's parser, writer, Maia encoding and the storm's grading scale, so a deck reads
+  and grades as the site would. Why: the owner asked for accuracy and consistency, and Claude's
+  weak point in chess is seeing the board, not knowing ideas.
+- **Idea cards will be keyed by chapter (`i|<sid>|<cid>`), not by position.** Was: plan cards
+  (§5.61), keyed by position, which gather every comment at that position from every study. Why:
+  a deck's card should show what the deck says, not the repertoire's notes mixed in.

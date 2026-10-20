@@ -6711,3 +6711,131 @@ move before, a miss and then known once, graded once, no new line; nothing witho
 with retries off), `timeTravel.test.ts` (each session kind's options: not Learn), `train.spec.ts`
 (desktop and phone: c5 missed by 4, shown again at the line's end with the notes, the colour and
 the counters, known once, the four events unchanged). Live: TESTING.md.
+
+#### 5.128 Opening ideas: a verified idea deck from a repertoire (the owner's request, 2026-10-19)
+
+The owner: start learning a new opening with its key ideas and rules of thumb, as PGN flashcards
+repworks imports: a position, arrows, and a description of the idea. A skill should make the
+accuracy consistent. This is mainly for openings the owner hasn't annotated: repertoires that the
+owner's own builder (deeprep) generates from the Lichess database by practical eval, prepared score
+and recurring themes. Their comments carry move shares and transpositions, and there are often
+few model games. "We can put much effort into making skills or in any way improve Claude's chess
+vision/wisdom." The owner approved the shape and the deck format the same day: a pilot, then the
+skill and its tools, then idea cards in the app.
+
+- **Why tools.** Claude knows a lot of chess and explains it well, but misreads boards. So the
+  skill's rule is that every concrete claim rests on a tool output: a move good or bad, a piece
+  loose, a square weak, a tactic that works, a legal line, a frequency. Knowledge decides what
+  to look for and how to say it.
+- **The tools** (`scripts/ideas/`, run as `node scripts/ideas/cv.ts <command>`). They use
+  core's parser, Maia encoding, UCI reading and the storm's grading scale, so a deck reads and
+  grades as the site would.
+  - `vision.ts` (pure) is the position's facts:
+    - material, pawns (islands, chains, isolated, doubled, backward, passed), files, centre
+    - development and king cover
+    - each piece's attackers and defenders, and a static exchange with x-rays (a capture by a
+      piece pinned to a queen or rook says so)
+    - pins, both sides' breaks and outposts
+    - the side to move's checks, captures and double attacks, and the other side's threats
+      (read with the turn passed)
+  - `engine.ts` runs Stockfish under Node: the vendored lite build, or a native binary named by
+    `STOCKFISH`. Searches are cached on disk, shared between agents.
+  - `maia.ts` runs Maia 3 on onnxruntime-web.
+  - `tree.ts` builds the repertoire's positions merged across transpositions, with each one's
+    reach (the opponent's `{ 45% }` shares multiplied along the way), and the profile: our moves,
+    our pieces at the line ends, structures, material and kings, all weighted by reach.
+  - `playout.ts` plays seeded short games, Maia or Stockfish on each side.
+  - `check.ts` is the deck's check.
+  - `cv.ts` is the command line. A move that is illegal or ambiguous is refused, and the legal
+    moves are listed.
+- **The deck format** (approved by the owner): one chapter per idea, with these headers:
+  - `ChapterName`
+  - `Orientation`
+  - `FEN`/`SetUp` (the card's position)
+  - `IdeaKind`: one of overview, structure, break, placement, maneuver, king, exchange, tactic,
+    trap, move-order, endgame
+  - `IdeaQuestion`
+  - `IdeaSource`
+
+  The comment before the first move is the explanation, with its arrows (green: our plan; red:
+  their threat; blue: a second option; yellow circles: key squares). The main line plays the idea
+  out. A side line marked `?` shows where it fails. Chapter 0, "Rules of thumb", lists the rules,
+  rule n summing up idea n. More positions of the same idea are their own chapters ("3b. …",
+  "3d. … (where it fails)"). A card's answers are its first move and any first move marked `!`
+  beside it; an unmarked side line at the start is a playable move that isn't the answer. The
+  site keeps the headers as imported, so no format changes: a deck imports today as a reference
+  study (§4.10, §5.76).
+- **The check** fails the run on any of these:
+  - a missing header or an unknown kind
+  - no explanation
+  - an illegal move
+  - a comment over Lichess's limit
+  - a chapter that doesn't come back unchanged from the site's writer
+  - a move of the deck's side that Stockfish grades `bad` or worse, unless marked `?`
+  - a `?` that isn't `bad` or worse, a `??` that isn't a blunder, a `!` that isn't `great`
+
+  It warns on:
+  - an arrow that starts on an empty square, unless it continues a route
+  - an opponent's blunder that isn't marked
+  - a card's own move that isn't `great`
+  - a `?!` that is `great` or `good`
+  - two chapters at the same position
+- **The skill** (`.claude/skills/opening-ideas/SKILL.md`):
+  1. Read the repertoire (`tree`, `profile` with the engine on the most reached line ends).
+  2. Find ideas through four lenses: structure and material; where the pieces go; tactics,
+     traps and attack (`maia --grade`: the opponent's natural moves that lose); move orders and
+     the opponent's choices.
+  3. Curate 10–14 ideas, one rule each, in the order they come up in a game, covering every
+     opponent setup with 5% or more reach.
+  4. Verify each idea as a skeptic.
+  5. Write the deck, and check it to zero errors.
+  6. Review as a critic, fix, and check again.
+  7. Report the repertoire notes (gaps, improvements, the owner's own notes checked) apart from
+     the deck.
+  8. Deliver the deck as a file. Decks and repertoires never go in this public repository.
+
+  With workflows opted into, steps 2–6 run as the saved workflow `opening-ideas-deck`
+  (`.claude/workflows/opening-ideas-deck.js`).
+- **The pilot** (2026-10-19/20): the owner's Scandinavian Gambit repertoire for Black (1.e4 d5
+  2.exd5 c6 3.dxc6 Nxc6; 320 positions, 34 line ends; Black a pawn down at 85% of them, about
+  −0.15 to −0.5 at the most reached). The lenses proposed 32 ideas. The curator kept 14 and the
+  skeptics fixed all 14, finding 13 faults in the rules, most of them too broad. For example,
+  "...Qb6 against Bg5" holds only while both kings are in the centre or an e7-bishop can take
+  back on f6. The critic then found three rules still wrong, two duplicate cards and the rules
+  numbered apart from the ideas. Those lessons are in the skill now: one rule per idea, ordered
+  by the game, each rule read literally against every card, and the duplicate-position warning.
+  The deck has 47 chapters, and its check reports 0 errors and 0 warnings at depth 18. It took
+  11 agents and about 1.3 million tokens, on the single-threaded lite Stockfish. It also gave
+  repertoire notes for the owner: gaps, a few improvements, and the owner's 8...h6 note checked.
+- **Idea cards in the app** (next, a session of its own):
+  - **The card:** one chapter is one card (`i|<sid>|<cid>`), enrolled for a whole study at once
+    from its ☰ menu, by `idea` events as plan cards' `plan` events (§5.61). The overview chapter
+    makes no card. A chapter-keyed card keeps the deck as written: a plan card gathers every
+    comment at its position from every study, which would mix the repertoire's notes in.
+  - **A review:**
+    1. The card's position is shown, turned to its `Orientation`, with the `IdeaQuestion`.
+    2. The user plays a move or presses Show. A move is right when it is the card's first move
+       or a first move marked `!` (or `!!`) beside it. Another move from the card's side lines
+       shows its comment; a move the card doesn't have is just not the answer.
+    3. Then the explanation and its arrows, and the main line stepped or played at the pace with
+       its comments and arrows. A side line can be opened as a comment line (§5.12).
+    4. A move is graded by itself (right the first time: Good; wrong: Again). Show, a card with
+       the other side to move, or a chapter with no moves is self-graded: Again, Hard, Good or
+       Easy.
+  - **A new card** is shown first, then asked, as Learn does.
+  - **Where:** the ideas study's Train button, and the home's due counts, within a daily limit of
+    new idea cards.
+
+  The details are decided when it is built.
+
+Tests: `test/unit/scripts/ideas.test.ts`. It covers:
+- exchange values on a gambit position worked out by hand, and a capture by a pinned piece
+- a pin, a mate in one, a knight fork, a threat read with the turn passed, no pass when in check
+- islands, isolated, doubled and passed pawns, chains, the French's breaks, a Najdorf's d5 outpost
+- the look as text from Black's side
+- an ambiguous move refused with the legal moves named
+- the reach multiplied and merged across a transposition, a guess marked
+- the deck's static check, with two chapters at one position
+- grades and the deck's check with Stockfish at depth 8: the marks, a card's own move, a `!`
+
+Live: TESTING.md (the owner reads the pilot deck).
