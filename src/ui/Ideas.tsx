@@ -37,12 +37,14 @@ export function IdeasScreen(props: { sid?: string }) {
   const s = ideaSession.value;
   useEffect(() => startIdeaCards(), []);
   // Once a visit, when the cards are read: the session left here goes on (back from the analysis
-  // board), any other starts afresh.
+  // board), any other starts afresh. One that found no cards begins again when they are read anew:
+  // cards made just before (their events land a moment after the menu says so), or a sync.
   const [begun, setBegun] = useState(false);
   useEffect(() => {
-    if (!ready || begun) return;
-    setBegun(true);
+    if (!ready) return;
     const now = ideaSession.peek();
+    if (begun && !(now && !now.run && !now.steps.length)) return;
+    setBegun(true);
     if (!now?.run || now.scope !== sid) beginIdeas(sid);
   }, [ready, sid]);
   useWakeLock(!!s?.run);
