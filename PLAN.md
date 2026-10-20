@@ -6807,7 +6807,7 @@ skill and its tools, then idea cards in the app.
   The deck has 47 chapters, and its check reports 0 errors and 0 warnings at depth 18. It took
   11 agents and about 1.3 million tokens, on the single-threaded lite Stockfish. It also gave
   repertoire notes for the owner: gaps, a few improvements, and the owner's 8...h6 note checked.
-- **Idea cards in the app** (next, a session of its own):
+- **Idea cards in the app** (built 2026-10-20, as built below):
   - **The card:** one chapter is one card (`i|<sid>|<cid>`), enrolled for a whole study at once
     from its ☰ menu, by `idea` events as plan cards' `plan` events (§5.61). The overview chapter
     makes no card. A chapter-keyed card keeps the deck as written: a plan card gathers every
