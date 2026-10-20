@@ -107,6 +107,12 @@ between agents.
    - `about`: what the repertoire is and what its comments mean
    - `level`
    - `hints`: optionally, what to look at per lens
+   - `lenses`: optionally, which lenses to run, e.g. `["pieces", "pawns"]` for the development
+     ideas alone
+   - `lean`: optionally `true`: no curator or skeptics; the writer chooses, verifies and writes,
+     and the critic fixes what it finds. That is 4 agents for two lenses, against about 14 for
+     the full run, which takes over a million tokens. The owner settled on the two development
+     lenses, run lean, for now (2026-10-20).
 
    Otherwise do the lenses in turn yourself. Use `tree --min 0` to find the reach of a position
    below the saved cutoff.

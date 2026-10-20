@@ -22,6 +22,10 @@ export const meta = {
 //   about: what the repertoire is and what its comments mean
 //   level: the owner's level and the opponents', e.g. "club player; opponents read with Maia at 2000–2200"
 //   hints: optional { pieces, pawns, structure, tactics, orders }: what to look at in this opening
+//   lenses: optional, the lenses to run (default all five), e.g. ['pieces', 'pawns'] for the
+//           development ideas alone
+//   lean: optional; true skips the curator and the skeptics: the writer chooses, verifies and
+//         writes, and the critic fixes what it finds (4 agents for two lenses, against about 14)
 // }
 const A = args
 const W = A.work
@@ -131,13 +135,47 @@ const LENSES = [
   },
 ]
 
+const RUN = A.lenses && A.lenses.length ? LENSES.filter((l) => A.lenses.includes(l.key)) : LENSES
+
 phase('Analyse')
-const found = await parallel(LENSES.map((l) => () =>
+const found = await parallel(RUN.map((l) => () =>
   agent(`${CONTEXT}\n\n${l.prompt}\n\nFor each idea give 1–3 positions: the main one (the clearest, most reached), maybe an example where the same idea recurs, maybe one where it FAILS (role "fails": the idea's move there grades bad or worse, and the card teaches the condition). Arrows: green for our plan, red for ${THEM}'s threat or what we prevent, blue for a second option; circles: yellow for a key square. Importance 1–5 = reach × consequence. In notes, list what you looked at that did NOT become an idea and why, then any trouble with the tools. Do not report gaps in the repertoire or better moves: the repertoire is right by definition.`,
     { label: `analyse:${l.key}`, phase: 'Analyse', schema: IDEAS })))
-const candidates = found.flatMap((r, i) => (r ? r.ideas.map((x) => ({ ...x, id: `${LENSES[i].key}-${x.id}` })) : []))
-const lost = LENSES.filter((_, i) => !found[i]).map((l) => l.key)
+const candidates = found.flatMap((r, i) => (r ? r.ideas.map((x) => ({ ...x, id: `${RUN[i].key}-${x.id}` })) : []))
+const lost = RUN.filter((_, i) => !found[i]).map((l) => l.key)
+const analystNotes = found.map((r, i) => `${RUN[i].key}: ${r ? r.notes : '(agent failed)'}`)
 log(`${candidates.length} candidate ideas from ${found.filter(Boolean).length} analysts${lost.length ? `; no ideas from ${lost.join(', ')} (agent failed)` : ''}`)
+
+const FORMAT = `The deck format (the owner approved it; the site imports it as a reference study and the checker enforces it):
+- One PGN game per chapter, Lichess dialect. Headers, in this order, each on one line, no double quotes inside a value:
+  [Event "${A.event}"]
+  [ChapterName "<n>. <title>"]   (more positions of the same idea: "<n>b. <title> (another position)", "<n>c. …")
+  [Orientation "${A.side}"]
+  [FEN "<the card's position>"]
+  [SetUp "1"]
+  [IdeaKind "<one of: ${KINDS.join(', ')}; overview only for the rules of thumb, which make no card>"]
+  [IdeaQuestion "<the question, answerable by looking at the board>"]
+  [IdeaSource "<short provenance: repertoire reach and path end, engine checks (depth, band), Maia figures (2000+)>"]
+- Then a blank line, then the movetext: first the explanation as a comment before the first move: { 1–3 plain sentences [%csl Yd4][%cal Gc8g4,Rf3e5] }; then the idea's move(s) (a glyph like ! right after a move where it earns it), each with a short comment where it helps; the continuation that shows the idea; a side line in parentheses for the case where it fails, its move marked ? (or ?? for a blunder), with a comment saying why; then *.
+- A card's answers are its first move and any first move marked ! beside it. At a repertoire position the first move is the repertoire's move, never marked ? and never with a ! move beside it; the main line keeps to the repertoire's moves while it is in the repertoire. Another move of ours beside it is a side line showing why that square is worse there: marked ? when it grades bad or worse, else unmarked or ?!, its comment saying what it gives up; never one that grades better than the repertoire's move. Beyond the repertoire, mark ! only a move as good as the main move (graded great). Two cards never start at the same position.
+- Movetext from a FEN with Black to move starts "<n>... <move>"; with White to move "<n>. <move>".
+- Comments never contain { or }. Arrows and circles: [%cal Gc8g4,Rf3e5] [%csl Yd4,Gf2]: G green = our plan, R red = ${THEM}'s threat or what we prevent, B blue = a second option, Y yellow = a key square. Every arrow starts on a piece in the position it is drawn in, or where another arrow of the same comment ends (a route).
+- The rules of thumb first, in two overview chapters, both [IdeaKind "overview"] and [FEN "${A.start}"], no IdeaQuestion, no moves, each comment under 1500 characters: [ChapterName "0. Rules of thumb: where the pieces go"] with the development ideas' rules numbered "1) … 2) …", then [ChapterName "0b. Rules of thumb: plans and tactics"] with the plans ideas' rules, numbered on from the first chapter's (left out when there are no plans ideas). Then the development ideas' chapters, then the plans ideas'.
+- A development card's question asks where the piece goes here (or what to play), and why; its explanation names the condition visible on the board and the reason; its side lines show the other natural squares and what they give up there.
+- Never write that the repertoire's move is a mistake, inaccurate or second best, nor "best" unless grade says great.
+- Explanations are for the owner's level: plain words, no engine numbers in the explanation (they go in IdeaSource), no claim the evidence does not back.`
+
+const CRITIC_CHECKS = `Check, with the tools: (1) accuracy: spot-check at least 8 concrete claims across the deck (moves, "wins", "threatens", "weak", "guards", arrows) with look/grade/squares/engine/line; (2) does each question have one clear answer on the board, and does the explanation answer it; (3) are the rules of thumb true, not contradicted by any card (read each rule's condition literally against every card), does every clause of a rule have a card, and do they cover the most reached positions and ${THEM}'s main setups (tree.txt, profile.txt)? Is anything important missing (a ≥5% setup, a frequent trap)? (4) development first: do the development cards come first, in the order the pieces come out, and does every first square with 3% or more reach in develop.txt have a card whose condition and reason a learner could apply in a new game? (5) the repertoire is right: no card's answer or main line departs from the repertoire at its positions, no text calls its move a mistake or second best, no side line offers a better move; (6) duplication and order; (7) clarity for the owner's level.${RUN.length < LENSES.length ? ` Only these lenses ran: ${RUN.map((l) => l.key).join(', ')}; judge coverage within them.` : ''}`
+
+if (A.lean) {
+  phase('Write')
+  const writer = await agent(`${CONTEXT}\n\nYou are the WRITER, with no curator or skeptics before you: you choose the ideas, verify them and write the deck to ${DECK} (create the folder if needed).\n\nThe analysts proposed these candidate ideas (JSON):\n${JSON.stringify(candidates)}\n${lost.length ? `\nThe ${lost.join(', ')} lens produced nothing (its agent failed): cover its ground yourself where the candidates leave a gap.\n` : ''}\n1. CHOOSE. Merge duplicates. Keep every development idea that covers a first square with 3% or more reach in develop.txt, ordered as the pieces come out (develop.txt's order); a piece whose square varies is one idea with one position per square. Write one rule of thumb per idea, about 100 characters, naming the piece and each square with the condition a player can see on the board.\n2. VERIFY every position before you write it: play its moves with line (the FEN must match) and run look; at a repertoire position (tree.txt) its answer must be the repertoire's move; the reason and every factual phrase ("guards e5", "hits b2", "can't be chased") must match a squares, grade or look output; each side line's grade and what it gives up must come from squares or grade; arrows start on pieces of the right colour. Read each rule literally against every card of its idea and against develop.txt's positions for that square (develop --piece lists them): narrow it or drop the idea when it fails. Keep your evidence in ${W}/notes.\n3. WRITE the deck.\n\n${FORMAT}\n\nEach position of an idea becomes one chapter; its "fails" position a side line in the main chapter where it fits, or its own chapter (the move marked ?); a position's "others" side lines beside its first move. A piece's other squares are its "b", "c" chapters, each asking the same question at its own setup.\n4. Run node scripts/ideas/cv.ts check ${DECK} --rep ${W}/repertoire.pgn --depth 18 --verbose and fix every ERROR (fix the content, never just the glyph unless the glyph is what was wrong) and every warning you can, until it reports 0 errors.\nReturn a summary: the ideas and chapters written, what you dropped or narrowed and why, the final check's last line, any warnings left and why.`,
+    { label: 'write', phase: 'Write', effort: 'high' })
+  phase('Review')
+  const critic = await agent(`${CONTEXT}\n\nYou are the CRITIC, a strong player and a demanding teacher, and you fix what you find. Read the deck at ${DECK} (the writer's report: ${writer}).\n\n${FORMAT}\n\n${CRITIC_CHECKS}\n\nThen apply each fix to the deck yourself, verifying every new or changed claim with the tools first (a fix the tools do not back is not applied), and run node scripts/ideas/cv.ts check ${DECK} --rep ${W}/repertoire.pgn --depth 18 until it reports 0 errors. Return: what you found (chapter, severity, problem, evidence), which fixes you applied and which not and why, the final check's last line, and a verdict: is this deck worth a learner's time, and what is its biggest weakness.`,
+    { label: 'critic', phase: 'Review', effort: 'high' })
+  return { deck: DECK, analystNotes, candidates: candidates.length, writer, critic }
+}
 
 phase('Curate')
 const CURATED = {
@@ -187,25 +225,6 @@ log(`verified: ${results.filter((r) => r.verdict === 'keep').length} kept, ${res
 const unverified = batches.flatMap((batch, b) => (verified[b] ? [] : batch))
 if (unverified.length) log(`${unverified.length} ideas were not verified (a verifier failed); the writer checks them or leaves them out`)
 
-const FORMAT = `The deck format (the owner approved it; the site imports it as a reference study and the checker enforces it):
-- One PGN game per chapter, Lichess dialect. Headers, in this order, each on one line, no double quotes inside a value:
-  [Event "${A.event}"]
-  [ChapterName "<n>. <title>"]   (more positions of the same idea: "<n>b. <title> (another position)", "<n>c. …")
-  [Orientation "${A.side}"]
-  [FEN "<the card's position>"]
-  [SetUp "1"]
-  [IdeaKind "<one of: ${KINDS.join(', ')}; overview only for the rules of thumb, which make no card>"]
-  [IdeaQuestion "<the question, answerable by looking at the board>"]
-  [IdeaSource "<short provenance: repertoire reach and path end, engine checks (depth, band), Maia figures (2000+)>"]
-- Then a blank line, then the movetext: first the explanation as a comment before the first move: { 1–3 plain sentences [%csl Yd4][%cal Gc8g4,Rf3e5] }; then the idea's move(s) (a glyph like ! right after a move where it earns it), each with a short comment where it helps; the continuation that shows the idea; a side line in parentheses for the case where it fails, its move marked ? (or ?? for a blunder), with a comment saying why; then *.
-- A card's answers are its first move and any first move marked ! beside it. At a repertoire position the first move is the repertoire's move, never marked ? and never with a ! move beside it; the main line keeps to the repertoire's moves while it is in the repertoire. Another move of ours beside it is a side line showing why that square is worse there: marked ? when it grades bad or worse, else unmarked or ?!, its comment saying what it gives up; never one that grades better than the repertoire's move. Beyond the repertoire, mark ! only a move as good as the main move (graded great). Two cards never start at the same position.
-- Movetext from a FEN with Black to move starts "<n>... <move>"; with White to move "<n>. <move>".
-- Comments never contain { or }. Arrows and circles: [%cal Gc8g4,Rf3e5] [%csl Yd4,Gf2]: G green = our plan, R red = ${THEM}'s threat or what we prevent, B blue = a second option, Y yellow = a key square. Every arrow starts on a piece in the position it is drawn in, or where another arrow of the same comment ends (a route).
-- The rules of thumb first, in two overview chapters, both [IdeaKind "overview"] and [FEN "${A.start}"], no IdeaQuestion, no moves, each comment under 1500 characters: [ChapterName "0. Rules of thumb: where the pieces go"] with the development ideas' rules numbered "1) … 2) …", then [ChapterName "0b. Rules of thumb: plans and tactics"] with the plans ideas' rules, numbered on from the first chapter's. Then the development ideas' chapters, then the plans ideas'.
-- A development card's question asks where the piece goes here (or what to play), and why; its explanation names the condition visible on the board and the reason; its side lines show the other natural squares and what they give up there.
-- Never write that the repertoire's move is a mistake, inaccurate or second best, nor "best" unless grade says great.
-- Explanations are for the owner's level: plain words, no engine numbers in the explanation (they go in IdeaSource), no claim the evidence does not back.`
-
 phase('Write')
 const writer = await agent(`${CONTEXT}\n\nYou are the WRITER. Write the idea deck to ${DECK} (create the folder if needed), from these verified ideas and rules.\n\n${FORMAT}\n\nRules of thumb (fix any that the verifiers found wrong, listed after them):\n${JSON.stringify(curated.rules)}\nCorrections from the verifiers:\n${JSON.stringify(rulesWrong)}\n\nVerified ideas (JSON):\n${JSON.stringify(kept)}\n${unverified.length ? `\nNOT verified (a verifier failed): verify these yourself with grade at depth 20 before writing them, or leave them out:\n${JSON.stringify(unverified)}` : ''}\n\nEach position of an idea becomes one chapter (main, examples), its "fails" position becoming a side line in the main chapter where it fits, or its own chapter (the move marked ?) where it does not; a position's "others" become side lines beside its first move. Number the ideas in the given order (the development ideas first, as the curator ordered them; a piece's other squares are its "b", "c" chapters, each asking the same question at its own setup). Then run: node scripts/ideas/cv.ts check ${DECK} --rep ${W}/repertoire.pgn --depth 18 --verbose\nFix every ERROR (a move the checker grades worse than its mark says means the text or the move is wrong: re-check with grade and fix the content, never just the glyph unless the glyph is what was wrong) and every warning you can; run the check again until it reports 0 errors. Return a summary: the chapters written, the final check's last line, any warnings left and why.`,
   { label: 'write', phase: 'Write' })
@@ -226,7 +245,7 @@ const REVIEW = {
   },
   required: ['fixes', 'verdict'],
 }
-const review = await agent(`${CONTEXT}\n\nYou are the CRITIC, a strong player and a demanding teacher. Read the deck at ${DECK} (the writer's report: ${writer}).\n\n${FORMAT}\n\nCheck, with the tools: (1) accuracy: spot-check at least 8 concrete claims across the deck (moves, "wins", "threatens", "weak", "guards", arrows) with look/grade/squares/engine/line; (2) does each question have one clear answer on the board, and does the explanation answer it; (3) are the rules of thumb true, not contradicted by any card (read each rule's condition literally against every card), does every clause of a rule have a card, and do they cover the most reached positions and ${THEM}'s main setups (tree.txt, profile.txt)? Is anything important missing (a ≥5% setup, a frequent trap)? (4) development first: do the development cards come first, in the order the pieces come out, and does every first square with 3% or more reach in develop.txt have a card whose condition and reason a learner could apply in a new game? (5) the repertoire is right: no card's answer or main line departs from the repertoire at its positions, no text calls its move a mistake or second best, no side line offers a better move; (6) duplication and order; (7) clarity for the owner's level. Return concrete fixes (chapter, severity, problem, fix, evidence) and a verdict.`,
+const review = await agent(`${CONTEXT}\n\nYou are the CRITIC, a strong player and a demanding teacher. Read the deck at ${DECK} (the writer's report: ${writer}).\n\n${FORMAT}\n\n${CRITIC_CHECKS} Return concrete fixes (chapter, severity, problem, fix, evidence) and a verdict.`,
   { label: 'critic', phase: 'Review', schema: REVIEW, effort: 'high' })
 const fixes = review ? review.fixes : []
 const fixer = fixes.length
@@ -236,7 +255,7 @@ const fixer = fixes.length
 
 return {
   deck: DECK,
-  analystNotes: found.map((r, i) => `${LENSES[i].key}: ${r ? r.notes : '(agent failed)'}`),
+  analystNotes,
   candidates: candidates.length,
   curated: curated.ideas.map((x) => `${x.id} (${x.section}): ${x.title}`),
   rules: curated.rules,
