@@ -28,8 +28,15 @@ fixes them and updates this file.
 ## Opening ideas: the second deck (§5.128, 2026-10-20)
 - The owner read the first deck and set three rules: the repertoire is right, Maia at 2000 or
   more, development first. The skill and its tools keep them now (the check against the
-  repertoire, the development map). A second Scandinavian Gambit deck is being made with them and
-  will be sent in the chat (never in the repo); this item says what to check once it is.
+  repertoire, the development map). The second Scandinavian Gambit deck was sent in the chat
+  (`scandi-gambit-ideas.pgn`, never in the repo): pieces and pawns only, 23 chapters.
+- Import it as a study, then ☰ → Make idea cards: 21 cards (the two "0." chapters are read, not
+  trained). Read chapter 0 first: is "where does this piece go, and when" clear for each piece,
+  e.g. the f8-bishop's d6 / c5 / e7? Then train a few cards.
+- Say whether a card's rule is wrong for the repertoire (it takes the repertoire's moves as right),
+  and whether the two gaps should get cards: the 4.Bb5 e5 5.Bxc6+ bxc6 structure, and when we
+  castle. About a third of the cards are at rare positions (under 1.5% of games): keep them or
+  cut them?
 - The repertoire notes are dropped: the skill no longer reviews the repertoire.
 
 ## Show and grade retries its mistakes (§5.127, 2026-10-19)

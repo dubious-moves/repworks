@@ -6850,7 +6850,20 @@ skill and its tools, then idea cards in the app.
   it had one card answering with a better move than the repertoire's: 12b, 6...Qb6 for the
   repertoire's 6...Bc5.
 - **The second pilot** (2026-10-20): the same repertoire through the updated workflow, with the
-  three rules. Its results are added here when it is done.
+  three rules. The full run (five lenses, about 14 agents) cost more than the owner wanted, so on
+  the owner's word it ran lean: the pieces and pawns lenses only, then one writer that also
+  verifies and one critic that fixes (`lenses`, `lean`). That took 4 agents, about 0.54 million
+  tokens and 21 minutes. The deck has 23 chapters: "0. Rules of thumb: where the pieces go"
+  (seven rules, one per piece: the e-pawn, g8-knight, f8-bishop, queen, c8-bishop, h-pawn and
+  a8-rook, each with its squares and when), "0b. Rules of thumb: plans and tactics" (the e-pawn
+  against d4), and 21 cards in the order the pieces come out. Its check against the repertoire
+  reports 0 errors and 0 warnings at depth 18, and 21 cards start at a repertoire position.
+  Headless (desktop Chromium), the app made 21 idea cards from it and every card's answer was
+  taken as right. The critic corrected six claims, each with the tool output behind it (a pin
+  that wasn't one, a break rule keyed to the wrong condition, a Maia claim the numbers didn't
+  bear out). It left two gaps, to save tokens: no card for the 4.Bb5 e5 5.Bxc6+ bxc6 structure
+  (about 7% of games, more by transposition) or for when we castle; and about a third of the
+  cards sit at positions under 1.5% of games.
 - **Idea cards in the app** (built 2026-10-20, as built below):
   - **The card:** one chapter is one card (`i|<sid>|<cid>`), enrolled for a whole study at once
     from its ☰ menu, by `idea` events as plan cards' `plan` events (§5.61). The overview chapter
