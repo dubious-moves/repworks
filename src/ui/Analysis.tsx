@@ -40,6 +40,8 @@ export function backTo(m: BackMode): string {
       return m.id ? 'Back to the game' : 'Back to the games';
     case 'gamesReview':
       return 'Back to the game cards';
+    case 'ideas':
+      return 'Back to the idea cards';
     case 'playOn':
       return 'Back to the game';
     case 'history':

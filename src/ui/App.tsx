@@ -19,6 +19,9 @@ import { RepertoireCheckScreen } from './RepertoireCheck.tsx';
 import { ChecklistDrill } from './Checklist.tsx';
 import { Debug } from './Debug.tsx';
 import { Guard } from './Guard.tsx';
+import { IdeasScreen } from './Ideas.tsx';
+import { ideaEnrolled, ideaQueueNow, startIdeaCards } from '../app/ideas.ts';
+import { enrolledIn } from '../core/ideas/cards.ts';
 import { ImportScreen } from './Import.tsx';
 import { SetupForm } from './Setup.tsx';
 import { SyncBanners, SyncChip } from './Sync.tsx';
@@ -38,7 +41,7 @@ import { confirmDeleteStudy, openNewStudy, openStudySettings, StudyDialogs } fro
 
 export function App() {
   return (
-    <div class={`shell${mode.value.name === 'chapter' || mode.value.name === 'analysis' ? ' shell-chapter' : ''}${['train', 'learn', 'practice', 'show', 'difficult', 'read', 'play', 'storm', 'gamesReview', 'playOn', 'history', 'checklist'].includes(mode.value.name) || (mode.value.name === 'games' && !!mode.value.id) ? ' shell-train' : ''}`}>
+    <div class={`shell${mode.value.name === 'chapter' || mode.value.name === 'analysis' ? ' shell-chapter' : ''}${['train', 'learn', 'practice', 'show', 'difficult', 'ideas', 'read', 'play', 'storm', 'gamesReview', 'playOn', 'history', 'checklist'].includes(mode.value.name) || (mode.value.name === 'games' && !!mode.value.id) ? ' shell-train' : ''}`}>
       <header class="topbar">
         <img class="topbar-icon" src={`${import.meta.env.BASE_URL}icons/icon.svg`} alt="" width={28} height={28} />
         <h1>Repworks</h1>
@@ -155,6 +158,8 @@ function Screen() {
       return <TrainScreen of={mode.value.sid ? { kind: 'show', scope: mode.value.sid } : { kind: 'show' }} />;
     case 'difficult':
       return <TrainScreen of={{ kind: 'difficult' }} />;
+    case 'ideas':
+      return <IdeasScreen {...(mode.value.sid ? { sid: mode.value.sid } : {})} />;
     case 'mistakes':
       return <MistakesView />;
     case 'read':
@@ -196,6 +201,7 @@ function Screen() {
 
 function Home() {
   const [conflicts, setConflicts] = useState(0);
+  useEffect(() => startIdeaCards(), []);
   const version = dataVersion.value;
   useEffect(() => {
     const store = localStore();
@@ -265,6 +271,8 @@ function StudyCard(props: { study: StudyRow }) {
   const s = props.study;
   const data = trainData.value;
   const queue = s.kind === 'repertoire' && data ? queueOf(data, decidingNow(), s.id) : undefined;
+  // An idea deck's cards (§5.128): their counts and their Train button.
+  const ideas = !queue && enrolledIn(ideaEnrolled.value, s.id).length ? ideaQueueNow(s.id) : undefined;
   const ref = { sid: s.id, name: s.name, kind: s.kind, chapters: s.chapters };
   return (
     <li class="study-card">
@@ -290,9 +298,19 @@ function StudyCard(props: { study: StudyRow }) {
             <span class={`due${queue.due.length ? ' some' : ''}`}>{queue.due.length} due</span> · <span class={`new${queue.newCards.length ? ' some' : ''}`}>{queue.newCards.length} new</span>
           </span>
         )}
+        {ideas && (
+          <span class="study-card-counts" title="Idea cards">
+            <span class={`due${ideas.due.length ? ' some' : ''}`}>{ideas.due.length} due</span> · <span class={`new${ideas.fresh.length ? ' some' : ''}`}>{ideas.fresh.length} new</span>
+          </span>
+        )}
       </div>
       {s.kind === 'repertoire' && (
         <a class="button primary study-card-train" href={`#/train/${s.id}`} aria-label={`Train ${s.name}`}>
+          Train
+        </a>
+      )}
+      {ideas && (
+        <a class="button primary study-card-train" href={`#/ideas/${s.id}`} aria-label={`Train ${s.name}`}>
           Train
         </a>
       )}

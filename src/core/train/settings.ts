@@ -1,7 +1,7 @@
 // The training settings every device must share (PLAN.md §5.2), in the data repo's
 // `settings.json`: the retention changes replayed card states, and the daily limit of new moves
 // is drawn from by both devices. Per-device preferences (pace, speech, keys) stay on the device.
-//   { "format": 1, "train": { "newPerDay": 20, "retention": 0.9, "learnStepHours": 4 } }
+//   { "format": 1, "train": { "newPerDay": 20, "retention": 0.9, "learnStepHours": 4, "newIdeasPerDay": 5 } }
 // A field missing means its default. Fields this code doesn't know are kept as they are, so an
 // older build never drops a newer one's settings. Merged per field, ours on a clash (§4.7).
 import type { Parsed } from '../study/studyMeta.ts';
@@ -15,14 +15,17 @@ export interface TrainSettings {
   retention: number;
   /** How long after a move is taught its first review comes due (§5.2). */
   learnStepHours: number;
+  /** New idea cards a day, from every device (§5.128). */
+  newIdeasPerDay: number;
 }
 
-export const DEFAULT_TRAIN: TrainSettings = { newPerDay: 20, retention: 0.9, learnStepHours: 4 };
+export const DEFAULT_TRAIN: TrainSettings = { newPerDay: 20, retention: 0.9, learnStepHours: 4, newIdeasPerDay: 5 };
 
 const RULES: { [K in keyof TrainSettings]: { ok: (v: number) => boolean; says: string } } = {
   newPerDay: { ok: (v) => Number.isInteger(v) && v >= 0 && v <= 1000, says: 'a whole number from 0 to 1000' },
   retention: { ok: (v) => v >= 0.7 && v <= 0.99, says: 'a number from 0.7 to 0.99' },
   learnStepHours: { ok: (v) => v >= 0 && v <= 48, says: 'a number of hours from 0 to 48' },
+  newIdeasPerDay: { ok: (v) => Number.isInteger(v) && v >= 0 && v <= 100, says: 'a whole number from 0 to 100' },
 };
 const KNOWN = Object.keys(RULES) as (keyof TrainSettings)[];
 

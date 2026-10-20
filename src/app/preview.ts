@@ -8,7 +8,7 @@ import { firstCursor, playedLines, stepCursor, switchLine, type Cursor, type Pla
 import { at } from './editor.ts';
 import { mode } from './mode.ts';
 
-export type PreviewOwner = 'chapter' | 'read' | 'train' | 'games';
+export type PreviewOwner = 'chapter' | 'read' | 'train' | 'games' | 'ideas';
 
 export interface Preview {
   owner: PreviewOwner;

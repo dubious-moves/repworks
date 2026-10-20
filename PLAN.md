@@ -6826,9 +6826,67 @@ skill and its tools, then idea cards in the app.
   - **Where:** the ideas study's Train button, and the home's due counts, within a daily limit of
     new idea cards.
 
-  The details are decided when it is built.
+  **As built** (2026-10-20):
+  - **Core.** `src/core/ideas/cards.ts`: a chapter makes a card when it has an `IdeaKind` other
+    than `overview` (unknown kinds too: the deck's check rejects those). The card is read live
+    from the chapter: its question (`IdeaQuestion`; "What is the idea here?" when missing), its
+    side (`Orientation`, else the side to move), the explanation (the comments before the first
+    move) and its shapes. Its answers are the first move unless that is marked `?` or `??`, and
+    the first moves marked `!` or `!!` beside it. It is self-graded when its side isn't to move
+    or no move answers it. A move played is right, one of the card's side lines, or a move the
+    card doesn't have, compared by SAN. A side line becomes a comment's line,
+    `(7... Nxd4?? 8. Nxd4 Qxd4? 9. Bb5+)` then its comments, so the §5.12 code previews it on
+    the board. It follows the line's main moves; lines nested in a side line are left out.
+    Today's queue is the game cards' (`gameQueue`): due first, then new cards in the deck's
+    order (studies by name, chapters in order), within the daily limit.
+  - **The session** (`src/core/ideas/session.ts`, pure):
+    - Due cards first, then new ones; a new card opens on its back ("Ask me" then asks it).
+    - A move right the first time records Good. The first wrong move records Again at once, with
+      the move in `w`, so leaving doesn't lose it. The board is set back, and the user tries
+      again or presses Show.
+    - Show records nothing until the owner's grade, unless a wrong move already graded Again.
+    - A card graded Again comes back at the session's end, not graded: asked until a move
+      answers it, or shown once when self-graded. FSRS never brings an Again back the same day
+      (§4.8), so this is the session's own retry, as show and grade's (§5.127).
+  - **The `idea` event**: `{ "k": "idea", "card": "i|<sid>|<cid>", "on": true }`. The latest
+    event of each card decides, as with `plan`. Removing a card keeps its reviews; made again,
+    it goes on from them.
+  - **The daily limit** is `newIdeasPerDay` in `settings.json`'s `train` (default 5, 0–100),
+    shared by the devices like the limit of new moves, and set in Training settings. A missing
+    field means the default, so older files read as before. Cards first reviewed today count.
+  - **The ☰ menu**, in a study whose open chapter has an `IdeaKind` or which has cards:
+    - "Make idea cards" enrols every chapter that makes one, read from all the study's files.
+    - With cards: "Idea cards for new chapters" enrols the chapters added since, and "Remove
+      the idea cards (n)" removes them all.
+  - **The screen**: `#/ideas` (every deck) and `#/ideas/<sid>` (one study), `src/ui/Ideas.tsx`.
+    - Asking: the board at the card's position turned to its side, a counter (n of m, the kind,
+      new, or "again, not graded"), the question in large text, Show (Space). The chapter's name
+      is hidden while asking: it often names the answer.
+    - A wrong move: "b6 isn't the answer (Again)", and for a side line its moves (clickable on
+      the board) and comments.
+    - The back and a new card's first showing: the Read view's `LineReader`. It shows the
+      explanation and arrows at the start, the main line stepped with ← → or played with ▶▶
+      at twice the training pace (`playMs`). The other moves at each position are comment lines
+      under the comments (`sideLines`). Above them: the chapter's name, the question, and what
+      happened ("c5: right, after b6. Recorded: Again.", "Shown. The answer: Bd7.").
+    - Below: Again/Hard/Good/Easy (1–4) when the owner grades, else Next (Space or Enter).
+      Also Open the chapter, Analyse (from the back; ← comes back to the session) and Remove
+      the card. The end shows the grades and Train again.
+  - **The home**: a study with idea cards shows their due and new counts and a Train button to
+    `#/ideas/<sid>`, as a repertoire study's. The training card adds "Ideas: n due · m new ·
+    Train ideas", and with no repertoire it shows only that line.
 
-Tests: `test/unit/scripts/ideas.test.ts`. It covers:
+Tests: `test/unit/core/ideas/cards.test.ts` (a French Advance deck written for the tests from
+public opening knowledge, `test/fixtures/ideas/french-advance.pgn`, checked at depth 18 with 0
+errors and 0 warnings). It covers the cards, the answers and a `??` first move, the judged moves,
+a side line's text, self-graded cards, the `idea` event and the enrolments, the queue and its
+limit, and the session's grades, retries and removal. Controls: an unmarked side line counted
+as an answer fails the cards' and the moves' tests; no retry fails both session tests.
+`test/e2e/ideas.spec.ts` (desktop and phone) imports the deck as a reference study, makes the
+cards from the ☰ menu, trains from the home's Train button (a side line's move, the answer, a
+`!` move, Show and Hard, the retry), checks the synced events, and removes the cards.
+
+Tests of the skill's tools: `test/unit/scripts/ideas.test.ts`. It covers:
 - exchange values on a gambit position worked out by hand, and a capture by a pinned piece
 - a pin, a mate in one, a knight fork, a threat read with the turn passed, no pass when in check
 - islands, isolated, doubled and passed pawns, chains, the French's breaks, a Najdorf's d5 outpost
@@ -6838,4 +6896,4 @@ Tests: `test/unit/scripts/ideas.test.ts`. It covers:
 - the deck's static check, with two chapters at one position
 - grades and the deck's check with Stockfish at depth 8: the marks, a card's own move, a `!`
 
-Live: TESTING.md (the owner reads the pilot deck).
+Live: TESTING.md (the owner reads the pilot deck, then trains it as idea cards).

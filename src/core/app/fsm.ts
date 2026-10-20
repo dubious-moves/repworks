@@ -9,6 +9,7 @@
 //   #/train/<sid>/<cid>?at=e4,e5&pick   the line through a study's move, selected, not started (§5.83)
 //   #/learn/<sid>/<cid>                 a chapter's new lines, past the daily limit (§5.16)
 //   #/show[/<sid>]                      show and grade, by two keys (§5.9)
+//   #/ideas[/<sid>]                     idea cards (§5.128): today's, of every idea deck or one study
 //   #/difficult                         the lines through difficult moves, overstudied: only due moves graded (§5.124)
 //   #/mistakes                          the day's mistakes and the pins (§5.8)
 //   #/mistakes/retry, #/mistakes/drill  the day's mistakes retried, or drilled
@@ -59,6 +60,8 @@ export type Mode =
   | { name: 'show'; sid?: string }
   /** Difficult lines (§5.124): the lines through difficult moves; only their due moves graded. */
   | { name: 'difficult' }
+  /** Idea cards (§5.128): today's, of every idea deck or one study. */
+  | { name: 'ideas'; sid?: string }
   | { name: 'mistakes' }
   /**
    * A chapter's line through the move `at` (to the end of the main line below it), read move by
@@ -264,6 +267,8 @@ export function parseHash(hash: string): Mode {
     return mode;
   }
   if (parts[0] === 'difficult' && parts.length === 1) return { name: 'difficult' };
+  if (parts[0] === 'ideas' && parts.length === 1) return { name: 'ideas' };
+  if (parts[0] === 'ideas' && parts.length === 2 && isId(parts[1])) return { name: 'ideas', sid: parts[1] };
   if (parts[0] === 'learn' && parts.length === 3 && isId(parts[1]) && isId(parts[2])) return { name: 'learn', sid: parts[1], cid: parts[2] };
   const practice = (Object.keys(PRACTICE_HASH) as Practice[]).find((p) => PRACTICE_HASH[p] === `#/${parts.join('/')}`);
   if (practice) return { name: 'practice', run: practice };
@@ -304,6 +309,8 @@ export function modeHash(mode: Mode): string {
       return mode.sid ? `#/show/${mode.sid}` : '#/show';
     case 'difficult':
       return '#/difficult';
+    case 'ideas':
+      return mode.sid ? `#/ideas/${mode.sid}` : '#/ideas';
     case 'mistakes':
       return '#/mistakes';
     case 'practice':

@@ -5,12 +5,15 @@
 // which a phone's head had squeezed beside the chapter's name. Between the two, what starts from
 // the move shown (§5.90, out of the move's menu): Analyse, Storm, Practise and its plan card.
 // Export PGN downloads the open chapter as its file in the data repo, edits not yet synced included.
+// An idea deck's cards are made or removed at the end (§5.128).
 import { signal } from '@preact/signals';
 import { makeFen } from 'chessops/fen';
 import { at, chapter, doc, feedback, redoEdit, side, study, undoEdit } from '../app/editor.ts';
 import { prefs, setPrefs } from '../app/explorer.ts';
 import { open } from '../app/mode.ts';
+import { enrolStudy, ideaEnrolled } from '../app/ideas.ts';
 import { planEnrolled, setPlanCard } from '../app/plans.ts';
+import { enrolledIn, isDeckChapter } from '../core/ideas/cards.ts';
 import { trainData } from '../app/train.ts';
 import { positionKeyOf } from '../core/chess/positionKey.ts';
 import { chapterExportName, chapterFileText } from '../core/pgn/write.ts';
@@ -112,9 +115,39 @@ export function StudyMenu(props: { fen: string; study?: StudyActions }) {
             <span class="menu-check" aria-hidden="true" />
             Study settings…
           </button>
+          <IdeaCards run={run} />
         </>
       )}
     </FloatingMenu>
+  );
+}
+
+/**
+ * An idea deck's cards (§5.128), made for the whole study: shown in a study whose open chapter is
+ * a deck's (it has an `IdeaKind`), or which has cards. With cards, the chapters added since get
+ * theirs, or every card goes.
+ */
+function IdeaCards(props: { run: (f: () => void) => () => void }) {
+  const s = study.value;
+  const c = chapter.value;
+  if (!s) return null;
+  const cards = enrolledIn(ideaEnrolled.value, s.sid).length;
+  if (!cards && !(c && isDeckChapter(c))) return null;
+  const enrol = (on: boolean) => () => void enrolStudy(s.sid, on).then((said) => (feedback.value = said));
+  return (
+    <>
+      <hr class="menu-sep" role="separator" />
+      <button type="button" role="menuitem" title="Every chapter of this idea deck but the rules of thumb, as a card asked from the study’s Train button" onClick={props.run(enrol(true))}>
+        <span class="menu-check" aria-hidden="true" />
+        {cards ? 'Idea cards for new chapters' : 'Make idea cards'}
+      </button>
+      {cards > 0 && (
+        <button type="button" role="menuitem" onClick={props.run(enrol(false))}>
+          <span class="menu-check" aria-hidden="true" />
+          Remove the idea cards ({cards})
+        </button>
+      )}
+    </>
   );
 }
 

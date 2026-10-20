@@ -131,6 +131,12 @@ export interface PlanEvent extends Base {
   on: boolean;
   side: 'white' | 'black';
 }
+/** An idea card (§5.128, `i|<sid>|<cid>`) enrolled (`on`) or removed. */
+export interface IdeaEvent extends Base {
+  k: 'idea';
+  card: string;
+  on: boolean;
+}
 /** A position's repertoire deviations ignored (`on`), or shown again. */
 export interface DismissEvent extends Base {
   k: 'dismiss';
@@ -196,13 +202,14 @@ export type KnownEvent =
   | DropEvent
   | RelapseEvent
   | PlanEvent
+  | IdeaEvent
   | DismissEvent
   | SavedEvent
   | PlayedEvent
   | PracticeEvent
   | LineEvent
   | NoteEvent;
-export const KNOWN_KINDS = ['review', 'suspend', 'unsuspend', 'forget', 'taught', 'pin', 'unpin', 'drill', 'alt', 'storm', 'snapshot', 'drop', 'relapse', 'plan', 'dismiss', 'saved', 'played', 'practice', 'line', 'note'] as const;
+export const KNOWN_KINDS = ['review', 'suspend', 'unsuspend', 'forget', 'taught', 'pin', 'unpin', 'drill', 'alt', 'storm', 'snapshot', 'drop', 'relapse', 'plan', 'idea', 'dismiss', 'saved', 'played', 'practice', 'line', 'note'] as const;
 
 /** A line as read. `event` is set for the kinds this code knows; `raw` is always the line itself. */
 export interface LogLine {
@@ -367,6 +374,12 @@ function knownEvent(o: Record<string, unknown>): KnownEvent | string {
       if (side !== 'white' && side !== 'black') return 'side must be white or black';
       return { ...base, k: 'plan', on, side };
     }
+    case 'idea': {
+      if (!/^i\|[^|]+\|[^|]+$/.test(card)) return 'card must be an idea card (i|<sid>|<cid>)';
+      const on = o['on'];
+      if (typeof on !== 'boolean') return 'on must be true or false';
+      return { ...base, k: 'idea', on };
+    }
     case 'dismiss': {
       if (!card.startsWith('d|') || card.length < 3) return 'card must be a position (d|<position>)';
       const on = o['on'];
@@ -441,7 +454,7 @@ export function formatEvent(event: KnownEvent): string {
   }
   if (event.k === 'relapse') Object.assign(o, { g: event.g, at: event.at });
   if (event.k === 'plan') Object.assign(o, { on: event.on, side: event.side });
-  if (event.k === 'dismiss') o['on'] = event.on;
+  if (event.k === 'dismiss' || event.k === 'idea') o['on'] = event.on;
   if (event.k === 'line') o['mark'] = event.mark;
   if (event.k === 'note') o['text'] = event.text;
   if (event.k === 'saved') o['item'] = event.item;

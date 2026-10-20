@@ -1,6 +1,7 @@
 // Card IDs carry a kind letter (PLAN.md §4.4): `r|<positionKey>|<uci>` is a repertoire move.
 // The storm (§5.41) adds `s|<positionKey>` (a storm position) and `z|<id>` (a Lichess puzzle);
-// Phase 5 adds `p|key` (plan recall) and `m|…` (game mistakes); §5.70 `l|sid|cid|moves` (a line's mark).
+// Phase 5 adds `p|key` (plan recall) and `m|…` (game mistakes); §5.70 `l|sid|cid|moves` (a line's mark);
+// §5.128 `i|sid|cid` (an idea card: one chapter of an idea deck).
 import type { PositionKey } from '../chess/positionKey.ts';
 
 export type CardId = string & { readonly __brand: 'CardId' };
@@ -24,6 +25,13 @@ export const lineCard = (sid: string, cid: string, path: readonly string[]) => `
 export function parseLineCard(id: string): { sid: string; cid: string; path: string[] } | undefined {
   const m = /^l\|([^|]+)\|([^|]+)\|(\S+(?: \S+)*)$/.exec(id);
   return m ? { sid: m[1]!, cid: m[2]!, path: m[3]!.split(' ') } : undefined;
+}
+/** An idea card (§5.128): one chapter of an idea deck, by its study and chapter. */
+export const ideaCard = (sid: string, cid: string) => `i|${sid}|${cid}` as CardId;
+/** An idea card's study and chapter, or undefined for any other card. */
+export function parseIdeaCard(id: string): { sid: string; cid: string } | undefined {
+  const m = /^i\|([^|]+)\|([^|]+)$/.exec(id);
+  return m ? { sid: m[1]!, cid: m[2]! } : undefined;
 }
 /** The rest of a card ID after its kind letter: `m|abc_17` → `abc_17`. */
 export const cardBody = (id: string) => id.slice(id.indexOf('|') + 1);

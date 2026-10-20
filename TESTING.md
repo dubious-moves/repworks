@@ -5,6 +5,23 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## Idea cards (§5.128, 2026-10-20)
+- Checked by the tests only (desktop and an emulated phone), on a small test deck. With the pilot
+  deck imported: open any of its chapters → ☰ → "Make idea cards". The home's study card should
+  show "0 due · 5 new" (the daily limit, Training settings → New idea cards a day) and a Train
+  button.
+- Train. A new card opens on its answer: explanation, arrows, the line (▶ steps, ▶▶ plays it),
+  and the other moves as clickable lines. Press "Ask me", then answer with a move:
+  - the card's move or a `!` move beside it is right (Good);
+  - a side line's move shows its comment (Again);
+  - any other move is just not the answer.
+  Or press Show and grade it yourself. Is the question clear without the chapter's name, which is
+  hidden until the answer?
+- A card missed comes back at the session's end, not graded. Is that welcome, or should it wait
+  for another day?
+- Is 5 new idea cards a day the right default? On the phone, is the answer screen too long
+  (grades below the line and its side lines)?
+
 ## Opening ideas: the pilot deck (§5.128, 2026-10-20)
 - The Scandinavian Gambit idea deck made from your repertoire (sent in the chat, never in the
   repo): Home → Import → PGN file → "Reference (read only, never trained)". Read its 47 chapters
@@ -13,9 +30,6 @@ fixes them and updates this file.
   what the text says? Is it too many chapters (14 ideas, about 3 positions each)? Are chapter 0's
   rules short enough to remember? Say what to change before idea cards are built (§5.128's plan,
   next), above all how a card should be asked.
-- Until then a chapter's start can be a plan card (its move menu → "Make a plan card", §5.61);
-  from the code, not checked live. A plan card also shows other studies' comments at the
-  position.
 - The repertoire notes (in the chat): do the gaps and improvements look right, and would you feed
   them to your repertoire builder?
 

@@ -143,8 +143,10 @@ inside a value:
   "Where it fails" is a side line with a move marked `?` (or `??`), or its own chapter, named
   "3d. … (where it fails)". Two chapters never start at the same position: merge them into one
   card with both side lines.
-- **A side line left unmarked** counts as a right answer when the card is asked: leave a move
-  unmarked only when it is as good as the main move (`great`), and say so in its comment.
+- **A side line left unmarked** is a playable move, but not the answer: the card asks for its
+  first move or a first move marked `!` beside it (repworks' idea cards answer it with the side
+  line's comment). Mark a move `!` only when it is as good as the main move (`great`), and say so
+  in its comment.
 - **Colours:**
   - green (G): our plan
   - red (R): their threat, or what we prevent

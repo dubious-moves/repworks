@@ -1,0 +1,43 @@
+[Event "Ideas: French Advance"]
+[ChapterName "0. Rules of thumb"]
+[Orientation "black"]
+[FEN "rnbqkbnr/ppp2ppp/4p3/3p4/3PP3/8/PPP2PPP/RNBQKBNR w KQkq - 0 3"]
+[SetUp "1"]
+[IdeaKind "overview"]
+[IdeaQuestion "What are the rules of thumb of the French Advance?"]
+[IdeaSource "test deck: public opening knowledge"]
+
+{ 1. Hit the chain at its base: ...c5 at once. 2. Pile up on d4: ...Nc6 and ...Qb6. 3. Don't grab d4 while Bb5+ uncovers White's queen. } *
+
+[Event "Ideas: French Advance"]
+[ChapterName "1. Hit the base of the chain: ...c5"]
+[Orientation "black"]
+[FEN "rnbqkbnr/ppp2ppp/4p3/3pP3/3P4/8/PPP2PPP/RNBQKBNR b KQkq - 0 3"]
+[SetUp "1"]
+[IdeaKind "break"]
+[IdeaQuestion "White's pawns on d4 and e5 cramp you. Which pawn break attacks them?"]
+[IdeaSource "test deck: public opening knowledge"]
+
+{ A pawn chain is weakest at its base: d4 holds e5 up. ...c5 hits it at once. [%csl Yd4][%cal Gc7c5] } 3... c5 ( 3... b6 { Playable, to trade the bad bishop with ...Ba6, but slow: the chain stands. } ) 4. c3 Nc6 { A second piece on d4. [%cal Gc5d4,Gc6d4] } *
+
+[Event "Ideas: French Advance"]
+[ChapterName "2. Pile up on d4: ...Qb6"]
+[Orientation "black"]
+[FEN "r1bqkbnr/pp3ppp/2n1p3/2ppP3/3P4/2P2N2/PP3PPP/RNBQKB1R b KQkq - 2 5"]
+[SetUp "1"]
+[IdeaKind "placement"]
+[IdeaQuestion "Two pieces hit d4. Which piece joins them, and what else does it hit?"]
+[IdeaSource "test deck: public opening knowledge"]
+
+{ The c5 pawn and the knight hit d4; the queen on b6 makes three, and eyes b2 too. [%csl Yd4][%cal Gd8b6,Gc6d4,Gc5d4] } 5... Qb6 { Three on d4, and b2 hangs if the bishop leaves c1. [%cal Gb6d4,Gb6b2] } ( 5... Bd7! { Just as good: ...Qb6 can wait, and the bishop clears the way for ...Rc8. } ) 6. a3 c4 { Now the queenside is closed, and the knight heads for a5 and b3. [%cal Gc6a5] } *
+
+[Event "Ideas: French Advance"]
+[ChapterName "3. Don't grab d4 too early"]
+[Orientation "black"]
+[FEN "r1b1kbnr/pp3ppp/1qn1p3/3pP3/3P4/3B1N2/PP3PPP/RNBQK2R b KQkq - 0 7"]
+[SetUp "1"]
+[IdeaKind "trap"]
+[IdeaQuestion "d4 is hit three times and held twice. Can you take it?"]
+[IdeaSource "test deck: public opening knowledge"]
+
+{ Not yet: after ...Nxd4 Nxd4 Qxd4, Bb5+ uncovers the queen on d1 against yours. First cover b5. [%cal Rd3b5,Rd1d4,Gc8d7] } 7... Bd7 { Now Bb5+ is met by the bishop, and d4 can be taken next. } ( 7... Nxd4?? 8. Nxd4 Qxd4? 9. Bb5+ { The king moves, and Qxd4 takes the queen. } ) 8. O-O Nxd4 9. Nxd4 Qxd4 *

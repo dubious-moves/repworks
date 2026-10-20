@@ -1,5 +1,5 @@
 // The training settings every device shares (PLAN.md §5.2), changed from the site: the daily limit
-// of new moves, the retention and the learning step, written to the data repo's `settings.json`
+// of new moves, the retention, the learning step and the daily limit of new idea cards (§5.128), written to the data repo's `settings.json`
 // and synced like any other change. A file that can't be read is never rewritten (D4).
 import { DEFAULT_TRAIN, parseSettings, SETTINGS_FILE, withTrain, writeSettings, type SettingsFile, type TrainSettings } from '../core/train/settings.ts';
 import type { Done } from './studies.ts';
@@ -18,7 +18,7 @@ export async function saveTrainSettings(next: TrainSettings): Promise<Done> {
   // Only the fields changed are written, so a field changed on the other device meanwhile merges.
   const now = file?.train ?? DEFAULT_TRAIN;
   let changed = file;
-  for (const key of ['newPerDay', 'retention', 'learnStepHours'] as const) if (next[key] !== now[key]) changed = withTrain(changed, key, next[key]);
+  for (const key of ['newPerDay', 'retention', 'learnStepHours', 'newIdeasPerDay'] as const) if (next[key] !== now[key]) changed = withTrain(changed, key, next[key]);
   if (changed === file) return { ok: true, value: undefined };
   const written = writeSettings(changed!);
   // Checked as it would be read: a value out of range is refused here, not written.

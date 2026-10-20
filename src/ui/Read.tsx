@@ -16,6 +16,7 @@ import { dataVersion } from '../app/sync.ts';
 import { chapterPath } from '../core/data/layout.ts';
 import { glyphSymbol } from '../core/pgn/nags.ts';
 import { parseChapterFile } from '../core/pgn/parse.ts';
+import { sideLineText } from '../core/ideas/cards.ts';
 import { header, type Chapter } from '../core/study/model.ts';
 import { lineThrough, nodeAt, positionAt, startPosition } from '../core/study/tree.ts';
 import { pathKey } from '../core/study/notation.ts';
@@ -116,9 +117,11 @@ export function ReadView(props: { sid: string; cid: string; at: string[]; from?:
 /**
  * A line read through (§5.10): the board with the study's arrows, the move and its comments in
  * large text, the line's moves to click, ← → Home End; Escape calls `onEscape`. The Read view's
- * body, and the training screen's Read (the owner's request, 2026-10-09). `children` are the actions.
+ * body, the training screen's Read (the owner's request, 2026-10-09), and an idea card's back
+ * (§5.128), which adds a head above the move, the side lines branching at the move shown as a
+ * comment's lines (§5.12), and Play, which steps the line at `playMs` a move. `children` are the actions.
  */
-export function LineReader(props: { chapter: Chapter; line: readonly string[]; ply: number; onPly(ply: number): void; onEscape(): void; children?: ComponentChildren }) {
+export function LineReader(props: { chapter: Chapter; line: readonly string[]; ply: number; onPly(ply: number): void; onEscape(): void; head?: ComponentChildren; sideLines?: boolean; playMs?: number; children?: ComponentChildren }) {
   const { chapter, line } = props;
   const last = line.length;
   const shown = Math.max(0, Math.min(props.ply, last));
@@ -183,10 +186,22 @@ export function LineReader(props: { chapter: Chapter; line: readonly string[]; p
   const side = header(chapter, 'Orientation') === 'black' ? 'black' : 'white';
   const shownLine = previewBoard('read');
   const go = (n: number) => {
+    setPlaying(false);
     endPreview();
     props.onPly(n);
   };
   const positions = () => ({ after: positionAt(chapter, path)!, before: path.length ? positionAt(chapter, path.slice(0, -1)) : undefined });
+  // Play: a move every `playMs`, to the line's end; any step taken stops it.
+  const [playing, setPlaying] = useState(false);
+  useEffect(() => {
+    if (!playing) return;
+    if (shown >= last) return setPlaying(false);
+    const timer = setTimeout(() => props.onPly(shown + 1), props.playMs);
+    return () => clearTimeout(timer);
+  }, [playing, shown, last]);
+  // The other moves at the position shown (the next main move's siblings), each as a comment's line.
+  const sides = props.sideLines && node && board ? node.children.filter((c) => c.san !== line[shown]).map((c) => sideLineText(board.pos, c)) : [];
+  const sidePositions = () => ({ after: positionAt(chapter, path)!, before: undefined });
 
   return (
     <div class="train-grid">
@@ -219,9 +234,15 @@ export function LineReader(props: { chapter: Chapter; line: readonly string[]; p
           <button type="button" aria-label="End of the line" disabled={shown === last} onClick={() => go(last)}>
             ⏭
           </button>
+          {props.playMs !== undefined && (
+            <button type="button" aria-label={playing ? 'Pause' : 'Play the line'} title={playing ? 'Pause' : 'Play the line at the pace'} disabled={shown === last && !playing} onClick={() => (playing ? setPlaying(false) : (endPreview(), setPlaying(true)))}>
+              {playing ? '⏸' : '▶▶'}
+            </button>
+          )}
         </div>
       </div>
       <div class="train-panel">
+        {props.head}
         <p class="read-move" aria-live="polite">
           {shown === 0 ? 'Start' : names[shown - 1]}
           {glyphs && <span class="glyphs">{glyphs}</span>}
@@ -241,6 +262,15 @@ export function LineReader(props: { chapter: Chapter; line: readonly string[]; p
             <p class="muted">No comment.</p>
           )}
         </div>
+        {sides.length > 0 && (
+          <div class="read-side-lines" aria-label="Other moves here">
+            {sides.map((text, i) => (
+              <p key={`${shown}-${i}`}>
+                <CommentText text={text} owner="read" id={commentId(`${pathKey(path)}#side${i}`, text)} positions={sidePositions} />
+              </p>
+            ))}
+          </div>
+        )}
         <p class="read-line" aria-label="The line">
           {names.map((name, i) => (
             <span key={i}>

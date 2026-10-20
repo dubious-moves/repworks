@@ -2622,6 +2622,39 @@ a.button.primary {
   color: var(--accent-text);
 }
 
+/* Idea cards (PLAN.md §5.128): the question, and on the back the side lines under the comments. */
+
+.idea-question {
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.4;
+  margin: 8px 0;
+}
+
+.idea-question.muted {
+  font-size: 1rem;
+  font-weight: 400;
+}
+
+.idea-name {
+  font-size: 1.1rem;
+  margin: 4px 0 0;
+}
+
+.idea-wrong p,
+.idea-result {
+  margin: 6px 0;
+}
+
+.read-side-lines {
+  line-height: 1.5;
+  padding: 0 12px;
+}
+
+.read-side-lines p {
+  margin: 6px 0;
+}
+
 /* Transposition badges (PLAN.md §5.11): small marks after a move, and the list they open. */
 
 .badges {

@@ -49,6 +49,7 @@ function Dialog() {
   const [newPerDay, setNewPerDay] = useState(String(now.newPerDay));
   const [retention, setRetention] = useState(String(now.retention));
   const [step, setStep] = useState(String(now.learnStepHours));
+  const [ideas, setIdeas] = useState(String(now.newIdeasPerDay));
   const [prefs, setPrefs] = useState<TrainPrefs>(trainPrefs.peek());
   const set = <K extends keyof TrainPrefs>(key: K, value: TrainPrefs[K]) => setPrefs({ ...prefs, [key]: value });
   const [error, setError] = useState<string | undefined>(undefined);
@@ -61,10 +62,11 @@ function Dialog() {
   }, []);
   const taught = data ? queueOf(data, decidingNow()).taughtToday : 0;
   const save = async () => {
-    const values = { newPerDay: Number(newPerDay), retention: Number(retention), learnStepHours: Number(step) };
+    const values = { newPerDay: Number(newPerDay), retention: Number(retention), learnStepHours: Number(step), newIdeasPerDay: Number(ideas) };
     if (!Number.isInteger(values.newPerDay) || values.newPerDay < 0 || values.newPerDay > 1000) return setError('New moves a day: a whole number from 0 to 1000.');
     if (!(values.retention >= 0.7 && values.retention <= 0.99)) return setError('Retention: a number from 0.7 to 0.99.');
     if (!(values.learnStepHours >= 0 && values.learnStepHours <= 48)) return setError('Learning step: from 0 to 48 hours.');
+    if (!Number.isInteger(values.newIdeasPerDay) || values.newIdeasPerDay < 0 || values.newIdeasPerDay > 100) return setError('New idea cards a day: a whole number from 0 to 100.');
     const sequenceLength = Number(seqLength);
     if (prefs.newMoves === 'sequence' && !(Number.isInteger(sequenceLength) && sequenceLength >= 1 && sequenceLength <= 50)) return setError('New moves in a sequence: a whole number from 1 to 50.');
     const reps = Number(repetitions);
@@ -96,6 +98,10 @@ function Dialog() {
         <label>
           First review after a new move <span class="muted">(hours)</span>
           <input type="number" name="learn-step" min={0} max={48} step={0.5} inputMode="decimal" value={step} onInput={(e) => setStep(e.currentTarget.value)} />
+        </label>
+        <label>
+          New idea cards a day <span class="muted">(an idea deck's cards, 0–100)</span>
+          <input type="number" name="new-ideas-per-day" min={0} max={100} step={1} inputMode="numeric" value={ideas} onInput={(e) => setIdeas(e.currentTarget.value)} />
         </label>
         <h3>This device</h3>
         <label>
