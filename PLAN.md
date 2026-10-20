@@ -6841,6 +6841,11 @@ skill and its tools, then idea cards in the app.
     order (studies by name, chapters in order), within the daily limit.
   - **The session** (`src/core/ideas/session.ts`, pure):
     - Due cards first, then new ones; a new card opens on its back ("Ask me" then asks it).
+    - **Read or Train** (asked for 2026-10-20): a switch in the screen's head, kept per device
+      (`localStorage`, like the pace), default Read. Read is the above; Train asks every card at
+      once, new ones too, so the answer isn't seen first. Switching changes the card in front
+      only while nothing is answered on it (a new card shown is asked; a new card asked untouched
+      is shown first), then every card after. A retry is asked in both.
     - A move right the first time records Good. The first wrong move records Again at once, with
       the move in `w`, so leaving doesn't lose it. The board is set back, and the user tries
       again or presses Show.

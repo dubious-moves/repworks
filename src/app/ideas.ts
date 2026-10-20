@@ -7,7 +7,7 @@ import type { Position } from 'chessops/chess';
 import type { NormalMove } from 'chessops/types';
 import { standardUci } from '../core/chess/uci.ts';
 import { enrolledIn, ideaDeck, ideaEnrolments, ideaQueue, judgeIdeaMove, makesIdeaCard, type Idea } from '../core/ideas/cards.ts';
-import { askIdea, gradeIdea, leaveIdea, nextIdea, playIdea, showIdea, startIdeas, type IdeaReview, type IdeaSession } from '../core/ideas/session.ts';
+import { askIdea, gradeIdea, leaveIdea, nextIdea, playIdea, setIdeaMode, showIdea, startIdeas, type IdeaMode, type IdeaReview, type IdeaSession } from '../core/ideas/session.ts';
 import { ideaCard, parseIdeaCard, type CardId } from '../core/progress/cards.ts';
 import type { Grade } from '../core/progress/events.ts';
 import { studiesFromFiles, type StudyChapters } from '../core/repertoire/files.ts';
@@ -99,6 +99,29 @@ export function setIdeaCards(sid: string, cids: readonly string[], on: boolean):
 
 export const ideaSession = signal<(IdeaSession & { scope?: string }) | undefined>(undefined);
 
+/** Read (a new card shown first) or Train (every card asked at once), per device. */
+const MODE_KEY = 'repworks.ideaMode';
+function readMode(): IdeaMode {
+  try {
+    if (localStorage.getItem(MODE_KEY) === 'train') return 'train';
+  } catch {
+    // Storage blocked: the default.
+  }
+  return 'read';
+}
+export const ideaMode = signal<IdeaMode>(readMode());
+/** Read or Train, from the card in front when nothing is answered on it yet. */
+export function setIdeaModeNow(m: IdeaMode): void {
+  ideaMode.value = m;
+  try {
+    localStorage.setItem(MODE_KEY, m);
+  } catch {
+    // Kept for this page only.
+  }
+  const s = ideaSession.peek();
+  if (s) put(setIdeaMode(s, m, Date.now()));
+}
+
 const record = (r: IdeaReview | undefined) => {
   if (r) void recordEvent({ t: new Date().toISOString(), k: 'review', card: r.card, g: r.g, ms: Math.round(r.ms), ...(r.w ? { w: r.w } : {}) });
 };
@@ -110,7 +133,7 @@ const put = (s: IdeaSession) => {
 /** Today's cards of every study (or one), from the first. */
 export function beginIdeas(scope?: string): void {
   const q = ideaQueueNow(scope);
-  ideaSession.value = { ...startIdeas(q, Date.now()), ...(scope ? { scope } : {}) };
+  ideaSession.value = { ...startIdeas(q, Date.now(), ideaMode.peek()), ...(scope ? { scope } : {}) };
 }
 
 export function endIdeas(): void {

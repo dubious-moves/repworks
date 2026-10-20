@@ -3,7 +3,8 @@
 // made from the ☰ menu, then asked from the study's Train button on the home: each new card shown
 // first, then asked; a side line's move answered with its comment (Again), the answer found, a `!`
 // move beside the first right (Good), Show and the owner's grade (Hard), and the card missed asked
-// again at the end, ungraded. The events synced, then the cards removed from the same menu.
+// again at the end, ungraded. The events synced, then the cards removed from the same menu. And
+// Train: every card asked at once, new ones too, the switch kept on the device.
 import { test, expect, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { buildImport, readImport } from '../../src/core/import/plan.ts';
@@ -118,4 +119,43 @@ test('idea cards made for a study, asked from its Train button, and removed', as
   expect(log()).toMatch(new RegExp(`"k":"review","card":"i\\|${sid}\\|${cids[1]}","g":1,"ms":\\d+,"w":\\["b7b6"\\]`));
   expect(log()).toContain(`"card":"i|${sid}|${cids[2]}","g":3`);
   expect(log()).toContain(`"card":"i|${sid}|${cids[3]}","g":2`);
+});
+
+test('Train asks a new card at once; Read shows it first; the choice kept on the device', async ({ page }) => {
+  const { github, sid, cids } = deckWorld();
+  await serveGithub(page, github);
+  await page.goto(`${site.url}#setup?repo=${encodeURIComponent(REPO)}&token=${TOKEN}&name=desktop`);
+  await expect(page.locator('button.chip')).toHaveText(/^synced/);
+  await page.evaluate((h) => (location.hash = h), `#/study/${sid}/${cids[1]}`);
+  await expect(page.locator('.cg-wrap')).toBeVisible();
+  await studyMenu(page, 'Make idea cards');
+  await expect(page.getByText('3 idea cards made')).toBeVisible();
+  await page.evaluate((h) => (location.hash = h), `#/ideas/${sid}`);
+  const card = page.getByTestId('idea-card');
+  const modes = page.getByRole('group', { name: 'Read or train' });
+  await expect(modes.getByRole('button', { name: 'Read' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(card).toHaveAttribute('data-phase', 'learn');
+
+  // Train: the card shown is asked at once, its answer not shown; the next new card too.
+  await modes.getByRole('button', { name: 'Train' }).click();
+  await expect(card).toHaveAttribute('data-phase', 'asking');
+  await expect(page.getByTestId('idea-question')).toHaveText("White's pawns on d4 and e5 cramp you. Which pawn break attacks them?");
+  await expect(card).not.toContainText('A pawn chain is weakest');
+  await play(page, 'c7', 'c5');
+  await expect(page.getByTestId('idea-result')).toHaveText('c5: right. Recorded: Good.');
+  await page.getByRole('button', { name: 'Next (Space)' }).click();
+  await expect(card).toHaveAttribute('data-card', `i|${sid}|${cids[2]}`);
+  await expect(card).toHaveAttribute('data-phase', 'asking');
+  await expect(card).toContainText('new');
+
+  // Read, while nothing is answered: the card is shown first.
+  await modes.getByRole('button', { name: 'Read' }).click();
+  await expect(card).toHaveAttribute('data-phase', 'learn');
+  await modes.getByRole('button', { name: 'Train' }).click();
+  await expect(card).toHaveAttribute('data-phase', 'asking');
+
+  // Kept on the device: a new visit trains.
+  await page.reload();
+  await expect(page.getByRole('group', { name: 'Read or train' }).getByRole('button', { name: 'Train' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('idea-card')).toHaveAttribute('data-phase', 'asking');
 });

@@ -3,7 +3,8 @@
 // answers it (right the first time Good, wrong Again), or Show turns it over and the owner grades
 // it. Its back is the chapter read through (the Read view's body): the explanation and its
 // arrows, the main line stepped or played at the pace, and the side lines at each move as a
-// comment's lines. A new card is shown first, then asked. Keys: Space or Enter for Show, Ask me
+// comment's lines. Read, a new card is shown first, then asked; Train, every card is asked at once
+// (the switch in the head, per device). Keys: Space or Enter for Show, Ask me
 // and Next; 1–4 for a grade; ← → through the line.
 import type { ComponentChildren } from 'preact';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
@@ -12,7 +13,7 @@ import { normalizeMove } from 'chessops/chess';
 import { isNormal, type Role } from 'chessops/types';
 import { parseSquare } from 'chessops/util';
 import type { Key } from '@lichess-org/chessground/types';
-import { askIdeaNow, beginIdeas, gradeIdeaNow, ideaSession, ideasReady, nextIdeaNow, playIdeaMove, removeIdeaCard, showIdeaNow, startIdeaCards } from '../app/ideas.ts';
+import { askIdeaNow, beginIdeas, gradeIdeaNow, ideaMode, ideaSession, ideasReady, nextIdeaNow, playIdeaMove, removeIdeaCard, setIdeaModeNow, showIdeaNow, startIdeaCards } from '../app/ideas.ts';
 import { analyseFrom } from '../app/mode.ts';
 import { commentId, endPreview } from '../app/preview.ts';
 import { studies } from '../app/state.ts';
@@ -53,8 +54,25 @@ export function IdeasScreen(props: { sid?: string }) {
         <div class="titles">
           <span class="study-title">Ideas{name ? ` · ${name}` : ''}</span>
         </div>
+        <ReadOrTrain />
       </div>
       {!begun || !s ? <p class="muted">Opening…</p> : s.run ? <Card key={`${s.index}`} s={s} run={s.run} /> : <Done s={s} sid={sid} />}
+    </div>
+  );
+}
+
+/** Read: a new card's answer shown before it is asked. Train: asked at once. */
+function ReadOrTrain() {
+  const mode = ideaMode.value;
+  const pick = (m: typeof mode, label: string, title: string) => (
+    <button type="button" aria-pressed={mode === m} title={title} onClick={mode === m ? undefined : () => setIdeaModeNow(m)}>
+      {label}
+    </button>
+  );
+  return (
+    <div class="mode-switch" role="group" aria-label="Read or train">
+      {pick('read', 'Read', 'A new card shows its answer and line first, then asks')}
+      {pick('train', 'Train', 'Every card asks at once, new ones too')}
     </div>
   );
 }

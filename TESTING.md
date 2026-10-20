@@ -17,6 +17,9 @@ fixes them and updates this file.
   - any other move is just not the answer.
   Or press Show and grade it yourself. Is the question clear without the chapter's name, which is
   hidden until the answer?
+- Train (the switch beside the title, Read | Train): every card is asked at once, new ones too,
+  with no answer shown first. Switch it on the first new card: it should be asked at once. The
+  choice stays on the device. Is Read still the right default?
 - A card missed comes back at the session's end, not graded. Is that welcome, or should it wait
   for another day?
 - Is 5 new idea cards a day the right default? On the phone, is the answer screen too long

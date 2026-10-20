@@ -1,6 +1,6 @@
-// An idea cards' session (PLAN.md §5.128): today's due cards, then the new ones. A new card is
-// shown first (its explanation and line), then asked, as Learn shows a move before asking it. A
-// card is answered by a move, graded by itself (right the first time Good, wrong Again, recorded
+// An idea cards' session (PLAN.md §5.128): today's due cards, then the new ones. Read, a new card
+// is shown first (its explanation and line), then asked, as Learn shows a move before asking it;
+// Train, every card is asked at once. A card is answered by a move, graded by itself (right the first time Good, wrong Again, recorded
 // at the first answer), or by Show and the owner's own grade, which is how a card is answered
 // whose side isn't to move or which has no move. A card graded Again comes back at the session's
 // end, ungraded: asked until a move answers it, or shown once when it is self-graded. Pure: the
@@ -40,7 +40,11 @@ export interface IdeaRun {
   graded?: Grade;
 }
 
+/** Read: a new card shown before it is asked. Train: every card asked at once. */
+export type IdeaMode = 'read' | 'train';
+
 export interface IdeaSession {
+  mode: IdeaMode;
   steps: IdeaStep[];
   index: number;
   run?: IdeaRun;
@@ -57,11 +61,24 @@ export interface IdeaReview {
   w?: string[];
 }
 
-const runOf = (step: IdeaStep, now: number): IdeaRun => ({ step, phase: step.isNew && !step.retry ? 'learn' : 'asking', askedAt: now, wrong: [], shown: false });
+const shownFirst = (step: IdeaStep, mode: IdeaMode) => mode === 'read' && step.isNew && !step.retry;
+const runOf = (step: IdeaStep, mode: IdeaMode, now: number): IdeaRun => ({ step, phase: shownFirst(step, mode) ? 'learn' : 'asking', askedAt: now, wrong: [], shown: false });
 
-export function startIdeas(queue: { due: readonly Idea[]; fresh: readonly Idea[] }, now: number): IdeaSession {
+export function startIdeas(queue: { due: readonly Idea[]; fresh: readonly Idea[] }, now: number, mode: IdeaMode = 'read'): IdeaSession {
   const steps = [...queue.due.map((idea) => ({ idea, isNew: false, retry: false })), ...queue.fresh.map((idea) => ({ idea, isNew: true, retry: false }))];
-  return { steps, index: 0, ...(steps[0] ? { run: runOf(steps[0], now) } : {}), results: new Map() };
+  return { mode, steps, index: 0, ...(steps[0] ? { run: runOf(steps[0], mode, now) } : {}), results: new Map() };
+}
+
+/**
+ * Read or Train from now on. The card in front changes too while nothing has been answered on it:
+ * a new card shown is asked at once (Train), a new card asked untouched is shown first (Read).
+ */
+export function setIdeaMode(s: IdeaSession, mode: IdeaMode, now: number): IdeaSession {
+  if (s.mode === mode) return s;
+  const run = s.run;
+  if (run?.phase === 'learn' && mode === 'train') return { ...s, mode, run: { ...run, phase: 'asking', askedAt: now } };
+  if (run?.phase === 'asking' && shownFirst(run.step, mode) && !run.wrong.length && run.graded === undefined) return { ...s, mode, run: { ...run, phase: 'learn' } };
+  return { ...s, mode };
 }
 
 /** A new card shown: now asked. */
@@ -116,7 +133,7 @@ export function nextIdea(s: IdeaSession, now: number): IdeaSession {
   if (missed) steps.push({ idea: run.step.idea, isNew: false, retry: true });
   const index = s.index + 1;
   const step = steps[index];
-  return { steps, index, results: s.results, ...(step ? { run: runOf(step, now) } : {}) };
+  return { mode: s.mode, steps, index, results: s.results, ...(step ? { run: runOf(step, s.mode, now) } : {}) };
 }
 
 /** Leaves the card ungraded; removed, its retries go too. */
@@ -127,5 +144,5 @@ export function leaveIdea(s: IdeaSession, now: number, removed = false): IdeaSes
   const steps = removed ? s.steps.filter((st, i) => i <= s.index || st.idea.card !== card) : s.steps;
   const index = s.index + 1;
   const step = steps[index];
-  return { steps, index, results: s.results, ...(step ? { run: runOf(step, now) } : {}) };
+  return { mode: s.mode, steps, index, results: s.results, ...(step ? { run: runOf(step, s.mode, now) } : {}) };
 }

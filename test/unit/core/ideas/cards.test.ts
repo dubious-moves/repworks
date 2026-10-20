@@ -3,7 +3,7 @@
 // 0 errors, 0 warnings): the cards read from the chapters (the overview none), the answers (the
 // first move, a `!` beside it, never a `??`), a move judged, a side line as a comment's line, the
 // enrolments and the `idea` event, today's queue within the limit, and the session: a new card
-// shown first, a move right first time Good, a wrong one Again at once and retried ungraded at the
+// shown first in Read and asked at once in Train (and the switch between them), a move right first time Good, a wrong one Again at once and retried ungraded at the
 // end, Show and the owner's grade, a card whose side isn't to move answered only by Show.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,7 +14,7 @@ import { parseSan } from 'chessops/san';
 import type { NormalMove } from 'chessops/types';
 import { readImport } from '../../../../src/core/import/plan.ts';
 import { ideaDeck, ideaEnrolments, ideaQueue, judgeIdeaMove, readIdea, sideLineText, type Idea } from '../../../../src/core/ideas/cards.ts';
-import { askIdea, gradeIdea, leaveIdea, needsGrade, nextIdea, playIdea, showIdea, startIdeas } from '../../../../src/core/ideas/session.ts';
+import { askIdea, gradeIdea, leaveIdea, needsGrade, nextIdea, playIdea, setIdeaMode, showIdea, startIdeas } from '../../../../src/core/ideas/session.ts';
 import { ideaCard, parseIdeaCard } from '../../../../src/core/progress/cards.ts';
 import { formatEvent, parseLog } from '../../../../src/core/progress/events.ts';
 import { Replay, toDeviceEvents } from '../../../../src/core/progress/replay.ts';
@@ -177,4 +177,28 @@ test('Show and the owner’s grade; a self-graded card takes no move; a card rem
   assert.deepEqual([s.run!.step.retry, needsGrade(s.run)], [true, false]);
   s = nextIdea(showIdea(s), 3000);
   assert.equal(s.run, undefined);
+});
+
+test('Train asks a new card at once; switching changes the card in front only while nothing is answered', () => {
+  const [, chain, queen] = ideas() as Idea[];
+  let s = startIdeas({ due: [], fresh: [chain!, queen!] }, 0, 'train');
+  assert.equal(s.run!.phase, 'asking', 'new, asked at once');
+  assert.deepEqual(playIdea(s, judge(chain!, 'c5'), 'c7c5', 2000).review, { card: chain!.card, g: 3, ms: 2000 });
+  // To Read: the untouched new card is shown first; to Train again: asked, timed from then.
+  s = setIdeaMode(s, 'read', 3000);
+  assert.deepEqual([s.mode, s.run!.phase], ['read', 'learn']);
+  s = setIdeaMode(s, 'train', 4000);
+  assert.deepEqual([s.run!.phase, s.run!.askedAt], ['asking', 4000]);
+  // A move tried: the card stays asked; the next new card follows the mode.
+  s = playIdea(s, judge(chain!, 'b6'), 'b7b6', 5000).session;
+  s = setIdeaMode(s, 'read', 6000);
+  assert.equal(s.run!.phase, 'asking');
+  s = nextIdea(showIdea(s), 7000);
+  assert.deepEqual([s.run!.step.idea.cid, s.run!.phase], ['Chapter2', 'learn']);
+  s = setIdeaMode(s, 'train', 8000);
+  assert.equal(s.run!.phase, 'asking');
+  s = gradeIdea(showIdea(s), 3, 9000).session;
+  // The retry of the card missed: asked in either mode.
+  assert.deepEqual([s.run!.step.retry, s.run!.phase], [true, 'asking']);
+  assert.equal(setIdeaMode(s, 'read', 9500).run!.phase, 'asking');
 });
