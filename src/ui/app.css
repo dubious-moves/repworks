@@ -1683,8 +1683,19 @@ table.cards td {
   max-height: 55dvh;
 }
 
-/* The move buttons in one row on a 360 px phone: they share the width. */
+/* The move buttons in one row on a 360 px phone: they share the width. They sit close under the
+   board (the feedback line takes no room while empty), with a little padding. */
 @media (max-width: 899px) {
+  .cv-board .feedback:empty {
+    min-height: 0;
+    margin: 0;
+  }
+
+  .cv-panel .controls {
+    margin: 6px 0 4px;
+    padding: 0 4px;
+  }
+
   .cv-panel .controls {
     flex-wrap: nowrap;
     gap: 4px;
@@ -3596,14 +3607,16 @@ a.button.primary {
 }
 
 /* The eval bar: in the gap right of the board on a wide screen (Qchess's place; left of it on the
-   stage, from 1150px), a thin strip under it on the phone. White's share grows from White's side of the board. */
+   stage, from 1150px), none on the phone (2026-10-21: the number beside the top line reads better).
+   White's share grows from White's side of the board. */
 
 .cv-board {
   position: relative;
 }
 
 .eval-bar {
-  display: flex;
+  /* Not on the phone: the number beside the top line says the same. */
+  display: none;
   flex-direction: row;
   height: 6px;
   margin: 2px 0 0;
@@ -3623,6 +3636,7 @@ a.button.primary {
 
 @media (min-width: 900px) {
   .eval-bar {
+    display: flex;
     position: absolute;
     top: var(--material-h);
     left: calc(var(--board) + 3px);
@@ -4412,7 +4426,7 @@ a.button.primary {
 
   .storm-review-grid .storm-list-wrap {
     flex: 1 1 0;
-    min-height: 100px;
+    min-height: 60px; /* a wrapped "Main line" above it took 23px more, and 100px let the panel past the board's foot on a 720px window */
     contain: size;
   }
 

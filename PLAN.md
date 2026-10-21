@@ -3910,7 +3910,7 @@ evals close at the same depth); the arrows' readability; a line added and synced
   top on a wide screen and after the move buttons on the phone; one row per line (the eval in
   Qchess's format, then up to 16 moves numbered from the position, cut with an ellipsis); the
   eval bar (`EvalBar`: a 9 px column in the gap right of the board on a wide screen, a 6 px
-  strip under it on the phone, White's share growing from White's side); the arrows
+  strip under it on the phone until 2026-10-21, when it was dropped there: the number beside the top line reads better; White's share growing from White's side); the arrows
   (`useEngineArrows`, chessground auto shapes; none while a line is previewed or in draw mode).
   `src/ui/EngineSettings.tsx`: depth, lines, max time, arrows, and the engine files' list.
   W toggles the threat on the desktop.

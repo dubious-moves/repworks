@@ -1778,3 +1778,10 @@ The technical calls, each with its reason:
   it ("define when the f8 bishop should develop to e7, d6, c5 and why"). Decided within it: the
   rules of thumb are split into two overview chapters (where the pieces go; plans and tactics),
   each under 1500 characters, and the duplicate-position warning counts cards only.
+
+## Revision of 2026-10-21 (the phone's study page)
+- **No eval bar on the phone (under 900px); the move buttons sit close under the board.** Was: a
+  6px strip under the board, and the buttons below an empty feedback line. Why: the owner: the
+  number beside the top line reads more clearly. The feedback line takes no room while empty
+  (it still shows its message when there is one), so the buttons start 28px under the board's
+  foot, with 4px of padding at their sides.
