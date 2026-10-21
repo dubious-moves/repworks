@@ -119,9 +119,11 @@ export function ReadView(props: { sid: string; cid: string; at: string[]; from?:
  * large text, the line's moves to click, ← → Home End; Escape calls `onEscape`. The Read view's
  * body, the training screen's Read (the owner's request, 2026-10-09), and an idea card's back
  * (§5.128), which adds a head above the move, the side lines branching at the move shown as a
- * comment's lines (§5.12), and Play, which steps the line at `playMs` a move. `children` are the actions.
+ * comment's lines (§5.12), Play, which steps the line at `playMs` a move, its own `orientation`, and
+ * `carryShapes`: the line's first move, when it has no arrows or circles, shows the start's (the
+ * card's arrows stay on after its answer is played). `children` are the actions.
  */
-export function LineReader(props: { chapter: Chapter; line: readonly string[]; ply: number; onPly(ply: number): void; onEscape(): void; head?: ComponentChildren; sideLines?: boolean; playMs?: number; children?: ComponentChildren }) {
+export function LineReader(props: { chapter: Chapter; line: readonly string[]; ply: number; onPly(ply: number): void; onEscape(): void; head?: ComponentChildren; sideLines?: boolean; playMs?: number; orientation?: 'white' | 'black'; carryShapes?: boolean; children?: ComponentChildren }) {
   const { chapter, line } = props;
   const last = line.length;
   const shown = Math.max(0, Math.min(props.ply, last));
@@ -183,7 +185,8 @@ export function LineReader(props: { chapter: Chapter; line: readonly string[]; p
   const node = nodeAt(chapter, path);
   const comments = node ? [...node.startingComments, ...node.comments] : [];
   const glyphs = node && path.length ? node.nags.map(glyphSymbol).join('') : '';
-  const side = header(chapter, 'Orientation') === 'black' ? 'black' : 'white';
+  const side = props.orientation ?? (header(chapter, 'Orientation') === 'black' ? 'black' : 'white');
+  const shapes = node?.shapes.length || !props.carryShapes || shown !== 1 ? (node?.shapes ?? []) : chapter.root.shapes;
   const shownLine = previewBoard('read');
   const go = (n: number) => {
     setPlaying(false);
@@ -214,7 +217,7 @@ export function LineReader(props: { chapter: Chapter; line: readonly string[]; p
             dests={new Map()}
             lastMove={shownLine ? shownLine.lastMove : board.lastMove}
             check={shownLine?.check ?? board.pos.isCheck()}
-            shapes={shownLine ? [] : (node?.shapes ?? [])}
+            shapes={shownLine ? [] : shapes}
             drawMode={false}
             brush="green"
             onMove={() => undefined}

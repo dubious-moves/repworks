@@ -6937,6 +6937,12 @@ skill and its tools, then idea cards in the app.
       at twice the training pace (`playMs`). The other moves at each position are comment lines
       under the comments (`sideLines`). Above them: the chapter's name, the question, and what
       happened ("c5: right, after b6. Recorded: Again.", "Shown. The answer: Bd7.").
+    - After a right move (the owner's request, 2026-10-21: the board popping back to the start
+      was jarring), the back opens at that move, so the board stays where it was; the line goes
+      through the move played (a `!` move beside the main one too, the main line then one of the
+      other moves at the start), and ← goes back to the explanation. When the move has no
+      arrows or circles of its own, the start's stay on (`carryShapes`, the first move only).
+      The back is turned to the card's side (`orientation`), as the question was.
     - Below: Again/Hard/Good/Easy (1–4) when the owner grades, else Next (Space or Enter).
       Also Open the chapter, Analyse (from the back; ← comes back to the session) and Remove
       the card. The end shows the grades and Train again.

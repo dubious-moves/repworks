@@ -233,13 +233,17 @@ function Asking(props: { s: IdeaSession; run: IdeaRun; counter: ComponentChildre
   );
 }
 
-/** The card's back (or a new card's first showing): the chapter read through, from its start. */
+/**
+ * The card's back (or a new card's first showing): the chapter read through, from its start; after
+ * a right move, through that move and at it, so the board stays where the move left it.
+ */
 function Answer(props: { run: IdeaRun; grading: boolean; counter: ComponentChildren; actions: ComponentChildren }) {
   const { run, grading } = props;
   const idea: Idea = run.step.idea;
-  const line = useMemo(() => lineThrough(idea.chapter, []) ?? [], [idea.chapter]);
-  const [ply, setPly] = useState(0);
   const answer = run.answer;
+  const played = run.phase === 'back' && answer?.kind === 'right' ? answer.san : undefined;
+  const line = useMemo(() => (played && lineThrough(idea.chapter, [played])) || (lineThrough(idea.chapter, []) ?? []), [idea.chapter, played]);
+  const [ply, setPly] = useState(played ? 1 : 0);
   const head = (
     <>
       {props.counter}
@@ -255,7 +259,7 @@ function Answer(props: { run: IdeaRun; grading: boolean; counter: ComponentChild
     </>
   );
   return (
-    <LineReader chapter={idea.chapter} line={line} ply={ply} onPly={setPly} onEscape={() => undefined} head={head} sideLines playMs={PACES[pace.value] * 2}>
+    <LineReader chapter={idea.chapter} line={line} ply={ply} onPly={setPly} onEscape={() => undefined} head={head} sideLines playMs={PACES[pace.value] * 2} orientation={idea.side} carryShapes>
       {run.phase === 'learn' ? (
         <button type="button" onClick={askIdeaNow}>
           Ask me <span class="muted">(Space)</span>

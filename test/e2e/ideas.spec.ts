@@ -76,6 +76,13 @@ test('idea cards made for a study, asked from its Train button, and removed', as
   await play(page, 'c7', 'c5');
   await expect(card).toHaveAttribute('data-phase', 'back');
   await expect(page.getByTestId('idea-result')).toHaveText('c5: right, after b6. Recorded: Again.');
+  // The back opens at the move played, not the start, the board still Black's; c5 has no arrows, so the start's stay.
+  await expect(card.locator('.read-move')).toContainText('3... c5');
+  await expect(card.locator('.cg-wrap')).toHaveClass(/orientation-black/);
+  await expect(card.locator('cg-container svg.cg-shapes line')).toHaveCount(1);
+  // A move with arrows of its own shows its own.
+  await page.getByRole('button', { name: 'End of the line' }).click();
+  await expect(card.locator('cg-container svg.cg-shapes line')).toHaveCount(2);
   await page.getByRole('button', { name: 'Next (Space)' }).click();
 
   // A first move marked ! beside the main one is right too: Good.
@@ -83,9 +90,10 @@ test('idea cards made for a study, asked from its Train button, and removed', as
   await page.getByRole('button', { name: 'Ask me (Space)' }).click();
   await play(page, 'c8', 'd7');
   await expect(page.getByTestId('idea-result')).toHaveText('Bd7: right. Recorded: Good.');
-  // The main line played out on the back.
-  await page.getByRole('button', { name: 'End of the line' }).click();
-  await expect(card.locator('.read-move')).toContainText('6... c4');
+  // The back goes through the move played; the main line is one of the other moves at the start.
+  await expect(card.locator('.read-move')).toContainText('5... Bd7');
+  await page.getByRole('button', { name: 'Start' }).click();
+  await expect(card.locator('.read-side-lines')).toContainText('(5... Qb6 6. a3 c4)');
   await page.getByRole('button', { name: 'Next (Space)' }).click();
 
   // Show, then the owner's grade.
