@@ -6,6 +6,7 @@ import { App } from '../ui/App.tsx';
 import { registerServiceWorker } from '../platform/serviceWorker.ts';
 import { closeDialogsOnBackdrop } from './lightDismiss.ts';
 import { takeLichessCallback } from './lichess.ts';
+import { installSelectFocusRelease } from './selectFocus.ts';
 import { takeSetupFromAddress } from './setup.ts';
 import { shellVersion, updateReady } from './shell.ts';
 import { startApp } from './state.ts';
@@ -19,6 +20,7 @@ const lichessCallback = takeLichessCallback();
 applyTheme();
 render(h(App, {}), document.getElementById('app')!);
 closeDialogsOnBackdrop();
+installSelectFocusRelease();
 // Safari on iOS shows :active (a button's press, app.css) only once the page listens for touches.
 document.addEventListener('touchstart', () => {}, { passive: true });
 // A frame of the styles gallery (styles.html): shown in another theme, never syncing.

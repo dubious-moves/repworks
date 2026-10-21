@@ -90,6 +90,13 @@ test('the panel: Qchess’s rows, sorted by eval, a row clicked plays its move, 
   // Sorted by popularity instead: c4 among the games, the novelty after them.
   await panel(page).getByRole('combobox', { name: 'Sort' }).selectOption('popularity');
   await expect(rows(page)).toHaveText(['e4', 'd4', 'c4', 'Nf3']);
+  // The menu lets go of the keys once an option is picked: ↑ ↓ ← → go on to the moves.
+  await expect(panel(page).getByRole('combobox', { name: 'Sort' })).not.toBeFocused();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('.move.current')).not.toHaveAttribute('data-path', '');
+  await expect(panel(page).getByRole('combobox', { name: 'Sort' })).toHaveValue('popularity');
+  await page.keyboard.press('Home');
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', '');
   // The column titles sort too, and the menu follows.
   await panel(page).getByRole('button', { name: 'Eval', exact: true }).click();
   await expect(rows(page)).toHaveText(['e4', 'd4', 'Nf3', 'c4']);

@@ -5,6 +5,14 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## A dropdown lets go of the keys once an option is picked (2026-10-21)
+- Checked by an e2e test in headless Chromium (the explorer's Sort menu: after a pick it is not
+  focused, → moves in the chapter and Home goes to the start, the pick unchanged). Not checked
+  with the native pickers of a real device: on your desktop browser and phone, pick a sort, a
+  chapter and a setting in a dialog; the arrow keys should then move through the study (or do
+  nothing in a dialog), never step the menu. Stepping a closed menu with the arrow keys itself
+  still works and keeps its focus.
+
 ## The material by every board (§5.129, 2026-10-21)
 - Checked by the tests and by screenshots in headless Chromium (desktop and an emulated phone,
   the Forest and Paper themes). As on Lichess: above the board the top side's extra pieces, below
