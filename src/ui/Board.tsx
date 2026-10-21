@@ -7,7 +7,7 @@
 import { Chessground } from '@lichess-org/chessground';
 import '@lichess-org/chessground/assets/chessground.base.css';
 import '@lichess-org/chessground/assets/chessground.brown.css';
-import '@lichess-org/chessground/assets/chessground.cburnett.css';
+import cburnett from '@lichess-org/chessground/assets/chessground.cburnett.css?inline';
 import type { Api } from '@lichess-org/chessground/api';
 import type { Config } from '@lichess-org/chessground/config';
 import type { DrawShape } from '@lichess-org/chessground/draw';
@@ -18,6 +18,7 @@ import type { Role, SquareName } from 'chessops/types';
 import type { Brush, Shape } from '../core/study/model.ts';
 import { toggleShape } from '../core/study/ops.ts';
 import { BOARD_MAX, BOARD_MIN, boardSize, setBoardSize } from '../app/boardSize.ts';
+import { MATERIAL_ROLES, material } from '../core/chess/material.ts';
 
 export interface BoardProps {
   fen: string;
@@ -55,6 +56,12 @@ export interface BoardProps {
    */
   promotion?: { dest: Key; onPick(role: Role | undefined): void } | undefined;
 }
+
+// The pieces' images, for the board and for the material row under it, which is not a `.cg-wrap`:
+// that class is the board itself, to the code and the tests that look for it.
+const pieces = document.createElement('style');
+pieces.textContent = cburnett.replaceAll('.cg-wrap piece', ':is(.cg-wrap, .board-material) piece');
+document.head.append(pieces);
 
 const BRUSHES: readonly string[] = ['green', 'red', 'blue', 'yellow'];
 
@@ -203,6 +210,7 @@ export function Board(p: BoardProps) {
       <div class="cg-host" ref={el} />
       {p.badge && <Badge {...p.badge} orientation={p.orientation} />}
       {p.promotion && <PromotionChoice {...p.promotion} orientation={p.orientation} />}
+      <Material fen={p.fen} orientation={p.orientation} />
       <Resize board={wrap} />
     </div>
   );
@@ -261,6 +269,40 @@ function Resize(props: { board: { current: HTMLDivElement | null } }) {
       onDblClick={() => setBoardSize(undefined)}
       onKeyDown={onKeyDown}
     />
+  );
+}
+
+/**
+ * The material under the board (the owner's request, 2026-10-21), after Lichess's: each side's
+ * pieces left over once the other's cancel them, the same kind overlapping, and +points after the
+ * side that is up. Lichess puts each side's by its player, above and below the board; with no
+ * players here, one row under it holds both, each side's pieces in its own colour, the side at the
+ * board's foot first. Its room is kept when there is nothing to show, so nothing moves.
+ */
+function Material(props: { fen: string; orientation: 'white' | 'black' }) {
+  const m = material(props.fen);
+  const lead = m.score > 0 ? 'white' : m.score < 0 ? 'black' : undefined;
+  const side = (color: 'white' | 'black') => {
+    const left = m[color];
+    const groups = MATERIAL_ROLES.filter((r) => left[r] > 0);
+    if (!groups.length && lead !== color) return null;
+    return (
+      <span key={color} class="material-side" data-color={color}>
+        {groups.map((role) => (
+          <span key={role} class="material-group">
+            {Array.from({ length: left[role] }, (_, i) => createElement('piece', { key: i, class: `${role} ${color}` }))}
+          </span>
+        ))}
+        {lead === color && <span class="material-score">+{Math.abs(m.score)}</span>}
+      </span>
+    );
+  };
+  const label = lead ? `Material: ${lead === 'white' ? 'White' : 'Black'} +${Math.abs(m.score)}` : 'Material level';
+  return (
+    <div class="board-material" role="img" aria-label={label} data-testid="board-material">
+      {side(props.orientation)}
+      {side(props.orientation === 'white' ? 'black' : 'white')}
+    </div>
   );
 }
 

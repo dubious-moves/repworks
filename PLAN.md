@@ -6978,3 +6978,37 @@ Tests of the skill's tools: `test/unit/scripts/ideas.test.ts`. It covers:
   against a repertoire, its blunder not graded and a better move beside it warned
 
 Live: TESTING.md (the owner reads the pilot deck, then trains it as idea cards).
+
+#### 5.129 The material under every board (the owner's request, 2026-10-21)
+
+The owner: on every board, a small view of the material, pieces and pawns, and +1.
+
+How others show it: Lichess (its source, `ui/lib/src/game/view/material.ts`) shows only the
+difference: each side's pieces left over once the other side's of the same kind cancel them,
+the same kind overlapping and a gap between kinds, queen first and pawns last, then "+n" after
+the side that is up (queen 9, rook 5, bishop and knight 3, pawn 1), above the board for the side
+at the top and below it for the side at the foot, by its player. Chess.com shows every piece
+captured, in the taken side's colour, by the taker's name, with the same "+n".
+
+Built (Lichess's difference, one row):
+- **Core** (`src/core/chess/material.ts`): `material(fen)` gives each side's surplus by role and
+  White's points less Black's, from the placement alone.
+- **The board** (`Board.tsx`): a row under the board, as wide as it, on every `Board` (study,
+  analysis, training, idea cards, Read, practice and its review, games, the storm, a card's note).
+  Repworks has no player bars, so one row holds both sides, each side's pieces in its own colour
+  (the board's cburnett set), the side at the board's foot first, and "+n" after the side that is
+  up. With nothing left over the row is empty; a bishop for a knight shows both, with no "+n".
+  The comment previews' mini boards don't have it: they are
+  thumbnails.
+- **Its room** (`--material-h`, 24px) is kept even when the row is empty, so the page never moves
+  as pieces are taken and retaken. The boards whose side is fitted to the window's height take it
+  off their side, so nothing under them moves either: on such a page the board is 24px smaller.
+- Black pieces get a rim of the page's ink, which is light on a dark theme, where they would be
+  lost; on a light theme it is dark and barely shows.
+- The row is not a `.cg-wrap` (that class is the board, to the code and the tests), so the board
+  loads chessground's piece images once with their selectors widened to the row.
+
+Tests: `material.test.ts` (the start level; a pawn up; the exchange, each side's surplus and the
+points netted; Black ahead; bishop for knight level; a placement alone), `analysis.spec.ts`
+(desktop and phone: level after e4 e5 with no pieces; a FEN a pawn up shows the white pawn, its
+image, and "+1"). Live: TESTING.md.
