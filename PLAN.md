@@ -6910,6 +6910,12 @@ skill and its tools, then idea cards in the app.
     - A card graded Again comes back at the session's end, not graded: asked until a move
       answers it, or shown once when self-graded. FSRS never brings an Again back the same day
       (§4.8), so this is the session's own retry, as show and grade's (§5.127).
+    - **Train again** (the owner's request, 2026-10-21; it used to rebuild today's queue, empty
+      by then, so it did nothing): every card of the deck (or the study), in its order, due or
+      not. A card in today's queue is recorded as ever; any other card is practice: asked and
+      graded the same way, retried after Again, but nothing is recorded ("practice, not
+      recorded" on the counter), so it keeps its schedule, as the line trainer's practice does.
+      The done card shows it only when the deck has cards.
   - **The `idea` event**: `{ "k": "idea", "card": "i|<sid>|<cid>", "on": true }`. The latest
     event of each card decides, as with `plan`. Removing a card keeps its reviews; made again,
     it goes on from them.

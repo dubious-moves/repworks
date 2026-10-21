@@ -104,6 +104,17 @@ test('idea cards made for a study, asked from its Train button, and removed', as
   await page.getByRole('button', { name: 'Next (Space)' }).click();
   await expect(page.getByTestId('ideas-done')).toContainText('3 cards answered: 0 easy, 1 good, 1 hard, 1 again');
 
+  // Train again: every card, due or not; none is due today, so all are practice, nothing recorded.
+  await page.getByRole('button', { name: 'Train again' }).click();
+  await expect(card).toHaveAttribute('data-card', `i|${sid}|${cids[1]}`);
+  await expect(card).toContainText('practice, not recorded');
+  await page.getByRole('button', { name: 'Show (Space)' }).click();
+  await page.getByRole('button', { name: /^Good/ }).click();
+  await expect(card).toHaveAttribute('data-card', `i|${sid}|${cids[2]}`);
+  await expect(card).toContainText('practice, not recorded');
+  await play(page, 'c8', 'd7');
+  await expect(page.getByTestId('idea-result')).toHaveText('Bd7: right. Practice: Good, not recorded.');
+
   await page.evaluate((h) => (location.hash = h), `#/study/${sid}/${cids[1]}`);
   await expect(page.locator('.cg-wrap')).toBeVisible();
   await studyMenu(page, 'Remove the idea cards');
@@ -117,7 +128,7 @@ test('idea cards made for a study, asked from its Train button, and removed', as
   expect(log()).toContain(`"k":"idea","card":"i|${sid}|${cids[1]}","on":true`);
   expect(log()).not.toContain(`"card":"i|${sid}|${cids[0]}"`);
   expect(log()).toMatch(new RegExp(`"k":"review","card":"i\\|${sid}\\|${cids[1]}","g":1,"ms":\\d+,"w":\\["b7b6"\\]`));
-  expect(log()).toContain(`"card":"i|${sid}|${cids[2]}","g":3`);
+  expect(log().split(`"card":"i|${sid}|${cids[2]}","g":3`).length, 'practice is not recorded').toBe(2);
   expect(log()).toContain(`"card":"i|${sid}|${cids[3]}","g":2`);
 });
 

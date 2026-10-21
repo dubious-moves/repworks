@@ -13,7 +13,7 @@ import { normalizeMove } from 'chessops/chess';
 import { isNormal, type Role } from 'chessops/types';
 import { parseSquare } from 'chessops/util';
 import type { Key } from '@lichess-org/chessground/types';
-import { askIdeaNow, beginIdeas, gradeIdeaNow, ideaMode, ideaSession, ideasReady, nextIdeaNow, playIdeaMove, removeIdeaCard, setIdeaModeNow, showIdeaNow, startIdeaCards } from '../app/ideas.ts';
+import { askIdeaNow, beginIdeas, gradeIdeaNow, ideaMode, ideaSession, ideasDeck, ideasReady, nextIdeaNow, playIdeaMove, practiseAllIdeas, removeIdeaCard, setIdeaModeNow, showIdeaNow, startIdeaCards } from '../app/ideas.ts';
 import { analyseFrom } from '../app/mode.ts';
 import { commentId, endPreview } from '../app/preview.ts';
 import { studies } from '../app/state.ts';
@@ -83,20 +83,31 @@ function Done(props: { s: IdeaSession; sid?: string | undefined }) {
   const counts = { 1: 0, 2: 0, 3: 0, 4: 0 };
   for (const g of props.s.results.values()) counts[g]++;
   const n = props.s.results.size;
+  const sid = props.sid;
+  const all = ideasDeck.value.filter((i) => !sid || i.sid === sid).length;
+  const practised = props.s.steps.some((st) => st.practice);
   return (
     <section class="card" data-testid="ideas-done">
       <h2>{props.s.steps.length ? 'Done for now' : 'No idea cards for today'}</h2>
       <p>
         {n} card{n === 1 ? '' : 's'} answered{n ? `: ${counts[4]} easy, ${counts[3]} good, ${counts[2]} hard, ${counts[1]} again` : ''}.
+        {practised && ' The ones not due were practice: they keep their schedule.'}
       </p>
-      {!props.s.steps.length && <p class="muted">Idea cards are made from an idea deck’s ☰ menu: Make idea cards. New ones come up within the day’s limit (Training settings).</p>}
+      {!all && <p class="muted">Idea cards are made from an idea deck’s ☰ menu: Make idea cards. New ones come up within the day’s limit (Training settings).</p>}
+      {all > 0 && !props.s.steps.length && (
+        <p class="muted">
+          None of the {all} is due. Train again goes through them all; the ones not due are practice, nothing recorded.
+        </p>
+      )}
       <div class="actions">
         <a class="button" href="#/">
           Home
         </a>
-        <button type="button" class="secondary" onClick={() => beginIdeas(props.sid)}>
-          Train again
-        </button>
+        {all > 0 && (
+          <button type="button" class="secondary" title="Every card, due or not: the ones not due are practice, nothing recorded" onClick={() => practiseAllIdeas(sid)}>
+            Train again
+          </button>
+        )}
       </div>
     </section>
   );
@@ -130,7 +141,7 @@ function Card(props: { s: IdeaSession; run: IdeaRun }) {
     <p class="train-counters">
       {s.index + 1} of {s.steps.length} · {idea.kind}
       {run.step.isNew && !run.step.retry ? ' · new' : ''}
-      {run.step.retry ? ' · again, not graded' : ''}
+      {run.step.retry ? ' · again, not graded' : run.step.practice ? ' · practice, not recorded' : ''}
     </p>
   );
   const actions = (
@@ -237,7 +248,7 @@ function Answer(props: { run: IdeaRun; grading: boolean; counter: ComponentChild
       {run.phase === 'back' && (
         <p class="feedback idea-result" role="status" data-testid="idea-result">
           {answer?.kind === 'right' ? (run.wrong.length ? `${answer.san}: right, after ${run.wrong.map((w) => w.san).join(', ')}.` : `${answer.san}: right.`) : run.wrong.length ? `Shown after ${run.wrong.map((w) => w.san).join(', ')}.` : 'Shown.'}
-          {run.graded !== undefined && ` Recorded: ${GRADE_WORD[run.graded]}.`}
+          {run.graded !== undefined && (run.step.practice ? ` Practice: ${GRADE_WORD[run.graded]}, not recorded.` : ` Recorded: ${GRADE_WORD[run.graded]}.`)}
           {idea.answers.length > 0 && answer?.kind !== 'right' && ` The answer: ${idea.answers.join(' or ')}.`}
         </p>
       )}

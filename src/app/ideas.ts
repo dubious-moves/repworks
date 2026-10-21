@@ -7,7 +7,7 @@ import type { Position } from 'chessops/chess';
 import type { NormalMove } from 'chessops/types';
 import { standardUci } from '../core/chess/uci.ts';
 import { enrolledIn, ideaDeck, ideaEnrolments, ideaQueue, judgeIdeaMove, makesIdeaCard, type Idea } from '../core/ideas/cards.ts';
-import { askIdea, gradeIdea, leaveIdea, nextIdea, playIdea, setIdeaMode, showIdea, startIdeas, type IdeaMode, type IdeaReview, type IdeaSession } from '../core/ideas/session.ts';
+import { askIdea, gradeIdea, leaveIdea, nextIdea, playIdea, practiseIdeas, setIdeaMode, showIdea, startIdeas, type IdeaMode, type IdeaReview, type IdeaSession } from '../core/ideas/session.ts';
 import { ideaCard, parseIdeaCard, type CardId } from '../core/progress/cards.ts';
 import type { Grade } from '../core/progress/events.ts';
 import { studiesFromFiles, type StudyChapters } from '../core/repertoire/files.ts';
@@ -134,6 +134,13 @@ const put = (s: IdeaSession) => {
 export function beginIdeas(scope?: string): void {
   const q = ideaQueueNow(scope);
   ideaSession.value = { ...startIdeas(q, Date.now(), ideaMode.peek()), ...(scope ? { scope } : {}) };
+}
+
+/** Train again: every card of every study (or one), due or not; the ones not due are practice. */
+export function practiseAllIdeas(scope?: string): void {
+  const deck = scope ? ideasDeck.value.filter((i) => i.sid === scope) : ideasDeck.value;
+  const states = trainData.value?.states ?? new Map();
+  ideaSession.value = { ...practiseIdeas(deck, ideaQueueNow(scope), (c) => (states.get(c)?.card.state ?? 0) !== 0, Date.now(), ideaMode.peek()), ...(scope ? { scope } : {}) };
 }
 
 export function endIdeas(): void {

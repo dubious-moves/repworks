@@ -4,7 +4,8 @@
 // first move, a `!` beside it, never a `??`), a move judged, a side line as a comment's line, the
 // enrolments and the `idea` event, today's queue within the limit, and the session: a new card
 // shown first in Read and asked at once in Train (and the switch between them), a move right first time Good, a wrong one Again at once and retried ungraded at the
-// end, Show and the owner's grade, a card whose side isn't to move answered only by Show.
+// end, Show and the owner's grade, a card whose side isn't to move answered only by Show, and
+// Train again's pass over every card, the ones not due practice.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -14,7 +15,7 @@ import { parseSan } from 'chessops/san';
 import type { NormalMove } from 'chessops/types';
 import { readImport } from '../../../../src/core/import/plan.ts';
 import { ideaDeck, ideaEnrolments, ideaQueue, judgeIdeaMove, readIdea, sideLineText, type Idea } from '../../../../src/core/ideas/cards.ts';
-import { askIdea, gradeIdea, leaveIdea, needsGrade, nextIdea, playIdea, setIdeaMode, showIdea, startIdeas } from '../../../../src/core/ideas/session.ts';
+import { askIdea, gradeIdea, leaveIdea, needsGrade, nextIdea, playIdea, practiseIdeas, setIdeaMode, showIdea, startIdeas } from '../../../../src/core/ideas/session.ts';
 import { ideaCard, parseIdeaCard } from '../../../../src/core/progress/cards.ts';
 import { formatEvent, parseLog } from '../../../../src/core/progress/events.ts';
 import { Replay, toDeviceEvents } from '../../../../src/core/progress/replay.ts';
@@ -201,4 +202,27 @@ test('Train asks a new card at once; switching changes the card in front only wh
   // The retry of the card missed: asked in either mode.
   assert.deepEqual([s.run!.step.retry, s.run!.phase], [true, 'asking']);
   assert.equal(setIdeaMode(s, 'read', 9500).run!.phase, 'asking');
+});
+
+test('Train again: every card in the deck’s order, due or not; the ones not due graded but not recorded', () => {
+  const [, chain, queen, trap] = ideas() as Idea[];
+  const reviewed = new Set([chain!.card, queen!.card]);
+  let s = practiseIdeas([chain!, queen!, trap!], { due: [queen!], fresh: [] }, (c) => reviewed.has(c), 0, 'read');
+  assert.deepEqual(
+    s.steps.map((x) => [x.idea.cid, x.isNew, !!x.practice]),
+    [
+      ['Chapter1', false, true],
+      ['Chapter2', false, false],
+      ['Chapter3', true, true],
+    ],
+  );
+  // Not due: Again by a move, nothing recorded, and still asked again at the end, as practice.
+  const wrong = playIdea(s, judge(chain!, 'b6'), 'b7b6', 1000);
+  assert.equal(wrong.review, undefined);
+  s = nextIdea(playIdea(wrong.session, judge(chain!, 'c5'), 'c7c5', 2000).session, 2500);
+  assert.deepEqual(s.steps.at(-1)!.practice, true);
+  // Due: recorded as ever.
+  assert.deepEqual(playIdea(s, judge(queen!, 'Qb6'), 'd8b6', 3000).review, { card: queen!.card, g: 3, ms: 500 });
+  assert.deepEqual(s.results.get(chain!.card), 1);
+  assert.equal(practiseIdeas([], { due: [], fresh: [] }, () => false, 0).run, undefined);
 });
