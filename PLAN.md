@@ -6990,25 +6990,28 @@ the side that is up (queen 9, rook 5, bishop and knight 3, pawn 1), above the bo
 at the top and below it for the side at the foot, by its player. Chess.com shows every piece
 captured, in the taken side's colour, by the taker's name, with the same "+n".
 
-Built (Lichess's difference, one row):
+Built (Lichess's, the owner's choice after a first try with one row under the board):
 - **Core** (`src/core/chess/material.ts`): `material(fen)` gives each side's surplus by role and
   White's points less Black's, from the placement alone.
-- **The board** (`Board.tsx`): a row under the board, as wide as it, on every `Board` (study,
-  analysis, training, idea cards, Read, practice and its review, games, the storm, a card's note).
-  Repworks has no player bars, so one row holds both sides, each side's pieces in its own colour
-  (the board's cburnett set), the side at the board's foot first, and "+n" after the side that is
-  up. With nothing left over the row is empty; a bishop for a knight shows both, with no "+n".
-  The comment previews' mini boards don't have it: they are
-  thumbnails.
-- **Its room** (`--material-h`, 24px) is kept even when the row is empty, so the page never moves
-  as pieces are taken and retaken. The boards whose side is fitted to the window's height take it
-  off their side, so nothing under them moves either: on such a page the board is 24px smaller.
+- **The board** (`Board.tsx`): a row above the board for the side at its top and one below it for
+  the side at its foot, as wide as the board, on every `Board` (study, analysis, training, idea
+  cards, Read, practice and its review, games, the storm, a card's note): that side's surplus, in
+  its own colour (the board's cburnett set), then "+n" if it is up. With nothing left over a row is
+  empty; a bishop for a knight shows each in its row, with no "+n". The comment previews' mini
+  boards don't have it: they are thumbnails. The first try (2026-10-21) put both sides in one row
+  under the board, each in its colour; the owner asked for Lichess's place.
+- **Their room** (`--material-h`, 22px each) is kept even when empty, so the page never moves as
+  pieces are taken and retaken. The boards whose side is fitted to the window's height take both
+  off their side, so nothing around them moves: on such a page the board is 44px smaller. What sits
+  by the board's edges keeps to the board, not the rows: the eval bar beside it, the practice
+  review's eval bar, the storm review's panel.
 - Black pieces get a rim of the page's ink, which is light on a dark theme, where they would be
   lost; on a light theme it is dark and barely shows.
-- The row is not a `.cg-wrap` (that class is the board, to the code and the tests), so the board
-  loads chessground's piece images once with their selectors widened to the row.
+- The rows are not a `.cg-wrap` (that class is the board, to the code and the tests), so the board
+  loads chessground's piece images once with their selectors widened to the rows.
 
 Tests: `material.test.ts` (the start level; a pawn up; the exchange, each side's surplus and the
 points netted; Black ahead; bishop for knight level; a placement alone), `analysis.spec.ts`
-(desktop and phone: level after e4 e5 with no pieces; a FEN a pawn up shows the white pawn, its
-image, and "+1"). Live: TESTING.md.
+(desktop and phone: level after e4 e5 with no pieces; a FEN a pawn up, the board turned: the white
+pawn, its image and "+1" above the board, nothing below), `storm.spec.ts` (the review's list ends
+at the board's foot). Live: TESTING.md.

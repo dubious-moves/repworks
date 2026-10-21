@@ -40,10 +40,12 @@ test('from the home screen: moves kept on this device, never synced; a FEN set u
   await page.reload();
   await expect(page.locator('.notation')).toContainText('e4');
   await expect(page.locator('.notation')).toContainText('e5');
-  // The material under the board: level, nothing shown.
-  const material = page.getByTestId('board-material');
-  await expect(material).toHaveAttribute('aria-label', 'Material level');
-  await expect(material.locator('piece')).toHaveCount(0);
+  // The material above and below the board: level, nothing shown.
+  const top = page.getByTestId('board-material-top');
+  const bottom = page.getByTestId('board-material-bottom');
+  await expect(top).toHaveAttribute('aria-label', 'Black material');
+  await expect(bottom).toHaveAttribute('aria-label', 'White material');
+  await expect(page.locator('.board-material piece')).toHaveCount(0);
   await page.locator('.chip').click();
   await expect(page.locator('.chip')).toHaveText(/^synced/);
   expect(git.head).toBe(head);
@@ -56,11 +58,15 @@ test('from the home screen: moves kept on this device, never synced; a FEN set u
   await expect(page.locator('.cg-wrap')).toHaveClass(/orientation-black/);
   await expect(page.locator('.notation')).not.toContainText('e5');
   await expect(page.getByLabel('FEN')).toHaveAttribute('placeholder', '4k3/8/8/8/8/8/4P3/4K3 b - - 0 1');
-  // White a pawn up: the board's own pawn under it, and +1.
-  await expect(material).toHaveAttribute('aria-label', 'Material: White +1');
-  await expect(material.locator('piece.pawn.white')).toHaveCount(1);
-  await expect(material.locator('.material-score')).toHaveText('+1');
-  expect(await material.locator('piece').evaluate((e) => getComputedStyle(e).backgroundImage)).toMatch(/^url\("data:image\/svg/);
+  // White a pawn up, at the top of the turned board: the board's own pawn above it, and +1.
+  await expect(top).toHaveAttribute('aria-label', 'White material +1');
+  await expect(top.locator('piece.pawn.white')).toHaveCount(1);
+  await expect(top.locator('.material-score')).toHaveText('+1');
+  expect(await top.locator('piece').evaluate((e) => getComputedStyle(e).backgroundImage)).toMatch(/^url\("data:image\/svg/);
+  await expect(bottom).toHaveAttribute('aria-label', 'Black material');
+  await expect(bottom.locator('piece, .material-score')).toHaveCount(0);
+  const [b, t] = [(await page.locator('.board .cg-host').boundingBox())!, (await top.boundingBox())!];
+  expect(t.y + t.height).toBeLessThanOrEqual(b.y + 1);
   // A bad one says so and leaves the board.
   await page.getByLabel('FEN').fill('not a fen');
   await page.getByRole('button', { name: 'Set up' }).click();

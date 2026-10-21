@@ -5,13 +5,12 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
-## The material under every board (§5.129, 2026-10-21)
+## The material by every board (§5.129, 2026-10-21)
 - Checked by the tests and by screenshots in headless Chromium (desktop and an emulated phone,
-  the Forest and Paper themes). Under each board: the pieces one side has more of, in its own
-  colour, and "+n" after the side that is up (e.g. a white rook "+4" and a black pawn after the
-  exchange for a pawn). Is it easy to read at a glance on your phone, and are black pieces clear
-  enough on your theme? The boards fitted to the window's height are 24px smaller to make room:
-  say if you'd rather have it beside the board or only above/below as on Lichess.
+  the Forest and Paper themes). As on Lichess: above the board the top side's extra pieces, below
+  it the bottom side's, in their own colour, and "+n" after the side that is up. Is it easy to
+  read at a glance on your phone, and are black pieces clear enough on your theme? The boards
+  fitted to the window's height are 44px smaller to make room: say if that's too much.
 
 ## Idea cards (§5.128, 2026-10-20)
 - Checked by the tests only (desktop and an emulated phone), on a small test deck. With the pilot

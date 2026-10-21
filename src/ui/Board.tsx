@@ -57,7 +57,7 @@ export interface BoardProps {
   promotion?: { dest: Key; onPick(role: Role | undefined): void } | undefined;
 }
 
-// The pieces' images, for the board and for the material row under it, which is not a `.cg-wrap`:
+// The pieces' images, for the board and for the material rows by it, which are not a `.cg-wrap`:
 // that class is the board itself, to the code and the tests that look for it.
 const pieces = document.createElement('style');
 pieces.textContent = cburnett.replaceAll('.cg-wrap piece', ':is(.cg-wrap, .board-material) piece');
@@ -273,36 +273,33 @@ function Resize(props: { board: { current: HTMLDivElement | null } }) {
 }
 
 /**
- * The material under the board (the owner's request, 2026-10-21), after Lichess's: each side's
- * pieces left over once the other's cancel them, the same kind overlapping, and +points after the
- * side that is up. Lichess puts each side's by its player, above and below the board; with no
- * players here, one row under it holds both, each side's pieces in its own colour, the side at the
- * board's foot first. Its room is kept when there is nothing to show, so nothing moves.
+ * The material (the owner's request, 2026-10-21), as Lichess shows it by its players: above the
+ * board the pieces the side at the top has left over once the other's cancel them, below it the
+ * side at the foot's, the same kind overlapping, and +points after the side that is up. The pieces
+ * are in their side's colour. Each row's room is kept when it is empty, so nothing moves.
  */
 function Material(props: { fen: string; orientation: 'white' | 'black' }) {
   const m = material(props.fen);
   const lead = m.score > 0 ? 'white' : m.score < 0 ? 'black' : undefined;
-  const side = (color: 'white' | 'black') => {
+  const row = (color: 'white' | 'black', at: 'top' | 'bottom') => {
     const left = m[color];
-    const groups = MATERIAL_ROLES.filter((r) => left[r] > 0);
-    if (!groups.length && lead !== color) return null;
+    const score = lead === color ? `+${Math.abs(m.score)}` : '';
     return (
-      <span key={color} class="material-side" data-color={color}>
-        {groups.map((role) => (
+      <div class={`board-material ${at}`} role="img" aria-label={`${color === 'white' ? 'White' : 'Black'} material${score ? ` ${score}` : ''}`} data-testid={`board-material-${at}`}>
+        {MATERIAL_ROLES.filter((r) => left[r] > 0).map((role) => (
           <span key={role} class="material-group">
             {Array.from({ length: left[role] }, (_, i) => createElement('piece', { key: i, class: `${role} ${color}` }))}
           </span>
         ))}
-        {lead === color && <span class="material-score">+{Math.abs(m.score)}</span>}
-      </span>
+        {score && <span class="material-score">{score}</span>}
+      </div>
     );
   };
-  const label = lead ? `Material: ${lead === 'white' ? 'White' : 'Black'} +${Math.abs(m.score)}` : 'Material level';
   return (
-    <div class="board-material" role="img" aria-label={label} data-testid="board-material">
-      {side(props.orientation)}
-      {side(props.orientation === 'white' ? 'black' : 'white')}
-    </div>
+    <>
+      {row(props.orientation === 'white' ? 'black' : 'white', 'top')}
+      {row(props.orientation, 'bottom')}
+    </>
   );
 }
 

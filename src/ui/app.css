@@ -5,8 +5,8 @@
   line-height: 1.45;
   background: var(--bg);
   color: var(--text);
-  /* The row under every board for its material (Board.tsx), kept out of the board's side. */
-  --material-h: 24px;
+  /* The rows above and below every board for its material (Board.tsx), kept out of the board's side. */
+  --material-h: 22px;
 }
 
 * {
@@ -906,10 +906,10 @@ textarea.script {
 }
 
 .board {
-  width: min(100%, var(--board-size, 560px), calc(100dvh - 200px - var(--material-h)));
+  width: min(100%, var(--board-size, 560px), calc(100dvh - 200px - 2 * var(--material-h)));
   min-width: 260px;
   aspect-ratio: 1;
-  margin: 0 auto var(--material-h);
+  margin: var(--material-h) auto;
   touch-action: none;
 }
 
@@ -1011,31 +1011,34 @@ textarea.script {
   }
 }
 
-/* The material under the board (Board.tsx), as Lichess shows it: the same kind overlapping, a
-   gap between kinds and between the sides, +points after the side that is up. The pieces are the
-   board's own (Board.tsx), each in its side's colour; black ones have a rim of the page's ink, which is light
-   on a dark theme, where they would be lost. */
+/* The material (Board.tsx), as Lichess shows it: the side at the top's above the board, the
+   side at the foot's below it, the same kind overlapping, a gap between kinds, +points after the
+   side that is up. The pieces are the board's own, in their side's colour; black ones have a rim
+   of the page's ink, which is light on a dark theme, where they would be lost. */
 .board .board-material {
   position: absolute;
-  top: 100%;
   left: 0;
-  right: 18px;
+  right: 0;
   height: var(--material-h);
   display: flex;
   align-items: center;
-  gap: 16px;
-  box-sizing: border-box;
-  padding-top: 2px;
+  gap: 6px;
   overflow: hidden;
   pointer-events: none;
   font: 600 0.85rem/1 var(--font);
   color: var(--text-soft);
 }
 
-.material-side {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.board .board-material.top {
+  bottom: 100%;
+  padding-bottom: 1px;
+}
+
+/* Clear of the size handle at the board's corner. */
+.board .board-material.bottom {
+  top: 100%;
+  right: 18px;
+  padding-top: 1px;
 }
 
 .material-group {
@@ -1044,8 +1047,8 @@ textarea.script {
 
 .board-material piece {
   display: block;
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   background-size: cover;
 }
 
@@ -1054,7 +1057,7 @@ textarea.script {
 }
 
 .board-material piece + piece {
-  margin-left: -11px;
+  margin-left: -10px;
 }
 
 .material-score {
@@ -1727,7 +1730,7 @@ table.cards td {
 
   .cv-grid {
     --panel: clamp(320px, 34cqw, 560px);
-    --board: min(100cqh - 34px - var(--material-h), 100cqw - var(--panel) - 16px, var(--board-size, 100vw));
+    --board: min(100cqh - 34px - 2 * var(--material-h), 100cqw - var(--panel) - 16px, var(--board-size, 100vw));
     display: grid;
     grid-template-columns: var(--board) var(--panel);
     grid-template-areas: 'board panel';
@@ -1743,7 +1746,7 @@ table.cards td {
   .cv-board .board {
     width: var(--board);
     min-width: 0;
-    margin: 0 0 var(--material-h);
+    margin: var(--material-h) 0;
   }
 
   .cv-panel {
@@ -1797,7 +1800,7 @@ table.cards td {
     --panel-min: clamp(320px, 33cqw, 400px);
     /* A multiple of 8px, as chessground draws its squares: the board's box is then the squares'
        own, and the eval bar beside it as tall as they are. */
-    --board: round(down, min(100cqh - 34px - var(--material-h), 100cqw - var(--panel-min) - 200px - 32px, var(--board-size, 100vw)), 8px);
+    --board: round(down, min(100cqh - 34px - 2 * var(--material-h), 100cqw - var(--panel-min) - 200px - 32px, var(--board-size, 100vw)), 8px);
     --panel: max(var(--panel-min), (100cqw - var(--board) - 32px) / 2);
     --side: calc(100cqw - var(--board) - var(--panel) - 32px);
     display: grid;
@@ -2365,7 +2368,7 @@ button.comment-offer-chip.important {
      (and the line list's, beside it from 1150 px). */
   .train-grid {
     --board-room: calc(100vw - 340px);
-    --board: min(100dvh - 240px - var(--material-h), var(--board-room), var(--board-size, 100vw));
+    --board: min(100dvh - 240px - 2 * var(--material-h), var(--board-room), var(--board-size, 100vw));
     display: grid;
     grid-template-columns: calc(var(--board) + var(--board-extra, 0px)) minmax(280px, 420px);
     justify-content: center;
@@ -3621,7 +3624,7 @@ a.button.primary {
 @media (min-width: 900px) {
   .eval-bar {
     position: absolute;
-    top: 0;
+    top: var(--material-h);
     left: calc(var(--board) + 3px);
     width: 9px;
     height: var(--board);
@@ -3790,7 +3793,7 @@ a.button.primary {
    footer), and the analysis board, with no chapter list, gives that column to the board. */
 @media (min-width: 900px) {
   .scratch .cv-grid {
-    --board: min(100cqh - 34px - var(--material-h) - 52px, 100cqw - var(--panel) - 16px, var(--board-size, 100vw));
+    --board: min(100cqh - 34px - 2 * var(--material-h) - 52px, 100cqw - var(--panel) - 16px, var(--board-size, 100vw));
     grid-template-columns: var(--board) var(--panel);
     grid-template-areas: 'board panel';
   }
@@ -3799,7 +3802,7 @@ a.button.primary {
 /* The stage's middle, as the study's board, its left side left empty. */
 @media (min-width: 1150px) {
   .scratch .cv-grid {
-    --board: min(100cqh - 34px - var(--material-h) - 52px, 100cqw - var(--panel-min) - 200px - 32px, var(--board-size, 100vw));
+    --board: min(100cqh - 34px - 2 * var(--material-h) - 52px, 100cqw - var(--panel-min) - 200px - 32px, var(--board-size, 100vw));
     grid-template-columns: var(--side) var(--board) var(--panel);
     grid-template-areas: 'side board panel';
   }
@@ -4402,9 +4405,9 @@ a.button.primary {
 /* Beside the board on a wide screen, the list fills what the panel leaves and scrolls itself, so
    every position is in view without scrolling the page; its own size counts for nothing. */
 @media (min-width: 900px) {
-  /* Down to the board's foot, not its material row's. */
+  /* From the board's top to its foot, not its material rows'. */
   .storm-review-grid .storm-panel {
-    margin-bottom: var(--material-h);
+    margin-block: var(--material-h);
   }
 
   .storm-review-grid .storm-list-wrap {
@@ -4847,8 +4850,8 @@ a.button.disabled {
 .review-eval {
   position: relative;
   flex: 0 0 22px;
-  /* As tall as the board, not its material row. */
-  margin-bottom: var(--material-h);
+  /* As tall as the board, not its material rows. */
+  margin-block: var(--material-h);
   border-radius: 3px;
   overflow: hidden;
   background: #3a3a3a; /* fixed */
