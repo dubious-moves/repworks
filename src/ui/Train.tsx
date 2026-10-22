@@ -14,7 +14,8 @@ import { commentId, endPreview, preview, stepPreview } from '../app/preview.ts';
 import { beginTraining } from '../app/state.ts';
 import { dataVersion } from '../app/sync.ts';
 import { decidingNow, timeOffset } from '../app/time.ts';
-import { analyseSession, command, leaveSession, resumeSession, seekSequence, isGraded, leaveForStudy, pace, PACES, pinMissed, playMove, press, queueOf, quizComments, readLine, readingAt, session, sessionProblem, setPace, setSelfGrade, setSpeech, speech, trainData, undoSuspend, type Pace, type SessionKind, type SessionView, type TrainData } from '../app/train.ts';
+import { goOnMs, moveMs, PACE_NAMES, paceSettings } from '../app/pace.ts';
+import { analyseSession, command, leaveSession, resumeSession, seekSequence, isGraded, leaveForStudy, pinMissed, playMove, press, queueOf, quizComments, readLine, readingAt, session, sessionProblem, setPace, setSelfGrade, setSpeech, speech, trainData, undoSuspend, type SessionKind, type SessionView, type TrainData } from '../app/train.ts';
 import { trainPrefs } from '../app/trainPrefs.ts';
 import type { Line, RepertoireIndex } from '../core/repertoire/index.ts';
 import type { Mode } from '../core/app/fsm.ts';
@@ -698,7 +699,7 @@ function Session(props: { s: SessionView }) {
 
 /**
  * The session's "⋯" menu (the owner's request, 2026-10-11): what is seldom pressed, out of the
- * buttons under the board: "Always play this for me", "Skip line" and the pace.
+ * buttons under the board: "Always play this for me", "Skip line" and the pace (its custom speed and pauses are in the training settings).
  */
 function TrainMenu(props: { graded: boolean; suspend: boolean; skip: boolean }) {
   const [at, setAt] = useState<{ x: number; y: number; above: number; opener: Element } | undefined>(undefined);
@@ -740,10 +741,10 @@ function TrainMenu(props: { graded: boolean; suspend: boolean; skip: boolean }) 
           )}
           {(props.graded || props.skip) && <hr class="menu-sep" role="separator" />}
           <span class="menu-heading">Pace</span>
-          {(Object.keys(PACES) as Pace[]).map((p) => (
-            <button key={p} type="button" role="menuitemradio" aria-checked={pace.value === p} onClick={run(() => setPace(p))}>
-              <span class="menu-check" aria-hidden="true">{pace.value === p ? '✓' : ''}</span>
-              {p} <kbd>{PACES[p]} ms</kbd>
+          {PACE_NAMES.map((p) => (
+            <button key={p} type="button" role="menuitemradio" aria-checked={paceSettings.value.pace === p} onClick={run(() => setPace(p))}>
+              <span class="menu-check" aria-hidden="true">{paceSettings.value.pace === p ? '✓' : ''}</span>
+              {p} <kbd>{moveMs({ ...paceSettings.value, pace: p })} ms</kbd>
             </button>
           ))}
         </FloatingMenu>
@@ -822,7 +823,7 @@ function GoingOn(props: { line: Line; number: number; data: TrainData; from: Lin
   const { line } = props;
   useEffect(() => {
     if (stopped) return;
-    const go = setTimeout(() => open({ name: 'train', sid: line.sid, cid: line.cid, at: [...line.path] }), 4 * PACES[pace.peek()]);
+    const go = setTimeout(() => open({ name: 'train', sid: line.sid, cid: line.cid, at: [...line.path] }), goOnMs());
     const onKey = (e: KeyboardEvent) => {
       // Escape that ends a comment's line on the board stops nothing else.
       if (e.key !== 'Escape' || e.defaultPrevented) return;

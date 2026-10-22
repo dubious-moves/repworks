@@ -823,3 +823,13 @@ q_extension (or give it to a session with q_extension attached), then run
  }
 ```
 
+## The pace of auto-played moves (2026-10-22)
+- Training settings ⚙ → "Pace of moves played for you": pick Fastest (250 ms) and run a session
+  with auto-play on; moves should come quickly but still be followable. Try Custom at 100 ms.
+- Custom with “Pause between lines” (say 3000): the next line should come after that long.
+  Empty: two moves' time (four when a picked line goes on to the next by itself).
+- The pause to look: after a wrong move, between a shown sequence's moves and before a comment
+  line's first move. Empty: two moves' time.
+- Changing the pace in ⋯ mid-session, or Save in the settings mid-session, applies from the next
+  move. The Ideas player steps at twice the move time.
+- Checked by unit tests only so far (the trainer's waits, the stored settings); not live.

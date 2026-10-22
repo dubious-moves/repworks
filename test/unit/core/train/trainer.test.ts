@@ -16,7 +16,7 @@ import { interactivePlan, planSession, type PlannedLine, type SessionPlan } from
 import { statusOf, todaysQueue, type Day } from '../../../../src/core/train/queue.ts';
 import { DEFAULT_TRAIN } from '../../../../src/core/train/settings.ts';
 import { quizLinesOf } from '../../../../src/core/train/commentQuiz.ts';
-import { AUTO_PLAYS, LINE_STARTS, MIN_PACE_MS, Trainer, type CommentQuiz, type TrainerCommand, type TrainerEffect, type TrainerOptions, type TrainerRecord, type TrainerView } from '../../../../src/core/train/trainer.ts';
+import { AUTO_PLAYS, LINE_STARTS, MIN_PACE_MS, Trainer, type CommentQuiz, type Pauses, type TrainerCommand, type TrainerEffect, type TrainerOptions, type TrainerRecord, type TrainerView } from '../../../../src/core/train/trainer.ts';
 import type { Chapter } from '../../../../src/core/study/model.ts';
 import { lineThrough, startPosition } from '../../../../src/core/study/tree.ts';
 import { mulberry32 } from '../../../support/random.ts';
@@ -65,7 +65,7 @@ const startOf = (w: World) => (line: Line) => {
   return c ? startPosition(c) : undefined;
 };
 const planOf = (w: World, states: Map<string, CardState>, newPerDay = 0) => planSession(w.ix, todaysQueue(w.ix, states, { ...DEFAULT_TRAIN, newPerDay }, day), states);
-const trainer = (w: World, plan: SessionPlan, states: Map<string, CardState>, extra: { record?: boolean; askAll?: boolean; follow?: boolean; paceMs?: number; selfGrade?: boolean } & TrainerOptions = {}) =>
+const trainer = (w: World, plan: SessionPlan, states: Map<string, CardState>, extra: { record?: boolean; askAll?: boolean; follow?: boolean; paceMs?: number; selfGrade?: boolean; pauses?: Pauses } & TrainerOptions = {}) =>
   new Trainer({ index: w.ix, plan, states, startOf: startOf(w), paceMs: extra.paceMs ?? 600, ...extra });
 
 /** Who answers an ask or a teach: a command, or undefined to stop the session. */
@@ -127,12 +127,41 @@ test('a line with nothing to ask auto-plays to its end and records nothing, at n
   const line = w.ix.lines[0]!;
   const plan: SessionPlan = { lines: [{ kind: 'review', line, end: line.path.length, ask: [], teach: [] }] };
   const states = new Map<string, CardState>([...w.ix.cards.keys()].map((c) => [c, notDue]));
-  const { effects, records } = run(trainer(w, plan, states, { paceMs: 100 }), () => assert.fail('nothing is asked'));
+  const { effects, records } = run(trainer(w, plan, states, { paceMs: 50 }), () => assert.fail('nothing is asked'));
   assert.deepEqual(plays(effects), ['auto:e4', 'opponent:e5', 'auto:Nf3', 'opponent:Nc6']);
   assert.deepEqual(records, []);
   for (const e of effects) if (e.type === 'wait') assert.ok(e.ms >= MIN_PACE_MS);
   // No arrow for a reviewed card played for the user.
   assert.ok(!effects.some((e) => e.type === 'arrow' && e.uci));
+});
+
+test('the pace and the pause at a line end: each wait is the move time or the pause as set, never below the floor', () => {
+  const w = world(chapter('Chapter1', 'white', '1. e4 e5 (1... c5)'));
+  const [one, two] = w.ix.lines;
+  const planned = (line: Line): SessionPlan['lines'][number] => ({ kind: 'review', line, end: line.path.length, ask: [], teach: [] });
+  const plan: SessionPlan = { lines: [planned(one!), planned(two!)] };
+  const states = new Map<string, CardState>([...w.ix.cards.keys()].map((c) => [c, notDue]));
+  const waits = (extra: Parameters<typeof trainer>[3]) => run(trainer(w, plan, states, extra), () => assert.fail('nothing is asked')).effects.flatMap((e) => (e.type === 'wait' ? [e.ms] : []));
+  // Faster than the old floor of 450, and the line's end two paces by default.
+  assert.deepEqual(waits({ paceMs: 250 }), [250, 250, 500, 250]);
+  // The line's end as set, whatever the pace; below the floor it is the floor.
+  assert.deepEqual(waits({ paceMs: 250, pauses: { lineEndMs: 3000 } }), [250, 250, 3000, 250]);
+  assert.deepEqual(waits({ paceMs: 250, pauses: { lineEndMs: 10 } }), [250, 250, MIN_PACE_MS, 250]);
+  assert.deepEqual(waits({ paceMs: 1 }), [MIN_PACE_MS, MIN_PACE_MS, 2 * MIN_PACE_MS, MIN_PACE_MS]);
+});
+
+test('a new pace and pauses apply from the next wait', () => {
+  const w = world(chapter('Chapter1', 'white', '1. e4 e5'));
+  const line = w.ix.lines[0]!;
+  const plan: SessionPlan = { lines: [{ kind: 'review', line, end: line.path.length, ask: [], teach: [] }] };
+  const states = new Map<string, CardState>([...w.ix.cards.keys()].map((c) => [c, notDue]));
+  const t = trainer(w, plan, states, { paceMs: 600 });
+  const first = t.send({ type: 'start', now: 0 } as TrainerCommand).find((e) => e.type === 'wait');
+  assert.equal(first?.type === 'wait' ? first.ms : 0, 600);
+  t.setPace(200, { lineEndMs: 1000 });
+  const tick = t.send({ type: 'tick', id: first!.type === 'wait' ? first!.id : 0, now: 600 });
+  const next = tick.find((e) => e.type === 'wait');
+  assert.equal(next?.type === 'wait' ? next.ms : 0, 200);
 });
 
 test('a due card is asked; right first time is Good, with the time taken', () => {

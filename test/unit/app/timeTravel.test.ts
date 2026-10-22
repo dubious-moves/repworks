@@ -15,6 +15,7 @@ import { todaysQueue } from '../../../src/core/train/queue.ts';
 import { DEFAULT_TRAIN } from '../../../src/core/train/settings.ts';
 import { dayOf, optionsFor, type SessionKind } from '../../../src/app/train.ts';
 import { decidingNow, offsetLabel, setTimeOffset, timeOffset } from '../../../src/app/time.ts';
+import { DEFAULT_PACE, moveMs, parsePace, pausesOf } from '../../../src/app/pace.ts';
 import { DEFAULT_PREFS, parsePrefs } from '../../../src/app/trainPrefs.ts';
 import { shiftedClock } from '../../../src/platform/browser.ts';
 import { asDevice, iso } from '../../support/reviewHistory.ts';
@@ -70,6 +71,20 @@ test('time travel: a move taught now is due at +4 hours, and its review recorded
   const b = onTime.states.get(e4)!.card;
   assert.equal(a.lastReview, real + 60_000);
   assert.ok(a.due! < b.due!, 'scheduled from the real time of the answer');
+});
+
+test('the pace: defaults, the old preset kept, each field checked, the custom speed and pauses', () => {
+  assert.deepEqual(parsePace(null), DEFAULT_PACE);
+  assert.deepEqual(parsePace('not json'), DEFAULT_PACE);
+  assert.equal(parsePace(null, 'fast').pace, 'fast');
+  assert.equal(parsePace(null, 'sprint').pace, 'normal');
+  assert.equal(moveMs(parsePace(JSON.stringify({ pace: 'fastest' }))), 250);
+  const custom = parsePace(JSON.stringify({ pace: 'custom', customMs: 180, lineEndMs: 1500, lookMs: 400 }));
+  assert.equal(moveMs(custom), 180);
+  assert.deepEqual(pausesOf(custom), { lineEndMs: 1500, lookMs: 400 });
+  // Out of range, fractional or mistyped: the default (a pause: unset).
+  assert.deepEqual(parsePace(JSON.stringify({ pace: 'custom', customMs: 20, lineEndMs: 99999, lookMs: 1.5 })), { pace: 'custom', customMs: DEFAULT_PACE.customMs });
+  assert.deepEqual(pausesOf(parsePace(JSON.stringify({ lineEndMs: '900' }))), {});
 });
 
 test('the per-device settings: defaults, each field checked', () => {

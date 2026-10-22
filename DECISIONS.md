@@ -1785,3 +1785,15 @@ The technical calls, each with its reason:
   number beside the top line reads more clearly. The feedback line takes no room while empty
   (it still shows its message when there is one), so the buttons start 28px under the board's
   foot, with 4px of padding at their sides.
+
+## Revision of 2026-10-22 (the pace of auto-played moves)
+- **A faster pace, and the speed and the pauses of auto-played moves are settings.** Was: three
+  paces (fast 450 ms, normal 600 ms, relaxed 900 ms), a floor of 450 ms (lichessable's), and the
+  pauses fixed at two paces. Now: "fastest" (250 ms) joins them, the floor is 100 ms, and the
+  training settings (this device) take a custom number of milliseconds a move, a pause at a
+  line's end and a pause to look at a position (after a mistake, between a shown sequence's
+  moves, before a comment line's first move); a pause left empty follows the speed as before.
+  Why: the owner asked for an even faster pace and for the speed and intervals as a setting.
+  Decided within it: a pause of 100–10000 ms; one pause for the line's end, whether the next
+  line opens by itself or the trainer goes on; the presets stay in the session's ⋯ menu, with
+  "custom" at the speed set in the settings.

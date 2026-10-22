@@ -1187,9 +1187,11 @@ settings.json   { "format": 1, "train": { "newPerDay": 20, "retention": 0.9, "le
   sides takes ours. A missing file or field means the default. `validate-data` checks it.
 - Changing the retention re-replays every card (as §4.8 planned), so due dates move at once,
   the same way on every device.
-- The rest is per device, in localStorage: the auto-play pace (fast 450 ms, normal 600 ms,
-  relaxed 900 ms per move; lichessable's floor of ~450 ms), speech on or off, and the
-  show-and-grade keys.
+- The rest is per device, in localStorage: the auto-play pace (fastest 250 ms, fast 450 ms,
+  normal 600 ms, relaxed 900 ms per move, or a custom number of milliseconds; the floor is
+  100 ms), the pauses (at a line's end, default two paces, four going on to a picked line's
+  next; and a look at a position, default two paces), speech on or off, and the show-and-grade
+  keys. The pace is in the training settings and, as the presets, in the session's ⋯ menu.
 
 **A new event kind, `taught`** (`{"k":"taught","card":…}`), is recorded when a new move has been
 shown and played. It starts the learning step, and it is what the daily limit counts, from every
@@ -1435,7 +1437,7 @@ asks nothing; a due card is asked and graded by time; a wrong move then the righ
 Again with `w`; Hint records Again with `h`; a never-reviewed card on a review line is taught; a
 suspended card is played; the conflict rule (the other move accepted, the due one asked after);
 a promotion asks for the piece; teaching records one `taught` event per new card and no review;
-pace delays never under 450 ms; every effect sequence is deterministic for a given input.
+pace delays never under the floor (MIN_PACE_MS, 100 ms); every effect sequence is deterministic for a given input.
 
 **As built** (2026-10-06):
 - `src/core/train/trainer.ts`: `new Trainer({ index, plan, states, startOf, paceMs, record?,
@@ -1454,7 +1456,7 @@ pace delays never under 450 ms; every effect sequence is deterministic for a giv
   lines (a conflict move answered out of turn) is passed over.
 - A line that shares its first moves with the board starts there, up to its first ask or teach,
   rather than replaying them: the planner orders lines so that this is most of each line.
-- The pace is clamped to 450 ms; the pause at a line's end is two paces.
+- The pace is clamped to the floor (450 ms at first, 100 ms since 2026-10-22); the pause at a line's end is two paces unless set.
 - Conflicting moves: the other own move is accepted and graded on its own card when that card
   is asked today (due, or known and never answered), else accepted with no record. The note then
   says the repertoire has another move here, without naming it (naming it would be a hint), and
@@ -1523,7 +1525,7 @@ by drag at the pace, reading the feedback, the wake lock, the time a session tak
   m), the chapter's name and the moves so far, the comments of the move reached (hidden while a
   move is asked, as they could give it away; shown while a move is taught), and the buttons:
   Hint, "Always play this for me" (with "Undo: ask Nc6 again" until the next line), Skip line,
-  Stop; the pace (fast, normal, relaxed; per device, changeable mid-session). Space is Hint,
+  Stop; the pace (fastest, fast, normal, relaxed, custom; per device, changeable mid-session). Space is Hint,
   Escape stops. The screen's wake lock is held while a session runs and taken again when the
   page comes back into view. The end shows the session's numbers, "Train again" and "Home".
 - `src/ui/TrainCard.tsx`: the home screen's "Train: 1 due · 3 new", the moves whose learning

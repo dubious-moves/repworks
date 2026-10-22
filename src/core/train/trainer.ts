@@ -74,8 +74,16 @@ import type { QuizLine } from './commentQuiz.ts';
 import type { PlannedLine, SessionPlan } from './plan.ts';
 import { knownCardsOf, statusOf } from './queue.ts';
 
-/** The quickest pace: lichessable's floor, so a move can still be followed (§5.2). */
-export const MIN_PACE_MS = 450;
+/** The quickest pace (§5.2): lichessable's floor was 450; the owner asked for faster (2026-10-22), and a move can still be followed at 100. */
+export const MIN_PACE_MS = 100;
+
+/** Pauses set by the user, in milliseconds; unset, they follow the pace (§5.2). */
+export interface Pauses {
+  /** At a line's end before the next line (unset: `lineEndPaces` paces, 2 by default). */
+  lineEndMs?: number;
+  /** A look at a position: after a mistake, between a shown sequence's moves, before a comment line's first move (unset: 2 paces). */
+  lookMs?: number;
+}
 
 /**
  * Which own moves the plan doesn't need are played for the user (§5.17, after lichessable's
@@ -258,6 +266,8 @@ export interface TrainerSetup {
   startOf(line: Line): Position | undefined;
   /** Milliseconds per move played for the user; never below MIN_PACE_MS. */
   paceMs: number;
+  /** The pauses the user set; each unset follows `paceMs`. */
+  pauses?: Pauses;
   /** False: nothing is graded or taught on record (Interactive view, retry, drill). */
   record?: boolean;
   /** Ask every own move not answered yet in the session, due or not (Interactive view). */
@@ -394,10 +404,18 @@ interface Aside {
   shown: boolean;
 }
 
+function clampPauses(p: Pauses | undefined): Pauses {
+  const out: Pauses = {};
+  if (p?.lineEndMs !== undefined) out.lineEndMs = Math.max(MIN_PACE_MS, p.lineEndMs);
+  if (p?.lookMs !== undefined) out.lookMs = Math.max(MIN_PACE_MS, p.lookMs);
+  return out;
+}
+
 export class Trainer {
   private readonly setup: TrainerSetup;
   private options: TrainerOptions;
   private pace: number;
+  private pauses: Pauses;
   private readonly record: boolean;
   /** The plan's lines; with `follow`, the line walked is replaced by the one the user chose. */
   private readonly lines: PlannedLine[];
@@ -463,6 +481,7 @@ export class Trainer {
     const { autoPlay, tryNew, sequence, lineStart, holdLineEnd, lineEndPaces, repetitions, retryMistakes, retryShown, comments } = setup;
     this.options = { autoPlay, tryNew, sequence, lineStart, holdLineEnd, lineEndPaces, repetitions, retryMistakes, retryShown, comments };
     this.pace = Math.max(MIN_PACE_MS, setup.paceMs);
+    this.pauses = clampPauses(setup.pauses);
     this.record = setup.record ?? true;
     this.lines = [...setup.plan.lines];
     if (setup.plan.gradeOnly) this.gradeOnly = new Set(setup.plan.gradeOnly);
@@ -512,9 +531,15 @@ export class Trainer {
     return out;
   }
 
-  /** A new pace, from the next move played for the user. */
-  setPace(ms: number): void {
+  /** A new pace and pauses, from the next move played for the user. */
+  setPace(ms: number, pauses?: Pauses): void {
     this.pace = Math.max(MIN_PACE_MS, ms);
+    this.pauses = clampPauses(pauses);
+  }
+
+  /** A look at a position: the user's pause, else two paces. */
+  private get look(): number {
+    return this.pauses.lookMs ?? this.pace * 2;
   }
 
   get view(): TrainerView {
@@ -894,7 +919,7 @@ export class Trainer {
     this.upcoming = this.findNext();
     const quiz = this.endQuiz().length > 0;
     if (!this.upcoming && !quiz) return this.finish(out);
-    if (!this.options.holdLineEnd && !quiz) this.wait(this.pace * (this.options.lineEndPaces ?? 2), out);
+    if (!this.options.holdLineEnd && !quiz) this.wait(this.pauses.lineEndMs ?? this.pace * (this.options.lineEndPaces ?? 2), out);
   }
 
   /** What the feedback line says at an ask: a retry's streak, a missed line again, or nothing. */
@@ -945,7 +970,7 @@ export class Trainer {
     this.phase = 'again';
     this.afterPause = then;
     out.push({ type: 'arrow' });
-    this.wait(this.pace * 2, out);
+    this.wait(this.look, out);
     return true;
   }
 
@@ -1036,7 +1061,7 @@ export class Trainer {
     this.phase = 'preview';
     out.push({ type: 'arrow' });
     out.push({ type: 'note', note: { kind: 'sequence', count } });
-    this.wait(this.pace * 2, out);
+    this.wait(this.look, out);
   }
 
   /** Show sequence: the board anywhere in the sequence shown; the playing stops there. */
@@ -1115,12 +1140,12 @@ export class Trainer {
       // A look at where it ends, then the next.
       this.phase = 'again';
       this.afterPause = 'aside';
-      this.wait(this.pace * 2, out);
+      this.wait(this.look, out);
       return;
     }
     if (!q.own[a.ply]) {
       this.phase = 'opponent';
-      this.wait(a.ply === 0 ? this.pace * 2 : this.pace, out);
+      this.wait(a.ply === 0 ? this.look : this.pace, out);
       return;
     }
     a.wrong = [];
@@ -1185,7 +1210,7 @@ export class Trainer {
       this.ply++;
       out.push({ type: 'play', uci: p.uci, san: p.san, path: this.path(), by: 'preview' });
       if (this.ply >= q.to) this.phase = 'previewed';
-      else this.wait(this.pace * 2, out);
+      else this.wait(this.look, out);
       return;
     }
     if (this.phase !== 'opponent' && this.phase !== 'auto') return;

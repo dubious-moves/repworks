@@ -2,7 +2,7 @@
 // retention and the learning step, shared by every device through the data repo's
 // `settings.json`; then this device's: new moves shown, tried first or shown as a sequence, the
 // repetitions and the mistakes retried (§5.77), a line's end, where a line starts, auto-play, the
-// lines from the comments quizzed in review (§5.98); and time travel, for this tab. Opened by ⚙ on the home screen's training
+// lines from the comments quizzed in review (§5.98), the pace of moves played for you; and time travel, for this tab. Opened by ⚙ on the home screen's training
 // card and on the training screen.
 import { decidingNow } from '../app/time.ts';
 import { signal } from '@preact/signals';
@@ -11,6 +11,8 @@ import { mode } from '../app/mode.ts';
 import { queueOf, trainData } from '../app/train.ts';
 import { saveTrainSettings } from '../app/trainSettings.ts';
 import { configureSession } from '../app/train.ts';
+import { DEFAULT_PACE, MAX_PACE_MS, PACE_NAMES, PACES, paceSettings, savePaceSettings, type Pace, type PaceSettings } from '../app/pace.ts';
+import { MIN_PACE_MS } from '../core/train/trainer.ts';
 import { saveTrainPrefs, trainPrefs, type LearnStart, type TrainPrefs } from '../app/trainPrefs.ts';
 import { DEFAULT_TRAIN } from '../core/train/settings.ts';
 import type { AutoPlay, CommentQuiz, LineStart } from '../core/train/trainer.ts';
@@ -56,6 +58,10 @@ function Dialog() {
   const [seqLength, setSeqLength] = useState(String(prefs.sequenceLength));
   const [repetitions, setRepetitions] = useState(String(prefs.repetitions));
   const [retries, setRetries] = useState(String(prefs.mistakeRetries));
+  const [pace, setPace] = useState<Pace>(paceSettings.peek().pace);
+  const [customMs, setCustomMs] = useState(String(paceSettings.peek().customMs));
+  const [lineEndMs, setLineEndMs] = useState(String(paceSettings.peek().lineEndMs ?? ''));
+  const [lookMs, setLookMs] = useState(String(paceSettings.peek().lookMs ?? ''));
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     if (!ref.current!.open) ref.current!.showModal();
@@ -73,9 +79,21 @@ function Dialog() {
     if (!(Number.isInteger(reps) && reps >= 1 && reps <= 5)) return setError('Repetitions: a whole number from 1 to 5.');
     const mistakeRetries = Number(retries);
     if (!(Number.isInteger(mistakeRetries) && mistakeRetries >= 0 && mistakeRetries <= 5)) return setError('Mistakes retried: a whole number from 0 to 5.');
+    const range = `from ${MIN_PACE_MS} to ${MAX_PACE_MS} milliseconds`;
+    const wholeMs = (text: string) => (/^\d+$/.test(text.trim()) && Number(text) >= MIN_PACE_MS && Number(text) <= MAX_PACE_MS ? Number(text) : undefined);
+    const custom = wholeMs(customMs);
+    if (pace === 'custom' && custom === undefined) return setError(`Time a move takes: a whole number of milliseconds, ${range}.`);
+    const lineEnd = lineEndMs.trim() === '' ? undefined : wholeMs(lineEndMs);
+    if (lineEndMs.trim() !== '' && lineEnd === undefined) return setError(`Pause between lines: empty, or a whole number of milliseconds, ${range}.`);
+    const look = lookMs.trim() === '' ? undefined : wholeMs(lookMs);
+    if (lookMs.trim() !== '' && look === undefined) return setError(`Pause to look at a position: empty, or a whole number of milliseconds, ${range}.`);
     const done = await saveTrainSettings(values);
     if (!done.ok) return setError(done.error);
     saveTrainPrefs({ ...(prefs.newMoves === 'sequence' ? { ...prefs, sequenceLength } : prefs), repetitions: reps, mistakeRetries });
+    const next: PaceSettings = { pace, customMs: custom ?? paceSettings.peek().customMs };
+    if (lineEnd !== undefined) next.lineEndMs = lineEnd;
+    if (look !== undefined) next.lookMs = look;
+    savePaceSettings(next);
     configureSession();
     close();
   };
@@ -155,6 +173,34 @@ function Dialog() {
             <option value="go">Go on to the next line</option>
           </select>
         </label>
+        <fieldset>
+          <legend>Pace of moves played for you</legend>
+          <label>
+            Speed
+            <select name="pace" value={pace} onChange={(e) => setPace(e.currentTarget.value as Pace)}>
+              {PACE_NAMES.map((p) => (
+                <option key={p} value={p}>
+                  {p === 'custom' ? 'Custom' : `${p[0]!.toUpperCase()}${p.slice(1)} (${PACES[p as keyof typeof PACES]} ms a move)`}
+                </option>
+              ))}
+            </select>
+          </label>
+          {pace === 'custom' && (
+            <label>
+              Time a move takes <span class="muted">(milliseconds, {MIN_PACE_MS}–{MAX_PACE_MS})</span>
+              <input type="number" name="pace-custom" min={MIN_PACE_MS} max={MAX_PACE_MS} step={10} inputMode="numeric" value={customMs} placeholder={String(DEFAULT_PACE.customMs)} onInput={(e) => setCustomMs(e.currentTarget.value)} />
+            </label>
+          )}
+          <label>
+            Pause between lines <span class="muted">(milliseconds; empty: two moves' time, four when a picked line goes on to the next)</span>
+            <input type="number" name="pace-line-end" min={MIN_PACE_MS} max={MAX_PACE_MS} step={50} inputMode="numeric" value={lineEndMs} onInput={(e) => setLineEndMs(e.currentTarget.value)} />
+          </label>
+          <label>
+            Pause to look at a position <span class="muted">(milliseconds; empty: two moves' time)</span>
+            <input type="number" name="pace-look" min={MIN_PACE_MS} max={MAX_PACE_MS} step={50} inputMode="numeric" value={lookMs} onInput={(e) => setLookMs(e.currentTarget.value)} />
+          </label>
+          <p class="muted">The line’s end pause applies where it goes on by itself (see “At a line’s end”). The look is after a mistake, between the moves of a shown sequence and before a comment line’s first move. The pace is also in the session’s “⋯” menu.</p>
+        </fieldset>
         <TimeControl />
         {error && (
           <p class="warn" role="alert">

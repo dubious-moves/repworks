@@ -17,7 +17,7 @@ import { askIdeaNow, beginIdeas, gradeIdeaNow, ideaMode, ideaSession, ideasDeck,
 import { analyseFrom } from '../app/mode.ts';
 import { commentId, endPreview } from '../app/preview.ts';
 import { studies } from '../app/state.ts';
-import { pace, PACES } from '../app/train.ts';
+import { moveMs, paceSettings } from '../app/pace.ts';
 import { sideLineText, type Idea } from '../core/ideas/cards.ts';
 import { needsGrade, type IdeaRun, type IdeaSession } from '../core/ideas/session.ts';
 import type { Grade } from '../core/progress/events.ts';
@@ -259,7 +259,7 @@ function Answer(props: { run: IdeaRun; grading: boolean; counter: ComponentChild
     </>
   );
   return (
-    <LineReader chapter={idea.chapter} line={line} ply={ply} onPly={setPly} onEscape={() => undefined} head={head} sideLines playMs={PACES[pace.value] * 2} orientation={idea.side} carryShapes>
+    <LineReader chapter={idea.chapter} line={line} ply={ply} onPly={setPly} onEscape={() => undefined} head={head} sideLines playMs={moveMs(paceSettings.value) * 2} orientation={idea.side} carryShapes>
       {run.phase === 'learn' ? (
         <button type="button" onClick={askIdeaNow}>
           Ask me <span class="muted">(Space)</span>

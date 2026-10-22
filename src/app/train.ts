@@ -30,6 +30,7 @@ import { quizLinesOf, type QuizLine } from '../core/train/commentQuiz.ts';
 import { Trainer, type Note, type Summary, type TrainerCommand, type TrainerEffect, type TrainerOptions, type TrainerView } from '../core/train/trainer.ts';
 import type { IdbStore } from '../platform/idbStore.ts';
 import { say, stopSpeaking } from '../platform/speech.ts';
+import { moveMs, pausesOf, paceSettings, savePaceSettings, type Pace } from './pace.ts';
 import { decidingNow } from './time.ts';
 import { trainPrefs, type TrainPrefs } from './trainPrefs.ts';
 
@@ -145,29 +146,15 @@ export function queueOf(data: TrainData, now: number, scope?: string): DailyQueu
   return todaysQueue(data.index, data.states, data.settings, dayOf(now), scope === undefined ? {} : { scope });
 }
 
-/** The pace of moves played for the user, per device (§5.2). */
-export const PACES = { fast: 450, normal: 600, relaxed: 900 } as const;
-export type Pace = keyof typeof PACES;
-const PACE_KEY = 'repworks.pace';
-
-function readPace(): Pace {
-  try {
-    const v = localStorage.getItem(PACE_KEY);
-    if (v === 'fast' || v === 'normal' || v === 'relaxed') return v;
-  } catch {
-    // Storage blocked: the default.
-  }
-  return 'normal';
-}
-export const pace = signal<Pace>(readPace());
+/** A pace chosen in the session's menu; the settings dialog sets the speed of "custom" and the pauses. */
 export function setPace(p: Pace): void {
-  pace.value = p;
-  trainer?.setPace(PACES[p]);
-  try {
-    localStorage.setItem(PACE_KEY, p);
-  } catch {
-    // Kept for this page only.
-  }
+  savePaceSettings({ ...paceSettings.peek(), pace: p });
+  applyPace();
+}
+
+/** The pace and pauses now set, from the next move played for the user. */
+export function applyPace(): void {
+  trainer?.setPace(moveMs(), pausesOf());
 }
 
 /**
@@ -332,7 +319,8 @@ export async function startSession(store: IdbStore, record: (event: Parameters<I
       const c = data.chapters.get(`${line.sid}/${line.cid}`);
       return c ? startPosition(c) : undefined;
     },
-    paceMs: PACES[pace.peek()],
+    paceMs: moveMs(),
+    pauses: pausesOf(),
     alternatives: data.alternatives,
     // In review, the lines from the comments along the line (§5.98): the queue's and a line picked.
     ...(of.kind === 'queue' || of.kind === 'line' || of.kind === 'difficult' ? { commentLines: commentLinesOf(data) } : {}),
@@ -399,6 +387,7 @@ export function optionsFor(of: SessionKind, prefs: TrainPrefs): TrainerOptions {
 export function configureSession(): void {
   const s = session.peek();
   if (trainer && s) trainer.configure(optionsFor(s.of, trainPrefs.peek()));
+  applyPace();
 }
 
 /** Sessions whose answers are graded and recorded: the queue's, lines picked from the list, and difficult lines' due moves. */
