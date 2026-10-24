@@ -1779,7 +1779,32 @@ The technical calls, each with its reason:
   rules of thumb are split into two overview chapters (where the pieces go; plans and tactics),
   each under 1500 characters, and the duplicate-position warning counts cards only.
 
-## Revision of 2026-10-21 (the phone's study page)
+## Revision of 2026-10-24 (opening ideas: a card is a decision, PLAN.md §5.128)
+- **An idea card is a decision a player could get wrong, asked neutrally.** Was: rule 3 as written
+  on 2026-10-20, one card for each square a piece goes to, each asking "where does this piece
+  go here, and why?". Now:
+  - Development still comes first. A square gets a card only where it is a real decision; a
+    natural or forced square is a clause of the piece's rule.
+  - The question may say what the opponent just played. It never names the answer's square or
+    lists our candidates, and names the moving piece only while that piece still has a real
+    choice.
+  - The deck check refuses the rest, with Stockfish and Maia 2000/2200.
+
+  Why: the owner, after training the first three decks: the questions were wrong or gave the
+  answer away. Measured on those decks: in 43 of 104 cards the named piece had one sensible
+  move, and in 66 Maia found the answer 85% of the time or more once the piece was named.
+- **A deck has about 12 cards (never more than 15) and at most 8 rules, taken by value from
+  `cv.ts decisions`.** Was: 12–18 ideas with no cap on a piece's cards, and no cap at all in the
+  lean run (the decks had 27–42 cards). Value is reach × how often Maia misses our move × what its
+  likeliest other move gives up. Why: the owner: 30+ cards is too many for a small chapter; the
+  owner left the size to Claude (2026-10-24). Decided within it:
+  - lean runs the writer and the critic only, `decisions` doing the lenses' search;
+  - the card's kind is hidden while it asks, since "break" names the answer's kind.
+  - The thresholds: a sensible move is within 10% win of the best (the storm's `ok`). A
+    question gives the answer away at 85% once the piece is named. A card is free at 80% found
+    unprompted, and rare under 2% reach.
+
+
 - **No eval bar on the phone (under 900px); the move buttons sit close under the board.** Was: a
   6px strip under the board, and the buttons below an empty feedback line. Why: the owner: the
   number beside the top line reads more clearly. The feedback line takes no room while empty

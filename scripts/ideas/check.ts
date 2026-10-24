@@ -15,12 +15,19 @@
 // there?) that never grades better than the repertoire's. Every other move of the deck's side is graded by Stockfish on the storm's scale: unmarked
 // moves must be at worst `ok`, a `?` must be `bad` or worse, a `??` a blunder, a `!` great, and a
 // card's answer beyond the repertoire the best move or as good.
+//
+// A card is a decision a player could get wrong (the owner, 2026-10-24, after the first decks asked
+// where a piece went when it had one sensible square). So the check also fails a card whose answer
+// is the only sensible move (unless Maia misses it: then it is the one move that saves us), whose
+// question names the answer's square, or names the piece that moves when that leaves one sensible
+// move or Maia then finds it `GIVEN_AWAY` of the time (decide.ts). It warns on a card Maia finds
+// unprompted, one under `RARE` reach, and a deck over its cards (an error over `MAX_CARDS`).
 import type { Position } from 'chessops/chess';
 import { makeFen } from 'chessops/fen';
 import { parseSan } from 'chessops/san';
 import type { Color } from 'chessops/types';
 import { isNormal } from 'chessops/types';
-import { parseSquare } from 'chessops/util';
+import { makeSquare, parseSquare } from 'chessops/util';
 import { positionKeyOf } from '../../src/core/chess/positionKey.ts';
 import { standardUci } from '../../src/core/chess/uci.ts';
 import { parseGames } from '../../src/core/pgn/parse.ts';
@@ -30,6 +37,7 @@ import { STORM, type Band } from '../../src/core/storm/config.ts';
 import { grade as band, wpLoss } from '../../src/core/storm/grade.ts';
 import { header, type Chapter, type MoveNode, type Shape } from '../../src/core/study/model.ts';
 import { startPosition } from '../../src/core/study/tree.ts';
+import { cardDecision, CARDS, GIVEN_AWAY, MAX_CARDS, namedMovers, namedSquares, NATURAL, RARE, type Policy } from './decide.ts';
 import { cpOf, scoreText, type Engine } from './engine.ts';
 import type { Repertoire } from './tree.ts';
 
@@ -106,10 +114,11 @@ function repertoireMoves(rep: Repertoire | undefined, pos: Position): Map<string
 
 export async function checkDeck(
   text: string,
-  o: { engine?: Engine; depth: number; rep?: Repertoire; log?: (line: string) => void },
-): Promise<{ findings: Finding[]; chapters: number; onRepertoire: number }> {
+  o: { engine?: Engine; policy?: Policy; depth: number; rep?: Repertoire; cards?: number; log?: (line: string) => void },
+): Promise<{ findings: Finding[]; chapters: number; onRepertoire: number; cards: number }> {
   const findings: Finding[] = [];
   let onRepertoire = 0;
+  let cards = 0;
   let n = 0;
   const parsed = parseGames(text, () => `c${++n}`);
   const starts = new Map<string, string>();
@@ -122,6 +131,32 @@ export async function checkDeck(
     const label = `#${i + 1} ${header(ch, 'ChapterName') ?? '(no ChapterName)'}`;
     const err = (t: string) => findings.push({ chapter: label, level: 'error', text: t });
     const warn = (t: string) => findings.push({ chapter: label, level: 'warning', text: t });
+    // Is the card a decision, and does its question give the answer away?
+    const decision = async (start: Position) => {
+      const first = ch.root.children[0];
+      if (!first || glyphs(first).includes('?')) return;
+      const answers = [first.san, ...ch.root.children.slice(1).filter((n) => glyphs(n).includes('!') && !glyphs(n).includes('?')).map((n) => n.san)];
+      const question = header(ch, 'IdeaQuestion') ?? '';
+      const squares = namedSquares(question);
+      for (const san of answers) {
+        const move = parseSan(start, san);
+        if (move && isNormal(move) && squares.includes(makeSquare(move.to))) err(`the question names ${makeSquare(move.to)}, where the answer ${san} goes: let the board ask it`);
+      }
+      if (!o.engine && !o.policy) return;
+      const given = namedMovers(question, start, first.san);
+      const d = await cardDecision(start, answers, { engine: o.engine, policy: o.policy, depth: o.depth, given });
+      const pct = (x: number) => `${Math.round(x * 100)}%`;
+      const maia = d.found === undefined ? '' : `; Maia plays ${answers.join(' or ')} ${pct(d.found)} here (likeliest ${d.top})`;
+      o.log?.(`  ${label}: sensible moves ${d.sensible?.join(' ') ?? '?'}${given ? `; the named pieces' sensible moves ${d.pieceSensible?.join(' ') ?? '?'} of ${d.pieceMoves}, Maia ${d.foundGivenPiece === undefined ? '?' : pct(d.foundGivenPiece)} among them` : ''}${maia}`);
+      // The one move that saves us is a lesson when players miss it, not when they find it anyway.
+      const missed = d.found !== undefined && d.found < 0.5;
+      // One sensible move is a decision still when it isn't the answer (the repertoire is right where Stockfish disagrees).
+      const only = (moves: string[] | undefined) => moves !== undefined && moves.every((m) => answers.includes(m));
+      if (only(d.sensible) && !missed) err(`${first.san} is the only sensible move here${maia}: nothing to decide; say it in the rules of thumb, not on a card`);
+      else if (given && d.foundGivenPiece !== undefined && d.foundGivenPiece >= GIVEN_AWAY) err(`the question names the piece that moves, and then the answer is plain: Maia plays ${first.san} ${pct(d.foundGivenPiece)} of the named pieces' moves; ask without naming them`);
+      else if (given && only(d.pieceSensible) && (d.foundGivenPiece === undefined || d.foundGivenPiece >= 0.5)) err(`the question names the piece that moves, and it has one sensible move (${first.san}, of ${d.pieceMoves}); ask without naming it`);
+      else if (d.found !== undefined && d.found >= NATURAL) warn(`Maia plays ${first.san} ${pct(d.found)} here unprompted: a player finds it anyway; a card should be a move one could miss`);
+    };
     for (const note of p.notes) {
       if (note.kind === 'illegal') err(`illegal move ${note.san} after "${note.path.join(' ')}" (cut)`);
       if (note.kind === 'long-comment') err(`a comment of ${note.length} characters; Lichess keeps ${LICHESS_COMMENT_LIMIT}`);
@@ -150,6 +185,10 @@ export async function checkDeck(
       if (twin) warn(`starts at the same position as ${twin}: merge them (one card, both side lines)`);
       else starts.set(key, label);
       if (o.rep?.positions.has(key)) onRepertoire++;
+      cards++;
+      const at = o.rep?.positions.get(key);
+      if (at && at.reach < RARE) warn(`the card's position is reached in ${(at.reach * 100).toFixed(1)}% of games: too rare to drill; a rule of thumb or a side line can carry it`);
+      if (side && start.turn === side) await decision(start);
     }
     const rep = o.rep && o.rep.side === side ? o.rep : undefined;
     for (const t of arrowProblems(start, ch.root.shapes)) warn(`at the start: ${t}`);
@@ -201,5 +240,8 @@ export async function checkDeck(
     };
     await walk(start, ch.root.children, [], true);
   }
-  return { findings, chapters: parsed.length, onRepertoire };
+  const budget = o.cards ?? CARDS;
+  if (cards > MAX_CARDS) findings.push({ chapter: 'the deck', level: 'error', text: `${cards} cards; a deck has ${budget} or so, never more than ${MAX_CARDS}: keep the decisions worth most (cv.ts decisions)` });
+  else if (cards > budget) findings.push({ chapter: 'the deck', level: 'warning', text: `${cards} cards, more than the ${budget} asked for: keep the decisions worth most (cv.ts decisions)` });
+  return { findings, chapters: parsed.length, onRepertoire, cards };
 }

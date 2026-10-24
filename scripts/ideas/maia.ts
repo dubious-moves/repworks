@@ -40,3 +40,17 @@ export async function maia(pos: Position, elo: number): Promise<MaiaRead> {
   });
   return { elo: e, moves: policyFrom(pos, out['logits_move']!.data as Float32Array), score: expectedScore(out['logits_value']!.data as Float32Array) };
 }
+
+/** What people play at these ratings, averaged: the decisions' and the deck check's view of a club opponent (or of us). */
+export function maiaPolicy(elos: readonly number[] = [MAIA_FLOOR, 2200]): (pos: Position) => Promise<MaiaMove[]> {
+  return async (pos) => {
+    const sum = new Map<string, MaiaMove>();
+    for (const elo of elos) {
+      for (const m of (await maia(pos, elo)).moves) {
+        const s = sum.get(m.uci);
+        sum.set(m.uci, { ...m, prob: (s?.prob ?? 0) + m.prob / elos.length });
+      }
+    }
+    return [...sum.values()].sort((a, b) => b.prob - a.prob);
+  };
+}

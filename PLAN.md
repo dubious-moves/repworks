@@ -6736,9 +6736,11 @@ skill and its tools, then idea cards in the app.
   2. **Maia at 2000 or more**, since Maia plays a little below its number. The tools refuse a
      lower rating, and read 2000 and 2200 by default.
   3. **Development first.** The first ideas say where each piece develops and when, with pawn
-     moves: "define when the f8 bishop should develop to e7, d6, c5 and why". There is one card
-     for each square, at a position where the repertoire plays it, all asking where the piece
-     goes there and why, so that a piece's cards teach the condition by contrast.
+     moves: "define when the f8 bishop should develop to e7, d6, c5 and why". Was: one card for
+     each square, all asking where the piece goes there and why. Since 2026-10-24 (below): a
+     square gets a card only where it is a real decision, with a neutral question; a natural or
+     forced square is a clause of the piece's rule, and the contrast is taught by the rule and
+     the cards' explanations.
 - **Why tools.** Claude knows a lot of chess and explains it well, but misreads boards. So the
   skill's rule is that every concrete claim rests on a tool output: a move good or bad, a piece
   loose, a square weak, a tactic that works, a legal line, a frequency. Knowledge decides what
@@ -6822,14 +6824,16 @@ skill and its tools, then idea cards in the app.
      `develop`).
   2. Find ideas through five lenses, development first:
      - development of the pieces: each first square with 3% or more reach, its condition from
-       `develop` confirmed on the board, and its reason from `squares`
+       `develop` confirmed on the board, and its reason from `squares` (a card only where it is
+       a real decision in `decisions`, since 2026-10-24)
      - development of the pawns, the king and the rooks
      - structure and material
      - tactics, traps and attack (`maia --grade`: the opponent's natural moves that lose)
      - move orders and the opponent's choices
-  3. Curate 12–18 ideas, one rule each: the development ideas first, in the order the pieces
-     come out (one card per square), then the rest in the order they come up in a game. Cover
-     every opponent setup with 5% or more reach.
+  3. Curate about 12 cards from `decisions` by value, in at most 8 ideas with one rule each
+     (12–18 ideas, one card per square, until 2026-10-24): the development ideas first, in the
+     order the pieces come out, then the rest in the order they come up in a game. Cover every
+     opponent setup with 5% or more reach.
   4. Verify each idea as a skeptic.
   5. Write the deck, and check it against the repertoire to zero errors.
   6. Review as a critic, fix, and check again.
@@ -6866,6 +6870,76 @@ skill and its tools, then idea cards in the app.
   bear out). It left two gaps, to save tokens: no card for the 4.Bb5 e5 5.Bxc6+ bxc6 structure
   (about 7% of games, more by transposition) or for when we castle; and about a third of the
   cards sit at positions under 1.5% of games.
+- **A card is a decision** (the owner, 2026-10-24, after training the first three decks made from
+  the "Against d4" repertoires: "in many cases we're asking the wrong question, or the question
+  itself reveals the answer", and 30+ cards are too many for a small chapter).
+  - **What was measured.** The three decks (Benoni gambit accepted 35 cards for 47 line ends,
+    Benko 27 for 79, Anti-c3 42 for 46) were run through Stockfish (lite, depth 14) and Maia
+    2000:
+    - In 43 of the 104 cards, the piece the question named had one sensible move (within 10%
+      win of the best). Examples: "where does the f8-bishop go?" where Bxb4+ was its one square
+      and the question said "his other pawn stands on b4"; Bxd6 where Be7 loses to dxe7; "what
+      does our e-pawn do?" with one legal move.
+    - In 66, once the question named the piece, Maia found the answer 85% of the time or more.
+      Where the move was a real lesson (…Nf6, Maia 3% unprompted, bxc5 81%), naming the knight
+      made it 100%.
+    - In 30, Maia played the answer 60% of the time or more unprompted: recaptures and natural
+      moves (Bxc5 94%, bxc6 93%, fxe6 97%).
+    - The card's kind on the counter ("break") told which kind of move was the answer.
+    - Why: rule 3 as written (one card per square, the question naming the piece), and the lean
+      workflow's writer, told to keep every development idea, had no cap (the 12–18 lived in the
+      curator, which lean skips). The deck check checked accuracy only, and the critic's "one
+      clear answer" favoured forced moves. The Benoni critic called the rules "a lookup table"
+      and passed the deck.
+  - **Built:**
+    - **`cv.ts decisions <rep>`** (`scripts/ideas/decide.ts`): our positions at 2% reach or more,
+      past the trunk, each with how often Maia 2000/2200 (averaged) finds the repertoire's move,
+      Maia's likeliest other move, what it gives up against ours (Stockfish depth 14), and our
+      sensible moves. Ranked by value = reach × (1 − found) × (½ + cost/40, at most 1): a miss
+      that costs nothing counts half. The natural (found 80% or more) and forced (one sensible
+      move, found half the time or more) are listed apart, as rules of thumb, not cards. On the
+      Benoni (91 positions, 2.5 minutes) its top includes the deck's good cards (…d5, …Nf6,
+      Qa5+, …Bb4, …Qe7) and two it lacked (…Re8, …Nxe4+); Bxc5, Bxd6 and bxc6 are in the last
+      list.
+    - **The check** (`check`, Maia on by default, `--no-maia` to skip) refuses:
+      - a card whose answer is the only sensible move, unless Maia misses it (under half the
+        time): then it is the one move that saves us. One sensible move that isn't the answer
+        is a decision still: the repertoire is right where Stockfish disagrees;
+      - a question that names the square an answer goes to. Moves it quotes ("5. Bg2", "cxd6",
+        "…a5") and pieces named by a square ("the c5-bishop") don't count;
+      - a question that names the moving piece (`namedMovers`: "the f8-bishop" is the bishop
+        of that colour, "which pawn" every pawn, "his knight" theirs) when that piece then has
+        one sensible move or Maia finds the answer 85% of its moves or more.
+
+      It warns on:
+      - a card Maia finds 80% of the time unprompted;
+      - a card under 2% reach;
+      - more cards than `--cards` (default 12).
+
+      It refuses more than 15 cards. The current Benoni deck now fails with 25 errors, among
+      them all three of the owner's examples.
+    - **The skill and the workflow:**
+      - Cards are taken from `decisions` by value: about 12 (the workflow's `cards`), never
+        more than 15, in at most 8 ideas, at most 8 rules.
+      - The question is neutral ("White has just played 7. Bg5. What do we play, and why?"),
+        with no answer square, no list of candidates, and the piece named only where it still
+        has a real choice.
+      - The critic checks that each card is a real decision and the size.
+      - Lean runs two agents (writer and critic, no lenses): `decisions` finds the positions
+        the lenses looked for.
+    - **The app:** the card's kind is hidden while it asks, as its chapter's name is, and shown
+      on the back.
+  - The three decks are not remade yet (the owner, 2026-10-24: later). Decks 3 and 5 wait for the
+    new process too.
+  - Tests (`test/unit/scripts/ideas.test.ts`):
+    - the pieces and squares a question names;
+    - the decisions on a small repertoire, with Maia faked;
+    - the square named, the deck's size and a rare card;
+    - with Stockfish at depth 8 and Maia faked:
+      - the one sensible move found, an error;
+      - the same move missed, no error;
+      - the bishop named and then found, an error;
+      - the same card asked neutrally, only the warning that Maia finds it unprompted.
 - **Idea cards in the app** (built 2026-10-20, as built below):
   - **The card:** one chapter is one card (`i|<sid>|<cid>`), enrolled for a whole study at once
     from its ☰ menu, by `idea` events as plan cards' `plan` events (§5.61). The overview chapter

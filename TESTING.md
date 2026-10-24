@@ -54,7 +54,15 @@ fixes them and updates this file.
   cut them?
 - The repertoire notes are dropped: the skill no longer reviews the repertoire.
 
-## Show and grade retries its mistakes (§5.127, 2026-10-19)
+## Idea cards ask decisions (§5.128, 2026-10-24)
+- Train any idea deck on the phone: while a card asks, its counter reads "6 of 34 · new" with no
+  kind ("break", "placement"); the kind shows on the back.
+- The decks are not remade yet. When the next deck comes (made under the new rules): about 12
+  cards, each question neutral ("White has just played 7. Bg5. What do we play, and why?"). Is
+  each card a move you could really miss, and is "what do we play" enough of a question, or do
+  some cards need a narrower one?
+
+
 - Show and grade from the training card: miss a move with 4 (or the ring). At the line's end the
   board goes back to the move before it, the note reads "Not a new line: your mistake again" in
   the warning colour, then "Your mistake again: show it"; 2 shows it, 2 again (known) ends it. Is

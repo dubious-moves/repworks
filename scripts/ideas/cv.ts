@@ -12,7 +12,8 @@
 //   node scripts/ideas/cv.ts profile <repertoire.pgn> [--side black] [--engine 16] [--top 10]
 //   node scripts/ideas/cv.ts develop <repertoire.pgn> [--side black] [--piece f8-bishop]
 //   node scripts/ideas/cv.ts playout <pos> [--n 6] [--plies 24] [--white maia:2000] [--black sf:12[:30]] [--seed 1] [--judge 14]
-//   node scripts/ideas/cv.ts check   <deck.pgn> [--rep repertoire.pgn] [--depth 16] [--no-engine] [--verbose]
+//   node scripts/ideas/cv.ts decisions <repertoire.pgn> [--side black] [--min 2] [--depth 14] [--top 40] [--no-engine]
+//   node scripts/ideas/cv.ts check   <deck.pgn> [--rep repertoire.pgn] [--depth 16] [--cards 12] [--no-engine] [--no-maia] [--verbose]
 //
 // <pos> is a FEN, `startpos`, or movetext from the start ("1. e4 d5 2. exd5 c6"). Moves are SAN or
 // UCI. Stockfish is the vendored lite build unless STOCKFISH names a native binary; searches are
@@ -26,13 +27,14 @@ import { parseSquare } from 'chessops/util';
 import { parseUciMove } from '../../src/core/chess/uci.ts';
 import { legalMoves } from '../../src/core/maia/encode.ts';
 import { checkDeck, gradeMoves } from './check.ts';
+import { CARDS, decisions, NATURAL, SENSIBLE_LOSS } from './decide.ts';
 import { Engine, positionOf, scoreText, whiteWinPct } from './engine.ts';
-import { maia, MAIA_FLOOR } from './maia.ts';
+import { maia, MAIA_FLOOR, maiaPolicy } from './maia.ts';
 import { parsePlayer, playouts } from './playout.ts';
 import { development, moveText, numbered, profile, readRepertoire, trunkOf, type DevMove } from './tree.ts';
 import { look, lookText, passTurn } from './vision.ts';
 
-const BOOLEAN = new Set(['full', 'no-engine', 'verbose', 'ours', 'leaves']);
+const BOOLEAN = new Set(['full', 'no-engine', 'no-maia', 'verbose', 'ours', 'leaves']);
 
 function parseArgs(argv: string[]): { pos: string[]; flags: Map<string, string> } {
   const pos: string[] = [];
@@ -262,14 +264,36 @@ async function main(): Promise<number> {
       console.log(`Black's moves: ${row(r.moves.black)}`);
       return 0;
     }
+    case 'decisions': {
+      const rep = readRepertoire(readFileSync(args[0]!, 'utf8'), flags.has('side') ? sideOf(flags) : undefined);
+      const engine = flags.has('no-engine') ? undefined : new Engine();
+      const min = Number(flags.get('min') ?? 2) / 100;
+      const ds = await decisions(rep, { policy: maiaPolicy(), engine, depth: depth(14), minReach: min });
+      engine?.quit();
+      const trunk = trunkOf(rep);
+      const forced = (d: (typeof ds)[number]) => d.found >= NATURAL || (d.sensible !== undefined && d.sensible.length <= 1 && d.found >= 0.5);
+      const cards = ds.filter((d) => !forced(d));
+      console.log(`Our decisions at ${pct(min)} reach or more${trunk.length ? `, after the trunk ${numbered(trunk, 1, 'white')}` : ''}: ${ds.length} positions. Ranked by value = reach × Maia's miss × the miss's cost (a miss that costs nothing counts half).`);
+      console.log(`found: Maia 2000/2200 plays the repertoire's move; miss: Maia's likeliest other move, and the win% it gives up against ours${engine ? ` (Stockfish depth ${depth(14)})` : ''}; sensible: our moves within ${SENSIBLE_LOSS}% of the best.`);
+      console.log(`\nCandidates for cards (${cards.length}; a deck has about ${CARDS}):`);
+      for (const d of cards.slice(0, Number(flags.get('top') ?? 40))) {
+        console.log(`  value ${(d.value * 100).toFixed(1).padStart(4)}  reach ${pct(d.reach).padStart(4)}  ours ${d.ours.join('/')}  found ${pct(d.found)}${d.miss ? `  miss ${d.miss.san} ${pct(d.miss.prob)}${d.cost === undefined ? '' : ` (gives up ${d.cost.toFixed(0)}%)`}` : ''}${d.sensible ? `  sensible ${d.sensible.join(' ')}` : ''}`);
+        console.log(`      ${d.path}\n      FEN ${d.fen}`);
+      }
+      const rest = ds.filter(forced);
+      console.log(`\nNatural (Maia finds it ${pct(NATURAL)} or more) or forced (one sensible move): ${rest.length}. Rules of thumb and explanations, not cards:`);
+      for (const d of rest) console.log(`  reach ${pct(d.reach).padStart(4)}  ${d.ours.join('/')} (found ${pct(d.found)}${d.sensible ? `, sensible ${d.sensible.join(' ')}` : ''})  ${d.path}`);
+      return 0;
+    }
     case 'check': {
       const engine = flags.has('no-engine') ? undefined : new Engine();
       const rep = flags.get('rep') ? readRepertoire(readFileSync(flags.get('rep')!, 'utf8')) : undefined;
-      const r = await checkDeck(readFileSync(args[0]!, 'utf8'), { engine, depth: depth(16), rep, log: flags.has('verbose') ? (l) => console.log(l) : undefined });
+      const policy = flags.has('no-maia') ? undefined : maiaPolicy();
+      const r = await checkDeck(readFileSync(args[0]!, 'utf8'), { engine, policy, depth: depth(16), rep, cards: Number(flags.get('cards') ?? CARDS), log: flags.has('verbose') ? (l) => console.log(l) : undefined });
       engine?.quit();
       for (const f of r.findings) console.log(`${f.level === 'error' ? 'ERROR' : 'warn '} ${f.chapter}: ${f.text}`);
       const errors = r.findings.filter((f) => f.level === 'error').length;
-      console.log(`${r.chapters} chapters: ${errors} errors, ${r.findings.length - errors} warnings${engine ? `, moves graded at depth ${depth(16)}` : ', no engine'}${rep ? `; ${r.onRepertoire} cards start at a repertoire position` : ''}.`);
+      console.log(`${r.chapters} chapters, ${r.cards} cards: ${errors} errors, ${r.findings.length - errors} warnings${engine ? `, moves graded at depth ${depth(16)}` : ', no engine'}${policy ? ', Maia 2000/2200' : ''}${rep ? `; ${r.onRepertoire} cards start at a repertoire position` : ''}.`);
       return errors ? 1 : 0;
     }
     default:

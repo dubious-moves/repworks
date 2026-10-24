@@ -69,6 +69,8 @@ test('idea cards made for a study, asked from its Train button, and removed', as
   await expect(card).toHaveAttribute('data-phase', 'asking');
   await expect(page.getByTestId('idea-question')).toHaveText("White's pawns on d4 and e5 cramp you. Which pawn break attacks them?");
   await expect(card).not.toContainText('A pawn chain is weakest');
+  // The kind would name the answer's kind (a break: a pawn moves): it waits for the back.
+  await expect(card.locator('.train-counters')).not.toContainText('break');
   // A side line's move: its comment, not the answer, Again.
   await play(page, 'b7', 'b6');
   await expect(page.getByTestId('idea-feedback')).toContainText('b6 isn’t the answer (Again)');
@@ -76,6 +78,7 @@ test('idea cards made for a study, asked from its Train button, and removed', as
   await play(page, 'c7', 'c5');
   await expect(card).toHaveAttribute('data-phase', 'back');
   await expect(page.getByTestId('idea-result')).toHaveText('c5: right, after b6. Recorded: Again.');
+  await expect(card.locator('.train-counters')).toContainText('· break');
   // The back opens at the move played, not the start, the board still Black's; c5 has no arrows, so the start's stay.
   await expect(card.locator('.read-move')).toContainText('3... c5');
   await expect(card.locator('.cg-wrap')).toHaveClass(/orientation-black/);

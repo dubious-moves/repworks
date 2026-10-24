@@ -139,7 +139,9 @@ function Card(props: { s: IdeaSession; run: IdeaRun }) {
   }, []);
   const counter = (
     <p class="train-counters">
-      {s.index + 1} of {s.steps.length} · {idea.kind}
+      {s.index + 1} of {s.steps.length}
+      {/* The kind names the answer's kind ("break": a pawn moves), so it waits for the back, as the chapter's name does. */}
+      {run.phase !== 'asking' ? ` · ${idea.kind}` : ''}
       {run.step.isNew && !run.step.retry ? ' · new' : ''}
       {run.step.retry ? ' · again, not graded' : run.step.practice ? ' · practice, not recorded' : ''}
     </p>

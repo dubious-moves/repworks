@@ -22,10 +22,39 @@ study, and trained there as idea cards.
    improvements are not reported.
 2. **Maia at 2000 or more.** Maia plays weaker than its number. The tools refuse a lower rating.
    The repertoire's own move shares (Lichess) come first; Maia is for positions without them.
-3. **Development first.** The first ideas say where each piece develops and when, pawn moves
-   included. For example: when the f8-bishop goes to e7, d6 or c5, and why. One card for each
-   square, at a position where the repertoire plays it. The question is always "where does this
-   piece go here, and why?", so that the cards for one piece teach the condition by contrast.
+3. **Development first** (revised 2026-10-24). The first ideas say where each piece develops and
+   when, pawn moves included. For example: when the f8-bishop goes to e7, d6 or c5, and why. A
+   piece's squares are taught by its rule of thumb and by the contrast in its cards'
+   explanations, but a square gets a card only where it is a real decision (below). A square the
+   piece goes to because it is the only sensible one, or the natural one (a recapture, the gambit
+   pawn taken back), is a clause of the rule, not a card.
+
+## A card is a decision (the owner, 2026-10-24)
+
+The first decks (Benoni, Benko, Anti-c3: 35, 27 and 42 cards) asked "where does the f8-bishop
+go?" where it had one sensible square, and the question gave the answer away. In four cards in
+ten, the piece named had one sensible move. In six in ten, once the piece was named, Maia 2000
+found the answer 85% of the time or more. So:
+
+- **Cards come from `decisions`.** It ranks the repertoire's positions by what missing our move
+  costs: reach × how often Maia 2000/2200 misses it × what Maia's likeliest other move gives up.
+  Its last list (natural: Maia finds it 80% of the time or more; forced: one sensible move) is
+  rules of thumb, not cards.
+- **About 12 cards a deck, never more than 15, and at most 8 rules.** Cut the cards worth least
+  before adding any.
+- **The question is neutral; let the board ask.** It may say what the opponent has just played:
+  "White has just played 7. Bg5. What do we play, and why?" It never names the square our answer
+  goes to or takes on, and never lists our candidates ("d6 or d5?"). It names the piece that moves
+  only when that piece still has a real choice. The app hides the chapter's name and the card's
+  kind while it asks.
+- **The check enforces it** with Stockfish and Maia. It refuses a card in any of these cases:
+  - its answer is the only sensible move (unless Maia misses it: then it is the one move that
+    saves us);
+  - its question names the answer's square;
+  - its question names the moving piece, and that leaves one sensible move or Maia then finds the
+    answer 85% of the time or more.
+
+  It warns on a card Maia finds 80% of the time unprompted, and on one under 2% reach.
 
 ## The rule that matters most
 
@@ -62,7 +91,8 @@ Knowledge decides what to look for and how to say it; it is never the evidence.
 | `profile <pgn> [--engine 18 --top 20]` | what we play, where our pieces stand at the line ends, structures, material, kings, and the engine's eval of the most reached line ends |
 | `develop <pgn> [--piece f8-bishop]` | the development map: each of our pieces and pawns, in the order they come out, with its first squares by reach, the positions where it goes there, what stands on the board there and not at its other squares ("with"/"without"), and its routes to the line ends; `--piece` lists every position with its FEN and setup |
 | `playout <pos> --n 6 --plies 20 --white maia:2000 --black sf:12:25` | short games from a position, with what each side played: model games where none exist |
-| `check <deck.pgn> --rep <repertoire.pgn> [--depth 18] [--no-engine] [--verbose]` | the deck's check (below) |
+| `decisions <pgn> [--min 2] [--depth 14] [--top 40] [--no-engine]` | our positions at 2% reach or more, past the trunk, ranked by value (reach × Maia's miss × the miss's cost): each with its FEN, how often Maia 2000/2200 finds our move, Maia's likeliest other move and what it gives up, our sensible moves; then the natural or forced ones. About 2.5 minutes on the lite Stockfish for 90 positions |
+| `check <deck.pgn> --rep <repertoire.pgn> [--depth 18] [--cards 12] [--no-engine] [--no-maia] [--verbose]` | the deck's check (below); `--verbose` prints each card's sensible moves and how often Maia finds its answer |
 
 Stockfish is the vendored lite build, single-threaded (depth 18 with 4 lines takes about 10 s).
 On a machine with a native Stockfish, set `STOCKFISH=/path/to/stockfish` (and
@@ -75,10 +105,12 @@ between agents.
    the opening's name, the owner's rating band (default: club player, opponents read with Maia
    at 2000–2200). Work in the scratchpad. Never commit a repertoire or a deck to this public
    repository.
-2. **Read the repertoire.** Save `tree --min 0.5`, `profile --engine 18 --top 20` and `develop`
-   to files. They show where the games go, what we play, where each piece goes and when, what
-   the line ends look like, and how good they are.
-3. **Find ideas through five lenses**, development first:
+2. **Read the repertoire.** Save `tree --min 0.5`, `profile --engine 18 --top 20`, `develop`
+   and `decisions --min 2 --top 40` to files. They show where the games go, what we play, where
+   each piece goes and when, what the line ends look like, how good they are, and which of our
+   moves a player misses.
+3. **Find ideas through five lenses**, development first, each position a decision from
+   `decisions` (or, beyond the repertoire, a position Maia misses):
    - **Development (pieces):** for each knight and bishop (and the queen when it comes out
      early), every first square with 3% or more reach. Find its condition: start from
      `develop`'s "with" and "without" features, then confirm it on the board with `look`. Find
@@ -109,21 +141,25 @@ between agents.
    - `hints`: optionally, what to look at per lens
    - `lenses`: optionally, which lenses to run, e.g. `["pieces", "pawns"]` for the development
      ideas alone
-   - `lean`: optionally `true`: no curator or skeptics; the writer chooses, verifies and writes,
-     and the critic fixes what it finds. That is 4 agents for two lenses, against about 14 for
-     the full run, which takes over a million tokens. The owner settled on the two development
-     lenses, run lean, for now (2026-10-20).
+   - `lean`: optionally `true`: no analysts, curator or skeptics; the writer chooses from
+     `decisions.txt`, verifies and writes, and the critic fixes what it finds. That is 2 agents,
+     against about 14 for the full run, which takes over a million tokens. The owner settled on
+     lean runs for now (2026-10-20; since 2026-10-24 lean runs no lenses: `decisions` finds the
+     positions they looked for).
+   - `cards`: optionally the deck's size (default 12).
 
    Otherwise do the lenses in turn yourself. Use `tree --min 0` to find the reach of a position
    below the saved cutoff.
-4. **Curate** 12–18 ideas, each with one rule of thumb (rule n sums up idea n):
+4. **Curate** about 12 cards, grouped into at most 8 ideas, each with one rule of thumb (rule n
+   sums up idea n). Take the cards from `decisions` by value:
    - **Development first,** in the order the pieces come out (`develop`'s order). A piece
-     whose first square depends on the setup is one idea, with one card per square. Pieces
+     whose first square depends on the setup is one idea, with a card for each square that is a
+     real decision; a square that is natural or forced there is a clause of its rule. Pieces
      and pawn moves with one square each can share an idea: the setup.
    - Then what the pawn or the opening buys, the middlegame plans, tactics and attacks, in the
      order they come up in a game.
    - Merge duplicates. Settle contradictions with the tools. Every opponent setup with 5% or
-     more reach is covered by an idea.
+     more reach is covered by an idea or a rule.
    - A rule is short (about 100 characters) and states one condition a player can see on the
      board; sub-cases go on the cards. A development rule names the piece and each square
      with its condition ("f8-bishop: d6 against Bb5 with Nf3; c5 against Bc4; e7 against
@@ -142,11 +178,13 @@ between agents.
    fix the content, not the glyph, unless the glyph is what's wrong.
 7. **Review as a critic.**
    - Spot-check 8 or more claims with the tools.
-   - Check that each question has one answer on the board.
+   - Check that each card is a real decision, asked neutrally (`check --verbose` prints its
+     sensible moves and how often Maia finds the answer), and has one answer on the board.
+   - Check the size: about 12 cards and at most 8 rules.
    - Read each rule's condition literally against every card: no card may contradict a rule,
      and every clause of a rule needs a card.
-   - Check that the development cards come first and that every first square with 3% or more
-     reach has its card.
+   - Check that the development ideas come first and that every first square with 3% or more
+     reach is in a rule (with a card where it is a real decision).
    - Check that no card offers a move better than the repertoire's.
    - Check coverage and clarity.
    - Fix what you find and check again.
@@ -203,6 +241,9 @@ inside a value:
   - yellow (Y) circles: key squares
 
   Every arrow starts on a piece, or where another arrow of the same comment ends (a route).
+- **The question** is neutral (see "A card is a decision"): what the opponent has just played,
+  then "What do we play, and why?". No square of our answer, no list of candidates, and the piece
+  named only where it still has a real choice.
 - **Explanations** are for a club player: plain words, no engine numbers (those go in
   `IdeaSource`), and no claim the evidence doesn't back.
 - **What the checker enforces** (with `--rep`, against the repertoire):
@@ -220,3 +261,8 @@ inside a value:
   - beyond the repertoire, a card's answer that isn't `great` (a warning)
   - no two cards at the same position (a warning)
   - an `overview` chapter with a question or moves (a warning: it would make no card)
+  - a card that is no decision: its answer the only sensible move (unless Maia misses it), its
+    question naming the answer's square, or naming the moving piece when that leaves one
+    sensible move or Maia then finds it 85% of the time (errors); Maia finding it 80% of the
+    time unprompted, or a position under 2% reach (warnings)
+  - more cards than `--cards` (a warning), or more than 15 (an error)

@@ -8,8 +8,10 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Chess } from 'chessops/chess';
+import { makeFen } from 'chessops/fen';
 import { parseSquare } from 'chessops/util';
 import { checkDeck, gradeMoves } from '../../../scripts/ideas/check.ts';
+import { decisions, namedMovers, namedPieces, namedSquares, type Policy } from '../../../scripts/ideas/decide.ts';
 import { play, readPosition, tokens } from '../../../scripts/ideas/cv.ts';
 import { Engine, positionOf } from '../../../scripts/ideas/engine.ts';
 import { maia } from '../../../scripts/ideas/maia.ts';
@@ -17,6 +19,7 @@ import { parsePlayer } from '../../../scripts/ideas/playout.ts';
 import { development, moveText, numbered, profile, readRepertoire, setupOf, trunkOf } from '../../../scripts/ideas/tree.ts';
 import { breaks, captureGain, forcing, kingSafety, look, lookText, outposts, passTurn, pawnFacts, pins, see } from '../../../scripts/ideas/vision.ts';
 import { parseUciMove } from '../../../src/core/chess/uci.ts';
+import { legalMoves } from '../../../src/core/maia/encode.ts';
 
 // Searches are cached on disk: a fresh folder, so the engine really searches here.
 process.env['IDEAS_CACHE'] = mkdtempSync(join(tmpdir(), 'repworks-ideas-test-'));
@@ -266,6 +269,103 @@ test('the deck and the grades with Stockfish', { timeout: 120_000 }, async () =>
     const against = await checkDeck(MARKS.replace(' ( 3. h3! )', ''), { engine, depth: 8, rep });
     assert.equal(against.findings.length, 1);
     assert.ok(against.findings[0]!.text.startsWith("Nxd4 (side line) grades great, better than the repertoire's a3 (blunder)"));
+  } finally {
+    engine.quit();
+  }
+});
+
+// What a question gives away: the deck of 2026-10-24 asked "Where does the f8-bishop go?" where it
+// had one square, and "his other pawn stands on b4" where it took on b4.
+test('a question: the pieces of ours it names, and the squares', () => {
+  const b4 = positionOf('rnbqkbnr/3p1ppp/1P6/4p3/1P6/8/P3PPPP/RNBQKBNR b KQkq - 0 6');
+  const q = "White's c-pawn has gone to b6, and his other pawn stands on b4. Where does the f8-bishop go, and why?";
+  assert.deepEqual(namedPieces(q, 'black'), [{ role: 'bishop', square: 'f8' }]);
+  assert.deepEqual(namedMovers(q, b4, 'Bxb4+'), ['f8']);
+  assert.equal(namedMovers(q, b4, 'Qxb6'), undefined);
+  assert.deepEqual(namedSquares(q), ['b6', 'b4']);
+  // "Which pawn" is every pawn; a moved bishop named by its home keeps its colour complex.
+  assert.deepEqual(namedMovers('Which pawn break hits the chain?', b4, 'd6')!.sort(), ['d7', 'e5', 'f7', 'g7', 'h7']);
+  const start = Chess.default();
+  assert.deepEqual(namedMovers('Where does the light-squared bishop go?', readPosition('1. e4 e5 2. Nf3 d6 3. d4'), 'Bg4'), ['c8']);
+  const london = readPosition('1. d4 d5 2. Bf4 Nf6 3. e3 e6');
+  assert.deepEqual(namedMovers('Where does the c1-bishop go now?', london, 'Bg5'), ['f4'], 'the f4-bishop came from c1');
+  assert.equal(namedMovers('Where does the f1-bishop go?', london, 'Bg5'), undefined);
+  assert.deepEqual(namedMovers('Our e-pawn: one step or two?', start, 'e4'), ['e2']);
+  assert.equal(namedMovers('Our d-pawn: one step or two?', start, 'e4'), undefined);
+  // Moves quoted are the position, not a hint; the squares of named pieces are names.
+  assert.deepEqual(namedSquares('White has just played 5. Bg2 after ...a5 and cxd6. What does the c5-bishop do?'), []);
+  assert.deepEqual(namedSquares('Does our d-pawn go to d6 or d5?'), ['d6', 'd5']);
+});
+
+/** Maia, faked: `found` for the moves named, the rest of the probability on the first other legal move. */
+const fakePolicy = (found: Record<string, number>): Policy => async (pos) => {
+  const legal = legalMoves(pos);
+  const named = legal.filter((m) => m.san in found).map((m) => ({ ...m, prob: found[m.san]! }));
+  const rest = 1 - named.reduce((t, m) => t + m.prob, 0);
+  const other = legal.find((m) => !(m.san in found));
+  return [...named, ...(other && rest > 0 ? [{ ...other, prob: rest }] : [])].sort((a, b) => b.prob - a.prob);
+};
+
+test('the decisions: our positions past the trunk, ranked by reach and what a miss costs', async () => {
+  const rep = readRepertoire(DEV);
+  const ds = await decisions(rep, { policy: fakePolicy({ Bd6: 0.1, Bc5: 0.95 }), depth: 8, minReach: 0 });
+  // The trunk's ...d5, ...c6 and ...Nxc6 are the opening itself, not decisions.
+  assert.ok(!ds.some((d) => ['d5', 'c6', 'Nxc6'].includes(d.ours[0]!)));
+  assert.equal(ds.length, 8);
+  assert.deepEqual(ds[0]!.ours, ['e5']);
+  assert.equal(ds[0]!.reach, 0.6);
+  const bd6 = ds.find((d) => d.ours[0] === 'Bd6')!;
+  assert.ok(Math.abs(bd6.found - 0.1) < 1e-9);
+  assert.equal(bd6.miss?.san, 'Bc5');
+  // Found 95% of the time: worth least, last.
+  assert.deepEqual(ds.at(-1)!.ours, ['Bc5']);
+  assert.equal((await decisions(rep, { policy: fakePolicy({}), depth: 8, minReach: 0.35 })).length, 3);
+});
+
+const neutral = (name: string, fen: string, movetext: string, question: string) => `[ChapterName "${name}"]
+[Orientation "black"]
+[FEN "${fen}"]
+[SetUp "1"]
+[IdeaKind "placement"]
+[IdeaQuestion "${question}"]
+[IdeaSource "test"]
+
+{ Explained. [%csl Yd4] } ${movetext}
+`;
+
+test('a card is a decision: the question names no square, the deck keeps to its size', async () => {
+  const leak = neutral('1. Leak', 'rnbqkbnr/3p1ppp/1P6/4p3/1P6/8/P3PPPP/RNBQKBNR b KQkq - 0 6', '6... Bxb4+ *', 'His other pawn stands on b4. Where does the f8-bishop go?');
+  const { findings } = await checkDeck(leak, { depth: 8 });
+  assert.deepEqual(findings.map((f) => f.text), ['the question names b4, where the answer Bxb4+ goes: let the board ask it']);
+  // Thirteen cards at thirteen positions: over the twelve asked for; sixteen: over fifteen.
+  const firsts = legalMoves(Chess.default()).filter((m) => !['e4', 'e3'].includes(m.san)).map((m) => m.san);
+  const deck = (n: number) => firsts.slice(0, n).map((w, i) => neutral(`${i + 1}. Card`, (() => { const p = Chess.default(); play(p, [w]); return makeFen(p.toSetup()); })(), '1... e5 *', 'What do we play?')).join('\n');
+  const over = await checkDeck(deck(13), { depth: 8 });
+  assert.equal(over.cards, 13);
+  assert.deepEqual(over.findings.map((f) => `${f.level} ${f.text.slice(0, 41)}`), ['warning 13 cards, more than the 12 asked for: kee']);
+  assert.ok((await checkDeck(deck(16), { depth: 8 })).findings.some((f) => f.level === 'error' && f.text.startsWith('16 cards; a deck has 12 or so, never more than 15')));
+  // A card under 2% of the repertoire's games is too rare to drill.
+  const rare = readRepertoire('[Orientation "black"]\n\n1. e4 { 1% } (1. d4 { 99% } 1... d5) 1... e5 *');
+  const e4 = neutral('1. Rare', 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1', '1... e5 *', 'What do we play?');
+  assert.ok((await checkDeck(e4, { depth: 8, rep: rare })).findings.some((f) => f.level === 'warning' && f.text.includes('reached in 1.0% of games: too rare')));
+});
+
+test('a card is a decision: Maia and Stockfish on what the question leaves to decide', { timeout: 120_000 }, async () => {
+  const engine = new Engine();
+  try {
+    // The queen hangs on d4: Nxd4 is the only sensible move. Found anyway, it is no card; missed, it is.
+    const queen = 'rnb1kbnr/pppp1ppp/8/4p3/3q4/5N2/PPPPPPPP/RNBQKB1R w KQkq - 0 3';
+    const card = (q: string) => neutral('1. Take', queen, '3. Nxd4 *', q).replace('"black"', '"white"');
+    const found = await checkDeck(card('What now?'), { engine, depth: 8, policy: fakePolicy({ Nxd4: 0.95 }) });
+    assert.ok(found.findings.some((f) => f.level === 'error' && f.text.startsWith('Nxd4 is the only sensible move here; Maia plays Nxd4 95% here')), found.findings.map((f) => f.text).join('\n'));
+    const missed = await checkDeck(card('What now?'), { engine, depth: 8, policy: fakePolicy({ Nxd4: 0.2 }) });
+    assert.ok(!missed.findings.some((f) => f.text.includes('only sensible')), missed.findings.map((f) => f.text).join('\n'));
+    // Bb5 with Nf3: three sensible squares for the bishop, but once the question names it, Maia takes d6.
+    const bb5 = 'r1bqkbnr/pp3ppp/2n5/1B2p3/8/5N2/PPPP1PPP/RNBQK2R b KQkq - 1 5';
+    const named = await checkDeck(neutral('1. Bishop', bb5, '5... Bd6 *', 'Where does the f8-bishop go?'), { engine, depth: 8, policy: fakePolicy({ Bd6: 0.5, Bc5: 0.05 }) });
+    assert.ok(named.findings.some((f) => f.level === 'error' && f.text.startsWith('the question names the piece that moves, and then the answer is plain: Maia plays Bd6 91%')), named.findings.map((f) => f.text).join('\n'));
+    const plain = await checkDeck(neutral('1. Bishop', bb5, '5... Bd6 *', 'Bb5 and Nf3 are out. What do we play?'), { engine, depth: 8, policy: fakePolicy({ Bd6: 0.85 }) });
+    assert.deepEqual(plain.findings.filter((f) => !f.text.includes('grades') && !f.text.includes("card's move")).map((f) => f.text.slice(0, 40)), ['Maia plays Bd6 85% here unprompted: a pl']);
   } finally {
     engine.quit();
   }
