@@ -6930,7 +6930,7 @@ skill and its tools, then idea cards in the app.
     - **The app:** the card's kind is hidden while it asks, as its chapter's name is, and shown
       on the back.
   - The three decks are not remade yet (the owner, 2026-10-24: later). Decks 3 and 5 wait for the
-    new process too. Decks 1 and 4 are remade (below); 2 waits for the owner's word.
+    new process too. Decks 1, 2 and 4 are remade (2 in a parallel session; 1 and 4 below).
   - Tests (`test/unit/scripts/ideas.test.ts`):
     - the pieces and squares a question names;
     - the decisions on a small repertoire, with Maia faked;

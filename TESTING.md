@@ -70,7 +70,7 @@ fixes them and updates this file.
   as good and the card asks for the repertoire's: do they feel like decisions, or like guessing
   the builder's preference? Cards 4, 5 and 7 are traps Maia falls into (…Bf5 at 7. Nf3, …Nxe4
   at 14. Nf3, …Qa5 at 9. Nf3), each at about 4% of games: is that the kind of card you want?
-  Decks 2, 3 and 5 wait for your word.
+  Decks 3 and 5 wait for your word.
 
 
 - Show and grade from the training card: miss a move with 4 (or the ring). At the line's end the
