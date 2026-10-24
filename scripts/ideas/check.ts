@@ -37,7 +37,7 @@ import { STORM, type Band } from '../../src/core/storm/config.ts';
 import { grade as band, wpLoss } from '../../src/core/storm/grade.ts';
 import { header, type Chapter, type MoveNode, type Shape } from '../../src/core/study/model.ts';
 import { startPosition } from '../../src/core/study/tree.ts';
-import { cardDecision, CARDS, GIVEN_AWAY, MAX_CARDS, namedMovers, namedSquares, NATURAL, RARE, type Policy } from './decide.ts';
+import { cardDecision, CARDS, GIVEN_AWAY, MAX_CARDS, namedMovers, namedSquares, NATURAL, RARE, transposingMoves, type Policy } from './decide.ts';
 import { cpOf, scoreText, type Engine } from './engine.ts';
 import type { Repertoire } from './tree.ts';
 
@@ -142,9 +142,12 @@ export async function checkDeck(
         const move = parseSan(start, san);
         if (move && isNormal(move) && squares.includes(makeSquare(move.to))) err(`the question names ${makeSquare(move.to)}, where the answer ${san} goes: let the board ask it`);
       }
+      // A move that only changes the move order reaches the repertoire too, yet the app would call it wrong.
+      const swaps = o.rep && o.rep.side === start.turn ? [...transposingMoves(o.rep, start).values()] : [];
+      for (const [san, ...order] of swaps) warn(`${san} only changes the move order (${san} ${order.join(' ')} reaches the repertoire): a player who plays it has found the idea, and the card would call it wrong; choose another position`);
       if (!o.engine && !o.policy) return;
       const given = namedMovers(question, start, first.san);
-      const d = await cardDecision(start, answers, { engine: o.engine, policy: o.policy, depth: o.depth, given });
+      const d = await cardDecision(start, [...answers, ...swaps.map((s) => s[0]!)], { engine: o.engine, policy: o.policy, depth: o.depth, given });
       const pct = (x: number) => `${Math.round(x * 100)}%`;
       const maia = d.found === undefined ? '' : `; Maia plays ${answers.join(' or ')} ${pct(d.found)} here (likeliest ${d.top})`;
       o.log?.(`  ${label}: sensible moves ${d.sensible?.join(' ') ?? '?'}${given ? `; the named pieces' sensible moves ${d.pieceSensible?.join(' ') ?? '?'} of ${d.pieceMoves}, Maia ${d.foundGivenPiece === undefined ? '?' : pct(d.foundGivenPiece)} among them` : ''}${maia}`);

@@ -6930,7 +6930,7 @@ skill and its tools, then idea cards in the app.
     - **The app:** the card's kind is hidden while it asks, as its chapter's name is, and shown
       on the back.
   - The three decks are not remade yet (the owner, 2026-10-24: later). Decks 3 and 5 wait for the
-    new process too. Decks 1, 2 and 4 are remade (2 in a parallel session; 1 and 4 below).
+    new process too. Decks 1, 2 and 4 are remade (below).
   - Tests (`test/unit/scripts/ideas.test.ts`):
     - the pieces and squares a question names;
     - the decisions on a small repertoire, with Maia faked;
@@ -6983,6 +6983,25 @@ skill and its tools, then idea cards in the app.
       enemy piece other than the king, with whether the pawn is safe there), printed after the
       breaks as "pushes that hit a piece: g5 (hits Bf4, loses the pawn)". Test: …g5 in the
       deck's card 7 position, and …e5 and …g5 after 5. cxd4 above.
+  - **Deck 2 remade** (Benko gambit, 2026-10-24; lean, writer's and critic's steps in one session
+    again): 13 cards in 7 rules (15 chapters), against 27 cards before. Every card at a repertoire
+    position and asked "White has just played …. What do we play, and why?". Its check against
+    the repertoire (Maia on, depth 18): 0 errors, 1 warning, the 13th card, kept so that every
+    first square with 3% or more reach has its rule (the a8-rook's b8, at 3%, is a real decision:
+    Maia 2000 plays …Qxb6 61%, which 10. Ne5 punishes). Maia finds the answer 5–68% of the time
+    (…Bb7 against 4. e3: 5%). The deck is in the testing data repo. The run found one flaw in the
+    tools, fixed:
+    - **An exchange taken in another order.** `decisions` ranked 6… Nxd5 (5. b6 e6 6. Nc3) as a
+      card that Maia misses 73% of the time, its "miss" 6… exd5 33%; but 6… exd5 7. Nxd5 Nxd5
+      8. Qxd5 is the repertoire's 6… Nxd5 7. Nxd5 exd5 8. Qxd5, and the card would have called a
+      right move wrong. Now `transposingMoves` finds our other captures that take the same
+      exchange on one square in another order (their captures kept) and reach the exchange's end;
+      `decisions` counts them as found (6… Nxd5: found 60%, value 1.7 from 2.8) and prints the
+      order, and the check warns on a card that has one. Only exchanges on one square: a looser
+      swap (our move, their reply, our other move) counted moves White would not answer the same
+      way (6… Ne4 7. Nc3 for 6… Qa5+ 7. Nc3), and was dropped.
+    - Tests: the Benko exchange found, with its order; no swap at a check or a non-capture; the
+      decision's found counting it; the card warned. Control: without the check's part, it fails.
 - **Idea cards in the app** (built 2026-10-20, as built below):
   - **The card:** one chapter is one card (`i|<sid>|<cid>`), enrolled for a whole study at once
     from its ☰ menu, by `idea` events as plan cards' `plan` events (§5.61). The overview chapter

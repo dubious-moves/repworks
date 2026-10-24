@@ -4,17 +4,19 @@
 // the piece was named Maia 2000 found the answer 85% of the time or more in six in ten. So a card
 // is now a decision a player could get wrong, and this module measures that:
 // - `decisions` ranks the repertoire's own positions by what missing our move there costs: its
-//   reach, how often Maia misses the move, and what Maia's likeliest other move gives up;
+//   reach, how often Maia misses the move (a move that only changes the move order, `transposingMoves`,
+//   counts as found), and what Maia's likeliest other move gives up;
 // - `namedPieces`, `namedMovers` and `namedSquares` read what a question gives away, and `cardDecision` measures
 //   a card's position: how many sensible moves there are, for the side and for the piece named,
 //   and how often Maia finds the answer, unprompted and once told which piece moves.
 // Maia comes in as a function (`Policy`), so the tests can fake it.
 import type { Position } from 'chessops/chess';
 import { makeFen } from 'chessops/fen';
-import { parseSan } from 'chessops/san';
-import type { Color, Role } from 'chessops/types';
+import { makeSan, parseSan } from 'chessops/san';
+import type { Color, NormalMove, Role } from 'chessops/types';
 import { isNormal } from 'chessops/types';
 import { makeSquare, parseSquare, squareFile } from 'chessops/util';
+import { positionKeyOf } from '../../src/core/chess/positionKey.ts';
 import { standardUci } from '../../src/core/chess/uci.ts';
 import { legalMoves, type MaiaMove } from '../../src/core/maia/encode.ts';
 import { STORM } from '../../src/core/storm/config.ts';
@@ -161,6 +163,57 @@ export async function cardDecision(pos: Position, answers: readonly string[], o:
   return out;
 }
 
+/**
+ * Our other captures at a repertoire position that only change the order of an exchange on one
+ * square: the repertoire's exchange there, with our captures in another order and theirs as they
+ * are, reaches the same position (Benko, 5. b6 e6 6. Nc3: 6... exd5 7. Nxd5 Nxd5 8. Qxd5 for the
+ * repertoire's 6... Nxd5 7. Nxd5 exd5 8. Qxd5). Each by its UCI, with that order in SAN. A player
+ * who plays one has found the move. Only exchanges: elsewhere their reply to our move need not be
+ * their reply to another.
+ */
+export function transposingMoves(rep: Repertoire, pos: Position): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  const at = rep.positions.get(positionKeyOf(pos));
+  if (!at?.ours) return out;
+  for (const a of at.next) {
+    // The repertoire's exchange: every capture on the first move's square, in its first line.
+    const first = parseSan(pos, a.san);
+    if (!first || !isNormal(first) || !pos.board.get(first.to)) continue;
+    const square = first.to;
+    const line: NormalMove[] = [];
+    let p = pos.clone();
+    let node: { san: string; key: string } | undefined = a;
+    while (node) {
+      const m = parseSan(p, node.san);
+      if (!m || !isNormal(m) || m.to !== square || !p.board.get(square)) break;
+      line.push(m);
+      p.play(m);
+      node = rep.positions.get(node.key)?.next.find((n) => {
+        const next = parseSan(p, n.san);
+        return next && isNormal(next) && next.to === square;
+      });
+    }
+    const end = positionKeyOf(p);
+    const ours = line.filter((_, i) => i % 2 === 0);
+    const theirs = line.filter((_, i) => i % 2 === 1);
+    if (ours.length < 2) continue;
+    // Our captures in every other order, theirs kept.
+    const orders = (xs: NormalMove[]): NormalMove[][] => xs.length <= 1 ? [xs] : xs.flatMap((x, i) => orders([...xs.slice(0, i), ...xs.slice(i + 1)]).map((rest) => [x, ...rest]));
+    for (const order of orders(ours)) {
+      if (order[0]!.from === first.from) continue;
+      const q = pos.clone();
+      const sans: string[] = [];
+      for (const [i, m] of line.map((_, i) => (i % 2 === 0 ? order[i / 2]! : theirs[(i - 1) / 2]!)).entries()) {
+        if (!q.isLegal(m)) break;
+        sans.push(makeSan(q, m));
+        q.play(m);
+        if (i === line.length - 1 && positionKeyOf(q) === end) out.set(standardUci(pos, order[0]!), sans);
+      }
+    }
+  }
+  return out;
+}
+
 export interface Decision {
   key: string;
   fen: string;
@@ -168,9 +221,11 @@ export interface Decision {
   reach: number;
   /** The repertoire's moves here. */
   ours: string[];
-  /** Maia's probability of the repertoire's moves. */
+  /** Maia's probability of the repertoire's moves, and of the moves that only change the move order. */
   found: number;
-  /** Maia's likeliest other move, and its probability. */
+  /** The moves that only change the move order (`transposingMoves`), each with the order that reaches the repertoire. */
+  transposing?: string[][];
+  /** Maia's likeliest other move (not one of those), and its probability. */
   miss?: { san: string; prob: number };
   /** The win% the miss gives up against our move (Stockfish), 0 when it is as good. */
   cost?: number;
@@ -188,14 +243,15 @@ export async function decisions(rep: Repertoire, o: { policy: Policy; engine?: E
     if (!p.ours || !p.moves.length || p.reach < o.minReach || p.ply < trunk) continue;
     const pos = positionOf(p.fen);
     const ours = p.moves.map((m) => m.san);
-    const ucis = new Set(ours.flatMap((san) => {
+    const transposing = transposingMoves(rep, pos);
+    const ucis = new Set([...ours.flatMap((san) => {
       const m = parseSan(pos, san);
       return m && isNormal(m) ? [standardUci(pos, m)] : [];
-    }));
+    }), ...transposing.keys()]);
     const moves = await o.policy(pos);
     const found = moves.filter((m) => ucis.has(m.uci)).reduce((s, m) => s + m.prob, 0);
     const other = moves.find((m) => !ucis.has(m.uci));
-    const d: Decision = { key: p.key, fen: p.fen, path: p.paths[0]!, reach: p.reach, ours, found, value: 0, ...(other ? { miss: { san: other.san, prob: other.prob } } : {}) };
+    const d: Decision = { key: p.key, fen: p.fen, path: p.paths[0]!, reach: p.reach, ours, found, value: 0, ...(transposing.size ? { transposing: [...transposing.values()] } : {}), ...(other ? { miss: { san: other.san, prob: other.prob } } : {}) };
     if (o.engine) {
       const decision = await cardDecision(pos, ours, { engine: o.engine, depth: o.depth, lines: 6 });
       d.sensible = decision.sensible;

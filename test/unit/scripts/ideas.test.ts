@@ -11,7 +11,7 @@ import { Chess } from 'chessops/chess';
 import { makeFen } from 'chessops/fen';
 import { parseSquare } from 'chessops/util';
 import { checkDeck, gradeMoves } from '../../../scripts/ideas/check.ts';
-import { decisions, namedMovers, namedPieces, namedSquares, type Policy } from '../../../scripts/ideas/decide.ts';
+import { decisions, namedMovers, namedPieces, namedSquares, transposingMoves, type Policy } from '../../../scripts/ideas/decide.ts';
 import { play, readPosition, tokens } from '../../../scripts/ideas/cv.ts';
 import { Engine, positionOf } from '../../../scripts/ideas/engine.ts';
 import { maia } from '../../../scripts/ideas/maia.ts';
@@ -353,6 +353,26 @@ test('the decisions: our positions past the trunk, ranked by reach and what a mi
   // Found 95% of the time: worth least, last.
   assert.deepEqual(ds.at(-1)!.ours, ['Bc5']);
   assert.equal((await decisions(rep, { policy: fakePolicy({}), depth: 8, minReach: 0.35 })).length, 3);
+});
+
+// The Benko deck (2026-10-24): `decisions` ranked 6...Nxd5 as a card that Maia missed with 6...exd5,
+// which only takes the same exchange on d5 in another order.
+test('an exchange taken in another order is the same move: found, and the card warned', async () => {
+  const rep = readRepertoire('[Orientation "black"]\n\n1. d4 c5 2. d5 Nf6 3. c4 b5 4. cxb5 a6 5. b6 (5. Nc3 axb5 6. Nxb5 Qa5+ 7. Nc3 Ne4) 5... e6 6. Nc3 Nxd5 7. Nxd5 exd5 8. Qxd5 Nc6 *');
+  const nc3 = readPosition('1. d4 c5 2. d5 Nf6 3. c4 b5 4. cxb5 a6 5. b6 e6 6. Nc3');
+  assert.deepEqual([...transposingMoves(rep, nc3)], [['e6d5', ['exd5', 'Nxd5', 'Nxd5', 'Qxd5']]]);
+  // No exchange, no other order: 6...Qa5+ is no capture, and 5...e6 takes nothing.
+  assert.equal(transposingMoves(rep, readPosition('1. d4 c5 2. d5 Nf6 3. c4 b5 4. cxb5 a6 5. Nc3 axb5 6. Nxb5')).size, 0);
+  assert.equal(transposingMoves(rep, readPosition('1. d4 c5 2. d5 Nf6 3. c4 b5 4. cxb5 a6 5. b6')).size, 0);
+  const ds = await decisions(rep, { policy: fakePolicy({ Nxd5: 0.3, exd5: 0.4 }), depth: 8, minReach: 0 });
+  const nxd5 = ds.find((d) => d.ours[0] === 'Nxd5' && d.path.endsWith('6. Nc3'))!;
+  assert.ok(Math.abs(nxd5.found - 0.7) < 1e-9);
+  assert.notEqual(nxd5.miss?.san, 'exd5');
+  assert.deepEqual(nxd5.transposing, [['exd5', 'Nxd5', 'Nxd5', 'Qxd5']]);
+  const card = neutral('1. Trade', makeFen(nc3.toSetup()), '6... Nxd5 7. Nxd5 exd5 8. Qxd5 *', 'White has just played 6. Nc3. What do we play, and why?');
+  const { findings } = await checkDeck(card, { depth: 8, rep });
+  assert.equal(findings.length, 1);
+  assert.ok(findings[0]!.text.startsWith('exd5 only changes the move order (exd5 Nxd5 Nxd5 Qxd5 reaches the repertoire)'), findings[0]!.text);
 });
 
 const neutral = (name: string, fen: string, movetext: string, question: string) => `[ChapterName "${name}"]

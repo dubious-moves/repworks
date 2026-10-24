@@ -274,10 +274,10 @@ async function main(): Promise<number> {
       const forced = (d: (typeof ds)[number]) => d.found >= NATURAL || (d.sensible !== undefined && d.sensible.length <= 1 && d.found >= 0.5);
       const cards = ds.filter((d) => !forced(d));
       console.log(`Our decisions at ${pct(min)} reach or more${trunk.length ? `, after the trunk ${numbered(trunk, 1, 'white')}` : ''}: ${ds.length} positions. Ranked by value = reach × Maia's miss × the miss's cost (a miss that costs nothing counts half).`);
-      console.log(`found: Maia 2000/2200 plays the repertoire's move; miss: Maia's likeliest other move, and the win% it gives up against ours${engine ? ` (Stockfish depth ${depth(14)})` : ''}; sensible: our moves within ${SENSIBLE_LOSS}% of the best.`);
+      console.log(`found: Maia 2000/2200 plays the repertoire's move (or one that only changes the move order); miss: Maia's likeliest other move, and the win% it gives up against ours${engine ? ` (Stockfish depth ${depth(14)})` : ''}; sensible: our moves within ${SENSIBLE_LOSS}% of the best.`);
       console.log(`\nCandidates for cards (${cards.length}; a deck has about ${CARDS}):`);
       for (const d of cards.slice(0, Number(flags.get('top') ?? 40))) {
-        console.log(`  value ${(d.value * 100).toFixed(1).padStart(4)}  reach ${pct(d.reach).padStart(4)}  ours ${d.ours.join('/')}  found ${pct(d.found)}${d.miss ? `  miss ${d.miss.san} ${pct(d.miss.prob)}${d.cost === undefined ? '' : ` (gives up ${d.cost.toFixed(0)}%)`}` : ''}${d.sensible ? `  sensible ${d.sensible.join(' ')}` : ''}`);
+        console.log(`  value ${(d.value * 100).toFixed(1).padStart(4)}  reach ${pct(d.reach).padStart(4)}  ours ${d.ours.join('/')}  found ${pct(d.found)}${d.transposing ? ` (with ${d.transposing.map((o) => o.join(' ')).join(', ')}: the same position)` : ''}${d.miss ? `  miss ${d.miss.san} ${pct(d.miss.prob)}${d.cost === undefined ? '' : ` (gives up ${d.cost.toFixed(0)}%)`}` : ''}${d.sensible ? `  sensible ${d.sensible.join(' ')}` : ''}`);
         console.log(`      ${d.path}\n      FEN ${d.fen}`);
       }
       const rest = ds.filter(forced);

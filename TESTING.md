@@ -71,6 +71,13 @@ fixes them and updates this file.
   the builder's preference? Cards 4, 5 and 7 are traps Maia falls into (…Bf5 at 7. Nf3, …Nxe4
   at 14. Nf3, …Qa5 at 9. Nf3), each at about 4% of games: is that the kind of card you want?
   Decks 3 and 5 wait for your word.
+- Deck 2 (Benko gambit) is remade the same way: 13 cards, 7 rules (27 cards before), in the
+  testing data repo and sent as a file. Delete the old Benko ideas study first (or import beside
+  it), import the file as a reference study, then ☰ → Make idea cards: 13 cards. Train it in Train
+  mode. Is the 13th card (6., 9. Nf3 …Rb8 in the 5. b6 line, 3% of games) worth keeping over a
+  rule? Are the move-order cards (2: 5. bxa6, 7b: 5. e3), where the other natural move is about
+  as good, real lessons, or do they feel like guessing the author's choice? Does the rule "castle
+  before taking on a6 once e4 is in" read clearly against card 3?
 
 
 - Show and grade from the training card: miss a move with 4 (or the ring). At the line's end the

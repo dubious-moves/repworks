@@ -91,7 +91,7 @@ Knowledge decides what to look for and how to say it; it is never the evidence.
 | `profile <pgn> [--engine 18 --top 20]` | what we play, where our pieces stand at the line ends, structures, material, kings, and the engine's eval of the most reached line ends |
 | `develop <pgn> [--piece f8-bishop]` | the development map: each of our pieces and pawns, in the order they come out, with its first squares by reach, the positions where it goes there, what stands on the board there and not at its other squares ("with"/"without"), and its routes to the line ends; `--piece` lists every position with its FEN and setup |
 | `playout <pos> --n 6 --plies 20 --white maia:2000 --black sf:12:25` | short games from a position, with what each side played: model games where none exist |
-| `decisions <pgn> [--min 2] [--depth 14] [--top 40] [--no-engine]` | our positions at 2% reach or more, past the trunk, ranked by value (reach × Maia's miss × the miss's cost): each with its FEN, how often Maia 2000/2200 finds our move, Maia's likeliest other move and what it gives up, our sensible moves; then the natural or forced ones. About 2.5 minutes on the lite Stockfish for 90 positions |
+| `decisions <pgn> [--min 2] [--depth 14] [--top 40] [--no-engine]` | our positions at 2% reach or more, past the trunk, ranked by value (reach × Maia's miss × the miss's cost): each with its FEN, how often Maia 2000/2200 finds our move (or the same exchange in another order), Maia's likeliest other move and what it gives up, our sensible moves; then the natural or forced ones. About 2.5 minutes on the lite Stockfish for 90 positions |
 | `check <deck.pgn> --rep <repertoire.pgn> [--depth 18] [--cards 12] [--no-engine] [--no-maia] [--verbose]` | the deck's check (below); `--verbose` prints each card's sensible moves and how often Maia finds its answer |
 
 Stockfish is the vendored lite build, single-threaded (depth 18 with 4 lines takes about 10 s).
@@ -261,6 +261,8 @@ inside a value:
   - beyond the repertoire, a card's answer that isn't `great` (a warning)
   - no two cards at the same position (a warning)
   - an `overview` chapter with a question or moves (a warning: it would make no card)
+  - a card whose answer another capture of ours reaches by taking the same exchange in another
+    order (a warning: the card would call that move wrong; `decisions` counts it as found)
   - a card that is no decision: its answer the only sensible move (unless Maia misses it), its
     question naming the answer's square, or naming the moving piece when that leaves one
     sensible move or Maia then finds it 85% of the time (errors); Maia finding it 80% of the
