@@ -6930,7 +6930,7 @@ skill and its tools, then idea cards in the app.
     - **The app:** the card's kind is hidden while it asks, as its chapter's name is, and shown
       on the back.
   - The three decks are not remade yet (the owner, 2026-10-24: later). Decks 3 and 5 wait for the
-    new process too. Deck 1 is remade (below); 2 and 4 wait for the owner's word.
+    new process too. Decks 1 and 4 are remade (below); 2 waits for the owner's word.
   - Tests (`test/unit/scripts/ideas.test.ts`):
     - the pieces and squares a question names;
     - the decisions on a small repertoire, with Maia faked;
@@ -6963,6 +6963,26 @@ skill and its tools, then idea cards in the app.
     - Tests: a move order with one reply and no share passes on that reply's part only (and the
       development map weighs its line ends so); a piece pinned to its king takes the pinner but
       nothing else, and after 8. Nc3 Nxe4 the e4-knight isn't lost.
+  - **Deck 4 remade** (Anti-c3 deep, 1. d4 c5 2. c3 Nf6, 2026-10-24; lean, writer and critic in
+    one session again): 12 cards in 7 rules (14 chapters), against 42 cards before. The cards are
+    the top of `decisions` (118 positions at 2% or more) by value, with duplicates merged
+    (3. dxc5 e6 into 4. dxc5 e6, 3. Bg5 Ne4 into 4. Bg5 Ne4, the castling after …Bc5 into its
+    card) and two of the 3.Bf4 line's equal-split 3.8% positions kept for what Maia's miss costs
+    there (…Bc5, where Maia takes on e4 59% of the time, and …g5, where it plays …Qa5 42%).
+    Every card at a repertoire position. Its check against the repertoire (Maia on, depth 18):
+    0 errors, 0 warnings. The critic, reading each rule literally against the repertoire,
+    narrowed three: the queen rule (after 3. Bg5 Ne4 4. Bf4 cxd4 5. cxd4 the repertoire plays
+    …e5, not …Qb6), the e-pawn rule (…e5 backed by knights too) and the f8-bishop rule (…Bc5 to
+    take back, then b4, then d6); and dropped a side line (9. Bg3 Be7) where …Bb4+ was a check
+    the rule would have called for. The deck is in the testing data repo. The run found one gap
+    in the tools, fixed:
+    - **A pawn push that hits a piece.** `look` listed a side's pawn breaks only where the push
+      hits a pawn, so it never said that …g5 hits the f4-bishop or …h6 the g5-bishop, and after
+      3. Bg5 Ne4 4. Bf4 cxd4 5. cxd4 it gave …e5 as hitting d4 alone. Such claims had to be read
+      off the position after the move. `breaks` now also lists the kicks (pushes that attack an
+      enemy piece other than the king, with whether the pawn is safe there), printed after the
+      breaks as "pushes that hit a piece: g5 (hits Bf4, loses the pawn)". Test: …g5 in the
+      deck's card 7 position, and …e5 and …g5 after 5. cxd4 above.
 - **Idea cards in the app** (built 2026-10-20, as built below):
   - **The card:** one chapter is one card (`i|<sid>|<cid>`), enrolled for a whole study at once
     from its ☰ menu, by `idea` events as plan cards' `plan` events (§5.61). The overview chapter

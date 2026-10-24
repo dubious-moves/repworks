@@ -1,8 +1,9 @@
 // Seeing a position, for the opening-ideas skill (PLAN.md §5.128): what a strong player takes in at
 // a glance, worked out exactly so that the skill never rests on picturing the board: material,
 // pawns and files, development, the kings' cover, what attacks and defends what (with the
-// exchange's value), pins, checks, captures and double attacks, outposts and pawn breaks. Both
-// sides' threats are read: the side not to move's from the same position with the turn passed.
+// exchange's value), pins, checks, captures and double attacks, outposts, pawn breaks and pawn
+// pushes that hit a piece. Both sides' threats are read: the side not to move's from the same
+// position with the turn passed.
 // Pure (chessops only).
 import { Chess, type Position } from 'chessops/chess';
 import { attacks, between, kingAttacks, pawnAttacks, ray } from 'chessops/attacks';
@@ -412,15 +413,19 @@ export interface Breaks {
   now: { move: string; hits: string[]; safe: boolean }[];
   /** Pawns already in contact: captures of an enemy pawn available to this side. */
   tension: string[];
+  /** Pawn pushes that attack an enemy piece (a kick: ...h6 at a g5-bishop), with whether the pawn is safe there. */
+  kicks: { move: string; hits: string[]; safe: boolean }[];
 }
 
-/** A side's pawn levers: pushes (or captures) that attack an enemy pawn. Read for either side. */
+/** A side's pawn levers: pushes (or captures) that attack an enemy pawn, and pushes that attack a piece. Read for either side. */
 export function breaks(pos: Position, color: Color): Breaks {
   const p = pos.turn === color ? pos : passTurn(pos);
   const now: Breaks['now'] = [];
   const tension: string[] = [];
-  if (!p) return { now, tension };
+  const kicks: Breaks['kicks'] = [];
+  if (!p) return { now, tension, kicks };
   const enemyPawns = p.board.pieces(opposite(color), 'pawn');
+  const enemyPieces = p.board[opposite(color)].diff(enemyPawns).diff(p.board.pieces(opposite(color), 'king'));
   for (const { uci, san } of legalMoves(p)) {
     const move = parseUciMove(p, uci)!;
     if (p.board.getRole(move.from) !== 'pawn') continue;
@@ -430,12 +435,15 @@ export function breaks(pos: Position, color: Color): Breaks {
     }
     if (squareFile(move.from) !== squareFile(move.to)) continue;
     const hits = pawnAttacks(color, move.to).intersect(enemyPawns);
-    if (hits.isEmpty()) continue;
+    const kicked = pawnAttacks(color, move.to).intersect(enemyPieces);
+    if (hits.isEmpty() && kicked.isEmpty()) continue;
     const after = p.clone();
     after.play(move);
-    now.push({ move: san, hits: [...hits].map(sq), safe: see(after, move.to, after.turn) <= 0 });
+    const safe = see(after, move.to, after.turn) <= 0;
+    if (hits.nonEmpty()) now.push({ move: san, hits: [...hits].map(sq), safe });
+    if (kicked.nonEmpty()) kicks.push({ move: san, hits: [...kicked].map((s) => name(p, s)), safe });
   }
-  return { now, tension };
+  return { now, tension, kicks };
 }
 
 /**
@@ -554,7 +562,8 @@ export function lookText(l: Look, side: Color = 'white'): string {
   for (const c of order) {
     const b = l.breaks[c];
     const now = b.now.map((x) => `${x.move} (hits ${x.hits.join(',')}${x.safe ? '' : ', loses the pawn'})`);
-    out.push(`${colorName(c)} pawn breaks: ${list(now, 'none')}${b.tension.length ? `; can take a pawn: ${b.tension.join(', ')}` : ''}.`);
+    const kicks = b.kicks.map((x) => `${x.move} (hits ${x.hits.join(',')}${x.safe ? '' : ', loses the pawn'})`);
+    out.push(`${colorName(c)} pawn breaks: ${list(now, 'none')}${b.tension.length ? `; can take a pawn: ${b.tension.join(', ')}` : ''}${kicks.length ? `; pushes that hit a piece: ${kicks.join(', ')}` : ''}.`);
     out.push(`${colorName(c)} outposts: ${list(l.outposts[c], 'none')}.`);
   }
   const forcingText = (who: string, f: MoveFacts) => {

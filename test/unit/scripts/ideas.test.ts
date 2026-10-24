@@ -80,6 +80,12 @@ test('pawns: islands, isolated, doubled, passed, chains; breaks and outposts', (
   const french = readPosition('1. e4 e6 2. d4 d5 3. e5');
   assert.deepEqual(breaks(french, 'black').now.map((b) => b.move).sort(), ['c5', 'f6']);
   assert.deepEqual(breaks(french, 'white').now.map((b) => b.move), ['c4']);
+  // A push that hits a piece is a kick, not a break: ...g5 at the f4-bishop; ...e5 hits d4 and the bishop too.
+  const pinned = positionOf('r1b1k2r/pp1p1ppp/1qn5/4P3/1b2nB2/1P2PN2/P2N1PPP/R2QKB1R b KQkq - 4 9');
+  assert.deepEqual(breaks(pinned, 'black').kicks, [{ move: 'g5', hits: ['Bf4'], safe: false }]);
+  const bf4 = readPosition('1. d4 c5 2. c3 Nf6 3. Bg5 Ne4 4. Bf4 cxd4 5. cxd4');
+  assert.deepEqual(breaks(bf4, 'black').now.map((b) => [b.move, b.hits]), [['e5', ['d4']]]);
+  assert.deepEqual(breaks(bf4, 'black').kicks.map((b) => [b.move, b.hits]), [['e5', ['Bf4']], ['g5', ['Bf4']]]);
   // A Najdorf's d5: no black pawn can ever attack it, and e4 covers it.
   const najdorf = positionOf('rnbqkb1r/1p3ppp/p2p1n2/4p3/4P3/2N5/PPP2PPP/R1BQKB1R w KQkq - 0 7');
   assert.ok(outposts(najdorf, 'white').includes('d5'));

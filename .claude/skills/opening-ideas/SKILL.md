@@ -80,7 +80,7 @@ Knowledge decides what to look for and how to say it; it is never the evidence.
 
 | Command | What it gives |
 | --- | --- |
-| `look <pos> [--side black]` | board, material, pawns (islands, chains, isolated, doubled, backward, passed), files, centre, development, king cover, each piece's mobility, attackers and defenders, what an exchange loses, pins, both sides' breaks and outposts, the side to move's checks, captures (exchange value) and double attacks, and the other side's threats |
+| `look <pos> [--side black]` | board, material, pawns (islands, chains, isolated, doubled, backward, passed), files, centre, development, king cover, each piece's mobility, attackers and defenders, what an exchange loses, pins, both sides' breaks, pawn pushes that hit a piece and outposts, the side to move's checks, captures (exchange value) and double attacks, and the other side's threats |
 | `line <pos> <moves…> [--full]` | plays moves; refuses an illegal one and lists the legal moves; prints the FEN |
 | `engine <pos> [--side black] [--depth 18] [--lines 4]` | Stockfish's lines |
 | `grade <pos> <moves…> [--depth 18]` | each move against the best, banded great/good/ok/bad/blunder by win% lost (<3, <6, <10, <20, ≥20: the storm's scale) |

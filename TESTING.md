@@ -64,6 +64,13 @@ fixes them and updates this file.
   could really miss, and is "What do we play, and why?" enough of a question, or do some cards
   need a narrower one? Are 12 cards and 7 rules the right size? Cards 4b, 5, 6 and 7 sit at about
   3% of games: worth a card, or rules only? Decks 2 and 4 wait for your word.
+- Deck 4 (Anti-c3 deep, 1. d4 c5 2. c3 Nf6) is remade the same way: 12 cards, 7 rules, against
+  42 cards before. Re-import it as above and train it in Train mode. Its first six cards are the
+  early choices (3. Nf3, 3. e3, 4. dxc5, 3. Bf4, 4. cxd4, 5. e3), where several moves are about
+  as good and the card asks for the repertoire's: do they feel like decisions, or like guessing
+  the builder's preference? Cards 4, 5 and 7 are traps Maia falls into (…Bf5 at 7. Nf3, …Nxe4
+  at 14. Nf3, …Qa5 at 9. Nf3), each at about 4% of games: is that the kind of card you want?
+  Decks 2, 3 and 5 wait for your word.
 
 
 - Show and grade from the training card: miss a move with 4 (or the ring). At the line's end the
