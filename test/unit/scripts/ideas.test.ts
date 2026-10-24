@@ -45,6 +45,13 @@ test('exchanges: what a capture wins once the recaptures are played out', () => 
   assert.equal(see(pos, parseSquare('e5'), 'white'), -2); // the first capture is forced
   const hanging = positionOf('rnb1kbnr/pppp1ppp/8/4p3/3q4/5N2/PPPPPPPP/RNBQKB1R w KQkq - 0 3');
   assert.equal(see(hanging, parseSquare('d4'), 'white'), 9);
+  // The d2-bishop is pinned to its king by the b4-bishop: it can take the pinner, not the e3-knight.
+  const pinned = positionOf('4k3/8/8/8/1b6/4n3/3B4/4K3 w - - 0 1');
+  assert.equal(see(pinned, parseSquare('e3'), 'white'), 0);
+  assert.equal(see(pinned, parseSquare('b4'), 'white'), 3);
+  // After 8. Nc3 Nxe4 the c3-knight, pinned by Qa5, can't take back: the e4-knight isn't lost.
+  const benoni = readPosition('1. d4 c5 2. dxc5 e5 3. e4 Bxc5 4. Nf3 Nc6 5. Bb5 Nf6 6. Bxc6 bxc6 7. Nxe5 Qa5+ 8. Nc3 Nxe4');
+  assert.equal(see(benoni, parseSquare('e4'), 'white'), 0);
 });
 
 test('pins, checks, double attacks and threats', () => {
@@ -108,13 +115,33 @@ test('the repertoire: reach multiplies the shares, transpositions merge, a guess
   assert.equal(merged.paths.length, 2);
   assert.ok(Math.abs(merged.reach - (0.24 + 0.15)) < 1e-9);
   assert.equal(merged.approx, false);
+  // 4. d4 has no share beside 4. Nf3 and 4. Nc3: it takes what they leave.
   assert.equal(at('1. e4 d5 2. exd5 c6 3. dxc6 Nxc6 4. d4').approx, true);
-  assert.equal(at('1. e4 d5 2. exd5 c6 3. dxc6 Nxc6 4. d4').reach, 1);
+  assert.ok(Math.abs(at('1. e4 d5 2. exd5 c6 3. dxc6 Nxc6 4. d4').reach - 0.1) < 1e-9);
   assert.equal(rep.transpositions.length, 1);
   const pr = profile(rep, positionOf);
   assert.ok(pr.ourMoves.some(([m]) => m === 'e5'));
   assert.ok(pr.ourMoves.some(([m]) => m === 'Nc6') && pr.theirMoves.some(([m]) => m === 'dxc6'));
   assert.deepEqual(pr.materialAtLeaves.map(([k]) => k).sort(), ['level', 'we are down 1']);
+});
+
+// One move order gives 6. Bc4's share, the other only 6. Bb5, without one: the shares are read at the
+// merged position, so 6. Bb5 takes the 10% that 6. Bc4 leaves, not every game of its move order.
+const MERGED = `[Orientation "black"]
+
+1. e4 d5 2. exd5 c6 3. dxc6 Nxc6 4. Nf3 { 60% } (4. Nc3 { 40% } 4... e5 5. Nf3 { 100% } 5... Nf6 6. Bb5) 4... e5 5. Nc3 { 100% } 5... Nf6 6. Bc4 { 90% } *`;
+
+test('the repertoire: a move order with one reply and no share passes on that reply’s part only', () => {
+  const rep = readRepertoire(MERGED);
+  const at = (moves: string) => [...rep.positions.values()].find((p) => p.paths.includes(moves))!;
+  assert.ok(Math.abs(at('1. e4 d5 2. exd5 c6 3. dxc6 Nxc6 4. Nf3 e5 5. Nc3 Nf6').reach - 1) < 1e-9);
+  assert.ok(Math.abs(at('1. e4 d5 2. exd5 c6 3. dxc6 Nxc6 4. Nf3 e5 5. Nc3 Nf6 6. Bc4').reach - 0.9) < 1e-9);
+  const bb5 = at('1. e4 d5 2. exd5 c6 3. dxc6 Nxc6 4. Nc3 e5 5. Nf3 Nf6 6. Bb5');
+  assert.ok(Math.abs(bb5.reach - 0.1) < 1e-9);
+  assert.equal(bb5.approx, true);
+  // The development map weighs the line ends the same way.
+  const knight = development(rep).find((m) => m.piece === 'g8-knight')!;
+  assert.deepEqual(knight.routes.map(([r, w]) => [r, Math.round(w * 100) / 100]), [['g8 → f6', 1]]);
 });
 
 // The f8-bishop's three squares, each against its own setup: d6 against Bb5, c5 against Bc4, e7 against Be2.

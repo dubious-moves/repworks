@@ -34,6 +34,18 @@ export function attackersOf(pos: Position, target: Square, color: Color, occupie
   return pos.kingAttackers(target, color, occupied).intersect(occupied);
 }
 
+/** Whether the piece on `s` is pinned to its own king by a piece other than `target`'s, so it can't capture there. */
+function pinnedOff(pos: Position, s: Square, target: Square, occupied: SquareSet): boolean {
+  const piece = pos.board.get(s)!;
+  const king = pos.board.kingOf(piece.color);
+  if (king === undefined || king === s) return false;
+  for (const p of pos.board[opposite(piece.color)].intersect(occupied)) {
+    if (p === target || !between(p, king).has(s)) continue;
+    if (attacks(pos.board.get(p)!, p, occupied.without(s)).has(king)) return true;
+  }
+  return false;
+}
+
 function leastValuable(pos: Position, set: SquareSet): Square | undefined {
   let best: Square | undefined;
   for (const s of set) if (best === undefined || VALUE[pos.board.getRole(s)!] < VALUE[pos.board.getRole(best)!]) best = s;
@@ -43,14 +55,20 @@ function leastValuable(pos: Position, set: SquareSet): Square | undefined {
 /**
  * The static exchange on `target` when `by` captures there first, least valuable piece first, each
  * side free to stop: what `by` gains in pawns (0 when nothing of theirs attacks it, or the square is
- * empty). X-rays count (a piece behind a capturer joins in).
+ * empty). X-rays count (a piece behind a capturer joins in); a piece pinned to its king doesn't,
+ * unless it takes the pinner.
  */
 export function see(pos: Position, target: Square, by: Color): number {
   const victim = pos.board.get(target);
   if (!victim) return 0;
   let occupied = pos.board.occupied;
   let side = by;
-  let attacker = leastValuable(pos, attackersOf(pos, target, side, occupied));
+  const capturers = (c: Color, occ: SquareSet) => {
+    let set = attackersOf(pos, target, c, occ);
+    for (const s of set) if (pinnedOff(pos, s, target, occ)) set = set.without(s);
+    return set;
+  };
+  let attacker = leastValuable(pos, capturers(side, occupied));
   if (attacker === undefined) return 0;
   const gain: number[] = [VALUE[victim.role]];
   let d = 0;
@@ -60,7 +78,7 @@ export function see(pos: Position, target: Square, by: Color): number {
     if (Math.max(-gain[d - 1]!, gain[d]!) < 0) break;
     occupied = occupied.without(attacker);
     side = opposite(side);
-    const next = leastValuable(pos, attackersOf(pos, target, side, occupied));
+    const next = leastValuable(pos, capturers(side, occupied));
     if (next === undefined) break;
     attacker = next;
   }

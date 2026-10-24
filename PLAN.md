@@ -6930,7 +6930,7 @@ skill and its tools, then idea cards in the app.
     - **The app:** the card's kind is hidden while it asks, as its chapter's name is, and shown
       on the back.
   - The three decks are not remade yet (the owner, 2026-10-24: later). Decks 3 and 5 wait for the
-    new process too.
+    new process too. Deck 1 is remade (below); 2 and 4 wait for the owner's word.
   - Tests (`test/unit/scripts/ideas.test.ts`):
     - the pieces and squares a question names;
     - the decisions on a small repertoire, with Maia faked;
@@ -6940,6 +6940,29 @@ skill and its tools, then idea cards in the app.
       - the same move missed, no error;
       - the bishop named and then found, an error;
       - the same card asked neutrally, only the warning that Maia finds it unprompted.
+  - **Deck 1 remade** (Benoni gambit accepted, 2026-10-24, the first under these rules; lean, the
+    writer's and critic's steps done in one session, as no workflow tool was available): 12 cards
+    in 7 rules (14 chapters), against 35 cards before. Every card at a repertoire position, its
+    question "White has just played …. What do we play, and why?". Its check against the
+    repertoire (Maia on, depth 18): 0 errors, 0 warnings. The deck is in the testing data repo.
+    The run found two flaws in the tools, both fixed:
+    - **Reach across transpositions.** `tree` carried reach down each move order separately, so
+      a move order that gave one reply only (with no share) passed all of its games to it, though
+      the merged position's other order gave the replies' shares. Here 3. e4 Bxc5 4. Nf3 Nc6 gave
+      only 5. Bb5 (no share), and 3. Nf3 Nc6 4. e4 Bxc5, the same position, gave 5. Bc4 38% and
+      5. Nc3 26%: 5. Bb5 got 11% of games and 5. Bc4 2.7%. Now the reach flows down the merged
+      positions, parents first: a move without a share beside moves with one takes an even part
+      of what they leave (5. Bb5 6.5%, 5. Bc4 6.8%), and moves none of which has a share split
+      the games evenly (before, each kept all of them). The profile and the development map weigh
+      the same way. `decisions` then lists 58 positions at 2% or more, not 91; the 5. Be3 sideline
+      of 3. b4 (given without a share beside 5. cxb6 56% and 5. Qd5 14%) went from 12% to 3.5%.
+    - **A pinned capturer.** `look`'s static exchange counted a capture by a piece pinned to its
+      king: after 7. Nxe5 Qa5+ 8. Nc3 Nxe4 it called our e4-knight "lost to an exchange (+3)", the
+      only capturer being the c3-knight that Qa5 pins. The exchange now leaves out a piece pinned
+      to its king, unless it takes the pinner.
+    - Tests: a move order with one reply and no share passes on that reply's part only (and the
+      development map weighs its line ends so); a piece pinned to its king takes the pinner but
+      nothing else, and after 8. Nc3 Nxe4 the e4-knight isn't lost.
 - **Idea cards in the app** (built 2026-10-20, as built below):
   - **The card:** one chapter is one card (`i|<sid>|<cid>`), enrolled for a whole study at once
     from its ☰ menu, by `idea` events as plan cards' `plan` events (§5.61). The overview chapter

@@ -87,7 +87,7 @@ Knowledge decides what to look for and how to say it; it is never the evidence.
 | `threat <pos>` | what the side not to move would play if it could move twice |
 | `squares <pos> <square> [--depth 18]` | every move of the piece on that square, graded: why the repertoire's square and not the others |
 | `maia <pos> [--elo 2000,2200] [--grade 14]` | what people at those ratings play (2000 or more); with `--grade`, each likely move's band (a natural move that loses is a trap) |
-| `tree <pgn> [--side] [--min 1] [--ours] [--leaves]` | every position with its reach (share of games), from the opponent's move shares (`{ 45% }` comments) |
+| `tree <pgn> [--side] [--min 1] [--ours] [--leaves]` | every position with its reach (share of games), from the opponent's move shares (`{ 45% }` comments) read at the merged position; a move without a share takes an even part of what the others leave |
 | `profile <pgn> [--engine 18 --top 20]` | what we play, where our pieces stand at the line ends, structures, material, kings, and the engine's eval of the most reached line ends |
 | `develop <pgn> [--piece f8-bishop]` | the development map: each of our pieces and pawns, in the order they come out, with its first squares by reach, the positions where it goes there, what stands on the board there and not at its other squares ("with"/"without"), and its routes to the line ends; `--piece` lists every position with its FEN and setup |
 | `playout <pos> --n 6 --plies 20 --white maia:2000 --black sf:12:25` | short games from a position, with what each side played: model games where none exist |

@@ -1,9 +1,13 @@
 // A repertoire read for the opening-ideas skill (PLAN.md §5.128): every position of every chapter,
 // merged where move orders transpose, with how often a game reaches it. The reach multiplies the
 // opponent's move shares along the way, read from a comment that starts with a percentage (as the
-// owner's repertoire builder writes them, `{ 45% }`); a move without one keeps its parent's reach
-// and marks the position approximate. The profile sums what we play, where our pieces stand and
-// which pawn structures we reach, weighted by that reach: the raw material of the rules of thumb.
+// owner's repertoire builder writes them, `{ 45% }`). The shares are read at the merged position: a
+// move order that gives one reply only (with no share) passes on that reply's part of the games,
+// not all of them, where another order gives the other replies' shares. A move without a share
+// beside moves with one takes an even part of what they leave, and marks the position approximate;
+// an only move takes all of it, and moves none of which has a share split it evenly. The profile
+// sums what we play, where our pieces stand and which pawn structures we reach, weighted by that
+// reach: the raw material of the rules of thumb.
 // The development map follows each of our pieces and pawns through every line: where it goes first,
 // in which positions, and what in the setup sets those positions apart (the owner's ask: the
 // first ideas say where each piece develops, and when).
@@ -31,6 +35,8 @@ export interface TreePos {
   ours: boolean;
   /** Our moves here (when it is our move), or the opponent's with their shares. */
   moves: { san: string; share?: number }[];
+  /** The position each move leads to, by its key. */
+  next: { san: string; key: string }[];
   leaf: boolean;
   comments: string[];
   shapes: Shape[];
@@ -54,6 +60,20 @@ export function shareOf(node: MoveNode): number | undefined {
     if (m) return Number(m[1]) / 100;
   }
   return undefined;
+}
+
+/**
+ * The share of the games at a position that go on with a move: 1 for ours, else its `{ n% }`, or
+ * for a move without one an even part of what the moves with one leave (all of it, split, when none
+ * has one).
+ */
+export function weightOf(p: Pick<TreePos, 'ours' | 'moves'>, san: string): number {
+  if (p.ours) return 1;
+  const m = p.moves.find((x) => x.san === san);
+  if (m?.share !== undefined) return m.share;
+  const known = p.moves.filter((x) => x.share !== undefined);
+  const left = Math.max(0, 1 - known.reduce((t, x) => t + x.share!, 0));
+  return left / Math.max(1, p.moves.length - known.length);
 }
 
 /** Movetext for SANs played from a position: `4. Nf3 e5 5. Bb5` or `4... e5 5. Bb5`. */
@@ -86,7 +106,8 @@ export function readRepertoire(text: string, side?: Color): Repertoire {
   const positions = new Map<string, TreePos>();
   const transpositions: { at: string; text: string }[] = [];
   const seenPaths = new Set<string>();
-  const visit = (pos: Position, start: Position, sans: string[], reach: number, approx: boolean, node: { comments: string[]; shapes: Shape[]; children: MoveNode[] }) => {
+  const roots = new Map<string, number>();
+  const visit = (pos: Position, start: Position, sans: string[], node: { comments: string[]; shapes: Shape[]; children: MoveNode[] }): string => {
     const key = positionKeyOf(pos);
     const path = numbered(sans, start.fullmoves, start.turn);
     const ours = pos.turn === us;
@@ -94,14 +115,10 @@ export function readRepertoire(text: string, side?: Color): Repertoire {
     const fresh = !seenPaths.has(`${key}|${path}`);
     seenPaths.add(`${key}|${path}`);
     if (!entry) {
-      entry = { key, fen: makeFen(pos.toSetup()), paths: [], reach: 0, approx: false, toMove: pos.turn, ours, moves: [], leaf: true, comments: [], shapes: [], ply: sans.length + (start.fullmoves - 1) * 2 + (start.turn === 'black' ? 1 : 0) };
+      entry = { key, fen: makeFen(pos.toSetup()), paths: [], reach: 0, approx: false, toMove: pos.turn, ours, moves: [], next: [], leaf: true, comments: [], shapes: [], ply: sans.length + (start.fullmoves - 1) * 2 + (start.turn === 'black' ? 1 : 0) };
       positions.set(key, entry);
     }
-    if (fresh) {
-      entry.paths.push(path || '(start)');
-      entry.reach += reach;
-      entry.approx ||= approx;
-    }
+    if (fresh) entry.paths.push(path || '(start)');
     for (const c of node.comments) {
       if (SHARE.test(c) && c.replace(SHARE, '').trim() === '') continue;
       if (!entry.comments.includes(c)) entry.comments.push(c);
@@ -115,10 +132,13 @@ export function readRepertoire(text: string, side?: Color): Repertoire {
       const next = pos.clone();
       next.play(move);
       const share = ours ? undefined : shareOf(child);
-      if (!entry.moves.some((m) => m.san === child.san)) entry.moves.push(share === undefined ? { san: child.san } : { san: child.san, share });
-      // A reply without a share among replies with one is a guess; an only reply is the line's premise.
-      visit(next, start, [...sans, child.san], ours ? reach : reach * (share ?? 1), approx || (!ours && share === undefined && node.children.length > 1), child);
+      const known = entry.moves.find((m) => m.san === child.san);
+      if (!known) entry.moves.push(share === undefined ? { san: child.san } : { san: child.san, share });
+      else if (known.share === undefined && share !== undefined) known.share = share;
+      const to = visit(next, start, [...sans, child.san], child);
+      if (!entry.next.some((n) => n.san === child.san)) entry.next.push({ san: child.san, key: to });
     }
+    return key;
   };
   for (const chapter of chapters) {
     const start = startPosition(chapter);
@@ -126,7 +146,25 @@ export function readRepertoire(text: string, side?: Color): Repertoire {
       problems.push(`chapter ${header(chapter, 'ChapterName') ?? chapter.id}: its start position is not legal`);
       continue;
     }
-    visit(start.clone(), start, [], 1, false, chapter.root);
+    const key = visit(start.clone(), start, [], chapter.root);
+    roots.set(key, (roots.get(key) ?? 0) + 1);
+  }
+  // The reach flows down the merged positions, parents first, so every move order adds its share.
+  const parents = new Map<string, number>();
+  for (const p of positions.values()) for (const n of p.next) parents.set(n.key, (parents.get(n.key) ?? 0) + 1);
+  for (const [key, r] of roots) positions.get(key)!.reach = r;
+  const ready = [...positions.values()].filter((p) => !parents.get(p.key));
+  while (ready.length) {
+    const p = ready.pop()!;
+    for (const n of p.next) {
+      const child = positions.get(n.key)!;
+      child.reach += p.reach * weightOf(p, n.san);
+      // A reply without a share among replies with one is a guess; an only reply is the line's premise.
+      child.approx ||= p.approx || (!p.ours && p.moves.length > 1 && p.moves.find((m) => m.san === n.san)?.share === undefined);
+      const left = parents.get(n.key)! - 1;
+      parents.set(n.key, left);
+      if (!left) ready.push(child);
+    }
   }
   return { side: us, positions, transpositions, problems, chapters };
 }
@@ -177,7 +215,7 @@ export function profile(rep: Repertoire, positionOf: (fen: string) => Position):
     for (const m of p.moves) {
       const g = moveGroup(pos, m.san);
       if (p.ours) add(ourMoves, g, p.reach);
-      else add(theirMoves, g, p.reach * (m.share ?? 1));
+      else add(theirMoves, g, p.reach * weightOf(p, m.san));
     }
     if (!p.leaf) continue;
     leafReach += p.reach;
@@ -375,7 +413,7 @@ export function development(rep: Repertoire): PieceMap[] {
       } else {
         nextWho.delete(move.to);
         if (move.promotion === undefined && pos.board.getRole(move.from) === 'pawn' && pos.epSquare === move.to) nextWho.delete(move.to + (us === 'white' ? 8 : -8));
-        share = shareOf(child) ?? 1;
+        share = entry ? weightOf(entry, child.san) : (shareOf(child) ?? 1);
       }
       visit(next, start, [...sans, child.san], reach * share, nextWho, nextTrail, child);
     }

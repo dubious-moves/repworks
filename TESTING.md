@@ -57,10 +57,13 @@ fixes them and updates this file.
 ## Idea cards ask decisions (§5.128, 2026-10-24)
 - Train any idea deck on the phone: while a card asks, its counter reads "6 of 34 · new" with no
   kind ("break", "placement"); the kind shows on the back.
-- The decks are not remade yet. When the next deck comes (made under the new rules): about 12
-  cards, each question neutral ("White has just played 7. Bg5. What do we play, and why?"). Is
-  each card a move you could really miss, and is "what do we play" enough of a question, or do
-  some cards need a narrower one?
+- Deck 1 (Benoni gambit accepted) is remade under the new rules: 12 cards, 7 rules, in the
+  testing data repo and sent as a file. Delete the old study first (or import beside it), import
+  the file as a reference study, then ☰ → Make idea cards: 12 cards (the two "0." chapters are
+  read, not trained). Train it in Train mode so no answer is shown first. Is each card a move you
+  could really miss, and is "What do we play, and why?" enough of a question, or do some cards
+  need a narrower one? Are 12 cards and 7 rules the right size? Cards 4b, 5, 6 and 7 sit at about
+  3% of games: worth a card, or rules only? Decks 2 and 4 wait for your word.
 
 
 - Show and grade from the training card: miss a move with 4 (or the ring). At the line's end the
