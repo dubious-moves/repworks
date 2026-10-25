@@ -54,10 +54,11 @@ function pushed(git: FakeGit): Record<string, unknown>[] {
 
 const card = (page: Page, name: string) => page.locator('.study-card').filter({ has: page.getByRole('link', { name, exact: true }) });
 
-test('the study cards: kind, chapters, side and today’s moves; a card opens its study', async ({ page }) => {
+test('the study cards: their panel by kind, chapters, side and today’s moves; a card opens its study', async ({ page }) => {
   await setUp(page);
   const rep = card(page, 'Test repertoire');
-  await expect(rep.locator('.study-card-badge')).toHaveText('Repertoire');
+  await expect(page.getByRole('region', { name: /^Repertoire/ }).locator('.study-card')).toHaveCount(1);
+  await expect(page.getByRole('region', { name: /^Repertoire/ })).toContainText('Test repertoire');
   await expect(rep.locator('.study-card-meta')).toHaveText('2 chaptersBlack1 due · 3 new');
   await expect(rep.getByRole('link', { name: 'Train Test repertoire' })).toHaveAttribute('href', '#/train/Rep0Najd');
   // Anywhere on the card opens the study, but its buttons.

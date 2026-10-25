@@ -236,13 +236,10 @@ function Home() {
         {studies.value.length === 0 ? (
           <p class="muted">No studies yet: make one, or import one.</p>
         ) : (
-          <ul class="studies">
-            {studies.value.map((s) => (
-              <Guard key={s.id} name={`The card of ${s.name}`}>
-                <StudyCard study={s} />
-              </Guard>
-            ))}
-          </ul>
+          <div class="studies">
+            <StudyGroup kind="repertoire" title="Repertoire" empty="No repertoire yet: a repertoire study is one you train." />
+            <StudyGroup kind="reference" title="Reference" empty="No reference studies yet." />
+          </div>
         )}
         {conflicts > 0 && (
           <p>
@@ -259,13 +256,37 @@ function Home() {
   );
 }
 
+/** The studies of one kind, as a panel of their own: the repertoire to train, the reference to read. */
+function StudyGroup(props: { kind: StudyRow['kind']; title: string; empty: string }) {
+  const rows = studies.value.filter((s) => s.kind === props.kind);
+  const id = `study-group-${props.kind}`;
+  return (
+    <section class={`study-group group-${props.kind}`} aria-labelledby={id}>
+      <h3 id={id}>
+        {props.title} <span class="muted">{rows.length}</span>
+      </h3>
+      {rows.length === 0 ? (
+        <p class="muted">{props.empty}</p>
+      ) : (
+        <ul class="study-list">
+          {rows.map((s) => (
+            <Guard key={s.id} name={`The card of ${s.name}`}>
+              <StudyCard study={s} />
+            </Guard>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 const SIDES = { white: 'White', black: 'Black', both: 'Both' } as const;
 
 /**
- * A study as a card, after Qchess's /studies (read live, 2026-10-06): the kind where Qchess shows
- * the visibility, the name, the chapters, and the side as Qchess's colour tag; here also today's
- * due and new moves. The card opens the study; ⚙ and 🗑 in its corner, as Qchess's tag and delete
- * buttons, open its settings and delete it.
+ * A study as a card, after Qchess's /studies (read live, 2026-10-06): the name, the chapters, and
+ * the side as Qchess's colour tag; here also today's due and new moves. Its kind is the panel it
+ * sits in. The card opens the study; ⚙ and 🗑 in its corner, as Qchess's tag and delete buttons,
+ * open its settings and delete it.
  */
 function StudyCard(props: { study: StudyRow }) {
   const s = props.study;
@@ -284,7 +305,6 @@ function StudyCard(props: { study: StudyRow }) {
           🗑
         </button>
       </div>
-      <span class={`study-card-badge badge-${s.kind}`}>{s.kind === 'repertoire' ? 'Repertoire' : 'Reference'}</span>
       <a class="study-card-title" href={`#/study/${s.id}`}>
         {s.name}
       </a>
