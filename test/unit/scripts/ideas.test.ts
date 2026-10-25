@@ -260,7 +260,10 @@ test('the deck against the repertoire: its moves answer, the main line keeps to 
   const texts = findings.map((f) => `${f.level} ${f.chapter.split(' ')[0]} ${f.text}`);
   // The rules of thumb make no card: two at the opening's start are no duplicate.
   assert.ok(!texts.some((t) => t.includes('#2 ') || t.startsWith('warning #1')), texts.join('\n'));
-  assert.ok(!texts.some((t) => t.split(' ')[1] === '#3'), 'Bd6 is the repertoire’s; Bc5 beside it is a side line');
+  // Card 4's answer 4... e5, then 5. Bb5 (the repertoire's main reply), is card 1's position: one card asked twice.
+  const next = (n: number) => `error #${n} its position comes right after #6 4. Off the line's answer, in the same line (e5 Bb5): one card, not two; keep the one worth more, and let its explanation and main line say the other move`;
+  assert.ok([3, 4, 5].every((n) => texts.includes(next(n))), texts.join('\n'));
+  assert.ok(!texts.some((t) => t.split(' ')[1] === '#3' && t !== next(3)), 'Bd6 is the repertoire’s; Bc5 beside it is a side line');
   assert.ok(texts.includes('error #4 Bc5 answers the card, but the repertoire plays Bd6 here: the answer is the repertoire\'s move'));
   assert.ok(texts.some((t) => t.startsWith("error #5 Bd6? is the repertoire's move, marked ?")));
   assert.ok(texts.includes('error #6 the main line leaves the repertoire at e5 Be2 Nf6 O-O Bd6: it plays Be7 here'));
@@ -422,4 +425,32 @@ test('a card is a decision: Maia and Stockfish on what the question leaves to de
   } finally {
     engine.quit();
   }
+});
+
+// The owner, 2026-10-25: the Anti-c3 deck asked 3. Bf4 cxd4, then the next card 4. cxd4 Qb6.
+test('a card never asks the very next move of another card’s line', async () => {
+  const rep = readRepertoire('[Orientation "black"]\n\n1. d4 c5 2. c3 Nf6 3. Bf4 { 40% } (3. Bg5 { 60% } 3... Ne4) 3... cxd4 4. cxd4 { 90% } (4. Qxd4 { 10% } 4... Nc6) 4... Qb6 5. Qb3 Nc6 6. e3 e5 *');
+  const fen = (moves: string) => makeFen(readPosition(moves).toSetup());
+  const bf4 = fen('1. d4 c5 2. c3 Nf6 3. Bf4');
+  const cxd4 = fen('1. d4 c5 2. c3 Nf6 3. Bf4 cxd4 4. cxd4');
+  const qxd4 = fen('1. d4 c5 2. c3 Nf6 3. Bf4 cxd4 4. Qxd4');
+  const e3 = fen('1. d4 c5 2. c3 Nf6 3. Bf4 cxd4 4. cxd4 Qb6 5. Qb3 Nc6 6. e3');
+  const q = (n: string) => `White has just played ${n}. What do we play, and why?`;
+  const texts = async (deck: string[], withRep = true) => (await checkDeck(deck.join('\n'), { depth: 8, ...(withRep ? { rep } : {}) })).findings.map((f) => `${f.level} ${f.chapter.split(' ')[0]} ${f.text.split(':')[0]}`);
+  const first = neutral('1. Take', bf4, '3... cxd4 *', q('3. Bf4'));
+  const second = neutral('2. Queen', cxd4, '4... Qb6 *', q('4. cxd4'));
+  // The repertoire's reply (90%): the second card asks the first one's next move, in either order.
+  assert.deepEqual(await texts([first, second]), ["error #2 its position comes right after #1 1. Take's answer, in the same line (cxd4 cxd4)"]);
+  assert.deepEqual(await texts([second, first]), ["error #1 its position comes right after #2 1. Take's answer, in the same line (cxd4 cxd4)"]);
+  // Without the repertoire, through the first card's own main line.
+  const played = neutral('1. Take', bf4, '3... cxd4 4. cxd4 Qb6 5. Qb3 Nc6 6. e3 e5 *', q('3. Bf4'));
+  assert.deepEqual(await texts([played, second], false), ["error #2 its position comes right after #1 1. Take's answer, in the same line (cxd4 cxd4)"]);
+  // A reply 10% of the games take is the opponent's choice: a card of its own.
+  assert.deepEqual(await texts([first, neutral('2. Other', qxd4, '4... Nc6 *', q('4. Qxd4'))]), []);
+  // Further down the first card's main line: a warning.
+  assert.deepEqual(await texts([played, neutral('3. Break', e3, '6... e5 *', q('6. e3'))]), ["warning #2 its position is on #1 1. Take's main line (cxd4 cxd4 Qb6 Qb3 Nc6 e3)"]);
+  // `decisions` marks the next move as the same line's.
+  const ds = await decisions(rep, { policy: fakePolicy({}), depth: 8, minReach: 0 });
+  assert.deepEqual(ds.find((d) => d.ours[0] === 'Qb6')!.after?.ours, ['cxd4']);
+  assert.equal(ds.find((d) => d.ours[0] === 'Nc6' && d.path.includes('Qxd4'))!.after, undefined);
 });

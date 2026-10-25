@@ -5,7 +5,8 @@
 // is now a decision a player could get wrong, and this module measures that:
 // - `decisions` ranks the repertoire's own positions by what missing our move there costs: its
 //   reach, how often Maia misses the move (a move that only changes the move order, `transposingMoves`,
-//   counts as found), and what Maia's likeliest other move gives up;
+//   counts as found), and what Maia's likeliest other move gives up; and marks a position that
+//   comes right after another in the same line (`nextDecisions`: one card for both, not two);
 // - `namedPieces`, `namedMovers` and `namedSquares` read what a question gives away, and `cardDecision` measures
 //   a card's position: how many sensible moves there are, for the side and for the piece named,
 //   and how often Maia finds the answer, unprompted and once told which piece moves.
@@ -23,7 +24,7 @@ import { STORM } from '../../src/core/storm/config.ts';
 import { wpLoss } from '../../src/core/storm/grade.ts';
 import { gradeMoves } from './check.ts';
 import { cpOf, positionOf, type Engine } from './engine.ts';
-import { trunkOf, type Repertoire } from './tree.ts';
+import { trunkOf, weightOf, type Repertoire } from './tree.ts';
 
 /** What people play at a position: each legal move's probability (Maia at 2000 or more). */
 export type Policy = (pos: Position) => Promise<MaiaMove[]>;
@@ -34,6 +35,8 @@ export const SENSIBLE_LOSS = 10;
 export const GIVEN_AWAY = 0.85;
 /** Maia finding the answer this often unprompted: a player finds it anyway. */
 export const NATURAL = 0.8;
+/** An opponent's reply this many of the games take is the line's own: our next move after it is the same card's (`nextDecisions`). */
+export const MAIN_REPLY = 0.5;
 /** A card at a repertoire position under this reach is too rare to drill (a warning). */
 export const RARE = 0.02;
 /** Cards a deck has by default (a warning above), and never more than `MAX_CARDS` (an error). */
@@ -214,6 +217,25 @@ export function transposingMoves(rep: Repertoire, pos: Position): Map<string, st
   return out;
 }
 
+/**
+ * Our next decisions in the same line, by key: the repertoire's positions after our move at `key`
+ * (`san`, or any of ours) and the opponent's reply that `MAIN_REPLY` of the games take, each with
+ * those two moves. A card there would ask the very
+ * next move of the card at `key` (the owner, 2026-10-25: 3. Bf4 cxd4, then 4. cxd4 Qb6, were two
+ * cards); one card teaches both, its explanation saying the follow-up.
+ */
+export function nextDecisions(rep: Repertoire, key: string, san?: string): { key: string; sans: [string, string] }[] {
+  const at = rep.positions.get(key);
+  if (!at?.ours) return [];
+  return at.next.filter((a) => san === undefined || a.san === san).flatMap((a) => {
+    const after = rep.positions.get(a.key);
+    if (!after || after.ours) return [];
+    return after.next
+      .filter((r) => weightOf(after, r.san) >= MAIN_REPLY && rep.positions.get(r.key)?.moves.length)
+      .map((r) => ({ key: r.key, sans: [a.san, r.san] as [string, string] }));
+  });
+}
+
 export interface Decision {
   key: string;
   fen: string;
@@ -233,6 +255,8 @@ export interface Decision {
   sensible?: string[];
   /** reach × (1 − found) × (½ + cost/40, at most 1): a miss that costs nothing counts half. */
   value: number;
+  /** The decision just before it in the same line (`nextDecisions`): one card with it, not two. */
+  after?: { path: string; ours: string[] };
 }
 
 /** Our positions past the opening's trunk with `minReach` or more, ranked by `value`, best first. */
@@ -262,6 +286,13 @@ export async function decisions(rep: Repertoire, o: { policy: Policy; engine?: E
     }
     d.value = p.reach * (1 - found) * (d.cost === undefined ? 0.75 : Math.min(1, 0.5 + d.cost / 40));
     out.push(d);
+  }
+  const byKey = new Map(out.map((d) => [d.key, d]));
+  for (const d of out) {
+    for (const { key } of nextDecisions(rep, d.key)) {
+      const next = byKey.get(key);
+      if (next && !next.after) next.after = { path: d.path, ours: d.ours };
+    }
   }
   return out.sort((a, b) => b.value - a.value);
 }

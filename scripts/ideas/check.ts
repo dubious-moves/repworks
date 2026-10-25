@@ -22,6 +22,11 @@
 // question names the answer's square, or names the piece that moves when that leaves one sensible
 // move or Maia then finds it `GIVEN_AWAY` of the time (decide.ts). It warns on a card Maia finds
 // unprompted, one under `RARE` reach, and a deck over its cards (an error over `MAX_CARDS`).
+//
+// A card never asks the very next move of another card's line (the owner, 2026-10-25, after
+// 3. Bf4 cxd4 and then 4. cxd4 Qb6 came as two cards): a card at the position after another
+// card's answer and the opponent's reply (its main line's, or the repertoire's for most of the
+// games) is an error, one card teaching both; one further down another card's main line, a warning.
 import type { Position } from 'chessops/chess';
 import { makeFen } from 'chessops/fen';
 import { parseSan } from 'chessops/san';
@@ -37,7 +42,7 @@ import { STORM, type Band } from '../../src/core/storm/config.ts';
 import { grade as band, wpLoss } from '../../src/core/storm/grade.ts';
 import { header, type Chapter, type MoveNode, type Shape } from '../../src/core/study/model.ts';
 import { startPosition } from '../../src/core/study/tree.ts';
-import { cardDecision, CARDS, GIVEN_AWAY, MAX_CARDS, namedMovers, namedSquares, NATURAL, RARE, transposingMoves, type Policy } from './decide.ts';
+import { cardDecision, CARDS, GIVEN_AWAY, MAX_CARDS, namedMovers, namedSquares, NATURAL, nextDecisions, RARE, transposingMoves, type Policy } from './decide.ts';
 import { cpOf, scoreText, type Engine } from './engine.ts';
 import type { Repertoire } from './tree.ts';
 
@@ -122,6 +127,8 @@ export async function checkDeck(
   let n = 0;
   const parsed = parseGames(text, () => `c${++n}`);
   const starts = new Map<string, string>();
+  // Each card's position, the positions of our next move in its line, and those further down its main line.
+  const lines: { label: string; key: string; next: Map<string, string>; later: Map<string, string> }[] = [];
   for (const [i, p] of parsed.entries()) {
     if (!p.ok) {
       findings.push({ chapter: `#${i + 1}`, level: 'error', text: p.reason });
@@ -191,7 +198,25 @@ export async function checkDeck(
       cards++;
       const at = o.rep?.positions.get(key);
       if (at && at.reach < RARE) warn(`the card's position is reached in ${(at.reach * 100).toFixed(1)}% of games: too rare to drill; a rule of thumb or a side line can carry it`);
-      if (side && start.turn === side) await decision(start);
+      if (side && start.turn === side) {
+        await decision(start);
+        const next = new Map<string, string>();
+        const later = new Map<string, string>();
+        const first = ch.root.children[0];
+        if (first && !glyphs(first).includes('?')) {
+          if (o.rep?.side === side) for (const n of nextDecisions(o.rep, key, first.san)) next.set(n.key, n.sans.join(' '));
+          const pos = start.clone();
+          const sans: string[] = [];
+          for (let node: MoveNode | undefined = first; node; node = node.children[0]) {
+            const m = parseSan(pos, node.san);
+            if (!m) break;
+            pos.play(m);
+            sans.push(node.san);
+            if (pos.turn === side) (sans.length === 2 ? next : later).set(positionKeyOf(pos), sans.join(' '));
+          }
+        }
+        lines.push({ label, key, next, later });
+      }
     }
     const rep = o.rep && o.rep.side === side ? o.rep : undefined;
     for (const t of arrowProblems(start, ch.root.shapes)) warn(`at the start: ${t}`);
@@ -242,6 +267,15 @@ export async function checkDeck(
       }
     };
     await walk(start, ch.root.children, [], true);
+  }
+  for (const b of lines) {
+    for (const a of lines) {
+      if (a === b) continue;
+      const soon = a.next.get(b.key);
+      const far = a.later.get(b.key);
+      if (soon) findings.push({ chapter: b.label, level: 'error', text: `its position comes right after ${a.label}'s answer, in the same line (${soon}): one card, not two; keep the one worth more, and let its explanation and main line say the other move` });
+      else if (far) findings.push({ chapter: b.label, level: 'warning', text: `its position is on ${a.label}'s main line (${far}): that card plays its answer already; one card, its explanation saying both, unless the opponent's moves on the way are real choices` });
+    }
   }
   const budget = o.cards ?? CARDS;
   if (cards > MAX_CARDS) findings.push({ chapter: 'the deck', level: 'error', text: `${cards} cards; a deck has ${budget} or so, never more than ${MAX_CARDS}: keep the decisions worth most (cv.ts decisions)` });

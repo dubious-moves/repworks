@@ -1811,6 +1811,20 @@ The technical calls, each with its reason:
   (it still shows its message when there is one), so the buttons start 28px under the board's
   foot, with 4px of padding at their sides.
 
+## Revision of 2026-10-25 (opening ideas: one card per stretch of a line, PLAN.md §5.128)
+- **A card never asks the very next move of another card's line; one card teaches both, its
+  explanation saying the follow-up.** Was: any decision from `decisions` could be a card, so
+  deck 4 asked 3. Bf4 …cxd4 and then 4. cxd4 …Qb6. The check refuses a card at the position after
+  another card's answer and the opponent's reply (the card's main line's, or the repertoire's
+  reply for half the games or more), and warns on one further down another card's main line. A
+  reply fewer than half the games take is the opponent's choice, and may have its own card. Why:
+  the owner, 2026-10-25: "not efficient, and the knowledge in the second card should be made
+  clear in the first card".
+- **A deck's cards go to where the repertoire breaks its patterns and to unintuitive moves; the
+  patterns are its rules.** What the owner values most: the common patterns, ideas and
+  development squares; when we break them (if at all); unintuitive decisions. Decided within it:
+  a card that breaks a pattern quotes the rule it breaks and says why.
+
 ## Revision of 2026-10-22 (the pace of auto-played moves)
 - **A faster pace, and the speed and the pauses of auto-played moves are settings.** Was: three
   paces (fast 450 ms, normal 600 ms, relaxed 900 ms), a floor of 450 ms (lichessable's), and the

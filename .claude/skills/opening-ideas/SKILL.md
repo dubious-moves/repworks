@@ -29,6 +29,19 @@ study, and trained there as idea cards.
    piece goes to because it is the only sensible one, or the natural one (a recapture, the gambit
    pawn taken back), is a clause of the rule, not a card.
 
+## What the owner values most (2026-10-25)
+
+1. **The common patterns:** the ideas, plans and development squares that recur across the
+   lines. These are the rules of thumb, and every card hangs on one of them.
+2. **When we break a pattern** (if we ever do): the position where the repertoire leaves its own
+   rule, and what on the board makes it. A card here quotes the rule it breaks and says why
+   ("the f8-bishop goes to e7, but here c5, because…").
+3. **Unintuitive decisions:** the moves a player would not find (`decisions`' miss).
+
+A deck spends its cards on 2 and 3, and teaches 1 through its rules and its explanations. A card
+that only applies a rule where nothing breaks it, and that a player would find anyway, is a
+clause of the rule.
+
 ## A card is a decision (the owner, 2026-10-24)
 
 The first decks (Benoni, Benko, Anti-c3: 35, 27 and 42 cards) asked "where does the f8-bishop
@@ -55,6 +68,14 @@ found the answer 85% of the time or more. So:
     answer 85% of the time or more.
 
   It warns on a card Maia finds 80% of the time unprompted, and on one under 2% reach.
+- **One card per stretch of a line (the owner, 2026-10-25).** A card never asks the very next
+  move of another card: the Anti-c3 deck asked 3. Bf4 …cxd4, then 4. cxd4 …Qb6, two cards for one
+  plan. The first card's explanation and main line teach the follow-up ("…cxd4, then …Qb6 hits
+  b2 and d4"); keep the card worth more, and let it say the other move. `decisions` marks such a
+  position "right after …". The check refuses a card at the position after another card's
+  answer and the opponent's reply (its main line's, or the repertoire's for half the games or
+  more), and warns on one further down another card's main line, which already plays its answer
+  (fine only where the opponent's moves on the way are real choices).
 
 ## The rule that matters most
 
@@ -158,7 +179,11 @@ between agents.
      and pawn moves with one square each can share an idea: the setup.
    - Then what the pawn or the opening buys, the middlegame plans, tactics and attacks, in the
      order they come up in a game.
-   - Merge duplicates. Settle contradictions with the tools. Every opponent setup with 5% or
+   - Spend the cards on where the repertoire breaks a pattern and on unintuitive moves (above);
+     the patterns themselves are the rules.
+   - Merge duplicates, and decisions one after the other in a line (`decisions`' "right
+     after"): one card, its explanation saying the follow-up. Settle contradictions with the
+     tools. Every opponent setup with 5% or
      more reach is covered by an idea or a rule.
    - A rule is short (about 100 characters) and states one condition a player can see on the
      board; sub-cases go on the cards. A development rule names the piece and each square
@@ -181,6 +206,10 @@ between agents.
    - Check that each card is a real decision, asked neutrally (`check --verbose` prints its
      sensible moves and how often Maia finds the answer), and has one answer on the board.
    - Check the size: about 12 cards and at most 8 rules.
+   - Check that no card asks the next move of another card's line, and that each card's
+     explanation says what follows it (the plan, not just the move).
+   - Check that each card is a pattern, a break of one, or a move a player would miss, and that
+     a break names the rule it breaks.
    - Read each rule's condition literally against every card: no card may contradict a rule,
      and every clause of a rule needs a card.
    - Check that the development ideas come first and that every first square with 3% or more
@@ -260,6 +289,9 @@ inside a value:
   - a chapter that comes back unchanged from the site's PGN writer
   - beyond the repertoire, a card's answer that isn't `great` (a warning)
   - no two cards at the same position (a warning)
+  - a card at the position after another card's answer and the opponent's reply (its main
+    line's, or the repertoire's for half the games): an error, one card for both; a card further
+    down another card's main line (a warning)
   - an `overview` chapter with a question or moves (a warning: it would make no card)
   - a card whose answer another capture of ours reaches by taking the same exchange in another
     order (a warning: the card would call that move wrong; `decisions` counts it as found)

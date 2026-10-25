@@ -7002,6 +7002,33 @@ skill and its tools, then idea cards in the app.
       way (6… Ne4 7. Nc3 for 6… Qa5+ 7. Nc3), and was dropped.
     - Tests: the Benko exchange found, with its order; no swap at a check or a non-capture; the
       decision's found counting it; the card warned. Control: without the check's part, it fails.
+- **One card per stretch of a line, and what the owner values most** (the owner, 2026-10-25,
+  after training deck 4, for future decks; the decks made so far are not remade): its card 2
+  asked 3. Bf4 …cxd4 and the next card 2b asked 4. cxd4 …Qb6, the very next move of the same
+  line. "This is not efficient, and the knowledge in the second card should be made clear in the
+  first card." What the owner values most in an idea deck:
+  1. the common patterns, ideas and development squares;
+  2. when we break these patterns (if at all);
+  3. unintuitive decisions.
+
+  - **Built:**
+    - `decide.ts` `nextDecisions`: our next positions in the same line, after our move and the
+      opponent's reply that half the games or more take there. `decisions` marks such a
+      position "right after …" (the decision before it): one card for both.
+    - **The check** refuses a card at the position after another card's answer and the
+      opponent's reply (its main line's, or the repertoire's for half the games or more), and
+      warns on a card further down another card's main line, which already plays its answer.
+      On the three remade decks (no engine): deck 4's card 2b (the owner's example), deck 1's 2b
+      and 3b, and deck 2's 5, 5b and 5c are refused; 3 more warned.
+    - **The skill and the workflow:** the owner's three values above. The rules of thumb carry
+      the patterns, and every card hangs on one; cards go to where the repertoire breaks a
+      pattern (quoting the rule it breaks and why) and to moves a player would miss. A card's
+      explanation says what follows its move (the plan). The critic checks both.
+  - Tests: the owner's case on a small repertoire, in either order, with the repertoire and
+    through the card's main line alone; a reply 10% of games take is a card of its own; a card
+    further down the main line is a warning; `decisions` marks the next move. The earlier test
+    deck now reports its card at 4. Nf3 …e5 then 5. Bb5 (the repertoire's main reply), the
+    position of its first card.
 - **Idea cards in the app** (built 2026-10-20, as built below):
   - **The card:** one chapter is one card (`i|<sid>|<cid>`), enrolled for a whole study at once
     from its ☰ menu, by `idea` events as plan cards' `plan` events (§5.61). The overview chapter

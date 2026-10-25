@@ -279,6 +279,7 @@ async function main(): Promise<number> {
       for (const d of cards.slice(0, Number(flags.get('top') ?? 40))) {
         console.log(`  value ${(d.value * 100).toFixed(1).padStart(4)}  reach ${pct(d.reach).padStart(4)}  ours ${d.ours.join('/')}  found ${pct(d.found)}${d.transposing ? ` (with ${d.transposing.map((o) => o.join(' ')).join(', ')}: the same position)` : ''}${d.miss ? `  miss ${d.miss.san} ${pct(d.miss.prob)}${d.cost === undefined ? '' : ` (gives up ${d.cost.toFixed(0)}%)`}` : ''}${d.sensible ? `  sensible ${d.sensible.join(' ')}` : ''}`);
         console.log(`      ${d.path}\n      FEN ${d.fen}`);
+        if (d.after) console.log(`      right after ${d.after.ours.join('/')} at ${d.after.path}, in the same line: one card for both, its explanation saying the follow-up`);
       }
       const rest = ds.filter(forced);
       console.log(`\nNatural (Maia finds it ${pct(NATURAL)} or more) or forced (one sensible move): ${rest.length}. Rules of thumb and explanations, not cards:`);
