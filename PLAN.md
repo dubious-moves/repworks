@@ -2394,7 +2394,7 @@ Build order: (a), then (b), (c) and (d); each part is pushed when its tests pass
   unpaused it comes back due (overdue), as any late review does.
 - **Paused lines still count everywhere except training**: the study views, the editor, Read,
   Quiz from here, the deviations (a move of a paused line is still the repertoire), coverage and
-  the checklist. The storm's repertoire sources (§5.40) leave paused lines out, as untrained
+  the checklist (which leaves them out since §5.130, the owner's choice). The storm's repertoire sources (§5.40) leave paused lines out, as untrained
   material.
 - **The line list** (§5.16): ⏸ in place of the state dot, labelled "Paused"; ★ beside a
   must-learn line. Each row's menu (⋯, or a right-click) has Pause or Unpause, and Must learn or
@@ -7180,3 +7180,93 @@ points netted; Black ahead; bishop for knight level; a placement alone), `analys
 (desktop and phone: level after e4 e5 with no pieces; a FEN a pawn up, the board turned: the white
 pawn, its image and "+1" above the board, nothing below), `storm.spec.ts` (the review's list ends
 at the board's foot). Live: TESTING.md.
+
+#### 5.130 The variation checklist on the study, synced (the owner's request, 2026-10-25)
+
+The owner asked how mistake-lab's "Repertoire checklist" works and how it should be in Repworks.
+Its generator, drill and completion are already here (§5.62, the same lines, reserve and gaps as
+mistake-lab's code). This part covers what the port left out or does differently, with the
+owner's answers of 2026-10-25: **the list is synced**, **the ranking stays mistake-lab's** (d'Hondt
+over the explorer's shares, cut at a ply, not §5.70's order), and **paused lines are left out**.
+
+How mistake-lab's works (read at `c525403`: `generateTodoVariations`, `startTodoVariation`,
+`finishTodoDrill`, `renderTodoStudyBlock`, `todoPresetStats`, `excludeTodoVariation`, and its
+reference's VARIATION-CHECKLIST section): the study's covered tree from the start, its move at
+the user's positions and every covered reply at the opponent's, scored by the explorer (1600–2500,
+blitz to correspondence); N slots split down the tree by d'Hondt, capped by each subtree's leaves;
+10 reserve lines in the order they would join; the uncovered replies played 8% of the time. A
+drill replays the prep from move 1 (a move off it refused), then plays on from the line's end
+against the explorer and Maia at Easy, Medium or Hard; a win checks the line off at that level,
+the next level opening after it; the chips show the last five tries, a draw ½. ✕ takes a line
+out and the reserve fills its slot. Every study is a folded block with a progress bar, the most
+recently drilled first; hovering a line shows a mini board that follows the moves; Maia's
+rating per level is a setting; the lists sync through its Gist. What Repworks lacks of it: the
+place (it is only under Games → Repertoire check, one study at a time), the sync, the blocks and
+their order, the preview, the opening names and the Maia setting.
+
+Build order: (a), (b), (c); each pushed when its tests pass.
+
+**(a) A synced list**
+- **A `checklist` event** on `t|<sid>` (a new card kind, `checklistListCard`), written by Make:
+  `{"k":"checklist","card":"t|<sid>","color":"white","ply":10,"n":10,"lines":["e2e4 e7e5 …",…],
+  "reserve":[…],"gaps":[{"line":"e2e4 c7c6","p":0.12},…]}`, each line its UCI moves from the start
+  and its share (`"lines":[{"m":"e2e4 e7e5 …","p":0.31},…]`). About 3 KB at 10 lines. The latest
+  by replay order is the study's list. Older readers skip it (the log's rule).
+- **Everything else is derived** from the event: each line's FENs, SANs and leaf key by replaying
+  its moves; the lines shown are the event's lines less the excluded and paused ones, filled from
+  its reserve in order up to `n`. So ✕ keeps writing only its `drop` on `c|<leafKey>`, and every
+  device shows the same list after a sync, with no second round of explorer calls.
+- **A list the study has left behind**: a line whose moves the study no longer plays (edited, or a
+  move taken out) is shown struck through with "no longer in the study · Make again", and
+  doesn't count in the progress bar. Make again keeps the exclusions, as now.
+- **Lists made before this** (`repworks-checklists` in localStorage): on the first load, each one
+  with no `checklist` event for its study is written as one, then the local key is removed.
+- The drill's address names its line by its moves (`#/checklist/<sid>?line=<uci,…>&preset=…`),
+  not its place in the list, so a list re-made on the other device doesn't change what an open
+  drill (or a reload of one) plays.
+
+**(b) Paused lines left out** (a change to §5.70, which counted them in the checklist)
+- The walk's study moves (`studyMoves`) come from the study's **active** lines only: a position
+  counts as covered, and its move as the study's, only on a line that isn't paused. A wholly
+  paused branch is then like an uncovered one, and its slots go to its siblings.
+- On a synced list, a line that became wholly paused since Make is hidden like an excluded one
+  and its slot filled from the reserve, with "n paused lines hidden" under the list. Unpausing
+  brings it back.
+- A paused branch is not listed among the uncovered replies (it is covered, just not trained).
+
+**(c) The checklist's own page, and what mistake-lab shows**
+- **`#/checklist`**: every repertoire study (each side of a two-sided study on its own) as a
+  folded block: the name, the side, a progress bar (wins over lines × 3 levels, coloured by
+  `winRateColor`) or "not made". The most recently drilled first (the newest `practice` event with
+  a preset at one of its leaves, or a drill opened in this session), then by name. Unfolded: lines,
+  plies, Make or Make again with its progress and Stop, the lines, the hidden counts, the
+  uncovered replies. `#/checklist?sid=…` opens with that study unfolded.
+- **Where it is opened**: "Checklist…" beside Prioritize… on a study's line list (opening its
+  block) and in each chapter's menu; "Checklist" on Home's repertoire panel; Repertoire check
+  keeps a link to it in place of the section.
+- **Each line**: its opening name (`openingNameAt` from the games index if it has the leaf, else the
+  chapter's name the line ends in, as `[ChapterName]`), its moves, its share, the chips as now, ✕
+  (asked once: "Take this line out? The next line takes its place.").
+- **The preview**: hovering a move of a line (desktop) shows the position after it on a small board
+  beside the row, the board following the cursor move by move; on a phone, a tap on a move shows
+  it and a tap elsewhere hides it. The same for the uncovered replies.
+- **Uncovered replies**: Open the chapter at the position (to add a move, as Prioritize's list
+  does) beside Practise.
+- **Maia's rating per level**: Easy, Medium and Hard each a number (1100–2600, step 25, the
+  practice settings' range), defaults mistake-lab's (1750, 2000, 2150), kept on this device
+  (`repworks-checklist-maia`); the precision stays the level's.
+
+Tests:
+- `test/unit/core/games/checklist.test.ts`: the event read and written (lines, reserve, gaps); the
+  shown list derived from an event, exclusions and paused lines (filled from the reserve, in
+  order); a line the study left behind; the walk over active lines only (a paused branch's slots
+  going to its sibling, not listed as uncovered). §5.62's cases against mistake-lab's code stay as
+  they are (no paused lines there).
+- `test/e2e/checklist.spec.ts` (desktop and phone): the page from the line list and from Home; a
+  list made on one device, synced, shown on the other with no explorer call; ✕ asked and synced; a
+  line paused and hidden, unpaused and back; the preview on hover and on a tap; the drill opened by
+  its moves and reloaded; Maia's rating used by the drill's opponent; an old local list carried
+  into an event.
+
+Live (TESTING.md): (desktop) a list made for a real study, then (phone) the same list after a sync,
+drilled at Easy; the order of the blocks after drilling; the preview's feel on both.

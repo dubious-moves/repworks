@@ -1825,6 +1825,19 @@ The technical calls, each with its reason:
   development squares; when we break them (if at all); unintuitive decisions. Decided within it:
   a card that breaks a pattern quotes the rule it breaks and says why.
 
+## Revision of 2026-10-25 (the variation checklist synced, PLAN.md §5.130)
+- **A checklist is synced, as a `checklist` event on `t|<sid>`** (its lines, reserve and gaps as
+  UCI moves from the start, with their shares; the latest wins). Was: kept on the device that made
+  it (the revision of 2026-10-07), so another device had to ask the explorer again and could pick
+  other lines as the explorer's numbers moved. Why: the owner's choice, 2026-10-25. The shown list
+  is derived from the event, the exclusions and the pauses, so ✕ still writes only its `drop`.
+- **The checklist leaves paused lines out.** Was: §5.70 counted paused lines everywhere but
+  training, the checklist included. Why: the owner's choice, 2026-10-25: the checklist drills what
+  is trained.
+- **The checklist keeps mistake-lab's ranking** (d'Hondt over the explorer's shares, cut at a
+  ply), not §5.70's greedy order. Why: the owner's choice, 2026-10-25; the port stays checked
+  against mistake-lab's code.
+
 ## Revision of 2026-10-22 (the pace of auto-played moves)
 - **A faster pace, and the speed and the pauses of auto-played moves are settings.** Was: three
   paces (fast 450 ms, normal 600 ms, relaxed 900 ms), a floor of 450 ms (lichessable's), and the
