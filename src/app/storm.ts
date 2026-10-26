@@ -1107,7 +1107,7 @@ function settle(item: StormItem, uci: string, v: StormAnswer): void {
   // The set (§17): a clean answer resolves, a worse one holds the card.
   const attempts = (item.attempts ?? 0) + 1;
   if (now.pass === 1 ? item.outcome : item.secondOutcome) {
-    // Tried again after it was found (not with the top move): practice, its outcome kept.
+    // Tried again after it was found: practice, its outcome kept.
     const next: StormItem = { ...item, answer: v, attempts };
     update({ item: next, history: now.history.map((h) => (h.card.card === item.card.card ? { ...h, ...next, answer: h.answer, later: [...(h.later ?? []), v] } : h)) });
     setPhase('verdict');
@@ -1210,7 +1210,8 @@ export function isTopMove(v: StormAnswer): boolean {
 
 /**
  * Whether the set's card can be tried again: held, with attempts left; or found on a retry (or in
- * the second pass) with anything but the top move, as often as wanted, the outcome kept.
+ * the second pass), as often as wanted, the outcome kept: for the top move when it was missed, or
+ * to look at other moves once it was found.
  */
 export function canTryAgain(s: StormSession | undefined): boolean {
   const item = s?.item;
@@ -1218,7 +1219,7 @@ export function canTryAgain(s: StormSession | undefined): boolean {
   if (s.phase === 'held') return (item.attempts ?? 0) < STORM.setRetryMax;
   if (s.phase !== 'verdict' || s.revealed || !item.answer) return false;
   const out = s.pass === 1 ? item.outcome : item.secondOutcome;
-  return (out === 'retry' || (out === 'first' && s.pass === 2)) && !isTopMove(item.answer);
+  return out === 'retry' || (out === 'first' && s.pass === 2);
 }
 
 /** A set card tried again (best still hidden) — the board is set back. */

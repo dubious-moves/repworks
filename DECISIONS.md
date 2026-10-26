@@ -1859,3 +1859,14 @@ The technical calls, each with its reason:
   Decided within it: a pause of 100–10000 ms; one pause for the line's end, whether the next
   line opens by itself or the trainer goes on; the presets stay in the session's ⋯ menu, with
   "custom" at the speed set in the settings.
+
+## Revision of 2026-10-26 (the best move celebrated, Try again after it, PLAN.md §5.131)
+- **A set card found on a retry keeps Try again after the top move too.** Was (§5.85): the top
+  move ended the tries. Why: the owner, 2026-10-26: "Sometimes you want to check other
+  alternatives even though you guessed correctly." The first answer still counts; the timed
+  storm still has none.
+- **A game card's mistake, once found, can be tried again**, the grade kept from the first try,
+  no limit on practice tries. Was (§5.55): a right answer ended the card. Why: the same request.
+- **The top move is titled "Best move!"** in the storm (was the band's "Great move") and
+  celebrated on the board. Why: the owner asked for the best move to be clearer and more
+  satisfying.

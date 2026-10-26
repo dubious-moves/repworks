@@ -15,7 +15,7 @@ import { explorerAt, historyReaches, openingNameOf, openings, forgetGames, gameB
 import type { HistoryEntry } from '../core/games/practice.ts';
 import { recid } from '../app/repertoireCheck.ts';
 import { badgeOf } from '../core/games/recidivism.ts';
-import { closeLine, continueSession, dropCard, dropLine, endGameSession, enterGameSession, gameSession, gradePlan, hint, hintMove, lineMove, lineStep, lineToAlt, lineToMain, MAX_TRIES, playMove, revealBest, showLine, showPlan, skipCard, tryAgain, type CardRun, type GameSession } from '../app/gameTrainer.ts';
+import { canTryAgain, closeLine, continueSession, dropCard, dropLine, endGameSession, enterGameSession, gameSession, gradePlan, hint, hintMove, lineMove, lineStep, lineToAlt, lineToMain, MAX_TRIES, playMove, revealBest, showLine, showPlan, skipCard, tryAgain, type CardRun, type GameSession } from '../app/gameTrainer.ts';
 import { lineFen, moveAt, type EngineLine } from '../core/games/engineLine.ts';
 import { plansInDeck, setPlanCard } from '../app/plans.ts';
 import { cpFor, type GameItem } from '../core/games/extract.ts';
@@ -506,7 +506,7 @@ function GameView(props: { id: string; ply?: number }) {
 
 /* ------------------------------------------------------------------ the game cards' session */
 
-function PlayBoard(props: { run: CardRun; asking: boolean; arrows: { orig: string; dest?: string; brush: string }[]; atStart?: boolean }) {
+function PlayBoard(props: { run: CardRun; asking: boolean; arrows: { orig: string; dest?: string; brush: string }[]; atStart?: boolean; burst?: string | undefined }) {
   const r = props.run;
   // A line of the card's note (§5.91) on the board, then the engine's line: the board is the line's
   // (a move on it goes along the line or branches it). `atStart`: the card's position, for the
@@ -542,6 +542,12 @@ function PlayBoard(props: { run: CardRun; asking: boolean; arrows: { orig: strin
         drawMode={false}
         brush="green"
         onMove={onMove}
+        {...(props.burst && lastUci && !line && !shown && !props.atStart
+          ? {
+              badge: { square: lastUci.slice(2, 4), symbol: CLASSIFICATION.best.symbol, colour: CLASSIFICATION.best.colour, word: CLASSIFICATION.best.word },
+              celebrate: { square: lastUci.slice(2, 4), key: props.burst },
+            }
+          : {})}
         promotion={
           promotion && {
             dest: promotion.dest,
@@ -706,10 +712,14 @@ function Card(props: { s: GameSession; r: CardRun }) {
   const answered = s.phase === 'right' || r.revealed || s.phase === 'unjudged';
   const arrowsOfNote = answered ? noteArrows(r.card.card) : [];
   const atStart = noteBoard && arrowsOfNote.length > 0;
+  // The best move found: said so, and celebrated on the board (a new burst for each try).
+  const top = s.phase === 'right' && item.kind === 'mistake' && (j?.exactBest || j?.classification === 'best');
+  const burst = top ? `${r.card.card}|${r.tries}` : undefined;
+  const again = canTryAgain(s);
   const prompt = item.kind === 'tactic' ? 'Find the tactic' : item.kind === 'mistake' ? (item.san ? `Find a better move than ${item.san}` : 'Find the best move') : '';
   return (
     <div class="train-grid game-card" data-phase={s.phase} data-card={r.card.card} data-kind={item.kind} data-step={r.tactic?.played.length ?? (r.lastUci ? 1 : 0)}>
-      <PlayBoard run={r} asking={asking} arrows={atStart ? arrowsOfNote : arrows} atStart={atStart} />
+      <PlayBoard run={r} asking={asking} arrows={atStart ? arrowsOfNote : arrows} atStart={atStart} burst={burst} />
       <div class="train-panel">
         <p class="train-counters">
           {s.index + 1} of {s.cards.length} · {KIND_WORD[item.kind]}
@@ -720,8 +730,15 @@ function Card(props: { s: GameSession; r: CardRun }) {
         <p class="train-line">
           <strong>{prompt}</strong> <span class="muted">· move {Math.ceil(item.ply / 2)}</span>
         </p>
-        <p class="feedback train-feedback" role="status" data-testid="game-feedback" style={cls ? { color: cls.colour } : undefined}>
-          {s.phase === 'judging'
+        <p class={`feedback train-feedback${top ? ' game-best-found' : ''}`} role="status" data-testid="game-feedback" style={cls ? { color: cls.colour } : undefined}>
+          {top ? (
+            <span class="best-found" key={burst}>
+              <span class="storm-star" aria-hidden="true">
+                ★
+              </span>{' '}
+              Best move!
+            </span>
+          ) : s.phase === 'judging'
             ? 'Stockfish is judging…'
             : s.phase === 'reply'
               ? 'The opponent answers…'
@@ -734,14 +751,14 @@ function Card(props: { s: GameSession; r: CardRun }) {
                   : s.phase === 'wrong'
                     ? item.kind === 'tactic'
                       ? 'Not this one'
-                      : `${cls?.word ?? 'Not this one'}${j ? ` · −${j.wpDrop}%` : ''}${r.tries < MAX_TRIES ? '' : ' · three tries'}`
+                      : `${cls?.word ?? 'Not this one'}${j ? ` · −${j.wpDrop}%` : ''}${r.tries < MAX_TRIES || r.found ? '' : ' · three tries'}`
                     : asking
                       ? s.message && item.kind === 'tactic' && r.tactic?.solved.length
                         ? s.message
                         : 'Your move'
                       : ''}
         </p>
-        {(r.revealed || s.phase === 'right') && r.bestSan && item.kind === 'mistake' && (
+        {(r.revealed || s.phase === 'right' || (s.phase === 'wrong' && r.found)) && r.bestSan && item.kind === 'mistake' && (
           <p class="muted" data-testid="game-best">
             Best: {r.bestSan}
             {r.bestLine && r.bestLine.length > 1 ? ` (${r.bestLine.join(' ')})` : ''}
@@ -764,17 +781,17 @@ function Card(props: { s: GameSession; r: CardRun }) {
               Hint
             </button>
           )}
-          {s.phase === 'wrong' && !r.revealed && (
-            <button type="button" onClick={tryAgain}>
+          {again && (
+            <button type="button" class={s.phase === 'wrong' && !r.found ? '' : 'secondary'} title={r.found ? 'Look at other moves here: the grade recorded stays' : undefined} onClick={tryAgain}>
               Try again
             </button>
           )}
-          {s.phase === 'wrong' && !r.revealed && (
+          {s.phase === 'wrong' && !r.revealed && !r.found && (
             <button type="button" class="secondary" onClick={revealBest}>
               Show the move
             </button>
           )}
-          {(s.phase === 'right' || r.revealed || s.phase === 'unjudged') && (
+          {(s.phase === 'right' || r.revealed || s.phase === 'unjudged' || (s.phase === 'wrong' && r.found)) && (
             <button type="button" onClick={continueSession}>
               Next
             </button>

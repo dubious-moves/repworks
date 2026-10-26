@@ -7318,3 +7318,35 @@ at Easy, 17%, the list and the win synced and shown on a second device with no e
 list kept on the device carried into the log after the sync; ✕ asked, dismissed and accepted,
 synced, Restore all; the Alapin line paused on another device hidden after a sync, then Make again
 leaving it out of the lines and the replies; the old drill address). Live: TESTING.md.
+
+#### 5.131 The best move said and celebrated, and Try again after it (the owner's request, 2026-10-26)
+
+"When playing the best move in storm or mistake retry, we should try to make it more clear that
+it's the best move. Also let's try to make it more satisfying for the user when they play the best
+move. And let's make 'try again' available after retry -> best move too. Sometimes you want to
+check other alternatives even though you guessed correctly."
+
+- **Said**: a storm position answered with the top move (§5.85's: rank 1, the engine's best SAN, or
+  level with it), timed or a set, is titled **"★ Best move!"** (was "Great move", the title of any
+  move within the band), its status lit in the best move's colour (grade.ts's `best`, mint) with a
+  gold star; the session's strip marks it with a gold dot. A game card's mistake found with the
+  best move reads "★ Best move!" (was "Best move"). A practice review's retry keeps its "★ Best
+  move!". Puzzles keep "Solved".
+- **Celebrated**: the board bursts on the move's square (a glow, a ring going out, eight sparks;
+  under a second, so a timed storm's next card isn't held), and the ★ badge stays on the square
+  while the verdict is read; the words pop in. With reduced motion, only the glow, fading. The
+  same burst in the storm, the game cards and the practice review's retry (`celebrate` on the
+  board).
+- **Try again after the best move**: a set card found on a retry (or in the second pass) keeps Try
+  again (`t`, secondary beside Next) when the top move is played too, with "Try again to look at
+  other moves, or go on."; Show the move goes (the best is shown). Was (§5.85): the top move ended
+  the tries. The first answer of a set's first pass is as before, and the timed storm has no Try
+  again. A game card's mistake, once found (with any good-enough move), offers Try again: the
+  grade recorded on the first try stays, the further tries have no limit and never reveal the
+  move by themselves, and a worse one keeps Try again and Next. Tactics are as before.
+
+Tests: `storm.spec.ts` (desktop and phone: the timed storm's top move titled and burst; a set's
+retry found with the top move keeping Try again, the best shown, no Show the move, then a
+practice try with the first answer still counted; a move level with the best titled Best move);
+`games.spec.ts` (the best move titled, burst and badged; Try again after it, another move, the
+grade kept, Try again still there). Live: TESTING.md.

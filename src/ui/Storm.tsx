@@ -17,6 +17,7 @@ import {
   analyse,
   answerMove,
   canTryAgain,
+  isTopMove,
   clearGathered,
   clockLeft,
   endStorm,
@@ -73,6 +74,7 @@ import { difficulty, difficultyWords, maiaLine } from '../core/storm/maia.ts';
 import { focusAbout, focusTitle, FOCUS_GROUPS, FOCUS_LABEL, LEVEL_MAX, LEVEL_MIN, positionTags, tagWords, type Focus, type LevelUp } from '../core/storm/kinds.ts';
 import { maiaDialog, maiaElo, maiaState } from '../app/maia.ts';
 import { Board } from './Board.tsx';
+import { CLASSIFICATION } from '../core/games/grade.ts';
 import { useWakeLock } from './Train.tsx';
 import { collect, fillBodies, puzzlePrefs, puzzleState, refreshPuzzles, setPuzzlePrefs, SHARD_MB, SHARES, SHARDS_PER_COLLECT, stopPuzzles, WORKING_SET } from '../app/puzzles.ts';
 import { Back, Stuck } from './Back.tsx';
@@ -82,6 +84,8 @@ const PUZZLE_WORD: Record<string, string> = { great: 'Solved', blunder: 'Not the
 const BAND_WORD: Record<string, string> = { great: 'Great', good: 'Good', ok: 'Inaccuracy', bad: 'Mistake', blunder: 'Blunder', unknown: 'No verdict', unanswered: 'Not answered' };
 /** The card's title once answered: the band as a move's verdict reads in an annotated game. */
 const TITLE_WORD: Record<string, string> = { great: 'Great move', good: 'Good move', ok: 'Inaccuracy', bad: 'Mistake', blunder: 'Blunder', unknown: 'No verdict', unanswered: 'Not answered' };
+/** A position's answer that is the top move (a puzzle has its own words). */
+const topFound = (v: StormAnswer, puzzle: boolean) => !puzzle && (v.band === 'great' || v.band === 'good') && isTopMove(v);
 const BANDS = ['great', 'good', 'ok', 'bad', 'blunder'] as const;
 
 /** An answer in a few words: the move and its band ("Qe7 · Good"). */
@@ -782,7 +786,7 @@ function Record(props: { r: RecordRow; title: string }) {
  * A card's board: the position, or once a move is played the position after it (the move stays
  * while it is graded and the verdict is read); arrows drawn on it stay until the next card.
  */
-function CardBoard(props: { item: StormItem; asking: boolean; onMove(uci: string): void; arrows?: { orig: string; dest: string; brush: string }[]; sketch: string; draw?: boolean }) {
+function CardBoard(props: { item: StormItem; asking: boolean; onMove(uci: string): void; arrows?: { orig: string; dest: string; brush: string }[]; sketch: string; draw?: boolean; burst?: string | undefined }) {
   const p = props.item.card;
   const puzzle = props.item.puzzle;
   const step = props.item.step ?? 0;
@@ -815,7 +819,8 @@ function CardBoard(props: { item: StormItem; asking: boolean; onMove(uci: string
         drawMode={!!props.draw}
         brush="green"
         onMove={onMove}
-       
+        badge={props.burst && played ? { square: played.slice(2, 4), symbol: CLASSIFICATION.best.symbol, colour: CLASSIFICATION.best.colour, word: CLASSIFICATION.best.word } : undefined}
+        celebrate={props.burst && played ? { square: played.slice(2, 4), key: props.burst } : undefined}
         sketchKey={props.sketch}
         promotion={
           promotion && {
@@ -899,7 +904,8 @@ function Strip(props: { s: StormSession }) {
       {shown.map((it, i) => {
         const b = it.answer?.band;
         const word = b ? (it.puzzle ? (PUZZLE_WORD[b] ?? BAND_WORD[b]) : BAND_WORD[b]) : 'Now';
-        return <li key={i} class={b ? `band-${b}` : 'current'} title={`${it.answer?.userSan ? it.answer.userSan + ' · ' : ''}${word}`} />;
+        const top = !!it.answer && topFound(it.answer, !!it.puzzle);
+        return <li key={i} class={b ? `band-${b}${top ? ' best' : ''}` : 'current'} title={`${it.answer?.userSan ? it.answer.userSan + ' · ' : ''}${top ? 'Best move' : word}`} />;
       })}
     </ol>
   );
@@ -938,16 +944,19 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
   const asking = phase === 'solving';
   // The disguise (§13): before a move a puzzle and a position read the same.
   const hush = s.disguise && !v;
-  // A set card found on a retry with less than the top move can be tried on (Try again stays).
+  // A set card found on a retry can be tried on (Try again stays): for the top move, or after it.
   const more = phase === 'verdict' && canTryAgain(s);
+  // The top move played: said so, and celebrated on the board (a new burst for each answer).
+  const top = !!v && phase === 'verdict' && topFound(v, !!item.puzzle);
+  const burst = top ? `${item.card.card}|${s.pass}|${item.attempts ?? 0}` : undefined;
   // The best move stays off the panel while a set holds the card, or offers more tries, and it
-  // wasn't asked for (§17.3).
-  const showBest = !!v && (s.mode === 'storm' || (!held && !more) || s.revealed);
+  // wasn't asked for (§17.3); the top move played is the best.
+  const showBest = !!v && (s.mode === 'storm' || (!held && !more) || s.revealed || top);
   const best = storedList(item.card)[0];
   const arrows = s.revealed && best && !item.puzzle ? [{ orig: best.uci.slice(0, 2), dest: best.uci.slice(2, 4), brush: 'green' }] : [];
   const turn = positionOf(item.puzzle ? puzzleFen(item) : item.card.fen)?.turn ?? item.card.side;
   const band = v?.band ?? (phase === 'grading' ? 'checking' : 'none');
-  const title = v ? (item.puzzle ? (PUZZLE_WORD[v.band] ?? '') : (TITLE_WORD[v.band] ?? '')) : phase === 'grading' && !item.puzzle ? 'Checking…' : 'Find a good move';
+  const title = v ? (item.puzzle ? (PUZZLE_WORD[v.band] ?? '') : top ? 'Best move!' : (TITLE_WORD[v.band] ?? '')) : phase === 'grading' && !item.puzzle ? 'Checking…' : 'Find a good move';
   const left = STORM.setRetryMax - (item.attempts ?? 0);
   // A set card tried again (or back in the second pass): its first answer is the one that counts.
   const counted = s.mode === 'set' ? s.history.find((h) => h.card.card === item.card.card)?.answer : undefined;
@@ -958,14 +967,15 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
     : `${turn === 'white' ? 'White' : 'Black'} to play`;
   return (
     <div class="train-grid storm-card" data-phase={phase} data-fen={item.card.fen} data-side={item.card.side} data-card={item.card.card} data-step={item.step ?? 0} data-line={item.puzzle ? '' : positionLineKey(item.card)}>
-      <CardBoard item={item} asking={asking} onMove={(u) => void answerMove(u)} arrows={arrows} sketch={sketch} draw={draw} />
+      <CardBoard item={item} asking={asking} onMove={(u) => void answerMove(u)} arrows={arrows} sketch={sketch} draw={draw} burst={burst} />
       <div class="train-panel storm-panel">
         <Hud s={s} />
         <Strip s={s} />
         <Where item={item} hush={hush} />
-        <div class={`storm-status band-${band}`} role="status" data-testid="storm-verdict">
-          <p class="storm-title">
+        <div class={`storm-status band-${band}${top ? ' best' : ''}`} role="status" data-testid="storm-verdict">
+          <p class={`storm-title${top ? ' best-found' : ''}`} key={burst ?? 'title'}>
             {!v && <span class={`storm-side side-${turn}`} aria-hidden="true" />}
+            {top && <span class="storm-star" aria-hidden="true">★</span>}
             {title}
             {v && s.mode === 'storm' && typeof v.points === 'number' && v.points !== 0 && <span class={`storm-delta ${v.points > 0 ? 'up' : 'down'}`}>{`${v.points > 0 ? '+' : ''}${v.points}`}</span>}
           </p>
@@ -979,7 +989,7 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
         {v && held && !s.revealed && (
           <p class="muted storm-hint">{left > 0 ? `Play it again: ${plural(left, 'attempt')} left, then the move is shown.` : 'No attempts left: show the move to go on.'}</p>
         )}
-        {more && <p class="muted storm-hint">Found, but not the top move: try again for it, or go on.</p>}
+        {more && <p class="muted storm-hint">{top ? 'Try again to look at other moves, or go on.' : 'Found, but not the top move: try again for it, or go on.'}</p>}
         {v && showBest && !item.puzzle && v.band !== 'unknown' && (
           <p class="muted storm-best" title={sourceTitle(v)}>
             {bestLine(v, f)}
@@ -1003,7 +1013,7 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
               Try again <kbd>T</kbd>
             </button>
           )}
-          {(held || more) && (
+          {(held || (more && !top)) && (
             <button type="button" class="secondary" onClick={showMove}>
               Show the move <kbd>S</kbd>
             </button>

@@ -42,6 +42,11 @@ export interface BoardProps {
   autoShapes?: readonly { orig: string; dest?: string; brush: string; lineWidth?: number }[];
   /** A move's classification on its square's corner (a game's review: mistake-lab's badge). */
   badge?: { square: string; symbol: string; colour: string; word: string } | undefined;
+  /**
+   * The best move found (the storm, a game card, a review's retry): a burst on its square, played
+   * once for each `key` (a new key plays it again).
+   */
+  celebrate?: { square: string; key: string } | undefined;
   /** Premoves for `color` while the other side is to move (a practice game): the one set, and its events. */
   premove?: { color: 'white' | 'black'; current: [Key, Key] | undefined; onSet(orig: Key, dest: Key): void; onUnset(): void };
   /**
@@ -209,6 +214,7 @@ export function Board(p: BoardProps) {
     <div class={`board${p.drawMode ? ' board-draw' : ''}`} ref={wrap}>
       <div class="cg-host" ref={el} />
       {p.badge && <Badge {...p.badge} orientation={p.orientation} />}
+      {p.celebrate && <Celebrate key={p.celebrate.key} square={p.celebrate.square} orientation={p.orientation} />}
       {p.promotion && <PromotionChoice {...p.promotion} orientation={p.orientation} />}
       <Material fen={p.fen} orientation={p.orientation} />
       <Resize board={wrap} />
@@ -344,6 +350,25 @@ function PromotionChoice(props: { dest: Key; onPick(role: Role | undefined): voi
         </button>
       ))}
     </div>
+  );
+}
+
+/** The best move's burst on its square: a glow, a ring and sparks, gone by themselves (app.css). */
+function Celebrate(props: { square: string; orientation: 'white' | 'black' }) {
+  const file = props.square.charCodeAt(0) - 97;
+  const rank = Number(props.square[1]) - 1;
+  if (!(file >= 0 && file < 8 && rank >= 0 && rank < 8)) return null;
+  const col = props.orientation === 'white' ? file : 7 - file;
+  const row = props.orientation === 'white' ? 7 - rank : rank;
+  return (
+    <span class="board-celebrate" data-testid="board-celebrate" aria-hidden="true" style={{ left: `${(col + 0.5) * 12.5}%`, top: `${(row + 0.5) * 12.5}%` }}>
+      <span class="ring" />
+      {Array.from({ length: 8 }, (_, i) => (
+        <span key={i} class="arm" style={{ transform: `rotate(${i * 45 + 22.5}deg)` }}>
+          <span class="spark" />
+        </span>
+      ))}
+    </span>
   );
 }
 

@@ -177,7 +177,9 @@ test('games read from the Gist and Lichess, a game opened, the day’s cards ans
   await expect(card).toHaveAttribute('data-card', 'm|GameOne1_7');
   await expect(card).toHaveAttribute('data-phase', 'asking');
   await play(page, 'f3d4');
-  await expect(page.getByTestId('game-feedback')).toHaveText(/Best move/);
+  await expect(page.getByTestId('game-feedback')).toHaveText('★ Best move!');
+  await expect(page.getByTestId('board-celebrate')).toHaveCount(1);
+  await expect(page.getByTestId('board-badge')).toHaveAttribute('title', 'Best move');
   await expect(card).toContainText('Recorded: Easy');
   const line = page.getByTestId('engine-line');
   await page.getByRole('button', { name: 'Show the engine’s line' }).click();
@@ -185,6 +187,15 @@ test('games read from the Gist and Lichess, a game opened, the day’s cards ans
   await expect(line).toHaveAttribute('data-idx', '1');
   await page.getByRole('button', { name: 'Hide the line' }).click();
   await expect(line).toHaveCount(0);
+  // Found, and tried again for another move: practice, the grade kept, Try again and Next stay.
+  await page.getByRole('button', { name: 'Try again' }).click();
+  await expect(card).toHaveAttribute('data-phase', 'asking');
+  await expect(page.getByTestId('board-celebrate')).toHaveCount(0);
+  await play(page, 'e1g1');
+  await expect(card).toHaveAttribute('data-phase', /right|wrong/);
+  await expect(page.getByTestId('game-feedback')).not.toHaveText(/Best move/);
+  await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
+  await expect(card).toContainText('Recorded: Easy');
   await page.getByRole('button', { name: 'Next' }).click();
 
   await expect(card).toHaveAttribute('data-card', 'm|GameTwo2_7');

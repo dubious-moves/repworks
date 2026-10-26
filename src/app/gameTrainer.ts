@@ -59,6 +59,8 @@ export interface CardRun {
   bestSan?: string;
   bestLine?: string[];
   revealed: boolean;
+  /** A mistake's move found: tried again after it, the tries are practice (no limit, the grade kept). */
+  found?: boolean;
   tactic?: TacticRun;
   tacticWrong: number;
   /** The last move judged, with the engine's line after it (UCI) and the score after it (White's view). */
@@ -277,7 +279,8 @@ async function mistakeMove(item: MistakeItem, uci: string): Promise<void> {
     patch.bestUci = best;
     patch.bestSan = sanLine(r.fen, [best])[0] ?? best;
   }
-  if (!ok && tries >= MAX_TRIES) {
+  if (ok) patch.found = true;
+  if (!ok && tries >= MAX_TRIES && !s.run.found) {
     // The best move shown on the card's position (mistake-lab's revealBestMove owns the board then).
     patch.revealed = true;
     patch.board = r.fen;
@@ -356,11 +359,18 @@ function lineDone(t: TacticRun): void {
   }, 600);
 }
 
+/** Whether the card can be tried again: after a wrong move, or a mistake's move found (to try others). */
+export function canTryAgain(s: GameSession | undefined): boolean {
+  const r = s?.run;
+  if (!s || !r || r.revealed) return false;
+  return s.phase === 'wrong' || (s.phase === 'right' && r.card.item.kind === 'mistake' && !!r.found);
+}
+
 /** Back to the card's position (a mistake), or to before the wrong move (a tactic). */
 export function tryAgain(): void {
   const s = gameSession.value;
   const r = s?.run;
-  if (!s || !r || s.phase !== 'wrong' || r.revealed) return;
+  if (!s || !r || !canTryAgain(s)) return;
   if (r.tactic) {
     let fen = r.fen;
     for (const uci of r.tactic.played) fen = playOn(fen, uci) ?? fen;
@@ -369,7 +379,7 @@ export function tryAgain(): void {
     gameSession.value = { ...s, phase: 'asking', run: { ...kept, board: fen, ...(last ? { lastUci: last } : {}) } };
     return;
   }
-  const { lastUci: _tried, line: _line, lineBusy: _busy, pendingFen: _pending, ...rest } = r;
+  const { lastUci: _tried, line: _line, lineBusy: _busy, pendingFen: _pending, judged: _judged, played: _played, ...rest } = r;
   gameSession.value = { ...s, phase: 'asking', run: { ...rest, board: r.fen } };
 }
 

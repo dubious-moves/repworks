@@ -217,12 +217,13 @@ test('the storm: positions gathered, a great move and a mistake scored, the revi
   await drawArrow(page, 'a2', 'a4', side);
   expect(await shapes(page)).toBeGreaterThan(0);
 
-  // The best move: great, +2; the move stays on the board through the verdict.
+  // The best move: great, +2, said as the best and celebrated; the move stays on the board through the verdict.
   const best = ranked(first)[0]!;
   const mover = await pieceOn(page, best.slice(0, 2));
   await play(page, best);
-  await expect(page.getByTestId('storm-verdict')).toContainText('Great');
+  await expect(page.getByTestId('storm-verdict')).toContainText('Best move!');
   await expect(page.getByTestId('storm-verdict')).toContainText('the top move');
+  await expect(page.getByTestId('board-celebrate')).toHaveCount(1);
   await expect(page.getByTestId('storm-points')).toHaveText('2');
   expect(await pieceOn(page, best.slice(2, 4))).toBe(mover);
   expect(await pieceOn(page, best.slice(0, 2))).toBe('');
@@ -545,7 +546,7 @@ test('Clear positions: asked once, then the gathered positions gone from this de
   await expect(page.getByTestId('storm-count')).toContainText('0 positions ready');
 });
 
-test('the set: a retry found with less than the top move keeps Try again; the top move ends it', async ({ page }) => {
+test('the set: a retry found keeps Try again, with less than the top move and with it; the top move said and celebrated', async ({ page }) => {
   const w = await setUp(page);
   await gathered(page, w);
   await page.getByRole('button', { name: /^Set of/ }).click();
@@ -567,13 +568,23 @@ test('the set: a retry found with less than the top move keeps Try again; the to
   await expect(page.getByRole('button', { name: /^Next position/ })).toBeVisible();
   await page.keyboard.press('t');
   await expect(page.getByTestId('storm-verdict')).toContainText('Find a good move');
-  // The top move: Try again goes, the best is shown.
+  // The top move: said so and celebrated, the best shown; Try again stays, to look at other moves.
   await play(page, moves[0]!);
-  await expect(page.getByTestId('storm-verdict')).toContainText('Great move');
-  await expect(page.getByRole('button', { name: /^Try again/ })).toHaveCount(0);
+  await expect(page.getByTestId('storm-verdict')).toContainText('Best move!');
+  await expect(page.getByTestId('board-celebrate')).toHaveCount(1);
+  await expect(page.getByTestId('board-badge')).toHaveAttribute('title', 'Best move');
   await expect(page.locator('.storm-best')).toContainText('best');
+  await expect(page.getByRole('button', { name: /^Show the move/ })).toHaveCount(0);
+  await expect(page.locator('.storm-hint')).toContainText('Try again to look at other moves');
   // The first answer still the one that counts.
   await expect(page.getByTestId('storm-counted')).toContainText('Mistake');
+  await page.getByRole('button', { name: /^Try again/ }).click();
+  await expect(page.getByTestId('storm-verdict')).toContainText('Find a good move');
+  await expect(page.getByTestId('board-celebrate')).toHaveCount(0);
+  await play(page, moves[1]!);
+  await expect(page.getByTestId('storm-verdict')).toContainText('Great move');
+  await expect(page.getByTestId('storm-counted')).toContainText('Mistake');
+  await expect(page.getByRole('button', { name: /^Next position/ })).toBeVisible();
 });
 
 test('the set: a mistake held, tried again, shown, and the second pass', async ({ page, isMobile }) => {
@@ -610,7 +621,7 @@ test('the set: a mistake held, tried again, shown, and the second pass', async (
     if (await page.getByTestId('storm-summary').isVisible()) break;
     const f = await cardFen(page);
     await play(page, ranked(f)[0]!);
-    await expect(page.getByTestId('storm-verdict')).toContainText('Great');
+    await expect(page.getByTestId('storm-verdict')).toContainText('Best move!');
     await page.getByRole('button', { name: /^Next position/ }).click();
   }
   await expect(page.getByTestId('storm-summary')).toContainText('5 of 6 found first time · 1 of 1 in the second pass');
@@ -674,7 +685,7 @@ test('a list over two depths (§5.120): each move scored the mean of the depth s
     await expect(page.locator('.storm-card')).toBeVisible();
     await play(page, ranked(await cardFen(page))[1]!);
     // One look: a scored move's verdict stays only STORM.verdictFastMs before the next card.
-    await expect(page.getByTestId('storm-verdict')).toContainText(/Great move.*#2 of 12 · level with the best/);
+    await expect(page.getByTestId('storm-verdict')).toContainText(/Best move!.*#2 of 12 · level with the best/);
   } finally {
     await two.close();
   }

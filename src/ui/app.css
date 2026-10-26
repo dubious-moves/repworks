@@ -1094,6 +1094,146 @@ textarea.script {
   pointer-events: none;
 }
 
+/* The best move found: a glow on its square, a ring going out and eight sparks, once (Board.tsx),
+   and its words popping in (`.best-found`). Still with reduced motion: the glow alone, fading. */
+.board-celebrate {
+  --best: #62cf8e; /* fixed */
+  position: absolute;
+  z-index: 3;
+  width: 12.5%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.board-celebrate::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle, rgb(98 207 142 / 75%) 0%, rgb(98 207 142 / 35%) 55%, transparent 72%); /* fixed */
+  animation: best-glow 1.4s ease-out forwards;
+}
+
+.board-celebrate .ring {
+  position: absolute;
+  inset: 0;
+  border: 3px solid var(--best);
+  border-radius: 50%;
+  opacity: 0;
+  animation: best-ring 0.7s ease-out forwards;
+}
+
+/* Each spark on its own arm, turned by Board.tsx, going out along it. */
+.board-celebrate .arm {
+  position: absolute;
+  inset: 0;
+}
+
+.board-celebrate .spark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 16%;
+  aspect-ratio: 1;
+  margin: -8% 0 0 -8%;
+  border-radius: 50%;
+  background: #f5d76e; /* fixed */
+  box-shadow: 0 0 4px #f5d76e; /* fixed */
+  opacity: 0;
+  animation: best-spark 0.8s ease-out forwards;
+}
+
+.board-celebrate .arm:nth-child(odd) .spark {
+  background: var(--best);
+  box-shadow: 0 0 4px var(--best);
+}
+
+@keyframes best-glow {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+
+  15% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
+@keyframes best-ring {
+  0% {
+    opacity: 1;
+    transform: scale(0.5);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.9);
+  }
+}
+
+@keyframes best-spark {
+  0% {
+    opacity: 1;
+    transform: translateY(-120%) scale(1.2);
+  }
+
+  60% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-560%) scale(0.5);
+  }
+}
+
+.best-found {
+  animation: best-pop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+@keyframes best-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .board-celebrate .ring,
+  .board-celebrate .spark {
+    display: none;
+  }
+
+  .board-celebrate::before {
+    animation-name: best-glow-still;
+  }
+
+  .best-found {
+    animation: none;
+  }
+
+  @keyframes best-glow-still {
+    from {
+      opacity: 1;
+    }
+
+    to {
+      opacity: 0;
+    }
+  }
+}
+
 .board-draw {
   outline: 3px solid var(--warn);
   outline-offset: 2px;
@@ -3873,6 +4013,7 @@ a.button.primary {
 
 .storm {
   --band-great: #5fbf55; /* fixed */
+  --band-best: #62cf8e; /* fixed */
   --band-good: #8fae6a; /* fixed */
   --band-ok: #9a9a9a; /* fixed */
   --band-bad: #d6a13a; /* fixed */
@@ -3898,6 +4039,11 @@ a.button.primary {
 
 .storm .band-blunder {
   --band-color: var(--band-blunder);
+}
+
+.storm .band-great.best,
+.storm .band-good.best {
+  --band-color: var(--band-best);
 }
 
 .storm .band-unknown,
@@ -4179,6 +4325,10 @@ a.button.primary {
   background: var(--band-color, rgb(var(--ink) / 15%));
 }
 
+.storm-strip li.best {
+  background: radial-gradient(circle, #f5d76e 0 28%, var(--band-color) 34%); /* fixed */
+}
+
 .storm-strip li.current {
   background: transparent;
   box-shadow: inset 0 0 0 2px var(--text);
@@ -4216,6 +4366,20 @@ a.button.primary {
   color: var(--band-color, var(--text));
   font-size: 1.3rem;
   font-weight: 700;
+}
+
+/* The top move played: the status lit in the best move's colour, a gold star by its words. */
+.storm-status.best {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--band-best) 18%, var(--surface)), var(--surface) 75%);
+}
+
+.storm-title.best-found {
+  transform-origin: left center;
+}
+
+.storm-star {
+  color: #f5c84c; /* fixed */
+  text-shadow: 0 0 6px rgb(245 200 76 / 60%); /* fixed */
 }
 
 .storm-line {
@@ -5092,6 +5256,14 @@ a.button.disabled {
   font-weight: 700;
   font-size: 1.05rem;
 }
+.review-card-title.best-found {
+  transform-origin: left center;
+}
+
+.game-best-found .best-found {
+  display: inline-block;
+}
+
 .review-card code {
   font-family: inherit;
   font-weight: 600;

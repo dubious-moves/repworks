@@ -76,7 +76,7 @@ function OpponentSettings(props: { value: Opponent; onChange(o: Opponent): void 
 
 /* ------------------------------------------------------------------ a board that takes moves */
 
-export function MoveBoard(props: { fen: string; orientation: 'white' | 'black'; movable: boolean; lastUci?: string | undefined; arrows?: { orig: string; dest?: string; brush: string }[]; badge?: BoardProps['badge']; onMove(uci: string): void; premove?: BoardProps['premove'] }) {
+export function MoveBoard(props: { fen: string; orientation: 'white' | 'black'; movable: boolean; lastUci?: string | undefined; arrows?: { orig: string; dest?: string; brush: string }[]; badge?: BoardProps['badge']; celebrate?: BoardProps['celebrate']; onMove(uci: string): void; premove?: BoardProps['premove'] }) {
   const pos = useMemo(() => positionOf(props.fen), [props.fen]);
   const [promotion, setPromotion] = useState<{ orig: Key; dest: Key } | undefined>(undefined);
   if (!pos) return null;
@@ -103,6 +103,7 @@ export function MoveBoard(props: { fen: string; orientation: 'white' | 'black'; 
         brush="green"
         onMove={onMove}
         badge={props.badge}
+        celebrate={props.celebrate}
         {...(props.premove ? { premove: props.premove } : {})}
         promotion={
           promotion && {
@@ -514,6 +515,7 @@ export function PracticeReview(props: { game: PracticeGame; onNext?: (() => void
   let lastUci: string | undefined;
   let arrows: { orig: string; dest?: string; brush: string }[] = [];
   let badge: BoardProps['badge'];
+  let celebrate: BoardProps['celebrate'];
   let movable = false;
   let onMove: (uci: string) => void = () => undefined;
   let cp: number | undefined;
@@ -539,6 +541,9 @@ export function PracticeReview(props: { game: PracticeGame; onNext?: (() => void
     movable = !retry.tried;
     onMove = (u) => void tryMove(u);
     badge = badgeOf(retry.tried, retry.judged?.classification);
+    // The best move found on a retry: a burst on its square.
+    const c = retry.judged?.classification;
+    if (retry.tried && (c === 'best' || c === 'great')) celebrate = { square: retry.tried.slice(2, 4), key: `${retry.i}|${retry.tried}` };
     cp = retry.tried ? white(retry.judged?.afterCp) : white(evals[at]);
   } else {
     board = fenAt(at);
@@ -670,7 +675,7 @@ export function PracticeReview(props: { game: PracticeGame; onNext?: (() => void
           </p>
         ) : (
           <>
-            <p class="review-card-title" role="status" data-testid="practice-retry" style={c ? { color: c.colour } : undefined}>
+            <p class={`review-card-title${exact ? ' best-found' : ''}`} role="status" data-testid="practice-retry" style={c ? { color: c.colour } : undefined}>
               {c ? `${c.symbol} ${c.word}${exact ? '!' : ''}` : 'Stockfish couldn’t judge it.'}
             </p>
             {j && (
@@ -792,7 +797,7 @@ export function PracticeReview(props: { game: PracticeGame; onNext?: (() => void
         <div class="review-board-row">
           <ReviewEvalBar cp={cp} orientation={s.color} />
           <div class="review-board-main">
-            <MoveBoard fen={board} orientation={s.color} movable={movable} lastUci={lastUci} arrows={arrows} badge={badge} onMove={onMove} />
+            <MoveBoard fen={board} orientation={s.color} movable={movable} lastUci={lastUci} arrows={arrows} badge={badge} celebrate={celebrate} onMove={onMove} />
           </div>
         </div>
         <div class="actions move-buttons">

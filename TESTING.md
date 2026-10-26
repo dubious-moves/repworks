@@ -882,3 +882,15 @@ q_extension (or give it to a session with q_extension attached), then run
 - In a practice game against the database or Maia, Take back (beside Hint) removes your last move
   and the opponent's answer; pressed while the opponent thinks, its answer shouldn't appear.
 - Not in advantage drills (graded). Checked by Playwright (desktop and emulated phone); not live.
+
+## The best move celebrated, and Try again after it (2026-10-26)
+
+- Storm (timed and a set) and the game cards: play the top move. The panel should read
+  "★ Best move!" in mint with a gold star, and the board should burst on the square (glow, ring,
+  sparks) with a ★ badge. Is it clear and satisfying, and not too much? On the phone too.
+- In a set: miss a card, Try again, then play the top move: Try again should still be there
+  (beside Next position) and Show the move gone; Try again, another move, the first answer still
+  "Counted".
+- Game cards: find a mistake's move, then Try again and play another: the "Recorded" grade stays.
+- Checked by Playwright (desktop and emulated phone); the look of the burst only in a headless
+  screenshot, not on a device.
