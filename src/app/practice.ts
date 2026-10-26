@@ -455,9 +455,10 @@ export async function practiceMove(uci: string): Promise<void> {
   const g = p.gen;
   const i = p.moves.length;
   const key = keyFen(before)?.key;
-  // The repertoire check while practising from a position: the move taken back, the first one tried remembered.
-  if (p.setup.kind === 'practice' && key) {
-    const check = repertoireCheck(before, repertoireEntries(key), { uci, san: after.san }, !!p.repIgnored);
+  // The repertoire check, practising from a position or in a checklist's drill (past its line's end
+  // too): the move taken back, the first one tried remembered. An advantage drill is graded as played.
+  if (p.setup.kind !== 'advantage' && key) {
+    const check = repertoireCheck(repertoireEntries(key), { uci, san: after.san }, !!p.repIgnored);
     if (check.refuse) {
       patch(g, (q) => ({ deviation: { san: after.san, uci, repUci: check.uci, repSan: check.san ?? check.uci }, ...(q.tried?.key === key ? {} : { tried: { key, san: after.san, uci } }) }));
       return;

@@ -894,3 +894,11 @@ q_extension (or give it to a session with q_extension attached), then run
 - Game cards: find a mistake's move, then Try again and play another: the "Recorded" grade stays.
 - Checked by Playwright (desktop and emulated phone); the look of the burst only in a headless
   screenshot, not on a device.
+
+## The repertoire check past a checklist line's end, at any ply (2026-10-26)
+
+- Make a checklist with Plies cut short of where the study ends (say 4 or 6) and drill a line:
+  once the game starts, play a move other than the study's at a position the study covers. It
+  should be taken back with "… isn’t your repertoire: the study move is …", and the study move
+  played then. Also in a game practised from a position past move 10, where the repertoire goes on.
+- Checked by Playwright (desktop and emulated phone, the checklist drill); not live.

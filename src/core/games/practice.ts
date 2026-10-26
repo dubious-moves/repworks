@@ -145,22 +145,14 @@ export interface PlayedMove {
   repTried?: { san: string; uci: string };
 }
 
-/** The repertoire check while practising asks before this ply (mistake-lab's FILTER PRACTICE: `ply < 20`). */
-export const REP_CHECK_PLIES = 20;
-
-/** A position's ply from its FEN's move number and side to move (mistake-lab's `(moveNum - 1) * 2 + (black ? 1 : 0)`). */
-export function plyOfFen(fen: string): number {
-  const [, turn, , , , full] = fen.split(' ');
-  return ((parseInt(full ?? '1', 10) || 1) - 1) * 2 + (turn === 'b' ? 1 : 0);
-}
-
 /**
  * The repertoire check on a move about to be played while practising: a move the repertoire
- * doesn't have, at a position before ply 20 where it has one, is taken back (`refuse`, the
- * repertoire's move); unless ignored for this game.
+ * doesn't have, at a position where it has one, is taken back (`refuse`, the repertoire's move);
+ * unless ignored for this game. At any ply (the owner's request, 2026-10-26; mistake-lab's asks
+ * before ply 20 only).
  */
-export function repertoireCheck(fen: string, entries: readonly { uci: string; san?: string }[] | undefined, move: { uci: string; san?: string }, ignored: boolean): { refuse: false } | { refuse: true; uci: string; san: string | undefined } {
-  if (ignored || !entries?.length || plyOfFen(fen) >= REP_CHECK_PLIES) return { refuse: false };
+export function repertoireCheck(entries: readonly { uci: string; san?: string }[] | undefined, move: { uci: string; san?: string }, ignored: boolean): { refuse: false } | { refuse: true; uci: string; san: string | undefined } {
+  if (ignored || !entries?.length) return { refuse: false };
   if (entries.some((e) => e.uci === move.uci || (!!e.san && e.san === move.san))) return { refuse: false };
   return { refuse: true, uci: entries[0]!.uci, san: entries[0]!.san };
 }

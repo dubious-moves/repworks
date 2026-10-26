@@ -5473,7 +5473,7 @@ again).
 
 **As built, item 2** (2026-10-07): in `src/app/practice.ts` and `src/ui/Practice.tsx`, for a game
 practised from a position (Practise from here, Play on, the analysis board's Practise): **the
-repertoire check** (`repertoireCheck` in `src/core/games/practice.ts`: before ply 20, at a position
+repertoire check** (`repertoireCheck` in `src/core/games/practice.ts`: before ply 20 (any ply since §5.132), at a position
 where the repertoire has a move of the user's side, a move it doesn't have, by UCI or SAN, is taken
 back with "e6 isn't your repertoire: the study move is d6" and Ignore for this game; the first move
 tried there is kept with the move then played, `repTried`, in the game and its history entry; the
@@ -7350,3 +7350,27 @@ retry found with the top move keeping Try again, the best shown, no Show the mov
 practice try with the first answer still counted; a move level with the best titled Best move);
 `games.spec.ts` (the best move titled, burst and badged; Try again after it, another move, the
 grade kept, Try again still there). Live: TESTING.md.
+
+#### 5.132 The repertoire check in a checklist's drill, at any ply (the owner's request, 2026-10-26)
+
+"When playing against Maia/DB, if the user deviates from their repertoire with a move, they should
+be notified during the game and be able to retry. Currently when playing a checklist variation, it
+only stops if the deviation is in the beginning."
+
+- A checklist's drill checked only its lead-up (a move off the line refused, §5.62); the game from
+  the line's end had no repertoire check, so where the study goes on past the list's cut (Plies)
+  a move off it was played. Now the drill's game runs §5.57 item 2's check as a game practised
+  from a position does: the move taken back, "e5 isn't your repertoire: the study move is cxd4",
+  Ignore for this game, said with voice on, the first move tried kept for the review. An
+  advantage drill stays unchecked (graded as played).
+- The check's window (before ply 20, mistake-lab's) is gone: it asks at every position where the
+  repertoire has a move of the user's side (`repertoireCheck` no longer takes the position).
+
+**As built** (2026-10-26): `src/core/games/practice.ts` (`repertoireCheck` without its ply,
+`REP_CHECK_PLIES` and `plyOfFen` removed), `src/app/practice.ts` (the check in every kind but the
+advantage drill). Tests: `test/unit/core/games/resume.test.ts` (the window's test removed; the
+check's cases kept), `test/e2e/checklist.spec.ts` (desktop and phone: a list cut at four plies,
+its line drilled, 3...e5 after the explorer's 3.d4 taken back with cxd4 named, cxd4 played, then
+a move past the study's end played; control: the check limited to practice games again fails it
+on both). Live: TESTING.md.
+

@@ -235,3 +235,41 @@ test('a list kept on the device before carried into the log; a line taken out an
   await expect(section.getByTestId('checklist-paused')).toHaveCount(0);
   await expect(section).toContainText('Replies the study doesn’t cover (2)');
 });
+
+test('a drill past its line’s end: a move off the repertoire taken back with the study move, then played on', async ({ page }) => {
+  test.setTimeout(60_000);
+  const { github } = world();
+  await setUp(page, github, 'desktop');
+  await page.evaluate(() => (location.hash = '#/checklist?sid=Rep0Najd&side=black'));
+  const section = await block(page);
+  // Cut at four plies: the line ends at 2...d6, where the study goes on (3.d4 cxd4).
+  await section.getByLabel('Plies').selectOption('4');
+  await section.getByRole('button', { name: 'Make' }).click();
+  const lines = section.getByTestId('checklist-line');
+  await expect(lines.nth(0).locator('.checklist-line')).toHaveText(/^1\. e4 c5 2\. Nf3 d6\s*$/);
+  await lines.nth(0).getByRole('button', { name: 'Easy' }).click();
+  const drill = page.getByTestId('checklist-drill');
+  for (const [from, to, step] of [['c7', 'c5', '1'], ['d7', 'd6', '3']] as const) {
+    await expect(drill).toHaveAttribute('data-step', step);
+    await clickSquare(page, from, 'black');
+    await clickSquare(page, to, 'black');
+  }
+  // The game from the line's end: the explorer's 3.d4, then 3...e5 isn't the study's move.
+  const game = page.locator('.practice-game');
+  await expect(game).toHaveAttribute('data-moves', '1');
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  await clickSquare(page, 'e7', 'black');
+  await clickSquare(page, 'e5', 'black');
+  await expect(page.getByTestId('practice-deviation')).toContainText('e5 isn’t your repertoire: the study move is cxd4');
+  await expect(game).toHaveAttribute('data-moves', '1');
+  await clickSquare(page, 'c5', 'black');
+  await clickSquare(page, 'd4', 'black');
+  await expect(page.getByTestId('practice-deviation')).toHaveCount(0);
+  await expect(game).toHaveAttribute('data-moves', '3');
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  // Past the study's end (4.Nxd4): any move is played.
+  await clickSquare(page, 'g8', 'black');
+  await clickSquare(page, 'f6', 'black');
+  await expect(page.getByTestId('practice-deviation')).toHaveCount(0);
+  await expect(game).toHaveAttribute('data-moves', '5');
+});
