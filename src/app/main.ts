@@ -4,6 +4,7 @@ import '../ui/themes.css';
 import '../ui/app.css';
 import { App } from '../ui/App.tsx';
 import { registerServiceWorker } from '../platform/serviceWorker.ts';
+import { carryOverLocalLists } from './checklist.ts';
 import { closeDialogsOnBackdrop } from './lightDismiss.ts';
 import { takeLichessCallback } from './lichess.ts';
 import { installSelectFocusRelease } from './selectFocus.ts';
@@ -25,6 +26,7 @@ installSelectFocusRelease();
 document.addEventListener('touchstart', () => {}, { passive: true });
 // A frame of the styles gallery (styles.html): shown in another theme, never syncing.
 void startApp(link, lichessCallback, !new URLSearchParams(location.search).has('preview'));
+carryOverLocalLists();
 
 if (import.meta.env.PROD) {
   registerServiceWorker(import.meta.env.BASE_URL, {

@@ -117,6 +117,9 @@ function PriorityBar(props: { groups: ChapterRows[]; scope: string }) {
       <button type="button" class="secondary" onClick={() => openPriority(scope)}>
         Prioritize…
       </button>
+      <button type="button" class="secondary" title="The lines that matter most, drilled against the explorer and Maia" onClick={() => open({ name: 'checklists', sid: scope })}>
+        Checklist…
+      </button>
       {growError.value && (
         <span class="error" role="alert">
           {growError.value}
@@ -190,6 +193,17 @@ function ChapterBlock(props: { group: ChapterRows; data: TrainData; open: boolea
             }}
           >
             Prioritize…
+          </button>
+          <button
+            type="button"
+            class="secondary"
+            onClick={() => {
+              menuFor.value = undefined;
+              const side = chapter ? header(chapter, 'Orientation') : undefined;
+              open({ name: 'checklists', sid: g.sid, ...(side === 'white' || side === 'black' ? { side } : {}) });
+            }}
+          >
+            Checklist…
           </button>
         </div>
       )}

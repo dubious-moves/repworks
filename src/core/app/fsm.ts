@@ -34,7 +34,10 @@
 //                                       (the side to move when none)
 //   #/repertoire-check                  deviations, gaps and weak spots from the games (§5.58–§5.60)
 //   #/progress                          what the log says of the training: recall, chapters, misses, workload (§5.122)
-//   #/checklist/<sid>/<n>?preset=easy   a checklist line's drill at a difficulty (§5.62)
+//   #/checklist[?sid=<sid>&side=black]  the variation checklists, every study's (§5.130), one unfolded
+//   #/checklist/<sid>?side=black&line=e2e4,c7c5&preset=easy
+//                                       a checklist line's drill at a difficulty (§5.62), the line by
+//                                       its moves (§5.130); the old #/checklist/<sid>/<n> opens the list
 //   #/migrate                           the migration from mistake-lab (§5.64)
 // A setup link (#setup?…) is read and removed before any of this (src/app/setup.ts).
 import { isId } from '../study/ids.ts';
@@ -96,8 +99,10 @@ export type Mode =
   | { name: 'repCheck' }
   /** What the log says of the training (§5.122). */
   | { name: 'progress' }
-  /** A study's checklist line `i` (as listed on this device), drilled at a preset (§5.62). */
-  | { name: 'checklist'; sid: string; i: number; preset: 'easy' | 'medium' | 'hard' };
+  /** The variation checklists (§5.130): every repertoire study's, with `sid` (and `side`) unfolded. */
+  | { name: 'checklists'; sid?: string; side?: 'white' | 'black' }
+  /** A checklist line of a study's side, by its moves from the start (UCI), drilled at a preset (§5.62, §5.130). */
+  | { name: 'checklist'; sid: string; side: 'white' | 'black'; line: string[]; preset: 'easy' | 'medium' | 'hard' };
 
 /** A page the analysis board was opened from and goes back to: any but the board itself. */
 export type BackMode = Exclude<Mode, { name: 'analysis' }>;
@@ -216,9 +221,20 @@ export function parseHash(hash: string): Mode {
   if (parts.length === 1 && parts[0] === 'migrate') return { name: 'migrate' };
   if (parts.length === 1 && parts[0] === 'repertoire-check') return { name: 'repCheck' };
   if (parts.length === 1 && parts[0] === 'progress') return { name: 'progress' };
-  if (parts[0] === 'checklist' && parts.length === 3 && isId(parts[1]) && /^\d{1,3}$/.test(parts[2]!)) {
-    const preset = /(?:^|&)preset=(easy|medium|hard)(?:&|$)/.exec(query)?.[1] as 'easy' | 'medium' | 'hard' | undefined;
-    return { name: 'checklist', sid: parts[1], i: Number(parts[2]), preset: preset ?? 'easy' };
+  if (parts[0] === 'checklist') {
+    const side = /(?:^|&)side=(white|black)(?:&|$)/.exec(query)?.[1] as 'white' | 'black' | undefined;
+    if (parts.length === 1) {
+      const sid = /(?:^|&)sid=([^&]+)/.exec(query)?.[1];
+      return sid && isId(sid) ? { name: 'checklists', sid, ...(side ? { side } : {}) } : { name: 'checklists' };
+    }
+    // A drill's old address named the line by its place in a list kept on the device: the list now.
+    if (parts.length === 3 && isId(parts[1]) && /^\d{1,3}$/.test(parts[2]!)) return { name: 'checklists', sid: parts[1] };
+    const line = /(?:^|&)line=([a-h1-8qrbn,]+)(?:&|$)/.exec(query)?.[1]?.split(',');
+    if (parts.length === 2 && isId(parts[1]) && side && line?.length && line.every((m) => /^[a-h][1-8][a-h][1-8][qrbn]?$/.test(m))) {
+      const preset = /(?:^|&)preset=(easy|medium|hard)(?:&|$)/.exec(query)?.[1] as 'easy' | 'medium' | 'hard' | undefined;
+      return { name: 'checklist', sid: parts[1], side, line, preset: preset ?? 'easy' };
+    }
+    return { name: 'checklists' };
   }
   if (parts[0] === 'games') {
     if (parts.length === 1) return { name: 'games' };
@@ -331,8 +347,10 @@ export function modeHash(mode: Mode): string {
       return '#/repertoire-check';
     case 'progress':
       return '#/progress';
+    case 'checklists':
+      return mode.sid ? `#/checklist?sid=${mode.sid}${mode.side ? `&side=${mode.side}` : ''}` : '#/checklist';
     case 'checklist':
-      return `#/checklist/${mode.sid}/${mode.i}?preset=${mode.preset}`;
+      return `#/checklist/${mode.sid}?side=${mode.side}&line=${mode.line.join(',')}&preset=${mode.preset}`;
     case 'storm':
       return `#/storm${mode.sid ? `/${mode.sid}${mode.cid ? `/${mode.cid}${atQuery(mode.at)}` : ''}` : ''}`;
     case 'analysis': {

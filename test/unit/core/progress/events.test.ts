@@ -60,3 +60,45 @@ test('a note (§5.91): on a game card, its text kept as written; anything else r
   assert.deepEqual(lines.map((l) => l.event), [note]);
   assert.deepEqual(problems.map((p) => p.reason), ['card must be a game card (m|…)', 'text must be a string']);
 });
+
+test('a checklist (§5.130): on a study, its lines, reserve and gaps as moves with shares; anything else refused', () => {
+  const list: KnownEvent = {
+    v: 1,
+    n: 1,
+    t: '2026-10-26T10:00:00.000Z',
+    k: 'checklist',
+    card: 't|Rep0Najd',
+    color: 'black',
+    ply: 10,
+    count: 2,
+    lines: [{ m: 'e2e4 c7c5 g1f3 d7d6', p: 0.7 }],
+    reserve: [{ m: 'e2e4 c7c5 c2c3', p: 0.3 }],
+    gaps: [{ m: 'd2d4', p: 0.4 }],
+    calls: 4,
+    cut: 1,
+  };
+  const line = formatEvent(list);
+  assert.equal(line, '{"v":1,"n":1,"t":"2026-10-26T10:00:00.000Z","k":"checklist","card":"t|Rep0Najd","color":"black","ply":10,"count":2,"lines":[{"m":"e2e4 c7c5 g1f3 d7d6","p":0.7}],"reserve":[{"m":"e2e4 c7c5 c2c3","p":0.3}],"gaps":[{"m":"d2d4","p":0.4}],"calls":4,"cut":1}');
+  const at = (n: number, rest: string) => `{"v":1,"n":${n},"t":"2026-10-26T10:00:00.000Z","k":"checklist",${rest}}`;
+  const ok = '"lines":[],"reserve":[],"gaps":[]';
+  const bad = [
+    at(2, `"card":"r|x|e2e4","color":"white","ply":0,"count":1,${ok}`),
+    at(3, `"card":"t|Rep0Najd","color":"red","ply":0,"count":1,${ok}`),
+    at(4, `"card":"t|Rep0Najd","color":"white","ply":-1,"count":1,${ok}`),
+    at(5, `"card":"t|Rep0Najd","color":"white","ply":0,"count":0,${ok}`),
+    at(6, `"card":"t|Rep0Najd","color":"white","ply":0,"count":1,"lines":[{"m":"e4 e5","p":0.5}],"reserve":[],"gaps":[]`),
+    at(7, `"card":"t|Rep0Najd","color":"white","ply":0,"count":1,"lines":[],"reserve":[{"m":"e2e4","p":2}],"gaps":[]`),
+    at(8, `"card":"t|Rep0Najd","color":"white","ply":0,"count":1,"lines":[],"reserve":[]`),
+  ];
+  const { lines, problems } = parseLog([line, ...bad].join('\n'));
+  assert.deepEqual(lines.map((l) => l.event), [list]);
+  assert.deepEqual(problems.map((p) => p.reason), [
+    'card must be a study (t|<sid>)',
+    'color must be white or black',
+    'ply must be a non-negative integer',
+    'count must be a positive integer',
+    'lines must be a list of lines ({m: moves in UCI, p: a share})',
+    'reserve must be a list of lines ({m: moves in UCI, p: a share})',
+    'gaps must be a list of lines ({m: moves in UCI, p: a share})',
+  ]);
+});

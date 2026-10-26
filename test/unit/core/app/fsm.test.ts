@@ -45,7 +45,10 @@ test('hashes parse to modes, and modes write back to the same hash', () => {
     ['#/repertoire-check', { name: 'repCheck' }],
     ['#/progress', { name: 'progress' }],
     ['#/difficult', { name: 'difficult' }],
-    ['#/checklist/Rep0Najd/3?preset=hard', { name: 'checklist', sid: 'Rep0Najd', i: 3, preset: 'hard' }],
+    ['#/checklist', { name: 'checklists' }],
+    ['#/checklist?sid=Rep0Najd', { name: 'checklists', sid: 'Rep0Najd' }],
+    ['#/checklist?sid=Rep0Najd&side=black', { name: 'checklists', sid: 'Rep0Najd', side: 'black' }],
+    ['#/checklist/Rep0Najd?side=black&line=e2e4,c7c5,g1f3&preset=hard', { name: 'checklist', sid: 'Rep0Najd', side: 'black', line: ['e2e4', 'c7c5', 'g1f3'], preset: 'hard' }],
     ['#/show', { name: 'show' }],
     ['#/show/Rep0Najd', { name: 'show', sid: 'Rep0Najd' }],
     ['#/mistakes', { name: 'mistakes' }],
@@ -77,6 +80,9 @@ test('hashes parse to modes, and modes write back to the same hash', () => {
   assert.deepEqual(parseHash('#/analysis?back=https%3A%2F%2Fexample.com'), { name: 'analysis' });
   assert.deepEqual(parseHash('#/analysis?line=e4,<x>&show=1'), { name: 'analysis' });
   assert.deepEqual(parseHash('#/analysis?line=e4,e5&show=2'), { name: 'analysis', line: ['e4', 'e5'] });
+  // A checklist drill's old address (its place in a list kept on the device) opens that study's list (§5.130).
+  assert.deepEqual(parseHash('#/checklist/Rep0Najd/3?preset=hard'), { name: 'checklists', sid: 'Rep0Najd' });
+  assert.deepEqual(parseHash('#/checklist/Rep0Najd?side=black&line=e2e4,e9e5'), { name: 'checklists' });
 });
 
 test('transitions: open, back, a missing chapter, the move shown', () => {

@@ -16,7 +16,7 @@ import { GamesScreen } from './Games.tsx';
 import { MigrateScreen } from './Migrate.tsx';
 import { HistoryScreen, PracticeScreen } from './Practice.tsx';
 import { RepertoireCheckScreen } from './RepertoireCheck.tsx';
-import { ChecklistDrill } from './Checklist.tsx';
+import { ChecklistDrill, ChecklistScreen } from './Checklist.tsx';
 import { Debug } from './Debug.tsx';
 import { Guard } from './Guard.tsx';
 import { IdeasScreen } from './Ideas.tsx';
@@ -193,7 +193,9 @@ function Screen() {
     case 'progress':
       return <ProgressView />;
     case 'checklist':
-      return <ChecklistDrill key={`${mode.value.sid}/${mode.value.i}/${mode.value.preset}`} sid={mode.value.sid} i={mode.value.i} preset={mode.value.preset} />;
+      return <ChecklistDrill key={`${mode.value.sid}/${mode.value.side}/${mode.value.line.join(',')}/${mode.value.preset}`} sid={mode.value.sid} side={mode.value.side} line={mode.value.line} preset={mode.value.preset} />;
+    case 'checklists':
+      return <ChecklistScreen {...(mode.value.sid ? { sid: mode.value.sid } : {})} {...(mode.value.side ? { side: mode.value.side } : {})} />;
     case 'list':
       return <Home />;
   }
@@ -264,6 +266,11 @@ function StudyGroup(props: { kind: StudyRow['kind']; title: string; empty: strin
     <section class={`study-group group-${props.kind}`} aria-labelledby={id}>
       <h3 id={id}>
         {props.title} <span class="muted">{rows.length}</span>
+        {props.kind === 'repertoire' && rows.length > 0 && (
+          <a class="button secondary study-group-link" href="#/checklist" title="The lines that matter most in each study, drilled against the explorer and Maia">
+            Checklist
+          </a>
+        )}
       </h3>
       {rows.length === 0 ? (
         <p class="muted">{props.empty}</p>

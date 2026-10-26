@@ -8,11 +8,19 @@
 // - the apportionment's cap left out → "mistake-lab’s variations" (first at "three slots: reserve");
 // - the covered replies' shares not renormalised among themselves → "mistake-lab’s variations".
 // (The reserve's dedup against the list needs a transposed leaf, which this study has none of.)
+//
+// §5.130: a list kept as its event and read back the same; what a kept list shows (exclusions and
+// paused lines filled from the reserve, a line the study left behind kept in its place); the walk
+// over a study's active lines only. Controls (2026-10-26), each failing exactly the named test:
+// - a reply the study knows on a paused line counted as a gap → "the walk over active lines only";
+// - paused lines shown as active → "what a kept list shows".
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { apportionSlots, completedPresets, excludeVariation, generateChecklist, presetOpen, presetStats, type StudyMoves } from '../../../../src/core/games/checklist.ts';
+import { apportionSlots, completedPresets, excludeVariation, gapsOf, generateChecklist, linesOf, presetOpen, presetStats, recordOf, shownLines, studyMovesOf, studyPlays, type StudyMoves } from '../../../../src/core/games/checklist.ts';
 import { indexStudies } from '../../../../src/core/repertoire/index.ts';
+import { lineCard } from '../../../../src/core/progress/cards.ts';
+import { markLines } from '../../../../src/core/train/paused.ts';
 import { addLine, newChapter } from '../../../../src/core/study/ops.ts';
 import type { PositionKey } from '../../../../src/core/chess/positionKey.ts';
 
@@ -107,4 +115,59 @@ test('completion: a win per preset; the chips’ last five, a draw half; a prese
   assert.equal(presetOpen('medium', new Set()), false);
   assert.equal(presetOpen('medium', done), true);
   assert.equal(presetOpen('hard', done), false);
+});
+
+test('a list kept as its event (§5.130): its lines, reserve and gaps read back as made', async () => {
+  const list = await generateChecklist('white', study, probs, { targetPly: 0, maxVariations: 3 });
+  const kept = JSON.parse(JSON.stringify(recordOf(list))) as ReturnType<typeof recordOf>;
+  assert.deepEqual(linesOf(kept.lines), list.variations);
+  assert.deepEqual(linesOf(kept.reserve), list.reserve);
+  assert.deepEqual(gapsOf(kept.gaps), list.gaps);
+  // A line with a move that isn't legal is left out, not fatal.
+  assert.deepEqual(linesOf([{ m: 'e2e4 e2e4', p: 0.5 }]), []);
+});
+
+test('what a kept list shows (§5.130): exclusions and paused lines filled from the reserve, a line the study left behind in its place', async () => {
+  const sides = () => 'white' as const;
+  const all = studyMovesOf(index, 'Rep00001', 'white', sides, false);
+  const list = await generateChecklist('white', all, probs, { targetPly: 0, maxVariations: 3 });
+  const shown = (excluded: Set<string>, active: StudyMoves, everything: StudyMoves = all) => shownLines({ ...list, count: 3 }, 'white', excluded, { all: everything, active });
+  const names = (r: ReturnType<typeof shown>) => r.lines.map((l) => (l.gone ? '-' : '') + l.v.lineSan.join(' '));
+  const base = shown(new Set(), all);
+  assert.deepEqual(names(base), list.variations.map((v) => v.lineSan.join(' ')));
+  assert.equal(base.paused, 0);
+  // Excluded: as `excludeVariation`.
+  const out = list.variations[0]!.leafKey;
+  assert.deepEqual(names(shown(new Set([out]), all)), excludeVariation(list, out, new Set([out])).map((v) => v.lineSan.join(' ')));
+  // The first line's chapter paused: hidden and counted, the reserve's next line in.
+  const first = list.variations[0]!;
+  const ix = markLines(index, new Map(index.lines.filter((l) => first.lineSan.every((s, i) => l.path[i] === s)).map((l) => [lineCard(l.sid, l.cid, l.path), 'paused' as const]))).index;
+  const active = studyMovesOf(ix, 'Rep00001', 'white', sides, true);
+  assert.equal(studyPlays(active, 'white', first.lineUci), false);
+  assert.equal(studyPlays(all, 'white', first.lineUci), true);
+  const paused = shown(new Set(), active);
+  assert.equal(paused.paused, 1);
+  assert.deepEqual(names(paused), [...list.variations.slice(1), list.reserve[0]!].map((v) => v.lineSan.join(' ')));
+  // A study that no longer plays the line (the same move taken out everywhere): kept, struck through.
+  const gone = shown(new Set(), active, active);
+  assert.deepEqual(names(gone), [`-${first.lineSan.join(' ')}`, ...list.variations.slice(1).map((v) => v.lineSan.join(' '))]);
+});
+
+test('the walk over active lines only (§5.130): a paused branch is neither a line nor an uncovered reply, its slots its sibling’s', async () => {
+  const sides = () => 'white' as const;
+  const all = studyMovesOf(index, 'Rep00001', 'white', sides, false);
+  // The same walk as the fixture's study.
+  assert.deepEqual(await generateChecklist('white', all, probs, { targetPly: 0, maxVariations: 3 }), await generateChecklist('white', study, probs, { targetPly: 0, maxVariations: 3 }));
+  const list = await generateChecklist('white', all, probs, { targetPly: 0, maxVariations: 30 });
+  const first = list.variations[0]!;
+  const ix = markLines(index, new Map(index.lines.filter((l) => first.lineSan.every((s, i) => l.path[i] === s)).map((l) => [lineCard(l.sid, l.cid, l.path), 'paused' as const]))).index;
+  const active = studyMovesOf(ix, 'Rep00001', 'white', sides, true);
+  const again = await generateChecklist('white', active, probs, { targetPly: 0, maxVariations: 30 });
+  assert.ok(!again.variations.some((v) => v.leafKey === first.leafKey));
+  assert.ok(!again.gaps.some((g) => first.lineUci.join(' ').startsWith(g.lineUci.join(' '))));
+  assert.equal(again.variations.length, list.variations.length - 1);
+  // Another study, or the other side, has none of these moves.
+  const none = studyMovesOf(index, 'Rep00002', 'white', sides, false);
+  assert.equal(none.covers(first.leafKey), false);
+  assert.equal(studyMovesOf(index, 'Rep00001', 'black', sides, false).moveAt(list.variations[0]!.leafKey), undefined);
 });

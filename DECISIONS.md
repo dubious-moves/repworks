@@ -1825,6 +1825,16 @@ The technical calls, each with its reason:
   development squares; when we break them (if at all); unintuitive decisions. Decided within it:
   a card that breaks a pattern quotes the rule it breaks and says why.
 
+## Revision of 2026-10-26 (the variation checklist as built, PLAN.md §5.130)
+- **Decided in the build**: the event names the number of lines `count` (`n` is the log's own
+  counter); a study keeps one list per side (the latest event for that side); a reply on a paused
+  line is not an uncovered reply, though the walk doesn't enter it; ✕ is asked every time; Restore
+  all shows the lines again at once (the list keeps them, where mistake-lab's dropped them until the
+  next generation); the blocks' folds are kept for the browser tab; a list kept on a device before
+  §5.130 is written into the log only after that page's first sync, so it never overtakes a list
+  made since on another device. Why: each keeps the list one thing on every device, and the rest
+  follows mistake-lab where nothing argues otherwise.
+
 ## Revision of 2026-10-25 (the variation checklist synced, PLAN.md §5.130)
 - **A checklist is synced, as a `checklist` event on `t|<sid>`** (its lines, reserve and gaps as
   UCI moves from the start, with their shares; the latest wins). Was: kept on the device that made

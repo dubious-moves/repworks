@@ -8,8 +8,7 @@ import { recordEvent } from '../app/state.ts';
 import { startGames } from '../app/games.ts';
 import { botSpots, dismissed, humanSpots, repertoireCheck, setDismissed } from '../app/repertoireCheck.ts';
 import { trainData } from '../app/train.ts';
-import { ChecklistSection } from './Checklist.tsx';
-import { checklists } from '../app/checklist.ts';
+import { checklistViews } from '../app/checklist.ts';
 import { deviationPasses, type Deviation, type Gap } from '../core/games/deviations.ts';
 import type { PositionKey } from '../core/chess/positionKey.ts';
 import { repertoireCard } from '../core/progress/cards.ts';
@@ -69,7 +68,14 @@ export function RepertoireCheckScreen() {
       <WeakSpots />
       <Deviations />
       <Gaps />
-      <ChecklistSection />
+      <section class="card" data-testid="checklist-link">
+        <div class="card-head">
+          <h2>Variation checklist</h2>
+        </div>
+        <p class="muted">
+          Each study’s most likely lines, played out against the explorer and Maia: <a href="#/checklist">the checklist</a>.
+        </p>
+      </section>
     </div>
   );
 }
@@ -134,12 +140,12 @@ function WeakSpots() {
                   <span class="actions">
                     {(() => {
                       // A checklist line's leaf: its drill at that difficulty (mistake-lab's Drill).
-                      for (const list of Object.values(checklists.value)) {
-                        const i = list.variations.findIndex((v) => v.leafKey === r.key);
-                        if (i >= 0 && (r.preset === 'easy' || r.preset === 'medium' || r.preset === 'hard'))
+                      for (const view of checklistViews.value) {
+                        const line = view.list?.lines.find((l) => !l.gone && l.v.leafKey === r.key);
+                        if (line && (r.preset === 'easy' || r.preset === 'medium' || r.preset === 'hard'))
                           return (
                             <>
-                              <button type="button" class="link" onClick={() => open({ name: 'checklist', sid: list.sid, i, preset: r.preset as 'easy' })}>
+                              <button type="button" class="link" onClick={() => open({ name: 'checklist', sid: view.sid, side: view.color, line: line.v.lineUci, preset: r.preset as 'easy' })}>
                                 Drill
                               </button>{' '}
                             </>

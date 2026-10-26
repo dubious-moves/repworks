@@ -9,12 +9,21 @@
 // the study doesn't cover, played at least 8% of the time. Completion is derived from practice
 // results at the leaf: a win at a preset checks it off; the chips show the last five attempts.
 // Pure: the explorer's shares come in through `probs`.
+//
+// §5.130: a list is kept as a `checklist` event (its lines, reserve and gaps as moves from the
+// start, with their shares; the latest per study and side), and what is shown is derived from it:
+// `recordOf` and `linesOf` go each way, `shownLines` takes out the excluded lines and those wholly
+// paused since (filled from the reserve), and marks the lines the study no longer plays. The walk
+// reads the study's active lines only (`studyMovesOf`), so a paused branch is neither a line nor
+// an uncovered reply.
 import { Chess, type Position } from 'chessops/chess';
 import { makeFen } from 'chessops/fen';
 import { makeSan } from 'chessops/san';
 import type { NormalMove } from 'chessops/types';
 import { positionKeyOf, type PositionKey } from '../chess/positionKey.ts';
 import { parseUciMove, standardUci } from '../chess/uci.ts';
+import type { ChecklistLine } from '../progress/events.ts';
+import type { Occurrence, RepertoireIndex } from '../repertoire/index.ts';
 import type { Color } from './record.ts';
 
 export const RANK_RATINGS = [1600, 1800, 2000, 2200, 2500];
@@ -69,6 +78,57 @@ export interface Checklist {
 export interface StudyMoves {
   moveAt(key: PositionKey): string | undefined;
   covers(key: PositionKey): boolean;
+  /** Whether the study plays this move here (any of its moves, where it has two). */
+  plays?(key: PositionKey, uci: string): boolean;
+  /** Whether the study has a move here on any line, paused ones too: a reply it knows is never a gap. */
+  knows?(key: PositionKey): boolean;
+}
+
+/**
+ * A study's own moves for one side, from the repertoire index: every chapter of that side, or with
+ * `activeOnly` only the moves on lines that aren't paused (§5.70), so a wholly paused branch is
+ * as if the study didn't have it.
+ */
+export function studyMovesOf(index: RepertoireIndex, sid: string, color: Color, sideOf: (cid: string) => Color | undefined, activeOnly: boolean): StudyMoves {
+  let active: Map<string, Set<string>> | undefined;
+  if (activeOnly) {
+    active = new Map();
+    for (const line of index.lines) {
+      if (line.sid !== sid || line.paused) continue;
+      let set = active.get(line.cid);
+      if (!set) active.set(line.cid, (set = new Set()));
+      let prefix = '';
+      for (const san of line.path) set.add((prefix = prefix ? `${prefix} ${san}` : san));
+    }
+  }
+  const ofStudy = (o: Occurrence) => o.sid === sid && sideOf(o.cid) === color;
+  const ok = (o: Occurrence) => ofStudy(o) && (!active || !!active.get(o.cid)?.has(o.path.join(' ')));
+  const memo = new Map<PositionKey, string[]>();
+  const own = (key: PositionKey) => {
+    let out = memo.get(key);
+    if (!out) memo.set(key, (out = [...(index.positions.get(key)?.own ?? [])].filter(([, places]) => places.some(ok)).map(([uci]) => uci)));
+    return out;
+  };
+  const knows = (key: PositionKey) => [...(index.positions.get(key)?.own.values() ?? [])].some((places) => places.some(ofStudy));
+  return { moveAt: (key) => own(key)[0], covers: (key) => own(key).length > 0, plays: (key, uci) => own(key).includes(uci), knows };
+}
+
+/** Whether the study still plays a line as the walk made it: its own moves, and a position it covers after each reply. */
+export function studyPlays(study: StudyMoves, color: Color, lineUci: readonly string[]): boolean {
+  const pos = Chess.default();
+  for (const uci of lineUci) {
+    const move = parseUciMove(pos, uci);
+    if (!move) return false;
+    if (pos.turn === color) {
+      const key = positionKeyOf(pos);
+      if (!(study.plays ? study.plays(key, uci) : study.moveAt(key) === uci)) return false;
+      pos.play(move);
+    } else {
+      pos.play(move);
+      if (!study.covers(positionKeyOf(pos))) return false;
+    }
+  }
+  return true;
 }
 
 /** The explorer's shares at a position, by standard UCI and by `s:<SAN without +#>`; empty when it has none. */
@@ -142,8 +202,9 @@ export async function generateChecklist(color: Color, study: StudyMoves, probs: 
       const uci = standardUci(pos, move);
       next.play(move);
       const share = p.get(uci) ?? p.get(`s:${san.replace(/[+#]/g, '')}`);
-      if (study.covers(positionKeyOf(next))) covered.push({ next, uci, san, raw: share ?? MISSING_PROB, share: 0 });
-      else if (share !== undefined && share >= GAP_MIN_PROB) gaps.push({ afterFen: makeFen(next.toSetup()), lineUci: [...lineUci, uci], lineSan: [...lineSan, san], reachProb: pathProb * share });
+      const nextKey = positionKeyOf(next);
+      if (study.covers(nextKey)) covered.push({ next, uci, san, raw: share ?? MISSING_PROB, share: 0 });
+      else if (share !== undefined && share >= GAP_MIN_PROB && !study.knows?.(nextKey)) gaps.push({ afterFen: makeFen(next.toSetup()), lineUci: [...lineUci, uci], lineSan: [...lineSan, san], reachProb: pathProb * share });
     }
     if (!covered.length) return makeLeaf(pos, lineUci, lineSan, pathProb);
     const total = covered.reduce((s, c) => s + c.raw, 0) || 1;
@@ -249,6 +310,76 @@ function selectLeaves(node: TreeNode, quota: number, out: Leaf[]): Leaf[] {
     if (alloc[i]! >= 1) selectLeaves(c.node, alloc[i]!, out);
   });
   return out;
+}
+
+/** A list as its `checklist` event keeps it: each line its moves (UCI, spaced) and share. */
+export function recordOf(list: Checklist): { lines: ChecklistLine[]; reserve: ChecklistLine[]; gaps: ChecklistLine[] } {
+  const line = (v: Variation): ChecklistLine => ({ m: v.lineUci.join(' '), p: v.cumProb });
+  return { lines: list.variations.map(line), reserve: list.reserve.map(line), gaps: list.gaps.map((g) => ({ m: g.lineUci.join(' '), p: g.reachProb })) };
+}
+
+/** Lines played from the start: the moves, the SANs, the position reached; a line with an illegal move is left out. */
+function replayed(lines: readonly ChecklistLine[]): { lineUci: string[]; lineSan: string[]; pos: Position; p: number }[] {
+  const out: { lineUci: string[]; lineSan: string[]; pos: Position; p: number }[] = [];
+  for (const l of lines) {
+    const pos = Chess.default();
+    const lineUci = l.m.split(' ');
+    const lineSan: string[] = [];
+    let legal = true;
+    for (const uci of lineUci) {
+      const move = parseUciMove(pos, uci);
+      if (!move) {
+        legal = false;
+        break;
+      }
+      lineSan.push(makeSan(pos, move));
+      pos.play(move);
+    }
+    if (legal) out.push({ lineUci, lineSan, pos, p: l.p });
+  }
+  return out;
+}
+
+/** The variations of a kept list (its lines or its reserve). */
+export function linesOf(lines: readonly ChecklistLine[]): Variation[] {
+  return replayed(lines).map((l) => ({ leafKey: positionKeyOf(l.pos), leafFen: makeFen(l.pos.toSetup()), lineUci: l.lineUci, lineSan: l.lineSan, cumProb: l.p }));
+}
+
+/** The uncovered replies of a kept list. */
+export function gapsOf(lines: readonly ChecklistLine[]): ChecklistGap[] {
+  return replayed(lines).map((l) => ({ afterFen: makeFen(l.pos.toSetup()), lineUci: l.lineUci, lineSan: l.lineSan, reachProb: l.p }));
+}
+
+export interface ShownLine {
+  v: Variation;
+  /** The study no longer plays it (edited since the list was made): kept in its place, struck through. */
+  gone: boolean;
+}
+
+/**
+ * What a kept list shows: its lines less the excluded and the wholly paused ones, filled from the
+ * reserve in order up to `count`; a line the study no longer plays stays in its place, `gone`.
+ * `paused`: the list's lines hidden because they are paused now.
+ */
+export function shownLines(list: { variations: readonly Variation[]; reserve: readonly Variation[]; count: number }, color: Color, excluded: ReadonlySet<string>, study: { all: StudyMoves; active: StudyMoves }): { lines: ShownLine[]; paused: number } {
+  const state = (v: Variation) => (excluded.has(v.leafKey) ? 'out' : !studyPlays(study.all, color, v.lineUci) ? 'gone' : !studyPlays(study.active, color, v.lineUci) ? 'paused' : 'on');
+  const lines: ShownLine[] = [];
+  const seen = new Set<string>();
+  let paused = 0;
+  for (const v of list.variations) {
+    const s = state(v);
+    if (s === 'paused') paused++;
+    if (s === 'out' || s === 'paused' || seen.has(v.leafKey)) continue;
+    seen.add(v.leafKey);
+    lines.push({ v, gone: s === 'gone' });
+  }
+  for (const v of list.reserve) {
+    if (lines.length >= list.count) break;
+    if (seen.has(v.leafKey) || state(v) !== 'on') continue;
+    seen.add(v.leafKey);
+    lines.push({ v, gone: false });
+  }
+  return { lines, paused };
 }
 
 /** Refills an excluded variation's place from the reserve (`excludeTodoVariation`): the first not excluded nor listed. */

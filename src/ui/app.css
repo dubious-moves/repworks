@@ -4807,6 +4807,99 @@ a.button.disabled {
   font-weight: 600;
 }
 
+/* The checklist's page (§5.130): a folded block per study and side, its progress bar. */
+.checklist-block {
+  padding: 0;
+}
+.checklist-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.checklist-fold {
+  width: 1em;
+  flex-shrink: 0;
+  color: var(--muted);
+}
+.checklist-study {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.checklist-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+.checklist-bar {
+  display: inline-block;
+  width: 64px;
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: color-mix(in srgb, currentColor 18%, transparent);
+}
+.checklist-bar > span {
+  display: block;
+  height: 100%;
+}
+.checklist-body {
+  padding: 0 12px 12px;
+}
+.checklist-maia input {
+  width: 5.5em;
+}
+.checklist-line-head .checklist-name {
+  font-size: 0.9rem;
+}
+.checklist-lines li.gone {
+  opacity: 0.7;
+}
+/* A line's moves: each shows its position on a small board, over what follows, when hovered or tapped. */
+.checklist-moves {
+  position: relative;
+}
+.checklist-move {
+  cursor: pointer;
+  border-radius: 3px;
+}
+.checklist-move:hover,
+.checklist-move.shown {
+  background: var(--surface);
+}
+.checklist-preview {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 20;
+  padding: 4px;
+  background: var(--bg);
+  border: 1px solid var(--surface);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgb(var(--shadow) / 35%);
+  pointer-events: none;
+}
+.study-group-link {
+  margin-left: 8px;
+  font-size: 0.85rem;
+  vertical-align: middle;
+}
+
 /* Voice input (§5.63). */
 .voice-controls {
   display: flex;

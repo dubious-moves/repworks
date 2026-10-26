@@ -7270,3 +7270,34 @@ Tests:
 
 Live (TESTING.md): (desktop) a list made for a real study, then (phone) the same list after a sync,
 drilled at Easy; the order of the blocks after drilling; the preview's feel on both.
+
+**As built** (2026-10-26, (a)–(c) together): `src/core/progress/events.ts` (the `checklist` event:
+`color`, `ply`, `count` (the lines asked for; `n` is the log's own counter), `lines`, `reserve` and
+`gaps` as `{m, p}`, `calls`, `cut`; anything else refused), `checklistListCard` (`t|<sid>`);
+`src/core/games/checklist.ts` (`studyMovesOf`: a study side's own moves from the index, every
+chapter's or the active lines' only, and `knows`, so a reply on a paused line is never a gap;
+`studyPlays`; `recordOf`, `linesOf`, `gapsOf`; `shownLines`: the excluded and paused lines out, filled
+from the reserve, a line the study no longer plays kept in its place as `gone`);
+`src/app/checklist.ts` (`checklistViews`: each study side's latest list, its shown lines, the lines
+taken out, its progress and when it was last drilled; Make as a `checklist` event, Stop at the next
+lookup; Maia's rating per level, `repworks-checklist-maia`; the lists kept on a device before carried
+into the log once the page has synced, unless that side has one, then `repworks-checklists`
+removed); `src/ui/Checklist.tsx` (`#/checklist`: the blocks, folded per tab (sessionStorage), the
+one named by `?sid=` unfolded; each line its opening name (the games' when loaded, else its
+chapter's), its moves (hovered or tapped: the position on a small board over what follows), its
+share, the chips, ✕ asked every time; Restore all brings the lines back at once, since the list
+keeps them; the uncovered replies with Open the chapter (where the study reaches the position before
+the reply) and Practise; the drill by its moves, `#/checklist/<sid>?side=…&line=…&preset=…`, its
+opponent's Maia rating shown); `Checklist` on Home's Repertoire panel, `Checklist…` on the line
+list's bar and in each chapter's ⋯; a link on Repertoire check in place of the section; the weak
+spots' Drill finds the line in the synced lists. A drill's old address opens the study's list.
+Tests: `test/unit/core/progress/events.test.ts` (the event read and written, seven refusals),
+`test/unit/core/games/checklist.test.ts` (a list kept and read back the same; exclusions, paused and
+gone lines; the walk over active lines, a paused branch neither a line nor a gap; two controls:
+the gap check without `knows`, and paused lines shown, each failing exactly its test),
+`test/unit/core/app/fsm.test.ts` (the addresses, the old one), `test/e2e/checklist.spec.ts` (desktop
+and phone: the page from Home, Make, the names, the preview, Maia at 1600 in the drill, the line won
+at Easy, 17%, the list and the win synced and shown on a second device with no explorer call; a
+list kept on the device carried into the log after the sync; ✕ asked, dismissed and accepted,
+synced, Restore all; the Alapin line paused on another device hidden after a sync, then Make again
+leaving it out of the lines and the replies; the old drill address). Live: TESTING.md.

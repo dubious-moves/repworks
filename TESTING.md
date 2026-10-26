@@ -5,6 +5,24 @@ push something only the owner can check, and remove an item once the owner repor
 item names its `PLAN.md` section, which says what to check. Report findings to any session; it
 fixes them and updates this file.
 
+## The variation checklist on its own page, synced (§5.130, 2026-10-26)
+- Checked by the tests and by screenshots in headless Chromium (desktop and an emulated phone);
+  nothing live yet. Home → Repertoire's "Checklist" (or the line list's "Checklist…", or a
+  chapter's ⋯): every repertoire study's checklist as a folded block, each side of a two-sided
+  study on its own. Desktop, with the Lichess login: unfold a real study, Make; then on the phone
+  after a sync the same lines, with no "Asking the explorer". Drill one at Easy there; back on the
+  desktop after a sync, ✓ Easy and the block's progress bar.
+- A list made before this build on a device is carried into the log once that device has synced;
+  check it shows on the other device too.
+- Pause a line (the line list's ⋯): the checklist hides it and says "1 paused line hidden",
+  bringing in the next line where the list has a reserve; Make again leaves it out entirely.
+- Hover the moves of a line on the desktop and tap them on the phone: does the small board follow
+  well, and is it in the way of the line below? The opening name comes from your games when they
+  are loaded (open Games once), else from the chapter the line ends in: are the names useful?
+- Maia's rating per level (above the blocks): the drill says which it plays at. Does Easy at 1750
+  feel right?
+- §5.62's comparison with mistake-lab's list still stands (TESTING.md's Phase 5 list).
+
 ## A dropdown lets go of the keys once an option is picked (2026-10-21)
 - Checked by an e2e test in headless Chromium (the explorer's Sort menu: after a pick it is not
   focused, → moves in the chapter and Home goes to the start, the pick unchanged). Not checked

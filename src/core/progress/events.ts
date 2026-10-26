@@ -166,6 +166,32 @@ export interface PracticeEvent extends Base {
   /** The user's moves played. */
   mv?: number;
 }
+/** A checklist line as the `checklist` event keeps it (§5.130): its moves from the start in UCI, spaced, and its share. */
+export interface ChecklistLine {
+  m: string;
+  p: number;
+}
+/**
+ * A study's variation checklist (§5.130), made on some device: `card` is the study (`t|<sid>`),
+ * `color` the side it is made for (the latest per side is the study's list). Its lines, reserve and
+ * the replies the study doesn't cover are kept as moves; everything else is derived from them.
+ */
+export interface ChecklistEvent extends Base {
+  k: 'checklist';
+  card: string;
+  color: 'white' | 'black';
+  /** Plies to a leaf; 0 for the end of the study's coverage. */
+  ply: number;
+  /** The number of lines asked for. */
+  count: number;
+  lines: ChecklistLine[];
+  reserve: ChecklistLine[];
+  gaps: ChecklistLine[];
+  /** The positions the explorer was asked about. */
+  calls?: number;
+  /** Set when the walk was cut short by its size limit. */
+  cut?: 1;
+}
 /** The marks a line can carry (§5.70): `none` clears one. */
 export type LineMark = 'paused' | 'must' | 'none';
 /**
@@ -208,8 +234,9 @@ export type KnownEvent =
   | PlayedEvent
   | PracticeEvent
   | LineEvent
-  | NoteEvent;
-export const KNOWN_KINDS = ['review', 'suspend', 'unsuspend', 'forget', 'taught', 'pin', 'unpin', 'drill', 'alt', 'storm', 'snapshot', 'drop', 'relapse', 'plan', 'idea', 'dismiss', 'saved', 'played', 'practice', 'line', 'note'] as const;
+  | NoteEvent
+  | ChecklistEvent;
+export const KNOWN_KINDS = ['review', 'suspend', 'unsuspend', 'forget', 'taught', 'pin', 'unpin', 'drill', 'alt', 'storm', 'snapshot', 'drop', 'relapse', 'plan', 'idea', 'dismiss', 'saved', 'played', 'practice', 'line', 'note', 'checklist'] as const;
 
 /** A line as read. `event` is set for the kinds this code knows; `raw` is always the line itself. */
 export interface LogLine {
@@ -225,6 +252,13 @@ export interface LineProblem {
   line: number;
   text: string;
   reason: string;
+}
+
+const UCI_LINE = /^[a-h][1-8][a-h][1-8][qrbn]?( [a-h][1-8][a-h][1-8][qrbn]?)*$/;
+function isChecklistLine(x: unknown): x is ChecklistLine {
+  if (typeof x !== 'object' || x === null) return false;
+  const { m, p } = x as Record<string, unknown>;
+  return typeof m === 'string' && UCI_LINE.test(m) && typeof p === 'number' && p >= 0 && p <= 1;
 }
 
 const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/;
@@ -428,6 +462,31 @@ function knownEvent(o: Record<string, unknown>): KnownEvent | string {
       if (typeof text !== 'string') return 'text must be a string';
       return { ...base, k: 'note', text };
     }
+    case 'checklist': {
+      if (!card.startsWith('t|') || card.length < 3) return 'card must be a study (t|<sid>)';
+      const color = o['color'];
+      if (color !== 'white' && color !== 'black') return 'color must be white or black';
+      const ply = o['ply'];
+      if (!Number.isSafeInteger(ply) || (ply as number) < 0) return 'ply must be a non-negative integer';
+      const count = o['count'];
+      if (!Number.isSafeInteger(count) || (count as number) < 1) return 'count must be a positive integer';
+      const lists: Record<'lines' | 'reserve' | 'gaps', ChecklistLine[]> = { lines: [], reserve: [], gaps: [] };
+      for (const f of ['lines', 'reserve', 'gaps'] as const) {
+        const x = o[f];
+        if (!Array.isArray(x) || !x.every(isChecklistLine)) return `${f} must be a list of lines ({m: moves in UCI, p: a share})`;
+        lists[f] = x.map((l: ChecklistLine) => ({ m: l.m, p: l.p }));
+      }
+      const event: ChecklistEvent = { ...base, k: 'checklist', color, ply: ply as number, count: count as number, ...lists };
+      const calls = o['calls'];
+      if (calls !== undefined) {
+        if (!Number.isSafeInteger(calls) || (calls as number) < 0) return 'calls must be a non-negative integer';
+        event.calls = calls as number;
+      }
+      const cut = o['cut'];
+      if (cut !== undefined && cut !== 1) return 'cut must be 1 when present';
+      if (cut === 1) event.cut = 1;
+      return event;
+    }
     default:
       return { ...base, k: 'forget' };
   }
@@ -457,6 +516,11 @@ export function formatEvent(event: KnownEvent): string {
   if (event.k === 'dismiss' || event.k === 'idea') o['on'] = event.on;
   if (event.k === 'line') o['mark'] = event.mark;
   if (event.k === 'note') o['text'] = event.text;
+  if (event.k === 'checklist') {
+    Object.assign(o, { color: event.color, ply: event.ply, count: event.count, lines: event.lines, reserve: event.reserve, gaps: event.gaps });
+    if (event.calls !== undefined) o['calls'] = event.calls;
+    if (event.cut !== undefined) o['cut'] = event.cut;
+  }
   if (event.k === 'saved') o['item'] = event.item;
   if (event.k === 'played') o['game'] = event.game;
   if (event.k === 'practice') {
