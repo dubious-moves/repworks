@@ -37,6 +37,7 @@ import { endPreview, preview, stepPreview } from '../app/preview.ts';
 import { endPreviewOnBoard, PreviewBar, previewBoard } from './CommentText.tsx';
 import { NoteButton, NoteText, noteArrows } from './CardNote.tsx';
 import { isoDay } from './day.ts';
+import { graphLabel, graphY, whiteEdge } from './evalGraph.ts';
 import { Back } from './Back.tsx';
 
 const sq = (u: string, i: number) => u.slice(i, i + 2) as SquareName;
@@ -338,25 +339,26 @@ function EvalGraph(props: { game: GameRecord; ply: number; items: readonly GameI
   const w = 600;
   const h = 120;
   const n = evals.length;
+  const color = props.game.color;
   const x = (i: number) => (n <= 1 ? 0 : (i / n) * w);
-  // The user's side up, clamped to ±10 pawns, as a win chance.
-  const y = (cp: number) => h - (h * (100 / (1 + Math.pow(10, -cp / 400)))) / 100;
-  const pts = evals.map((e, i) => `${x(i + 1).toFixed(1)},${y(cpFor(e, props.game.color)).toFixed(1)}`);
+  const pts = evals.map((e, i) => `${x(i + 1).toFixed(1)},${graphY(cpFor(e, color), h).toFixed(1)}`);
   const path = `M0,${(h / 2).toFixed(1)} L${pts.join(' L')}`;
+  const edge = whiteEdge(color, h);
   return (
     <svg
       class="eval-graph"
       viewBox={`0 0 ${w} ${h}`}
       preserveAspectRatio="none"
       role="img"
-      aria-label="The evaluation through the game, from your side"
+      aria-label={graphLabel(color)}
+      data-color={color}
       onClick={(e) => {
         const r = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
         props.onPly(Math.max(0, Math.min(n, Math.round(((e.clientX - r.left) / r.width) * n))));
       }}
     >
+      <path d={`${path} L${x(n)},${edge} L0,${edge} Z`} class="eval-area" />
       <line x1="0" x2={w} y1={h / 2} y2={h / 2} class="eval-mid" />
-      <path d={`${path} L${x(n)},${h} L0,${h} Z`} class="eval-area" />
       <path d={path} class="eval-line" fill="none" />
       {props.items.map((it) => (
         <line key={it.pid} x1={x(it.ply)} x2={x(it.ply)} y1="0" y2={h} class={`eval-item item-${it.kind}`} />

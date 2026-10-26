@@ -174,6 +174,10 @@ test('a practice game: played against the explorer, stopped, reviewed, kept in t
   await expect(review.getByTestId('practice-end')).toContainText('Stopped.');
   await expect(review.getByTestId('practice-accuracy')).toContainText('1 key move');
   await expect(review.getByTestId('practice-keys')).toContainText('d4');
+  // The graph: White's light area from the bottom, the user being White.
+  const graph = review.locator('.review-graph');
+  await expect(graph).toHaveAttribute('data-color', 'white');
+  await expect(graph.locator('.eval-area')).toHaveAttribute('d', / L[\d.]+,100 L[\d.]+,100 Z$/);
   // Analyse, and ← comes back to the review as it was (the owner's request, 2026-10-08).
   await review.locator('.review-actions').getByRole('button', { name: 'Analyse' }).click();
   await expect(page).toHaveURL(/#\/analysis\?/);

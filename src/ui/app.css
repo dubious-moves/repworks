@@ -4649,13 +4649,13 @@ a.button.primary {
   height: 120px;
   display: block;
   margin: 8px 0;
-  background: #2b2b2b; /* fixed */
+  /* Black's area; White's is the light one, as on the eval bar (`.review-eval`). */
+  background: #3a3a3a; /* fixed */
   border-radius: 4px;
   cursor: pointer;
 }
 .eval-graph .eval-area {
-  fill: #ddd; /* fixed */
-  opacity: 0.85;
+  fill: #e8e8e8; /* fixed */
 }
 .eval-graph .eval-line {
   stroke: #999; /* fixed */

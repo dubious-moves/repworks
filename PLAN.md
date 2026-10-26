@@ -5101,6 +5101,12 @@ castling as standard UCI (e1g1), as the analyzer's lines and Stockfish write it.
   Stockfish), silent or with feedback per move; the end (mate, draw, a claim of victory at +1000
   three times, Stop); the review: every user move classified by Stockfish in the background
   (depth 22), the accuracy, the eval graph, the key moves with Retry and Show the line.
+- The eval graphs (the games' and the practice review's) as chess.com draws its game-review
+  graph: White's area light and Black's dark, so the colour says who is ahead, and the user's side
+  at the bottom as on the board and the eval bar beside it, so the curve rises as the user's game
+  gets better; for a Black game White's area hangs from the top. Heights are Lichess's winning
+  chances, as the eval bar's. (Lichess keeps White at the bottom whatever the side; until
+  2026-10-26 the user's side was drawn light, which read as White ahead in a Black win.)
 - Advantage cards: the drill from the peak, silent, ended as mistake-lab ends it (600 cp is good
   enough), graded by its outcome.
 - A finished practice game of at least five user moves becomes a `played` event (the history:

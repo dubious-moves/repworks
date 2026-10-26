@@ -34,6 +34,7 @@ import { Board, type BoardProps } from './Board.tsx';
 import { answerPending, repeatOpponent, setVoiceConfirm, voice, voiceConfirm, voiceOff, voiceOn } from '../app/voice.ts';
 import { useWakeLock } from './Train.tsx';
 import { isoDay } from './day.ts';
+import { graphLabel, graphY, whiteEdge } from './evalGraph.ts';
 import { Back } from './Back.tsx';
 
 const sq = (u: string, i: number) => u.slice(i, i + 2) as Key;
@@ -346,31 +347,33 @@ function ReviewEvalBar(props: { cp: number | undefined; orientation: 'white' | '
   );
 }
 
-/** The graph from the user's side: the area, the key moves as dots of their colour, the cursor; a click goes to that move. */
-function Graph(props: { game: PracticeGame; points: Review['evalPoints']; keys: ReadonlySet<number>; at: number; onAt(i: number): void }) {
+/** The graph, the user's side at the bottom (`evalGraph.ts`): the areas, the key moves as dots of their colour, the cursor; a click goes to that move. */
+function Graph(props: { game: PracticeGame; color: 'white' | 'black'; points: Review['evalPoints']; keys: ReadonlySet<number>; at: number; onAt(i: number): void }) {
   const pts = props.points;
   if (pts.length < 2) return null;
   const w = 600;
   const h = 100;
   const n = props.game.moves.length + 1;
   const x = (idx: number) => ((idx + 1) / Math.max(1, n - 1)) * w;
-  const y = (cp: number) => h - h / (1 + Math.pow(10, -cp / 400));
+  const y = (cp: number) => graphY(cp, h);
   const path = pts.map((p, i) => `${i ? 'L' : 'M'}${x(p.idx).toFixed(1)},${y(p.cp).toFixed(1)}`).join(' ');
   const first = pts[0]!;
   const last = pts[pts.length - 1]!;
+  const edge = whiteEdge(props.color, h);
   return (
     <svg
       class="eval-graph review-graph"
       viewBox={`0 0 ${w} ${h}`}
       preserveAspectRatio="none"
       role="img"
-      aria-label="The evaluation through the game, from your side"
+      aria-label={graphLabel(props.color)}
+      data-color={props.color}
       onClick={(e) => {
         const r = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
         props.onAt(Math.max(-1, Math.min(n - 2, Math.round(((e.clientX - r.left) / r.width) * (n - 1)) - 1)));
       }}
     >
-      <path d={`${path} L${x(last.idx).toFixed(1)},${h} L${x(first.idx).toFixed(1)},${h} Z`} class="eval-area" />
+      <path d={`${path} L${x(last.idx).toFixed(1)},${edge} L${x(first.idx).toFixed(1)},${edge} Z`} class="eval-area" />
       <line x1="0" x2={w} y1={h / 2} y2={h / 2} class="eval-mid" />
       <path d={path} class="eval-line" fill="none" />
       <line x1={x(props.at)} x2={x(props.at)} y1="0" y2={h} class="eval-cursor" />
@@ -835,7 +838,7 @@ export function PracticeReview(props: { game: PracticeGame; onNext?: (() => void
               ))}
             </p>
           )}
-          <Graph game={g} points={review.evalPoints} keys={keySet} at={at} onAt={go} />
+          <Graph game={g} color={s.color} points={review.evalPoints} keys={keySet} at={at} onAt={go} />
           {keys.length > 0 && (
             <ul class="review-keys" data-testid="practice-keys">
               {keys.map((i) => {
