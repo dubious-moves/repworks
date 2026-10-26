@@ -14,7 +14,7 @@ import type { Key } from '@lichess-org/chessground/types';
 import { analyseFrom, entryKey, open } from '../app/mode.ts';
 import { recordEvent } from '../app/state.ts';
 import { openingNameOf, practiceHistory, savedDeck } from '../app/games.ts';
-import { analyse, claimVictory, clearPremove, detection, setFoundState, type FoundTactic, discardSaved, gameOfHistory, ignoreRepertoire, loadOpponent, practiceFeedback, practiceHint, resumePractice, setPracticeFeedback, showsFeedback, savedPractice, saveOpponent, judge, parkPractice, practice, practiceMove, takeUpPractice, practiceReview, setPremove, startPractice, stopPractice, type Opponent, type PracticeGame, type PracticeMove } from '../app/practice.ts';
+import { analyse, canTakeBack, claimVictory, clearPremove, detection, setFoundState, type FoundTactic, discardSaved, gameOfHistory, ignoreRepertoire, loadOpponent, practiceFeedback, practiceHint, resumePractice, setPracticeFeedback, showsFeedback, savedPractice, saveOpponent, judge, parkPractice, practice, practiceMove, takeUpPractice, practiceReview, setPremove, startPractice, stopPractice, takeBack, type Opponent, type PracticeGame, type PracticeMove } from '../app/practice.ts';
 import { parseUciMove, standardUci } from '../core/chess/uci.ts';
 import { makeFen } from 'chessops/fen';
 import { CLASSIFICATION, moverScore, type Classification } from '../core/games/grade.ts';
@@ -202,6 +202,11 @@ export function PracticeBoard(props: { onNext?: () => void }) {
           {canHint && (
             <button type="button" class="secondary" title="The repertoire’s move, else Stockfish’s: the piece, then the move (H)" disabled={hint?.level === 2} onClick={() => void practiceHint()}>
               Hint
+            </button>
+          )}
+          {canTakeBack(p) && (
+            <button type="button" class="secondary" data-testid="practice-takeback" title="Your last move taken back, with the opponent’s answer: a misclick, say" onClick={takeBack}>
+              Take back
             </button>
           )}
           <button type="button" class="secondary" title="The analysis board at this position, the game's moves on it; ← comes back to the game" onClick={() => analyseFrom({ fen: s.fen, ...(p.moves.length && p.moves.length <= 300 ? { line: p.moves.map((m) => m.san) } : p.moves.length ? { fen } : {}), side: s.color })}>

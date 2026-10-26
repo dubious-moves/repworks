@@ -152,6 +152,14 @@ test('a practice game: played against the explorer, stopped, reviewed, kept in t
     await expect(game).toHaveAttribute('data-phase', 'user');
   }
   await expect(page.getByText(/Opponent: DB \(100\)/)).toBeVisible();
+  // Take back (a misclick): the last move and the opponent's answer off, the user to move; played again.
+  await game.getByTestId('practice-takeback').click();
+  await expect(game).toHaveAttribute('data-moves', String(GAME.length - 2));
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  await clickSquare(page, 'b1', 'white');
+  await clickSquare(page, 'c3', 'white');
+  await expect(game).toHaveAttribute('data-moves', String(GAME.length));
+  await expect(game).toHaveAttribute('data-phase', 'user');
   // No move feedback while playing unless it is turned on (the owner's request, 2026-10-09).
   const moves = page.getByTestId('practice-moves');
   await expect(page.getByTestId('practice-feedback')).toHaveText(/^Your move/);
@@ -356,6 +364,14 @@ test('practising from a position: the repertoire check, the hint, a premove, and
   await expect(hint).toBeDisabled();
   await move('d7d6');
   await expect(page.getByTestId('practice-deviation')).toHaveCount(0);
+  await expect(game).toHaveAttribute('data-moves', '3');
+
+  // Taken back while the opponent thinks: its answer to the move taken back never lands.
+  await expect(game).toHaveAttribute('data-phase', 'opponent');
+  await game.getByTestId('practice-takeback').click();
+  await expect(game).toHaveAttribute('data-moves', '2');
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  await move('d7d6');
   await expect(game).toHaveAttribute('data-moves', '3');
 
   // A premove while the opponent thinks, played once it has moved.

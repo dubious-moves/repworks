@@ -876,3 +876,9 @@ q_extension (or give it to a session with q_extension attached), then run
 - Changing the pace in ⋯ mid-session, or Save in the settings mid-session, applies from the next
   move. The Ideas player steps at twice the move time.
 - Checked by unit tests only so far (the trainer's waits, the stored settings); not live.
+
+## Take back in practice games (2026-10-26)
+
+- In a practice game against the database or Maia, Take back (beside Hint) removes your last move
+  and the opponent's answer; pressed while the opponent thinks, its answer shouldn't appear.
+- Not in advantage drills (graded). Checked by Playwright (desktop and emulated phone); not live.

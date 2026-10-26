@@ -278,14 +278,15 @@ export async function judge(fenBefore: string, uci: string, fenAfter: string): P
   return { classification: j.classification, wpDrop: j.wpDrop, cpLoss: j.cpLoss, bestCp: j.bestCp, afterCp: afterCp ?? j.bestCp - j.cpLoss, bestMoveUci: j.bestMove ?? '', bestLine: sanLine(fenBefore, best.pv), pvs: lines.map((l) => ({ cp: l.cp, firstMove: l.move })) };
 }
 
-let pending = 0;
+/** Judges still out, by game (a takeback or a resume starts a new one while the old judges finish). */
+const pendingBy = new Map<number, number>();
 const judging = new Set<Promise<unknown>>();
 
 function judgeAt(g: number, i: number): Promise<void> {
   const p = practice.peek();
   const mv = p?.moves[i];
   if (!p || !mv) return Promise.resolve();
-  pending++;
+  pendingBy.set(g, (pendingBy.get(g) ?? 0) + 1);
   const job = judge(mv.fenBefore, mv.uci, mv.fen).then((j) => {
     patch(g, (q) => {
       const moves = [...q.moves];
@@ -297,8 +298,12 @@ function judgeAt(g: number, i: number): Promise<void> {
   judging.add(job);
   return job.finally(() => {
     judging.delete(job);
-    pending--;
-    if (!pending) patch(g, () => ({ judged: true }));
+    const left = (pendingBy.get(g) ?? 1) - 1;
+    if (left) pendingBy.set(g, left);
+    else {
+      pendingBy.delete(g);
+      patch(g, () => ({ judged: true }));
+    }
   });
 }
 
@@ -308,7 +313,6 @@ export function startPractice(setup: PracticeSetup): void {
   const pos = positionOf(setup.fen);
   if (!pos) return;
   gen++;
-  pending = 0;
   practice.value = { gen, setup, moves: [], phase: pos.turn === setup.color ? 'user' : 'opponent', track: startTrack(setup.peakCp ?? null), claim: false, judged: true };
   if (pos.turn !== setup.color) void opponentTurn(gen);
 }
@@ -406,7 +410,6 @@ export function resumePractice(s: Saved<SavedGame>): void {
   const pos = positionOf(fen);
   if (!pos) return;
   gen++;
-  pending = 0;
   const g = gen;
   const opponentToMove = pos.turn !== g0.setup.color;
   practice.value = {
@@ -484,6 +487,44 @@ export async function practiceMove(uci: string): Promise<void> {
   const end = endOf(after.fen, true);
   if (end) return void finish(g, end);
   setTimeout(() => void opponentTurn(g), 500);
+}
+
+/** Whether the user's last move can be taken back: a game from a position or a checklist's drill, in
+ *  play, with a move of the user's on the board (an advantage drill is graded, so it has none). */
+export const canTakeBack = (p: PracticeGame): boolean => p.setup.kind !== 'advantage' && p.phase !== 'over' && p.moves.some((m) => m.isUser);
+
+/**
+ * Takeback (the owner's request, 2026-10-26: a misclick against Maia or the database): the user's
+ * last move taken off, with the opponent's answer when it has come, the user to move again. The
+ * game goes on as a new one (its own `gen`) so the opponent's search and the judges of the moves
+ * taken off land nowhere; the judges still out on the moves kept are asked again, and the Claim
+ * Victory count is counted again over the moves kept.
+ */
+export function takeBack(): void {
+  const p = practice.peek();
+  if (!p || !canTakeBack(p)) return;
+  let n = p.moves.length;
+  while (n > 0 && !p.moves[n - 1]!.isUser) n--;
+  const moves = p.moves.slice(0, n - 1);
+  gen++;
+  const g = gen;
+  let track = startTrack(p.setup.peakCp ?? null);
+  let claim = false;
+  for (const m of moves)
+    if (m.isUser && m.afterCp !== undefined) ({ track, claim } = trackAdvantage(track, m.afterCp, m.wpDrop ?? 0, false));
+  const { deviation: _d, hint: _h, premove: _p, ...rest } = p;
+  const lastSource = [...moves].reverse().find((m) => !m.isUser)?.source;
+  const next: PracticeGame = { ...rest, gen: g, moves, phase: 'user', track, claim, judged: !moves.some((m) => m.judging) };
+  if (lastSource) next.source = lastSource;
+  else delete next.source;
+  // A move that corrected the repertoire check, taken back: the move first tried there is still remembered.
+  const off = p.moves[n - 1]!;
+  const key = off.repTried && keyFen(off.fenBefore)?.key;
+  if (key) next.tried = { key, ...off.repTried! };
+  practice.value = next;
+  moves.forEach((m, i) => {
+    if (m.judging) void judgeAt(g, i).then(() => claimCheck(g, i));
+  });
 }
 
 /** The Claim Victory count, as each move's judge comes in (a game not drilled for an advantage). */

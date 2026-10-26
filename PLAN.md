@@ -5143,6 +5143,17 @@ symbols) unless "Move feedback" under the moves is ticked; the setting is kept o
 drills (advantage, checklist) stay silent; the opponent's source is still shown. Tests: the practice
 e2e checks it off, on, and off again.
 
+**Take back** (2026-10-26, the owner's request: "in case of a misclick" against Maia or the
+database): a game from a position and a checklist's drill have Take back beside Hint while the game
+is in play and the user has a move on the board: the user's last move goes, with the opponent's
+answer when it has come, and the user is to move again. Taken back while the opponent thinks, its
+answer never lands (the game goes on under a new `gen`, as a resume does). The moves kept keep their
+judges (those still out asked again), the Claim Victory count is counted again over them, and a move
+that corrected the repertoire check keeps its "you first tried" note when taken back and played
+again. An advantage drill has none: it is graded. Takebacks aren't counted or shown in the review.
+Tests: the practice e2e takes back after an answer and while the opponent thinks (desktop and
+phone).
+
 **The review reworked** (2026-10-07, the owner's note: "more like mistake-lab", whose Game Review
 was read at its current `main`: `showReviewKeyMoveInfo`, `showReviewBestArrow`,
 `showReviewBestLine`, `showReviewRefutation`, `handleReviewRetryResult`): the board with an eval bar
