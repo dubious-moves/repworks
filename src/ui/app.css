@@ -2219,6 +2219,11 @@ table.cards td {
   display: none;
 }
 
+/* "Next line" beside the feedback line, rendered on a phone only (Train.tsx). */
+.train-next-near {
+  flex: none;
+}
+
 .train-feedback {
   font-size: 1.1rem;
   font-weight: 600;
@@ -2795,6 +2800,33 @@ a.button.primary {
 
 .read-controls {
   justify-content: center;
+}
+
+/* An idea card's Next, Ask me or grades under the board on a phone (Read.tsx's `primary`). */
+.read-near {
+  justify-content: center;
+  margin: 8px 0 4px;
+}
+
+.read-near > .actions {
+  margin: 0;
+}
+
+/* The four grades on one row, of one width, their keys smaller. */
+.read-near > .grade-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  width: 100%;
+}
+
+.read-near > .grade-row > button {
+  padding: 0 4px;
+  white-space: nowrap;
+}
+
+.read-near > .grade-row .muted {
+  font-size: 0.8em;
 }
 
 .read-move {

@@ -261,24 +261,37 @@ function Answer(props: { run: IdeaRun; grading: boolean; counter: ComponentChild
     </>
   );
   return (
-    <LineReader chapter={idea.chapter} line={line} ply={ply} onPly={setPly} onEscape={() => undefined} head={head} sideLines playMs={moveMs(paceSettings.value) * 2} orientation={idea.side} carryShapes>
-      {run.phase === 'learn' ? (
-        <button type="button" onClick={askIdeaNow}>
-          Ask me <span class="muted">(Space)</span>
-        </button>
-      ) : grading ? (
-        <div class="actions grade-row" role="group" aria-label="Grade">
-          {([1, 2, 3, 4] as const).map((g) => (
-            <button key={g} type="button" class={g === 1 ? 'secondary' : ''} onClick={() => gradeIdeaNow(g)}>
-              {GRADE_WORD[g]} <span class="muted">({g})</span>
-            </button>
-          ))}
-        </div>
-      ) : (
-        <button type="button" onClick={nextIdeaNow}>
-          Next <span class="muted">(Space)</span>
-        </button>
-      )}
+    <LineReader
+      chapter={idea.chapter}
+      line={line}
+      ply={ply}
+      onPly={setPly}
+      onEscape={() => undefined}
+      head={head}
+      sideLines
+      playMs={moveMs(paceSettings.value) * 2}
+      orientation={idea.side}
+      carryShapes
+      primary={
+        run.phase === 'learn' ? (
+          <button type="button" onClick={askIdeaNow}>
+            Ask me <span class="muted">(Space)</span>
+          </button>
+        ) : grading ? (
+          <div class="actions grade-row" role="group" aria-label="Grade">
+            {([1, 2, 3, 4] as const).map((g) => (
+              <button key={g} type="button" class={g === 1 ? 'secondary' : ''} onClick={() => gradeIdeaNow(g)}>
+                {GRADE_WORD[g]} <span class="muted">({g})</span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <button type="button" onClick={nextIdeaNow}>
+            Next <span class="muted">(Space)</span>
+          </button>
+        )
+      }
+    >
       {props.actions}
     </LineReader>
   );

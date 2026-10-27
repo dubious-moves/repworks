@@ -68,7 +68,7 @@ const shot = async (page: Page, name: string) => {
   if (process.env['REPWORKS_SHOTS']) await page.screenshot({ path: `${process.env['REPWORKS_SHOTS']}/${name}-${page.viewportSize()!.width}.png` });
 };
 
-test('the line list: a line picked and trained, then practised again, a miss recorded', async ({ page }) => {
+test('the line list: a line picked and trained, then practised again, a miss recorded', async ({ page, isMobile }) => {
   await walkOnce(page);
   const git = await setUp(page);
   await page.goto(`${site.url}#/train/Rep0Najd`);
@@ -100,7 +100,8 @@ test('the line list: a line picked and trained, then practised again, a miss rec
   await play(page, 'b8', 'c6');
   const done = page.getByRole('region', { name: 'Session done' });
   await expect(done).toContainText('Line done');
-  await expect(done.getByRole('button', { name: 'Next line' })).toBeVisible();
+  // "Next line" in the summary; on a phone under the board, beside the feedback line, without a scroll.
+  await expect((isMobile ? page.locator('.train-feedback-row') : done).getByRole('button', { name: 'Next line' })).toBeInViewport();
   await page.locator('.chip').click();
   await expect.poll(() => pushed(git).map((e) => [e['k'], e['card'], e['g']])).toEqual([
     ['review', C5, 3],

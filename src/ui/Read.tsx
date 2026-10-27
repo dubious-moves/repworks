@@ -23,6 +23,7 @@ import { pathKey } from '../core/study/notation.ts';
 import { Board } from './Board.tsx';
 import { CommentText, endPreviewOnBoard, PreviewBar, previewBoard } from './CommentText.tsx';
 import { Back, Stuck } from './Back.tsx';
+import { phone } from './phone.ts';
 
 type Loaded = { chapter: Chapter; line: string[] } | { problem: string };
 
@@ -123,7 +124,7 @@ export function ReadView(props: { sid: string; cid: string; at: string[]; from?:
  * `carryShapes`: the line's first move, when it has no arrows or circles, shows the start's (the
  * card's arrows stay on after its answer is played). `children` are the actions.
  */
-export function LineReader(props: { chapter: Chapter; line: readonly string[]; ply: number; onPly(ply: number): void; onEscape(): void; head?: ComponentChildren; sideLines?: boolean; playMs?: number; orientation?: 'white' | 'black'; carryShapes?: boolean; children?: ComponentChildren }) {
+export function LineReader(props: { chapter: Chapter; line: readonly string[]; ply: number; onPly(ply: number): void; onEscape(): void; head?: ComponentChildren; sideLines?: boolean; playMs?: number; orientation?: 'white' | 'black'; carryShapes?: boolean; primary?: ComponentChildren; children?: ComponentChildren }) {
   const { chapter, line } = props;
   const last = line.length;
   const shown = Math.max(0, Math.min(props.ply, last));
@@ -243,6 +244,8 @@ export function LineReader(props: { chapter: Chapter; line: readonly string[]; p
             </button>
           )}
         </div>
+        {/* What goes on (an idea card's Next or grades): under the board on a phone, where the panel's buttons are below the fold. */}
+        {props.primary && phone.value && <div class="actions read-near">{props.primary}</div>}
       </div>
       <div class="train-panel">
         {props.head}
@@ -284,7 +287,10 @@ export function LineReader(props: { chapter: Chapter; line: readonly string[]; p
             </span>
           ))}
         </p>
-        <div class="actions">{props.children}</div>
+        <div class="actions">
+          {!phone.value && props.primary}
+          {props.children}
+        </div>
       </div>
     </div>
   );

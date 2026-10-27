@@ -199,6 +199,26 @@ test('on a phone the buttons keep their place through a line, whatever the feedb
   await expect.poll(place).toEqual({ text: 'Your mistake again: 0 of 2 right in a row', y });
 });
 
+test('on a phone "Next line" is under the board, beside the feedback line, and Hint keeps its place', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'on a desktop the buttons are beside the board');
+  await walkOnce(page);
+  await setUp(page);
+  await page.locator('.train-card').getByRole('link', { name: 'Train' }).click();
+  await asked(page);
+  const hint = page.locator('.train-actions').getByRole('button', { name: 'Hint' });
+  const before = (await hint.boundingBox())!.y;
+  await play(page, 'c7', 'c5');
+  await expect(feedback(page)).toHaveText(/^Line done · Next: /);
+  const next = page.locator('.train-feedback-row').getByRole('button', { name: 'Next line' });
+  await expect(next).toBeInViewport();
+  await expect(page.getByRole('button', { name: 'Next line' })).toHaveCount(1);
+  // Hint keeps the place "Next line" had in the panel, greyed out: nothing there moved.
+  await expect(hint).toBeDisabled();
+  expect((await hint.boundingBox())!.y).toBe(before);
+  await next.click();
+  await expect(feedback(page)).toHaveText('New move: play cxd4');
+});
+
 test('train one study from the study list and Escape stops', async ({ page, isMobile }) => {
   await setUp(page);
   await page.getByRole('link', { name: 'Train Test repertoire' }).click();

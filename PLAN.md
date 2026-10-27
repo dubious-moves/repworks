@@ -7374,3 +7374,31 @@ its line drilled, 3...e5 after the explorer's 3.d4 taken back with cxd4 named, c
 a move past the study's end played; control: the check limited to practice games again fails it
 on both). Live: TESTING.md.
 
+
+#### 5.133 On a phone, the button that goes on right under the board (the owner's request, 2026-10-27)
+
+"After reviewing/training a variation or idea card on mobile (portrait), the 'Next' button needs
+to be close to the board so that the user don't have to scroll down every time."
+
+- **A line's end** (the queue, Learn, show and grade, difficult lines, waiting for "Next line" or
+  "Finish", §5.17): on a phone (up to 599 px wide) the button is beside the "Line done · Next: …"
+  note under the board, where Misclick goes (§5.123). In the panel Hint keeps its place, greyed
+  out, so no button there moves; "Quiz lines" stays in the panel. On a Pixel 7 the button was at
+  the screen's foot (its top at 795 of 839 px, the setup notice shown); now at 651.
+- **A line trained from the line list or the chapter** (its "Line done" summary in the panel):
+  "Next line" goes to the same place on a phone; the summary keeps Again and the rest. It was
+  below the fold (871 of 839).
+- **An idea card's back**: Ask me, the grades and Next go under the board's step buttons on a
+  phone, the four grades on one row of one width; Open the chapter, Analyse and Remove the card
+  stay in the panel. They were at 683–1070 of 839, under the explanation, the comments and the
+  side lines; now at 688, whatever the card's text.
+- A desktop is as it was. One button each time, never a copy hidden by the stylesheet: the place
+  is chosen by `phone` (`src/ui/phone.ts`, the same 599 px media query).
+
+**As built** (2026-10-27): `src/ui/phone.ts`, `src/ui/Train.tsx` (the feedback row's
+`train-next-near`, `Done`'s `nextNear`), `src/ui/Read.tsx` (`LineReader`'s `primary`: under the
+board on a phone, first in the panel's actions on a desktop), `src/ui/Ideas.tsx`, `app.css`.
+Tests: `train.spec.ts` (phone: "Next line" beside the note, in the viewport, the only one, Hint
+greyed out at the same height), `lines.spec.ts` (the line's "Next line" in the viewport, under
+the board on a phone), `ideas.spec.ts` (Next and the grades in the viewport; under the board on a
+phone). Live: TESTING.md.

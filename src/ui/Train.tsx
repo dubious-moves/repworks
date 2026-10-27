@@ -34,6 +34,7 @@ import { setMark } from '../app/lineMarks.ts';
 import { openTrainSettings } from './TrainSettings.tsx';
 import { Back, Stuck } from './Back.tsx';
 import { LineReader } from './Read.tsx';
+import { phone } from './phone.ts';
 import { FloatingMenu } from './MoveMenu.tsx';
 import { asideLastMove, CommentOffer } from './CommentOffer.tsx';
 import { positionKeyOf } from '../core/chess/positionKey.ts';
@@ -273,7 +274,8 @@ export function TrainScreen(props: { of: SessionKind }) {
 }
 
 /** The session's end: on a card, or under the board kept at the last position (`inline`). */
-function Done(props: { s: SessionView; inline?: boolean }) {
+/** `nextNear`: "Next line" is under the board (a phone's, beside the feedback line), not here. */
+function Done(props: { s: SessionView; inline?: boolean; nextNear?: boolean }) {
   const { done, plan, of } = props.s;
   const cls = props.inline ? 'train-done train-done-inline' : 'card train-done';
   if (!done) return null;
@@ -345,11 +347,7 @@ function Done(props: { s: SessionView; inline?: boolean }) {
       )}
       {after && trainPrefs.value.lineEnd === 'go' && <GoingOn line={after.line} number={after.number} data={trainData.value ?? props.s.data} from={props.s.line} />}
       <div class="actions">
-        {after && (
-          <button type="button" onClick={() => open({ name: 'train', sid: after.line.sid, cid: after.line.cid, at: [...after.line.path] })}>
-            Next line
-          </button>
-        )}
+        {after && !props.nextNear && <NextLineButton line={after.line} />}
         <button type="button" class={after ? 'secondary' : undefined} onClick={() => void beginTraining(of)}>
           {practice || of.kind === 'line' || of.kind === 'difficult' ? 'Again' : 'Train again'}
         </button>
@@ -512,6 +510,17 @@ function Session(props: { s: SessionView }) {
   const waits = holding && (trainPrefs.value.lineEnd === 'wait' || endQuiz > 0);
   const nextLabel = s.upcoming ? 'Next line' : 'Finish';
   const upcoming = s.upcoming && `Line ${lineNumber(s.data.index, s.upcoming)}${s.line && s.upcoming.cid !== s.line.cid ? ` · ${chapterNameOf(s, s.upcoming)}` : ''}`;
+  // On a phone the button that goes on at a line's end is beside the feedback line, under the
+  // board: in the panel it was below the fold (the owner's request, 2026-10-27). Hint keeps its
+  // place in the panel, so nothing there moves.
+  const nextNear = phone.value && waits;
+  const of = s.of;
+  const doneNext = phone.value && s.done && of.kind === 'line' ? nextLine(trainData.value ?? s.data, s.scope, { sid: of.sid, cid: of.cid, path: of.at }) : undefined;
+  const hint = (
+    <button type="button" disabled={s.phase !== 'ask' && s.phase !== 'wrong'} onClick={() => command('hint')}>
+      Hint
+    </button>
+  );
   return (
     <div class="train-grid train-session" data-phase={s.done ? 'done' : s.phase}>
       <div class="train-board" onPointerDown={shownLine ? endPreviewOnBoard : undefined}>
@@ -542,6 +551,12 @@ function Session(props: { s: SessionView }) {
             Misclick
           </button>
         )}
+        {nextNear && (
+          <button type="button" class="train-next-near" onClick={() => command('next')}>
+            {nextLabel}
+          </button>
+        )}
+        {doneNext && <NextLineButton line={doneNext.line} near />}
         </div>
       </div>
       <div class="train-panel">
@@ -576,7 +591,7 @@ function Session(props: { s: SessionView }) {
           )}
         </p>
         {s.of.kind === 'line' && s.line?.paused && <PausedLine line={s.line} />}
-        {s.done && <Done s={s} inline />}
+        {s.done && <Done s={s} inline nextNear={!!doneNext} />}
         {/* The buttons stay as they are through a line (the owner's request, 2026-10-11): none
             comes or goes while the opponent moves or a comment shows, so none moves under a
             finger. Hint is greyed out when nothing is asked, and gives its place to "Next line";
@@ -604,9 +619,13 @@ function Session(props: { s: SessionView }) {
             </>
           ) : waits ? (
             <>
-              <button type="button" onClick={() => command('next')}>
-                {nextLabel}
-              </button>
+              {nextNear ? (
+                hint
+              ) : (
+                <button type="button" onClick={() => command('next')}>
+                  {nextLabel}
+                </button>
+              )}
               {endQuiz > 0 && (
                 <button type="button" onClick={() => quizComments()} title="Play the lines from the comments met on this line on the board, one after another">
                   Quiz lines ({endQuiz})
@@ -614,9 +633,7 @@ function Session(props: { s: SessionView }) {
               )}
             </>
           ) : (
-            <button type="button" disabled={s.phase !== 'ask' && s.phase !== 'wrong'} onClick={() => command('hint')}>
-              Hint
-            </button>
+            hint
           )}
           {show ? (
             <button type="button" class="secondary" disabled={s.phase === 'shown'} onClick={() => setSelfGrade(false)} title="Back to playing the moves on the board">
@@ -638,14 +655,14 @@ function Session(props: { s: SessionView }) {
           </button>
         </div>
         )}
-        {!s.done && ((show && waits) || (s.wrongMove && !show) || s.savedAlt || s.missed || s.suspended || aside) && (
+        {!s.done && ((show && waits && !nextNear) || (s.wrongMove && !show) || s.savedAlt || s.missed || s.suspended || aside) && (
         <div class="actions train-actions train-extra">
           {aside && (
             <button type="button" class="secondary" onClick={() => command('skipComment')} title="On to the next line from the comments, or back to where the line was">
               Skip this line
             </button>
           )}
-          {show && waits && (
+          {show && waits && !nextNear && (
             <button type="button" onClick={() => command('next')}>
               {nextLabel}
             </button>
@@ -1026,5 +1043,15 @@ function NothingToTrain(props: { s: SessionView }) {
         </button>
       </div>
     </section>
+  );
+}
+
+/** "Next line" after a line trained from the line list or the chapter: the list's next one. */
+function NextLineButton(props: { line: Line; near?: boolean }) {
+  const { line } = props;
+  return (
+    <button type="button" class={props.near ? 'train-next-near' : undefined} onClick={() => open({ name: 'train', sid: line.sid, cid: line.cid, at: [...line.path] })}>
+      Next line
+    </button>
   );
 }

@@ -902,3 +902,12 @@ q_extension (or give it to a session with q_extension attached), then run
   should be taken back with "… isn’t your repertoire: the study move is …", and the study move
   played then. Also in a game practised from a position past move 10, where the repertoire goes on.
 - Checked by Playwright (desktop and emulated phone, the checklist drill); not live.
+
+## On a phone, Next right under the board (2026-10-27)
+
+- Portrait, training the queue or a line: at a line's end "Next line" (or "Finish") should sit
+  beside "Line done · Next: …" under the board, reachable without a scroll, and Hint greyed out
+  where it was. A line trained from the line list: "Next line" in the same place.
+- Idea cards: on a card's back, Ask me, the four grades (on one row) and Next under the board's
+  step buttons. Is the board still big enough above them?
+- Checked by Playwright on an emulated Pixel 7 (and the desktop unchanged); not on a device.

@@ -44,7 +44,7 @@ async function play(page: Page, from: string, to: string) {
   await clickSquare(page, to, 'black');
 }
 
-test('idea cards made for a study, asked from its Train button, and removed', async ({ page }) => {
+test('idea cards made for a study, asked from its Train button, and removed', async ({ page, isMobile }) => {
   const { git, github, sid, cids } = deckWorld();
   await serveGithub(page, github);
   await page.goto(`${site.url}#setup?repo=${encodeURIComponent(REPO)}&token=${TOKEN}&name=desktop`);
@@ -86,6 +86,8 @@ test('idea cards made for a study, asked from its Train button, and removed', as
   // A move with arrows of its own shows its own.
   await page.getByRole('button', { name: 'End of the line' }).click();
   await expect(card.locator('cg-container svg.cg-shapes line')).toHaveCount(2);
+  // On a phone Next is under the board's controls, seen without a scroll; beside the board, in the panel.
+  await expect(card.locator(isMobile ? '.train-board' : '.train-panel').getByRole('button', { name: 'Next (Space)' })).toBeInViewport();
   await page.getByRole('button', { name: 'Next (Space)' }).click();
 
   // A first move marked ! beside the main one is right too: Good.
@@ -105,6 +107,7 @@ test('idea cards made for a study, asked from its Train button, and removed', as
   await page.getByRole('button', { name: 'Show (Space)' }).click();
   await expect(page.getByTestId('idea-result')).toHaveText('Shown. The answer: Bd7.');
   await expect(card.locator('.read-side-lines')).toContainText('(7... Nxd4?? 8. Nxd4 Qxd4? 9. Bb5+)');
+  await expect(page.getByRole('button', { name: /^Easy/ })).toBeInViewport();
   await page.getByRole('button', { name: /^Hard/ }).click();
 
   // The card missed: asked again at the end, not graded.
