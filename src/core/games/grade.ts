@@ -84,6 +84,29 @@ export function judgeMove(lines: readonly MoverLine[], uci: string, afterCp: num
 }
 
 /**
+ * A move judged worse than good is searched again before it is told (PLAN.md §5.136): deeper, and
+ * the moves compared in one search (the lines' moves and the move played, `searchmoves`), as a
+ * score from a line of a shallow MultiPV search, or from another search of the position after,
+ * can be off by more than a band (a best move told a blunder). Pure.
+ */
+export const RECHECK = { overWp: 5, depth: 22, phoneDepth: 20, movetime: 15000 } as const;
+
+export const needsRecheck = (j: Judged): boolean => !j.exactBest && j.wpDrop > RECHECK.overWp;
+
+/** The moves searched again: the lines' first moves and the move played, each once. */
+export function recheckMoves(lines: readonly MoverLine[], uci: string): string[] {
+  return [...new Set([...lines.map((l) => l.move), uci])];
+}
+
+/**
+ * A move's judgement from the deeper search of `recheckMoves`; undefined when that search has no
+ * line for the move played (the first judgement then stands).
+ */
+export function rejudge(lines: readonly MoverLine[], uci: string): Judged | undefined {
+  return lines.some((l) => l.move === uci) ? judgeMove(lines, uci, undefined) : undefined;
+}
+
+/**
  * A mistake card's grade, mistake-lab's: a hint, or a first try that failed, is Again; else by the
  * win% given up: best or within 2 Easy, 5 Good, 10 Hard, more Again.
  */

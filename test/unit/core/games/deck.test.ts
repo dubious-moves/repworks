@@ -19,7 +19,7 @@ import { readFileSync } from 'node:fs';
 import { readGamesFile } from '../../../../src/core/games/record.ts';
 import { extractGame } from '../../../../src/core/games/extract.ts';
 import type { GameItem, MistakeItem, TacticItem } from '../../../../src/core/games/extract.ts';
-import { classifyWpDrop, judgeMove, mistakeGrade, tacticGrade } from '../../../../src/core/games/grade.ts';
+import { classifyWpDrop, judgeMove, mistakeGrade, needsRecheck, recheckMoves, rejudge, tacticGrade } from '../../../../src/core/games/grade.ts';
 
 const DAY = 86_400_000;
 const T0 = Date.parse('2026-10-07T10:00:00.000Z');
@@ -199,4 +199,32 @@ test('Hide time trouble: the mistakes flagged left out, as mistake-lab’s apply
   // Only a mistake's flag counts (an item of another kind carrying one is kept).
   const odd = [{ kind: 'tactic', timeTrouble: true }, { kind: 'advantage', timeTrouble: true }, { kind: 'mistake', timeTrouble: true }, { kind: 'mistake', timeTrouble: false }];
   assert.deepEqual(withoutTimeTrouble(odd, true).map((i) => i.kind), ['tactic', 'advantage', 'mistake']);
+});
+
+test('a move judged worse than good is searched again with the lines’ moves, and judged by that search (§5.136)', () => {
+  // The owner's 14...Qh4 (2026-10-28): not among a shallow search's three lines, and the position
+  // after it scored low by a search of its own: told a blunder.
+  const lines = [
+    { move: 'c8a6', cp: 239 },
+    { move: 'h7h5', cp: 179 },
+    { move: 'e7e5', cp: 150 },
+  ];
+  const first = judgeMove(lines, 'e7h4', 70)!;
+  assert.equal(first.classification, 'blunder');
+  assert.equal(needsRecheck(first), true);
+  assert.deepEqual(recheckMoves(lines, 'e7h4'), ['c8a6', 'h7h5', 'e7e5', 'e7h4']);
+  // The deeper search of those four puts it first: the best move.
+  const deep = rejudge([{ move: 'e7h4', cp: 246 }, { move: 'c8a6', cp: 227 }, { move: 'h7h5', cp: 190 }, { move: 'e7e5', cp: 140 }], 'e7h4')!;
+  assert.equal(deep.classification, 'best');
+  assert.equal(deep.cpLoss, 0);
+  // Second, close behind: excellent, not great (the context is the deeper search's).
+  assert.equal(rejudge([{ move: 'c8a6', cp: 240 }, { move: 'e7h4', cp: 230 }], 'e7h4')!.classification, 'excellent');
+  // No line for the move played: the first judgement stands.
+  assert.equal(rejudge([{ move: 'c8a6', cp: 240 }], 'e7h4'), undefined);
+  // A move among the lines is searched again with them, once.
+  assert.deepEqual(recheckMoves(lines, 'h7h5'), ['c8a6', 'h7h5', 'e7e5']);
+  // Good or better, or the best move itself, is told as it is.
+  assert.equal(needsRecheck(judgeMove(lines, 'h7h5', undefined)!), true);
+  assert.equal(needsRecheck(judgeMove([{ move: 'c8a6', cp: 239 }, { move: 'h7h5', cp: 215 }], 'h7h5', undefined)!), false);
+  assert.equal(needsRecheck(judgeMove(lines, 'c8a6', undefined)!), false);
 });

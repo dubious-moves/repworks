@@ -2,7 +2,9 @@
 // (serveSite's `engine`): it answers the handshake, then for each `go` gives the lines scripted
 // for its position (or, with `ask`, those serveSite's `engineLines` gives for it), a shallow depth
 // at once (with `before`, the depth before the target too) and the depth asked for (when it is from
-// 21 to 30, else 20) after `SLOW` ms, then `bestmove`;
+// 21 to 30, else 20) after `SLOW` ms, then `bestmove`; a `go … searchmoves` gives the lines
+// scripted for the position and those moves (keyed `<key>|<moves>`), else its lines of those moves
+// (a search wanting a line for each move waits out its time when one has none);
 // `stop` ends a search at once. Every command it receives is requested from the site as
 // `__engine/<command>`, so a test reads them from the server's request log. Scores are the side
 // to move's, as the engine writes them.
@@ -47,6 +49,7 @@ const linesOf = (f) => {
   LINES[f] = JSON.parse(x.responseText);
 };
 let fen = '';
+let now = [];
 let timers = [];
 let searching = false;
 let seq = 0;
@@ -54,11 +57,11 @@ const log = (c) => fetch('/repworks/__engine/' + seq++ + '/' + encodeURIComponen
 const finish = () => {
   timers.forEach(clearTimeout);
   timers = [];
-  if (searching) postMessage('bestmove ' + ((LINES[fen] || [])[0] ? LINES[fen][0][2].split(' ')[0] : '(none)'));
+  if (searching) postMessage('bestmove ' + (now[0] ? now[0][2].split(' ')[0] : '(none)'));
   searching = false;
 };
 const emit = (depth, shift = {}) => {
-  for (const [multipv, cp, pv] of LINES[fen] || []) {
+  for (const [multipv, cp, pv] of now) {
     postMessage('info depth ' + depth + ' seldepth ' + (depth + 3) + ' multipv ' + multipv + ' score cp ' + (cp + (shift[multipv] || 0)) + ' nodes 1000 nps 650000 time 10 pv ' + pv);
   }
 };
@@ -73,6 +76,9 @@ onmessage = (e) => {
   }
   if (c.startsWith('go')) {
     searching = true;
+    const only = (/ searchmoves (.+)$/.exec(c) || [])[1];
+    const moves = only ? only.split(' ') : undefined;
+    now = !moves ? LINES[fen] || [] : LINES[fen + '|' + only] || (LINES[fen] || []).filter((l) => moves.includes(l[2].split(' ')[0])).map((l, i) => [i + 1, l[1], l[2]]);
     const asked = Number((/depth (\\d+)/.exec(c) || [])[1]);
     const target = asked > 20 && asked <= 30 ? asked : 20;
     timers.push(setTimeout(() => emit(8), 20));

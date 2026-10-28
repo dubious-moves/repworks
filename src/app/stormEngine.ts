@@ -26,6 +26,8 @@ interface Job {
   lines: number;
   depth: number;
   movetime: number;
+  /** Only these root moves (UCI). */
+  moves?: readonly string[];
   /** When a worker took it, ms (`performance.now`). */
   startedAt?: number;
   resolve(a: EngineAnswer | null): void;
@@ -132,6 +134,9 @@ async function next(): Promise<void> {
   if (!pos || pos.isEnd()) return finish(lane, null);
   let legal = 0;
   for (const [, dests] of pos.allDests()) legal += dests.size();
+  // A search of some moves only is kept apart from the position's own (the search's cache is by key).
+  const moves = job.moves?.length ? job.moves : undefined;
+  if (moves) legal = Math.min(legal, moves.length);
   // A search that runs out of time is taken at the depth it reached (§14.23).
   lane.timer = setTimeout(() => {
     if (lane.job !== job) return;
@@ -139,7 +144,8 @@ async function next(): Promise<void> {
     search.stop();
     finish(lane, now && now.fen === job.fen && now.lines.length ? answerOf(now) : null);
   }, job.movetime + 4000);
-  search.analyse({ fen: job.fen, key: positionKeyOf(pos), turn: pos.turn, depth: job.depth, movetime: job.movetime, lines: job.lines, legal });
+  const key = positionKeyOf(pos) + (moves ? `|${moves.join(' ')}` : '');
+  search.analyse({ fen: job.fen, key, turn: pos.turn, depth: job.depth, movetime: job.movetime, lines: job.lines, legal, ...(moves ? { moves } : {}) });
 }
 
 /**
@@ -147,7 +153,7 @@ async function next(): Promise<void> {
  * search finish an iteration one by one); null when none runs there or it has no line yet.
  */
 export function stormSearchSoFar(fen: string): EngineAnswer | null {
-  const lane = lanes.find((l) => l.job?.fen === fen);
+  const lane = lanes.find((l) => l.job?.fen === fen && !l.job.moves);
   const now = lane?.search?.current();
   if (!now || now.fen !== fen || !now.lines.length) return null;
   return answerOf(now, Math.min(...now.lines.map((l) => l.depth)));
@@ -174,10 +180,10 @@ export function stormEngineProgress(): (LaneProgress | null)[] {
   });
 }
 
-/** Stockfish's MultiPV lines for a position, to `depth` or `movetime` ms; null when it can't. */
-export function analyseForStorm(fen: string, lines: number, depth: number, movetime: number): Promise<EngineAnswer | null> {
+/** Stockfish's MultiPV lines for a position, to `depth` or `movetime` ms, of `moves` only when given; null when it can't. */
+export function analyseForStorm(fen: string, lines: number, depth: number, movetime: number, moves?: readonly string[]): Promise<EngineAnswer | null> {
   return new Promise((resolve) => {
-    queue.push({ fen, lines, depth, movetime, resolve });
+    queue.push({ fen, lines, depth, movetime, ...(moves?.length ? { moves } : {}), resolve });
     void next();
   });
 }

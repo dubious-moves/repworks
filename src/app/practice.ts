@@ -25,7 +25,7 @@ import { makeSanAndPlay } from 'chessops/san';
 import { keyFen, type PositionKey } from '../core/chess/positionKey.ts';
 import { parseUciMove, standardUci } from '../core/chess/uci.ts';
 import type { FromWorker, ToWorker } from '../core/explorer/service.ts';
-import { judgeMove, moverScore, type MoverLine } from '../core/games/grade.ts';
+import { judgeMove, moverScore, needsRecheck, RECHECK, recheckMoves, rejudge, type MoverLine } from '../core/games/grade.ts';
 import { advantageGrade, historyEntry, maiaPick, pickExplorerMove, PRACTICE, repertoireCheck, repertoireVerdict, resultOf, reviewOf, startTrack, trackAdvantage, type AdvantageOutcome, type AdvantageTrack, type HistoryEntry, type HistorySource, type PlayedMove, type RepertoireVerdict, type Review } from '../core/games/practice.ts';
 import { readSaved, resumable, type Saved } from '../core/games/resume.ts';
 import { covered, scanCandidate, tacticCandidates, TACTIC, type DetectedTactic, type Pv } from '../core/games/detect.ts';
@@ -236,10 +236,14 @@ function played(fen: string, uci: string): { san: string; fen: string } | undefi
 const searches = new Map<string, Promise<Awaited<ReturnType<typeof analyseForStorm>>>>();
 /** A position's lines at the judges' depth, kept for the review (its lines and its eval bar ask again). */
 export function analyse(fen: string, lines: number) {
-  const key = `${fen}|${lines}`;
+  return search(fen, lines, narrow() ? 16 : 18, 8000);
+}
+
+function search(fen: string, lines: number, depth: number, movetime: number, moves?: readonly string[]) {
+  const key = `${fen}|${lines}|${depth}|${moves?.join(' ') ?? ''}`;
   let p = searches.get(key);
   if (!p) {
-    p = analyseForStorm(fen, lines, narrow() ? 16 : 18, 8000);
+    p = analyseForStorm(fen, lines, depth, movetime, moves);
     searches.set(key, p);
     if (searches.size > 80) searches.delete(searches.keys().next().value!);
   }
@@ -258,22 +262,40 @@ function sanLine(fen: string, pv: readonly string[]): string[] {
   return out;
 }
 
-/** Judges a move from its position (the trainer's rule): the classification, the loss, the scores for the mover. */
+/**
+ * Judges a move from its position (the trainer's rule): the classification, the loss, the scores
+ * for the mover. A move judged worse than good is searched again deeper, with the lines' moves, and
+ * judged by that search (§5.136).
+ */
 export async function judge(fenBefore: string, uci: string, fenAfter: string): Promise<Partial<PracticeMove> | undefined> {
   const pos = positionOf(fenBefore);
   if (!pos) return undefined;
-  const a = await analyse(fenBefore, 3);
-  const lines: MoverLine[] = (a?.lines ?? []).filter((l) => l.pv.length).map((l) => ({ move: l.pv[0]!, cp: moverScore(l.score, pos.turn) }));
+  const moverLines = (a: Awaited<ReturnType<typeof analyse>>): MoverLine[] => (a?.lines ?? []).filter((l) => l.pv.length).map((l) => ({ move: l.pv[0]!, cp: moverScore(l.score, pos.turn) }));
+  let a = await analyse(fenBefore, 3);
+  let lines = moverLines(a);
   const matched = lines.find((l) => l.move === uci);
   let afterCp = matched?.cp;
   const after = positionOf(fenAfter);
-  if (after?.isEnd()) afterCp = after.isCheckmate() ? 10000 : 0;
+  const ended = !!after?.isEnd();
+  if (ended) afterCp = after!.isCheckmate() ? 10000 : 0;
   else if (!matched && after) {
     const l = (await analyse(fenAfter, 1))?.lines[0];
     if (l?.pv.length) afterCp = -moverScore(l.score, after.turn);
   }
-  const j = judgeMove(lines, uci, afterCp);
+  let j = judgeMove(lines, uci, afterCp);
   if (!j) return undefined;
+  if (!ended && needsRecheck(j)) {
+    const moves = recheckMoves(lines, uci);
+    const deep = await search(fenBefore, moves.length, narrow() ? RECHECK.phoneDepth : RECHECK.depth, RECHECK.movetime, moves);
+    const deepLines = moverLines(deep);
+    const k = rejudge(deepLines, uci);
+    if (k) {
+      j = k;
+      a = deep;
+      lines = deepLines;
+      afterCp = deepLines.find((l) => l.move === uci)!.cp;
+    }
+  }
   const best = a!.lines[0]!;
   return { classification: j.classification, wpDrop: j.wpDrop, cpLoss: j.cpLoss, bestCp: j.bestCp, afterCp: afterCp ?? j.bestCp - j.cpLoss, bestMoveUci: j.bestMove ?? '', bestLine: sanLine(fenBefore, best.pv), pvs: lines.map((l) => ({ cp: l.cp, firstMove: l.move })) };
 }

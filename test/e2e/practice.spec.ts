@@ -19,7 +19,7 @@ import { makeUci } from 'chessops/util';
 import type { FakeGit } from '../support/fakeGit.ts';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
 import { clickSquare } from './board.ts';
-import { fakeEngine, SLOW } from './engine.ts';
+import { commands, fakeEngine, SLOW } from './engine.ts';
 import { fakeExplorer, lichessLogin, serveExplorer } from './explorer.ts';
 import { serveGithub, world } from './github.ts';
 import { serveSite, type SiteServer } from './server.ts';
@@ -49,6 +49,11 @@ const T1 = from(ITALIAN, ['Bxf7+']);
 const T2 = from(ITALIAN, ['Bxf7+', 'Kxf7']);
 const T3 = from(ITALIAN, ['Bxf7+', 'Kxf7', 'Ng5+']);
 const T4 = from(ITALIAN, ['Bxf7+', 'Kxf7', 'Ng5+', 'Ke8']);
+// §5.136: 3.Nc3 isn't among the first search's three lines and the position after it scores low
+// (a blunder); the deeper search of those moves and Nc3 puts it close behind the best.
+const TWO_KNIGHTS = 'r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3';
+const AFTER_NC3 = from(TWO_KNIGHTS, ['Nc3']);
+const RECHECKED = 'f1b5 f1c4 d2d4 b1c3';
 
 let site: SiteServer;
 test.beforeAll(async () => {
@@ -61,6 +66,13 @@ test.beforeAll(async () => {
       ],
       // Black to move after 3.d4: +1.5 for Black.
       [AFTER_D4.key]: [[1, 150, 'c5d4 f3d4']],
+      // 3.d4 searched again with the three lines' moves (§5.136): still a blunder.
+      [`${BEFORE_D4.key}|f1b5 c2c3 b1c3 d2d4`]: [
+        [1, 80, 'f1b5 c8d7'],
+        [2, 70, 'c2c3 g8f6'],
+        [3, 60, 'b1c3 g8f6'],
+        [4, -150, 'd2d4 c5d4'],
+      ],
       // The tactic: 4.Bxf7+ the only good move, Kxf7 forced, 5.Ng5+ the only good move again, then nothing unique.
       [fenKey(ITALIAN)]: [
         [1, 700, 'c4f7 e8f7 f3g5'],
@@ -86,6 +98,18 @@ test.beforeAll(async () => {
         [1, 300, 'd1f3 g8f6'],
         [2, 290, 'd1h5 g7g6'],
         [3, 280, 'b1c3 g8f6'],
+      ],
+      [fenKey(TWO_KNIGHTS)]: [
+        [1, 40, 'f1b5 a7a6'],
+        [2, 35, 'f1c4 g8f6'],
+        [3, 25, 'd2d4 e5d4'],
+      ],
+      [AFTER_NC3.key]: [[1, 120, 'g8f6 f1b5']],
+      [`${fenKey(TWO_KNIGHTS)}|${RECHECKED}`]: [
+        [1, 40, 'f1b5 a7a6'],
+        [2, 35, 'f1c4 g8f6'],
+        [3, 30, 'b1c3 g8f6'],
+        [4, 25, 'd2d4 e5d4'],
       ],
       [PEAK.key]: [
         [1, 60, 'd2d4 b8d7'],
@@ -135,7 +159,7 @@ const progressLog = (git: FakeGit) =>
     .map(([, t]) => t)
     .join('');
 
-test('a practice game: played against the explorer, stopped, reviewed, kept in the history and synced', async ({ page }) => {
+test('a practice game: played against the explorer, stopped, reviewed, kept in the history and synced', async ({ page, isMobile }) => {
   const { git } = await setUp(page);
   await page.evaluate(() => (location.hash = '#/practice?fen=' + encodeURIComponent('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1')));
   const game = page.locator('.practice-game');
@@ -166,6 +190,9 @@ test('a practice game: played against the explorer, stopped, reviewed, kept in t
   await expect(moves.locator('.practice-cls')).toHaveCount(0);
   await page.getByTestId('practice-feedback-toggle').check();
   await expect(moves.locator('.practice-cls').first()).toBeVisible();
+  // 3.d4, told worse than good, searched again deeper with the lines' moves: still a blunder.
+  await expect(moves).toContainText('3. d4??');
+  expect(commands(site.requests)).toContain(`go depth ${isMobile ? 20 : 22} movetime 15000 searchmoves f1b5 c2c3 b1c3 d2d4`);
   await page.getByTestId('practice-feedback-toggle').uncheck();
   await expect(moves.locator('.practice-cls')).toHaveCount(0);
   await page.getByRole('button', { name: 'Stop & review' }).click();
@@ -405,6 +432,24 @@ test('practising from a position: the repertoire check, the hint, a premove, and
   // Ended: nothing is offered again.
   await page.reload();
   await expect(page.getByTestId('practice-resume')).toHaveCount(0);
+});
+
+test('a move judged worse than good is searched again deeper with the lines’ moves, and told by that search', async ({ page, isMobile }) => {
+  await setUp(page);
+  const ex = fakeExplorer();
+  ex.games.set(AFTER_NC3.key, [{ san: 'Nf6', uci: 'g8f6', white: 40, draws: 20, black: 40 }]);
+  await serveExplorer(page, ex);
+  await page.evaluate((fen) => (location.hash = '#/practice?fen=' + encodeURIComponent(fen)), TWO_KNIGHTS);
+  const game = page.locator('.practice-game');
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  await page.getByTestId('practice-feedback-toggle').check();
+  await clickSquare(page, 'b1', 'white');
+  await clickSquare(page, 'c3', 'white');
+  await expect(game).toHaveAttribute('data-moves', '2');
+  // The first search's lines and the position after said a blunder; the deeper search says excellent.
+  await expect(page.getByTestId('practice-feedback')).toHaveText(/^Nc3: Excellent · −1\.4%/);
+  await expect(page.getByTestId('practice-moves')).toContainText('3. Nc3!');
+  expect(commands(site.requests)).toContain(`go depth ${isMobile ? 20 : 22} movetime 15000 searchmoves ${RECHECKED}`);
 });
 
 test('tactics detected after a practice game: found by the scan, tried, discarded and back, saved and synced', async ({ page }) => {

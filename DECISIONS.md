@@ -1879,6 +1879,16 @@ The technical calls, each with its reason:
   2026-10-28: "During storm, you should always be able to retry a move, even if you play a
   good/great/best move."
 
+## Revision of 2026-10-28 (a move told worse than good searched again in practice, PLAN.md §5.136)
+- **Practice's judge searches a move again before telling it worse than good**: more than 5%
+  given up, not the best, searched again at depth 22 (20 on a phone, fifteen seconds at most)
+  with the first search's three moves and the move played compared in one search
+  (`searchmoves`), and judged by that search. Was (§5.57): one search at depth 18 (16 on a
+  phone), a move outside its three lines scored by a search of its own of the position after.
+  Why: the owner, 2026-10-28: "I played the best move at 24 depth and it got classified as a
+  blunder." The shallow search's noise, through mistake-lab's win-% curve, made a top move a
+  blunder; the cost is a second search only on the moves told bad.
+
 ## Revision of 2026-10-26 (the repertoire check at any ply, and in a checklist's drill, PLAN.md §5.132)
 - **The repertoire check runs in a checklist's drill too**, past its line's end, as in a game
   practised from a position: a move the repertoire doesn't have where it has one is taken back

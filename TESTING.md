@@ -927,3 +927,13 @@ q_extension (or give it to a session with q_extension attached), then run
 - In a timed storm, press `t` (or Try again) on any verdict before the next card comes: the card
   stays, the clock stopped; play again, nothing scored; Next goes on with the clock running.
 - Checked by Playwright (desktop and emulated phone); not on a device.
+
+## A move told worse than good searched again in practice (2026-10-28)
+
+- With Move feedback on, play a move the analysis board likes (a top line at depth 24) where the
+  engine is close between moves, like the 14...Qh4 game. The label should not say Blunder or
+  Mistake; at most Inaccuracy when the moves are close. A move that is a real blunder should
+  still say Blunder, a few seconds later than before (the second search).
+- Checked: the app's search and judge under Node (both engines); the built app in headless
+  Chromium on SF18 one thread and SF19 four threads, the owner's game replayed; Playwright with
+  the fake engine (desktop and emulated phone). Not on the owner's device.

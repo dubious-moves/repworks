@@ -7447,3 +7447,41 @@ in `src/app/storm.ts`, `src/ui/Storm.tsx`. Tests: `storm.spec.ts` (desktop and p
 move and a second-ranked move first time each keeping Try again, a practice try with the first
 answer counted, the summary unchanged; the timed storm's Mistake tried again with `t`, the next
 card held, no points, the clock stopped, Next going on with the clock running). Live: TESTING.md.
+
+#### 5.136 A move told worse than good searched again in practice (the owner's report, 2026-10-28)
+
+"What depth is "move feedback" during practice? I played the best move at 24 depth and it got
+classified as a blunder."
+
+- **What it was**: each of the user's moves is judged by the storm's Stockfish client at depth 18
+  (16 on a phone), eight seconds at most, three lines, on the engine version and threads set on
+  the device (§5.36, §5.75), not the analysis board's depth. A move among the three lines takes
+  that line's score; one that isn't takes the score of a search of its own of the position after.
+  The owner's 14...Qh4 (Black, +2.5 at depth 24 on the analysis board, its first line) was told
+  "Blunder · −17.5%".
+- **Why**: not a sign or a mix-up of positions (the app's own search and judge, run under Node
+  on both vendored engines, say Good, −2.5% and −3.8%; the built app in Chromium on one thread
+  says Good, −2.1%). It is the shallow search's noise, which the win-% curve
+  (`100 / (1 + 10^(−cp/400))`, mistake-lab's, steep at +2) turns into bands: SF19 on four threads
+  at depth 18, twelve fresh searches, gave Ba6 +1.88 to +2.36 and Qh4 +1.37 to +1.83 (a single
+  run in the built app: Inaccuracy, −6.1%); a warm hash, a busy device, or Qh4 falling out of the
+  three lines (its score then from another search) widens it further.
+- **Now**: a move judged worse than good (more than 5% given up, not the best) is searched again
+  before it is told, deeper (depth 22, 20 on a phone, fifteen seconds at most) and with the moves
+  compared in one search: the first search's three moves and the move played (`searchmoves`),
+  that many lines. That search judges it, the best line and the scores with it; when it has no
+  line for the move played the first judgement stands. A move that mates or stalemates is not
+  searched again. The advantage drill, which waits for each judge, waits for this one too.
+- The same search, six times on SF19 and four threads in the container (depth 20 to 22 in the
+  fifteen seconds): Qh4 17 to 73 cp behind Ba6 (Excellent to Inaccuracy, never worse). At these depths the engine prefers Ba6 a little; the analysis board's
+  depth 24 put Qh4 first by 0.19.
+- Not changed: the game cards' and the review line's judges (`gameTrainer.ts`, `reviewLine.ts`)
+  keep their one search.
+
+**As built** (2026-10-28): `RECHECK`, `needsRecheck`, `recheckMoves` and `rejudge` in
+`src/core/games/grade.ts`; `judge` in `src/app/practice.ts`; `moves` (UCI `searchmoves`) on the
+search request (`src/core/engine/search.ts`) and on `analyseForStorm` (`src/app/stormEngine.ts`,
+kept under its own key). The fake engine answers `searchmoves`. Tests: `deck.test.ts` (the owner's
+Qh4 told a blunder, then best from the deeper search), `search.test.ts`, `practice.spec.ts`
+(desktop and phone: a blunder by the first search told Excellent by the second, 3.d4 confirmed a
+blunder, the `go … searchmoves` sent). Live: TESTING.md.

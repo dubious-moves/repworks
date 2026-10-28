@@ -181,3 +181,18 @@ test('stop leaves nothing wanted; a restart of the engine starts the wanted sear
   w.search.reset();
   assert.deepEqual(w.sent, ['setoption name MultiPV value 2', `position fen ${START}`, 'go depth 20 movetime 8000']);
 });
+
+test('a search of some moves only sends searchmoves, kept under its own key', () => {
+  const w = world();
+  const moves = ['e2e4', 'd2d4'];
+  w.search.analyse(req(START, { key: `${req(START).key}|e2e4 d2d4`, moves, legal: 2 }));
+  assert.deepEqual(w.sent, ['setoption name MultiPV value 2', `position fen ${START}`, 'go depth 20 movetime 8000 searchmoves e2e4 d2d4']);
+  w.info(20, 1, 30, 'e2e4 e7e5');
+  w.info(20, 2, 25, 'd2d4 d7d5');
+  w.search.receive('bestmove e2e4');
+  assert.equal(w.last().done, true);
+  // The position's own search isn't answered from it.
+  w.sent.length = 0;
+  w.search.analyse(req(START));
+  assert.deepEqual(w.sent, [`position fen ${START}`, 'go depth 20 movetime 8000']);
+});

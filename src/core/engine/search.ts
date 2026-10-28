@@ -22,6 +22,8 @@ export interface SearchRequest {
   legal: number;
   /** Past the depth and time: Qchess's "+", searching until stopped (depth 99). */
   deeper?: boolean;
+  /** Only these root moves (UCI `searchmoves`); `key` then names the position and the moves. */
+  moves?: readonly string[];
 }
 
 export interface EngineLine {
@@ -159,6 +161,7 @@ export function createSearch(o: SearchOptions): Search {
     o.send(`position fen ${req.fen}`);
     let go = `go depth ${req.deeper ? 99 : req.depth}`;
     if (!req.deeper && Number.isFinite(req.movetime)) go += ` movetime ${Math.round(req.movetime)}`;
+    if (req.moves?.length) go += ` searchmoves ${req.moves.join(' ')}`;
     o.send(go);
     active = { req, started: o.now() };
     stopSent = false;
