@@ -5,10 +5,11 @@
 // which a phone's head had squeezed beside the chapter's name. Between the two, what starts from
 // the move shown (§5.90, out of the move's menu): Analyse, Storm, Practise and its plan card.
 // Export PGN downloads the open chapter as its file in the data repo, edits not yet synced included.
-// An idea deck's cards are made or removed at the end (§5.128).
+// An idea deck's cards are made or removed at the end (§5.128). On the analysis board it opens
+// with Flip board (§5.134).
 import { signal } from '@preact/signals';
 import { makeFen } from 'chessops/fen';
-import { at, chapter, doc, feedback, redoEdit, side, study, undoEdit } from '../app/editor.ts';
+import { at, chapter, doc, feedback, flipBoard, redoEdit, SCRATCH, side, study, undoEdit } from '../app/editor.ts';
 import { prefs, setPrefs } from '../app/explorer.ts';
 import { open } from '../app/mode.ts';
 import { enrolStudy, ideaEnrolled } from '../app/ideas.ts';
@@ -31,7 +32,7 @@ export function StudyMenuButton() {
       aria-label="More"
       aria-haspopup="menu"
       aria-expanded={Boolean(menu.value)}
-      title="The explorer, undo and redo, Copy FEN, from the move shown, the chapter and the study, Export PGN"
+      title={study.value?.sid === SCRATCH ? 'Flip board, the explorer, undo and redo, Copy FEN' : 'The explorer, undo and redo, Copy FEN, from the move shown, the chapter and the study, Export PGN'}
       onClick={(e) => {
         if (menu.peek()) return close();
         const r = e.currentTarget.getBoundingClientRect();
@@ -79,6 +80,12 @@ export function StudyMenu(props: { fen: string; study?: StudyActions }) {
   };
   return (
     <FloatingMenu at={m} label="More" onClose={close}>
+      {!props.study && (
+        <button type="button" role="menuitem" title="See the board from the other side; Practise and a saved sequence take that side" onClick={run(flipBoard)}>
+          <span class="menu-check" aria-hidden="true">⇅</span>
+          Flip board <kbd>F</kbd>
+        </button>
+      )}
       <button type="button" role="menuitemcheckbox" aria-checked={explorer} title={explorer ? 'Close the explorer (no requests while it is closed)' : 'Open the explorer'} onClick={run(() => setPrefs({ on: !explorer }))}>
         <span class="menu-check" aria-hidden="true">{explorer ? '✓' : ''}</span>
         Explorer

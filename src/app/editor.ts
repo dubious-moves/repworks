@@ -329,6 +329,23 @@ export const conflictsHere = computed(() => (chapter.value ? openConflicts(chapt
 
 export const setSide = (side: 'white' | 'black') => edit((c) => setOrientation(c, side));
 
+/**
+ * Turns the analysis board round (§5.134): the side it is seen from, which Practise and a saved
+ * sequence take, kept with the board. Not an edit: every step of its history is turned, so undo
+ * never turns it back.
+ */
+export function flipBoard(): void {
+  const d = doc.peek();
+  if (!d || study.peek()?.sid !== SCRATCH) return;
+  const to = side.peek() === 'white' ? 'black' : 'white';
+  const turn = (c: Chapter) => {
+    const r = setOrientation(c, to);
+    return r.ok ? r.value : c;
+  };
+  doc.value = { past: d.past.map(turn), present: turn(d.present), future: d.future.map(turn) };
+  persist(doc.value.present);
+}
+
 export function renameOpenChapter(name: string): void {
   const s = study.peek();
   if (s) edit((c) => renameChapter(c, s.meta.name, name));

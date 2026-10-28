@@ -7402,3 +7402,22 @@ Tests: `train.spec.ts` (phone: "Next line" beside the note, in the viewport, the
 greyed out at the same height), `lines.spec.ts` (the line's "Next line" in the viewport, under
 the board on a phone), `ideas.spec.ts` (Next and the grades in the viewport; under the board on a
 phone). Live: TESTING.md.
+
+#### 5.134 Flip board on the analysis board (the owner's request, 2026-10-28)
+
+"There doesn't seem to be a way to actually flip the board in analysis. … It's good enough to
+have it in the hamburger menu."
+
+- **Flip board** is the first item of the analysis board's ☰ menu, and `F` does the same (as on
+  Lichess). The board was turned only by the side it was opened with (the chapter's, or the side
+  to move of a FEN set up), with no way to turn it after.
+- It turns the board's chapter's `Orientation`, so what goes by the side the board is seen from
+  follows: the eval bar, the material, Practise and a sequence saved from the board. It is kept
+  with the board on the device (a reload keeps it) but is not an edit: every step of the undo
+  history is turned with it, so undo never turns the board back.
+- Not in a study's menu: a chapter's side is what it trains, set in Chapter settings.
+
+**As built** (2026-10-28): `flipBoard` in `src/app/editor.ts`, `src/ui/StudyMenu.tsx`, the key in
+`src/ui/ChapterView.tsx`. Tests: `analysis.spec.ts` (flipped from the menu, undo and redo leave
+it, kept after a reload, `F` both ways, Practise takes the side, none in a study's menu). Live:
+TESTING.md.

@@ -115,6 +115,40 @@ test('from a chapter’s move: a line played there and added back to the chapter
   await expect.poll(() => git.textsOf().get('studies/Rep0Najd/Ch1Najdf.pgn') ?? '').toContain('(2... e6 3. d4)');
 });
 
+test('the board flipped from the ☰ menu or with F, kept with the board, never undone (§5.134)', async ({ page }) => {
+  await setUp(page);
+  await page.getByRole('link', { name: 'Analysis board' }).click();
+  await page.getByRole('button', { name: 'New' }).click();
+  await expect(page.locator('.cg-wrap')).toHaveClass(/orientation-white/);
+  await clickSquare(page, 'e2', 'white');
+  await clickSquare(page, 'e4', 'white');
+  await studyMenu(page, 'Flip board');
+  await expect(page.locator('.cg-wrap')).toHaveClass(/orientation-black/);
+  await expect(page.getByTestId('board-material-bottom')).toHaveAttribute('aria-label', /^Black material/);
+  // Not an edit: undo takes the move back and leaves the board turned.
+  await page.keyboard.press('Control+z');
+  await expect(page.locator('.notation')).not.toContainText('e4');
+  await expect(page.locator('.cg-wrap')).toHaveClass(/orientation-black/);
+  await page.keyboard.press('Control+y');
+  await expect(page.locator('.notation')).toContainText('e4');
+  await expect(page.locator('.cg-wrap')).toHaveClass(/orientation-black/);
+  // Kept after a reload; F turns it back.
+  await page.reload();
+  await expect(page.locator('.cg-wrap')).toHaveClass(/orientation-black/);
+  await page.keyboard.press('f');
+  await expect(page.locator('.cg-wrap')).toHaveClass(/orientation-white/);
+  await page.keyboard.press('f');
+  // Practise takes the side the board is seen from.
+  await page.getByRole('button', { name: 'Practise' }).click();
+  await expect(page).toHaveURL(/#\/practice\?fen=.*&side=black$/);
+  // A study's menu has no Flip board: its side is the chapter's (Chapter settings).
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf`);
+  await expect(page.locator('.notation')).toContainText('A made-up comment');
+  await page.getByRole('button', { name: 'More', exact: true }).click();
+  await expect(page.getByRole('menuitem', { name: 'Chapter settings…' })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: /Flip board/ })).toHaveCount(0);
+});
+
 test('any analysis saved as a sequence: the lines from the board’s start, the side to move asked (§5.74)', async ({ page }) => {
   await setUp(page);
   await page.getByRole('link', { name: 'Analysis board' }).click();

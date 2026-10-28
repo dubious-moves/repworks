@@ -911,3 +911,10 @@ q_extension (or give it to a session with q_extension attached), then run
 - Idea cards: on a card's back, Ask me, the four grades (on one row) and Next under the board's
   step buttons. Is the board still big enough above them?
 - Checked by Playwright on an emulated Pixel 7 (and the desktop unchanged); not on a device.
+
+## Flip board on the analysis board (2026-10-28)
+
+- On the analysis board, ☰ → Flip board (first in the menu) should turn the board, the eval bar
+  and the material with it; `F` on a keyboard does the same. Practise afterwards plays the side
+  now at the bottom. Undo takes back moves without turning the board back.
+- Checked by Playwright (desktop and emulated phone); not on a device.

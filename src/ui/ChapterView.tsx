@@ -16,7 +16,7 @@ import { chessgroundDests, chessgroundMove } from 'chessops/compat';
 import { normalizeMove } from 'chessops/chess';
 import type { Key } from '@lichess-org/chessground/types';
 import type { Move, Role } from 'chessops/types';
-import { afterEdits, at, chapter, conflictsHere, doc, edit, feedback, move, play, problem, redoEdit, resolve, SCRATCH, side, study, undoEdit } from '../app/editor.ts';
+import { afterEdits, at, chapter, conflictsHere, doc, edit, feedback, flipBoard, move, play, problem, redoEdit, resolve, SCRATCH, side, study, undoEdit } from '../app/editor.ts';
 import { AnalysisFen, AnalysisHead } from './Analysis.tsx';
 import { open } from '../app/mode.ts';
 import { left, trainingFrom } from '../app/train.ts';
@@ -117,6 +117,8 @@ export function ChapterView() {
         Home: () => move('start'),
         End: () => move('end'),
         w: () => setThreat(!threat.peek()),
+        // The analysis board turns round, as on Lichess (§5.134).
+        ...(study.peek()?.sid === SCRATCH ? { f: flipBoard } : {}),
       };
       if (ctrl && e.key.toLowerCase() === 'z') (e.shiftKey ? redoEdit : undoEdit)();
       else if (ctrl && e.key.toLowerCase() === 'y') redoEdit();

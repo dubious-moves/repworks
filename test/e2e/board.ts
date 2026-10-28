@@ -73,7 +73,7 @@ export async function drawInDrawMode(page: Page, from: string, to: string, orien
 /** Picks an item of the study's ☰ menu (§5.87, §5.88, §5.90): the explorer on or off, Undo, Redo, Copy FEN, from the move shown, the study's own, Export PGN. */
 export async function studyMenu(
   page: Page,
-  item: 'Explorer' | 'Undo' | 'Redo' | 'Copy FEN' | 'Analyse from here' | 'Storm from here' | 'Practise from here' | 'Make a plan card' | 'Remove the plan card' | 'Make idea cards' | 'Remove the idea cards' | 'New chapter' | 'Chapter settings' | 'Export PGN' | 'Study settings',
+  item: 'Explorer' | 'Flip board' | 'Undo' | 'Redo' | 'Copy FEN' | 'Analyse from here' | 'Storm from here' | 'Practise from here' | 'Make a plan card' | 'Remove the plan card' | 'Make idea cards' | 'Remove the idea cards' | 'New chapter' | 'Chapter settings' | 'Export PGN' | 'Study settings',
 ) {
   await page.getByRole('button', { name: 'More', exact: true }).click();
   const menu = page.getByRole('menu', { name: 'More' });
