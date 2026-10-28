@@ -873,6 +873,9 @@ export interface StormSession {
   total: number;
   /** A retry from the review (§14.10b): nothing scored or recorded. */
   retry?: StormItem;
+  /** The card on the board tried again after its answer counted (a storm's scored one, a set's
+   *  outcome): practice, nothing scored or recorded, a storm's clock stopped. */
+  practice?: boolean;
   /** Puzzles are in play: before a move, a puzzle and a position read the same (§13). */
   disguise: boolean;
   /** The focus dealt (§5.100; the unintuitive storm of §5.82 is one): none for the classic storm. */
@@ -1014,7 +1017,7 @@ export async function startStorm(s: StormScopeData, mode: SessionMode, o: { focu
 function setPhase(phase: Phase): void {
   const s = stormSession.value;
   if (!s) return;
-  if (s.mode === 'storm') {
+  if (s.mode === 'storm' && !s.practice) {
     if (phase === 'solving' && s.endsAt === undefined) return update({ phase, endsAt: Date.now() + s.left });
     if (phase !== 'solving' && s.endsAt !== undefined) return update({ phase, left: Math.max(0, s.endsAt - Date.now()), endsAt: undefined });
   }
@@ -1051,7 +1054,7 @@ function deal(): void {
     return deal();
   }
   if (!item) return endStorm(s.history.length ? 'out' : 'empty');
-  const { nextAt: _a, nextIn: _b, ...rest } = stormSession.value!;
+  const { nextAt: _a, nextIn: _b, practice: _c, ...rest } = stormSession.value!;
   stormSession.value = { ...rest, item, revealed: false, history: s.pass === 1 ? [...s.history, item] : s.history };
   setPhase('solving');
   void lookAhead();
@@ -1090,6 +1093,14 @@ function settle(item: StormItem, uci: string, v: StormAnswer): void {
   if (!now) return;
   const card = item.card;
   const band = v.band as Band;
+  const attempts = (item.attempts ?? 0) + 1;
+  if (now.practice) {
+    // Tried again after its answer counted: practice, the counted answer and the outcome kept.
+    const next: StormItem = { ...item, answer: v, attempts };
+    update({ item: next, history: now.history.map((h) => (h.card.card === item.card.card ? { ...h, ...next, answer: h.answer, later: [...(h.later ?? []), v] } : h)) });
+    setPhase('verdict');
+    return;
+  }
   if (now.mode === 'storm') {
     const pts = points(band, now.streak, STORM);
     v.points = pts;
@@ -1105,14 +1116,6 @@ function settle(item: StormItem, uci: string, v: StormAnswer): void {
     return;
   }
   // The set (§17): a clean answer resolves, a worse one holds the card.
-  const attempts = (item.attempts ?? 0) + 1;
-  if (now.pass === 1 ? item.outcome : item.secondOutcome) {
-    // Tried again after it was found: practice, its outcome kept.
-    const next: StormItem = { ...item, answer: v, attempts };
-    update({ item: next, history: now.history.map((h) => (h.card.card === item.card.card ? { ...h, ...next, answer: h.answer, later: [...(h.later ?? []), v] } : h)) });
-    setPhase('verdict');
-    return;
-  }
   const first = now.pass === 1 && attempts === 1;
   if (first) void recordEvent({ t: new Date().toISOString(), ...stormAnswer(card.card, band, { uci, wp: v.wp ?? null, set: true, chapter: chapterOf(card) }) });
   const held = setHeld(band, STORM) && !now.revealed;
@@ -1209,25 +1212,37 @@ export function isTopMove(v: StormAnswer): boolean {
 }
 
 /**
- * Whether the set's card can be tried again: held, with attempts left; or found on a retry (or in
- * the second pass), as often as wanted, the outcome kept: for the top move when it was missed, or
- * to look at other moves once it was found.
+ * Whether the card can be tried again (the owner's request, 2026-10-28: always, whatever the move):
+ * a held set card with attempts left, and any verdict, timed or a set, as often as wanted. Once
+ * the answer counted, the tries are practice (`practice`): nothing scored or recorded.
  */
 export function canTryAgain(s: StormSession | undefined): boolean {
   const item = s?.item;
-  if (!s || !item || s.mode !== 'set') return false;
-  if (s.phase === 'held') return (item.attempts ?? 0) < STORM.setRetryMax;
-  if (s.phase !== 'verdict' || s.revealed || !item.answer) return false;
-  const out = s.pass === 1 ? item.outcome : item.secondOutcome;
-  return out === 'retry' || (out === 'first' && s.pass === 2);
+  if (!s || !item) return false;
+  if (s.phase === 'held') return s.mode === 'set' && (item.attempts ?? 0) < STORM.setRetryMax;
+  return s.phase === 'verdict';
 }
 
-/** A set card tried again (best still hidden) — the board is set back. */
+/**
+ * A set card's tries going on, the best hidden until shown (§5.85): found on a retry, in the
+ * second pass, or on a try after it was found first time.
+ */
+export function triesGoOn(s: StormSession | undefined): boolean {
+  const item = s?.item;
+  if (!s || !item || s.mode !== 'set' || s.phase !== 'verdict' || s.revealed || !item.answer) return false;
+  const out = s.pass === 1 ? item.outcome : item.secondOutcome;
+  return out === 'retry' || (out === 'first' && (s.pass === 2 || (item.attempts ?? 0) > 1));
+}
+
+/** The card tried again — the board is set back; a storm's next card waits, its clock stopped. */
 export function tryAgain(): void {
   const s = stormSession.value;
   if (!s?.item || !canTryAgain(s)) return;
+  clearTimeout(verdictTimer);
   const { answer: _gone, played: _move, ...rest } = s.item;
-  update({ item: s.item.puzzle ? { ...rest, step: 0 } : rest });
+  const { nextAt: _a, nextIn: _b, ...session } = s;
+  const practice = s.mode === 'storm' || !!(s.pass === 1 ? s.item.outcome : s.item.secondOutcome);
+  stormSession.value = { ...session, item: s.item.puzzle ? { ...rest, step: 0 } : rest, revealed: false, ...(practice ? { practice } : {}) };
   setPhase('solving');
 }
 
@@ -1237,7 +1252,7 @@ export function showMove(): void {
   const s = stormSession.value;
   if (!s?.item) return;
   // Found already, kept for more tries: the move shown, the outcome as it was.
-  if (s.phase === 'verdict' && canTryAgain(s)) return update({ revealed: true });
+  if (triesGoOn(s)) return update({ revealed: true });
   if (s.phase !== 'held') return;
   reveal({ ...s, item: s.item });
 }
@@ -1362,7 +1377,8 @@ export function analysisFor(item: StormItem, back: StormMode): Extract<Mode, { n
 export function analyse(item: StormItem, back: StormMode, reviewAt?: number): void {
   const s = stormSession.value;
   if (s?.phase === 'held' && s.item === item) showMove();
-  else if (s?.phase === 'solving' && s.item === item) giveUp({ ...s, item });
+  // A practice try left as it is: its answer counted already.
+  else if (s?.phase === 'solving' && s.item === item && !s.practice) giveUp({ ...s, item });
   if (reviewAt !== undefined) update({ reviewAt });
   open(analysisFor(item, back));
 }

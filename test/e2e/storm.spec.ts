@@ -587,6 +587,66 @@ test('the set: a retry found keeps Try again, with less than the top move and wi
   await expect(page.getByRole('button', { name: /^Next position/ })).toBeVisible();
 });
 
+test('Try again always (the owner’s request, 2026-10-28): after a set’s first answer, top or not, and in the timed storm, as practice', async ({ page }) => {
+  const w = await setUp(page);
+  await gathered(page, w);
+  await page.getByRole('button', { name: /^Set of/ }).click();
+  await expect(page.locator('.storm-card')).toBeVisible();
+  // The top move first time: Best move!, the best shown, and Try again beside Next.
+  const first = await cardFen(page);
+  const moves = ranked(first);
+  await play(page, moves[0]!);
+  await expect(page.getByTestId('storm-verdict')).toContainText('Best move!');
+  await expect(page.locator('.storm-best')).toContainText('best');
+  await expect(page.getByTestId('storm-counted')).toHaveCount(0);
+  await page.getByRole('button', { name: /^Try again/ }).click();
+  await expect(page.getByTestId('storm-verdict')).toContainText('Find a good move');
+  // A practice try: graded, the first answer still the one that counts, Try again still there.
+  await play(page, moves[1]!);
+  await expect(page.getByTestId('storm-verdict')).toContainText('Great move');
+  await expect(page.getByTestId('storm-counted')).toContainText('the first answer');
+  await expect(page.getByRole('button', { name: /^Try again/ })).toBeVisible();
+  await page.getByRole('button', { name: /^Next position/ }).click();
+  // A good move first time, not the top one: resolved, the best shown, and Try again too.
+  await expect.poll(() => cardFen(page)).not.toBe(first);
+  await play(page, ranked(await cardFen(page))[1]!);
+  await expect(page.getByTestId('storm-verdict')).toContainText('Great move');
+  await expect(page.locator('.storm-best')).toContainText('best');
+  await expect(page.getByRole('button', { name: /^Try again/ })).toBeVisible();
+  await page.getByRole('button', { name: /^End/ }).click();
+  await expect(page.getByTestId('storm-summary')).toContainText('2 of 2 found first time');
+  await expect(page.getByTestId('storm-later')).toContainText('not counted');
+
+  // The timed storm: Try again (t) on a verdict stops the next card from coming; the try is
+  // practice, nothing scored, the clock stopped; Next goes on with the clock running.
+  await page.locator('.storm-result').getByRole('button', { name: 'Storm', exact: true }).click();
+  await expect(page.getByTestId('storm-verdict')).toContainText('Find a good move');
+  const timed = await cardFen(page);
+  const list = ranked(timed);
+  await play(page, list[Math.min(list.length, LADDER.length) - 1]!);
+  await expect(page.getByTestId('storm-verdict')).toContainText('Mistake');
+  await page.keyboard.press('t');
+  await expect(page.getByTestId('storm-verdict')).toContainText('Find a good move');
+  const points = await page.getByTestId('storm-points').textContent();
+  await expect(page.getByTestId('storm-clock')).toHaveClass(/stopped/);
+  const clock = await page.getByTestId('storm-clock').textContent();
+  await play(page, list[0]!);
+  await expect(page.getByTestId('storm-verdict')).toContainText('Best move!');
+  await expect(page.getByTestId('storm-counted')).toContainText('Mistake');
+  await page.waitForTimeout(STORM_VERDICT_MS + 500);
+  expect(await cardFen(page)).toBe(timed);
+  await expect(page.getByTestId('storm-points')).toHaveText(points!);
+  await expect(page.getByTestId('storm-clock')).toHaveText(clock!);
+  await page.getByRole('button', { name: /^Try again/ }).click();
+  await expect(page.getByTestId('storm-verdict')).toContainText('Find a good move');
+  await play(page, list[1]!);
+  await expect(page.getByTestId('storm-verdict')).toContainText('Great move');
+  await page.getByRole('button', { name: /^Next/ }).click();
+  await expect.poll(() => cardFen(page)).not.toBe(timed);
+  await expect(page.getByTestId('storm-verdict')).toContainText('Find a good move');
+  await expect(page.getByTestId('storm-clock')).not.toHaveClass(/stopped/);
+});
+
 test('the set: a mistake held, tried again, shown, and the second pass', async ({ page, isMobile }) => {
   const w = await setUp(page);
   await gathered(page, w);

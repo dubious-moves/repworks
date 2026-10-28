@@ -49,6 +49,7 @@ import {
   stormEntry,
   suspendStorm,
   toggleShown,
+  triesGoOn,
   tryAgain,
   puzzleFen,
   maiaRating,
@@ -930,7 +931,7 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
       else if ((e.key === ' ' || e.key === 'Enter') && now.phase === 'verdict') nextCard();
       else if (e.key === 'p' && now.phase === 'verdict' && now.nextAt !== undefined) pauseVerdict();
       else if (e.key === 't' && canTryAgain(now)) tryAgain();
-      else if (e.key === 's' && (now.phase === 'held' || canTryAgain(now))) showMove();
+      else if (e.key === 's' && (now.phase === 'held' || triesGoOn(now))) showMove();
       else if (e.key === 'a' && now.item && now.phase !== 'grading') analyse(now.item, props.scope.route);
       else return;
       e.preventDefault();
@@ -944,8 +945,10 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
   const asking = phase === 'solving';
   // The disguise (§13): before a move a puzzle and a position read the same.
   const hush = s.disguise && !v;
-  // A set card found on a retry can be tried on (Try again stays): for the top move, or after it.
-  const more = phase === 'verdict' && canTryAgain(s);
+  // Try again on any verdict (practice once the answer counted); a set card found on a retry
+  // goes on with the best hidden: for the top move, or after it.
+  const again = canTryAgain(s);
+  const more = triesGoOn(s);
   // The top move played: said so, and celebrated on the board (a new burst for each answer).
   const top = !!v && phase === 'verdict' && topFound(v, !!item.puzzle);
   const burst = top ? `${item.card.card}|${s.pass}|${item.attempts ?? 0}` : undefined;
@@ -958,8 +961,8 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
   const band = v?.band ?? (phase === 'grading' ? 'checking' : 'none');
   const title = v ? (item.puzzle ? (PUZZLE_WORD[v.band] ?? '') : top ? 'Best move!' : (TITLE_WORD[v.band] ?? '')) : phase === 'grading' && !item.puzzle ? 'Checking…' : 'Find a good move';
   const left = STORM.setRetryMax - (item.attempts ?? 0);
-  // A set card tried again (or back in the second pass): its first answer is the one that counts.
-  const counted = s.mode === 'set' ? s.history.find((h) => h.card.card === item.card.card)?.answer : undefined;
+  // A card tried again (or back in the second pass): its first answer is the one that counts.
+  const counted = s.history.find((h) => h.card.card === item.card.card)?.answer;
   const line = v
     ? item.puzzle
       ? `${v.userSan || '—'}${v.points ? ` · ${v.points > 0 ? '+' : ''}${v.points}` : ''}`
@@ -1008,7 +1011,7 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
           </div>
         )}
         <div class="actions train-actions">
-          {(held || more) && canTryAgain(s) && (
+          {again && (
             <button type="button" class={held ? 'primary' : 'secondary'} onClick={tryAgain}>
               Try again <kbd>T</kbd>
             </button>

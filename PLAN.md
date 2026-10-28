@@ -7421,3 +7421,29 @@ have it in the hamburger menu."
 `src/ui/ChapterView.tsx`. Tests: `analysis.spec.ts` (flipped from the menu, undo and redo leave
 it, kept after a reload, `F` both ways, Practise takes the side, none in a study's menu). Live:
 TESTING.md.
+
+#### 5.135 Try again always in the storm (the owner's request, 2026-10-28)
+
+"During storm, you should always be able to retry a move, even if you play a good/great/best move."
+
+- **Every verdict offers Try again** (`t`): a set's first answer, clean or not, top move or not;
+  a card shown; and the timed storm's verdicts. Was (§5.85, §5.131): only a held card, or one
+  found on a retry or in the second pass; a set's clean first answer and the timed storm had none.
+- **The answer that counted stays**: once it is scored (the timed storm) or resolved (a set's
+  outcome), the tries are practice (`practice` on the session): nothing scored or recorded, the
+  outcome and the streak as they were, each try kept in the review's "not counted" (`later`), the
+  panel's "Counted: the first answer" in view. A held card's tries are as before (three, then
+  shown).
+- **The timed storm**: Try again stops the next card from coming by itself and keeps the clock
+  stopped through the practice tries; Next goes on, the clock running again. Analyse from a
+  practice try leaves it waiting for a move (it isn't passed).
+- **What the panel shows** is as before: after a clean first answer the best is shown, Try again
+  secondary beside Next; a set's tries after it go on with the best hidden until Show the move or
+  the top move (§5.85's rule, now also for a practice try after a first-time find). A card tried
+  again after Show the move starts without the best's arrow.
+
+**As built** (2026-10-28): `canTryAgain`, `triesGoOn`, `tryAgain` and `settle`'s practice branch
+in `src/app/storm.ts`, `src/ui/Storm.tsx`. Tests: `storm.spec.ts` (desktop and phone: a set's top
+move and a second-ranked move first time each keeping Try again, a practice try with the first
+answer counted, the summary unchanged; the timed storm's Mistake tried again with `t`, the next
+card held, no points, the clock stopped, Next going on with the clock running). Live: TESTING.md.

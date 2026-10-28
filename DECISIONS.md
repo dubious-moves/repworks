@@ -1871,6 +1871,14 @@ The technical calls, each with its reason:
   celebrated on the board. Why: the owner asked for the best move to be clearer and more
   satisfying.
 
+## Revision of 2026-10-28 (Try again always in the storm, PLAN.md §5.135)
+- **Every storm verdict offers Try again**, a set's clean first answer and the timed storm's
+  included; once the answer counted the tries are practice, nothing scored or recorded, and a
+  timed storm's next card and clock wait for Next. Was (§5.85, the revision of 2026-10-26): only a
+  set card found on a retry or in the second pass, and the timed storm had none. Why: the owner,
+  2026-10-28: "During storm, you should always be able to retry a move, even if you play a
+  good/great/best move."
+
 ## Revision of 2026-10-26 (the repertoire check at any ply, and in a checklist's drill, PLAN.md §5.132)
 - **The repertoire check runs in a checklist's drill too**, past its line's end, as in a game
   practised from a position: a move the repertoire doesn't have where it has one is taken back

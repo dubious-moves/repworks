@@ -918,3 +918,12 @@ q_extension (or give it to a session with q_extension attached), then run
   and the material with it; `F` on a keyboard does the same. Practise afterwards plays the side
   now at the bottom. Undo takes back moves without turning the board back.
 - Checked by Playwright (desktop and emulated phone); not on a device.
+
+## Try again always in the storm (2026-10-28)
+
+- In a set, play a good or the top move first time: Try again (`t`) should be beside Next
+  position; another move after it reads "Counted: the first answer", and the summary counts the
+  first answer only.
+- In a timed storm, press `t` (or Try again) on any verdict before the next card comes: the card
+  stays, the clock stopped; play again, nothing scored; Next goes on with the clock running.
+- Checked by Playwright (desktop and emulated phone); not on a device.
