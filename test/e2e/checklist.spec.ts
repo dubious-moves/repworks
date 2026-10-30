@@ -10,6 +10,8 @@
 // shows the same list after its sync, with no explorer call. Then a list kept on a device before
 // §5.130 carried into the log after the first sync; a line taken out (asked first) and restored;
 // the Alapin line paused on another device, hidden here after a sync; a drill's old address.
+// Then a drill drawn by repetition (§5.137): a position of the Alapin's lead-up standing the third
+// time in the game played from its end.
 import { test, expect, type Page } from '@playwright/test';
 import { Chess } from 'chessops/chess';
 import { makeFen } from 'chessops/fen';
@@ -272,4 +274,37 @@ test('a drill past its line’s end: a move off the repertoire taken back with t
   await clickSquare(page, 'f6', 'black');
   await expect(page.getByTestId('practice-deviation')).toHaveCount(0);
   await expect(game).toHaveAttribute('data-moves', '5');
+});
+
+test('a drill drawn by repetition, the lead-up’s positions counted: after 2.c3 stands the third time at 6.Nb1', async ({ page }) => {
+  test.setTimeout(60_000);
+  const { github } = world();
+  const ex = explorer();
+  // The opponent shuffles its knight: 3.Na3 at the line's end, 4.Nb1 after 3...Ng8, and again.
+  const g = (sans: string[], san: string) => [{ san, uci: uci(sans, san), white: 50, draws: 0, black: 50 }];
+  ex.games.set(key(ALAPIN), g(ALAPIN, 'Na3'));
+  ex.games.set(key([...ALAPIN, 'Na3', 'Ng8']), g([...ALAPIN, 'Na3', 'Ng8'], 'Nb1'));
+  await setUp(page, github, 'desktop', ex);
+  await page.evaluate(() => (location.hash = '#/checklist?sid=Rep0Najd&side=black'));
+  const section = await block(page);
+  await section.getByLabel('Plies').selectOption('0');
+  await section.getByRole('button', { name: 'Make' }).click();
+  const alapin = section.getByTestId('checklist-line').filter({ hasText: 'Alapin' });
+  await expect(alapin.locator('.checklist-line')).toHaveText(/^1\. e4 c5 2\. c3 Nf6/);
+  await alapin.getByRole('button', { name: 'Easy' }).click();
+  const drill = page.getByTestId('checklist-drill');
+  for (const [from, to, step] of [['c7', 'c5', '1'], ['g8', 'f6', '3']] as const) {
+    await expect(drill).toHaveAttribute('data-step', step);
+    await clickSquare(page, from, 'black');
+    await clickSquare(page, to, 'black');
+  }
+  // 3.Na3 Ng8 4.Nb1 (after 2.c3 the second time) Nf6 5.Na3 Ng8 6.Nb1: the game alone has it twice.
+  const game = page.locator('.practice-game');
+  for (const [n, from, to] of [[1, 'f6', 'g8'], [3, 'g8', 'f6'], [5, 'f6', 'g8']] as const) {
+    await expect(game).toHaveAttribute('data-moves', String(n));
+    await expect(game).toHaveAttribute('data-phase', 'user');
+    await clickSquare(page, from, 'black');
+    await clickSquare(page, to, 'black');
+  }
+  await expect(page.getByTestId('practice-end')).toContainText('Draw by threefold repetition. Counted as a draw.');
 });

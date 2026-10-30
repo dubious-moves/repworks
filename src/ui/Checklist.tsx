@@ -23,7 +23,7 @@ import { trainData } from '../app/train.ts';
 import { completedPresets, linesOf, PRESET_ORDER, PRESETS, presetOpen, presetStats, RANK_SPEEDS, type ChecklistGap, type Preset, type ShownLine } from '../core/games/checklist.ts';
 import type { Color } from '../core/games/record.ts';
 import { parseUciMove } from '../core/chess/uci.ts';
-import { positionKeyOf } from '../core/chess/positionKey.ts';
+import { keyFen, positionKeyOf } from '../core/chess/positionKey.ts';
 import { positionOf } from '../core/storm/walk.ts';
 import { MiniBoard } from './CommentOffer.tsx';
 import { MoveBoard, PracticeBoard } from './Practice.tsx';
@@ -412,7 +412,7 @@ export function ChecklistDrill(props: { sid: string; side: Color; line: string[]
     if (!inLeadUp) {
       if (resumed && practice.peek()) return;
       const p = PRESETS[props.preset];
-      startPractice({ kind: 'checklist', fen: v.leafFen, color, silent: true, title: lineText(v.lineSan), opponent: { ratings: [...p.ratings], speeds: [...RANK_SPEEDS], maiaElo, precision: p.precision }, preset: props.preset, leaf: v.leafKey });
+      startPractice({ kind: 'checklist', fen: v.leafFen, color, silent: true, title: lineText(v.lineSan), opponent: { ratings: [...p.ratings], speeds: [...RANK_SPEEDS], maiaElo, precision: p.precision }, preset: props.preset, leaf: v.leafKey, before: v.lineUci.map((_, n) => keyFen(fenAt(n))!.key) });
       return;
     }
     if (turn !== color) {

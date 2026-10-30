@@ -7485,3 +7485,41 @@ kept under its own key). The fake engine answers `searchmoves`. Tests: `deck.tes
 Qh4 told a blunder, then best from the deeper search), `search.test.ts`, `practice.spec.ts`
 (desktop and phone: a blunder by the first search told Excellent by the second, 3.d4 confirmed a
 blunder, the `go … searchmoves` sent). Live: TESTING.md.
+
+#### 5.137 Draws in practice: repetition, fifty moves, and Offer draw (the owner's request, 2026-10-30)
+
+"Is threefold repetition (draw) implemented in practice? (including start from checklist)" — it
+wasn't: a game ended only on what chessops's `isEnd` sees in one position (mate, stalemate,
+insufficient material), so repeated moves went on for ever, and the fifty-move rule wasn't kept
+either. Then: "add it, including the line before the checklist leaf", and a draw offer ("accepted
+if the conditions are true. Otherwise we would give away information that the position is a
+draw, while the player might think he's winning/losing").
+
+- **Repetition**: a game from a position, a checklist's drill and an advantage drill end as a
+  draw when a position (its key: placement, side to move, castling, a legal en passant) stands
+  for the third time, after either side's move. A checklist's drill counts its lead-up from the
+  start too (`PracticeSetup.before`, kept with the game for a resume): after 1.e4 c5 2.c3 Nf6,
+  3.Na3 Ng8 4.Nb1 Nf6 5.Na3 Ng8 6.Nb1 is the third time of the position after 2.c3. A game from
+  any other position counts from that position (its URL carries no moves before it).
+- **Fifty moves**: a draw at the position's halfmove clock 100, played automatically as Lichess
+  does (not on claim). Mate on that move comes first.
+- **Offer draw**, beside Hint and Take back, in a game from a position and a checklist's drill
+  (not in an advantage drill, which is graded): the opponent waits for the judges still out and
+  searches the position on the board, then accepts when the game is at move 20 or later (ply 40
+  by the board's move number, a checklist's lead-up counted) and the user's last five moves and
+  the position now are all scored within ±0.50 for the user. Otherwise "The opponent declines the
+  draw.", nothing more, and no second offer at that position (a move, or a takeback, lets the
+  user offer again). Accepted: "Draw agreed.", a draw.
+- A draw of any of these counts as a draw: the `practice` event's `res` (a checklist's line half a
+  win, as before), the history entry's outcome, an advantage drill graded Again.
+- Not changed: the judges search a position alone, so a move that repeats into the draw is
+  classified by the engine's score of the position, not as 0.00.
+
+**As built** (2026-10-30): `ruleDraw`, `plyOf`, `drawAccepted` and `PRACTICE`'s `drawOfferPly`,
+`drawishCp`, `drawishRuns` in `src/core/games/practice.ts`; `endOf`, `offerDraw`, `canOfferDraw`
+in `src/app/practice.ts`; the button, its note and the end words in `src/ui/Practice.tsx`; the
+lead-up's keys from `ChecklistDrill` (`src/ui/Checklist.tsx`). Tests: `practice.test.ts`
+(repetition with and without the lead-up, fifty moves, the offer's rule), `checklist.spec.ts`
+(desktop and phone: the Alapin drill drawn by repetition at 6.Nb1, which fails with the lead-up
+left out), `draws.spec.ts` (desktop and phone: an offer declined after one move, the button off
+at that position, accepted after five level moves). Live: TESTING.md.

@@ -14,7 +14,7 @@ import type { Key } from '@lichess-org/chessground/types';
 import { analyseFrom, entryKey, open } from '../app/mode.ts';
 import { recordEvent } from '../app/state.ts';
 import { openingNameOf, practiceHistory, savedDeck } from '../app/games.ts';
-import { analyse, canTakeBack, claimVictory, clearPremove, detection, setFoundState, type FoundTactic, discardSaved, gameOfHistory, ignoreRepertoire, loadOpponent, practiceFeedback, practiceHint, resumePractice, setPracticeFeedback, showsFeedback, savedPractice, saveOpponent, judge, parkPractice, practice, practiceMove, takeUpPractice, practiceReview, setPremove, startPractice, stopPractice, takeBack, type Opponent, type PracticeGame, type PracticeMove } from '../app/practice.ts';
+import { analyse, canOfferDraw, canTakeBack, claimVictory, offerDraw, clearPremove, detection, setFoundState, type FoundTactic, discardSaved, gameOfHistory, ignoreRepertoire, loadOpponent, practiceFeedback, practiceHint, resumePractice, setPracticeFeedback, showsFeedback, savedPractice, saveOpponent, judge, parkPractice, practice, practiceMove, takeUpPractice, practiceReview, setPremove, startPractice, stopPractice, takeBack, type Opponent, type PracticeGame, type PracticeMove } from '../app/practice.ts';
 import { parseUciMove, standardUci } from '../core/chess/uci.ts';
 import { makeFen } from 'chessops/fen';
 import { CLASSIFICATION, moverScore, type Classification } from '../core/games/grade.ts';
@@ -125,7 +125,10 @@ const END_WORD = {
   mate: 'Checkmate: you won.',
   mated: 'Checkmated.',
   stalemate: 'Stalemate: a draw.',
-  draw: 'A draw.',
+  draw: 'Insufficient material: a draw.',
+  repetition: 'Draw by threefold repetition.',
+  fifty: 'Draw by the fifty-move rule.',
+  agreed: 'Draw agreed.',
   claim: 'Victory claimed.',
   collapse: 'The advantage is gone: the eval fell to +1 or below.',
   stopped: 'Stopped.',
@@ -188,6 +191,11 @@ export function PracticeBoard(props: { onNext?: () => void }) {
         )}
         {p.source && !s.silent && <p class="muted">Opponent: {p.source}</p>}
         {p.note && <p class="muted">{p.note}</p>}
+        {p.drawOffer?.at === p.moves.length && (
+          <p class="muted" role="status" data-testid="practice-draw-offer">
+            {p.drawOffer.state === 'pending' ? 'Draw offered: the opponent is thinking…' : 'The opponent declines the draw.'}
+          </p>
+        )}
         <MoveList moves={p.moves} baseFen={s.fen} marks={feedback} />
         {s.kind === 'practice' && (
           <label class="check" title="Each move’s classification as you play (the review at the end has them either way)">
@@ -204,6 +212,11 @@ export function PracticeBoard(props: { onNext?: () => void }) {
           {canHint && (
             <button type="button" class="secondary" title="The repertoire’s move, else Stockfish’s: the piece, then the move (H)" disabled={hint?.level === 2} onClick={() => void practiceHint()}>
               Hint
+            </button>
+          )}
+          {s.kind !== 'advantage' && (
+            <button type="button" class="secondary" data-testid="practice-offer-draw" title="The opponent accepts only a level position, from move 20" disabled={!canOfferDraw(p)} onClick={() => void offerDraw()}>
+              Offer draw
             </button>
           )}
           {canTakeBack(p) && (

@@ -14,7 +14,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { advantageGrade, positionEvals, repertoireVerdict, historyEntry, historyOf, maiaPick, pickExplorerMove, readHistoryEntry, resultOf, reviewOf, startTrack, trackAdvantage, type ExplorerMove, type PlayedMove } from '../../../../src/core/games/practice.ts';
+import { Chess } from 'chessops/chess';
+import { makeFen } from 'chessops/fen';
+import { parseSan } from 'chessops/san';
+import { advantageGrade, drawAccepted, plyOf, positionEvals, repertoireVerdict, historyEntry, historyOf, maiaPick, pickExplorerMove, readHistoryEntry, resultOf, reviewOf, ruleDraw, startTrack, trackAdvantage, type ExplorerMove, type PlayedMove } from '../../../../src/core/games/practice.ts';
 import { parseLog } from '../../../../src/core/progress/events.ts';
 import { toDeviceEvents, type DeviceEvent } from '../../../../src/core/progress/replay.ts';
 
@@ -124,4 +127,58 @@ test('the eval bar’s scores: before and after each user move, an opponent’s 
     { san: 'cxd4', uci: 'c5d4', isUser: false },
   ];
   assert.deepEqual(positionEvals(moves), [30, 25, 35, 30, undefined, undefined, undefined]);
+});
+
+// ---- Draws (the owner's request, 2026-10-30): repetition, fifty moves, and a draw offered ----
+
+/** The keys of the positions of a game from the start, and the last position's halfmove clock. */
+function walk(sans: string[]): { keys: string[]; halfmoves: number } {
+  const pos = Chess.default();
+  const keys = [makeFen(pos.toSetup()).split(' ').slice(0, 4).join(' ')];
+  for (const san of sans) {
+    pos.play(parseSan(pos, san)!);
+    keys.push(makeFen(pos.toSetup()).split(' ').slice(0, 4).join(' '));
+  }
+  return { keys, halfmoves: pos.halfmoves };
+}
+
+test('a draw by repetition: the third time a position stands, the positions before the game counted', () => {
+  const lead = ['e4', 'c5', 'c3', 'Nf6'];
+  const shuffle = ['Na3', 'Ng8', 'Nb1', 'Nf6', 'Na3', 'Ng8', 'Nb1'];
+  // After 2.c3 (Black to move) stands again after 4.Nb1 and 6.Nb1: the third time with the lead-up counted.
+  const w = walk([...lead, ...shuffle]);
+  assert.equal(ruleDraw(w.keys, w.halfmoves), 'repetition');
+  // The game alone (from 2...Nf6): only twice so far.
+  assert.equal(ruleDraw(w.keys.slice(lead.length), w.halfmoves), undefined);
+  // One move earlier, nothing stands three times.
+  const v = walk([...lead, ...shuffle.slice(0, -1)]);
+  assert.equal(ruleDraw(v.keys, v.halfmoves), undefined);
+  // The same placement with the other side to move is another position.
+  assert.equal(ruleDraw(['a w', 'a b', 'a w', 'a b'], 0), undefined);
+  assert.equal(ruleDraw(['a w', 'a b', 'a w', 'a b', 'a w'], 0), 'repetition');
+});
+
+test('a draw by the fifty-move rule: a hundred plies with no capture or pawn move', () => {
+  assert.equal(ruleDraw(['x'], 99), undefined);
+  assert.equal(ruleDraw(['x'], 100), 'fifty');
+  assert.equal(walk(['Nf3', 'Nf6', 'Ng1', 'Ng8']).halfmoves, 4);
+});
+
+test('a draw offered: accepted from move 20 when the last five moves and the position now are level; else declined', () => {
+  assert.equal(plyOf(1, 'white'), 0);
+  assert.equal(plyOf(20, 'white'), 38);
+  assert.equal(plyOf(20, 'black'), 39);
+  assert.equal(plyOf(21, 'white'), 40);
+  const level = [300, 40, -20, 0, 50, -50];
+  assert.equal(drawAccepted({ ply: 40, userCps: level, nowCp: 10 }), true);
+  // Too early in the game.
+  assert.equal(drawAccepted({ ply: 39, userCps: level, nowCp: 10 }), false);
+  // Fewer than five moves, or one of the last five not level (the first, 300, is out of the run).
+  assert.equal(drawAccepted({ ply: 60, userCps: [0, 0, 0, 0], nowCp: 0 }), false);
+  assert.equal(drawAccepted({ ply: 60, userCps: [0, 0, 60, 0, 0], nowCp: 0 }), false);
+  assert.equal(drawAccepted({ ply: 60, userCps: [0, 0, -60, 0, 0], nowCp: 0 }), false);
+  // A move whose judge failed, or the position now not level (the opponent's last move a blunder).
+  assert.equal(drawAccepted({ ply: 60, userCps: [0, 0, undefined, 0, 0], nowCp: 0 }), false);
+  assert.equal(drawAccepted({ ply: 60, userCps: [0, 0, 0, 0, 0], nowCp: 400 }), false);
+  assert.equal(drawAccepted({ ply: 60, userCps: [0, 0, 0, 0, 0], nowCp: undefined }), false);
 });

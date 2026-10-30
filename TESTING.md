@@ -937,3 +937,14 @@ q_extension (or give it to a session with q_extension attached), then run
 - Checked: the app's search and judge under Node (both engines); the built app in headless
   Chromium on SF18 one thread and SF19 four threads, the owner's game replayed; Playwright with
   the fake engine (desktop and emulated phone). Not on the owner's device.
+
+## Draws in practice: repetition, fifty moves, Offer draw (2026-10-30)
+
+- In a checklist drill, shuffle a piece back and forth so that a position from the line's lead-up
+  comes back: the game should end "Draw by threefold repetition." on its third time, the lead-up's
+  occurrence counted, and the line's chip count it as a draw.
+- In a game from a position, Offer draw early, or while one side is clearly better: "The opponent
+  declines the draw.", and the button stays off until you move. In a level position from move 20,
+  after five level moves: "Draw agreed."
+- Checked by unit tests and Playwright with the fake explorer and engine (desktop and emulated
+  phone); not on a device.

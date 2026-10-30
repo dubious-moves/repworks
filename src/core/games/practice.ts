@@ -23,6 +23,14 @@ export const PRACTICE = {
   /** Claim Victory: three of the user's moves running at +1000. */
   claimCp: 1000,
   claimRuns: 3,
+  /**
+   * Offer draw (the owner's request, 2026-10-30): the opponent accepts from move 20 (ply 40 of the
+   * game, counted by the board), when the user's last five moves and the position now are all
+   * scored within half a pawn; else it declines, saying nothing of the score.
+   */
+  drawOfferPly: 40,
+  drawishCp: 50,
+  drawishRuns: 5,
   /** The advantage drill ends at +1 or less (a collapse). */
   collapseCp: 100,
   /** A dip below +2 (by a move giving up more than 2 points) makes a win Good, not Easy. */
@@ -116,6 +124,35 @@ export function advantageGrade(outcome: AdvantageOutcome, t: AdvantageTrack, hin
   if (outcome !== 'victory') return 1;
   if (hint) return 2;
   return t.minCp !== null && t.minCp < PRACTICE.dipCp ? 3 : 4;
+}
+
+/* ------------------------------------------------------------------ draws */
+
+/**
+ * A draw the game ends on by itself: the position (by key) standing for the third time, the
+ * positions before the game's start counted (a checklist's lead-up), or fifty moves of each side
+ * with no capture or pawn move (`halfmoves`, the position's clock). Mate and stalemate are the
+ * position's own and come first.
+ */
+export function ruleDraw(keys: readonly string[], halfmoves: number): 'repetition' | 'fifty' | undefined {
+  const now = keys[keys.length - 1];
+  if (now !== undefined && keys.filter((k) => k === now).length >= 3) return 'repetition';
+  if (halfmoves >= 100) return 'fifty';
+  return undefined;
+}
+
+/** The game's ply at a position, by the board's move number (0 at the start). */
+export const plyOf = (fullmoves: number, turn: Color): number => (fullmoves - 1) * 2 + (turn === 'black' ? 1 : 0);
+
+/**
+ * Whether the opponent accepts a draw: from `drawOfferPly`, the user's last `drawishRuns` moves
+ * scored (for the user, after each) within `drawishCp`, and the position now too. A move not
+ * scored (its judge failed) is not level.
+ */
+export function drawAccepted(o: { ply: number; userCps: readonly (number | undefined)[]; nowCp: number | undefined }): boolean {
+  const level = (cp: number | undefined) => cp !== undefined && Math.abs(cp) <= PRACTICE.drawishCp;
+  const last = o.userCps.slice(-PRACTICE.drawishRuns);
+  return o.ply >= PRACTICE.drawOfferPly && last.length >= PRACTICE.drawishRuns && last.every(level) && level(o.nowCp);
 }
 
 /** `evalToResult`: a game stopped, by the score for the user (null: drawn). */

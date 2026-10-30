@@ -26,7 +26,7 @@ import { keyFen, type PositionKey } from '../core/chess/positionKey.ts';
 import { parseUciMove, standardUci } from '../core/chess/uci.ts';
 import type { FromWorker, ToWorker } from '../core/explorer/service.ts';
 import { judgeMove, moverScore, needsRecheck, RECHECK, recheckMoves, rejudge, type MoverLine } from '../core/games/grade.ts';
-import { advantageGrade, historyEntry, maiaPick, pickExplorerMove, PRACTICE, repertoireCheck, repertoireVerdict, resultOf, reviewOf, startTrack, trackAdvantage, type AdvantageOutcome, type AdvantageTrack, type HistoryEntry, type HistorySource, type PlayedMove, type RepertoireVerdict, type Review } from '../core/games/practice.ts';
+import { advantageGrade, drawAccepted, historyEntry, maiaPick, pickExplorerMove, PRACTICE, plyOf, repertoireCheck, repertoireVerdict, resultOf, reviewOf, ruleDraw, startTrack, trackAdvantage, type AdvantageOutcome, type AdvantageTrack, type HistoryEntry, type HistorySource, type PlayedMove, type RepertoireVerdict, type Review } from '../core/games/practice.ts';
 import { readSaved, resumable, type Saved } from '../core/games/resume.ts';
 import { covered, scanCandidate, tacticCandidates, TACTIC, type DetectedTactic, type Pv } from '../core/games/detect.ts';
 import type { Color } from '../core/games/record.ts';
@@ -102,6 +102,8 @@ export interface PracticeSetup {
   /** The checklist's preset and leaf, for its `practice` event. */
   preset?: string;
   leaf?: PositionKey;
+  /** The positions before `fen` (a checklist's lead-up from the start), by key, for the repetition draw. */
+  before?: string[];
   /** Told the grade (an advantage card) once the game ends. */
   onEnd?(grade: Grade | undefined): void;
 }
@@ -118,7 +120,8 @@ export interface PracticeMove extends PlayedMove {
   judging?: boolean;
 }
 
-export type EndReason = 'mate' | 'mated' | 'stalemate' | 'draw' | 'claim' | 'collapse' | 'stopped' | 'interrupted';
+/** `draw` is insufficient material; `repetition` and `fifty` the rules' draws; `agreed` a draw offered and accepted. */
+export type EndReason = 'mate' | 'mated' | 'stalemate' | 'draw' | 'repetition' | 'fifty' | 'agreed' | 'claim' | 'collapse' | 'stopped' | 'interrupted';
 
 export interface PracticeGame {
   gen: number;
@@ -146,6 +149,8 @@ export interface PracticeGame {
   hint?: { fen: string; level: 1 | 2; uci?: string };
   /** A move set during the opponent's turn, played after it (from, to). */
   premove?: { from: string; to: string };
+  /** A draw offered at the position after `at` moves: the opponent answering, or declined there. */
+  drawOffer?: { at: number; state: 'pending' | 'declined' };
 }
 
 export const practice = signal<PracticeGame | undefined>(undefined);
@@ -507,7 +512,8 @@ export async function practiceMove(uci: string): Promise<void> {
     patch(g, () => ({ track: t.track, claim: t.claim }));
     if (t.collapse) return void finish(g, 'collapse');
   } else void job.then(() => claimCheck(g, i));
-  const end = endOf(after.fen, true);
+  const now = practice.peek();
+  const end = now?.gen === g && endOf(now, true);
   if (end) return void finish(g, end);
   setTimeout(() => void opponentTurn(g), 500);
 }
@@ -535,7 +541,7 @@ export function takeBack(): void {
   let claim = false;
   for (const m of moves)
     if (m.isUser && m.afterCp !== undefined) ({ track, claim } = trackAdvantage(track, m.afterCp, m.wpDrop ?? 0, false));
-  const { deviation: _d, hint: _h, premove: _p, ...rest } = p;
+  const { deviation: _d, hint: _h, premove: _p, drawOffer: _o, ...rest } = p;
   const lastSource = [...moves].reverse().find((m) => !m.isUser)?.source;
   const next: PracticeGame = { ...rest, gen: g, moves, phase: 'user', track, claim, judged: !moves.some((m) => m.judging) };
   if (lastSource) next.source = lastSource;
@@ -560,12 +566,17 @@ function claimCheck(g: number, i: number): void {
   patch(g, () => ({ track: t.track, claim: t.claim }));
 }
 
-function endOf(fen: string, byUser: boolean): EndReason | undefined {
-  const pos = positionOf(fen);
-  if (!pos || !pos.isEnd()) return undefined;
-  if (pos.isCheckmate()) return byUser ? 'mate' : 'mated';
-  if (pos.isStalemate()) return 'stalemate';
-  return 'draw';
+/** The game's end at its last position: mate, stalemate, insufficient material, then repetition (the positions before its start counted) and fifty moves. */
+function endOf(p: PracticeGame, byUser: boolean): EndReason | undefined {
+  const pos = positionOf(fenAfter(p));
+  if (!pos) return undefined;
+  if (pos.isEnd()) {
+    if (pos.isCheckmate()) return byUser ? 'mate' : 'mated';
+    if (pos.isStalemate()) return 'stalemate';
+    return 'draw';
+  }
+  const keys = [...(p.setup.before ?? []), ...[p.setup.fen, ...p.moves.map((m) => m.fen)].map((f) => keyFen(f)?.key ?? f)];
+  return ruleDraw(keys, pos.halfmoves);
 }
 
 async function opponentTurn(g: number): Promise<void> {
@@ -579,8 +590,8 @@ async function opponentTurn(g: number): Promise<void> {
   const after = played(fen, m.uci);
   if (!after) return void finish(g, 'interrupted');
   const note = m.dbFailed && !q.note && !q.setup.silent ? 'The database is unavailable (a Lichess login is needed): Maia or Stockfish answers.' : q.note;
-  patch(g, (r) => ({ moves: [...r.moves, { san: after.san, uci: m.uci, isUser: false, fenBefore: fen, fen: after.fen, source: m.source }], source: m.source, phase: 'user', ...(note ? { note } : {}) }));
-  const end = endOf(after.fen, false);
+  const now = patch(g, (r) => ({ moves: [...r.moves, { san: after.san, uci: m.uci, isUser: false, fenBefore: fen, fen: after.fen, source: m.source }], source: m.source, phase: 'user', ...(note ? { note } : {}) }));
+  const end = now && endOf(now, false);
   if (end) return finish(g, end);
   // The premove, played now when it is legal here (mistake-lab's: always a queen; dropped when illegal).
   const pre = practice.peek()?.premove;
@@ -671,16 +682,45 @@ export function claimVictory(): void {
   if (p && p.phase !== 'over' && p.claim) finish(p.gen, 'claim');
 }
 
+/** Whether a draw can be offered: the user to move in a game from a position or a checklist's drill, not already offered here. */
+export const canOfferDraw = (p: PracticeGame): boolean => p.setup.kind !== 'advantage' && p.phase === 'user' && p.drawOffer?.at !== p.moves.length;
+
+/**
+ * Offer draw (the owner's request, 2026-10-30): the opponent answers once the judges are in and the
+ * position is searched, and accepts only by `drawAccepted`'s rule; declined, it says nothing more,
+ * so the offer doesn't give the score away. One offer a position; a move played meanwhile lets it lapse.
+ */
+export async function offerDraw(): Promise<void> {
+  const p = practice.peek();
+  if (!p || !canOfferDraw(p)) return;
+  const g = p.gen;
+  const at = p.moves.length;
+  const fen = fenAfter(p);
+  const pos = positionOf(fen);
+  if (!pos) return;
+  patch(g, () => ({ drawOffer: { at, state: 'pending' } }));
+  await Promise.all([...judging]);
+  const top = (await analyse(fen, 3))?.lines[0];
+  const q = practice.peek();
+  if (!q || q.gen !== g || q.phase !== 'user' || q.moves.length !== at) return;
+  const userCps = q.moves.filter((m) => m.isUser).map((m) => m.afterCp);
+  const nowCp = top ? moverScore(top.score, pos.turn) : undefined;
+  if (drawAccepted({ ply: plyOf(pos.fullmoves, pos.turn), userCps, nowCp })) return finish(g, 'agreed');
+  patch(g, () => ({ drawOffer: { at, state: 'declined' } }));
+}
+
+const isDraw = (r: EndReason) => r === 'stalemate' || r === 'draw' || r === 'repetition' || r === 'fifty' || r === 'agreed';
+
 const lastAfterCp = (p: PracticeGame) => [...p.moves].reverse().find((m) => m.isUser && m.afterCp !== undefined)?.afterCp;
 
 function finish(g: number, reason: EndReason): void {
   const p = practice.peek();
   if (!p || p.gen !== g || p.phase === 'over') return;
   const userCp = lastAfterCp(p);
-  const result: 'win' | 'draw' | 'loss' = reason === 'mate' || reason === 'claim' ? 'win' : reason === 'mated' || reason === 'collapse' ? 'loss' : reason === 'stalemate' || reason === 'draw' ? 'draw' : resultOf(userCp);
+  const result: 'win' | 'draw' | 'loss' = reason === 'mate' || reason === 'claim' ? 'win' : reason === 'mated' || reason === 'collapse' ? 'loss' : isDraw(reason) ? 'draw' : resultOf(userCp);
   let grade: Grade | undefined;
   if (p.setup.kind === 'advantage') {
-    const outcome: AdvantageOutcome = reason === 'mate' || reason === 'claim' ? 'victory' : reason === 'stalemate' || reason === 'draw' ? 'draw' : reason === 'interrupted' || reason === 'stopped' ? 'interrupted' : 'collapse';
+    const outcome: AdvantageOutcome = reason === 'mate' || reason === 'claim' ? 'victory' : isDraw(reason) ? 'draw' : reason === 'interrupted' || reason === 'stopped' ? 'interrupted' : 'collapse';
     // No hints in the drill (mistake-lab hides them in its silent game).
     grade = advantageGrade(outcome, p.track, false);
   }
@@ -703,7 +743,7 @@ function finish(g: number, reason: EndReason): void {
   });
 }
 
-const OUTCOME: Record<EndReason, 'win' | 'draw' | 'loss' | 'stopped' | 'ended'> = { mate: 'win', claim: 'win', mated: 'loss', collapse: 'loss', stalemate: 'draw', draw: 'draw', stopped: 'stopped', interrupted: 'ended' };
+const OUTCOME: Record<EndReason, 'win' | 'draw' | 'loss' | 'stopped' | 'ended'> = { mate: 'win', claim: 'win', mated: 'loss', collapse: 'loss', stalemate: 'draw', draw: 'draw', repetition: 'draw', fifty: 'draw', agreed: 'draw', stopped: 'stopped', interrupted: 'ended' };
 
 async function writeHistory(g: number, reason: EndReason, result: 'win' | 'draw' | 'loss', finalCp: number | null): Promise<void> {
   const p = practice.peek();
