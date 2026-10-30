@@ -961,3 +961,17 @@ q_extension (or give it to a session with q_extension attached), then run
   that revises; Playwright for the panel as before. Not in a browser against live ChessDB, and
   not on the owner's device.
 
+
+## Shallow ChessDB evals marked (2026-10-30)
+
+- Open a position ChessDB hardly knows (deep in a sideline: one or a few moves in the Eval column,
+  like the Scandi Gambit's 15.bxc3): its evals should turn light and italic within a second, and
+  hovering one (desktop) should say "Shallow: ChessDB's best line here is only N plies deep…".
+  Compare with a deep Stockfish search there: is a shallow eval where the two disagree?
+- Open a main-line position: its evals stay bold; hovering the best says how deep ChessDB's line
+  is. A sideline move in it that ChessDB hasn't looked at the replies to is italic alone.
+- The threshold is 10 plies of ChessDB's best line (PLAN.md §5.139): say if it marks evals you'd
+  trust, or leaves unmarked ones that turned out wrong.
+- Checked: ChessDB's notes and `querypv` read live from the container, and the table built from
+  live answers under Node; the rest by unit tests and Playwright with a fake ChessDB (desktop and
+  emulated phone). Not in a browser against live ChessDB, and not on the owner's device.

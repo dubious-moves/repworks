@@ -163,6 +163,9 @@ function Dialog() {
             <input type="checkbox" name="analyse" checked={draft.analyse} onChange={(e) => setDraft({ ...draft, analyse: e.currentTarget.checked })} />
             Ask ChessDB to analyse positions it doesn’t know (uses its volunteers’ computers)
           </label>
+          <p class="muted">
+            An eval in <em class="ex-shallow-key">light italics</em> is shallow: ChessDB’s best line from the position is under ten plies, or it hasn’t looked at the replies to the move. A deep Stockfish search is the better guide there.
+          </p>
         </fieldset>
         <label>
           Local explorer <span class="muted">(q_extension’s explorerdb serve, e.g. localhost:9337; empty: Lichess)</span>

@@ -58,6 +58,13 @@ export interface ChessdbMove {
   san: string;
   /** Centipawns from the side to move; a mate is ±(30000 − plies). */
   score: number;
+  /**
+   * Moves ChessDB has scored in the position after this one: its note's first number (`! (05-01)`,
+   * the second being how many of those are good replies). 0 when it hasn't looked at the replies,
+   * so the score is one engine estimate, never backed up from them. Absent for a tablebase note,
+   * or an answer cached before it was read (§5.139).
+   */
+  replies?: number;
 }
 
 export interface ChessdbAnswer {
@@ -67,6 +74,16 @@ export interface ChessdbAnswer {
   t?: number;
   /** It agreed with the ask before it, at least TTL.settle earlier: ChessDB has stopped revising it. */
   settled?: boolean;
+}
+
+/** ChessDB's best line from a position (`querypv`, §5.139). */
+export interface ChessdbLine {
+  /** Its length in plies: how deep the best move's score is backed up from; 0 with no line. */
+  depth: number;
+  /** Its first move, in ChessDB's UCI (castling e1g1). */
+  uci?: string;
+  /** When it was fetched (the providers' cache). */
+  t?: number;
 }
 
 export interface MaiaMove {

@@ -16,8 +16,13 @@ export interface FakeMove {
 export interface FakeExplorer {
   /** Lichess's and Masters' games by the FEN's first four fields. */
   games: Map<string, FakeMove[]>;
-  /** ChessDB's moves by the FEN's first four fields: SAN and centipawns from the side to move. */
-  evals: Map<string, [string, number][]>;
+  /**
+   * ChessDB's moves by the FEN's first four fields: SAN, centipawns from the side to move and, when
+   * given, the replies it knows after the move (its note's `(05-01)`, §5.139).
+   */
+  evals: Map<string, [string, number, number?][]>;
+  /** ChessDB's best line's depth in plies by the FEN's first four fields (`querypv`, §5.139); 30 where unset. */
+  lines: Map<string, number>;
   /** Every request, as `explorer <url>` with its Authorization, or `chessdb <url>`. */
   requests: { url: string; auth: string | undefined }[];
   /** Answer the next explorer requests with this status instead (e.g. 429). */
@@ -25,7 +30,7 @@ export interface FakeExplorer {
 }
 
 export function fakeExplorer(): FakeExplorer {
-  return { games: new Map(), evals: new Map(), requests: [], refuse: [] };
+  return { games: new Map(), evals: new Map(), lines: new Map(), requests: [], refuse: [] };
 }
 
 const key = (fen: string) => fen.split(' ').slice(0, 4).join(' ');
@@ -51,7 +56,9 @@ export async function serveExplorer(page: Page, fake: FakeExplorer = fakeExplore
     const url = new URL(route.request().url());
     fake.requests.push({ url: route.request().url(), auth: undefined });
     const known = fake.evals.get(key(url.searchParams.get('board') ?? ''));
-    const body = known ? { status: 'ok', moves: known.map(([san, score]) => ({ uci: san, san, score })) } : { status: 'unknown' };
+    // The best line from the first move listed (the fake lists ChessDB's moves best first).
+    const line = known?.length ? { status: 'ok', depth: fake.lines.get(key(url.searchParams.get('board') ?? '')) ?? 30, pv: [known[0]![0]] } : { status: 'unknown' };
+    const body = url.searchParams.get('action') === 'querypv' ? line : known ? { status: 'ok', moves: known.map(([san, score, replies]) => ({ uci: san, san, score, ...(replies === undefined ? {} : { note: `! (${String(replies).padStart(2, '0')}-01)` }) })) } : { status: 'unknown' };
     await route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*', 'content-type': 'application/json' }, body: JSON.stringify(body) });
   });
   return fake;

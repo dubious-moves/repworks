@@ -17,7 +17,7 @@
 //   - A cache hit costs nothing: no token, no budget, no queue slot.
 
 import { BudgetOut, Cancelled, createLimiter, createRateLimiter, HttpError, type LimiterSnapshot, type Now, type Sleep } from './limiter.ts';
-import { fenKey, type ChessdbAnswer, type ExplorerAnswer, type PeError } from './search.ts';
+import { fenKey, type ChessdbAnswer, type ChessdbLine, type ChessdbMove, type ExplorerAnswer, type PeError } from './search.ts';
 import type { Budget, CacheCounts } from './rounds.ts';
 
 export const EXPLORER_BASE = 'https://explorer.lichess.org';
@@ -216,11 +216,25 @@ export function compactExplorer(json: unknown): CompactExplorer {
 }
 
 export function compactChessdb(json: unknown): ChessdbAnswer & { moves: NonNullable<ChessdbAnswer['moves']> } {
-  const j = (json || {}) as { status?: string; moves?: { uci: string; san: string; score: unknown }[] };
+  const j = (json || {}) as { status?: string; moves?: { uci: string; san: string; score: unknown; note?: unknown }[] };
   return {
     status: j.status || 'unknown',
-    moves: (j.moves || []).map((m) => ({ uci: m.uci, san: m.san, score: Number(m.score) })),
+    moves: (j.moves || []).map((m) => {
+      const out: ChessdbMove = { uci: m.uci, san: m.san, score: Number(m.score) };
+      // `! (05-01)`: the replies ChessDB knows after the move, and the good ones among them.
+      const note = typeof m.note === 'string' ? /\((\d+)-\d+\)/.exec(m.note) : null;
+      if (note) out.replies = Number(note[1]);
+      return out;
+    }),
   };
+}
+
+/** `querypv`'s answer: the line's length in plies, and its first move; depth 0 when ChessDB has none. */
+export function compactChessdbLine(json: unknown): ChessdbLine {
+  const j = (json || {}) as { status?: string; depth?: unknown; pv?: unknown };
+  const depth = j.status === 'ok' ? Number(j.depth) : 0;
+  const first = Array.isArray(j.pv) && typeof j.pv[0] === 'string' ? j.pv[0] : undefined;
+  return { depth: Number.isFinite(depth) ? depth : 0, ...(first ? { uci: first } : {}) };
 }
 
 /** Scores this close (centipawns) count as the same: ChessDB's own drift between two asks. */
@@ -290,6 +304,8 @@ export interface Providers {
   mastersGame(id: string): Promise<string>;
   /** maxAge: a cached answer older than this (ms) is asked again. */
   chessdb(fen: string, isStale?: () => boolean, priority?: number, maxAge?: number): Promise<ChessdbAnswer>;
+  /** ChessDB's best line's depth from a position (§5.139); maxAge as chessdb's. */
+  chessdbLine(fen: string, isStale?: () => boolean, priority?: number, maxAge?: number): Promise<ChessdbLine>;
   analyse(fen: string, uci?: string | null): Promise<boolean>;
   testToken(token: string): Promise<{ ok: boolean; status: number }>;
   localInfo(address: string): Promise<LocalInfo>;
@@ -481,39 +497,61 @@ export function createProviders(o: ProvidersOptions): Providers {
       const asked = hit && ask && now() - Math.max(hit.t || 0, ask.t) >= TTL.recheck && (hit.status === 'ok' ? ask.t >= (hit.t || 0) : now() - ask.t < TTL.recheckFor);
       const young = maxAge === undefined || now() - (hit?.t || 0) < maxAge;
       if (hit && !asked && young && (hit.status === 'ok' || now() - hit.t < TTL.chessdbUnknown)) return hit;
-      return once<ChessdbAnswer>('c' + key, isStale, priority, (stale) => {
-        const out: { job: { priority: number } | null } = { job: null };
-        function attempt(tries: number): Promise<ChessdbAnswer> {
-          const p = cdbLane(
-            () => {
-              bump('chessdbRequests');
-              const url = CHESSDB_URL + '?action=queryall&json=1&board=' + encodeURIComponent(fen);
-              return cdbFetch(url)
-                .then((res) => {
-                  if (!res.ok) throw HttpError(res.status);
-                  return res.json();
-                })
-                .then((j) => {
-                  const v: ChessdbAnswer = compactChessdb(j);
-                  v.t = now();
-                  if (hit && v.t - (hit.t || 0) >= TTL.settle && sameEvals(hit, v)) v.settled = true;
-                  return o.cache.put('chessdb', key, v).then(() => v);
-                });
-            },
-            stale,
-            out.job ? out.job.priority : priority,
-          );
-          out.job = p.job;
-          return p.catch((e: PeError) => {
-            if (!cdbRetryable(e) || tries >= CDB_RETRIES || stale()) throw e;
-            return sleep(CDB_RETRY_MS * (tries + 1)).then(() => attempt(tries + 1));
-          });
-        }
-        const p = attempt(0) as Joined<ChessdbAnswer>;
-        // chessdb() raises a joined request's priority through p.job: the one waiting now.
-        Object.defineProperty(p, 'job', { get: () => out.job });
-        return p;
+      return cdbAsk<ChessdbAnswer>('c' + key, CHESSDB_URL + '?action=queryall&json=1&board=' + encodeURIComponent(fen), isStale, priority, (j) => {
+        const v: ChessdbAnswer = compactChessdb(j);
+        v.t = now();
+        if (hit && v.t - (hit.t || 0) >= TTL.settle && sameEvals(hit, v)) v.settled = true;
+        return o.cache.put('chessdb', key, v).then(() => v);
       });
+    });
+  }
+
+  /*
+   * ChessDB's best line from a position (`querypv`), for its depth (§5.139): how many plies its
+   * best move's score is backed up from. The panel's alone; cached with the answers, asked again
+   * when older than maxAge.
+   */
+  function chessdbLine(fen: string, isStale?: () => boolean, priority?: number, maxAge?: number): Promise<ChessdbLine> {
+    const key = 'pv|' + fenKey(fen);
+    return o.cache.get('chessdb', key, TTL.chessdb).then((r) => {
+      const hit = r as ChessdbLine | undefined;
+      if (hit && (maxAge === undefined || now() - (hit.t || 0) < maxAge)) return hit;
+      return cdbAsk<ChessdbLine>('p' + key, CHESSDB_URL + '?action=querypv&json=1&board=' + encodeURIComponent(fen), isStale, priority, (j) => {
+        const v = compactChessdbLine(j);
+        v.t = now();
+        return o.cache.put('chessdb', key, v).then(() => v);
+      });
+    });
+  }
+
+  /** One ChessDB request on its lane, joined by the same ask while in flight, retried as cdbRetryable says. */
+  function cdbAsk<T>(onceKey: string, url: string, isStale: (() => boolean) | undefined, priority: number | undefined, read: (json: unknown) => Promise<T>): Promise<T> {
+    return once<T>(onceKey, isStale, priority, (stale) => {
+      const out: { job: { priority: number } | null } = { job: null };
+      function attempt(tries: number): Promise<T> {
+        const p = cdbLane(
+          () => {
+            bump('chessdbRequests');
+            return cdbFetch(url)
+              .then((res) => {
+                if (!res.ok) throw HttpError(res.status);
+                return res.json();
+              })
+              .then(read);
+          },
+          stale,
+          out.job ? out.job.priority : priority,
+        );
+        out.job = p.job;
+        return p.catch((e: PeError) => {
+          if (!cdbRetryable(e) || tries >= CDB_RETRIES || stale()) throw e;
+          return sleep(CDB_RETRY_MS * (tries + 1)).then(() => attempt(tries + 1));
+        });
+      }
+      const p = attempt(0) as Joined<T>;
+      // A joined request's priority is raised through p.job: the one waiting now.
+      Object.defineProperty(p, 'job', { get: () => out.job });
+      return p;
     });
   }
 
@@ -614,6 +652,7 @@ export function createProviders(o: ProvidersOptions): Providers {
     games,
     mastersGame,
     chessdb,
+    chessdbLine,
     analyse,
     testToken,
     localInfo: (address) => localInfo(o.http, address),

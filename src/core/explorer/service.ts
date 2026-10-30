@@ -16,7 +16,7 @@ import { STORM } from '../storm/config.ts';
 import { LICHESS_RATE, OWN_BURST, type LimiterSnapshot, type Now, type Sleep } from './limiter.ts';
 import { createProviders, localAddress, SAME_CP, TTL, type CompactExplorer, type ExplorerCache, type ExplorerFilter, type Http, type ProviderStats } from './providers.ts';
 import { createPreviewedSearch, type Budget, type RootSearch } from './rounds.ts';
-import { fenKey, type ChessdbAnswer, type ChessdbMove, type MaiaMove, type PeError, type RowResult, type SearchOptions, type SearchProvider } from './search.ts';
+import { fenKey, type ChessdbAnswer, type ChessdbLine, type ChessdbMove, type MaiaMove, type PeError, type RowResult, type SearchOptions, type SearchProvider } from './search.ts';
 
 export const DEFAULT_BUDGET = 60; // uncached explorer requests per root position
 export const ANALYSE_MAX = 30; // ChessDB analysis requests per root position
@@ -104,6 +104,8 @@ export type FromWorker =
   | { type: 'games'; id: number; error: LookupError }
   | { type: 'evals'; id: number; evals: ChessdbAnswer }
   | { type: 'evals'; id: number; error: LookupError }
+  /** ChessDB's best line from the looked-up position (§5.139). */
+  | { type: 'line'; id: number; line: ChessdbLine }
   /** A row's value; `pass: 'maia'` for the Maia preview's (§5.34). */
   | { type: 'update'; gen: number; root: string; san: string; result: RowResult; pass?: 'maia' }
   /** Lichess asked to slow down: every queued explorer request waits this long. */
@@ -250,14 +252,26 @@ export function createExplorerService(o: ServiceOptions): ExplorerService {
     const show = (evals: ChessdbAnswer, n: number): Promise<void> | undefined => {
       if (isStale()) return;
       o.post({ type: 'evals', id, evals });
+      const asked = evals.status === 'ok' ? line(evals) : undefined;
       const best = bestMove(evals);
-      if (!best || evals.settled || deepened.has(best.san) || deepened.size >= DEEPER_MAX) return recheck(evals, n);
-      deepened.add(best.san);
-      return deeper(best).then(
-        (fresh) => (fresh ? show(fresh, n) : recheck(evals, n)),
-        () => recheck(evals, n),
-      );
+      let next: Promise<void> | undefined;
+      if (!best || evals.settled || deepened.has(best.san) || deepened.size >= DEEPER_MAX) next = recheck(evals, n);
+      else {
+        deepened.add(best.san);
+        next = deeper(best).then(
+          (fresh) => (fresh ? show(fresh, n) : recheck(evals, n)),
+          () => recheck(evals, n),
+        );
+      }
+      return asked ? Promise.all([asked, next]).then(() => undefined) : next;
     };
+    // ChessDB's best line here, for how deep its evals go (§5.139): asked with each answer shown
+    // unless asked as lately as the answer would be. A failed ask says nothing.
+    const line = (evals: ChessdbAnswer): Promise<void> =>
+      providers.chessdbLine(fen, isStale, 2, evals.settled ? TTL.panel : TTL.settle).then(
+        (l) => void (isStale() || o.post({ type: 'line', id, line: l })),
+        () => undefined,
+      );
     // The position after `best`, asked unless ChessDB answered it lately; where its best reply
     // says other than `best`'s score, this position asked again.
     const deeper = (best: ChessdbMove): Promise<ChessdbAnswer | undefined> => {

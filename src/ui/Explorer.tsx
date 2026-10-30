@@ -15,7 +15,7 @@ import { makeFen } from 'chessops/fen';
 import { parseSan } from 'chessops/san';
 import { localAddress } from '../core/explorer/providers.ts';
 import type { ExplorerTab } from '../core/explorer/service.ts';
-import { barLabel, buildTable, evalTone, formatCount, formatEval, formatShare, SORT_LABELS, type SortMode, type Table, type TableInput, type TableRow } from '../core/explorer/table.ts';
+import { barLabel, buildTable, evalNote, evalTone, formatCount, formatEval, formatShare, SORT_LABELS, type Eval, type SortMode, type Table, type TableInput, type TableRow } from '../core/explorer/table.ts';
 import { filterLabel, practicalDetails, preparedDetails, previewDetails, type DetailOptions } from '../core/explorer/details.ts';
 import { equalDetails, equalPrepared, equalPreparedLine, equalScore, type EqualScore } from '../core/explorer/equal.ts';
 import { autoRows, bestOf } from '../core/explorer/rows.ts';
@@ -179,6 +179,7 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
     turn: pos.turn === 'white' ? 'w' : 'b',
     ...(l?.games ? { games: l.games } : {}),
     ...(l?.evals ? { evals: l.evals } : {}),
+    ...(l?.line ? { line: l.line } : {}),
     sort: p.sort,
     side,
     covered,
@@ -504,6 +505,17 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
   );
 }
 
+/** ChessDB's eval of a move; a shallow one (§5.139) light and italic, with why in its title. */
+function EvalCell(props: { value: Eval | undefined; missing?: string }) {
+  const e = props.value;
+  if (!e) return <span class="ex-eval">{props.missing ?? ''}</span>;
+  return (
+    <span class={`ex-eval ${evalTone(e)}${e.shallow ? ' shallow' : ''}`} title={evalNote(e)}>
+      {formatEval(e)}
+    </span>
+  );
+}
+
 /** The last position's rows, faded and inert, while this one is asked. */
 function StaleRows(props: { shown: Shown; cols: Cols }) {
   const { table } = props.shown;
@@ -515,7 +527,7 @@ function StaleRows(props: { shown: Shown; cols: Cols }) {
           <span class="ex-move">
             <span class="ex-san">{r.san}</span>
           </span>
-          {c.eval && <span class={`ex-eval${r.eval ? ` ${evalTone(r.eval)}` : ''}`}>{r.eval ? formatEval(r.eval) : ''}</span>}
+          {c.eval && <EvalCell value={r.eval} />}
           {c.prac && <span class="ex-prac" />}
           {c.share && <span class="ex-share">{r.novelty ? '' : formatShare(r.share)}</span>}
           {c.count && <span class="ex-count">{r.novelty || r.maiaOnly ? '' : formatCount(r.games)}</span>}
@@ -685,7 +697,7 @@ function Row(props: { row: TableRow; games: boolean; cols: Cols; others: Occurre
           </button>
         )}
       </span>
-      {c.eval && <span class={`ex-eval${r.eval ? ` ${evalTone(r.eval)}` : ''}`}>{r.eval ? formatEval(r.eval) : r.novelty || r.maiaOnly ? '' : '?'}</span>}
+      {c.eval && <EvalCell value={r.eval} missing={r.novelty || r.maiaOnly ? '' : '?'} />}
       {props.practical}
       {c.share && <span class="ex-share">{r.novelty || r.maiaOnly ? '' : formatShare(r.share)}</span>}
       {c.count && <span class="ex-count">{r.novelty || r.maiaOnly ? '' : formatCount(r.games)}</span>}

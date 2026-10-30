@@ -7578,3 +7578,49 @@ ChessDB revising on its own: +0.56, +1.12, settled; an answer the search fetched
 the panel comes; a position ChessDB keeps revising asked three times a visit; a dropped lookup
 stops asking; an ask too soon after the one before never settles it; `sameEvals`). Live:
 TESTING.md.
+
+#### 5.139 Shallow ChessDB evals marked (the owner's request, 2026-10-30)
+
+"Could we add some kind of warning/identification of shallow chessdb evaluations? In these cases,
+high depth stockfish should be trusted more than chessdb, but it's not currently clear when a
+chessdb evaluation is shallow."
+
+- **What ChessDB says about depth** (its source, github.com/noobpwnftw/chessdb, `getMoves` in
+  `web/chessdb.php`, and live from the container, 2026-10-30): `queryall` gives no depth (§5.84),
+  but each move's note `! (05-01)` holds two counts for the position after the move: the replies
+  ChessDB has scored there, and how many of those are good. 0 replies means the move's score is
+  one engine estimate, never backed up from the replies. The count of replies doesn't tell
+  shallow from deep, though: ChessDB's first pass at a position scores about five moves, so the
+  positions 15 to 20 moves deep along the Berlin endgame's main line also had 5 to 7 known, with
+  lines of 19 to 40 plies under them. `querypv`'s `depth` does tell them apart: its best line's
+  length in plies, which the best move's score is backed up from. It was 5 at the owner's
+  15.bxc3 position (§5.138), whose score went +0.75, −0.44 and −0.15 within the hour; 19 to 75
+  along the Berlin line, 39 after 1.e4 and 58 at the start.
+- **Now**: the panel asks `querypv` for its position with each answer it shows (D9 allows it:
+  "only `queryall` and `querypv`"), unless asked within `TTL.settle`, or within `TTL.panel` for a
+  settled answer; cached with the answers (`chessdbLine`, key `pv|<fen>`). Only the panel: the
+  Practical search, the storm and the gather ask as before. A move's eval is **shallow** when its
+  score isn't a mate and either ChessDB's best line here is under `SHALLOW_PLIES` (10) plies, or
+  it has looked at none of the replies to the move. A shallow eval is light, italic and dotted
+  underlined in the Eval column; its title says why and to trust a deep Stockfish search over it.
+  Every eval's title says what it rests on: the best line's depth for its first move, the replies
+  known for another. The explorer's settings say what the italics mean (no hover on a phone).
+- Cost: one `querypv` per position the panel shows, and one more with each of §5.138's asks
+  again that comes more than 15 s after the one before; a failed ask leaves the evals unmarked by
+  depth.
+- 10 plies is a first guess between the two kinds measured; the owner's use will say whether it
+  marks too much or too little (TESTING.md).
+
+**As built** (2026-10-30): `ChessdbMove.replies` and `ChessdbLine` (`src/core/explorer/search.ts`);
+`compactChessdb` reading the note, `compactChessdbLine`, `chessdbLine` and `cdbAsk` (the lane,
+joining and retries the two asks share) in `providers.ts`; the panel's `line` in `lookup` and the
+`line` message (`service.ts`, `src/app/explorer.ts`); `SHALLOW_PLIES`, `Eval`'s `replies`, `line`,
+`best` and `shallow`, and `evalNote` (`table.ts`); `EvalCell` in `Explorer.tsx`, the note in
+`ExplorerSettings.tsx`. Tests: `table.test.ts` (the note read, a tablebase note aside; the owner's
+position with a 5-ply line, every eval shallow, and with a 24-ply line, only the move with no
+replies looked at; no line yet; a mate never shallow; `querypv` read), `service.test.ts` (the line
+asked once with the answers a visit shows, posted with each, from the cache, again after the
+hour, never for the search's lookups; refused, nothing said), `explorer.spec.ts` on desktop and
+the emulated phone (the move with no replies looked at shallow, its title; a 4-ply line making
+every eval shallow; the settings' note). Live: ChessDB's notes and `querypv` read from the
+container, and the table built from live answers under Node; not in a browser.

@@ -5,7 +5,7 @@
 import { signal } from '@preact/signals';
 import type { LimiterSnapshot } from '../core/explorer/limiter.ts';
 import { localInfo, TTL, type CompactExplorer } from '../core/explorer/providers.ts';
-import { fenKey, type ChessdbAnswer } from '../core/explorer/search.ts';
+import { fenKey, type ChessdbAnswer, type ChessdbLine } from '../core/explorer/search.ts';
 import type { ExplorerConfig, ExplorerTab, FromWorker, LookupError, ToWorker } from '../core/explorer/service.ts';
 import type { SortMode } from '../core/explorer/table.ts';
 import { lichessToken, lichessUser } from './lichess.ts';
@@ -235,6 +235,8 @@ export interface Lookup {
   gamesError?: LookupError;
   evals?: ChessdbAnswer;
   evalsError?: LookupError;
+  /** ChessDB's best line from the position, for how deep its evals go (§5.139). */
+  line?: ChessdbLine;
 }
 
 /** The panel's position, as far as it has come. */
@@ -304,12 +306,14 @@ function receive(m: FromWorker) {
   for (const l of listeners) l(m);
   switch (m.type) {
     case 'games':
-    case 'evals': {
+    case 'evals':
+    case 'line': {
       if (!current || m.id !== current.id) return;
       const was = lookup.peek();
       if (!was || was.key !== current.key) return;
       const next: Lookup = { ...was };
-      if (m.type === 'games') {
+      if (m.type === 'line') next.line = m.line;
+      else if (m.type === 'games') {
         if ('games' in m) {
           next.games = m.games;
           delete next.gamesError;

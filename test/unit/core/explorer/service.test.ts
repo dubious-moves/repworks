@@ -35,6 +35,7 @@ function world(
   options: {
     explorer?: (url: string) => HttpResponse | Promise<HttpResponse>;
     chessdb?: (fen: string, asked: number) => unknown;
+    line?: (fen: string) => unknown;
     sleep?: (ms: number) => Promise<void>;
     maia?: (fen: string, elo: number) => Promise<MaiaMove[] | null>;
     config?: Partial<ExplorerConfig>;
@@ -45,9 +46,19 @@ function world(
   const auth: (string | undefined)[] = [];
   const posts: FromWorker[] = [];
   const cdbAsked = new Map<string, number>();
+  const lines: string[] = [];
   const http = (url: string, init?: { headers?: Record<string, string> }): Promise<HttpResponse> => {
-    urls.push(url);
     const fen = decodeURIComponent((/(?:fen|board)=([^&]+)/.exec(url) ?? [])[1] ?? '');
+    // ChessDB's best line (§5.139), kept apart from the other asks: 30 plies from its first move.
+    if (url.includes('action=querypv')) {
+      lines.push(fen);
+      if (options.line) {
+        const body = options.line(fen);
+        return Promise.resolve(body === null ? json(404, {}) : json(200, body));
+      }
+      return Promise.resolve(json(200, { status: 'ok', depth: 30, pv: [legalSans(fen, 1)[0]?.uci] }));
+    }
+    urls.push(url);
     if (url.startsWith('https://explorer.lichess.org')) {
       auth.push(init?.headers?.Authorization);
       if (options.explorer) return Promise.resolve(options.explorer(url));
@@ -74,7 +85,7 @@ function world(
     ...(options.maia ? { maia: options.maia } : {}),
   });
   service.handle({ type: 'config', config: { ...CONFIG, ...options.config, options: { ...CONFIG.options, ...options.config?.options } } });
-  return { service, urls, auth, posts, tick: (ms: number) => (t += ms) };
+  return { service, urls, lines, auth, posts, tick: (ms: number) => (t += ms) };
 }
 
 const settle = () => new Promise((r) => setTimeout(r, 20));
@@ -100,6 +111,45 @@ test('a lookup: the games and ChessDB’s evals, asked once and then from the ca
   assert.equal(w.urls.length, 5, 'the second lookup came from the cache, move counters aside');
 });
 
+test('ChessDB’s best line asked with the answer the panel shows, its depth posted, then from the cache (§5.139)', async () => {
+  const w = world({ line: (fen) => (fen === START ? { status: 'ok', score: 1, depth: 5, pv: ['e2e4', 'e7e5'] } : { status: 'unknown' }) });
+  w.service.handle({ type: 'lookup', id: 1, tab: 'chessdb', fen: START });
+  await settle();
+  const lineOf = (id: number) => w.posts.filter((m) => m.type === 'line' && m.id === id).map((m) => (m.type === 'line' ? m.line : undefined));
+  assert.deepEqual(w.lines, [START], 'once: the answers after it came within TTL.settle, or settled');
+  assert.deepEqual(
+    lineOf(1).map((l) => [l!.depth, l!.uci]),
+    [
+      [5, 'e2e4'],
+      [5, 'e2e4'],
+      [5, 'e2e4'],
+    ],
+  );
+  w.service.handle({ type: 'lookup', id: 2, tab: 'chessdb', fen: START });
+  await settle();
+  assert.equal(w.lines.length, 1, 'from the cache');
+  assert.equal(lineOf(2)[0]!.depth, 5);
+  w.tick(61 * 60 * 1000);
+  w.service.handle({ type: 'lookup', id: 3, tab: 'chessdb', fen: START });
+  await settle();
+  assert.equal(w.lines.length, 2, 'over an hour old: asked again');
+  // Only the panel asks it: the Practical search's and the storm's lookups don't.
+  w.service.handle({ type: 'scores', id: 4, fen: 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1' });
+  await settle();
+  assert.equal(w.lines.length, 2);
+});
+
+test('ChessDB’s line refused: nothing said, the evals stand; an unreadable depth is none', async () => {
+  const w = world({ line: () => null });
+  w.service.handle({ type: 'lookup', id: 1, tab: 'chessdb', fen: START });
+  await settle();
+  assert.equal(evalsOf(w, 1).at(-1)!.status, 'ok');
+  assert.equal(w.posts.filter((m) => m.type === 'line').length, 0);
+  const v = world({ line: () => ({ status: 'ok', depth: 'x' }) });
+  v.service.handle({ type: 'lookup', id: 1, tab: 'chessdb', fen: START });
+  await settle();
+  assert.deepEqual(v.posts.find((m) => m.type === 'line'), { type: 'line', id: 1, line: { depth: 0, t: 1_000_000 } });
+});
 test('the panel shows an hour-old ChessDB answer at once, then asks again and shows the new one', async () => {
   const w = world();
   w.service.handle({ type: 'lookup', id: 1, tab: 'chessdb', fen: START });

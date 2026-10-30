@@ -2,7 +2,7 @@
 // move with its eval, its share and count of games and its results; ChessDB's moves the games don't
 // have as "novelty" rows; a Σ row; and Qchess's sort orders. Pure: the answers in, rows out.
 import type { CompactExplorer } from './providers.ts';
-import { moveKey, type ChessdbAnswer, type Side } from './search.ts';
+import { moveKey, type ChessdbAnswer, type ChessdbLine, type Side } from './search.ts';
 
 /** Qchess's sort menu (Maia's order with Maia on, §5.33), and the Practical column's order. */
 export type SortMode = 'popularity' | 'eval' | 'prac' | 'score' | 'maia' | 'white-eval' | 'black-eval' | 'mine-eval' | 'only-rep';
@@ -25,7 +25,23 @@ const MATE = 29000;
 export interface Eval {
   /** Centipawns from White's side; a mate is ±(30000 − plies), as ChessDB scores it. */
   cp: number;
+  /** The replies ChessDB knows after the move (`ChessdbMove.replies`), when its answer says. */
+  replies?: number;
+  /** The depth in plies of ChessDB's best line at the position (`ChessdbLine`), once asked. */
+  line?: number;
+  /** The move is that line's first: its score is backed up from `line` plies. */
+  best?: boolean;
+  /** Little analysis under it: no replies looked at, or a best line here under SHALLOW_PLIES (§5.139). */
+  shallow?: boolean;
 }
+
+/**
+ * ChessDB's best line from a position this short (plies) means its evals there are shallow
+ * (§5.139): built on a few engine estimates, and revised as it learns (§5.138). Measured
+ * 2026-10-30: 5 at the owner's 15.bxc3 position, whose score went +0.75, −0.44, −0.15 within the
+ * hour; 19 to 75 along the Berlin endgame's main line, 20 at 1.e4 e5 and more at the start.
+ */
+export const SHALLOW_PLIES = 10;
 
 export interface TableRow {
   san: string;
@@ -64,6 +80,8 @@ export interface TableInput {
   /** The database's answer; undefined for ChessDB's tab, or while it is asked. */
   games?: CompactExplorer;
   evals?: ChessdbAnswer;
+  /** ChessDB's best line from the position, for how deep its evals go (§5.139). */
+  line?: ChessdbLine;
   sort: SortMode;
   /** The chapter's side, for "your moves by eval". */
   side: Side;
@@ -120,6 +138,20 @@ export function barLabel(fraction: number): string {
   return (Math.round(x) === 0 && x > 0 ? x.toFixed(1) : String(Math.round(x))) + '%';
 }
 
+/** What ChessDB's eval of a move rests on, for its cell's title (§5.139). */
+export function evalNote(e: Eval): string {
+  const trust = 'Trust a deep Stockfish search over it.';
+  const plies = (n: number) => `${n} ${n === 1 ? 'ply' : 'plies'}`;
+  if (e.shallow && e.line !== undefined && e.line < SHALLOW_PLIES) {
+    const known = e.best || e.replies === undefined ? '' : e.replies === 0 ? ' It hasn’t looked at the replies to this move.' : ` It knows ${e.replies} ${e.replies === 1 ? 'reply' : 'replies'} to this move.`;
+    return `Shallow: ChessDB’s best line here is only ${plies(e.line)} deep, and it revises its scores as it learns.${known} ${trust}`;
+  }
+  if (e.shallow) return `Shallow: ChessDB hasn’t looked at the replies to this move, so this is one quick engine estimate. ${trust}`;
+  if (e.best && e.line !== undefined) return `ChessDB’s eval, from its best line here: ${plies(e.line)} deep`;
+  if (e.replies !== undefined) return `ChessDB’s eval, backed up from the ${e.replies} ${e.replies === 1 ? 'reply' : 'replies'} it knows to this move`;
+  return 'ChessDB’s eval';
+}
+
 /** The side to move's score with the move, 0 to 1 (Qchess's "score" order). */
 function moverScore(r: TableRow, turn: Side): number {
   if (!r.games) return -1;
@@ -135,7 +167,16 @@ export function buildTable(input: TableInput): Table {
   if (evals && evals.status === 'ok') {
     for (const m of evals.moves ?? []) {
       if (!Number.isFinite(m.score)) continue;
-      evalOf.set(moveKey(m.san), { cp: turn === 'w' ? m.score : -m.score });
+      const e: Eval = { cp: turn === 'w' ? m.score : -m.score };
+      const line = input.line;
+      if (m.replies !== undefined) e.replies = m.replies;
+      if (line) {
+        e.line = line.depth;
+        if (line.uci === m.uci) e.best = true;
+      }
+      // A mate is ChessDB's to trust, however it was found.
+      if (Math.abs(m.score) < MATE && (m.replies === 0 || (line && line.depth < SHALLOW_PLIES))) e.shallow = true;
+      evalOf.set(moveKey(m.san), e);
     }
   }
   const base = (san: string): Pick<TableRow, 'covered' | 'repertoire'> & { eval?: Eval } => {

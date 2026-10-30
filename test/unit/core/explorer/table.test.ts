@@ -1,9 +1,10 @@
 // The explorer panel's table (PLAN.md §5.23): Qchess's rows, novelties, Σ and sort orders.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { barLabel, buildTable, evalTone, formatCount, formatEval, formatShare } from '../../../../src/core/explorer/table.ts';
+import { barLabel, buildTable, evalNote, evalTone, formatCount, formatEval, formatShare } from '../../../../src/core/explorer/table.ts';
+import { compactChessdb, compactChessdbLine } from '../../../../src/core/explorer/providers.ts';
 import type { CompactExplorer } from '../../../../src/core/explorer/providers.ts';
-import type { ChessdbAnswer } from '../../../../src/core/explorer/search.ts';
+import type { ChessdbAnswer, ChessdbLine } from '../../../../src/core/explorer/search.ts';
 
 // After 1. d4, Black to move: three moves with games, ChessDB knowing two of them and two others.
 const games: CompactExplorer = {
@@ -130,4 +131,69 @@ test('the score order at equal ratings (§5.126): the scores given in place of t
   ]);
   assert.deepEqual(sans(buildTable({ turn: 'b', games, evals, sort: 'score', side: 'w', scores })), ['d5', 'Nf6', 'f5', 'e5', 'g5']);
   assert.deepEqual(sans(buildTable({ turn: 'b', games, evals, sort: 'popularity', side: 'w', scores })), ['Nf6', 'd5', 'f5', 'e5', 'g5']);
+});
+
+test('ChessDB’s note read: the replies it knows after each move, none for a tablebase note (§5.139)', () => {
+  const a = compactChessdb({
+    status: 'ok',
+    moves: [
+      { uci: 'b2c3', san: 'bxc3', score: -44, rank: 2, note: '! (05-01)', winrate: '46.67' },
+      { uci: 'a1b1', san: 'Rb1', score: -447, rank: 0, note: '? (00-00)' },
+      { uci: 'e1g1', san: 'O-O', score: 29990, rank: 2, note: '! (W-M-0010)' },
+      { uci: 'h2h3', san: 'h3', score: 12 },
+    ],
+  });
+  assert.deepEqual(
+    a.moves.map((m) => m.replies),
+    [5, 0, undefined, undefined],
+  );
+});
+
+test('a shallow eval: ChessDB’s best line here under ten plies, or no replies looked at (§5.139)', () => {
+  // The owner's position (§5.138), White to move: ChessDB's line 5 plies deep from bxc3.
+  const answer: ChessdbAnswer = {
+    status: 'ok',
+    moves: [
+      { uci: 'b2c3', san: 'bxc3', score: 75, replies: 1 },
+      { uci: 'g2g3', san: 'Kg3', score: -377, replies: 5 },
+      { uci: 'a1b1', san: 'Rb1', score: -447, replies: 0 },
+      { uci: 'f1h1', san: 'Rh1', score: -453 },
+    ],
+  };
+  const evalsOf = (line?: ChessdbLine) => {
+    const t = buildTable({ turn: 'w', evals: answer, ...(line ? { line } : {}), sort: 'eval', side: 'w' });
+    return new Map(t.rows.map((r) => [r.san, r.eval!] as const));
+  };
+  const thin = evalsOf({ depth: 5, uci: 'b2c3' });
+  assert.deepEqual(thin.get('bxc3'), { cp: 75, replies: 1, line: 5, best: true, shallow: true });
+  assert.deepEqual(thin.get('Kg3'), { cp: -377, replies: 5, line: 5, shallow: true });
+  assert.match(evalNote(thin.get('bxc3')!), /^Shallow: ChessDB’s best line here is only 5 plies deep, and it revises its scores as it learns\. Trust/);
+  assert.match(evalNote(thin.get('Kg3')!), /only 5 plies deep.* It knows 5 replies to this move\. Trust/);
+  assert.match(evalNote(thin.get('Rb1')!), /only 5 plies deep.* It hasn’t looked at the replies to this move\. Trust/);
+  assert.match(evalNote(thin.get('Rh1')!), /only 5 plies deep, and it revises its scores as it learns\. Trust/);
+
+  // Ten plies or more: only a move with no replies looked at is shallow.
+  const deep = evalsOf({ depth: 24, uci: 'b2c3' });
+  assert.deepEqual(deep.get('bxc3'), { cp: 75, replies: 1, line: 24, best: true });
+  assert.deepEqual(deep.get('Kg3'), { cp: -377, replies: 5, line: 24 });
+  assert.deepEqual(deep.get('Rb1'), { cp: -447, replies: 0, line: 24, shallow: true });
+  assert.equal(evalNote(deep.get('bxc3')!), 'ChessDB’s eval, from its best line here: 24 plies deep');
+  assert.equal(evalNote(deep.get('Kg3')!), 'ChessDB’s eval, backed up from the 5 replies it knows to this move');
+  assert.match(evalNote(deep.get('Rb1')!), /^Shallow: ChessDB hasn’t looked at the replies to this move, so this is one quick engine estimate\. Trust/);
+
+  // The line not asked yet: the notes alone.
+  const unasked = evalsOf();
+  assert.deepEqual(unasked.get('bxc3'), { cp: 75, replies: 1 });
+  assert.equal(unasked.get('Rb1')!.shallow, true);
+  assert.deepEqual(unasked.get('Rh1'), { cp: -453 });
+  assert.equal(evalNote(unasked.get('Rh1')!), 'ChessDB’s eval');
+
+  // A mate is ChessDB's to trust, however shallow the line.
+  const mate = buildTable({ turn: 'w', evals: { status: 'ok', moves: [{ uci: 'h1h8', san: 'Rh8#', score: 29999, replies: 0 }] }, line: { depth: 1, uci: 'h1h8' }, sort: 'eval', side: 'w' });
+  assert.equal(mate.rows[0]!.eval!.shallow, undefined);
+});
+
+test('querypv read: the line’s depth and first move; none is depth 0', () => {
+  assert.deepEqual(compactChessdbLine({ status: 'ok', score: -15, depth: 5, pv: ['b2c3', 'b7b5'], pvSAN: ['bxc3', 'b5'] }), { depth: 5, uci: 'b2c3' });
+  assert.deepEqual(compactChessdbLine({ status: 'unknown' }), { depth: 0 });
 });

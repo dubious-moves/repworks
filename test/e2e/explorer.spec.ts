@@ -29,8 +29,8 @@ function positions(): FakeExplorer {
   ]);
   fake.evals.set(START, [
     ['e4', 30],
-    ['d4', 25],
-    ['Nf3', 20],
+    ['d4', 25, 20],
+    ['Nf3', 20, 0],
   ]);
   fake.games.set(AFTER_C5, [
     { san: 'Nf3', white: 50, draws: 30, black: 20 },
@@ -77,6 +77,18 @@ test('the panel: Qchess’s rows, sorted by eval, a row clicked plays its move, 
   await expect(e4.locator('.ex-white')).toHaveText('50%');
   await expect(e4).toHaveAttribute('title', 'Average rating: 2101');
   await expect(panel(page).locator('.ex-row.novelty')).toHaveText(/Nf3.*novelty/);
+  // ChessDB's best line here is 30 plies deep, from e4; it hasn't looked at the replies to Nf3:
+  // that eval is shallow, light and italic, its title saying why (§5.139).
+  const nf3Eval = panel(page).locator('.ex-row', { hasText: 'Nf3' }).locator('.ex-eval');
+  await expect(nf3Eval).toHaveClass(/shallow/);
+  await expect(nf3Eval).toHaveAttribute('title', /^Shallow: ChessDB hasn’t looked at the replies to this move/);
+  await expect(nf3Eval).toHaveCSS('font-style', 'italic');
+  const d4Eval = panel(page).locator('.ex-row', { hasText: 'd4' }).locator('.ex-eval');
+  await expect(d4Eval).not.toHaveClass(/shallow/);
+  await expect(d4Eval).toHaveAttribute('title', 'ChessDB’s eval, backed up from the 20 replies it knows to this move');
+  await expect(e4.locator('.ex-eval')).not.toHaveClass(/shallow/);
+  await expect(e4.locator('.ex-eval')).toHaveAttribute('title', 'ChessDB’s eval, from its best line here: 30 plies deep');
+  expect(fake.requests.filter((r) => r.url.includes('action=querypv'))).toHaveLength(1);
   await expect(panel(page).locator('.ex-total .ex-count')).toHaveText('1k');
   // The bars line up whatever the counts' lengths (600, 1k): the count has one width (Qchess's).
   const lefts = await panel(page).locator('.ex-bar:not(.ex-novelty)').evaluateAll((bars) => bars.map((b) => Math.round(b.getBoundingClientRect().left)));
@@ -118,6 +130,18 @@ test('the panel: Qchess’s rows, sorted by eval, a row clicked plays its move, 
   await page.getByRole('button', { name: 'More', exact: true }).click();
   await expect(page.getByRole('menuitemcheckbox', { name: 'Explorer' })).toHaveAttribute('aria-checked', 'false');
   await page.keyboard.press('Escape');
+});
+
+test('ChessDB’s best line here only 4 plies deep: every eval shallow, said in its title and in the settings', async ({ page }) => {
+  const fake = await setUp(page);
+  fake.lines.set(START, 4);
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf`);
+  await expect(rows(page)).toHaveText(['e4', 'd4', 'Nf3', 'c4']);
+  await expect(panel(page).locator('.ex-eval.shallow')).toHaveCount(3);
+  await expect(panel(page).locator('.ex-row', { hasText: 'e4' }).first().locator('.ex-eval')).toHaveAttribute('title', /^Shallow: ChessDB’s best line here is only 4 plies deep/);
+  await expect(panel(page).locator('.ex-row', { hasText: 'c4' }).locator('.ex-eval')).toHaveText('?');
+  await panel(page).getByRole('button', { name: 'Explorer settings' }).click();
+  await expect(page.getByText(/is shallow: ChessDB’s best line from the position is under ten plies/)).toBeVisible();
 });
 
 test('no games here: ChessDB’s moves are the rows, said above them; with ChessDB not knowing it either, that is said', async ({ page }) => {
