@@ -1889,6 +1889,17 @@ The technical calls, each with its reason:
   blunder." The shallow search's noise, through mistake-lab's win-% curve, made a top move a
   blunder; the cost is a second search only on the moves told bad.
 
+## Revision of 2026-10-30 (ChessDB's evals asked again until they settle, PLAN.md §5.138)
+- **The explorer panel asks ChessDB about the position after its best move, and again about the
+  position itself until two asks 15 s or more apart agree** (the same scored moves, each within
+  10 cp): at once where the position after the best move disagrees with the move's score, then
+  15 s, 30 s and 60 s after the answer before while the panel stays, then on the next visit. A
+  settled answer holds for the hour. Was (§5.22): the first answer shown and kept, by the page for
+  the whole session and by the worker for an hour. Why: the owner, 2026-10-30: "outdated/wrong
+  chessdb evaluation … Going from +0.75 to -0.46 after the best move." ChessDB revises what it
+  has hardly analysed once it is asked: 15.bxc3 +0.75 became −0.44 once 15...b5 was scored; the
+  panel had kept the first answer. Still `queryall` only (D9).
+
 ## Revision of 2026-10-26 (the repertoire check at any ply, and in a checklist's drill, PLAN.md §5.132)
 - **The repertoire check runs in a checklist's drill too**, past its line's end, as in a game
   practised from a position: a move the repertoire doesn't have where it has one is taken back

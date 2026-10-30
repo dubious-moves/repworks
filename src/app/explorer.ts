@@ -1,9 +1,10 @@
 // The explorer in the app (PLAN.md §5.22, §5.23): the device's explorer settings, the worker that
 // makes every explorer and ChessDB request, and the panel's lookups. The worker starts on first
-// use; its answers are kept for the session, so going back to a position is instant.
+// use; its answers are kept for the session, so going back to a position is instant (ChessDB's
+// asked again behind them until it has settled, §5.138).
 import { signal } from '@preact/signals';
 import type { LimiterSnapshot } from '../core/explorer/limiter.ts';
-import { localInfo, type CompactExplorer } from '../core/explorer/providers.ts';
+import { localInfo, TTL, type CompactExplorer } from '../core/explorer/providers.ts';
 import { fenKey, type ChessdbAnswer } from '../core/explorer/search.ts';
 import type { ExplorerConfig, ExplorerTab, FromWorker, LookupError, ToWorker } from '../core/explorer/service.ts';
 import type { SortMode } from '../core/explorer/table.ts';
@@ -256,7 +257,9 @@ function remember(l: Lookup) {
   if (answers.size > KEEP) answers.delete(answers.keys().next().value!);
 }
 
-const complete = (l: Lookup) => (l.tab === 'chessdb' || !!l.games) && !!l.evals;
+// Nothing left to ask: the games, and ChessDB's answer once it has settled (two asks agreeing), for
+// TTL.panel. Before that, a kept answer is shown and the worker asks ChessDB again (service.ts).
+const complete = (l: Lookup) => (l.tab === 'chessdb' || !!l.games) && !!l.evals?.settled && Date.now() - (l.evals.t ?? 0) < TTL.panel;
 
 /** The panel looks at `fen` (undefined: nothing, the panel is off). Asked after a short pause. */
 export function lookAt(fen: string | undefined): void {

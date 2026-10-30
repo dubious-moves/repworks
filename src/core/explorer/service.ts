@@ -14,12 +14,28 @@ import { parseSan } from 'chessops/san';
 import { standardUci } from '../chess/uci.ts';
 import { STORM } from '../storm/config.ts';
 import { LICHESS_RATE, OWN_BURST, type LimiterSnapshot, type Now, type Sleep } from './limiter.ts';
-import { createProviders, localAddress, TTL, type CompactExplorer, type ExplorerCache, type ExplorerFilter, type Http, type ProviderStats } from './providers.ts';
+import { createProviders, localAddress, SAME_CP, TTL, type CompactExplorer, type ExplorerCache, type ExplorerFilter, type Http, type ProviderStats } from './providers.ts';
 import { createPreviewedSearch, type Budget, type RootSearch } from './rounds.ts';
-import { fenKey, type ChessdbAnswer, type MaiaMove, type PeError, type RowResult, type SearchOptions, type SearchProvider } from './search.ts';
+import { fenKey, type ChessdbAnswer, type ChessdbMove, type MaiaMove, type PeError, type RowResult, type SearchOptions, type SearchProvider } from './search.ts';
 
 export const DEFAULT_BUDGET = 60; // uncached explorer requests per root position
 export const ANALYSE_MAX = 30; // ChessDB analysis requests per root position
+/**
+ * While the panel stays on a position whose ChessDB answer hasn't settled, it asks again this long
+ * after the answer before, each time; then not until it comes back. The first is TTL.settle, the
+ * least that can settle an answer.
+ */
+export const PANEL_RECHECKS = [TTL.settle, 2 * TTL.settle, 4 * TTL.settle];
+/** The panel asks the position after the best move for at most this many best moves a visit. */
+export const DEEPER_MAX = 3;
+
+/** ChessDB's best move in an answer (its score from the side to move), if it scores any. */
+function bestMove(a: ChessdbAnswer | undefined): ChessdbMove | undefined {
+  if (!a || a.status !== 'ok') return undefined;
+  let best: ChessdbMove | undefined;
+  for (const m of a.moves || []) if (Number.isFinite(m.score) && (!best || m.score > best.score)) best = m;
+  return best;
+}
 
 export interface ExplorerConfig {
   /** The Lichess token, or '' when not logged in. */
@@ -221,20 +237,58 @@ export function createExplorerService(o: ServiceOptions): ExplorerService {
         .finally(() => (pending.delete('games'), settle()));
     }
     pending.add('evals');
+    /*
+     * ChessDB revises what it has hardly analysed once it is asked (queryall's learn=1, §5.138): a
+     * position's answer, seconds later; and a move's score, once the position after it is asked
+     * and scored anew (15.bxc3 +0.75 became −0.44 once 15...b5 was scored). So the panel shows
+     * what it has at once; unless that has settled, asks the position after the best move, and
+     * this one again at once where the two disagree (each best move once, DEEPER_MAX at most); and
+     * asks again while it stays, until two asks agree (TTL.settle). A settled answer holds for
+     * TTL.panel. A failed ask leaves the answer up.
+     */
+    const deepened = new Set<string>();
+    const show = (evals: ChessdbAnswer, n: number): Promise<void> | undefined => {
+      if (isStale()) return;
+      o.post({ type: 'evals', id, evals });
+      const best = bestMove(evals);
+      if (!best || evals.settled || deepened.has(best.san) || deepened.size >= DEEPER_MAX) return recheck(evals, n);
+      deepened.add(best.san);
+      return deeper(best).then(
+        (fresh) => (fresh ? show(fresh, n) : recheck(evals, n)),
+        () => recheck(evals, n),
+      );
+    };
+    // The position after `best`, asked unless ChessDB answered it lately; where its best reply
+    // says other than `best`'s score, this position asked again.
+    const deeper = (best: ChessdbMove): Promise<ChessdbAnswer | undefined> => {
+      const after = Promise.resolve().then(() => child(fen, best.san).fen);
+      return after.then((at) =>
+        providers
+          .chessdb(at, isStale, 2)
+          .then((c) => (isStale() || lately(c) ? c : providers.chessdb(at, isStale, 2, 0)))
+          .then((c) => {
+            const reply = bestMove(c);
+            if (isStale() || !reply || Math.abs(reply.score + best.score) <= SAME_CP) return undefined;
+            return providers.chessdb(fen, isStale, 2, 0);
+          }),
+      );
+    };
+    const lately = (c: ChessdbAnswer) => o.now() - (c.t || 0) < (c.settled ? TTL.panel : TTL.settle);
+    const recheck = (evals: ChessdbAnswer, n: number): Promise<void> | undefined => {
+      const age = o.now() - (evals.t || 0);
+      if (evals.settled ? age < TTL.panel : n >= PANEL_RECHECKS.length) return;
+      const wait = evals.settled ? 0 : PANEL_RECHECKS[n]! - age;
+      return (wait > 0 ? o.sleep(wait) : Promise.resolve())
+        .then(() => (isStale() ? undefined : providers.chessdb(fen, isStale, 2, 0)))
+        .then(
+          (fresh) => (fresh ? show(fresh, n + 1) : undefined),
+          () => undefined,
+        );
+    };
     providers
       .chessdb(fen, isStale, 2)
       .then(
-        (evals) => {
-          if (isStale()) return;
-          o.post({ type: 'evals', id, evals });
-          // An older answer is shown at once and asked again: ChessDB keeps learning. If that
-          // fails, the cached answer stays up.
-          if (o.now() - (evals.t || 0) < TTL.panel) return;
-          return providers.chessdb(fen, isStale, 2, TTL.panel).then(
-            (fresh) => !isStale() && o.post({ type: 'evals', id, evals: fresh }),
-            () => undefined,
-          );
-        },
+        (evals) => show(evals, 0),
         (e: PeError) => !isStale() && !e?.cancelled && o.post({ type: 'evals', id, error: reasonOf(e, 'ChessDB') }),
       )
       .finally(() => (pending.delete('evals'), settle()));

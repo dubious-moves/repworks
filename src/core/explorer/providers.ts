@@ -56,6 +56,12 @@ export const TTL = {
   // adds moves and changes scores as it analyses, and a week-old answer had missed its two best
   // moves (2026-10-09). The searches keep the week: they ask hundreds of positions.
   panel: 60 * 60 * 1000,
+  // ChessDB learns from being asked (`queryall`'s learn=1): a position it has hardly analysed
+  // answers with a move or two, and with other scores and more moves seconds later. Measured
+  // 2026-10-30: a lone 16.Re1 +0.56, +1.12 with two more moves 20 s on; 15.bxc3 shown +0.75 in the
+  // panel, −0.44 on ChessDB a minute later. An answer is settled when an ask at least this long
+  // after the one before agrees with it (`sameEvals`); the panel asks until it is (service.ts).
+  settle: 15 * 1000,
   // After asking, look the position up again once this has passed: a queued position had evals
   // about 65 s later when measured (2026-09-25). Still unknown then, it is looked up again at this
   // interval for `recheckFor`, whenever a search needs it.
@@ -215,6 +221,23 @@ export function compactChessdb(json: unknown): ChessdbAnswer & { moves: NonNulla
     status: j.status || 'unknown',
     moves: (j.moves || []).map((m) => ({ uci: m.uci, san: m.san, score: Number(m.score) })),
   };
+}
+
+/** Scores this close (centipawns) count as the same: ChessDB's own drift between two asks. */
+export const SAME_CP = 10;
+
+/** Two ChessDB answers that say the same: the same status, the same scored moves, each within SAME_CP. */
+export function sameEvals(a: ChessdbAnswer, b: ChessdbAnswer): boolean {
+  if (a.status !== b.status) return false;
+  const scored = (x: ChessdbAnswer) => new Map((x.moves || []).filter((m) => Number.isFinite(m.score)).map((m) => [m.uci, m.score] as const));
+  const ma = scored(a);
+  const mb = scored(b);
+  if (ma.size !== mb.size) return false;
+  for (const [uci, score] of ma) {
+    const other = mb.get(uci);
+    if (other === undefined || Math.abs(other - score) > SAME_CP) return false;
+  }
+  return true;
 }
 
 export interface ProviderStats {
@@ -473,6 +496,7 @@ export function createProviders(o: ProvidersOptions): Providers {
                 .then((j) => {
                   const v: ChessdbAnswer = compactChessdb(j);
                   v.t = now();
+                  if (hit && v.t - (hit.t || 0) >= TTL.settle && sameEvals(hit, v)) v.settled = true;
                   return o.cache.put('chessdb', key, v).then(() => v);
                 });
             },

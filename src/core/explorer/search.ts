@@ -65,6 +65,8 @@ export interface ChessdbAnswer {
   moves?: ChessdbMove[];
   /** When it was fetched (the providers' cache). */
   t?: number;
+  /** It agreed with the ask before it, at least TTL.settle earlier: ChessDB has stopped revising it. */
+  settled?: boolean;
 }
 
 export interface MaiaMove {

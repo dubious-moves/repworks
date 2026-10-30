@@ -3338,7 +3338,7 @@ answering from the cache; the request counts after ten minutes of browsing (the 
   worker started on first use with the Lichess token (`lichessToken()`, re-sent on a login or
   logout), the bucket kept in `sessionStorage`, and the panel's lookups: asked 280 ms after a
   position is shown, the previous one dropped, answers kept for the session (errors aren't, so
-  coming back asks again).
+  coming back asks again; nor is a ChessDB answer that hasn't settled, §5.138).
 - Tests: `test/unit/core/explorer/service.test.ts` (a lookup asked once then from the cache,
   move counters aside; Masters with no filter and ChessDB's tab asking ChessDB alone; no login:
   the games refused with a login offered, ChessDB answering, the Practical rows saying why; a 429
@@ -7523,3 +7523,58 @@ lead-up's keys from `ChecklistDrill` (`src/ui/Checklist.tsx`). Tests: `practice.
 (desktop and phone: the Alapin drill drawn by repetition at 6.Nb1, which fails with the lead-up
 left out), `draws.spec.ts` (desktop and phone: an offer declined after one move, the button off
 at that position, accepted after five level moves). Live: TESTING.md.
+
+#### 5.138 ChessDB's evals asked again until they settle (the owner's report, 2026-10-30)
+
+"I noticed some problem with outdated/wrong chessdb evaluation in repworks. Going from +0.75 to
+-0.46 after the best move."
+
+- **What it was**: in the Scandi Gambit study's "Accepted - Main lines", White to move at move 15
+  (`r2q1rk1/pp3ppp/8/4p3/2B3b1/2bP1N2/PPP2PK1/R2Q1R2 w`), the panel had ChessDB's one move,
+  15.bxc3 +0.75; after it, ChessDB's best, 15...b5, said −0.46. ChessDB's own page, a minute
+  later, gave bxc3 −0.44, with four more moves scored.
+- **Why**: ChessDB learns from being asked (`queryall`'s `learn=1`, the default, Phase 4's
+  checks): a position it has hardly analysed answers with what it has, a move or two, and revises
+  it seconds later: the move's score backed up from the position after it, more moves scored.
+  Measured 2026-10-30 from the container, asking every 5 s: 15.bxc3 Rc8 answered a lone 16.Re1
+  +0.56, then +1.12 with two more moves at 21 s, a fourth at 53 s; 15.bxc3 Re8's Re1 went +3.06,
+  +2.96, +3.27 at 13 and 18 s, and its parent's Re8 followed; 15.bxc3's b5 drifted 41 to 46 cp
+  between asks. The panel showed the first answer and kept it: the page for the whole session (a
+  position seen once was never asked again while the page stayed open), the worker's cache for an
+  hour, and an answer the Practical search or the storm had fetched was shown as it was, up to an
+  hour old. No sign or position mix-up: the panel asks ChessDB for the FEN shown, scores from the
+  side to move.
+- **Now**: an answer is *settled* when an ask at least 15 s (`TTL.settle`) after the one before
+  agrees with it: the same scored moves, each within 10 cp (`sameEvals`). The panel shows what it
+  has at once; then, unless that has settled:
+  - it asks the position after ChessDB's best move (`deeper`: from the cache if ChessDB answered it
+    within 15 s, or settled within the hour), and where that position's best reply is more than
+    10 cp from the move's score, asks this position again at once and shows that. For the owner's
+    position: bxc3 +0.75, then 15...b5 asked (+0.44 for Black), then bxc3 −0.44. Each best move
+    once a visit, three at most (`DEEPER_MAX`); the position after is then in the cache when the
+    move is played;
+  - while the panel stays, it asks again 15 s after the answer before, then 30 s, then 60 s
+    (`PANEL_RECHECKS`), each new answer shown as it comes, until one settles; then not until the
+    panel comes back.
+- A settled answer holds for the hour, as before (asked again after it, and settled at once if
+  ChessDB still says the same). The page asks again on coming back to a position whose answer
+  hasn't settled or is over the hour old. A failed ask leaves the answer up. Cost: for a position
+  the panel shows, the position after its best move and one more ask here when the panel stays
+  15 s; up to three more while ChessDB keeps revising it; only `queryall` (D9).
+- Live in the container (2026-10-30), the worker's service under Node with real fetch and timers:
+  16...Bh3+ (15.bxc3 Qc8 16.Qe2, which ChessDB had scored at −2.74 alone) answered −2.25 with four
+  more moves; the position after Bh3+ was asked at once and agreed; 15 s on, ChessDB had revised
+  Bh3+ to −2.67 and the panel showed it; 30 s later the same, settled.
+- Not changed: the Practical search, the storm and the gather read ChessDB as before (a week's
+  cache); a position they asked is asked again when the panel comes to it, and their next lookups
+  read the panel's newer answers from the cache.
+
+**As built** (2026-10-30): `TTL.settle`, `SAME_CP`, `sameEvals` and `settled` on the answer
+(`src/core/explorer/providers.ts`, `search.ts`); `PANEL_RECHECKS`, `DEEPER_MAX`, `bestMove`, and
+the panel's `show`, `deeper` and `recheck` in `lookup` (`src/core/explorer/service.ts`);
+`complete` in `src/app/explorer.ts`. Tests: `service.test.ts` (the owner's 15.bxc3: +0.75, the
+position after it asked, −0.44 at once, settled 15 s on, and neither asked again within the hour;
+ChessDB revising on its own: +0.56, +1.12, settled; an answer the search fetched asked again when
+the panel comes; a position ChessDB keeps revising asked three times a visit; a dropped lookup
+stops asking; an ask too soon after the one before never settles it; `sameEvals`). Live:
+TESTING.md.

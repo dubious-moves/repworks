@@ -948,3 +948,16 @@ q_extension (or give it to a session with q_extension attached), then run
   after five level moves: "Draw agreed."
 - Checked by unit tests and Playwright with the fake explorer and engine (desktop and emulated
   phone); not on a device.
+
+## ChessDB's evals asked again until they settle (2026-10-30)
+
+- Open a position ChessDB hardly knows (deep in a sideline: one or two moves in the Eval column).
+  Within a second the evals may change (the position after the best move was asked), and again
+  about 15 s and 45 s in if you stay; a move may be added. Then play ChessDB's best move: the next
+  position's best eval should be within about 0.1 of the one the move had. Step back: the earlier
+  position shows its latest evals at once.
+- Checked: ChessDB's revisions measured live from the container, and the worker's service run
+  under Node against live ChessDB (PLAN.md §5.138); the asks by unit tests with a fake ChessDB
+  that revises; Playwright for the panel as before. Not in a browser against live ChessDB, and
+  not on the owner's device.
+

@@ -4,10 +4,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Chess } from 'chessops/chess';
 import { makeFen, parseFen } from 'chessops/fen';
-import { makeSan } from 'chessops/san';
-import { createMemoryCache, type HttpResponse } from '../../../../src/core/explorer/providers.ts';
-import { createExplorerService, type ExplorerConfig, type FromWorker } from '../../../../src/core/explorer/service.ts';
-import type { MaiaMove } from '../../../../src/core/explorer/search.ts';
+import { makeSan, parseSan } from 'chessops/san';
+import { createMemoryCache, sameEvals, TTL, type HttpResponse } from '../../../../src/core/explorer/providers.ts';
+import { createExplorerService, PANEL_RECHECKS, type ExplorerConfig, type FromWorker } from '../../../../src/core/explorer/service.ts';
+import type { ChessdbAnswer, MaiaMove } from '../../../../src/core/explorer/search.ts';
 
 const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 const CONFIG: ExplorerConfig = { token: 'tok', filter: { speeds: ['blitz'], ratings: [2000] }, local: '', analyse: false, options: { maxPly: 4 }, budget: 60 };
@@ -26,12 +26,25 @@ function legalSans(fen: string, n: number): { san: string; uci: string }[] {
   return out;
 }
 
-/** A world where every position has two moves with games, and ChessDB knows them. */
-function world(options: { explorer?: (url: string) => HttpResponse | Promise<HttpResponse>; maia?: (fen: string, elo: number) => Promise<MaiaMove[] | null>; config?: Partial<ExplorerConfig> } = {}) {
+/**
+ * A world where every position has two moves with games, and ChessDB knows them. `chessdb` answers
+ * ChessDB in their place (the asks of that position so far, from 0); `sleep` waits in place of
+ * the clock's jump (which it still makes when it resolves).
+ */
+function world(
+  options: {
+    explorer?: (url: string) => HttpResponse | Promise<HttpResponse>;
+    chessdb?: (fen: string, asked: number) => unknown;
+    sleep?: (ms: number) => Promise<void>;
+    maia?: (fen: string, elo: number) => Promise<MaiaMove[] | null>;
+    config?: Partial<ExplorerConfig>;
+  } = {},
+) {
   let t = 1_000_000;
   const urls: string[] = [];
   const auth: (string | undefined)[] = [];
   const posts: FromWorker[] = [];
+  const cdbAsked = new Map<string, number>();
   const http = (url: string, init?: { headers?: Record<string, string> }): Promise<HttpResponse> => {
     urls.push(url);
     const fen = decodeURIComponent((/(?:fen|board)=([^&]+)/.exec(url) ?? [])[1] ?? '');
@@ -41,6 +54,11 @@ function world(options: { explorer?: (url: string) => HttpResponse | Promise<Htt
       const moves = legalSans(fen, 2).map((m, i) => ({ uci: m.uci, san: m.san, white: 300 - 100 * i, draws: 200, black: 100 + 50 * i }));
       return Promise.resolve(json(200, { white: 900, draws: 400, black: 350, moves }));
     }
+    if (options.chessdb) {
+      const n = cdbAsked.get(fen) ?? 0;
+      cdbAsked.set(fen, n + 1);
+      return Promise.resolve(json(200, options.chessdb(fen, n)));
+    }
     const moves = legalSans(fen, 2).map((m, i) => ({ uci: m.uci, san: m.san, score: 30 - 20 * i }));
     return Promise.resolve(json(200, { status: 'ok', moves }));
   };
@@ -48,10 +66,10 @@ function world(options: { explorer?: (url: string) => HttpResponse | Promise<Htt
     http,
     cache: createMemoryCache(() => t),
     now: () => t,
-    sleep: (ms) => {
-      t += ms;
-      return Promise.resolve();
-    },
+    sleep: (ms) =>
+      (options.sleep ? options.sleep(ms) : Promise.resolve()).then(() => {
+        t += ms;
+      }),
     post: (m) => posts.push(m),
     ...(options.maia ? { maia: options.maia } : {}),
   });
@@ -73,31 +91,173 @@ test('a lookup: the games and ChessDB’s evals, asked once and then from the ca
   assert.equal(explorerUrls(w.urls).length, 1);
   assert.match(explorerUrls(w.urls)[0]!, /\/lichess\?variant=standard&fen=.*&speeds=blitz&ratings=2000&moves=30/);
   assert.deepEqual(w.auth, ['Bearer tok']);
+  // The fake scores every position's best move +0.30 for the side to move, so the position after
+  // it disagrees and this one is asked again; then TTL.settle on, which settles it.
+  assert.equal(cdbUrls(w).length, 4, 'here, the position after the best move, here again, and here TTL.settle on');
+  assert.ok(evalsOf(w, 1).at(-1)!.settled);
   w.service.handle({ type: 'lookup', id: 2, tab: 'lichess', fen: START.replace(' 0 1', ' 3 7') });
   await settle();
-  assert.equal(w.urls.length, 2, 'the second lookup came from the cache, move counters aside');
-  assert.ok(w.posts.some((m) => m.type === 'games' && m.id === 2));
+  assert.equal(w.urls.length, 5, 'the second lookup came from the cache, move counters aside');
 });
 
 test('the panel shows an hour-old ChessDB answer at once, then asks again and shows the new one', async () => {
   const w = world();
-  const cdbUrls = () => w.urls.filter((u) => u.startsWith('https://www.chessdb.cn'));
   w.service.handle({ type: 'lookup', id: 1, tab: 'chessdb', fen: START });
   await settle();
-  assert.equal(cdbUrls().length, 1);
+  assert.equal(cdbUrls(w).length, 4);
   w.tick(30 * 60 * 1000);
   w.service.handle({ type: 'lookup', id: 2, tab: 'chessdb', fen: START });
   await settle();
-  assert.equal(cdbUrls().length, 1, 'half an hour old: from the cache alone');
-  assert.equal(w.posts.filter((m) => m.type === 'evals' && m.id === 2).length, 1);
+  assert.equal(cdbUrls(w).length, 4, 'settled half an hour ago: from the cache alone');
+  assert.equal(evalsOf(w, 2).length, 1);
   w.tick(31 * 60 * 1000);
   w.service.handle({ type: 'lookup', id: 3, tab: 'chessdb', fen: START });
   await settle();
-  assert.equal(cdbUrls().length, 2, 'over an hour old: asked again');
-  const posted = w.posts.filter((m) => m.type === 'evals' && m.id === 3);
+  assert.equal(cdbUrls(w).length, 5, 'over an hour old: asked again, and settled by agreeing with it');
+  const posted = evalsOf(w, 3);
   assert.equal(posted.length, 2, 'the cached answer, then the new one');
-  const ts = posted.map((m) => ('evals' in m ? m.evals.t : undefined));
-  assert.ok(ts[1]! > ts[0]!);
+  assert.ok(posted[1]!.t! > posted[0]!.t! && posted[1]!.settled);
+});
+
+// The owner's report (2026-10-30): at move 15, White to move, the panel had ChessDB's one move,
+// 15.bxc3 +0.75; after it, 15...b5 said −0.46, and ChessDB itself said −0.44 for bxc3 a minute
+// on, once the position after it had been asked and scored.
+const BXC3 = 'r2q1rk1/pp3ppp/8/4p3/2B3b1/2bP1N2/PPP2PK1/R2Q1R2 w - - 0 15';
+const AFTER_BXC3 = 'r2q1rk1/pp3ppp/8/4p3/2B3b1/2PP1N2/P1P2PK1/R2Q1R2 b - - 0 15';
+const four = (fen: string) => fen.split(' ').slice(0, 4).join(' ');
+const after = (fen: string, san: string) => {
+  const pos = Chess.fromSetup(parseFen(fen).unwrap()).unwrap();
+  pos.play(parseSan(pos, san)!);
+  return makeFen(pos.toSetup());
+};
+const answer = (...moves: [string, string, number][]) => ({ status: 'ok', moves: moves.map(([uci, san, score]) => ({ uci, san, score })) });
+const THIN = answer(['b2c3', 'bxc3', 75]);
+const LEARNED = answer(['b2c3', 'bxc3', -44], ['g2g3', 'Kg3', -354]);
+/** ChessDB at the owner's position: one move +0.75 until the position after it is asked, then −0.44. */
+function owners() {
+  let after = false;
+  return (fen: string) => {
+    if (four(fen) === four(BXC3)) return after ? LEARNED : THIN;
+    if (four(fen) !== four(AFTER_BXC3)) return { status: 'unknown' };
+    after = true;
+    return answer(['b7b5', 'b5', 44], ['a8c8', 'Rc8', -51]);
+  };
+}
+const cdbUrls = (w: { urls: string[] }) => w.urls.filter((u) => u.startsWith('https://www.chessdb.cn'));
+const boards = (w: { urls: string[] }) => cdbUrls(w).map((u) => four(decodeURIComponent(/board=([^&]+)/.exec(u)![1]!)));
+const evalsOf = (w: { posts: FromWorker[] }, id: number) => w.posts.flatMap((m) => (m.type === 'evals' && m.id === id && 'evals' in m ? [m.evals] : []));
+const scoreOf = (e: ChessdbAnswer | undefined, san: string) => e?.moves?.find((m) => m.san === san)?.score;
+
+test('the owner’s 15.bxc3: +0.75, then −0.44 at once, from asking the position after the best move', async () => {
+  const w = world({ chessdb: owners() });
+  w.service.handle({ type: 'lookup', id: 1, tab: 'chessdb', fen: BXC3 });
+  await settle();
+  assert.deepEqual(boards(w), [four(BXC3), four(AFTER_BXC3), four(BXC3), four(BXC3)], 'here, after bxc3, here again at once, and here TTL.settle on');
+  const posted = evalsOf(w, 1);
+  assert.deepEqual(
+    posted.map((e) => [scoreOf(e, 'bxc3'), e.moves!.length, !!e.settled]),
+    [
+      [75, 1, false],
+      [-44, 2, false],
+      [-44, 2, true],
+    ],
+  );
+  assert.equal(posted[2]!.t! - posted[1]!.t!, PANEL_RECHECKS[0]);
+  w.tick(10 * 60 * 1000);
+  w.service.handle({ type: 'lookup', id: 2, tab: 'chessdb', fen: BXC3 });
+  w.service.handle({ type: 'lookup', id: 3, tab: 'chessdb', fen: AFTER_BXC3 });
+  await settle();
+  assert.equal(scoreOf(evalsOf(w, 2)[0], 'bxc3'), -44, 'settled: shown from the cache');
+  assert.equal(scoreOf(evalsOf(w, 3)[0], 'b5'), 44, 'and the position after it, asked already');
+  assert.deepEqual(boards(w).slice(4), [four(after(AFTER_BXC3, 'b5')), four(AFTER_BXC3)], 'nothing asked for the settled one; the other, unsettled: after its b5, and itself again');
+});
+
+test('an answer the Practical search or the storm fetched is asked again when the panel comes to it', async () => {
+  const w = world({ chessdb: owners() });
+  w.service.handle({ type: 'scores', id: 1, fen: BXC3 });
+  await settle();
+  assert.equal(cdbUrls(w).length, 1);
+  w.tick(40 * 1000);
+  w.service.handle({ type: 'lookup', id: 2, tab: 'chessdb', fen: BXC3 });
+  await settle();
+  assert.deepEqual(
+    evalsOf(w, 2).map((e) => scoreOf(e, 'bxc3')),
+    [75, -44, -44],
+  );
+});
+
+test('ChessDB revising a position on its own: the panel asks again until two answers agree', async () => {
+  // 15.bxc3 Rc8, measured 2026-10-30: a lone 16.Re1 +0.56, then +1.12 with more moves 20 s on.
+  const RC8 = '2rq1rk1/pp3ppp/8/4p3/2B3b1/2PP1N2/P1P2PK1/R2Q1R2 w - - 1 16';
+  const w = world({
+    chessdb: (fen, n) => (four(fen) !== four(RC8) ? { status: 'unknown' } : n === 0 ? answer(['f1e1', 'Re1', 56]) : answer(['f1e1', 'Re1', 112], ['d1c1', 'Qc1', 0])),
+  });
+  w.service.handle({ type: 'lookup', id: 1, tab: 'chessdb', fen: RC8 });
+  await settle();
+  const posted = evalsOf(w, 1);
+  assert.deepEqual(
+    posted.map((e) => [scoreOf(e, 'Re1'), !!e.settled]),
+    [
+      [56, false],
+      [112, false],
+      [112, true],
+    ],
+  );
+  assert.deepEqual(
+    posted.map((e) => e.t! - posted[0]!.t!),
+    [0, PANEL_RECHECKS[0], PANEL_RECHECKS[0]! + PANEL_RECHECKS[1]!],
+  );
+  assert.equal(cdbUrls(w).length, 1 + 1 + 2, 'here, after Re1 (unknown), here twice; none once settled');
+});
+
+test('a position ChessDB keeps revising is asked PANEL_RECHECKS times a visit', async () => {
+  const w = world({ chessdb: (fen, n) => (four(fen) === four(BXC3) ? answer(['b2c3', 'bxc3', 75 - 40 * n]) : { status: 'unknown' }) });
+  w.service.handle({ type: 'lookup', id: 1, tab: 'chessdb', fen: BXC3 });
+  await settle();
+  assert.equal(evalsOf(w, 1).length, 1 + PANEL_RECHECKS.length, 'each revision shown');
+  assert.ok(!evalsOf(w, 1).some((e) => e.settled));
+  const asked = boards(w).filter((b) => b === four(BXC3)).length;
+  assert.equal(asked, 1 + PANEL_RECHECKS.length);
+  w.service.handle({ type: 'lookup', id: 2, tab: 'chessdb', fen: BXC3 });
+  await settle();
+  assert.equal(boards(w).filter((b) => b === four(BXC3)).length, asked + PANEL_RECHECKS.length, 'unsettled: shown from the cache and asked again on the next visit');
+});
+
+test('the panel leaving a position stops its asks', async () => {
+  const waits: (() => void)[] = [];
+  const w = world({ chessdb: (fen) => (four(fen) === four(BXC3) ? THIN : { status: 'unknown' }), sleep: () => new Promise<void>((resolve) => waits.push(resolve)) });
+  w.service.handle({ type: 'lookup', id: 1, tab: 'chessdb', fen: BXC3 });
+  await settle();
+  assert.equal(waits.length, 1, 'waiting to ask again');
+  const asked = cdbUrls(w).length;
+  w.service.handle({ type: 'drop', id: 1 });
+  waits.shift()!();
+  await settle();
+  assert.equal(cdbUrls(w).length, asked, 'dropped: not asked again');
+  assert.equal(evalsOf(w, 1).length, 1);
+});
+
+test('two ChessDB answers agree with the same scored moves, each within 10 centipawns', () => {
+  const a: ChessdbAnswer = answer(['b7b5', 'b5', 42], ['a8c8', 'Rc8', -51]);
+  assert.ok(sameEvals(a, answer(['a8c8', 'Rc8', -45], ['b7b5', 'b5', 41])), 'drift and order aside');
+  assert.ok(!sameEvals(a, answer(['b7b5', 'b5', 42], ['a8c8', 'Rc8', -112])), 'a score revised');
+  assert.ok(!sameEvals(a, answer(['b7b5', 'b5', 42])), 'a move fewer');
+  assert.ok(!sameEvals(a, { status: 'unknown' }));
+  assert.ok(sameEvals({ status: 'unknown' }, { status: 'unknown' }));
+  assert.ok(sameEvals(answer(['b7b5', 'b5', NaN]), answer()), 'unscored moves aside');
+});
+
+test('an answer is settled only by an ask TTL.settle or more after the one before', async () => {
+  const w = world();
+  w.service.handle({ type: 'scores', id: 1, fen: START });
+  await settle();
+  w.tick(TTL.settle - 1);
+  w.service.handle({ type: 'lookup', id: 2, tab: 'chessdb', fen: START });
+  await settle();
+  const posted = evalsOf(w, 2);
+  assert.equal(posted.length, 3, 'the cached answer, the one asked after the position after its best, and one TTL.settle on');
+  assert.ok(sameEvals(posted[0]!, posted[1]!) && !posted[1]!.settled, 'the same, but asked too soon after');
+  assert.ok(posted[2]!.settled);
 });
 
 test('Masters is asked without the filter; ChessDB’s tab asks ChessDB alone', async () => {
