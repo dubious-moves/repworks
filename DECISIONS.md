@@ -1976,3 +1976,25 @@ The technical calls, each with its reason:
   abandoned drill), though the end screen said "Counted as a loss". A game the opponent couldn't
   answer still counts nothing. Why: the owner, 2026-10-31: the won / total "doesn't seem to count
   games where I stopped the game and it counted as a loss, it should".
+
+## Revision of 2026-10-31 (endgames, PLAN.md §5.145)
+- **A new page, Endgames**: ten theoretical endgames (the queen and rook mates; king and pawn:
+  the king in front, the opposition, holding with it, the breakthrough, Réti's study; Lucena;
+  Philidor; queen against a pawn), each played for its goal against Stockfish alone, every move
+  judged for the goal and a move that throws it away stopping the game until it is taken back.
+  Why: the owner's open request of 2026-10-31 ("whatever you think is best for user experience and
+  chess improvement"); the endgame was the one part of the game the site didn't train, and a game
+  played on from a position answers as people do (database, Maia), not as a defence.
+- **No new data format**: a try's result is §5.57's `practice` event at the start's position with
+  `preset: "endgame"`; where an endgame stands and when it comes back (1, 3, 7, 14, 30, 60 days by
+  the solves in a row) are read back from those events. The bot lens of the weak spots leaves them
+  out. Decided in the build: a try counts once, by its first slip, hint or giving up (§5.73's first
+  answer), and a win's rules draw (stalemate, repetition, fifty moves) is a miss.
+- **Stockfish judges, not a tablebase**: the goal is kept at +2 (a win) or −2 (a draw) for the
+  user, on the judges' search (§5.57, §5.136). Every position and its first moves were checked on
+  the vendored Stockfish at depths 16 and 18, and the drills played out with the app's judge (§5.145's
+  tables); positions it can't judge at that depth were left out. Lichess's tablebase would be exact
+  but needs the network and is out of the container's reach.
+- **Against a draw, the attacker presses**: of Stockfish's three lines within 0.30 of the best, the
+  first whose next two plies give no material away. Why: in a drawn position its first line often
+  gave the pawn away and ended the drill in a few moves.

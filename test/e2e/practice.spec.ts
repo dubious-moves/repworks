@@ -277,7 +277,7 @@ test('a practice game: played against the explorer, stopped, reviewed, kept in t
 
 test('an advantage card drilled in the game cards’ session: a collapse, graded Again', async ({ page }) => {
   const { git } = await setUp(page);
-  await page.getByRole('link', { name: 'Games' }).click();
+  await page.getByRole('link', { name: 'Games', exact: true }).click();
   await page.getByRole('button', { name: 'Refresh' }).click();
   await expect(page.getByTestId('games-queue')).toContainText('0 due · 1 new today');
   await page.getByRole('link', { name: 'Review' }).click();

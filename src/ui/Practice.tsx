@@ -121,7 +121,7 @@ export function MoveBoard(props: { fen: string; orientation: 'white' | 'black'; 
 
 /* ------------------------------------------------------------------ the game */
 
-const END_WORD = {
+export const END_WORD = {
   mate: 'Checkmate: you won.',
   mated: 'Checkmated.',
   stalemate: 'Stalemate: a draw.',
@@ -133,6 +133,7 @@ const END_WORD = {
   collapse: 'The advantage is gone: the eval fell to +1 or below.',
   stopped: 'Stopped.',
   interrupted: 'The opponent couldn’t answer (no database, Maia or Stockfish): the game ends here, nothing graded.',
+  goal: 'Goal reached.',
 } as const;
 const RESULT_WORD = { win: 'a win', draw: 'a draw', loss: 'a loss' } as const;
 const GRADE_WORD = { 1: 'Again', 2: 'Hard', 3: 'Good', 4: 'Easy' } as const;
@@ -284,7 +285,7 @@ function VoiceControls() {
 }
 
 /** The game's moves while it is played, the user's with their symbols when feedback is shown. */
-function MoveList(props: { moves: readonly PracticeMove[]; baseFen: string; marks: boolean }) {
+export function MoveList(props: { moves: readonly PracticeMove[]; baseFen: string; marks: boolean }) {
   const [, turn, , , , n] = props.baseFen.split(' ');
   let number = Number(n) || 1;
   let white = turn !== 'b';

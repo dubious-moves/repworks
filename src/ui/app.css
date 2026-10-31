@@ -6065,3 +6065,106 @@ a.button.disabled {
   height: 100%;
   background: var(--info);
 }
+
+/* Endgames (Endgames.tsx, PLAN.md §5.145): each endgame as a board and its words, the groups as cards. */
+.endgames .card {
+  margin-bottom: 12px;
+}
+
+.endgames-intro p {
+  margin-top: 0;
+}
+
+.endgame-group h2 {
+  margin: 0 0 10px;
+  font-size: 1.05rem;
+}
+
+.endgame-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.endgame-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.endgame-item .mini-board {
+  width: 112px;
+}
+
+.endgame-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.endgame-title {
+  font-weight: 600;
+}
+
+.endgame-standing {
+  font-size: 0.9rem;
+}
+
+.endgame-standing.state-due {
+  color: var(--warn);
+}
+
+.endgame-standing.state-later {
+  color: var(--good-text);
+}
+
+.endgame-marks {
+  margin-left: 4px;
+  letter-spacing: 1px;
+}
+
+.endgame-marks .solved {
+  color: var(--good-text);
+}
+
+.endgame-marks .missed {
+  color: var(--danger);
+}
+
+.endgame-slip,
+.endgame-missed {
+  color: var(--warn);
+}
+
+.endgame-solved {
+  color: var(--good-text);
+}
+
+.endgame-method {
+  margin-top: 8px;
+}
+
+.endgame-method summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.endgame-method p {
+  margin: 6px 0 0;
+  line-height: 1.45;
+}
+
+@media (max-width: 480px) {
+  .endgame-item .mini-board {
+    width: 96px;
+  }
+}
+
+.endgame-fifty {
+  color: var(--warn);
+}

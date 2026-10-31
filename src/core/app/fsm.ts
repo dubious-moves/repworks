@@ -38,6 +38,8 @@
 //   #/checklist/<sid>?side=black&line=e2e4,c7c5&preset=easy
 //                                       a checklist line's drill at a difficulty (§5.62), the line by
 //                                       its moves (§5.130); the old #/checklist/<sid>/<n> opens the list
+//   #/endgames                          the theoretical endgames, each played for its goal (§5.145)
+//   #/endgames/<id>                     one endgame, played against Stockfish
 //   #/migrate                           the migration from mistake-lab (§5.64)
 // A setup link (#setup?…) is read and removed before any of this (src/app/setup.ts).
 import { isId } from '../study/ids.ts';
@@ -102,7 +104,9 @@ export type Mode =
   /** The variation checklists (§5.130): every repertoire study's, with `sid` (and `side`) unfolded. */
   | { name: 'checklists'; sid?: string; side?: 'white' | 'black' }
   /** A checklist line of a study's side, by its moves from the start (UCI), drilled at a preset (§5.62, §5.130). */
-  | { name: 'checklist'; sid: string; side: 'white' | 'black'; line: string[]; preset: 'easy' | 'medium' | 'hard' };
+  | { name: 'checklist'; sid: string; side: 'white' | 'black'; line: string[]; preset: 'easy' | 'medium' | 'hard' }
+  /** The theoretical endgames (§5.145); with `id`, one played for its goal. */
+  | { name: 'endgames'; id?: string };
 
 /** A page the analysis board was opened from and goes back to: any but the board itself. */
 export type BackMode = Exclude<Mode, { name: 'analysis' }>;
@@ -144,6 +148,8 @@ export function pageOf(mode: Mode): string {
       return mode.id ? `game ${mode.id}` : 'games';
     case 'history':
       return `history ${mode.id}`;
+    case 'endgames':
+      return mode.id ? `endgame ${mode.id}` : 'endgames';
     case 'coverage':
       return `coverage ${mode.sid}`;
     default:
@@ -221,6 +227,8 @@ export function parseHash(hash: string): Mode {
   if (parts.length === 1 && parts[0] === 'migrate') return { name: 'migrate' };
   if (parts.length === 1 && parts[0] === 'repertoire-check') return { name: 'repCheck' };
   if (parts.length === 1 && parts[0] === 'progress') return { name: 'progress' };
+  if (parts[0] === 'endgames' && parts.length === 1) return { name: 'endgames' };
+  if (parts[0] === 'endgames' && parts.length === 2 && /^[a-z0-9-]{1,40}$/.test(parts[1]!)) return { name: 'endgames', id: parts[1]! };
   if (parts[0] === 'checklist') {
     const side = /(?:^|&)side=(white|black)(?:&|$)/.exec(query)?.[1] as 'white' | 'black' | undefined;
     if (parts.length === 1) {
@@ -347,6 +355,8 @@ export function modeHash(mode: Mode): string {
       return '#/repertoire-check';
     case 'progress':
       return '#/progress';
+    case 'endgames':
+      return mode.id ? `#/endgames/${mode.id}` : '#/endgames';
     case 'checklists':
       return mode.sid ? `#/checklist?sid=${mode.sid}${mode.side ? `&side=${mode.side}` : ''}` : '#/checklist';
     case 'checklist':

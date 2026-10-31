@@ -31,6 +31,7 @@ import { readSaved, resumable, type Saved } from '../core/games/resume.ts';
 import { covered, scanCandidate, tacticCandidates, TACTIC, type DetectedTactic, type Pv } from '../core/games/detect.ts';
 import type { Color } from '../core/games/record.ts';
 import { historyCard, practiceCard } from '../core/progress/cards.ts';
+import { ENDGAME_PRESET, GOAL_CP, held, keepsGoal, materialFor, pressingMove, slips, wonAfter, type Endgame } from '../core/endgames/endgames.ts';
 import type { Grade } from '../core/progress/events.ts';
 import { positionOf } from '../core/storm/walk.ts';
 import { onWorker, postToWorker } from './explorer.ts';
@@ -88,7 +89,8 @@ export function setPracticeFeedback(on: boolean): void {
 export const showsFeedback = (s: PracticeSetup, on: boolean): boolean => !s.silent && (s.kind !== 'practice' || on);
 
 export interface PracticeSetup {
-  kind: 'practice' | 'advantage' | 'checklist';
+  /** `endgame` (§5.145): a theoretical endgame against Stockfish, each move judged for its goal. */
+  kind: 'practice' | 'advantage' | 'checklist' | 'endgame';
   fen: string;
   /** The user's side. */
   color: Color;
@@ -104,6 +106,8 @@ export interface PracticeSetup {
   leaf?: PositionKey;
   /** The positions before `fen` (a checklist's lead-up from the start), by key, for the repetition draw. */
   before?: string[];
+  /** The endgame drilled (kind `endgame`). */
+  endgame?: Endgame;
   /** Told the grade (an advantage card) once the game ends. */
   onEnd?(grade: Grade | undefined): void;
 }
@@ -120,8 +124,8 @@ export interface PracticeMove extends PlayedMove {
   judging?: boolean;
 }
 
-/** `draw` is insufficient material; `repetition` and `fifty` the rules' draws; `agreed` a draw offered and accepted. */
-export type EndReason = 'mate' | 'mated' | 'stalemate' | 'draw' | 'repetition' | 'fifty' | 'agreed' | 'claim' | 'collapse' | 'stopped' | 'interrupted';
+/** `draw` is insufficient material; `repetition` and `fifty` the rules' draws; `agreed` a draw offered and accepted; `goal` an endgame's goal reached (a pawn queened, a bare king, a draw held). */
+export type EndReason = 'mate' | 'mated' | 'stalemate' | 'draw' | 'repetition' | 'fifty' | 'agreed' | 'claim' | 'collapse' | 'stopped' | 'interrupted' | 'goal';
 
 export interface PracticeGame {
   gen: number;
@@ -151,6 +155,13 @@ export interface PracticeGame {
   premove?: { from: string; to: string };
   /** A draw offered at the position after `at` moves: the opponent answering, or declined there. */
   drawOffer?: { at: number; state: 'pending' | 'declined' };
+  /**
+   * An endgame's move that threw its goal away (§5.145): the game waits for Take back (or Play on),
+   * the move that kept it ready to show.
+   */
+  slip?: { at: number; uci?: string; san?: string };
+  /** This endgame try already counted as missed (a slip, a hint): nothing more is recorded for it. */
+  failed?: boolean;
 }
 
 export const practice = signal<PracticeGame | undefined>(undefined);
@@ -200,6 +211,28 @@ function explorerGames(fen: string, o: Opponent): Promise<PracticeReply | null> 
     waiting.set(id, (r) => (clearTimeout(timer), resolve(r)));
     postToWorker({ type: 'practiceGames', id, fen, speeds: o.speeds, ratings: o.ratings } satisfies ToWorker);
   });
+}
+
+/**
+ * An endgame's opponent (§5.145): Stockfish's best at the judges' depth, the defence of a win; the
+ * attacker against a draw presses, never simply giving material away (`pressingMove`).
+ */
+async function endgameReply(fen: string, goal: 'win' | 'draw'): Promise<{ uci: string; source: string; dbFailed: boolean } | undefined> {
+  const pos = positionOf(fen);
+  if (!pos) return undefined;
+  const a = await search(fen, goal === 'draw' ? 3 : 1, narrow() ? 16 : 18, 6000);
+  const lines = (a?.lines ?? []).filter((l) => l.pv.length).map((l) => ({ cp: moverScore(l.score, pos.turn), pv: l.pv }));
+  const material = (pv: readonly string[]) => {
+    const p = pos.clone();
+    for (const uci of pv) {
+      const m = parseUciMove(p, uci);
+      if (!m) return undefined;
+      p.play(m);
+    }
+    return materialFor(p, pos.turn);
+  };
+  const best = goal === 'draw' ? pressingMove(lines, material) : lines[0]?.pv[0];
+  return best ? { uci: best, source: 'Stockfish', dbFailed: false } : undefined;
 }
 
 /** The opponent's move: the database, then Maia, then Stockfish; undefined when none answers. */
@@ -383,7 +416,7 @@ export function takeUpPractice(entry: string): boolean {
   }
   if (p.phase === 'over') return true;
   // Played on from where it was left, from memory: a game of a move or none isn't kept on the device.
-  resumePractice({ savedAt: Date.now(), game: { setup: p.setup, moves: p.moves, track: p.track, claim: p.claim, ...(p.source ? { source: p.source } : {}), ...(p.repIgnored ? { repIgnored: true } : {}), ...(p.tried ? { tried: p.tried } : {}) } });
+  resumePractice({ savedAt: Date.now(), game: { setup: p.setup, moves: p.moves, track: p.track, claim: p.claim, ...(p.source ? { source: p.source } : {}), ...(p.repIgnored ? { repIgnored: true } : {}), ...(p.tried ? { tried: p.tried } : {}), ...(p.failed ? { failed: true } : {}), ...(p.slip ? { slip: p.slip } : {}) } });
   return true;
 }
 
@@ -399,6 +432,9 @@ interface SavedGame {
   source?: string;
   repIgnored?: boolean;
   tried?: PracticeGame['tried'];
+  /** An endgame's try missed already, and its slip waiting (kept in memory only: endgames aren't saved). */
+  failed?: boolean;
+  slip?: PracticeGame['slip'];
 }
 const isSavedGame = (g: unknown): g is SavedGame => {
   const o = g as SavedGame | null;
@@ -450,17 +486,26 @@ export function resumePractice(s: Saved<SavedGame>): void {
     ...(g0.source ? { source: g0.source } : {}),
     ...(g0.repIgnored ? { repIgnored: true } : {}),
     ...(g0.tried ? { tried: g0.tried } : {}),
+    ...(g0.failed ? { failed: true } : {}),
+    ...(g0.slip ? { slip: g0.slip } : {}),
   };
+  // An endgame waits on its last move's judge (a slip stops it there), and on Take back after a slip.
+  const lastJudging = g0.setup.kind === 'endgame' && opponentToMove && g0.moves.at(-1)?.judging ? g0.moves.length - 1 : -1;
   g0.moves.forEach((m, i) => {
-    if (m.judging) void judgeAt(g, i).then(() => claimCheck(g, i));
+    if (!m.judging) return;
+    const job = judgeAt(g, i);
+    if (i === lastJudging) void endgameMove(g, i, job);
+    else void job.then(() => claimCheck(g, i));
   });
-  if (opponentToMove) void opponentTurn(g);
+  if (opponentToMove && !g0.slip && lastJudging < 0) void opponentTurn(g);
 }
 
 // Saved at every change of a game in play; cleared when it ends.
 effect(() => {
   const p = practice.value;
   if (!p || p.gen < 0) return;
+  // An endgame's try is short and graded from its start: never kept to resume (§5.145).
+  if (p.setup.kind === 'endgame') return;
   if (p.phase === 'over') return clearSaved();
   if (!p.moves.length) return;
   const { onEnd: _onEnd, ...setup } = p.setup;
@@ -484,7 +529,7 @@ export async function practiceMove(uci: string): Promise<void> {
   const key = keyFen(before)?.key;
   // The repertoire check, practising from a position or in a checklist's drill (past its line's end
   // too): the move taken back, the first one tried remembered. An advantage drill is graded as played.
-  if (p.setup.kind !== 'advantage' && key) {
+  if (p.setup.kind !== 'advantage' && p.setup.kind !== 'endgame' && key) {
     const check = repertoireCheck(repertoireEntries(key), { uci, san: after.san }, !!p.repIgnored);
     if (check.refuse) {
       patch(g, (q) => ({ deviation: { san: after.san, uci, repUci: check.uci, repSan: check.san ?? check.uci }, ...(q.tried?.key === key ? {} : { tried: { key, san: after.san, uci } }) }));
@@ -501,6 +546,7 @@ export async function practiceMove(uci: string): Promise<void> {
   });
   if (!next) return;
   const job = judgeAt(g, i);
+  if (p.setup.kind === 'endgame') return endgameMove(g, i, job);
   // An advantage drill waits for the judge: a collapse ends it before the opponent answers.
   if (p.setup.kind === 'advantage') {
     await job;
@@ -541,7 +587,7 @@ export function takeBack(): void {
   let claim = false;
   for (const m of moves)
     if (m.isUser && m.afterCp !== undefined) ({ track, claim } = trackAdvantage(track, m.afterCp, m.wpDrop ?? 0, false));
-  const { deviation: _d, hint: _h, premove: _p, drawOffer: _o, ...rest } = p;
+  const { deviation: _d, hint: _h, premove: _p, drawOffer: _o, slip: _s, ...rest } = p;
   const lastSource = [...moves].reverse().find((m) => !m.isUser)?.source;
   const next: PracticeGame = { ...rest, gen: g, moves, phase: 'user', track, claim, judged: !moves.some((m) => m.judging) };
   if (lastSource) next.source = lastSource;
@@ -559,7 +605,7 @@ export function takeBack(): void {
 /** The Claim Victory count, as each move's judge comes in (a game not drilled for an advantage). */
 function claimCheck(g: number, i: number): void {
   const q = practice.peek();
-  if (!q || q.gen !== g || q.phase === 'over') return;
+  if (!q || q.gen !== g || q.phase === 'over' || q.setup.kind === 'endgame') return;
   const mv = q.moves[i];
   if (mv?.afterCp === undefined) return;
   const t = trackAdvantage(q.track, mv.afterCp, mv.wpDrop ?? 0, false);
@@ -583,7 +629,7 @@ async function opponentTurn(g: number): Promise<void> {
   const p = practice.peek();
   if (!p || p.gen !== g || p.phase !== 'opponent') return;
   const fen = fenAfter(p);
-  const m = await opponentMove(fen, p.setup.opponent);
+  const m = p.setup.kind === 'endgame' ? await endgameReply(fen, p.setup.endgame!.goal) : await opponentMove(fen, p.setup.opponent);
   const q = practice.peek();
   if (!q || q.gen !== g || q.phase !== 'opponent') return;
   if (!m) return void finish(g, 'interrupted');
@@ -654,14 +700,16 @@ export function ignoreRepertoire(): void {
 /** The hint (practising from a position): the piece first, then the move; the repertoire's move, else Stockfish's. */
 export async function practiceHint(): Promise<void> {
   const p = practice.peek();
-  if (!p || p.phase !== 'user' || p.setup.kind !== 'practice') return;
+  if (!p || p.phase !== 'user' || (p.setup.kind !== 'practice' && p.setup.kind !== 'endgame')) return;
   const fen = fenAfter(p);
   const g = p.gen;
   if (p.hint?.fen === fen) {
     if (p.hint.level === 1 && p.hint.uci) patch(g, () => ({ hint: { ...p.hint!, level: 2 } }));
     return;
   }
-  const key = keyFen(fen)?.key;
+  // An endgame's hint is Stockfish's, and the try counts as missed, as a hint does in training (§5.2).
+  if (p.setup.kind === 'endgame') endgameMiss(g, 'loss');
+  const key = p.setup.kind === 'endgame' ? undefined : keyFen(fen)?.key;
   const rep = key ? repertoireEntries(key)?.[0]?.uci : undefined;
   patch(g, () => ({ hint: { fen, level: 1, ...(rep ? { uci: rep } : {}) } }));
   if (rep) return;
@@ -683,7 +731,7 @@ export function claimVictory(): void {
 }
 
 /** Whether a draw can be offered: the user to move in a game from a position or a checklist's drill, not already offered here. */
-export const canOfferDraw = (p: PracticeGame): boolean => p.setup.kind !== 'advantage' && p.phase === 'user' && p.drawOffer?.at !== p.moves.length;
+export const canOfferDraw = (p: PracticeGame): boolean => p.setup.kind !== 'advantage' && p.setup.kind !== 'endgame' && p.phase === 'user' && p.drawOffer?.at !== p.moves.length;
 
 /**
  * Offer draw (the owner's request, 2026-10-30): the opponent answers once the judges are in and the
@@ -716,6 +764,7 @@ const lastAfterCp = (p: PracticeGame) => [...p.moves].reverse().find((m) => m.is
 function finish(g: number, reason: EndReason): void {
   const p = practice.peek();
   if (!p || p.gen !== g || p.phase === 'over') return;
+  if (p.setup.kind === 'endgame') return finishEndgame(p, reason);
   const userCp = lastAfterCp(p);
   // A checklist drill stopped is given up: a loss, whatever the eval (it is won only by mate or a
   // claim), and counted on the line's chip (the owner's request, 2026-10-31).
@@ -746,7 +795,7 @@ function finish(g: number, reason: EndReason): void {
   });
 }
 
-const OUTCOME: Record<EndReason, 'win' | 'draw' | 'loss' | 'stopped' | 'ended'> = { mate: 'win', claim: 'win', mated: 'loss', collapse: 'loss', stalemate: 'draw', draw: 'draw', repetition: 'draw', fifty: 'draw', agreed: 'draw', stopped: 'stopped', interrupted: 'ended' };
+const OUTCOME: Record<EndReason, 'win' | 'draw' | 'loss' | 'stopped' | 'ended'> = { mate: 'win', claim: 'win', mated: 'loss', collapse: 'loss', stalemate: 'draw', draw: 'draw', repetition: 'draw', fifty: 'draw', agreed: 'draw', stopped: 'stopped', interrupted: 'ended', goal: 'win' };
 
 async function writeHistory(g: number, reason: EndReason, result: 'win' | 'draw' | 'loss', finalCp: number | null): Promise<void> {
   const p = practice.peek();
@@ -758,6 +807,86 @@ async function writeHistory(g: number, reason: EndReason, result: 'win' | 'draw'
   if (!entry) return;
   patch(g, () => ({ historyId: id }));
   await recordEvent({ t: new Date().toISOString(), k: 'played', card: historyCard(id), game: { ...entry } });
+}
+
+/* ------------------------------------------------------------------ endgames (§5.145) */
+
+/**
+ * An endgame's move, once judged: one that throws the goal away waits for Take back (the try
+ * counted as missed); else the game ends where the goal is reached (mate, the pawn queened, a
+ * bare king, the draw held) or by the rules, or the defence answers.
+ */
+async function endgameMove(g: number, i: number, job: Promise<void>): Promise<void> {
+  await job;
+  const q = practice.peek();
+  if (!q || q.gen !== g || q.phase === 'over') return;
+  const e = q.setup.endgame!;
+  const mv = q.moves[i]!;
+  if (mv.afterCp === undefined || mv.bestCp === undefined) return void finish(g, 'interrupted');
+  if (slips(e.goal, mv.bestCp, mv.afterCp)) {
+    const keep = mv.bestMoveUci || undefined;
+    const san = keep ? played(mv.fenBefore, keep)?.san : undefined;
+    patch(g, () => ({ slip: { at: i, ...(keep ? { uci: keep } : {}), ...(san ? { san } : {}) } }));
+    endgameMiss(g, e.goal === 'win' && mv.afterCp > -GOAL_CP.win ? 'draw' : 'loss');
+    return;
+  }
+  const end = endOf(q, true);
+  if (end) return void finish(g, end);
+  const after = positionOf(mv.fen);
+  const userMoves = q.moves.filter((m) => m.isUser).length;
+  if (after && keepsGoal(e.goal, mv.afterCp) && (wonAfter(e, after, mv.uci.length === 5) || held(e, userMoves))) return void finish(g, 'goal');
+  setTimeout(() => void opponentTurn(g), 500);
+}
+
+/** The endgame's try counted as missed, once: a `practice` event at its start with the preset `endgame`. */
+function endgameMiss(g: number, res: 'draw' | 'loss'): void {
+  const p = practice.peek();
+  if (!p || p.gen !== g || p.setup.kind !== 'endgame' || p.failed) return;
+  patch(g, () => ({ failed: true }));
+  recordEndgame(p, res);
+}
+
+function recordEndgame(p: PracticeGame, res: 'win' | 'draw' | 'loss'): void {
+  const key = keyFen(p.setup.fen)?.key;
+  if (!key) return;
+  const cp = lastAfterCp(p);
+  const white = cp === undefined ? undefined : p.setup.color === 'white' ? cp : -cp;
+  void recordEvent({ t: new Date().toISOString(), k: 'practice', card: practiceCard(key), res, preset: ENDGAME_PRESET, ...(white !== undefined ? { cp: Math.round(white) } : {}), mv: p.moves.filter((m) => m.isUser).length });
+}
+
+/** An endgame's end: its result as the game's, recorded when the try hasn't been already. No history entry, no tactic scan. */
+function finishEndgame(p: PracticeGame, reason: EndReason): void {
+  const e = p.setup.endgame!;
+  const result: 'win' | 'draw' | 'loss' = reason === 'goal' ? (e.goal === 'win' ? 'win' : 'draw') : reason === 'mate' ? 'win' : isDraw(reason) ? 'draw' : 'loss';
+  const { slip: _s, ...rest } = p;
+  practice.value = { ...rest, phase: 'over', end: { reason, result }, claim: false };
+  const userMoves = p.moves.filter((m) => m.isUser).length;
+  if (!p.failed && reason !== 'interrupted' && userMoves > 0) recordEndgame(p, result);
+}
+
+/** After a slip, the game played on as it is (the try is missed already): the defence answers. */
+export function playOnAfterSlip(): void {
+  const p = practice.peek();
+  if (!p?.slip || p.phase === 'over') return;
+  const g = p.gen;
+  const next = replace(g, (q) => {
+    const { slip: _s, ...rest } = q;
+    return rest;
+  });
+  const end = next && endOf(next, true);
+  if (end) return finish(g, end);
+  void opponentTurn(g);
+}
+
+/** After a slip, the move taken back and the one that kept the goal shown, as a hint's arrow. */
+export function showSlipMove(): void {
+  const p = practice.peek();
+  const s = p?.slip;
+  const fen = s && p.moves[s.at]?.fenBefore;
+  if (!p || !s) return;
+  takeBack();
+  const q = practice.peek();
+  if (q && fen && s.uci) patch(q.gen, () => ({ hint: { fen, level: 2, uci: s.uci! } }));
 }
 
 /* ------------------------------------------------------------------ the review */

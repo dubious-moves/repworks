@@ -57,7 +57,7 @@ const progressLog = (git: FakeGit) =>
 
 test('deviations, gaps and a dismissal; a relapse rescheduled; a chapter opened from a deviation', async ({ page }) => {
   const git = await setUp(page);
-  await page.getByRole('link', { name: 'Games' }).click();
+  await page.getByRole('link', { name: 'Games', exact: true }).click();
   await page.getByRole('button', { name: 'Refresh' }).click();
   await expect(page.getByTestId('games-status')).toContainText('Gist: 4 games read');
   // The newer game met the reviewed position with the same mistake: relapsed, and rescheduled.

@@ -17,6 +17,8 @@ import { MigrateScreen } from './Migrate.tsx';
 import { HistoryScreen, PracticeScreen } from './Practice.tsx';
 import { RepertoireCheckScreen } from './RepertoireCheck.tsx';
 import { ChecklistDrill, ChecklistScreen } from './Checklist.tsx';
+import { EndgamesScreen } from './Endgames.tsx';
+import { endgameStandings } from '../app/endgames.ts';
 import { Debug } from './Debug.tsx';
 import { Guard } from './Guard.tsx';
 import { IdeasScreen } from './Ideas.tsx';
@@ -42,7 +44,7 @@ import { confirmDeleteStudy, openNewStudy, openStudySettings, StudyDialogs } fro
 
 export function App() {
   return (
-    <div class={`shell${mode.value.name === 'chapter' || mode.value.name === 'analysis' ? ' shell-chapter' : ''}${['train', 'learn', 'practice', 'show', 'difficult', 'ideas', 'read', 'play', 'storm', 'gamesReview', 'playOn', 'history', 'checklist'].includes(mode.value.name) || (mode.value.name === 'games' && !!mode.value.id) ? ' shell-train' : ''}`}>
+    <div class={`shell${mode.value.name === 'chapter' || mode.value.name === 'analysis' ? ' shell-chapter' : ''}${['train', 'learn', 'practice', 'show', 'difficult', 'ideas', 'read', 'play', 'storm', 'gamesReview', 'playOn', 'history', 'checklist'].includes(mode.value.name) || (mode.value.name === 'games' && !!mode.value.id) || (mode.value.name === 'endgames' && !!mode.value.id) ? ' shell-train' : ''}`}>
       <header class="topbar">
         <img class="topbar-icon" src={`${import.meta.env.BASE_URL}icons/icon.svg`} alt="" width={28} height={28} />
         <h1>Repworks</h1>
@@ -198,6 +200,8 @@ function Screen() {
       return <ChecklistDrill key={`${mode.value.sid}/${mode.value.side}/${mode.value.line.join(',')}/${mode.value.preset}`} sid={mode.value.sid} side={mode.value.side} line={mode.value.line} preset={mode.value.preset} />;
     case 'checklists':
       return <ChecklistScreen {...(mode.value.sid ? { sid: mode.value.sid } : {})} {...(mode.value.side ? { side: mode.value.side } : {})} />;
+    case 'endgames':
+      return <EndgamesScreen {...(mode.value.id ? { id: mode.value.id } : {})} />;
     case 'list':
       return <Home />;
   }
@@ -230,6 +234,7 @@ function Home() {
           <a class="button secondary" href="#/games">
             Games
           </a>
+          <EndgamesLink />
           <a class="button secondary" href="#/analysis">
             Analysis board
           </a>
@@ -257,6 +262,17 @@ function Home() {
         <Debug />
       </Guard>
     </>
+  );
+}
+
+/** Endgames (§5.145), with how many are due: none tried yet says nothing more. */
+function EndgamesLink() {
+  const standings = [...endgameStandings(decidingNow()).values()];
+  const due = standings.filter((s) => s.state === 'due').length;
+  return (
+    <a class="button secondary" href="#/endgames" title="The theoretical endgames, each played for its goal against Stockfish">
+      Endgames{due > 0 && <span class="home-tool-count"> · {due} due</span>}
+    </a>
   );
 }
 

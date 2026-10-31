@@ -14,6 +14,7 @@ import { dismissCard, gameCard } from '../core/progress/cards.ts';
 import { gameRows, gamesPrefs, itemsOf, playedOf, practiceHistory, savedDeck } from './games.ts';
 import { recordEvent } from './state.ts';
 import { trainData } from './train.ts';
+import { ENDGAME_PRESET } from '../core/endgames/endgames.ts';
 
 /** The checklist's presets (§5.62), for the bot lens's buckets. */
 export const PRESET_NAMES = ['easy', 'medium', 'hard'] as const;
@@ -66,7 +67,7 @@ export const practiceResults = computed<(PracticeResult & { t: number })[]>(() =
 });
 
 /** The bot lens (§5.60): practice results by position and preset. */
-export const botSpots = computed(() => botWeakSpots(practiceResults.value, PRESET_NAMES));
+export const botSpots = computed(() => botWeakSpots(practiceResults.value.filter((r) => r.preset !== ENDGAME_PRESET), PRESET_NAMES));
 
 /* ------------------------------------------------------------------ recidivism (§5.59) */
 

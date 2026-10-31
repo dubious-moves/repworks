@@ -136,7 +136,7 @@ async function play(page: Page, uci: string) {
 
 test('games read from the Gist and Lichess, a game opened, the day’s cards answered and synced', async ({ page }) => {
   const w = await setUp(page);
-  await page.getByRole('link', { name: 'Games' }).click();
+  await page.getByRole('link', { name: 'Games', exact: true }).click();
   await expect(page).toHaveURL(/#\/games$/);
   await page.getByRole('button', { name: 'Refresh' }).click();
   await expect(page.getByTestId('games-status')).toContainText('Gist: 3 games read, 3 new or changed.');
@@ -270,7 +270,7 @@ test('games read from the Gist and Lichess, a game opened, the day’s cards ans
 
 test('a mistake made into a sequence on the analysis board, checked, saved in its place and drilled (§5.56)', async ({ page }) => {
   const w = await setUp(page);
-  await page.getByRole('link', { name: 'Games' }).click();
+  await page.getByRole('link', { name: 'Games', exact: true }).click();
   await page.getByRole('button', { name: 'Refresh' }).click();
   await expect(page.getByTestId('games-queue')).toContainText('0 due · 3 new today');
   await page.getByTestId('game-row').filter({ hasText: 'Blackburne' }).click();
@@ -318,7 +318,7 @@ test('a mistake made into a sequence on the analysis board, checked, saved in it
 
 test('the games’ own explorer: moves and results by position, the list filtered, the opening name (§6)', async ({ page }) => {
   await setUp(page);
-  await page.getByRole('link', { name: 'Games' }).click();
+  await page.getByRole('link', { name: 'Games', exact: true }).click();
   await page.getByRole('button', { name: 'Refresh' }).click();
   await expect(page.getByTestId('games-count')).toHaveText('4 of 4');
   const ex = page.getByTestId('games-explorer');
@@ -352,7 +352,7 @@ test('the games’ own explorer: moves and results by position, the list filtere
 
 test('Hide time trouble: the mistake marked, then left out of the counts and the game cards, kept on the device (§6)', async ({ page }) => {
   await setUp(page);
-  await page.getByRole('link', { name: 'Games' }).click();
+  await page.getByRole('link', { name: 'Games', exact: true }).click();
   await page.getByRole('button', { name: 'Refresh' }).click();
   await expect(page.getByTestId('games-queue')).toContainText('0 due · 3 new today');
   const qgd = page.getByTestId('game-row').filter({ hasText: 'Queen’s Gambit Declined' });
@@ -366,7 +366,7 @@ test('Hide time trouble: the mistake marked, then left out of the counts and the
   await expect(qgd).toContainText('—');
   // Kept (the setting is this device's; the test's start script writes the settings on every load, so no reload here).
   await page.evaluate(() => (location.hash = '#/'));
-  await page.getByRole('link', { name: 'Games' }).click();
+  await page.getByRole('link', { name: 'Games', exact: true }).click();
   await expect(chip).toBeChecked();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('repworks-games') ?? '{}').filters?.hideTimeTrouble)).toBe(true);
   await expect(page.getByTestId('games-queue')).toContainText('0 due · 2 new today');
@@ -376,7 +376,7 @@ test('Hide time trouble: the mistake marked, then left out of the counts and the
 
 test('a note on a game card: written on its position with a line and an arrow, shown once answered, its line on the board, synced (§5.91)', async ({ page }) => {
   const w = await setUp(page);
-  await page.getByRole('link', { name: 'Games' }).click();
+  await page.getByRole('link', { name: 'Games', exact: true }).click();
   await page.getByRole('button', { name: 'Refresh' }).click();
   await expect(page.getByTestId('games-count')).toHaveText('4 of 4');
   await page.getByRole('link', { name: 'Review' }).click();

@@ -7,7 +7,7 @@ where the build differed). What remains is live: the spike's re-run (§4.2), the
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
 with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
-for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Storm positions shared between devices through the data repo, and an overnight gather (§5.102), are built (2026-10-12). Lc0 on the study page, its pick among close moves (§5.143), is built (2026-10-31). Read with `DECISIONS.md`, which this plan updates (its
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Storm positions shared between devices through the data repo, and an overnight gather (§5.102), are built (2026-10-12). Lc0 on the study page, its pick among close moves (§5.143), is built (2026-10-31). Endgames, the theoretical endgames each played for its goal against Stockfish (§5.145), are built (2026-10-31). Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -7943,3 +7943,106 @@ with fake ports: who is asked where, the database failing, the game over, no mov
 desktop and the emulated phone (the real Lc0 and Maia, a fake explorer: the download, 4. Nxd4 from
 the games, Lc0's moves, Maia's where no games, Stop, the same line again, added to the chapter).
 Live: TESTING.md.
+
+#### 5.145 Endgames: the theoretical endgames, each played for its goal (2026-10-31)
+
+The owner's request of 2026-10-31 was open: "Improve repworks … whatever you think is best for user
+experience and chess improvement." The site trains the repertoire, tactics and intuition (the
+storm, puzzles), the owner's own mistakes and practice games, but not the endgame: nothing teaches
+the positions every player needs to know by hand, and a game played on from a position stops being
+about technique once Maia or the database answers. This adds that, built on the practice game.
+
+- **Where**: Home → "Endgames" (with "· n due" once some are due), `#/endgames`: ten positions in
+  four groups (mating the bare king; king and pawns; rook endings; queen against pawn), each a small
+  board, its task ("White to play and win (queen a pawn)", "Black to play and draw (hold 15
+  moves)") and where it stands ("New", "Due · missed last time", "Solved 3 times running · back in
+  6 days", and the last five tries as ✓ ✗); "Next due" / "Next new" at the top. `#/endgames/<id>`
+  plays one.
+- **The game**: a practice game of a new kind, `endgame`, from the position, the user's side the
+  side to move. The opponent is **Stockfish alone** at the judges' depth (18, 16 on a phone):
+  neither the database nor Maia, which answer as people do, not as a defence. Every move of the
+  user's is judged as practice judges (§5.57, with §5.136's deeper second search for a move told
+  bad), and **the opponent waits for the judge**, as in an advantage drill.
+- **The goal, move by move** (`core/endgames/endgames.ts`): a win is kept while the user's score
+  is +2 or better, a draw while it is −2 or better (`GOAL_CP`). A move that takes the score from
+  kept to lost **stops the game**: "Kd2 lets the win slip. Take it back and find a better move." (":
+  stalemate" when it is, ": the fifty-move rule comes first" when the clock is past 35 moves), with
+  Take back, "Show a move that keeps it" (taken back, Stockfish's move as the hint's arrow) and Play
+  on. A slower win is never a slip: technique has many right moves.
+- **The end**: a win at mate, at a promotion that keeps it (`until: 'promote'`), or at the
+  defender's bare king (`'bare'`, queen against pawn); a draw once held for its moves (`hold`) or
+  by the rules (stalemate, material, repetition, fifty moves). The rules' draw in a win is a miss.
+  Restart and Stop give a try up. The fifty-move count shows in a win once 30 moves have passed
+  without a capture or a pawn move.
+- **The attacker against a draw presses** (`pressingMove`): in a drawn position every move scores
+  about 0.00, and Stockfish's first line was often one that gave its pawn away (the simulation
+  below: 7.e6+ Kxe6 ended "Hold with the opposition" on move 7). It plays the first of its three
+  lines within 0.30 of the best whose next two plies give no material away.
+- **What counts** (as everywhere in training, the first answer, §5.73): a try's first slip, a
+  hint (Stockfish's, H: the piece then the move) or giving up counts it missed; reached without
+  any, solved. A try counts once: after a slip, the rest is practice. The result is a `practice`
+  event at the start's position with `preset: "endgame"` (§5.57's, so no new data format): `res`
+  the game's (a win let go is `draw`, a draw lost `loss`), `cp` and `mv` as practice writes them.
+  The bot lens of the weak spots (§5.60) leaves them out; no history entry, no tactic scan.
+- **Spacing**: a solved endgame comes back after 1, 3, 7, 14, 30 and 60 days by its solves in a
+  row; a missed one is due at once. "Next" takes the first due in the list's order, else the first
+  never tried.
+- **The method**: each position carries a few sentences of method (written here from standard
+  endgame theory; no course content), open before a first try and folded after.
+
+**The positions, checked** (2026-10-31, the vendored Stockfish 18 lite under Node,
+`scripts/ideas/engine.ts`; every legal first move scored, depth 16, Lucena 18; scores for the side
+to move):
+
+| Endgame | Start | Goal | The good first moves | The rest |
+| --- | --- | --- | --- | --- |
+| Queen mate | `8/8/8/4k3/8/8/8/3QK3 w` | win, mate | 18 of 21: mate found or +42 to +61 | Qd4+, Qd5+, Qd6+ hang the queen: 0.00 |
+| Rook mate | `8/8/8/4k3/8/8/8/R3K3 w` | win, mate | all 15: +4.4 to +8.2 | (a hung rook or stalemate later) |
+| King in front of the pawn | `5k2/8/8/8/3KP3/8/8/8 w` | win, queen | Kd5 +64.8 | 7 moves 0.00 |
+| Take the opposition | `8/8/8/4k3/8/3K4/4P3/8 w` | win, queen | Ke3 +42.4 | 6 moves 0.00 |
+| Hold with the opposition | `4k3/8/8/4K3/4P3/8/8/8 b` | draw, 12 | Ke7 −0.09 | 4 moves −10.9 to −12.8 |
+| The breakthrough | `8/ppp4k/8/PPP5/8/8/8/7K w` | win, queen | b6 +5.65 | king moves 0.00; a6, c6 −6.4, −7.0 |
+| Two goals at once (Réti) | `7K/8/k1P5/7p/8/8/8/8 w` | draw, 10 | Kg7 −0.23 | 3 moves −10.8 to −12.5 |
+| Lucena | `1K1k4/1P6/8/8/8/8/r7/2R5 w` | win, queen | 12 moves +4.5 to +6.3 | Ra1 0.00, Rc2 −6.7 |
+| Philidor | `4k3/R7/8/4PK2/8/8/8/1r6 b` | draw, 15 | 10 moves −0.09 to −0.62 | 4 moves −4.2 to −4.4; Ra1, Rb7 −16.7, −17.2 |
+| Queen against a pawn on the 7th | `8/8/8/8/8/8/3pk3/K6Q w` | win, bare king | Qh2+, Qh5+, Qg2+, Qe4+ +10.5 to +13.0 | 15 moves 0.00; queen hangs −8.9 and worse |
+
+The king-and-pawn starts were found by a search over K+P against K positions for those with exactly
+one winning move (wins +40 and more, draws about 0.00 to +0.3: Stockfish 18 lite scores drawn K+P endings
+about +0.1 rather than a bitbase's 0.00, but it sees the queening within depth 16 here). Left out after the same checks: the two bishops' mate
+(scored only +2.5 at depth 16, too near the line), the queen against a bishop's pawn (the defending
+king stepping in front of its pawn scores −0.17: its loss, if any, is beyond the horizon), the wrong
+bishop and the outside passed pawn as first set (every move draws, or every move wins: no decision
+to drill). A tablebase (Lichess's) would judge every ending up to seven pieces exactly, but it is out
+of the cloud container's reach and would need the network; Stockfish is on the device.
+
+**The whole game, simulated** (`sim.ts`, the build session's scratch, not kept): each position
+played out twice at depth 16 with the app's own judge (`judge` as practice.ts runs it, then
+`slips`, `wonAfter`, `held`) against Stockfish's defence, the user's side playing the best move 70%
+of the time and another move that keeps the goal otherwise, and a bad move judged (not played) at
+about a third of its turns. **Not one good move was stopped** in 436 of the user's moves
+over 25 games, and 86 of the 93 bad moves judged were stopped; the other 7 came in the rook mate
+and the queen against a pawn with the fifty-move clock past 40 moves, where every move scores 0.00
+(the rule draws it) and the win was already gone. Every game reached its goal: the queen mate in
+11 and 15 moves, the rook mate in 50 (the other ran into the fifty-move rule after 53, the
+simulated user's random moves wandering), the queen against a pawn in 6 and 55 (Stockfish
+underpromoted to a knight with check, 8...d1=N+, after a slow queen move: the drill goes on until
+the knight falls too), the king in front in 35 and 15, the opposition in 22 and 19, the
+breakthrough in 3 and 4, Lucena in 12 and 14 (Rd1+ and the bridge on d4 both times), Philidor held
+15 moves twice, "Hold with the opposition" 12 and Réti 10, three games each. Before the pressing
+move those two ended on moves 7 and 6 with the attacker's last pawn gone (7.e6+ Kxe6 in the first).
+
+**As built** (2026-10-31): `src/core/endgames/endgames.ts` (the positions, `taskOf`, `GOAL_CP`,
+`keepsGoal`, `slips`, `wonAfter`, `held`, `solvedBy`, `standingOf`, `attemptsByEndgame`,
+`nextEndgame`, `materialFor`, `pressingMove`); in `src/app/practice.ts` the kind `endgame`
+(`endgameReply`, `endgameMove`, `endgameMiss`, `finishEndgame`, `playOnAfterSlip`,
+`showSlipMove`; the hint allowed and counted; no draw offer, no Claim victory, no repertoire check,
+not kept on the device to resume, its slip and miss carried through Analyse and ←);
+`src/app/endgames.ts`; `src/ui/Endgames.tsx`; the routes `#/endgames[/<id>]` in `fsm.ts`; the home's
+link. Tests: `test/unit/core/endgames/endgames.test.ts` (every position legal with the user to
+move, the tasks, the goal's line, the three ends, the spacing, the tries from practice results, the
+next one, the pressing move), the routes in `fsm.test.ts`, and `test/e2e/endgames.spec.ts` on
+desktop and the emulated phone (the list; Kd2 searched again and stopped, taken back, the keeping
+move's arrow, Ke3 and the answer, one event synced for the try, the list saying it is due; the
+breakthrough solved along Stockfish's line, the promotion, the event, "back tomorrow"). Live:
+TESTING.md.

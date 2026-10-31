@@ -1051,3 +1051,26 @@ q_extension (or give it to a session with q_extension attached), then run
   scored by Stockfish), the whole dialog by Playwright with the real Lc0 and Maia and a fake
   explorer (desktop and emulated phone), screenshots in headless Chromium. Not on your devices, not
   against Lc0 itself, and not against the real Lichess database.
+
+## Endgames (§5.145, 2026-10-31)
+
+- Home → Endgames: ten positions in four groups, "Next new: Queen mate". On the phone and the
+  desktop: are the small boards readable, and is the list the right length, or should it grow
+  (more rook endings, the two bishops, knight and bishop)?
+- Play a few, including one you know well: does Stockfish defend (and, in Philidor and "Hold with
+  the opposition", attack) the way you'd expect? Each of your moves is checked before Stockfish
+  answers: is the wait acceptable on the phone ("Checking your move…"; a move that looks bad is
+  searched again, up to 15 s)?
+- Throw a win away on purpose (e.g. Kd2 in "Take the opposition"): the game stops with "Kd2 lets
+  the win slip", Take back, "Show a move that keeps it" (its arrow), Play on. Is any good move ever
+  stopped as a slip? Say which, with the position: the line is +2 (a win) or −2 (a draw) on
+  Stockfish's search, and the drills were played out against it here without a false stop.
+- What counts: the first slip, a hint (H) or Restart counts the try as missed; reached cleanly,
+  "Solved first time", back in 1, 3, 7, 14, 30, 60 days. Is that spacing right for endgames?
+  After a sync, the other device's list shows the same standing.
+- The rook mate is long: past 30 moves without a capture or a pawn move the fifty-move count
+  shows; a win the rule would draw is stopped as a slip ("the fifty-move rule comes first").
+- Checked: the positions and the judge by Stockfish 18 lite under Node (every first move, and
+  each drill played out with the app's own judge), the pages by unit tests and Playwright with a
+  fake engine (desktop and emulated phone), screenshots in headless Chromium. Not on your devices,
+  and not with the real engine in the browser.
