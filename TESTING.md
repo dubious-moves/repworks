@@ -975,3 +975,16 @@ q_extension (or give it to a session with q_extension attached), then run
 - Checked: ChessDB's notes and `querypv` read live from the container, and the table built from
   live answers under Node; the rest by unit tests and Playwright with a fake ChessDB (desktop and
   emulated phone). Not in a browser against live ChessDB, and not on the owner's device.
+
+## Several chapters at once (2026-10-31)
+
+- Import (or add "From PGN") a file of several games into a study, so it makes a chapter per game.
+  Open ☰ → "Manage chapters…" (also "Chapters…" in Study settings, "Several chapters…" in Chapter
+  settings). On the desktop, click one box and shift-click another: every chapter between is
+  ticked. "Merge into one": the first ticked chapter keeps its name and gets every line of the
+  others, its main line still first; the others are gone. Train the study after: the merged lines'
+  moves should keep their progress (cards are per position).
+- Tick chapters for the wrong side and use "For White"/"For Black"; then delete a few at once
+  (asked first). Sync, and check the phone shows the same chapters.
+- Checked by unit tests and Playwright with the fake data repo (desktop and emulated phone); not
+  on a device.

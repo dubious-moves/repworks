@@ -203,6 +203,80 @@ test('a new chapter from a FEN, from pasted PGN and from a PGN file', async ({ p
   expect(added[3]).toContain('1. e4 d5 2. exd5 Qxd5 *');
 });
 
+test('several chapters at once: a PGN’s games turned, merged into one, and deleted (§5.140)', async ({ page }) => {
+  const git = await setUp(page);
+  await card(page, 'Test repertoire').getByRole('link', { name: 'Test repertoire', exact: true }).click();
+  await expect(page.locator('.notation')).toContainText('1. e4');
+  const options = page.getByLabel('Chapter', { exact: true }).locator('option');
+  const before = await options.allTextContents();
+
+  // A PGN of three games makes three chapters, as an import does.
+  await studyMenu(page, 'New chapter');
+  let dialog = page.getByRole('dialog', { name: 'New chapter' });
+  await dialog.getByLabel('Black').check();
+  await dialog.getByLabel('From PGN').check();
+  await dialog.getByLabel('PGN', { exact: true }).fill('[Event "Game A"]\n\n1. e4 c5 2. Nf3 d6 { Najdorf next } *\n\n[Event "Game B"]\n\n1. e4 c5 2. Nf3 Nc6 *\n\n[Event "Game C"]\n\n1. e4 c5 2. c3 Nf6 *\n');
+  await dialog.getByRole('button', { name: 'Create chapter' }).click();
+  await dialog.waitFor({ state: 'detached' });
+  await expect(options).toHaveText([...before, 'Game A', 'Game B', 'Game C']);
+
+  await studyMenu(page, 'Manage chapters');
+  dialog = page.getByRole('dialog', { name: 'Manage chapters' });
+  const box = (name: string) => dialog.getByRole('checkbox', { name: new RegExp(`^${name} `) });
+  await expect(dialog.getByText(`0 of ${before.length + 3} chapters chosen`)).toBeVisible();
+  // A shift-click ticks the run from the box clicked before.
+  await box('Game A').click();
+  await box('Game C').click({ modifiers: ['Shift'] });
+  await expect(box('Game B')).toBeChecked();
+  await expect(dialog.getByText(`3 of ${before.length + 3} chapters chosen`)).toBeVisible();
+
+  // Turned, then merged into the first of them, which opens.
+  await dialog.getByRole('button', { name: 'For White' }).click();
+  await expect(dialog.getByRole('status')).toHaveText('3 chapters for White.');
+  await expect(box('Game B')).toHaveAccessibleName('Game B White');
+  page.once('dialog', (d) => void d.accept());
+  await dialog.getByRole('button', { name: 'Merge into one' }).click();
+  await expect(dialog.getByRole('status')).toHaveText('Merged into “Game A”.');
+  await expect(box('Game B')).toHaveCount(0);
+  await expect(options).toHaveText([...before, 'Game A']);
+  await expect(page.getByLabel('Chapter', { exact: true })).toHaveValue(await options.last().getAttribute('value') as string);
+  await expect(page.locator('.cg-wrap')).toHaveClass(/orientation-white/);
+
+  // Deleting asks first; refused, nothing goes.
+  await box('Game A').click();
+  await box(before[0]!).click();
+  page.once('dialog', (d) => void d.dismiss());
+  await dialog.getByRole('button', { name: 'Delete 2 chapters' }).click();
+  await expect(options).toHaveText([...before, 'Game A']);
+  await dialog.getByRole('button', { name: 'Done' }).click();
+  await dialog.waitFor({ state: 'detached' });
+  await sync(page);
+  const files = git.textsOf();
+  const meta = JSON.parse(files.get('studies/Rep0Najd/study.json')!) as { chapters: string[] };
+  expect(meta.chapters).toHaveLength(before.length + 1);
+  const merged = files.get(`studies/Rep0Najd/${meta.chapters[before.length]!}.pgn`)!;
+  expect(merged).toContain('[Event "Game A"]');
+  expect(merged).toContain('[Orientation "white"]');
+  expect(merged).toContain('1. e4 c5 2. Nf3 (2. c3 Nf6) 2... d6 { Najdorf next } (2... Nc6) *');
+
+  // From the study's settings this time: ticked again, and deleted.
+  await studyMenu(page, 'Study settings');
+  await page.getByRole('dialog', { name: 'Study settings' }).getByRole('button', { name: 'Chapters…' }).click();
+  await box('Game A').click();
+  await box(before[0]!).click();
+  page.once('dialog', (d) => void d.accept());
+  await dialog.getByRole('button', { name: 'Delete 2 chapters' }).click();
+  await expect(dialog.getByRole('status')).toHaveText('2 chapters deleted.');
+  await expect(options).toHaveText(before.slice(1));
+  await dialog.getByRole('button', { name: 'Done' }).click();
+  await dialog.waitFor({ state: 'detached' });
+  await sync(page);
+  const after = git.textsOf();
+  expect(JSON.parse(after.get('studies/Rep0Najd/study.json')!)).toMatchObject({ chapters: meta.chapters.slice(1, before.length) });
+  expect(after.has(`studies/Rep0Najd/${meta.chapters[0]!}.pgn`)).toBe(false);
+  expect(after.has(`studies/Rep0Najd/${meta.chapters[before.length]!}.pgn`)).toBe(false);
+});
+
 test('a study renamed from its card, and deleted from its settings in the chapter view', async ({ page }) => {
   const git = await setUp(page);
   await card(page, 'Test repertoire').getByRole('button', { name: 'Settings of Test repertoire' }).click();

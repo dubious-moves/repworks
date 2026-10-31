@@ -2,13 +2,16 @@
 // study list; a study's settings (name, kind, delete) from its card's ⚙ or the ⚙ by its name in
 // the chapter view; a chapter's settings (name, side, order, delete) from the ⚙ by it in the
 // chapter list; and a new chapter from "+ New": empty, from a FEN, or from PGN pasted or read
-// from a file (a chapter per game). Each is a modal dialog, as Qchess's are.
+// from a file (a chapter per game); and several chapters at once (§5.140): deleted, given a side or
+// merged into one. Each is a modal dialog, as Qchess's are.
 import { signal } from '@preact/signals';
 import type { ComponentChildren } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { addChapter, chapter, type ChapterStart, deleteOpenChapter, doc, moveOpenChapter, renameOpenChapter, setSide, side, study } from '../app/editor.ts';
+import { chapterRows, joinChapters, removeChapters, turnChapters, type ChapterRow } from '../app/chapters.ts';
 import { mode, open } from '../app/mode.ts';
 import { changeStudy, newStudy, removeStudy } from '../app/studies.ts';
+import { dataVersion } from '../app/sync.ts';
 import { header, type StudyKind } from '../core/study/model.ts';
 
 type Side = 'white' | 'black';
@@ -21,7 +24,8 @@ export interface StudyRef {
   chapters: number;
 }
 
-const dialog = signal<{ kind: 'newStudy' } | { kind: 'study'; study: StudyRef } | { kind: 'chapter'; cid: string } | { kind: 'newChapter' } | undefined>(undefined);
+type Dialog = { kind: 'newStudy' } | { kind: 'study'; study: StudyRef } | { kind: 'chapter'; cid: string } | { kind: 'newChapter' } | { kind: 'chapters'; sid: string };
+const dialog = signal<Dialog | undefined>(undefined);
 
 export const openNewStudy = () => (dialog.value = { kind: 'newStudy' });
 export const openStudySettings = (s: StudyRef) => (dialog.value = { kind: 'study', study: s });
@@ -32,6 +36,8 @@ export function openChapterSettings(sid: string, cid: string): void {
   if (m.name !== 'chapter' || m.sid !== sid || m.cid !== cid) open({ name: 'chapter', sid, cid });
 }
 export const openNewChapter = () => (dialog.value = { kind: 'newChapter' });
+/** Several chapters of a study at once (§5.140), from its settings, the ☰ menu or a chapter's settings. */
+export const openManageChapters = (sid: string) => (dialog.value = { kind: 'chapters', sid });
 const close = () => (dialog.value = undefined);
 
 /** Asks before deleting a study, as Qchess does; "its chapters" is said out loud. */
@@ -63,6 +69,8 @@ export function StudyDialogs() {
       return study.value?.cid === d.cid ? <ChapterSettings key={d.cid} /> : null;
     case 'newChapter':
       return <NewChapter />;
+    case 'chapters':
+      return <ManageChapters key={d.sid} sid={d.sid} />;
   }
 }
 
@@ -205,6 +213,12 @@ function StudySettings(props: { study: StudyRef }) {
         </button>{' '}
         <span class="muted">{s.kind === 'reference' ? 'which of its lines your repertoire doesn’t have' : 'the lines of a reference study this one doesn’t have'}</span>
       </p>
+      <p>
+        <button type="button" class="secondary" onClick={() => openManageChapters(s.sid)}>
+          Chapters…
+        </button>{' '}
+        <span class="muted">delete, turn or merge several at once</span>
+      </p>
       {s.kind === 'repertoire' && (
         <p>
           <button type="button" class="secondary" onClick={() => (close(), open({ name: 'storm', sid: s.sid }))}>
@@ -267,6 +281,12 @@ function ChapterSettings() {
           Move down
         </button>
       </div>
+      <p>
+        <button type="button" class="secondary" onClick={() => openManageChapters(s.sid)}>
+          Several chapters…
+        </button>{' '}
+        <span class="muted">delete, turn or merge several at once</span>
+      </p>
       <Buttons submit="Save" danger={{ label: 'Delete chapter', onClick: remove }} />
     </Modal>
   );
@@ -338,6 +358,154 @@ function NewChapter() {
         </p>
       )}
       <Buttons submit="Create chapter" busy={busy} />
+    </Modal>
+  );
+}
+
+const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
+const sideName = (side: ChapterRow['side']) => (side === 'white' ? 'White' : side === 'black' ? 'Black' : 'No side');
+const sentence = (text: string) => `${text[0]!.toUpperCase()}${text.slice(1)}.`;
+
+/**
+ * Several chapters at once (§5.140): the study's chapters with a box each (a shift-click ticks or
+ * clears the run from the last one clicked), and what to do with those ticked: give them a side,
+ * merge them into the first of them, or delete them. The dialog stays open after each, its list
+ * read again, so a side can be set and the chapters then merged.
+ */
+function ManageChapters(props: { sid: string }) {
+  const { sid } = props;
+  const [rows, setRows] = useState<ChapterRow[] | undefined>(undefined);
+  const [chosen, setChosen] = useState<ReadonlySet<string>>(new Set());
+  const [anchor, setAnchor] = useState<number | undefined>(undefined);
+  const [error, setError] = useState<string | undefined>(undefined);
+  const [said, setSaid] = useState<string | undefined>(undefined);
+  const [busy, setBusy] = useState(false);
+  const version = dataVersion.value;
+  useEffect(() => {
+    let live = true;
+    void chapterRows(sid).then((read) => {
+      if (!live) return;
+      if (!read.ok) return setError(sentence(read.error));
+      setRows(read.value);
+      // A chapter gone (deleted here, or by a sync) is no longer ticked.
+      setChosen((before) => new Set(read.value.filter((r) => before.has(r.id)).map((r) => r.id)));
+    });
+    return () => void (live = false);
+  }, [sid, version]);
+  const list = rows ?? [];
+  const picked = list.filter((r) => chosen.has(r.id));
+  const n = picked.length;
+  const all = list.length > 0 && n === list.length;
+
+  const tick = (i: number, on: boolean, range: boolean) => {
+    const next = new Set(chosen);
+    const [from, to] = range && anchor !== undefined ? [Math.min(anchor, i), Math.max(anchor, i)] : [i, i];
+    for (let j = from; j <= to; j++) {
+      if (on) next.add(list[j]!.id);
+      else next.delete(list[j]!.id);
+    }
+    setChosen(next);
+    setAnchor(i);
+  };
+  const run = async (what: () => Promise<{ ok: true; said: string } | { ok: false; error: string }>) => {
+    setBusy(true);
+    setError(undefined);
+    setSaid(undefined);
+    const done = await what();
+    setBusy(false);
+    if (done.ok) setSaid(done.said);
+    else setError(sentence(done.error));
+  };
+  const ids = picked.map((r) => r.id);
+  const turn = (side: Side) =>
+    run(async () => {
+      const done = await turnChapters(sid, ids, side);
+      if (!done.ok) return done;
+      const left = done.value.length ? ` ${done.value.map((name) => `“${name}”`).join(', ')} can’t be read, so ${done.value.length === 1 ? 'it is' : 'they are'} left as ${done.value.length === 1 ? 'it is' : 'they are'}.` : '';
+      return { ok: true, said: `${sentence(`${plural(n - done.value.length, 'chapter')} for ${side === 'white' ? 'White' : 'Black'}`)}${left}` };
+    });
+  const merge = () => {
+    const into = picked[0]!;
+    if (!confirm(`Merge ${plural(n, 'chapter')} into “${into.name}”? Their lines go into it, and the other ${plural(n - 1, 'chapter')} ${n === 2 ? 'is' : 'are'} deleted.`)) return;
+    void run(async () => {
+      const done = await joinChapters(sid, ids);
+      if (!done.ok) return done;
+      setChosen(new Set());
+      setAnchor(undefined);
+      // In the study, the merged chapter opens.
+      const m = mode.peek();
+      if (m.name === 'chapter' && m.sid === sid && m.cid !== done.value) open({ name: 'chapter', sid, cid: done.value });
+      return { ok: true, said: `Merged into “${into.name}”.` };
+    });
+  };
+  const remove = () => {
+    const ask = n === 1 ? `Delete the chapter “${picked[0]!.name}”?` : all ? `Delete all ${n} chapters? The study stays, with none.` : `Delete ${n} chapters?`;
+    if (!confirm(ask)) return;
+    void run(async () => {
+      const done = await removeChapters(sid, ids);
+      if (!done.ok) return done;
+      setChosen(new Set());
+      setAnchor(undefined);
+      return { ok: true, said: `${sentence(`${plural(n, 'chapter')} deleted`)}` };
+    });
+  };
+
+  return (
+    <Modal title="Manage chapters" onSubmit={close}>
+      <label class="chapter-all">
+        <input
+          type="checkbox"
+          checked={all}
+          ref={(el) => {
+            if (el) el.indeterminate = n > 0 && !all;
+          }}
+          disabled={!list.length}
+          onChange={() => (setChosen(all ? new Set() : new Set(list.map((r) => r.id))), setAnchor(undefined))}
+        />{' '}
+        {rows === undefined ? 'Reading the chapters…' : `${n} of ${plural(list.length, 'chapter')} chosen`}
+      </label>
+      <ul class="chapter-rows" aria-label="Chapters">
+        {list.map((r, i) => (
+          <li key={r.id}>
+            <label>
+              <input type="checkbox" checked={chosen.has(r.id)} onClick={(e) => tick(i, e.currentTarget.checked, e.shiftKey)} />
+              <span class="chapter-row-name">{r.name}</span>
+              <span class="chapter-row-side muted">{sideName(r.side)}</span>
+            </label>
+          </li>
+        ))}
+      </ul>
+      <p class="muted chapter-hint">
+        <span class="fine-only">Shift-click a box to tick or clear every chapter from the last one clicked. </span>Merging keeps the first chosen chapter, with every line of the others added to it.
+      </p>
+      <div class="chapter-actions" role="group" aria-label="With the chosen chapters">
+        <button type="button" class="secondary" disabled={busy || n === 0} onClick={() => void turn('white')}>
+          For White
+        </button>
+        <button type="button" class="secondary" disabled={busy || n === 0} onClick={() => void turn('black')}>
+          For Black
+        </button>
+        <button type="button" class="secondary" disabled={busy || n < 2} onClick={merge}>
+          Merge into one
+        </button>
+      </div>
+      {error && (
+        <p class="warn" role="alert">
+          {error}
+        </p>
+      )}
+      <p class="muted" role="status">
+        {said ?? ''}
+      </p>
+      <div class="dialog-buttons">
+        <button type="button" class="secondary danger" disabled={busy || n === 0} onClick={remove}>
+          {n > 1 ? `Delete ${n} chapters` : 'Delete chapter'}
+        </button>
+        <span class="spacer" />
+        <button type="submit" class="primary">
+          Done
+        </button>
+      </div>
     </Modal>
   );
 }

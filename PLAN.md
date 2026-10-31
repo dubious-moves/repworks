@@ -7624,3 +7624,45 @@ hour, never for the search's lookups; refused, nothing said), `explorer.spec.ts`
 the emulated phone (the move with no replies looked at shallow, its title; a 4-ply line making
 every eval shallow; the settings' note). Live: ChessDB's notes and `querypv` read from the
 container, and the table built from live answers under Node; not in a browser.
+
+#### 5.140 Several chapters at once (the owner's request, 2026-10-31)
+
+"When importing a pgn, it can result in many chapters instead of a merged chapter, which is a pain
+to delete currently. Implement a way to delete/edit multiple chapters in a study at once."
+
+- **Where**: "Manage chapters…" in the chapter view's ☰ menu, "Chapters…" in Study settings (so
+  from a study's card too), and "Several chapters…" in Chapter settings, where a single chapter is
+  deleted. A dialog lists the study's chapters in order, each with a box and its side; a box at the
+  top ticks or clears them all ("3 of 40 chapters chosen"); a shift-click ticks or clears the run
+  from the box clicked before (the hint for it shown only with a mouse).
+- **What, for the chosen chapters**, each one change to the working copies, after the open
+  chapter's edits, as the study's settings are:
+  - **For White / For Black**: their `[Orientation]`; a chapter already for that side isn't
+    written, and one that can't be read is left as it is and named.
+  - **Merge into one** (two or more): into the first chosen in the study's order, which keeps its
+    ID, name and headers; every line of the others is added to it (the union of the trees, by
+    path, with the parser's rules for a move written twice: comments, shapes and glyphs joined,
+    none twice, the first's move and position glyph kept; its children first, so its main line
+    stays the main line). The others' files go and study.json drops them. Refused, nothing
+    written, when one can't be read, starts from another position, or is for the other side ("give
+    them the same side first", which the same dialog does). Asked first. In the study, the merged
+    chapter opens.
+  - **Delete n chapters**: their files and study.json without them; asked first ("Delete all 12
+    chapters? The study stays, with none." when every one is ticked). The open chapter, if it
+    goes, gives way to the study's first one left.
+- The dialog stays open after each, its list read again (and on a sync), so chapters can be
+  turned, then merged, then the rest deleted.
+- Progress: repertoire cards are per position and move, so a merged line keeps its cards. A
+  paused-line mark (§5.70, `l|sid|cid|…`) names its chapter, so one on a chapter merged away no
+  longer applies; the line is trained again until paused in the merged chapter.
+
+**As built** (2026-10-31): `combineChapters` (`src/core/study/combine.ts`); `deleteChapters`,
+`setChaptersSide`, `mergeChapters` (`src/core/study/manage.ts`); `chapterRows`, `removeChapters`,
+`turnChapters`, `joinChapters` (`src/app/chapters.ts`); `ManageChapters` and its entry points in
+`src/ui/StudyDialogs.tsx`, the ☰ item in `StudyMenu.tsx`. Tests: `combine.test.ts` (the union,
+main line first; comments, shapes and glyphs joined once and read back the same; refused for one
+chapter, another start, another side; the files deleting, turning and merging write; an unreadable
+chapter left and named, or refusing the merge), `studies.spec.ts` on desktop and the emulated phone
+(three games from PGN shift-ticked, turned for White, merged with the lines and comment in the
+merged file, a delete refused then done from Study settings, each checked in the fake repo). Live:
+TESTING.md.

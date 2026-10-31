@@ -34,7 +34,7 @@ import { BranchPicker, branchOpen, chooseBranch, closeBranches, stepOn } from '.
 import { CommentPanel, Notation } from './Notation.tsx';
 import { endPreviewOnBoard, PreviewBar, previewBoard } from './CommentText.tsx';
 import { ModeSwitch } from './ModeSwitch.tsx';
-import { openChapterSettings, openNewChapter, openStudySettings } from './StudyDialogs.tsx';
+import { openChapterSettings, openManageChapters, openNewChapter, openStudySettings } from './StudyDialogs.tsx';
 import { TranspositionList } from './Transpositions.tsx';
 import { Explorer } from './Explorer.tsx';
 import { EnginePanel, EvalBar, useEngineArrows } from './Engine.tsx';
@@ -318,7 +318,7 @@ export function ChapterView() {
       {c && board && (
         <StudyMenu
           fen={shownLine?.fen ?? board.fen}
-          {...(scratch ? {} : { study: { settings: studySettings, chapterSettings: () => openChapterSettings(s.sid, s.cid), exportPgn: exportChapterPgn, newChapter: openNewChapter } })}
+          {...(scratch ? {} : { study: { settings: studySettings, chapterSettings: () => openChapterSettings(s.sid, s.cid), manageChapters: () => openManageChapters(s.sid), exportPgn: exportChapterPgn, newChapter: openNewChapter } })}
         />
       )}
       <BranchPicker />

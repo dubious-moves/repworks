@@ -584,6 +584,65 @@ button.danger {
   flex: 1;
 }
 
+/* Several chapters at once (§5.140): a box per chapter, the list scrolling inside the dialog. */
+.study-dialog .chapter-all {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+}
+
+.study-dialog .chapter-rows {
+  max-height: min(48dvh, 420px);
+  margin: 4px 0 8px;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius);
+}
+
+.study-dialog .chapter-rows label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.study-dialog .chapter-rows li + li {
+  border-top: 1px solid var(--control-border);
+}
+
+.study-dialog .chapter-row-name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.study-dialog .chapter-row-side {
+  flex: none;
+  font-size: 0.85em;
+}
+
+.study-dialog .chapter-hint {
+  margin: 0 0 8px;
+  font-size: 0.85em;
+}
+
+@media (pointer: coarse) {
+  .study-dialog .chapter-hint .fine-only {
+    display: none;
+  }
+}
+
+.study-dialog .chapter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .debug summary {
   cursor: pointer;
   min-height: 32px;

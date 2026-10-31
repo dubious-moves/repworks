@@ -48,6 +48,7 @@ export function StudyMenuButton() {
 export interface StudyActions {
   newChapter(): void;
   chapterSettings(): void;
+  manageChapters(): void;
   exportPgn(): void;
   settings(): void;
 }
@@ -113,6 +114,10 @@ export function StudyMenu(props: { fen: string; study?: StudyActions }) {
           <button type="button" role="menuitem" onClick={run(props.study.chapterSettings)}>
             <span class="menu-check" aria-hidden="true" />
             Chapter settings…
+          </button>
+          <button type="button" role="menuitem" title="Delete, turn or merge several chapters at once" onClick={run(props.study.manageChapters)}>
+            <span class="menu-check" aria-hidden="true" />
+            Manage chapters…
           </button>
           <button type="button" role="menuitem" title="Download this chapter as a PGN file" onClick={run(props.study.exportPgn)}>
             <span class="menu-check" aria-hidden="true">⤓</span>
