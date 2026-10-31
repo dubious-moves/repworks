@@ -36,7 +36,7 @@ export default defineConfig({
     alias: { 'onnxruntime-web/wasm': resolve('node_modules/onnxruntime-web/dist/ort.wasm.min.mjs') },
   },
   plugins: [engines(), serviceWorker()],
-  // Maia's worker reads the engines' URLs too (§5.32).
+  // Maia's and Lc0's workers read the engines' URLs too (§5.32, §5.143).
   worker: { format: 'es', plugins: () => [engines()] },
 });
 
@@ -57,6 +57,7 @@ const ENGINE_FILES: Record<string, string> = {
   stockfish19MtJs: 'vendor/stockfish/stockfish-19-lite.js',
   stockfish19MtWasm: 'vendor/stockfish/stockfish-19-lite.wasm',
   maiaModel: 'vendor/maia/maia3_simplified.onnx',
+  lc0Model: 'vendor/lc0/791556.onnx',
   ortWasm: 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm',
   ortMjs: 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.mjs',
 };

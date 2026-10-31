@@ -308,11 +308,13 @@ test('mistakes: fail a move, pin it, see it, retry and drill it with nothing gra
   await play(page, 'c7', 'c5');
   await expect(page.getByRole('region', { name: 'Session done' })).toContainText('1 move, 1 right first time');
 
+  // The drill is recorded on this device (its count read from the store), then synced: a sync
+  // asked for before the drill's event is stored would push the others alone (a race under load).
+  await page.goto(`${site.url}#/mistakes`);
+  await expect(page.getByRole('region', { name: 'Pinned' }).locator('li')).toContainText('1 of 3 clean');
   await page.locator('.chip').click();
   await expect.poll(() => pushed(git).map((e) => e['k'])).toEqual(['review', 'pin', 'drill']);
   expect(pushed(git)[2]).toMatchObject({ card: C5, ok: true });
-  await page.goto(`${site.url}#/mistakes`);
-  await expect(page.getByRole('region', { name: 'Pinned' }).locator('li')).toContainText('1 of 3 clean');
 });
 
 test('mistakes: a mistake not pinned can be pinned while it is retried (§5.110)', async ({ page }) => {

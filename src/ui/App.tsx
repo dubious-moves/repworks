@@ -37,6 +37,7 @@ import { TimeBanner } from './TimeTravel.tsx';
 import { ExplorerSettingsDialog } from './ExplorerSettings.tsx';
 import { EngineSettingsDialog } from './EngineSettings.tsx';
 import { MaiaDialog } from './MaiaDialog.tsx';
+import { Lc0Dialog } from './Lc0Dialog.tsx';
 import { confirmDeleteStudy, openNewStudy, openStudySettings, StudyDialogs } from './StudyDialogs.tsx';
 
 export function App() {
@@ -76,6 +77,7 @@ export function App() {
         <ExplorerSettingsDialog />
         <EngineSettingsDialog />
         <MaiaDialog />
+        <Lc0Dialog />
         <PriorityDialog />
       </Guard>
       <footer class="footer">

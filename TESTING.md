@@ -1013,3 +1013,20 @@ q_extension (or give it to a session with q_extension attached), then run
   back on the desktop after a sync it is gone.
 - Is the ☰ menu (the line to the move shown) the right place, and should an added line come first
   rather than last?
+
+## Lc0 on the study page (§5.143, 2026-10-31)
+
+- On the desktop, open a chapter, switch **Lc0** on in the engine bar: a dialog asks for the
+  one-time download (35.9 MB, or 21.7 MB if Maia is already downloaded). Then switch Stockfish on
+  at a position where you hesitate between moves: beside each line, Lc0's share of its first move;
+  where two or more lines are within 0.30, Lc0's pick is the one highlighted. Is the pick useful?
+  Is 0.30 the right width for "close"?
+- The row under the lines: Lc0's eval, win / draw / loss for White and its three likeliest moves.
+  Step through a line with the arrows: it should follow within a fraction of a second.
+- On the phone: the same, and how fast it answers there (about 80 ms a position under Node on the
+  container's CPU; a phone may take a few times that).
+- Grading: once you have used the pick a while, say whether Lc0 should weigh in on any move grade.
+- Checked: the conversion and the encoding by unit tests under Node (Lc0's move table, mates found,
+  mirrored colours, 78 positions against Stockfish); the page by Playwright with the real network
+  and a scripted Stockfish (desktop and emulated phone). Not against Lc0 itself (it can't run in
+  the container), and not on your devices.

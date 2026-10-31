@@ -2,10 +2,12 @@
 // engine's name, the depth, "+" to go deeper and the settings (the threat stays on W, with no
 // button: the owner's notes of 2026-10-11); under it one row per line, its eval from White's side and its moves, each move a
 // line to preview on the board (◀ ▶ Back), which the preview bar's Add puts in the chapter. The
-// eval bar sits by the board, and the arrows go to the board as auto shapes.
+// eval bar sits by the board, and the arrows go to the board as auto shapes. With Lc0 on (§5.143):
+// its policy share beside each line's first move, its pick marked where two or more lines are
+// close, and a row of its own: its eval and W/D/L from White's side, and the moves it likes most.
 import { useEffect, useMemo, useRef } from 'preact/hooks';
 import { Chess, type Position } from 'chessops/chess';
-import { parseFen } from 'chessops/fen';
+import { makeFen, parseFen } from 'chessops/fen';
 import { analysis, enginePrefs, engineStatus, goDeeper, retryEngine, runningThreads, threat, updateEnginePrefs } from '../app/engine.ts';
 import { previewOf, showLine } from '../app/preview.ts';
 import type { Analysis, EngineLine } from '../core/engine/search.ts';
@@ -17,6 +19,9 @@ import { parseUciMove } from '../core/chess/uci.ts';
 import type { PlayedLine } from '../core/repertoire/lines.ts';
 import { openEngineSettings } from './EngineSettings.tsx';
 import { maiaPrefs, maiaState, setMaiaOn } from '../app/maia.ts';
+import { lc0Answer, lc0Prefs, lc0State, setLc0On, type Lc0Answer } from '../app/lc0.ts';
+import { lc0Centipawns } from '../core/lc0/encode.ts';
+import { lc0Pick, shareOf } from '../core/lc0/pick.ts';
 
 /** Moves shown in a row (the row is cut to its width on a narrow screen). */
 const SHOWN_MOVES = 16;
@@ -65,6 +70,11 @@ export function EnginePanel(props: { board: Position | undefined }) {
   const on = prefs.on;
   const status = engineStatus.value;
   const canDeeper = on && !threat.value && !!shown && shown.a.done && !shown.a.noMove;
+  // Lc0's answer for the board's position; beside the lines only when they are the board's (no threat).
+  const answer = lc0Answer.value;
+  const lc0 = lc0Prefs.value.on && answer && props.board && answer.fen === makeFen(props.board.toSetup()) ? answer : undefined;
+  const beside = lc0 && shown && !threat.value && shown.a.fen.split(' ').slice(0, 4).join(' ') === lc0.fen.split(' ').slice(0, 4).join(' ') ? lc0 : undefined;
+  const pick = beside && shown ? lc0Pick(shown.a.lines, beside.policy, shown.start.turn) : undefined;
   // Its height, for the explorer's room below it (app.css: --engine-h on the panel).
   const box = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -82,6 +92,7 @@ export function EnginePanel(props: { board: Position | undefined }) {
     <section class="engine" aria-label="Engine" ref={box}>
       <div class="engine-bar">
         <MaiaSwitch />
+        <Lc0Switch />
         <label class="switch" title="Stockfish on or off">
           <input type="checkbox" role="switch" aria-label="Engine" checked={on} onChange={(e) => updateEnginePrefs({ on: e.currentTarget.checked })} />
           <span class="slider" />
@@ -108,10 +119,11 @@ export function EnginePanel(props: { board: Position | undefined }) {
       {on && shown && shown.a.lines.length > 0 && (
         <ol class="engine-lines">
           {shown.a.lines.map((l) => (
-            <LineRow key={l.multipv} line={l} start={shown.start} threat={threat.value} />
+            <LineRow key={l.multipv} line={l} start={shown.start} threat={threat.value} lc0={lc0} pick={pick} />
           ))}
         </ol>
       )}
+      {lc0Prefs.value.on && <Lc0Row answer={lc0} board={props.board} />}
     </section>
   );
 }
@@ -134,7 +146,60 @@ function MaiaSwitch() {
   );
 }
 
-function LineRow(props: { line: EngineLine; start: Position; threat: boolean }) {
+/** A share as the explorer shows Maia's: one decimal under 10%. */
+const percent = (p: number): string => (p * 100 < 9.95 ? `${(p * 100).toFixed(1)}%` : `${Math.round(p * 100)}%`);
+
+/** Lc0's switch, beside Maia's (§5.143). */
+function Lc0Switch() {
+  const on = lc0Prefs.value.on;
+  const s = lc0State.value;
+  const note = !on ? '' : s.kind === 'loading' ? '…' : s.kind === 'downloading' ? ` ${Math.floor((100 * s.received) / s.total)}%` : s.kind === 'failed' ? ' !' : '';
+  return (
+    <span class="lc0-switch" data-state={s.kind} title={s.kind === 'failed' ? s.reason : 'Lc0: its pick among close moves, and its own view of the position'}>
+      <label class="switch">
+        <input type="checkbox" role="switch" aria-label="Lc0" checked={on} onChange={(e) => setLc0On(e.currentTarget.checked)} />
+        <span class="slider" />
+      </label>
+      <span class="lc0-name">Lc0{note}</span>
+    </span>
+  );
+}
+
+/** Lc0's view of the board's position: its eval and W/D/L from White's side, its three likeliest moves. */
+function Lc0Row(props: { answer: Lc0Answer | undefined; board: Position | undefined }) {
+  const a = props.answer;
+  if (!props.board || props.board.isEnd()) return null;
+  if (!a) {
+    const s = lc0State.value;
+    return (
+      <div class="lc0-row muted" aria-label="Lc0">
+        <span class="lc0-tag">Lc0</span> {s.kind === 'failed' ? s.reason : s.kind === 'missing' ? 'Not downloaded' : '…'}
+      </div>
+    );
+  }
+  const white = props.board.turn === 'white';
+  const w = white ? a.wdl : { win: a.wdl.loss, draw: a.wdl.draw, loss: a.wdl.win };
+  const cp = lc0Centipawns(w);
+  const pct = (x: number) => `${Math.round(x * 100)}%`;
+  return (
+    <div class="lc0-row" aria-label="Lc0">
+      <span class="lc0-tag">Lc0</span>
+      <span class={`engine-eval ${cp === 0 ? 'even' : cp > 0 ? 'white' : 'black'}`}>{formatScore({ cp })}</span>
+      <span class="lc0-wdl" title="Lc0’s chances for White: win, draw, loss">
+        {pct(w.win)} / {pct(w.draw)} / {pct(w.loss)}
+      </span>
+      <span class="lc0-moves">
+        {a.policy.slice(0, 3).map((m) => (
+          <span key={m.uci} class="lc0-move">
+            {m.san} <span class="muted">{percent(m.prob)}</span>
+          </span>
+        ))}
+      </span>
+    </div>
+  );
+}
+
+function LineRow(props: { line: EngineLine; start: Position; threat: boolean; lc0: Lc0Answer | undefined; pick: string | undefined }) {
   const played = useMemo(() => playPv(props.start, props.line.pv), [props.start, props.line.pv]);
   const key = `engine#${props.line.multipv}`;
   const p = previewOf('chapter');
@@ -147,8 +212,13 @@ function LineRow(props: { line: EngineLine; start: Position; threat: boolean }) 
     showLine('chapter', key, [played], { line: 0, ply }, 'engine');
   };
   return (
-    <li class={`engine-line${props.threat ? ' threat' : ''}`}>
+    <li class={`engine-line${props.threat ? ' threat' : ''}${props.pick && props.pick === props.line.pv[0] ? ' lc0-pick' : ''}`}>
       <span class={`engine-eval ${even ? 'even' : white ? 'white' : 'black'}`}>{props.threat ? 'Threat' : formatScore(props.line.score)}</span>
+      {props.lc0 && !props.threat && props.line.pv[0] && (
+        <span class="lc0-share" title={props.pick === props.line.pv[0] ? 'Lc0’s pick among the close lines: its policy’s share of this move' : 'Lc0’s policy: its share of this move'}>
+          {percent(shareOf(props.lc0.policy, props.line.pv[0]))}
+        </span>
+      )}
       <span class="engine-moves">
         {played.sans.map((san, i) => {
           const pos = played.positions[i]!;

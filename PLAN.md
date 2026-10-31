@@ -7,7 +7,7 @@ where the build differed). What remains is live: the spike's re-run (§4.2), the
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
 with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
-for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Storm positions shared between devices through the data repo, and an overnight gather (§5.102), are built (2026-10-12). Read with `DECISIONS.md`, which this plan updates (its
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Storm positions shared between devices through the data repo, and an overnight gather (§5.102), are built (2026-10-12). Lc0 on the study page, its pick among close moves (§5.143), is built (2026-10-31). Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -7817,3 +7817,68 @@ added from the ☰ menu and the Alapin from the line list; shown before any Make
 keep both, the Alapin out of the made list's lines; the events in the fake repo; an added line's
 drill by its moves; ✕ asked and taken out, synced), `views.spec.ts` (the ☰ menu's items). Live:
 TESTING.md.
+
+#### 5.143 Lc0 on the study page: its pick among close moves (the owner's request, 2026-10-31)
+
+The owner: "I'm mainly interested in the study / analysis page (not practice). When I'm unsure
+which move to pick between multiple close-to-equal choices, having the Lc0's pick available would
+be nice. Maybe it could also be used to balance out Stockfish evaluation in some move grading, but
+I'm not sure."
+
+- **Measured and found** (2026-10-31, cloud container):
+  - Lc0's source builds can't run in a cloud container (the auto-mode check refuses running
+    downloaded code), and lczero.org is outside its network policy. Lc0's GitHub release packages
+    are reachable, and every one (v0.31.2, v0.32.1; CPU, CUDA, ONNX builds) bundles one network,
+    `791556`: 15 blocks of 192 filters with squeeze-and-excitation, Mish, the classical 112 input
+    planes, an attention policy and a W/D/L value head. Its weights are about 10 M, close to Maia
+    3's size.
+  - Lichess's `zerofish` (npm, AGPL) is Lc0 compiled to wasm on the CPU with tiny networks only
+    (its README: "only low block/filter sizes"): too weak for a pick among a strong player's
+    candidates, so not used.
+  - So the network is converted with a port of Lc0's `leela2onnx` (`scripts/lc0-onnx.mjs`, Node,
+    no new tools) and run on onnxruntime-web, as Maia is. ONNX's checker accepts it. Under Node,
+    one thread: about 80 ms a position (the session 0.75 s), a batch of 8 no cheaper per position.
+  - With no Lc0 to compare against, the port is checked by what only a correct one gets right:
+    the 1858 moves equal Lc0's table (sha256 over it); mates in one, a free queen and promotions
+    found; mirrored colours give mirrored moves; the openings' moves are book (e4/d4/Nf3; h3/d4 in
+    the closed Ruy Lopez; f3/Be3 against the Najdorf). Against Stockfish 18 at depth 12 on 78
+    positions of the fixture games, Lc0's first move was Stockfish's best in 44, within 0.30 in 65,
+    15 cp lost on average (Maia at 2200: 35, 21 cp).
+- **Decided** (Claude's calls):
+  - **No search: Lc0's network alone** (its policy and W/D/L, one run per position). Its policy is
+    what Lc0 plays at once, and that is its pick. A search (MCTS) is the step after, if the owner
+    finds the pick worth more: on wasm a position costs about 80 ms on a desktop, so a few hundred
+    nodes take a minute.
+  - **An "Lc0" switch** beside Maia's in the engine bar, off by default; the first switch-on asks,
+    as Maia's dialog does, for the one-time download: the network (21.7 MB) and onnxruntime-web's
+    wasm unless Maia brought it (35.9 MB in all). The worker ends after 90 s unused, as Maia's.
+    Never in training or practice.
+  - **Beside each of Stockfish's lines**, Lc0's policy share of its first move; **its pick**: where
+    two or more lines are within **0.30** (`CLOSE_CP`, the mover's side) of the best, the close
+    line whose first move Lc0 likes most, its share marked. Fewer than two close lines, no mark
+    (nothing to choose). Not for the threat's lines.
+  - **Its own row** under the lines (shown with Stockfish off too): its eval (Lc0's
+    `90·tan(1.5637541897·Q)`), win / draw / loss from White's side, its three likeliest moves.
+  - **Its history**: the line from the chapter's start to the board (its last 30 positions), as
+    Lc0 reads 8 positions back and repetitions; a FEN-started chapter's start is repeated as Lc0's
+    `HistoryFill=fen_only` does. Shares at Lc0's policy temperature, 1.359 (its "P").
+  - **Grading** (the owner's "maybe"): not built. Lc0's W/D/L after each candidate is one run a
+    move and could stand beside Stockfish's win % in a grade; wait for the owner's view once the
+    pick has been used.
+
+**As built** (2026-10-31): `vendor/lc0/791556.onnx` and its README (source, sha256, how to
+reproduce); `scripts/lc0-onnx.mjs` (the converter) and `scripts/lc0-reference.mjs` (the
+fixture); `src/core/lc0/encode.ts` (`LC0_MOVES`, `lc0Index`, `lc0Planes`, `lc0Policy`, `wdlFrom`,
+`lc0Centipawns`), `pick.ts` (`lc0Pick`, `shareOf`, `CLOSE_CP`), `protocol.ts`;
+`src/platform/lc0Worker.ts`; `src/app/lc0.ts` (the switch, the worker, `lc0Position`, one ask at a
+time for the position the board stops at); `src/ui/Engine.tsx` (the switch, the shares, the pick,
+the row), `Lc0Dialog.tsx`, the debug panel's "Lc0 791556" files; the engines' list in
+`vite.config.ts`. Tests: `test/unit/core/lc0/encode.test.ts` (the moves against Lc0's table, an
+index from either side with castling and promotions, the planes: pieces, history from Black's
+view, a FEN's filled history and its en passant pawn put back, repetitions, the 50-move count; the
+policy at temperature; the eval), `pick.test.ts` (close lines, Black's side, mates, nothing to
+choose), `test/unit/engine/lc0.test.ts` (the network on onnxruntime-web under Node: its inputs and
+outputs, 16 lines against the fixture to 1e-5, mates in one, mirrored colours, the history read);
+`test/e2e/lc0.spec.ts` (desktop and phone, the real network beside a scripted Stockfish: Cancel
+downloads nothing, the download, the row as the fixture, the shares and the pick, the next
+position, remembered without a second download, off). Live: TESTING.md.

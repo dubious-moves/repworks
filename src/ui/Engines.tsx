@@ -1,8 +1,9 @@
-// The engines' files on this device (PLAN.md §5.29), in the debug panel: Stockfish and Maia,
+// The engines' files on this device (PLAN.md §5.29), in the debug panel: Stockfish, Maia and Lc0,
 // stored or not, their size, a download with progress and a delete.
 import { useEffect, useState } from 'preact/hooks';
 import { ENGINES, ensure, remove, stored, type EngineFile, type Progress } from '../platform/blobs.ts';
 import { deleteMaia, maiaPrefs } from '../app/maia.ts';
+import { deleteLc0, lc0Prefs } from '../app/lc0.ts';
 
 const GROUPS: { name: string; files: EngineFile[] }[] = [
   { name: 'Stockfish 18', files: [ENGINES.stockfishJs, ENGINES.stockfishWasm] },
@@ -10,7 +11,15 @@ const GROUPS: { name: string; files: EngineFile[] }[] = [
   { name: 'Stockfish 19', files: [ENGINES.stockfish19Js, ENGINES.stockfish19Wasm] },
   { name: 'Stockfish 19 threads', files: [ENGINES.stockfish19MtJs, ENGINES.stockfish19MtWasm] },
   { name: 'Maia 3', files: [ENGINES.maiaModel, ENGINES.ortWasm, ENGINES.ortMjs] },
+  { name: 'Lc0 791556', files: [ENGINES.lc0Model, ENGINES.ortWasm, ENGINES.ortMjs] },
 ];
+
+/** Delete: Maia or Lc0 switched off first when on; Lc0 leaves the runtime it shares with Maia. */
+function del(files: EngineFile[]): Promise<void> {
+  if (files.includes(ENGINES.maiaModel) && maiaPrefs.peek().on) return deleteMaia();
+  if (files.includes(ENGINES.lc0Model)) return lc0Prefs.peek().on ? deleteLc0() : remove([ENGINES.lc0Model]);
+  return remove(files);
+}
 
 export const megabytes = (bytes: number): string => `${(bytes / 1e6).toFixed(1)} MB`;
 
@@ -41,7 +50,7 @@ function Group(props: { name: string; files: EngineFile[] }) {
         </button>
       )}
       {has && (
-        <button type="button" class="secondary" onClick={() => void (props.files.includes(ENGINES.maiaModel) && maiaPrefs.peek().on ? deleteMaia() : remove(props.files)).then(check)}>
+        <button type="button" class="secondary" onClick={() => void del(props.files).then(check)}>
           Delete
         </button>
       )}

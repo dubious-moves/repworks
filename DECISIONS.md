@@ -1938,3 +1938,15 @@ The technical calls, each with its reason:
   their leaves out, so the number of lines asked for is besides them; an exclusion never hides a
   picked line; ✕ on one takes it off (and out of the made list where that has it too); a picked
   line wholly paused is hidden and counted as the made list's are.
+
+## Revision of 2026-10-31 (Lc0 on the study page, PLAN.md §5.143)
+- **A third engine, Lc0, on the study page only**: its network `791556` (the one Lc0's release
+  packages bundle, GPL-3.0), converted to ONNX by a port of Lc0's converter and run on
+  onnxruntime-web as Maia is, downloaded on first use behind a dialog, off by default. No search:
+  its policy is its pick. Beside Stockfish's lines, its share of each first move, and its pick
+  marked among the lines within 0.30 of the best; a row of its eval, W/D/L and likeliest moves.
+  Never in training or practice. Why: the owner, 2026-10-31: "When I'm unsure which move to pick
+  between multiple close-to-equal choices, having the Lc0's pick available would be nice." Lc0's
+  own builds can't run in the cloud container and lczero.org is out of its reach; Lichess's
+  zerofish runs only tiny networks.
+- **Not in any grading yet.** The owner was unsure; Lc0's W/D/L after a move is available for it.

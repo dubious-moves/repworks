@@ -13,7 +13,7 @@ import { makeFen } from 'chessops/fen';
 import { makeSan, parseSan } from 'chessops/san';
 import { parseSquare } from 'chessops/util';
 import { chessgroundDests, chessgroundMove } from 'chessops/compat';
-import { normalizeMove } from 'chessops/chess';
+import { normalizeMove, type Position } from 'chessops/chess';
 import type { Key } from '@lichess-org/chessground/types';
 import type { Move, Role } from 'chessops/types';
 import { afterEdits, at, chapter, conflictsHere, doc, edit, feedback, flipBoard, move, play, problem, redoEdit, resolve, SCRATCH, side, study, undoEdit } from '../app/editor.ts';
@@ -39,6 +39,7 @@ import { TranspositionList } from './Transpositions.tsx';
 import { Explorer } from './Explorer.tsx';
 import { EnginePanel, EvalBar, useEngineArrows } from './Engine.tsx';
 import { analysePosition, setThreat, threat } from '../app/engine.ts';
+import { lc0Position } from '../app/lc0.ts';
 import { Back, Stuck } from './Back.tsx';
 
 const BRUSH_NAMES: Brush[] = ['green', 'red', 'blue', 'yellow'];
@@ -57,6 +58,19 @@ function boardState(c: Chapter, path: Path) {
     if (m) lastMove = chessgroundMove(m) as [Key, Key];
   }
   return { pos, fen: makeFen(pos.toSetup()), dests: chessgroundDests(pos) as Map<Key, Key[]>, lastMove, check: pos.isCheck() };
+}
+
+/** The positions from the chapter's start to the end of `path`, oldest first (Lc0's history, §5.143). */
+function lineTo(c: Chapter, path: Path): Position[] {
+  const pos = positionAt(c, [])!.clone();
+  const out = [pos.clone()];
+  for (const san of path) {
+    const m = parseSan(pos, san);
+    if (!m) break;
+    pos.play(m);
+    out.push(pos.clone());
+  }
+  return out;
 }
 
 /**
@@ -139,6 +153,9 @@ export function ChapterView() {
   // The engine looks at the board's position (§5.31), and at nothing once the page is left.
   useEffect(() => analysePosition(board?.pos), [board]);
   useEffect(() => () => analysePosition(undefined), []);
+  // Lc0 reads the line that led to the board (§5.143).
+  useEffect(() => lc0Position(c && board ? lineTo(c, adding ? adding.slice(0, -1) : path) : undefined), [board]);
+  useEffect(() => () => lc0Position(undefined), []);
   const arrows = useEngineArrows();
 
   // Another chapter opens at the board, wherever the page was scrolled.
