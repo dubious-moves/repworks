@@ -311,6 +311,11 @@ function Line(props: { line: ShownLine; view: ChecklistView; results: { res: str
           <span class="checklist-added" data-testid="checklist-added" title="Added by you: it stays when the list is made again">
             added
           </span>
+        )}{' '}
+        {props.line.paused && (
+          <span class="muted" data-testid="checklist-line-paused" title="Its lines are paused in training (the line list's ⋯ unpauses them); the checklist drills it all the same">
+            paused in training
+          </span>
         )}
       </div>
       <div class="checklist-line">{gone ? <s>{lineText(v.lineSan)}</s> : <Moves id={id} lineUci={v.lineUci} lineSan={v.lineSan} color={view.color} />}</div>

@@ -384,6 +384,8 @@ export interface ShownLine {
   gone: boolean;
   /** Added by hand (§5.142), kept whatever Make again lists: `too` where the made list has it as well, `only` where it doesn't (no share then). */
   added?: 'too' | 'only';
+  /** An added line wholly paused in training: shown all the same (§5.142). */
+  paused?: true;
 }
 
 /**
@@ -403,13 +405,16 @@ export function picksOf(events: readonly { color: Color; m: string; on: boolean 
 /**
  * The picked lines added to what a list shows (§5.142): one the list shows already is marked added
  * there (`too`); the others follow (`only`) in the order picked, a line the study no longer has
- * kept `gone`, one wholly paused now hidden and counted. Exclusions don't apply: picking a line is
- * asking for it. Two picks reaching one position are one line (results are kept by position).
+ * kept `gone`. Neither an exclusion nor a pause hides one: picking a line is asking for it (with
+ * Prioritize, most deep lines are paused until added to training); one wholly paused is marked
+ * `paused`, and a made-list line hidden as paused that is picked comes back, out of the count. Two
+ * picks reaching one position are one line (results are kept by position).
  */
 export function withPicks(shown: { lines: readonly ShownLine[]; paused: number; pausedLeaves?: readonly string[] }, picks: readonly Variation[], color: Color, study: { all: StudyMoves; active: StudyMoves }): { lines: ShownLine[]; paused: number } {
   const lines = shown.lines.map((l) => ({ ...l }));
   const at = new Map(lines.map((l, i) => [l.v.leafKey, i]));
   let paused = shown.paused;
+  const counted = new Set<string>();
   for (const v of picks) {
     const i = at.get(v.leafKey);
     if (i !== undefined && !lines[i]!.gone) {
@@ -417,11 +422,12 @@ export function withPicks(shown: { lines: readonly ShownLine[]; paused: number; 
       continue;
     }
     const gone = !studyHasLine(study.all, color, v.lineUci);
-    if (!gone && !studyHasLine(study.active, color, v.lineUci)) {
-      if (!shown.pausedLeaves?.includes(v.leafKey)) paused++;
-      continue;
-    }
     const line: ShownLine = { v, gone, added: 'only' };
+    if (!gone && !studyHasLine(study.active, color, v.lineUci)) line.paused = true;
+    if (shown.pausedLeaves?.includes(v.leafKey) && !counted.has(v.leafKey)) {
+      counted.add(v.leafKey);
+      paused--;
+    }
     if (i !== undefined) lines[i] = line;
     else {
       at.set(v.leafKey, lines.length);

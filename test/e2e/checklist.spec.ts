@@ -14,8 +14,9 @@
 // time in the game played from its end.
 // §5.142: lines added by hand, from the study's ☰ menu (2...Nc6 3.d4, which the walk never takes:
 // the study's first move there is 2...d6) and from the line list's ⋯ (the Alapin): shown before
-// any Make, kept by Make and Make again, the Alapin left out of the made list's lines; ✕ on one
-// asked and taken out; the events synced.
+// any Make, kept by Make and Make again, the Alapin left out of the made list's lines; the Alapin
+// paused elsewhere and still shown, marked "paused in training"; ✕ on one asked and taken out; the
+// events synced.
 import { test, expect, type Page } from '@playwright/test';
 import { Chess } from 'chessops/chess';
 import { makeFen } from 'chessops/fen';
@@ -376,6 +377,15 @@ test('lines added by hand from the study and the line list, kept by Make again, 
   await expect(page).toHaveURL(new RegExp(`#/checklist/Rep0Najd\\?side=black&line=${ucis(NC6).join(',')}&preset=easy$`));
   await expect(page.getByTestId('checklist-drill')).toHaveAttribute('data-step', '1');
   await page.evaluate(() => (location.hash = '#/checklist?sid=Rep0Najd&side=black'));
+
+  // The Alapin paused on another device (with Prioritize, most deep lines are): an added line stays, marked.
+  const pause = `{"v":1,"n":900,"t":"${new Date().toISOString()}","k":"line","card":"l|Rep0Najd|Ch2Alapn|e4 c5 c3 Nf6","mark":"paused"}\n`;
+  git.commitIfHead(git.head, 'phone: 1 event\n\nrepworks-sync: Phone001:900', new Map([['progress/Phone001/2026-10-26.jsonl', pause]]), []);
+  await sync(page);
+  await expect(lines.nth(2).getByTestId('checklist-line-paused')).toHaveText('paused in training');
+  await expect(lines).toHaveCount(3);
+  await expect(section.getByTestId('checklist-paused')).toHaveCount(0);
+  await expect(lines.nth(1).getByTestId('checklist-line-paused')).toHaveCount(0);
 
   // ✕ on an added line: asked, then taken out of the checklist.
   let asked = '';

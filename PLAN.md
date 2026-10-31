@@ -7792,11 +7792,15 @@ after remake)."
   are drilled as any line (the drill's address is its moves).
 - **Make leaves the picked leaves out of the walk** (as an exclusion does), so "Lines 10" is ten
   lines besides the added ones and the slots go to the next lines.
+- **Its moves are kept as added**: a line added 15 plies deep stays 15 plies whatever the made
+  list's plies; its drill replays all of them, then the game from its end.
 - **The study must play the line**: its own moves at its side's positions (any of them, so a second
   move the walk never takes can be added), a position it covers after each reply but the last,
   which it need only reach (a line may end on the opponent's move). A line the study no longer
-  plays is struck through with "No longer in the study · Take it out"; one wholly paused since is
-  hidden and counted with the paused lines, as §5.130's are.
+  plays is struck through with "No longer in the study · Take it out". One whose lines are all
+  paused in training is shown all the same, marked "paused in training" (changed the same day,
+  after the owner's first try: with Prioritize most deep lines are paused, and the added line was
+  hidden under "1 paused line hidden").
 - **✕ on an added line** asks "Take this line out of the checklist?" and writes `on: false`; where
   the made list has it too it is also taken out of that (a `drop`, the reserve filling its slot).
   An exclusion never hides a picked line: picking a line is asking for it.
@@ -7811,10 +7815,11 @@ picked leaves); `src/ui/Checklist.tsx` (the lines with or without a made list, t
 `src/ui/LineList.tsx`. Tests: `events.test.ts` (the event read and written, five refusals),
 `checklist.test.ts` (which lines the study has: a second own move, a line ending on a reply it
 only reaches, a reply met only on a paused line; the picks from their events; joining a kept list:
-marked there, appended, gone, paused and counted once, not hidden by an exclusion; four controls,
-each failing exactly that test), `checklist.spec.ts` on desktop and the emulated phone (2...Nc6 3.d4
+marked there, appended, gone, paused but shown, a picked list line hidden as paused back and out of
+the count, not hidden by an exclusion; five controls, each failing exactly that test), `checklist.spec.ts` on desktop and the emulated phone (2...Nc6 3.d4
 added from the ☰ menu and the Alapin from the line list; shown before any Make; Make and Make again
-keep both, the Alapin out of the made list's lines; the events in the fake repo; an added line's
+keep both, the Alapin out of the made list's lines; the events in the fake repo; the Alapin paused
+on another device, still shown and marked; an added line's
 drill by its moves; ✕ asked and taken out, synced), `views.spec.ts` (the ☰ menu's items). Live:
 TESTING.md.
 

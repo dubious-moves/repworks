@@ -1936,8 +1936,11 @@ The technical calls, each with its reason:
   remake)". Decided in the build: the line is to the move shown (study) or the whole line (line
   list); added lines follow the made list's, with no share, and count in the progress; Make leaves
   their leaves out, so the number of lines asked for is besides them; an exclusion never hides a
-  picked line; ✕ on one takes it off (and out of the made list where that has it too); a picked
-  line wholly paused is hidden and counted as the made list's are.
+  picked line; ✕ on one takes it off (and out of the made list where that has it too).
+- **A picked line is shown even when its lines are paused**, marked "paused in training". Was
+  (earlier the same day): hidden and counted as the made list's paused lines are. Why: the
+  owner's first try: a line added 15 plies deep went under "1 paused line hidden", since with
+  Prioritize most deep lines are paused until added to training; adding a line is asking for it.
 
 ## Revision of 2026-10-31 (Lc0 on the study page, PLAN.md §5.143)
 - **A third engine, Lc0, on the study page only**: its network `791556` (the one Lc0's release

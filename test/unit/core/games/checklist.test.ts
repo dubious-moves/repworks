@@ -18,7 +18,8 @@
 // §5.142: lines added by hand: which the study has (a second own move, a line ending on a reply it
 // only reaches), the picks read from their events, and how they join a kept list. Controls
 // (2026-10-31), each failing exactly that test: the last reply needing the study's answer; a pick
-// the list has shown twice; a pick of a paused list line counted twice; `reaches` over paused lines.
+// the list has shown twice; a picked paused list line still counted as hidden; `reaches` over
+// paused lines; a paused pick not marked.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -260,15 +261,22 @@ test('lines added by hand (§5.142): which the study has, the picks from their e
   const out = shownLines({ ...list, count: 3 }, 'white', new Set([list.variations[1]!.leafKey]), { all, active: all });
   const picked = withPicks(out, [list.variations[1]!], 'white', { all, active: all });
   assert.deepEqual(picked.lines.at(-1), { v: list.variations[1]!, gone: false, added: 'only' });
-  // The Bc4 chapter paused: its pick hidden and counted; a pick of a list line hidden as paused counted once.
+  // The Bc4 chapter paused: its pick shown all the same, marked paused (with Prioritize most deep
+  // lines are paused); a list line hidden as paused and picked comes back, out of the count.
   const pausedIx = markLines(ix, new Map(ix.lines.filter((l) => l.cid === 'Bc4xxxxx' || l.cid === 'Nge7xxxx' || list.variations[0]!.lineSan.every((s, i) => l.path[i] === s)).map((l) => [lineCard(l.sid, l.cid, l.path), 'paused' as const]))).index;
   const active = studyMovesOf(pausedIx, 'Rep00001', 'white', sides, true);
   const half = shownLines({ ...list, count: 3 }, 'white', new Set(), { all, active });
   assert.equal(half.paused, 1);
-  const hidden = withPicks(half, [own, list.variations[0]!], 'white', { all, active });
-  assert.equal(hidden.paused, 2);
+  const hidden = withPicks(half, [own, list.variations[0]!, list.variations[0]!], 'white', { all, active });
+  assert.equal(hidden.paused, 0);
+  assert.deepEqual(
+    hidden.lines.slice(-2).map((l) => [l.v.lineSan.join(' '), l.added, l.gone, l.paused ?? false]),
+    [
+      ['e4 e5 Nf3 Nc6 Bc4 Bc5', 'only', false, true],
+      [list.variations[0]!.lineSan.join(' '), 'only', false, true],
+    ],
+  );
   // A reply met only on a paused line: the line up to it active, the line paused.
   assert.equal(studyHasLine(all, 'white', ucis('e4 e5 Nf3 Nc6 Bb5 Nge7')), true);
   assert.equal(studyHasLine(active, 'white', ucis('e4 e5 Nf3 Nc6 Bb5 Nge7')), false);
-  assert.ok(!hidden.lines.some((l) => l.v.leafKey === own.leafKey || l.v.leafKey === list.variations[0]!.leafKey));
 });

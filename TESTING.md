@@ -1011,6 +1011,8 @@ q_extension (or give it to a session with q_extension attached), then run
   is the "Lines" asked for. Drill one at Easy.
 - On the phone after a sync: the same added lines. ✕ on one there asks first and takes it out;
   back on the desktop after a sync it is gone.
+- The deep line you added on 2026-10-31 that couldn't be found should now be at the end of its
+  study's block, marked "added" (and "paused in training" if its lines are paused).
 - Is the ☰ menu (the line to the move shown) the right place, and should an added line come first
   rather than last?
 
