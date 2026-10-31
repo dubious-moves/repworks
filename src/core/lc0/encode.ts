@@ -168,9 +168,10 @@ export interface Lc0Move {
 
 /**
  * Lc0's policy in `pos` from its row of `logits` (from `offset`): the legal moves, likeliest
- * first, at Lc0's policy temperature, the tail under `MIN_PROB` dropped. Empty with no legal move.
+ * first, at Lc0's policy temperature, the tail under `floor` dropped (none for a search's priors,
+ * which need every move). Empty with no legal move.
  */
-export function lc0Policy(pos: Position, logits: ArrayLike<number>, offset = 0, temperature = POLICY_TEMPERATURE): Lc0Move[] {
+export function lc0Policy(pos: Position, logits: ArrayLike<number>, offset = 0, temperature = POLICY_TEMPERATURE, floor = MIN_PROB): Lc0Move[] {
   const moves = legalMoves(pos);
   if (!moves.length) return [];
   const ls = moves.map((m) => logits[offset + lc0Index(pos, m.uci)]! / temperature);
@@ -179,7 +180,7 @@ export function lc0Policy(pos: Position, logits: ArrayLike<number>, offset = 0, 
   const z = e.reduce((a, b) => a + b, 0);
   return moves
     .map((m, i) => ({ san: m.san, uci: m.uci, prob: e[i]! / z }))
-    .filter((x) => x.prob >= MIN_PROB)
+    .filter((x) => x.prob >= floor)
     .sort((a, b) => b.prob - a.prob);
 }
 

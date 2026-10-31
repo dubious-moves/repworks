@@ -1954,3 +1954,14 @@ The technical calls, each with its reason:
   (the chapter's Orientation). Its eval stays White's, as Stockfish's lines. Why: the owner,
   2026-10-31: "should be in the perspective of the board, not always white"; then "The evaluation
   should stay -0.12 even if it's black's advantage. I only meant the % rate".
+
+## Revision of 2026-10-31 (Lc0 vs Maia from a move, PLAN.md §5.144)
+- **Lc0 searches here**: a port of its PUCT tree search on the vendored network (Lc0's default
+  parameters, one playout at a time, an exact early stop), 800 nodes a move by default. Was
+  (§5.143): Lc0's network alone, no search. The board's row stays policy-only. Why: the owner
+  asked for Lc0's top move with "accuracy > speed"; on 31 positions Stockfish scored the policy's
+  pick 13.6 cp below its best on average, 400–800 nodes about 6.
+- **People's move is the Lichess database's most played, Maia blended in under 100 games** (the
+  database weighing games / 100), Maia alone with none or when the database fails. The likeliest
+  move always, so the line is reproducible. Why: the owner's request, 2026-10-31.
+- **The line goes into the chapter only when asked** ("Add to the chapter"), with no comments.

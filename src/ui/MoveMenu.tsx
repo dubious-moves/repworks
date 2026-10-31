@@ -5,13 +5,14 @@
 import { signal } from '@preact/signals';
 import type { ComponentChildren } from 'preact';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { chapter, doc, edit, feedback, goTo, SCRATCH, study } from '../app/editor.ts';
+import { chapter, doc, edit, feedback, goTo, SCRATCH, side, study } from '../app/editor.ts';
+import { openContinuation } from '../app/continuation.ts';
 import { open } from '../app/mode.ts';
 import { moveCard } from './MoveCard.tsx';
 import { LICHESS_COMMENT_LIMIT, sanitizeComment } from '../core/pgn/comment.ts';
 import { GLYPHS, MOVE_GLYPHS, OBSERVATION_GLYPHS, POSITION_GLYPHS } from '../core/pgn/nags.ts';
 import { branchesToComment, branchPgn, continuation, deletePath, linePgn, makeMainline, ownComment, promote, setComment, setNags, toggleGlyph, variationStart } from '../core/study/ops.ts';
-import { nodeAt, type Path } from '../core/study/tree.ts';
+import { nodeAt, positionAt, type Path } from '../core/study/tree.ts';
 
 const GLYPH_ROWS: readonly (readonly number[])[] = [
   [3, 1, 5, 6, 2, 4, 146],
@@ -96,6 +97,8 @@ export function MoveMenu() {
   if (isMove && (nodeAt(c, m.path)?.children.length ?? 0) > 0) items.push({ label: 'Copy branch as PGN', run: () => void copyLine(m.path, 'branch') });
   // From the branch's first move to the line's end, numbered from there (§5.11).
   if (isMove) items.push({ label: 'Copy continuation', run: () => void copyLine(m.path, 'continuation') });
+  // Lc0's searched moves against the moves people play, from the position after this move (§5.144).
+  if (isMove && !positionAt(c, m.path)?.isEnd()) items.push({ label: 'Lc0 vs Maia continuation', run: () => openContinuation(m.path, side.peek()) });
   const s = study.value;
   // Qchess's quiz of the line through this move (§5.10). Read, Analyse, Storm, Practise and the
   // plan card left this menu for the ☰ menu or went (§5.90), for the card's items.

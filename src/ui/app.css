@@ -6027,3 +6027,41 @@ a.button.disabled {
 .lc0-move + .lc0-move {
   margin-left: 8px;
 }
+
+/* Lc0 vs Maia from a move (§5.144): the settings in a row, the line with each move's source. */
+.continuation-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 8px 0;
+}
+
+.continuation-moves {
+  margin: 8px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.continuation-moves li {
+  padding: 3px 0;
+  overflow-wrap: anywhere;
+}
+
+.continuation-moves li.lc0 strong {
+  color: var(--info);
+}
+
+.continuation-now {
+  display: grid;
+  gap: 6px;
+}
+
+.continuation-now .maia-progress {
+  display: block;
+}
+
+.continuation-now .maia-progress > span {
+  display: block;
+  height: 100%;
+  background: var(--info);
+}

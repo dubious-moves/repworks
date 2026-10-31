@@ -46,6 +46,24 @@ export function positionAt(chapter: Chapter, path: Path): Position | undefined {
   return pos;
 }
 
+/**
+ * The positions from the chapter's start to the end of `path`, oldest first (Lc0 reads them, §5.143):
+ * as far as the path's moves are legal.
+ */
+export function positionsTo(chapter: Chapter, path: Path): Position[] {
+  const start = startPosition(chapter);
+  if (!start) return [];
+  const pos = start.clone();
+  const out = [pos.clone()];
+  for (const san of path) {
+    const m = parseSan(pos, san);
+    if (!m) break;
+    pos.play(m);
+    out.push(pos.clone());
+  }
+  return out;
+}
+
 /** The main line from the root: its moves' paths, in order. */
 export function mainline(chapter: Chapter): Path[] {
   const out: Path[] = [];

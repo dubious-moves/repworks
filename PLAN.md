@@ -7885,3 +7885,56 @@ outputs, 16 lines against the fixture to 1e-5, mates in one, mirrored colours, t
 `test/e2e/lc0.spec.ts` (desktop and phone, the real network beside a scripted Stockfish: Cancel
 downloads nothing, the download, the row as the fixture turned to the board's side (Black's), the shares and the pick, the next
 position, remembered without a second download, off). Live: TESTING.md.
+
+#### 5.144 Lc0 vs Maia from a move (the owner's request, 2026-10-31)
+
+The owner: "In study / analysis, implement the option to generate a Lc0 vs Maia continuation from a
+position, available on the right click menu of a move. The continuation should be Lc0's top move
+against the most common move in Lichess db, which fallbacks to Maia likelihood below a certain
+amount of games available (maybe start blend in Maia likelihood starting from 100 games). We can
+start with a continuation depth of 6 ply. Accuracy > speed."
+
+- **Where**: the move menu (right-click, long-press on the phone) of any move in a study chapter or
+  on the analysis board, "Lc0 vs Maia continuation", unless the game is over after it. A dialog:
+  Lc0's side (the board's side at first), the moves (6 plies at first; 2–12), Lc0's search (800
+  nodes at first; 100, 400, 800, 1,600), Start. The moves are listed as they are decided, each
+  with its source; Stop ends at once; at the end "Add to the chapter" (the moves after the move,
+  followed where the chapter has them already, the board on the last), Copy, Run again.
+- **Lc0's move: a search, not its policy alone** (accuracy over speed). `src/core/lc0/search.ts`:
+  Lc0's PUCT tree search with v0.32's defaults (cpuct 1.745, base 38739, factor 3.894; FPU
+  reduction 0.330; the network's Q = W − L; a mate −1, stalemate, dead position, fifty moves,
+  threefold 0, a twofold inside the tree 0 as `TwoFoldDraws`; the most visited move, then Q, then
+  policy; a mate in one at once). One playout at a time (no virtual loss). It stops once the
+  runner-up cannot catch up in the nodes left: exact, so the move is the one the full count would
+  give ("decided early" in the dialog). No tree kept between moves (a kept tree's twofold draws
+  were judged from the old root). It runs in a worker of its own (`lc0Worker.ts`'s `search`), so
+  the board's Lc0 row keeps answering.
+  - **Measured** (2026-10-31, cloud container, Node, one thread): a network run 100 ms (two
+    threads 77 ms, four 92 ms: not used). On 31 positions from Maia 2000's games (ply 14–44),
+    each pick scored by Stockfish 18 lite at depth 18, mean loss against its best: policy 13.6 cp
+    (6 over 30 cp), 100 nodes 8.2 (4), 400 nodes 5.7 (2), 800 nodes 6.0 (2). 800 is the default
+    for "accuracy > speed" though it measured no better than 400 on this small set; 400 is there
+    for a quicker line. A unit test keeps one of them: a3 (policy, −0.24) against Bg4 (search).
+- **People's move** (`src/core/lc0/continuation.ts`, `opponentPick`): the Lichess database at the
+  explorer's filter (this device's speeds and ratings), its most played move from **100 games**
+  (`BLEND_GAMES`); under that, w · its share + (1 − w) · Maia's likelihood with w = games / 100,
+  the likeliest taken; with no games, Maia alone. Maia at the explorer's Maia rating (the one set,
+  or the filter's). Always the likeliest, so a position gives the same line every time. When the
+  database fails (no Lichess login, no answer within a minute), Maia alone, the reason shown;
+  Maia is asked only where the games are under 100.
+- **Downloads**: Lc0's network, Maia and the runtime when not stored (one dialog button).
+
+**As built** (2026-10-31): `src/core/lc0/search.ts` (`lc0Search`, `terminalValue`, `key`);
+`src/core/lc0/continuation.ts` (`opponentPick`, `dbWeight`, `modelContinuation`); `lc0Policy`'s
+`floor` (a search's priors need every move); `positionsTo` in `src/core/study/tree.ts` (from
+ChapterView); the worker's `search` and `stop`; `src/app/continuation.ts`; `src/ui/
+ContinuationDialog.tsx`; the menu item in `MoveMenu.tsx`. Tests: `search.test.ts` (a fake material
+network with priors on the wrong move: a poisoned pawn left, a free piece taken, both colours; the
+visits, early stops, mate in one, a single move; the game's end: mate, stalemate, dead position,
+fifty moves, threefold, a twofold inside the tree and not before it), `continuation.test.ts` (the
+database alone from 100 games, the blend, Maia alone, castling spellings, illegal moves; the line
+with fake ports: who is asked where, the database failing, the game over, no move, stopped),
+`test/unit/engine/lc0.test.ts` (the real network's search finding Bg4), `continuation.spec.ts` on
+desktop and the emulated phone (the real Lc0 and Maia, a fake explorer: the download, 4. Nxd4 from
+the games, Lc0's moves, Maia's where no games, Stop, the same line again, added to the chapter).
+Live: TESTING.md.

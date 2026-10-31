@@ -13,7 +13,7 @@ import { makeFen } from 'chessops/fen';
 import { makeSan, parseSan } from 'chessops/san';
 import { parseSquare } from 'chessops/util';
 import { chessgroundDests, chessgroundMove } from 'chessops/compat';
-import { normalizeMove, type Position } from 'chessops/chess';
+import { normalizeMove } from 'chessops/chess';
 import type { Key } from '@lichess-org/chessground/types';
 import type { Move, Role } from 'chessops/types';
 import { afterEdits, at, chapter, conflictsHere, doc, edit, feedback, flipBoard, move, play, problem, redoEdit, resolve, SCRATCH, side, study, undoEdit } from '../app/editor.ts';
@@ -25,10 +25,11 @@ import { isKeptMarker, parseTextConflict, type OpenConflict } from '../core/merg
 import type { Brush, Chapter } from '../core/study/model.ts';
 import { setShapes } from '../core/study/ops.ts';
 import { pathKey } from '../core/study/notation.ts';
-import { nodeAt, positionAt, samePath, type Path } from '../core/study/tree.ts';
+import { nodeAt, positionAt, positionsTo, samePath, type Path } from '../core/study/tree.ts';
 import { Board } from './Board.tsx';
 import { addAlternative, altAdding, AltAdding } from './MoveCard.tsx';
 import { CommentDialog, MoveMenu } from './MoveMenu.tsx';
+import { ContinuationDialog } from './ContinuationDialog.tsx';
 import { exportChapterPgn, StudyMenu, StudyMenuButton } from './StudyMenu.tsx';
 import { BranchPicker, branchOpen, chooseBranch, closeBranches, stepOn } from './BranchPicker.tsx';
 import { CommentPanel, Notation } from './Notation.tsx';
@@ -58,19 +59,6 @@ function boardState(c: Chapter, path: Path) {
     if (m) lastMove = chessgroundMove(m) as [Key, Key];
   }
   return { pos, fen: makeFen(pos.toSetup()), dests: chessgroundDests(pos) as Map<Key, Key[]>, lastMove, check: pos.isCheck() };
-}
-
-/** The positions from the chapter's start to the end of `path`, oldest first (Lc0's history, §5.143). */
-function lineTo(c: Chapter, path: Path): Position[] {
-  const pos = positionAt(c, [])!.clone();
-  const out = [pos.clone()];
-  for (const san of path) {
-    const m = parseSan(pos, san);
-    if (!m) break;
-    pos.play(m);
-    out.push(pos.clone());
-  }
-  return out;
 }
 
 /**
@@ -154,7 +142,7 @@ export function ChapterView() {
   useEffect(() => analysePosition(board?.pos), [board]);
   useEffect(() => () => analysePosition(undefined), []);
   // Lc0 reads the line that led to the board (§5.143).
-  useEffect(() => lc0Position(c && board ? lineTo(c, adding ? adding.slice(0, -1) : path) : undefined), [board]);
+  useEffect(() => lc0Position(c && board ? positionsTo(c, adding ? adding.slice(0, -1) : path) : undefined), [board]);
   useEffect(() => () => lc0Position(undefined), []);
   const arrows = useEngineArrows();
 
@@ -341,6 +329,7 @@ export function ChapterView() {
       <BranchPicker />
       <TranspositionList />
       <CommentDialog />
+      <ContinuationDialog />
     </div>
   );
 }

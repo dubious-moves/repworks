@@ -1031,3 +1031,21 @@ q_extension (or give it to a session with q_extension attached), then run
   mirrored colours, 78 positions against Stockfish); the page by Playwright with the real network
   and a scripted Stockfish (desktop and emulated phone). Not against Lc0 itself (it can't run in
   the container), and not on your devices.
+
+## Lc0 vs Maia from a move (§5.144, 2026-10-31)
+
+- On the desktop, logged in to Lichess, right-click a move in a chapter → "Lc0 vs Maia
+  continuation". Start (the first time, the download of Lc0's network and Maia). At 800 nodes a
+  Lc0 move takes up to about a minute and a half (often less: "decided early"). Are the people's
+  moves the ones you'd expect, and Lc0's the ones you'd want to learn? Is 800 worth the wait over
+  400?
+- A position deep in a line, where the database has few games: the moves marked as blended or
+  Maia's. Is 100 games the right point to start blending Maia in?
+- Add to the chapter: the line goes in after the move, and syncs.
+- On the phone: the same, and how long a Lc0 move takes there (search there may be a few times
+  slower; Stop keeps the moves decided so far).
+- The analysis board: the same item on its moves.
+- Checked: the search by unit tests (a fake network; the real one finding a move its policy misses,
+  scored by Stockfish), the whole dialog by Playwright with the real Lc0 and Maia and a fake
+  explorer (desktop and emulated phone), screenshots in headless Chromium. Not on your devices, not
+  against Lc0 itself, and not against the real Lichess database.

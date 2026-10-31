@@ -2,7 +2,8 @@
 // site's encoding on the vendored network against test/fixtures/lc0/reference.json (the same
 // runtime's values when the network was converted, scripts/lc0-reference.mjs): the same top five
 // in the same order, to 1e-5. Lc0 itself can't run here, so beside them, checks that hold only
-// for a correct port: mates in one found, the colours mirrored, the history read.
+// for a correct port: mates in one found, the colours mirrored, the history read. And its search
+// (§5.144) finding a move the policy alone misses.
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -11,6 +12,7 @@ import * as ort from 'onnxruntime-web';
 import type { Position } from 'chessops/chess';
 import { lc0Planes, lc0Policy, wdlFrom, type Wdl } from '../../../src/core/lc0/encode.ts';
 import { history, LINES } from '../../fixtures/lc0/lines.ts';
+import { lc0Search } from '../../../src/core/lc0/search.ts';
 
 const ROOT = join(import.meta.dirname, '..', '..', '..');
 interface Ref {
@@ -75,4 +77,19 @@ test('the colours mirrored give the same answer, and the history is read', async
   const fenOnly = await ask(h.slice(-1));
   assert.notEqual(withHistory.policy[0]!.prob, fenOnly.policy[0]!.prob);
   assert.deepEqual(fenOnly.policy.slice(0, 2).map((m) => m.san).sort(), withHistory.policy.slice(0, 2).map((m) => m.san).sort());
+});
+
+test('the search (§5.144) on the real network: a move its policy alone misses', async () => {
+  const net = async (h: readonly Position[]) => {
+    const r = await session.run({ input: new ort.Tensor('float32', lc0Planes(h), [1, 112, 8, 8]) });
+    return { policy: lc0Policy(h[h.length - 1]!, r.policy!.data as Float32Array, 0, undefined, 0), wdl: wdlFrom(r.wdl!.data as Float32Array) };
+  };
+  // From a Maia game (2026-10-31): the policy's a3 loses 0.24 by Stockfish 18 at depth 18, the
+  // search's Bg4 nothing.
+  const h = history({ name: 'a Maia game', fen: '2r2rk1/p3nppp/1p1q4/3p4/1p1P4/1Q2PB1P/PP3PP1/2R2RK1 w - - 2 18', moves: '' });
+  assert.equal((await net(h)).policy[0]!.san, 'a3');
+  const r = await lc0Search({ history: h, nodes: 100, net });
+  assert.equal(r.san, 'Bg4');
+  assert.ok(r.nodes <= 100 && r.evals <= r.nodes);
+  assert.equal(r.moves.reduce((n, m) => n + m.visits, 0), r.nodes - 1);
 });
