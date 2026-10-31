@@ -70,6 +70,9 @@ test('a refused token keeps local work, says so, and a new token sends it', asyn
   github.faults.set('commit', { kind: 'auth' });
   await page.getByText('Settings and debug').click();
   await page.getByRole('button', { name: 'Record a test review' }).click();
+  // The review is stored before the sync is asked for, or the sync can run with nothing to push
+  // and never meet the refused token (a flaky failure on the phone, 2026-10-31).
+  await expect(page.locator('.chip')).toHaveText('1 change waiting');
   await page.getByRole('button', { name: 'Sync now' }).click();
   await expect(page.getByRole('alert')).toContainText('GitHub refused the token');
   await expect(page.locator('.chip')).toHaveText('token refused');
