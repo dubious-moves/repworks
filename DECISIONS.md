@@ -1272,7 +1272,7 @@ The technical calls, each with its reason:
 - **Checklists are kept on the device that made them**, as regenerable definitions (mistake-lab's
   are too); the exclusions (`drop` on `c|<leafKey>`) and the results (`practice` with the preset)
   are synced, so a checklist made again on the other device shows the same progress. A checklist
-  drill stopped counts nothing.
+  drill stopped counts as a loss (was: nothing; revision of 2026-10-31 below).
 - **Two small fixes over mistake-lab, on purpose**: a castle that gives check is matched and spoken
   as a castle by voice input; the game trainer's board sends castling as standard UCI, as the
   analyzer's lines and Stockfish write it.
@@ -1968,3 +1968,11 @@ The technical calls, each with its reason:
   database weighing games / 100), Maia alone with none or when the database fails. The likeliest
   move always, so the line is reproducible. Why: the owner's request, 2026-10-31.
 - **The line goes into the chapter only when asked** ("Add to the chapter"), with no comments.
+
+## Revision of 2026-10-31 (a checklist drill stopped counts as a loss)
+- **Stop in a checklist drill's game records a loss** at its difficulty, shown on the line's chip
+  (Medium 0/1) and in its last five; the end screen says "Counted as a loss" whatever the eval, as
+  the drill is won only by mate or Claim victory. Was: a stopped drill counted nothing (mistake-lab's
+  abandoned drill), though the end screen said "Counted as a loss". A game the opponent couldn't
+  answer still counts nothing. Why: the owner, 2026-10-31: the won / total "doesn't seem to count
+  games where I stopped the game and it counted as a loss, it should".

@@ -6,7 +6,8 @@
 // A move hovered shows its position. The first line drilled at Easy (Maia's rating set to 1600):
 // its lead-up (a move off the prep refused), then a game from its end against the explorer's
 // moves, judged by the fake engine at +12 three times running, won by Claim victory: the line
-// checked off at Easy, the block's progress 17%. The list and the win synced; a second device
+// checked off at Easy, the block's progress 17%; then Medium stopped in its game, counted a loss
+// (Medium 0/1). The list and the win synced; a second device
 // shows the same list after its sync, with no explorer call. Then a list kept on a device before
 // §5.130 carried into the log after the first sync; a line taken out (asked first) and restored;
 // the Alapin line paused on another device, hidden here after a sync; a drill's old address.
@@ -169,8 +170,29 @@ test('a checklist made on its page, a line drilled at Easy through its lead-up a
   await expect(again.getByTestId('checklist-line').nth(0).getByRole('button', { name: /Medium/ })).toBeEnabled();
   // One win of two lines × three levels.
   await expect(again.getByTestId('checklist-progress')).toHaveText('17%');
+
+  // Medium, stopped once the game is under way: a loss, on the chip (0 of 1), the line not checked off.
+  await again.getByTestId('checklist-line').nth(0).getByRole('button', { name: /Medium/ }).click();
+  await expect(page).toHaveURL(/&preset=medium$/);
+  await expect(drill).toHaveAttribute('data-step', '1');
+  for (const [from, to, step] of [['c7', 'c5', '3'], ['d7', 'd6', '5']] as const) {
+    await clickSquare(page, from, 'black');
+    await clickSquare(page, to, 'black');
+    await expect(drill).toHaveAttribute('data-step', step);
+  }
+  await clickSquare(page, 'c5', 'black');
+  await clickSquare(page, 'd4', 'black');
+  await expect(game).toHaveAttribute('data-moves', '1');
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  await page.getByRole('button', { name: /^Stop/ }).click();
+  await expect(page.getByTestId('practice-end')).toContainText('Stopped. Counted as a loss.');
+  await page.evaluate(() => (location.hash = '#/checklist'));
+  const after = await block(page);
+  await expect(after.getByTestId('checklist-line').nth(0).getByRole('button', { name: /Medium/ })).toHaveText('Medium 0/1');
+  await expect(after.getByTestId('checklist-progress')).toHaveText('17%');
   await sync(page);
   await expect.poll(() => progress(git), { timeout: 15_000 }).toContain(`"k":"practice","card":"x|${key(LINE)}","res":"win","preset":"easy"`);
+  expect(progress(git)).toContain(`"k":"practice","card":"x|${key(LINE)}","res":"loss","preset":"medium"`);
   expect(progress(git)).toContain(`"k":"checklist","card":"t|Rep0Najd","color":"black","ply":0,"count":10,"lines":[{"m":"${ucis(LINE).join(' ')}","p":0.7},{"m":"${ucis(ALAPIN).join(' ')}","p":0.3}]`);
 
   // The other device: the same list and its progress after its sync, and the explorer never asked.

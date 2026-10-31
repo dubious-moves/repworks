@@ -5306,7 +5306,7 @@ draw half, coloured as mistake-lab's, ✓ when won, opened in order; ✕; the un
 Practise) and `#/checklist/<sid>/<n>?preset=…` (the drill: the lead-up from the start, the
 opponent's moves played, a move off the prep refused; then §5.57's game from the line's end, silent,
 the preset's opponent, never collapsing, won by mate or Claim victory: a `practice` event at the
-leaf with the preset; stopped, nothing is counted). The weak spots' practice lens opens a
+leaf with the preset; stopped, a loss is counted, DECISIONS.md's revision of 2026-10-31). The weak spots' practice lens opens a
 checklist line's drill at that difficulty. Maia's rating per preset is the preset's (mistake-lab's
 adjustable one isn't built). Tests: `test/unit/core/games/checklist.test.ts`, **the same
 variations, reserve and gaps as mistake-lab's own `generateTodoVariations`** on six cases of

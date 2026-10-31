@@ -717,7 +717,10 @@ function finish(g: number, reason: EndReason): void {
   const p = practice.peek();
   if (!p || p.gen !== g || p.phase === 'over') return;
   const userCp = lastAfterCp(p);
-  const result: 'win' | 'draw' | 'loss' = reason === 'mate' || reason === 'claim' ? 'win' : reason === 'mated' || reason === 'collapse' ? 'loss' : isDraw(reason) ? 'draw' : resultOf(userCp);
+  // A checklist drill stopped is given up: a loss, whatever the eval (it is won only by mate or a
+  // claim), and counted on the line's chip (the owner's request, 2026-10-31).
+  const result: 'win' | 'draw' | 'loss' =
+    reason === 'mate' || reason === 'claim' ? 'win' : reason === 'mated' || reason === 'collapse' || (reason === 'stopped' && p.setup.kind === 'checklist') ? 'loss' : isDraw(reason) ? 'draw' : resultOf(userCp);
   let grade: Grade | undefined;
   if (p.setup.kind === 'advantage') {
     const outcome: AdvantageOutcome = reason === 'mate' || reason === 'claim' ? 'victory' : isDraw(reason) ? 'draw' : reason === 'interrupted' || reason === 'stopped' ? 'interrupted' : 'collapse';
@@ -731,8 +734,8 @@ function finish(g: number, reason: EndReason): void {
   const userMoves = p.moves.filter((m) => m.isUser).length;
   const finalCp = userCp === undefined ? null : p.setup.color === 'white' ? userCp : -userCp;
   // The scoreboard (mistake-lab's recordPracticeResult): practice from a position, and a checklist's drill.
-  // A checklist drill stopped or interrupted counts nothing (mistake-lab's abandoned drill).
-  if (p.setup.kind !== 'advantage' && reason !== 'interrupted' && !(p.setup.kind === 'checklist' && reason === 'stopped')) {
+  // A game interrupted (the opponent couldn't answer) counts nothing.
+  if (p.setup.kind !== 'advantage' && reason !== 'interrupted') {
     const key = p.setup.leaf ?? keyFen(p.setup.fen)?.key;
     if (key) void recordEvent({ t, k: 'practice', card: practiceCard(key), res: result, ...(p.setup.preset ? { preset: p.setup.preset } : {}), ...(finalCp !== null ? { cp: Math.round(finalCp) } : {}), mv: userMoves });
   }
