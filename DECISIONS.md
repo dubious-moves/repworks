@@ -1950,3 +1950,6 @@ The technical calls, each with its reason:
   own builds can't run in the cloud container and lczero.org is out of its reach; Lichess's
   zerofish runs only tiny networks.
 - **Not in any grading yet.** The owner was unsure; Lc0's W/D/L after a move is available for it.
+- **Lc0's row reads for the board's side**, not White's: its eval and W/D/L for the side at the
+  bottom (the chapter's Orientation). Why: the owner, 2026-10-31: "should be in the perspective
+  of the board, not always white". Stockfish's lines keep White's side.

@@ -68,12 +68,15 @@ test('Lc0â€™s dialog and download, its row, its share and pick beside Stockfishâ
   await expect(dialog).toHaveCount(0, { timeout: 30_000 });
   expect(lc0Files(site)).toHaveLength(3);
 
-  // Its row at the start: +0.13, 31% / 47% / 22%, e4 d4 Nf3 with their shares.
+  // Its row at the start, for the board's side (the test chapter is Black's: White to move, so
+  // Lc0's W/D/L turned): âˆ’0.13, 22% / 47% / 31%; e4 d4 Nf3 with their shares.
   const start = refs.find((r) => r.name === 'start')!;
   const row = panel.getByLabel('Lc0', { exact: true }).and(page.locator('.lc0-row'));
   await expect(row.locator('.lc0-move')).toHaveText(start.top5.slice(0, 3).map((m) => `${m.san} ${fmt(m.prob)}`), { timeout: 30_000 });
-  await expect(row.locator('.engine-eval')).toHaveText('+0.13');
-  await expect(row.locator('.lc0-wdl')).toHaveText(start.wdl.map((x) => `${Math.round(x * 100)}%`).join(' / '));
+  await expect(row.locator('.engine-eval')).toHaveText('-0.13');
+  await expect(row.locator('.engine-eval')).toHaveClass(/white/); // White is ahead
+  await expect(row.locator('.lc0-wdl')).toHaveText([start.wdl[2]!, start.wdl[1]!, start.wdl[0]!].map((x) => `${Math.round(x * 100)}%`).join(' / '));
+  await expect(row.locator('.lc0-wdl')).toHaveAttribute('title', /for Black/);
 
   // Stockfish on: Lc0's share of each line's first move; e4 its pick, d4 within 0.30 of it, g4 not close.
   await panel.getByRole('switch', { name: 'Engine' }).check();
@@ -88,8 +91,9 @@ test('Lc0â€™s dialog and download, its row, its share and pick beside Stockfishâ
   await page.getByRole('button', { name: 'Next move' }).click();
   const e4 = refs.find((r) => r.name === '1. e4')!;
   await expect(row.locator('.lc0-move')).toHaveText(e4.top5.slice(0, 3).map((m) => `${m.san} ${fmt(m.prob)}`), { timeout: 30_000 });
-  // White's side: Black stands a little better after 1. e4 for Lc0.
-  await expect(row.locator('.lc0-wdl')).toHaveText([e4.wdl[2]!, e4.wdl[1]!, e4.wdl[0]!].map((x) => `${Math.round(x * 100)}%`).join(' / '));
+  // Black to move, Black's board: Lc0's W/D/L as it gives it (Black a little worse after 1. e4).
+  await expect(row.locator('.lc0-wdl')).toHaveText(e4.wdl.map((x) => `${Math.round(x * 100)}%`).join(' / '));
+  await expect(row.locator('.engine-eval')).toHaveText('-0.15');
 
   // Remembered: on again after a reload, no dialog, nothing downloaded again.
   await page.reload();

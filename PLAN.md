@@ -7858,7 +7858,10 @@ I'm not sure."
     line whose first move Lc0 likes most, its share marked. Fewer than two close lines, no mark
     (nothing to choose). Not for the threat's lines.
   - **Its own row** under the lines (shown with Stockfish off too): its eval (Lc0's
-    `90·tan(1.5637541897·Q)`), win / draw / loss from White's side, its three likeliest moves.
+    `90·tan(1.5637541897·Q)`) and win / draw / loss **for the side at the bottom of the board**,
+    its three likeliest moves. The eval's colour still says who is ahead. (Built first from White's
+    side, as Stockfish's lines; the owner, 2026-10-31: "should be in the perspective of the board,
+    not always white".)
   - **Its history**: the line from the chapter's start to the board (its last 30 positions), as
     Lc0 reads 8 positions back and repetitions; a FEN-started chapter's start is repeated as Lc0's
     `HistoryFill=fen_only` does. Shares at Lc0's policy temperature, 1.359 (its "P").
@@ -7880,5 +7883,5 @@ policy at temperature; the eval), `pick.test.ts` (close lines, Black's side, mat
 choose), `test/unit/engine/lc0.test.ts` (the network on onnxruntime-web under Node: its inputs and
 outputs, 16 lines against the fixture to 1e-5, mates in one, mirrored colours, the history read);
 `test/e2e/lc0.spec.ts` (desktop and phone, the real network beside a scripted Stockfish: Cancel
-downloads nothing, the download, the row as the fixture, the shares and the pick, the next
+downloads nothing, the download, the row as the fixture turned to the board's side (Black's), the shares and the pick, the next
 position, remembered without a second download, off). Live: TESTING.md.
