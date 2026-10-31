@@ -1000,3 +1000,16 @@ q_extension (or give it to a session with q_extension attached), then run
   report reads it (the side, the end of prep, the evals) without help.
 - Do you want the plans trainable? The skill offers an idea deck from the games (cards at the
   turning points and the rare moves); say if that should be the default.
+
+## A line added to the checklist by hand (§5.142, 2026-10-31)
+- Checked by unit tests and Playwright with the fake data repo and explorer (desktop and an
+  emulated phone), and by screenshots in headless Chromium; not on a device.
+- In a repertoire study, go to a move deep in a line the checklist doesn't list (a second-choice
+  move of yours, say), ☰ → "Add to the checklist". Also add a whole line from the training
+  screen's line list (a line's ⋯). On the checklist page both are listed after the made lines,
+  marked "added"; Make again and check they are still there, and that the number of other lines
+  is the "Lines" asked for. Drill one at Easy.
+- On the phone after a sync: the same added lines. ✕ on one there asks first and takes it out;
+  back on the desktop after a sync it is gone.
+- Is the ☰ menu (the line to the move shown) the right place, and should an added line come first
+  rather than last?

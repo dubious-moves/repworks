@@ -5136,6 +5136,13 @@ a.button.disabled {
 .checklist-lines li.gone {
   opacity: 0.7;
 }
+/* A line added by hand (§5.142): kept when the list is made again. */
+.checklist-added {
+  font-size: 0.75rem;
+  padding: 0 6px;
+  border-radius: 8px;
+  border: 1px solid var(--accent-border);
+}
 /* A line's moves: each shows its position on a small board, over what follows, when hovered or tapped. */
 .checklist-moves {
   position: relative;

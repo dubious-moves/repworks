@@ -325,7 +325,7 @@ test('the ☰ menu: the explorer, undo and redo, Copy FEN, the study’s own; th
   await more.click();
   await expect(more).toHaveAttribute('aria-expanded', 'true');
   await expect(menu.getByRole('menuitemcheckbox')).toHaveAccessibleName('Explorer');
-  await expect(menu.getByRole('menuitem')).toHaveText([/^↶Undo/, /^↷Redo/, 'Copy FEN', 'Analyse from here', 'Storm from here', 'Practise from here', '+New chapter…', 'Chapter settings…', 'Manage chapters…', '⤓Export PGN', 'Study settings…']);
+  await expect(menu.getByRole('menuitem')).toHaveText([/^↶Undo/, /^↷Redo/, 'Copy FEN', 'Analyse from here', 'Storm from here', 'Practise from here', 'Add to the checklist', '+New chapter…', 'Chapter settings…', 'Manage chapters…', '⤓Export PGN', 'Study settings…']);
   await expect(menu.getByRole('menuitem', { name: 'Undo' })).toBeDisabled();
   await expect(menu.getByRole('menuitem', { name: 'Redo' })).toBeDisabled();
   // ☰ again closes it, as Escape does; the keys move along the line again afterwards.

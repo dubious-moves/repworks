@@ -3,11 +3,13 @@
 // "Line n" with a state dot and "Due now" / "Due in 3 days"; a line clicked is trained at once,
 // due or not. Here each line also shows its own moves, from where it leaves the line before it.
 // Each line's menu (⋯, or a right-click) pauses it or marks it must-learn (§5.70); a paused line
-// shows ⏸ for its dot, and the chapter's menu pauses or unpauses all its lines.
+// shows ⏸ for its dot, and the chapter's menu pauses or unpauses all its lines. A line's menu also
+// adds it to its study's variation checklist, or takes it off (§5.142).
 import { decidingNow } from '../app/time.ts';
 import { signal } from '@preact/signals';
 import { useEffect, useMemo } from 'preact/hooks';
 import type { Position } from 'chessops/chess';
+import { chapterLine, isPicked, pickLine } from '../app/checklist.ts';
 import { open } from '../app/mode.ts';
 import { setMark, setMarks } from '../app/lineMarks.ts';
 import { addNext, growError, growing, openPriority } from '../app/priority.ts';
@@ -17,6 +19,7 @@ import { header } from '../core/study/model.ts';
 import { startPosition } from '../core/study/tree.ts';
 import type { LineMark } from '../core/progress/events.ts';
 import type { Line } from '../core/repertoire/index.ts';
+import type { Chapter } from '../core/study/model.ts';
 
 /** Chapters opened in the list, by `sid/cid`; kept while the app runs, as Qchess keeps them. */
 const expanded = signal<ReadonlySet<string>>(new Set());
@@ -77,6 +80,11 @@ export function LineList(props: {
   return (
     <>
     {scope !== undefined && <PriorityBar groups={groups} scope={scope} />}
+    {pickSaid.value && (
+      <p class="muted line-list-said" role="status" data-testid="line-list-said">
+        {pickSaid.value}
+      </p>
+    )}
     <div class="line-list" role="list" aria-label="Lines">
       {groups.map((g) => {
         const heading = scope === undefined && g.sid !== study ? (study = g.sid) : undefined;
@@ -252,6 +260,7 @@ function ChapterBlock(props: { group: ChapterRows; data: TrainData; open: boolea
                     <button type="button" class="secondary" onClick={() => void lineMark(row.line, row.line.must ? 'none' : 'must')}>
                       {row.line.must ? 'Not must-learn' : 'Must learn'}
                     </button>
+                    <ChecklistToggle chapter={chapter} line={row.line} />
                   </div>
                 )}
               </div>
@@ -262,6 +271,34 @@ function ChapterBlock(props: { group: ChapterRows; data: TrainData; open: boolea
     </>
   );
 }
+
+/** The line on its study side's checklist, or off it (§5.142); none for a chapter not played from the start. */
+function ChecklistToggle(props: { chapter: Chapter | undefined; line: Line }) {
+  const at = props.chapter && chapterLine(props.chapter, props.line.path);
+  if (!at) return null;
+  const on = isPicked(props.line.sid, at.color, at.uci);
+  return (
+    <button
+      type="button"
+      class="secondary"
+      title={on ? 'This line was added to the checklist: take it out' : 'Drill this line in the variation checklist, whatever Make again lists'}
+      onClick={() => {
+        menuFor.value = undefined;
+        void pickLine(props.line.sid, at.color, at.uci, !on).then((said) => {
+          pickSaid.value = said;
+          clearTimeout(saidTimer);
+          saidTimer = setTimeout(() => (pickSaid.value = undefined), 5000);
+        });
+      }}
+    >
+      {on ? 'Out of the checklist' : 'Add to the checklist'}
+    </button>
+  );
+}
+
+/** What the last Add to the checklist said, under the list's bar. */
+const pickSaid = signal<string | undefined>(undefined);
+let saidTimer: ReturnType<typeof setTimeout> | undefined;
 
 async function lineMark(line: Line, mark: LineMark): Promise<void> {
   menuFor.value = undefined;

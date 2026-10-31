@@ -5,13 +5,15 @@
 // which a phone's head had squeezed beside the chapter's name. Between the two, what starts from
 // the move shown (§5.90, out of the move's menu): Analyse, Storm, Practise and its plan card.
 // Export PGN downloads the open chapter as its file in the data repo, edits not yet synced included.
-// An idea deck's cards are made or removed at the end (§5.128). On the analysis board it opens
+// The line to the move shown is added to the checklist, or taken off it (§5.142), in a repertoire
+// chapter. An idea deck's cards are made or removed at the end (§5.128). On the analysis board it opens
 // with Flip board (§5.134).
 import { signal } from '@preact/signals';
 import { makeFen } from 'chessops/fen';
 import { at, chapter, doc, feedback, flipBoard, redoEdit, SCRATCH, side, study, undoEdit } from '../app/editor.ts';
 import { prefs, setPrefs } from '../app/explorer.ts';
 import { open } from '../app/mode.ts';
+import { chapterLine, isPicked, pickLine } from '../app/checklist.ts';
 import { enrolStudy, ideaEnrolled } from '../app/ideas.ts';
 import { planEnrolled, setPlanCard } from '../app/plans.ts';
 import { enrolledIn, isDeckChapter } from '../core/ideas/cards.ts';
@@ -163,6 +165,28 @@ function IdeaCards(props: { run: (f: () => void) => () => void }) {
   );
 }
 
+/** The line to the move shown on the study side's checklist (§5.142), or off it: in a repertoire chapter played from the start. */
+function ChecklistItem(props: { run: (f: () => void) => () => void }) {
+  const s = study.value;
+  const c = chapter.value;
+  const path = at.value;
+  if (!s || !c || s.meta.kind !== 'repertoire' || !trainData.value?.chapters.has(`${s.sid}/${s.cid}`)) return null;
+  const line = chapterLine(c, path);
+  if (!line) return null;
+  const on = isPicked(s.sid, line.color, line.uci);
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      title={on ? 'This line was added to the checklist: take it out' : 'Drill this line (to the move shown) in the variation checklist, whatever Make again lists'}
+      onClick={props.run(() => void pickLine(s.sid, line.color, line.uci, !on).then((said) => (feedback.value = said)))}
+    >
+      <span class="menu-check" aria-hidden="true">{on ? '✓' : ''}</span>
+      {on ? 'In the checklist (take out)' : 'Add to the checklist'}
+    </button>
+  );
+}
+
 /** What starts from the move shown, in a study: the analysis board, the storm, a game, a plan card. */
 function FromHere(props: { run: (f: () => void) => () => void }) {
   const s = study.value;
@@ -197,6 +221,7 @@ function FromHere(props: { run: (f: () => void) => () => void }) {
         <span class="menu-check" aria-hidden="true" />
         Practise from here
       </button>
+      <ChecklistItem run={run} />
       {plannable && (
         <button
           type="button"

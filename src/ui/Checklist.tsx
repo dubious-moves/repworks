@@ -5,7 +5,9 @@
 // opponent's strength), checked off by a win, the last five attempts' score on each chip; a line
 // taken out (✕) is replaced from the reserve. The drill: the line's lead-up played from the start
 // (your moves asked, the opponent's played; a move off your prep is refused), then a game from its
-// end against the level's opponent, won by mate or Claim victory.
+// end against the level's opponent, won by mate or Claim victory. Lines added by hand (§5.142, from
+// the study's ☰ menu or a line's ⋯ in the line list) follow the made list's, marked "added", and
+// stay when the list is made again; their ✕ takes them off.
 import { signal } from '@preact/signals';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { Position } from 'chessops/chess';
@@ -14,7 +16,7 @@ import { makeSanAndPlay } from 'chessops/san';
 import { parseSquare } from 'chessops/util';
 import type { Key } from '@lichess-org/chessground/types';
 import { analyseFrom, entryKey, open } from '../app/mode.ts';
-import { chapterNameAt, checklistMaia, checklistViews, excludeLine, generating, makeChecklist, MAIA_MAX, MAIA_MIN, restoreExcluded, setChecklistMaia, stopChecklist, touch, type ChecklistView } from '../app/checklist.ts';
+import { chapterNameAt, checklistMaia, checklistViews, excludeLine, generating, makeChecklist, MAIA_MAX, MAIA_MIN, restoreExcluded, setChecklistMaia, stopChecklist, touch, unpickLine, type ChecklistView } from '../app/checklist.ts';
 import { openingNameOf } from '../app/games.ts';
 import { lichessToken } from '../app/lichess.ts';
 import { leavePractice, parkPractice, practice, startPractice, takeUpPractice } from '../app/practice.ts';
@@ -98,6 +100,7 @@ export function ChecklistScreen(props: { sid?: string; side?: Color }) {
         </div>
       </div>
       <p class="muted">Each study’s most likely lines, by the explorer’s games at 1600–2500. Win a line at Easy, then Medium, then Hard, to check it off.</p>
+      <p class="muted">Add a line of your own from a study’s ☰ menu (the line to the move shown) or a line’s ⋯ in the line list: it stays when the list is made again.</p>
       {!lichessToken() && <p class="muted">The explorer needs the Lichess login: without it every line is weighted the same.</p>}
       <MaiaSettings />
       {!trainData.value ? (
@@ -193,21 +196,31 @@ function StudyBody(props: { view: ChecklistView }) {
         )}
       </div>
       {list && (
+        <p class="muted">
+          {v.lines.length} line{v.lines.length === 1 ? '' : 's'}
+          {v.picked.length ? ` (${v.picked.length} added by you)` : ''}, made {isoDay(list.made)}
+          {list.calls !== undefined ? ` (${list.calls} positions asked${list.cut ? ', cut short' : ''})` : ''}.
+        </p>
+      )}
+      {!list && v.picked.length > 0 && (
+        <p class="muted">
+          {v.picked.length} line{v.picked.length === 1 ? '' : 's'} added by you; Make adds the most likely lines to {v.picked.length === 1 ? 'it' : 'them'}.
+        </p>
+      )}
+      {v.lines.length > 0 && (
+        <ol class="checklist-lines">
+          {v.lines.map((l) => (
+            <Line key={l.v.leafKey} line={l} view={v} results={results.filter((r) => r.key === l.v.leafKey)} />
+          ))}
+        </ol>
+      )}
+      {v.paused > 0 && (
+        <p class="muted" data-testid="checklist-paused">
+          {v.paused} paused line{v.paused === 1 ? '' : 's'} hidden: unpause {v.paused === 1 ? 'it' : 'them'} to bring {v.paused === 1 ? 'it' : 'them'} back.
+        </p>
+      )}
+      {list && (
         <>
-          <p class="muted">
-            {list.lines.length} line{list.lines.length === 1 ? '' : 's'}, made {isoDay(list.made)}
-            {list.calls !== undefined ? ` (${list.calls} positions asked${list.cut ? ', cut short' : ''})` : ''}.
-          </p>
-          <ol class="checklist-lines">
-            {list.lines.map((l) => (
-              <Line key={l.v.leafKey} line={l} view={v} results={results.filter((r) => r.key === l.v.leafKey)} />
-            ))}
-          </ol>
-          {list.paused > 0 && (
-            <p class="muted" data-testid="checklist-paused">
-              {list.paused} paused line{list.paused === 1 ? '' : 's'} hidden: unpause {list.paused === 1 ? 'it' : 'them'} to bring {list.paused === 1 ? 'it' : 'them'} back.
-            </p>
-          )}
           <Excluded view={v} />
           {list.gaps.length > 0 && (
             <details>
@@ -284,7 +297,7 @@ function squares(uci: string): [Key, Key] | undefined {
 }
 
 function Line(props: { line: ShownLine; view: ChecklistView; results: { res: string; preset?: string }[] }) {
-  const { v, gone } = props.line;
+  const { v, gone, added } = props.line;
   const view = props.view;
   const done = completedPresets(props.results);
   const stats = presetStats(props.results);
@@ -293,11 +306,25 @@ function Line(props: { line: ShownLine; view: ChecklistView; results: { res: str
   return (
     <li data-testid="checklist-line" class={gone ? 'gone' : undefined}>
       <div class="checklist-line-head">
-        {name && <strong class="checklist-name">{name}</strong>} <span class="muted">{(v.cumProb * 100).toFixed(1)}%</span>
+        {name && <strong class="checklist-name">{name}</strong>} {added !== 'only' && <span class="muted">{(v.cumProb * 100).toFixed(1)}%</span>}{' '}
+        {added && (
+          <span class="checklist-added" data-testid="checklist-added" title="Added by you: it stays when the list is made again">
+            added
+          </span>
+        )}
       </div>
       <div class="checklist-line">{gone ? <s>{lineText(v.lineSan)}</s> : <Moves id={id} lineUci={v.lineUci} lineSan={v.lineSan} color={view.color} />}</div>
       {gone ? (
-        <p class="muted">No longer in the study · Make again</p>
+        added ? (
+          <p class="muted">
+            No longer in the study ·{' '}
+            <button type="button" class="link" onClick={() => unpickLine(view, props.line)}>
+              Take it out
+            </button>
+          </p>
+        ) : (
+          <p class="muted">No longer in the study · Make again</p>
+        )
       ) : (
         <div class="actions">
           {PRESET_ORDER.map((p) => {
@@ -326,9 +353,11 @@ function Line(props: { line: ShownLine; view: ChecklistView; results: { res: str
             type="button"
             class="link"
             aria-label="Take this line out"
-            title="Take this line out: the next line takes its place"
+            title={added ? 'Take this line out of the checklist' : 'Take this line out: the next line takes its place'}
             onClick={() => {
-              if (confirm(`Take this line out?\n\n${lineText(v.lineSan)}\n\nThe next line takes its place.`)) excludeLine(v);
+              if (added) {
+                if (confirm(`Take this line out of the checklist?\n\n${lineText(v.lineSan)}\n\nYou added it; add it again from the study.`)) unpickLine(view, props.line);
+              } else if (confirm(`Take this line out?\n\n${lineText(v.lineSan)}\n\nThe next line takes its place.`)) excludeLine(v);
             }}
           >
             ✕

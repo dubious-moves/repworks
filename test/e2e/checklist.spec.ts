@@ -12,6 +12,10 @@
 // the Alapin line paused on another device, hidden here after a sync; a drill's old address.
 // Then a drill drawn by repetition (§5.137): a position of the Alapin's lead-up standing the third
 // time in the game played from its end.
+// §5.142: lines added by hand, from the study's ☰ menu (2...Nc6 3.d4, which the walk never takes:
+// the study's first move there is 2...d6) and from the line list's ⋯ (the Alapin): shown before
+// any Make, kept by Make and Make again, the Alapin left out of the made list's lines; ✕ on one
+// asked and taken out; the events synced.
 import { test, expect, type Page } from '@playwright/test';
 import { Chess } from 'chessops/chess';
 import { makeFen } from 'chessops/fen';
@@ -19,7 +23,7 @@ import { parseSan } from 'chessops/san';
 import { makeUci } from 'chessops/util';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
 import type { FakeGit } from '../support/fakeGit.ts';
-import { clickSquare } from './board.ts';
+import { clickSquare, studyMenu } from './board.ts';
 import { fakeEngine, SLOW } from './engine.ts';
 import { fakeExplorer, lichessLogin, serveExplorer, type FakeExplorer } from './explorer.ts';
 import { serveGithub, world } from './github.ts';
@@ -307,4 +311,82 @@ test('a drill drawn by repetition, the lead-up’s positions counted: after 2.c3
     await clickSquare(page, to, 'black');
   }
   await expect(page.getByTestId('practice-end')).toContainText('Draw by threefold repetition. Counted as a draw.');
+});
+
+test('lines added by hand from the study and the line list, kept by Make again, one taken out', async ({ page }) => {
+  test.setTimeout(90_000);
+  const { git, github } = world();
+  await setUp(page, github, 'desktop');
+  const NC6 = ['e4', 'c5', 'Nf3', 'Nc6', 'd4'];
+  // From the study's ☰ menu: the line to the move shown, ending on the opponent's move.
+  await page.evaluate(() => (location.hash = '#/study/Rep0Najd/Ch1Najdf?at=e4,c5,Nf3,Nc6,d4'));
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 Nc6 d4');
+  await studyMenu(page, 'Add to the checklist');
+  await expect(page.locator('.cv-board .feedback')).toHaveText('Added to the checklist: it stays when the list is made again');
+  await page.getByRole('button', { name: 'More', exact: true }).click();
+  await expect(page.getByRole('menu', { name: 'More' }).getByRole('menuitem', { name: 'In the checklist (take out)' })).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  // From a line's ⋯ in the line list: the Alapin.
+  await page.evaluate(() => (location.hash = '#/train/Rep0Najd'));
+  const list = page.getByRole('complementary', { name: 'Lines to train' });
+  const show = list.getByRole('button', { name: /Show lines/ });
+  await expect(show).toHaveAttribute('aria-expanded', 'false');
+  await show.click();
+  await list.getByRole('button', { name: 'Alapin', exact: true }).click();
+  const row = list.locator('.line-list-row').filter({ hasText: 'Nf6' });
+  await row.getByRole('button', { name: 'Line menu' }).click();
+  await row.getByRole('button', { name: 'Add to the checklist' }).click();
+  await expect(page.getByTestId('line-list-said')).toHaveText('Added to the checklist: it stays when the list is made again');
+  await row.getByRole('button', { name: 'Line menu' }).click();
+  await expect(row.getByRole('button', { name: 'Out of the checklist' })).toBeVisible();
+  await row.getByRole('button', { name: 'Line menu' }).click();
+
+  // On the checklist before any Make: both, marked added, with no share.
+  await page.evaluate(() => (location.hash = '#/checklist?sid=Rep0Najd&side=black'));
+  const section = await block(page);
+  const lines = section.getByTestId('checklist-line');
+  await expect(lines).toHaveCount(2);
+  await expect(section).toContainText('2 lines added by you');
+  await expect(lines.nth(0).locator('.checklist-line')).toHaveText(/^1\. e4 c5 2\. Nf3 Nc6 3\. d4\s*$/);
+  await expect(lines.nth(1).locator('.checklist-line')).toHaveText(/^1\. e4 c5 2\. c3 Nf6\s*$/);
+  await expect(lines.getByTestId('checklist-added')).toHaveCount(2);
+  await expect(lines.nth(0).locator('.checklist-line-head')).not.toContainText('%');
+  await expect(section.getByTestId('checklist-progress')).toHaveText('0%');
+
+  // Made, then made again: the main line from the explorer, the added lines after it, the Alapin's slot not taken twice.
+  await section.getByLabel('Plies').selectOption('0');
+  for (const name of ['Make', 'Make again']) {
+    await section.getByRole('button', { name, exact: true }).click();
+    await expect(section.getByRole('button', { name: 'Make again' })).toBeEnabled();
+    await expect(lines).toHaveCount(3);
+    await expect(lines.nth(0).locator('.checklist-line')).toHaveText(/^1\. e4 c5 2\. Nf3 d6 3\. d4 cxd4/);
+    await expect(lines.nth(0).getByTestId('checklist-added')).toHaveCount(0);
+    await expect(lines.nth(1).locator('.checklist-line')).toHaveText(/^1\. e4 c5 2\. Nf3 Nc6 3\. d4\s*$/);
+    await expect(lines.nth(2).locator('.checklist-line')).toHaveText(/^1\. e4 c5 2\. c3 Nf6\s*$/);
+    await expect(section).toContainText('3 lines (2 added by you), made');
+  }
+  await sync(page);
+  await expect.poll(() => progress(git), { timeout: 15_000 }).toContain(`"k":"pick","card":"t|Rep0Najd","color":"black","m":"${ucis(NC6).join(' ')}","on":true`);
+  expect(progress(git)).toContain(`"k":"pick","card":"t|Rep0Najd","color":"black","m":"${ucis(ALAPIN).join(' ')}","on":true`);
+  expect(progress(git)).toContain(`"k":"checklist","card":"t|Rep0Najd","color":"black","ply":0,"count":10,"lines":[{"m":"${ucis(LINE).join(' ')}","p":0.7}]`);
+
+  // An added line's drill, by its moves.
+  await lines.nth(1).getByRole('button', { name: 'Easy' }).click();
+  await expect(page).toHaveURL(new RegExp(`#/checklist/Rep0Najd\\?side=black&line=${ucis(NC6).join(',')}&preset=easy$`));
+  await expect(page.getByTestId('checklist-drill')).toHaveAttribute('data-step', '1');
+  await page.evaluate(() => (location.hash = '#/checklist?sid=Rep0Najd&side=black'));
+
+  // ✕ on an added line: asked, then taken out of the checklist.
+  let asked = '';
+  page.once('dialog', (d) => {
+    asked = d.message();
+    void d.accept();
+  });
+  await lines.nth(2).getByRole('button', { name: 'Take this line out' }).click();
+  expect(asked).toContain('Take this line out of the checklist?');
+  await expect(lines).toHaveCount(2);
+  await expect(section).toContainText('2 lines (1 added by you), made');
+  await sync(page);
+  await expect.poll(() => progress(git)).toContain(`"k":"pick","card":"t|Rep0Najd","color":"black","m":"${ucis(ALAPIN).join(' ')}","on":false`);
 });

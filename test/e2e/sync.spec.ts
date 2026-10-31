@@ -101,6 +101,8 @@ test('the REST write path (write=rest in the link) pushes too', async ({ page })
   await page.getByText('Settings and debug').click();
   await expect(page.locator('.debug')).toContainText('writes via REST');
   await page.getByRole('button', { name: 'Record a test review' }).click();
+  // The review is stored before the sync is asked for, or the sync can run with nothing to push.
+  await expect(page.locator('.chip')).toHaveText('1 change waiting');
   await page.getByRole('button', { name: 'Sync now' }).click();
   const day = new Date().toISOString().slice(0, 10);
   await expect.poll(() => git.textsOf().get(`progress/${id}/${day}.jsonl`) ?? '').toContain('"card":"r|test|e2e4"');

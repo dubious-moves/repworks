@@ -14,15 +14,24 @@
 // over a study's active lines only. Controls (2026-10-26), each failing exactly the named test:
 // - a reply the study knows on a paused line counted as a gap → "the walk over active lines only";
 // - paused lines shown as active → "what a kept list shows".
+//
+// §5.142: lines added by hand: which the study has (a second own move, a line ending on a reply it
+// only reaches), the picks read from their events, and how they join a kept list. Controls
+// (2026-10-31), each failing exactly that test: the last reply needing the study's answer; a pick
+// the list has shown twice; a pick of a paused list line counted twice; `reaches` over paused lines.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { apportionSlots, completedPresets, excludeVariation, gapsOf, generateChecklist, linesOf, presetOpen, presetStats, recordOf, shownLines, studyMovesOf, studyPlays, type StudyMoves } from '../../../../src/core/games/checklist.ts';
+import { apportionSlots, completedPresets, excludeVariation, gapsOf, generateChecklist, linesOf, picksOf, presetOpen, presetStats, recordOf, shownLines, studyHasLine, studyMovesOf, studyPlays, withPicks, type StudyMoves } from '../../../../src/core/games/checklist.ts';
 import { indexStudies } from '../../../../src/core/repertoire/index.ts';
 import { lineCard } from '../../../../src/core/progress/cards.ts';
 import { markLines } from '../../../../src/core/train/paused.ts';
 import { addLine, newChapter } from '../../../../src/core/study/ops.ts';
 import type { PositionKey } from '../../../../src/core/chess/positionKey.ts';
+import { standardUci } from '../../../../src/core/chess/uci.ts';
+import { Chess } from 'chessops/chess';
+import { parseSan } from 'chessops/san';
+import type { NormalMove } from 'chessops/types';
 
 interface Fixture {
   color: 'white';
@@ -170,4 +179,96 @@ test('the walk over active lines only (§5.130): a paused branch is neither a li
   const none = studyMovesOf(index, 'Rep00002', 'white', sides, false);
   assert.equal(none.covers(first.leafKey), false);
   assert.equal(studyMovesOf(index, 'Rep00001', 'black', sides, false).moveAt(list.variations[0]!.leafKey), undefined);
+});
+
+
+/** UCI moves from the start, for SAN moves. */
+function ucis(sans: string): string[] {
+  const pos = Chess.default();
+  return sans.split(' ').map((san) => {
+    const m = parseSan(pos, san) as NormalMove;
+    const uci = standardUci(pos, m);
+    pos.play(m);
+    return uci;
+  });
+}
+
+test('lines added by hand (§5.142): which the study has, the picks from their events, and how they join a kept list', async () => {
+  const sides = () => 'white' as const;
+  // The fixture's study, and a chapter ending on Black's move after a second White move (4.Bc4, where the walk takes 4.Bb5).
+  const extra = newChapter('Bc4xxxxx', 'Rep', 'Bc4', 'white');
+  assert.ok(extra.ok);
+  const bc4 = addLine(extra.value, [], 'e4 e5 Nf3 Nc6 Bc4 Bc5'.split(' '));
+  assert.ok(bc4.ok);
+  // And one ending on 4...Nge7, a reply only it meets.
+  const extra2 = newChapter('Nge7xxxx', 'Rep', 'Nge7', 'white');
+  assert.ok(extra2.ok);
+  const nge7 = addLine(extra2.value, [], 'e4 e5 Nf3 Nc6 Bb5 Nge7'.split(' '));
+  assert.ok(nge7.ok);
+  const ix = indexStudies([{ sid: 'Rep00001', kind: 'repertoire', chapters: [...chapters, bc4.value.chapter, nge7.value.chapter] }]);
+  const all = studyMovesOf(ix, 'Rep00001', 'white', sides, false);
+  assert.equal(studyHasLine(all, 'white', ucis('e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O')), true);
+  // Ending on a reply the study answers, or one it only reaches (the chapter's end).
+  assert.equal(studyHasLine(all, 'white', ucis('e4 e5 Nf3 Nc6 Bb5 a6')), true);
+  assert.equal(studyHasLine(all, 'white', ucis('e4 e5 Nf3 Nc6 Bc4 Bc5')), true);
+  // Not the walk's line: 4.Bc4 is the study's second move there.
+  assert.equal(studyPlays(all, 'white', ucis('e4 e5 Nf3 Nc6 Bc4')), true);
+  assert.equal(studyMovesOf(ix, 'Rep00001', 'white', sides, false).moveAt(linesOf([{ m: ucis('e4 e5 Nf3 Nc6').join(' '), p: 0 }])[0]!.leafKey), ucis('e4 e5 Nf3 Nc6 Bb5')[4]);
+  // A move the study doesn't play, a reply it never meets, nothing, the other side.
+  assert.equal(studyHasLine(all, 'white', ucis('e4 e5 d4')), false);
+  assert.equal(studyHasLine(all, 'white', ucis('e4 e5 Nf3 a6')), false);
+  assert.equal(studyHasLine(all, 'white', ucis('e4 e5 Nf3 Nc6 Bc4 Nf6')), false);
+  assert.equal(studyHasLine(all, 'white', []), false);
+  assert.equal(studyHasLine(studyMovesOf(ix, 'Rep00001', 'black', sides, false), 'black', ucis('e4 e5 Nf3 Nc6 Bc4 Bc5')), false);
+
+  // The picks: per side, the latest event per line deciding, the most recently added last.
+  const a = 'e2e4 e7e5';
+  const b = 'e2e4 c7c5';
+  assert.deepEqual(
+    picksOf(
+      [
+        { color: 'white', m: a, on: true },
+        { color: 'white', m: b, on: true },
+        { color: 'black', m: 'd2d4', on: true },
+        { color: 'white', m: a, on: false },
+        { color: 'white', m: a, on: true },
+        { color: 'white', m: 'g1f3', on: false },
+      ],
+      'white',
+    ),
+    [b, a],
+  );
+
+  // Joining a kept list: one it has is marked there; the others follow, gone or paused as the study says.
+  const list = await generateChecklist('white', all, probs, { targetPly: 0, maxVariations: 3 });
+  const kept = shownLines({ ...list, count: 3 }, 'white', new Set(), { all, active: all });
+  const own = linesOf([{ m: ucis('e4 e5 Nf3 Nc6 Bc4 Bc5').join(' '), p: 0 }])[0]!;
+  const off = linesOf([{ m: ucis('e4 e5 d4').join(' '), p: 0 }])[0]!;
+  const joined = withPicks(kept, [list.variations[1]!, own, off, list.variations[1]!], 'white', { all, active: all });
+  assert.deepEqual(
+    joined.lines.map((l) => [l.v.lineSan.join(' '), l.added ?? '', l.gone]),
+    [
+      [list.variations[0]!.lineSan.join(' '), '', false],
+      [list.variations[1]!.lineSan.join(' '), 'too', false],
+      [list.variations[2]!.lineSan.join(' '), '', false],
+      ['e4 e5 Nf3 Nc6 Bc4 Bc5', 'only', false],
+      ['e4 e5 d4', 'only', true],
+    ],
+  );
+  assert.equal(joined.paused, 0);
+  // Exclusions don't hide a pick; the list's line excluded, the pick shows on its own.
+  const out = shownLines({ ...list, count: 3 }, 'white', new Set([list.variations[1]!.leafKey]), { all, active: all });
+  const picked = withPicks(out, [list.variations[1]!], 'white', { all, active: all });
+  assert.deepEqual(picked.lines.at(-1), { v: list.variations[1]!, gone: false, added: 'only' });
+  // The Bc4 chapter paused: its pick hidden and counted; a pick of a list line hidden as paused counted once.
+  const pausedIx = markLines(ix, new Map(ix.lines.filter((l) => l.cid === 'Bc4xxxxx' || l.cid === 'Nge7xxxx' || list.variations[0]!.lineSan.every((s, i) => l.path[i] === s)).map((l) => [lineCard(l.sid, l.cid, l.path), 'paused' as const]))).index;
+  const active = studyMovesOf(pausedIx, 'Rep00001', 'white', sides, true);
+  const half = shownLines({ ...list, count: 3 }, 'white', new Set(), { all, active });
+  assert.equal(half.paused, 1);
+  const hidden = withPicks(half, [own, list.variations[0]!], 'white', { all, active });
+  assert.equal(hidden.paused, 2);
+  // A reply met only on a paused line: the line up to it active, the line paused.
+  assert.equal(studyHasLine(all, 'white', ucis('e4 e5 Nf3 Nc6 Bb5 Nge7')), true);
+  assert.equal(studyHasLine(active, 'white', ucis('e4 e5 Nf3 Nc6 Bb5 Nge7')), false);
+  assert.ok(!hidden.lines.some((l) => l.v.leafKey === own.leafKey || l.v.leafKey === list.variations[0]!.leafKey));
 });

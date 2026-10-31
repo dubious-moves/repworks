@@ -213,6 +213,18 @@ export interface NoteEvent extends Base {
   card: string;
   text: string;
 }
+/**
+ * A line added to a study side's checklist by hand (§5.142): its UCI moves from the start. It is
+ * shown whatever Make again lists, until taken off (`on: false`); the latest per side and moves
+ * decides.
+ */
+export interface PickEvent extends Base {
+  k: 'pick';
+  card: string;
+  color: 'white' | 'black';
+  m: string;
+  on: boolean;
+}
 export type KnownEvent =
   | ReviewEvent
   | SuspendEvent
@@ -235,8 +247,9 @@ export type KnownEvent =
   | PracticeEvent
   | LineEvent
   | NoteEvent
-  | ChecklistEvent;
-export const KNOWN_KINDS = ['review', 'suspend', 'unsuspend', 'forget', 'taught', 'pin', 'unpin', 'drill', 'alt', 'storm', 'snapshot', 'drop', 'relapse', 'plan', 'idea', 'dismiss', 'saved', 'played', 'practice', 'line', 'note', 'checklist'] as const;
+  | ChecklistEvent
+  | PickEvent;
+export const KNOWN_KINDS = ['review', 'suspend', 'unsuspend', 'forget', 'taught', 'pin', 'unpin', 'drill', 'alt', 'storm', 'snapshot', 'drop', 'relapse', 'plan', 'idea', 'dismiss', 'saved', 'played', 'practice', 'line', 'note', 'checklist', 'pick'] as const;
 
 /** A line as read. `event` is set for the kinds this code knows; `raw` is always the line itself. */
 export interface LogLine {
@@ -487,6 +500,16 @@ function knownEvent(o: Record<string, unknown>): KnownEvent | string {
       if (cut === 1) event.cut = 1;
       return event;
     }
+    case 'pick': {
+      if (!card.startsWith('t|') || card.length < 3) return 'card must be a study (t|<sid>)';
+      const color = o['color'];
+      if (color !== 'white' && color !== 'black') return 'color must be white or black';
+      const m = o['m'];
+      if (typeof m !== 'string' || !UCI_LINE.test(m)) return 'm must be moves in UCI, spaced';
+      const on = o['on'];
+      if (typeof on !== 'boolean') return 'on must be true or false';
+      return { ...base, k: 'pick', color, m, on };
+    }
     default:
       return { ...base, k: 'forget' };
   }
@@ -521,6 +544,7 @@ export function formatEvent(event: KnownEvent): string {
     if (event.calls !== undefined) o['calls'] = event.calls;
     if (event.cut !== undefined) o['cut'] = event.cut;
   }
+  if (event.k === 'pick') Object.assign(o, { color: event.color, m: event.m, on: event.on });
   if (event.k === 'saved') o['item'] = event.item;
   if (event.k === 'played') o['game'] = event.game;
   if (event.k === 'practice') {

@@ -61,6 +61,23 @@ test('a note (§5.91): on a game card, its text kept as written; anything else r
   assert.deepEqual(problems.map((p) => p.reason), ['card must be a game card (m|…)', 'text must be a string']);
 });
 
+test('a line added to a checklist (§5.142): on a study, a side, its moves and on; anything else refused', () => {
+  const pick: KnownEvent = { v: 1, n: 1, t: '2026-10-31T10:00:00.000Z', k: 'pick', card: 't|Rep0Najd', color: 'black', m: 'e2e4 c7c5 c2c3', on: true };
+  const line = formatEvent(pick);
+  assert.equal(line, '{"v":1,"n":1,"t":"2026-10-31T10:00:00.000Z","k":"pick","card":"t|Rep0Najd","color":"black","m":"e2e4 c7c5 c2c3","on":true}');
+  const at = (n: number, rest: string) => `{"v":1,"n":${n},"t":"2026-10-31T10:00:00.000Z","k":"pick",${rest}}`;
+  const bad = [
+    at(2, `"card":"c|x","color":"white","m":"e2e4","on":true`),
+    at(3, `"card":"t|Rep0Najd","color":"red","m":"e2e4","on":true`),
+    at(4, `"card":"t|Rep0Najd","color":"white","m":"e4 e5","on":true`),
+    at(5, `"card":"t|Rep0Najd","color":"white","m":"","on":true`),
+    at(6, `"card":"t|Rep0Najd","color":"white","m":"e2e4","on":1`),
+  ];
+  const { lines, problems } = parseLog([line, ...bad].join('\n'));
+  assert.deepEqual(lines.map((l) => l.event), [pick]);
+  assert.deepEqual(problems.map((p) => p.reason), ['card must be a study (t|<sid>)', 'color must be white or black', 'm must be moves in UCI, spaced', 'm must be moves in UCI, spaced', 'on must be true or false']);
+});
+
 test('a checklist (§5.130): on a study, its lines, reserve and gaps as moves with shares; anything else refused', () => {
   const list: KnownEvent = {
     v: 1,

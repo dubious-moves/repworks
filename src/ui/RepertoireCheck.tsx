@@ -141,7 +141,7 @@ function WeakSpots() {
                     {(() => {
                       // A checklist line's leaf: its drill at that difficulty (mistake-lab's Drill).
                       for (const view of checklistViews.value) {
-                        const line = view.list?.lines.find((l) => !l.gone && l.v.leafKey === r.key);
+                        const line = view.lines.find((l) => !l.gone && l.v.leafKey === r.key);
                         if (line && (r.preset === 'easy' || r.preset === 'medium' || r.preset === 'hard'))
                           return (
                             <>

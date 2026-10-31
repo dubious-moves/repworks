@@ -7772,3 +7772,48 @@ Tests (`test/unit/scripts/games.test.ts`, hand-made games in the generator's for
 - Lc0 as Black, read from its side, and the filters;
 - the games as a repertoire, with our shares and without;
 - the typical games, and the rare moves with a fake Maia.
+
+#### 5.142 A line of the study added to its checklist by hand (the owner's request, 2026-10-31)
+
+"Implement the option to add a specific variation from a study to its checklist (that stays even
+after remake)."
+
+- **Where**: in a repertoire chapter played from the starting position, the study's ☰ menu has
+  "Add to the checklist" with the move shown (the line from move 1 to it, so any depth, ending on
+  either side's move), and a line's ⋯ in the training screen's line list has it for the whole line.
+  Once added, both say so ("In the checklist (take out)", "Out of the checklist") and take it off.
+- **Kept as a `pick` event on the study's `t|<sid>`**:
+  `{"k":"pick","card":"t|<sid>","color":"black","m":"e2e4 c7c5 g1f3 b8c6 d2d4","on":true}`, the
+  latest per side and moves deciding, so it syncs and Make (a new `checklist` event) never touches
+  it. Older readers skip the kind (the log's rule).
+- **Shown** after the made list's lines, in the order added, marked "added", with no share (the
+  explorer wasn't asked); before any Make too ("2 lines added by you"). A picked line the made list
+  has as well is shown once, in the list's place, marked added. They count in the progress bar and
+  are drilled as any line (the drill's address is its moves).
+- **Make leaves the picked leaves out of the walk** (as an exclusion does), so "Lines 10" is ten
+  lines besides the added ones and the slots go to the next lines.
+- **The study must play the line**: its own moves at its side's positions (any of them, so a second
+  move the walk never takes can be added), a position it covers after each reply but the last,
+  which it need only reach (a line may end on the opponent's move). A line the study no longer
+  plays is struck through with "No longer in the study · Take it out"; one wholly paused since is
+  hidden and counted with the paused lines, as §5.130's are.
+- **✕ on an added line** asks "Take this line out of the checklist?" and writes `on: false`; where
+  the made list has it too it is also taken out of that (a `drop`, the reserve filling its slot).
+  An exclusion never hides a picked line: picking a line is asking for it.
+
+**As built** (2026-10-31): `src/core/progress/events.ts` (the `pick` event, five refusals);
+`src/core/games/checklist.ts` (`StudyMoves.reaches`, `studyHasLine`, `picksOf`, `withPicks`,
+`ShownLine.added` as `too` or `only`, `shownLines`' `pausedLeaves` so a picked list line paused
+is counted once); `src/app/checklist.ts` (`ChecklistView.lines`, `paused` and `picked`, the made
+list's meta in `list`; `chapterLine`, `isPicked`, `pickLine`, `unpickLine`; Make excluding the
+picked leaves); `src/ui/Checklist.tsx` (the lines with or without a made list, the "added" tag,
+✕ and "Take it out"); the ☰ item in `src/ui/StudyMenu.tsx`; the ⋯ item and its message in
+`src/ui/LineList.tsx`. Tests: `events.test.ts` (the event read and written, five refusals),
+`checklist.test.ts` (which lines the study has: a second own move, a line ending on a reply it
+only reaches, a reply met only on a paused line; the picks from their events; joining a kept list:
+marked there, appended, gone, paused and counted once, not hidden by an exclusion; four controls,
+each failing exactly that test), `checklist.spec.ts` on desktop and the emulated phone (2...Nc6 3.d4
+added from the ☰ menu and the Alapin from the line list; shown before any Make; Make and Make again
+keep both, the Alapin out of the made list's lines; the events in the fake repo; an added line's
+drill by its moves; ✕ asked and taken out, synced), `views.spec.ts` (the ☰ menu's items). Live:
+TESTING.md.

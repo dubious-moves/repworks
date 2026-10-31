@@ -4,13 +4,22 @@
 // each line's completion derived from the practice results at its leaf (§5.57's `practice`
 // events, tagged with the preset). The walk and the list read the study's active lines only:
 // a paused line is left out, and one paused since the list was made is hidden and refilled.
+// Lines added by hand (§5.142) are `pick` events on the same card, shown after the made list's
+// lines whatever Make again lists; Make leaves their leaves to them.
 import { computed, effect, signal } from '@preact/signals';
 import type { PositionKey } from '../core/chess/positionKey.ts';
 import type { FromWorker, ToWorker } from '../core/explorer/service.ts';
-import { completedPresets, gapsOf, generateChecklist, linesOf, PRESET_ORDER, PRESETS, RANK_RATINGS, RANK_SPEEDS, recordOf, shownLines, studyMovesOf, type ChecklistGap, type Preset, type ShownLine, type StudyMoves, type Variation } from '../core/games/checklist.ts';
+import { Chess } from 'chessops/chess';
+import { parseSan } from 'chessops/san';
+import { isNormal } from 'chessops/types';
+import { positionKeyOf } from '../core/chess/positionKey.ts';
+import { standardUci } from '../core/chess/uci.ts';
+import { completedPresets, gapsOf, generateChecklist, linesOf, picksOf, PRESET_ORDER, PRESETS, RANK_RATINGS, RANK_SPEEDS, recordOf, shownLines, studyHasLine, studyMovesOf, withPicks, type ChecklistGap, type Preset, type ShownLine, type StudyMoves, type Variation } from '../core/games/checklist.ts';
+import { header, type Chapter } from '../core/study/model.ts';
+import { startPosition } from '../core/study/tree.ts';
 import type { Color } from '../core/games/record.ts';
 import { checklistCard, checklistListCard } from '../core/progress/cards.ts';
-import type { ChecklistEvent, ChecklistLine } from '../core/progress/events.ts';
+import type { ChecklistEvent, ChecklistLine, PickEvent } from '../core/progress/events.ts';
 import { onWorker, postToWorker } from './explorer.ts';
 import { practiceResults } from './repertoireCheck.ts';
 import { recordEvent, settings } from './state.ts';
@@ -54,6 +63,13 @@ function listsOf(data: TrainData, sid: string): Map<Color, { event: ChecklistEve
   return out;
 }
 
+/** The moves of the lines added to a study side's checklist by hand (§5.142), the latest last. */
+function picksIn(data: TrainData, sid: string, color: Color): string[] {
+  const events: PickEvent[] = [];
+  for (const e of data.eventsOf(checklistListCard(sid))) if (e.event?.k === 'pick') events.push(e.event);
+  return picksOf(events, color);
+}
+
 /** When each checklist was last opened for a drill in this session (mistake-lab's `_todoTouch`). */
 const touched = signal<Map<string, number>>(new Map());
 export function touch(sid: string, color: Color): void {
@@ -66,17 +82,21 @@ export interface ChecklistView {
   color: Color;
   /** Whether the study has chapters for the other side too (each side is a checklist of its own). */
   twoSided: boolean;
+  /** The list made from the explorer (Make). */
   list?: {
     made: number;
     ply: number;
     count: number;
     calls?: number;
     cut: boolean;
-    lines: ShownLine[];
-    /** The list's lines hidden because they are paused now. */
-    paused: number;
     gaps: ChecklistGap[];
   };
+  /** The lines shown: the made list's, then those added by hand (§5.142). */
+  lines: ShownLine[];
+  /** The lines hidden because they are paused now. */
+  paused: number;
+  /** The lines added by hand, as moves from the start (paused ones too). */
+  picked: Variation[];
   /** The list's lines (and reserve) taken out (✕), by leaf. */
   excluded: string[];
   /** Wins over the shown lines × three levels (lines the study no longer plays left out). */
@@ -102,15 +122,23 @@ export const checklistViews = computed<ChecklistView[]>(() => {
   for (const [sid, set] of sides) {
     const lists = listsOf(data, sid);
     for (const color of (['white', 'black'] as const).filter((c) => set.has(c))) {
-      const view: ChecklistView = { sid, name: data.studyNames.get(sid) ?? sid, color, twoSided: set.size > 1, excluded: [], last: touched.value.get(`${sid}|${color}`) ?? 0 };
+      const picked = linesOf(picksIn(data, sid, color).map((m) => ({ m, p: 0 })));
+      const view: ChecklistView = { sid, name: data.studyNames.get(sid) ?? sid, color, twoSided: set.size > 1, excluded: [], lines: [], paused: 0, picked, last: touched.value.get(`${sid}|${color}`) ?? 0 };
       const kept = lists.get(color);
+      const moves = movesOf(data, sid, color);
+      let made: ReturnType<typeof shownLines> = { lines: [], paused: 0, pausedLeaves: [] };
       if (kept) {
         const e = kept.event;
         const variations = linesOf(e.lines);
         const reserve = linesOf(e.reserve);
-        const shown = shownLines({ variations, reserve, count: e.count }, color, excluded, movesOf(data, sid, color));
+        made = shownLines({ variations, reserve, count: e.count }, color, excluded, moves);
         view.excluded = [...new Set([...variations, ...reserve].map((x) => x.leafKey).filter((k) => excluded.has(k)))];
-        view.list = { made: kept.t, ply: e.ply, count: e.count, ...(e.calls !== undefined ? { calls: e.calls } : {}), cut: e.cut === 1, lines: shown.lines, paused: shown.paused, gaps: gapsOf(e.gaps) };
+        view.list = { made: kept.t, ply: e.ply, count: e.count, ...(e.calls !== undefined ? { calls: e.calls } : {}), cut: e.cut === 1, gaps: gapsOf(e.gaps) };
+      }
+      const shown = withPicks(made, picked, color, moves);
+      view.lines = shown.lines;
+      view.paused = shown.paused;
+      if (kept || shown.lines.length) {
         let done = 0;
         let total = 0;
         const leaves = new Set<string>();
@@ -181,7 +209,9 @@ export async function makeChecklist(sid: string, color: Color, ply: number, coun
   stopping = false;
   generating.value = { sid, color, calls: 0 };
   try {
-    const list = await generateChecklist(color, movesOf(data, sid, color).active, explorerShares, { targetPly: ply, maxVariations: count, exclude: excludedLeaves.peek() }, (calls) => (generating.value = { sid, color, calls }));
+    // The lines added by hand are on the list anyway: their slots go to the next lines (§5.142).
+    const exclude = new Set([...excludedLeaves.peek(), ...linesOf(picksIn(data, sid, color).map((m) => ({ m, p: 0 }))).map((v) => v.leafKey)]);
+    const list = await generateChecklist(color, movesOf(data, sid, color).active, explorerShares, { targetPly: ply, maxVariations: count, exclude }, (calls) => (generating.value = { sid, color, calls }));
     await recordEvent({ t: new Date().toISOString(), k: 'checklist', card: checklistListCard(sid), color, ply, count, ...recordOf(list), calls: list.calls, ...(list.truncated ? { cut: 1 as const } : {}) });
   } catch (e) {
     if (!(e instanceof Stopped)) throw e;
@@ -204,6 +234,50 @@ export function excludeLine(v: Variation): void {
 /** The lines taken out come back (`clearTodoExclusions`): these, or every one. A kept list shows them again at once. */
 export function restoreExcluded(keys: readonly string[] = [...excludedLeaves.peek()]): void {
   for (const k of keys) void recordEvent({ t: new Date().toISOString(), k: 'drop', card: checklistCard(k as PositionKey), on: false });
+}
+
+/* ------------------------------------------------------------------ lines added by hand (§5.142) */
+
+/**
+ * A chapter's line through `path` as UCI moves from the start, with the chapter's side: undefined
+ * for a chapter that doesn't start from the starting position (a checklist's lines are played from
+ * move 1), or a move that can't be read.
+ */
+export function chapterLine(chapter: Chapter, path: readonly string[]): { color: Color; uci: string[] } | undefined {
+  const pos = startPosition(chapter);
+  if (!pos || !path.length || positionKeyOf(pos) !== positionKeyOf(Chess.default())) return undefined;
+  const uci: string[] = [];
+  for (const san of path) {
+    const move = parseSan(pos, san);
+    if (!move || !isNormal(move)) return undefined;
+    uci.push(standardUci(pos, move));
+    pos.play(move);
+  }
+  return { color: header(chapter, 'Orientation') === 'black' ? 'black' : 'white', uci };
+}
+
+/** Whether a line is on a study side's checklist as one added by hand. */
+export function isPicked(sid: string, color: Color, lineUci: readonly string[]): boolean {
+  const data = trainData.value;
+  return !!data && picksIn(data, sid, color).includes(lineUci.join(' '));
+}
+
+/**
+ * Adds a line to a study side's checklist (synced), to stay whatever Make again lists, or takes it
+ * off; says which, or why it can't be added (the study must play it to its end).
+ */
+export async function pickLine(sid: string, color: Color, lineUci: readonly string[], on: boolean): Promise<string> {
+  const data = trainData.peek();
+  if (!data || !lineUci.length) return 'The repertoire isn’t read yet';
+  if (on && !studyHasLine(movesOf(data, sid, color).all, color, lineUci)) return 'The study doesn’t play this line (synced and read yet?)';
+  await recordEvent({ t: new Date().toISOString(), k: 'pick', card: checklistListCard(sid), color, m: lineUci.join(' '), on });
+  return on ? 'Added to the checklist: it stays when the list is made again' : 'Taken out of the checklist';
+}
+
+/** ✕ on a line added by hand: every pick reaching its position comes off, and where the made list has it too, it is taken out of that as well. */
+export function unpickLine(view: ChecklistView, line: ShownLine): void {
+  for (const v of view.picked) if (v.leafKey === line.v.leafKey) void pickLine(view.sid, view.color, v.lineUci, false);
+  if (line.added === 'too') excludeLine(line.v);
 }
 
 /* ------------------------------------------------------------------ Maia's rating per level */

@@ -16,6 +16,12 @@
 // paused since (filled from the reserve), and marks the lines the study no longer plays. The walk
 // reads the study's active lines only (`studyMovesOf`), so a paused branch is neither a line nor
 // an uncovered reply.
+//
+// §5.142: a line added by hand (a `pick` event on `t|<sid>`, its moves from the start) is shown
+// after the made list's lines whatever Make again lists, and Make leaves its leaf to it. It needs
+// only the study to play it: any of the study's moves at its side's positions, and the last move
+// may be a reply the study only reaches. A picked line the made list has too is shown once, in the
+// list's place, marked added.
 import { Chess, type Position } from 'chessops/chess';
 import { makeFen } from 'chessops/fen';
 import { makeSan } from 'chessops/san';
@@ -82,6 +88,8 @@ export interface StudyMoves {
   plays?(key: PositionKey, uci: string): boolean;
   /** Whether the study has a move here on any line, paused ones too: a reply it knows is never a gap. */
   knows?(key: PositionKey): boolean;
+  /** Whether a move of the study reaches this position (on any line, or an active one). */
+  reaches?(key: PositionKey): boolean;
 }
 
 /**
@@ -110,7 +118,8 @@ export function studyMovesOf(index: RepertoireIndex, sid: string, color: Color, 
     return out;
   };
   const knows = (key: PositionKey) => [...(index.positions.get(key)?.own.values() ?? [])].some((places) => places.some(ofStudy));
-  return { moveAt: (key) => own(key)[0], covers: (key) => own(key).length > 0, plays: (key, uci) => own(key).includes(uci), knows };
+  const reaches = (key: PositionKey) => (index.reached.get(key) ?? []).some(ok);
+  return { moveAt: (key) => own(key)[0], covers: (key) => own(key).length > 0, plays: (key, uci) => own(key).includes(uci), knows, reaches };
 }
 
 /** Whether the study still plays a line as the walk made it: its own moves, and a position it covers after each reply. */
@@ -129,6 +138,25 @@ export function studyPlays(study: StudyMoves, color: Color, lineUci: readonly st
     }
   }
   return true;
+}
+
+/**
+ * Whether the study has a line picked by hand (§5.142): its own moves at its side's positions, a
+ * position it covers after each reply but the last, which it need only reach (a line may end on
+ * the opponent's move).
+ */
+export function studyHasLine(study: StudyMoves, color: Color, lineUci: readonly string[]): boolean {
+  if (!lineUci.length) return false;
+  const last = lineUci.length - 1;
+  if (!studyPlays(study, color, lineUci.slice(0, last))) return false;
+  const pos = Chess.default();
+  for (const uci of lineUci.slice(0, last)) pos.play(parseUciMove(pos, uci)!);
+  const move = parseUciMove(pos, lineUci[last]!);
+  if (!move) return false;
+  if (pos.turn === color) return study.plays ? study.plays(positionKeyOf(pos), lineUci[last]!) : study.moveAt(positionKeyOf(pos)) === lineUci[last];
+  pos.play(move);
+  const key = positionKeyOf(pos);
+  return study.covers(key) || !!study.reaches?.(key);
 }
 
 /** The explorer's shares at a position, by standard UCI and by `s:<SAN without +#>`; empty when it has none. */
@@ -354,21 +382,68 @@ export interface ShownLine {
   v: Variation;
   /** The study no longer plays it (edited since the list was made): kept in its place, struck through. */
   gone: boolean;
+  /** Added by hand (§5.142), kept whatever Make again lists: `too` where the made list has it as well, `only` where it doesn't (no share then). */
+  added?: 'too' | 'only';
+}
+
+/**
+ * The lines picked for one side, from its study's `pick` events in replay order: each one's moves,
+ * the most recently added last; one taken off (`on: false`) is gone until added again.
+ */
+export function picksOf(events: readonly { color: Color; m: string; on: boolean }[], color: Color): string[] {
+  const on = new Set<string>();
+  for (const e of events) {
+    if (e.color !== color) continue;
+    on.delete(e.m);
+    if (e.on) on.add(e.m);
+  }
+  return [...on];
+}
+
+/**
+ * The picked lines added to what a list shows (§5.142): one the list shows already is marked added
+ * there (`too`); the others follow (`only`) in the order picked, a line the study no longer has
+ * kept `gone`, one wholly paused now hidden and counted. Exclusions don't apply: picking a line is
+ * asking for it. Two picks reaching one position are one line (results are kept by position).
+ */
+export function withPicks(shown: { lines: readonly ShownLine[]; paused: number; pausedLeaves?: readonly string[] }, picks: readonly Variation[], color: Color, study: { all: StudyMoves; active: StudyMoves }): { lines: ShownLine[]; paused: number } {
+  const lines = shown.lines.map((l) => ({ ...l }));
+  const at = new Map(lines.map((l, i) => [l.v.leafKey, i]));
+  let paused = shown.paused;
+  for (const v of picks) {
+    const i = at.get(v.leafKey);
+    if (i !== undefined && !lines[i]!.gone) {
+      lines[i]!.added ??= 'too';
+      continue;
+    }
+    const gone = !studyHasLine(study.all, color, v.lineUci);
+    if (!gone && !studyHasLine(study.active, color, v.lineUci)) {
+      if (!shown.pausedLeaves?.includes(v.leafKey)) paused++;
+      continue;
+    }
+    const line: ShownLine = { v, gone, added: 'only' };
+    if (i !== undefined) lines[i] = line;
+    else {
+      at.set(v.leafKey, lines.length);
+      lines.push(line);
+    }
+  }
+  return { lines, paused };
 }
 
 /**
  * What a kept list shows: its lines less the excluded and the wholly paused ones, filled from the
  * reserve in order up to `count`; a line the study no longer plays stays in its place, `gone`.
- * `paused`: the list's lines hidden because they are paused now.
+ * `paused`: the list's lines hidden because they are paused now (`pausedLeaves` their leaves).
  */
-export function shownLines(list: { variations: readonly Variation[]; reserve: readonly Variation[]; count: number }, color: Color, excluded: ReadonlySet<string>, study: { all: StudyMoves; active: StudyMoves }): { lines: ShownLine[]; paused: number } {
+export function shownLines(list: { variations: readonly Variation[]; reserve: readonly Variation[]; count: number }, color: Color, excluded: ReadonlySet<string>, study: { all: StudyMoves; active: StudyMoves }): { lines: ShownLine[]; paused: number; pausedLeaves: string[] } {
   const state = (v: Variation) => (excluded.has(v.leafKey) ? 'out' : !studyPlays(study.all, color, v.lineUci) ? 'gone' : !studyPlays(study.active, color, v.lineUci) ? 'paused' : 'on');
   const lines: ShownLine[] = [];
   const seen = new Set<string>();
-  let paused = 0;
+  const pausedLeaves: string[] = [];
   for (const v of list.variations) {
     const s = state(v);
-    if (s === 'paused') paused++;
+    if (s === 'paused') pausedLeaves.push(v.leafKey);
     if (s === 'out' || s === 'paused' || seen.has(v.leafKey)) continue;
     seen.add(v.leafKey);
     lines.push({ v, gone: s === 'gone' });
@@ -379,7 +454,7 @@ export function shownLines(list: { variations: readonly Variation[]; reserve: re
     seen.add(v.leafKey);
     lines.push({ v, gone: false });
   }
-  return { lines, paused };
+  return { lines, paused: pausedLeaves.length, pausedLeaves };
 }
 
 /** Refills an excluded variation's place from the reserve (`excludeTodoVariation`): the first not excluded nor listed. */

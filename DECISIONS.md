@@ -1926,3 +1926,15 @@ The technical calls, each with its reason:
   mistake-lab's window. Why: the same request; a repertoire longer than ten moves went unchecked
   past move 10, though the review marked the deviation afterwards. The advantage drill stays
   unchecked: it is graded as played.
+
+## Revision of 2026-10-31 (a line added to the checklist by hand, PLAN.md §5.142)
+- **D4: a new event kind `pick`**: a line added to a study side's checklist by hand, on `t|<sid>`
+  (its UCI moves from the start, `on` true or false, the latest per side and moves deciding), apart
+  from the `checklist` event Make writes. Was (§5.130): the list was only what Make chose, so a
+  line the explorer ranks low, or a second move of the study, could not be drilled there. Why: the
+  owner, 2026-10-31: "add a specific variation from a study to its checklist (that stays even after
+  remake)". Decided in the build: the line is to the move shown (study) or the whole line (line
+  list); added lines follow the made list's, with no share, and count in the progress; Make leaves
+  their leaves out, so the number of lines asked for is besides them; an exclusion never hides a
+  picked line; ✕ on one takes it off (and out of the made list where that has it too); a picked
+  line wholly paused is hidden and counted as the made list's are.
