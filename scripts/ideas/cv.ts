@@ -13,7 +13,12 @@
 //   node scripts/ideas/cv.ts develop <repertoire.pgn> [--side black] [--piece f8-bishop]
 //   node scripts/ideas/cv.ts playout <pos> [--n 6] [--plies 24] [--white maia:2000] [--black sf:12[:30]] [--seed 1] [--judge 14]
 //   node scripts/ideas/cv.ts decisions <repertoire.pgn> [--side black] [--min 2] [--depth 14] [--top 40] [--no-engine]
-//   node scripts/ideas/cv.ts check   <deck.pgn> [--rep repertoire.pgn] [--depth 16] [--cards 12] [--no-engine] [--no-maia] [--verbose]
+//   node scripts/ideas/cv.ts check   <deck.pgn> [--rep repertoire.pgn | --games model-games.pgn] [--depth 16] [--cards 12] [--no-engine] [--no-maia] [--verbose]
+//   node scripts/ideas/cv.ts games   <model-games.pgn> [--after "10. Ne4 Rad8"] [--with f5] [--window 15] [--depth 4] [--min 2] [--at 10,20,30,40] [--jump 100] [--maia 2000,2200] [--game 7]
+//
+// `tree`, `profile`, `develop` and `decisions` read model games (Lc0 against Maia, from the owner's
+// model-game generator) as a repertoire with `--games`: one tree of every game, the strong side's
+// moves the ones to learn, the weaker side's carrying their share of the games (games.ts).
 //
 // <pos> is a FEN, `startpos`, or movetext from the start ("1. e4 d5 2. exd5 c6"). Moves are SAN or
 // UCI. Stockfish is the vendored lite build unless STOCKFISH names a native binary; searches are
@@ -31,10 +36,11 @@ import { CARDS, decisions, NATURAL, SENSIBLE_LOSS } from './decide.ts';
 import { Engine, positionOf, scoreText, whiteWinPct } from './engine.ts';
 import { maia, MAIA_FLOOR, maiaPolicy } from './maia.ts';
 import { parsePlayer, playouts } from './playout.ts';
-import { development, moveText, numbered, profile, readRepertoire, trunkOf, type DevMove } from './tree.ts';
+import { asRepertoirePgn, filterGames, gamesText, gameText, mistakes, readModelGames, replyFound, surprise } from './games.ts';
+import { development, moveText, numbered, profile, readRepertoire, trunkOf, type DevMove, type Repertoire } from './tree.ts';
 import { look, lookText, passTurn } from './vision.ts';
 
-const BOOLEAN = new Set(['full', 'no-engine', 'no-maia', 'verbose', 'ours', 'leaves']);
+const BOOLEAN = new Set(['full', 'no-engine', 'no-maia', 'verbose', 'ours', 'leaves', 'games']);
 
 function parseArgs(argv: string[]): { pos: string[]; flags: Map<string, string> } {
   const pos: string[] = [];
@@ -84,6 +90,15 @@ export function readPosition(text: string): Position {
   const pos = Chess.default();
   play(pos, tokens(t));
   return pos;
+}
+
+/** A repertoire, or with `--games` a file of model games read as one (the strong side's moves to learn). */
+function repertoireOf(path: string, flags: Map<string, string>, games = flags.has('games')): Repertoire {
+  const text = readFileSync(path, 'utf8');
+  const side = flags.has('side') ? sideOf(flags) : undefined;
+  if (!games) return readRepertoire(text, side);
+  const mg = readModelGames(text, side);
+  return readRepertoire(asRepertoirePgn(mg), mg.us, { ourShares: true });
 }
 
 const sideOf = (flags: Map<string, string>, fallback: Color = 'white'): Color => (flags.get('side') === 'black' ? 'black' : flags.get('side') === 'white' ? 'white' : fallback);
@@ -161,7 +176,7 @@ async function main(): Promise<number> {
       return 0;
     }
     case 'develop': {
-      const rep = readRepertoire(readFileSync(args[0]!, 'utf8'), flags.has('side') ? sideOf(flags) : undefined);
+      const rep = repertoireOf(args[0]!, flags);
       const only = flags.get('piece');
       const all = development(rep);
       const maps = all.filter((m) => !only || m.piece === only);
@@ -203,7 +218,7 @@ async function main(): Promise<number> {
       return 0;
     }
     case 'tree': {
-      const rep = readRepertoire(readFileSync(args[0]!, 'utf8'), flags.has('side') ? sideOf(flags) : undefined);
+      const rep = repertoireOf(args[0]!, flags);
       const min = Number(flags.get('min') ?? 1) / 100;
       const all = [...rep.positions.values()].filter((p) => p.reach >= min && (!flags.has('ours') || p.ours) && (!flags.has('leaves') || p.leaf));
       all.sort((a, b) => b.reach - a.reach || a.ply - b.ply);
@@ -219,7 +234,7 @@ async function main(): Promise<number> {
       return 0;
     }
     case 'profile': {
-      const rep = readRepertoire(readFileSync(args[0]!, 'utf8'), flags.has('side') ? sideOf(flags) : undefined);
+      const rep = repertoireOf(args[0]!, flags);
       const pr = profile(rep, positionOf);
       const row = (xs: [string, number][]) => xs.map(([k, v]) => `${k} ${pct(v)}`).join(', ');
       console.log(`Profile for ${pr.side}: ${pr.positions} positions, ${pr.leaves} line ends; weights are shares of games.`);
@@ -265,7 +280,7 @@ async function main(): Promise<number> {
       return 0;
     }
     case 'decisions': {
-      const rep = readRepertoire(readFileSync(args[0]!, 'utf8'), flags.has('side') ? sideOf(flags) : undefined);
+      const rep = repertoireOf(args[0]!, flags);
       const engine = flags.has('no-engine') ? undefined : new Engine();
       const min = Number(flags.get('min') ?? 2) / 100;
       const ds = await decisions(rep, { policy: maiaPolicy(), engine, depth: depth(14), minReach: min });
@@ -288,7 +303,7 @@ async function main(): Promise<number> {
     }
     case 'check': {
       const engine = flags.has('no-engine') ? undefined : new Engine();
-      const rep = flags.get('rep') ? readRepertoire(readFileSync(flags.get('rep')!, 'utf8')) : undefined;
+      const rep = flags.get('rep') ? readRepertoire(readFileSync(flags.get('rep')!, 'utf8')) : flags.get('games') && flags.get('games') !== 'true' ? repertoireOf(flags.get('games')!, flags, true) : undefined;
       const policy = flags.has('no-maia') ? undefined : maiaPolicy();
       const r = await checkDeck(readFileSync(args[0]!, 'utf8'), { engine, policy, depth: depth(16), rep, cards: Number(flags.get('cards') ?? CARDS), log: flags.has('verbose') ? (l) => console.log(l) : undefined });
       engine?.quit();
@@ -296,6 +311,37 @@ async function main(): Promise<number> {
       const errors = r.findings.filter((f) => f.level === 'error').length;
       console.log(`${r.chapters} chapters, ${r.cards} cards: ${errors} errors, ${r.findings.length - errors} warnings${engine ? `, moves graded at depth ${depth(16)}` : ', no engine'}${policy ? ', Maia 2000/2200' : ''}${rep ? `; ${r.onRepertoire} cards start at a repertoire position` : ''}.`);
       return errors ? 1 : 0;
+    }
+    case 'games': {
+      const text = readFileSync(args[0]!, 'utf8');
+      const all = readModelGames(text, flags.has('side') ? sideOf(flags) : undefined);
+      const window = Number(flags.get('window') ?? 15);
+      if (flags.get('game')) {
+        console.log(gameText(all, Number(flags.get('game'))));
+        return 0;
+      }
+      const mg = filterGames(all, { after: flags.get('after') ? tokens(flags.get('after')!) : undefined, with: flags.get('with'), window });
+      if (flags.get('after') || flags.get('with')) console.log(`Of ${all.games.length} games, ${mg.games.length} ${flags.get('after') ? `go on ${flags.get('after')}` : ''}${flags.get('after') && flags.get('with') ? ' and ' : ''}${flags.get('with') ? `have the strong side play ${flags.get('with')} within its first ${window} moves` : ''}.\n`);
+      const jump = Number(flags.get('jump') ?? 100);
+      const ms = mistakes(mg, { min: jump });
+      let rare;
+      if (flags.get('maia')) {
+        const elos = flags.get('maia')!.split(',').map(Number);
+        const policy = maiaPolicy(elos);
+        rare = await surprise(mg, window, policy);
+        await replyFound(mg, ms.filter((m) => m.turning), policy);
+      }
+      console.log(gamesText(mg, {
+        window,
+        depth: Number(flags.get('depth') ?? 4),
+        min: Number(flags.get('min') ?? 2),
+        at: (flags.get('at') ?? '10,20,30,40').split(',').map(Number),
+        jump,
+        mistakes: ms,
+        surprise: rare,
+        elos: mg.games.flatMap((g) => (g.elo ? [g.elo] : [])),
+      }));
+      return 0;
     }
     default:
       console.log(readFileSync(new URL(import.meta.url), 'utf8').split('\n').filter((l) => l.startsWith('//')).join('\n'));

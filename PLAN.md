@@ -7666,3 +7666,109 @@ chapter left and named, or refusing the merge), `studies.spec.ts` on desktop and
 (three games from PGN shift-ticked, turned for White, merged with the lines and comment in the
 merged file, a delete refused then done from Study settings, each checked in the fake repo). Live:
 TESTING.md.
+
+#### 5.141 Model games: the plans and goals from a position (the owner's request, 2026-10-31)
+
+The owner: develop a skill (or several) that helps analyse model games and summarize the plan and
+goals from a position. The model games share one starting point; they are Lc0 against Maia,
+"to showcase how a stronger player would punish a weaker player in a specific position", made
+with the owner's generator, `model_games_app.py` (not in this repo). The example input:
+`modelgames_Scandi_gambit_accepted_-_Early_d3.pgn`, 50 games.
+
+- **The generator's PGN** (read from its source):
+  - `[White "Lc0"]` or `[Black "Lc0"]`, the other side `Maia3-<elo>`, with `WhiteElo`/`BlackElo`,
+    `MaiaOppoElo`, `MaiaTemperature`, `MaiaTopP`; `Termination` when not a normal end.
+  - `{ end of prep }` on the prep's last move.
+  - Lc0's eval after every fifth of its moves, from White's side (`{ -0.57 }`, `+M`/`-M`).
+  - `{ eval a -> b }` on the weaker side's move, when Lc0's eval moved 1.00 or more between its
+    moves before and after.
+  - Adjudication at ±6.00 for four of Lc0's moves.
+  - The weaker side's first two moves at temperature 1 and top-p 1, to spread the games: the
+    branch shares there are the generator's, not people's.
+- **Decided** (Claude's call: the format of a report, not of the owner's data):
+  - One skill, `.claude/skills/model-games/SKILL.md`, on the opening-ideas tools.
+  - Its output is a plan summary in Markdown, delivered as a file. For training, the skill offers
+    an idea deck made with the opening-ideas skill, in the format the owner approved: cards at
+    the shared position's decisions, the turning points and the rare moves, checked against the
+    games (`check --games`).
+  - The rules of the idea decks carry over:
+    - every claim rests on a tool output;
+    - Maia at 2000 or more;
+    - development first;
+    - the owner's three values (patterns, where a pattern breaks, unintuitive moves);
+    - the strong side's moves taught, not reviewed.
+- **The tools** (`scripts/ideas/games.ts`, pure; `cv.ts games`):
+  - The shared position: the `end of prep` marks when all agree, else where the games part.
+  - Lc0's side, from the player names.
+  - The evals and the jumps, from the strong side (Lc0's eval scale, quoted as Lc0's).
+  - The report:
+    - results, and the games' tree from the shared position;
+    - the strong side's moves by what they do within its first `--window` moves: games, move
+      number, contact, and how many come before the game **tips** (the first eval of +1.50 or
+      more; a jump's move when a jump takes it there). Moves before the tip are the plan, after
+      it the punishment;
+    - each piece's first squares and routes (castling's rook too), and kept or traded;
+    - the weaker side's moves;
+    - checkpoints at fixed plies, each read where an exchange in progress has settled (of the
+      ply and the two after, the first at their median material);
+    - Lc0's eval curve, and the first move at +1.50 and +3.00;
+    - material won against the shared position (kept two plies), with the capture behind it;
+    - the mistakes and the turning point of each game (grouped where games share the position),
+      with the FEN and the punishing line;
+    - the games that cover the common plan best, and the quickest wins;
+    - with `--maia`, Maia's chance (playing the strong side) of each of Lc0's moves, rarest
+      first, and of each punishing reply.
+  - `--after` and `--with` filter the games by their moves after the shared position, or by a
+    strong-side move; `--game` prints one game.
+  - **The games as a repertoire** (`asRepertoirePgn`, and `--games` on `tree`, `profile`,
+    `develop`, `decisions` and `check`): one tree of every game, every move with its share of
+    the games. `readRepertoire`'s new `ourShares` reads our moves' shares too, so where Lc0
+    varies each move takes its own part of the games. Without it (every repertoire) our moves
+    keep all of their games, as before: shares on our moves are ignored.
+- **The skill's procedure**:
+  1. Read the games: the report with `--maia`, `develop --games`, `tree --games`, and the report
+     again per main reply (15% or more).
+  2. Read the shared position: `look`, `engine`, `threat`, and `maia` for what people play there
+     (the games' first moves are random on purpose).
+  3. Six lenses: where the pieces go, the pawn moves and the structure, the goals, how the weaker
+     side goes wrong, the moves a human wouldn't find, their main tries.
+  4. Verify as a skeptic. Lc0's eval is never the evidence that a move works; `grade` is. A "mistake"
+     Stockfish rates `good` means the position was already going wrong: find where, and teach the
+     punishing move as the plan's threat.
+  5. Write the summary: about 1500 words before its evidence section, in a fixed set of sections
+     (the plan, the pieces' table, breaks, goals, their main tries, mistakes and punishments, rare
+     moves, at most 8 rules of thumb, games to study, evidence).
+  6. Review as a critic, then deliver the file.
+- **The pilot** (2026-10-31, the owner's example: 50 games, Lc0 as Black, all won). The report
+  takes 1 s, or 2¼ minutes with Maia (window 12). Stockfish (lite, depth 20) checked about 25 positions
+  in about 15 minutes.
+  - **What the summary found:**
+    - ...Rad8 at once (47 of 50 games; Stockfish's best after 10. Re1; Maia 26%);
+    - ...h6, then against Bh4 ...g5 and ...Nh5xg3 (10 of the 20 games with h6 and Bh4), leaving
+      White with doubled g-pawns;
+    - ...f5 once the f6-knight has moved (35 of 35), then ...f4, ...e4 or ...g4;
+    - ...Qb6 against Re1 and Bf1;
+    - after Bxf6 Bxf6, ...Be7 back (9 of 10; Stockfish's best, and ...Rad8 a mistake there);
+    - the gambit pawn back in 46 of 50 games by move 21;
+    - five kinds of punishment, each checked at depth 20.
+  - **Checking found that Lc0's jumps and Stockfish disagree.** The three games' "15. h3?" grades
+    `good`: after 14...f5, ...f4 against the g3-bishop was already the threat (Stockfish's best
+    reply is Qd2; Nd2 is a blunder). Likewise 16. Bf1 in three more games. The skill now says so.
+  - The summary is the owner's to read (TESTING.md). It isn't in this public repo, as the idea
+    decks aren't.
+
+**As built** (2026-10-31): `scripts/ideas/games.ts` (`readModelGames`, `filterGames`, `ourMoves`,
+`summary`, `branches`, `plan`, `tipOf`, `checkpoints`, `gains`, `mistakes`, `firstAt`, `evalCurve`,
+`representative`, `surprise`, `replyFound`, `asRepertoirePgn`, `gamesText`, `gameText`); `cv.ts
+games` and `--games`; `tree.ts`: `readRepertoire`'s `ourShares`, `weightOf` reading our moves'
+shares, `names` exported, the profile and the development map weighing our moves by their shares.
+`.claude/skills/model-games/SKILL.md`; the opening-ideas skill names model games as an input.
+Tests (`test/unit/scripts/games.test.ts`, hand-made games in the generator's format):
+- the shared position (marked, and where the games part when unmarked);
+- the evals and jumps, the weaker side's rating, the tree;
+- the strong side's moves by piece, with castling's rook, contact, and the tip;
+- the material won and the capture behind it;
+- the mistakes and turning points, and a checkpoint read once an exchange has settled;
+- Lc0 as Black, read from its side, and the filters;
+- the games as a repertoire, with our shares and without;
+- the typical games, and the rare moves with a fake Maia.

@@ -122,8 +122,10 @@ between agents.
 
 ## Procedure
 
-1. **Inputs.** The repertoire PGN and its side (`Orientation`, or ask). Optional: a games PGN,
-   the opening's name, the owner's rating band (default: club player, opponents read with Maia
+1. **Inputs.** The repertoire PGN and its side (`Orientation`, or ask). Optional: a games PGN
+   (model games from the owner's generator, Lc0 against Maia from a position of the repertoire:
+   read them with `games` and the `--games` flag, as the model-games skill does, for the plans
+   beyond the line ends and the mistakes they punish), the opening's name, the owner's rating band (default: club player, opponents read with Maia
    at 2000–2200). Work in the scratchpad. Never commit a repertoire or a deck to this public
    repository.
 2. **Read the repertoire.** Save `tree --min 0.5`, `profile --engine 18 --top 20`, `develop`

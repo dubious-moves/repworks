@@ -63,13 +63,14 @@ export function shareOf(node: MoveNode): number | undefined {
 }
 
 /**
- * The share of the games at a position that go on with a move: 1 for ours, else its `{ n% }`, or
- * for a move without one an even part of what the moves with one leave (all of it, split, when none
- * has one).
+ * The share of the games at a position that go on with a move: 1 for ours (its share when the
+ * repertoire was read with `ourShares`: model games, where the strong side varies), else its
+ * `{ n% }`, or for a move without one an even part of what the moves with one leave (all of it,
+ * split, when none has one).
  */
 export function weightOf(p: Pick<TreePos, 'ours' | 'moves'>, san: string): number {
-  if (p.ours) return 1;
   const m = p.moves.find((x) => x.san === san);
+  if (p.ours) return m?.share ?? 1;
   if (m?.share !== undefined) return m.share;
   const known = p.moves.filter((x) => x.share !== undefined);
   const left = Math.max(0, 1 - known.reduce((t, x) => t + x.share!, 0));
@@ -90,7 +91,11 @@ export function numbered(sans: readonly string[], fullmoves: number, turn: Color
   return out.join(' ');
 }
 
-export function readRepertoire(text: string, side?: Color): Repertoire {
+/**
+ * `ourShares`: read our moves' `{ n% }` too, as the share of the games that go on with each (model
+ * games read as a repertoire); a repertoire's own moves are all played, each by every game.
+ */
+export function readRepertoire(text: string, side?: Color, o: { ourShares?: boolean } = {}): Repertoire {
   let n = 0;
   const parsed = parseGames(text, () => `c${++n}`);
   const problems: string[] = [];
@@ -131,7 +136,7 @@ export function readRepertoire(text: string, side?: Color): Repertoire {
       if (!move || !isNormal(move)) continue;
       const next = pos.clone();
       next.play(move);
-      const share = ours ? undefined : shareOf(child);
+      const share = ours && !o.ourShares ? undefined : shareOf(child);
       const known = entry.moves.find((m) => m.san === child.san);
       if (!known) entry.moves.push(share === undefined ? { san: child.san } : { san: child.san, share });
       else if (known.share === undefined && share !== undefined) known.share = share;
@@ -214,7 +219,7 @@ export function profile(rep: Repertoire, positionOf: (fen: string) => Position):
     const pos = positionOf(p.fen);
     for (const m of p.moves) {
       const g = moveGroup(pos, m.san);
-      if (p.ours) add(ourMoves, g, p.reach);
+      if (p.ours) add(ourMoves, g, p.reach * weightOf(p, m.san));
       else add(theirMoves, g, p.reach * weightOf(p, m.san));
     }
     if (!p.leaf) continue;
@@ -329,7 +334,7 @@ export function setupOf(pos: Position): string[] {
 }
 
 /** Our pieces named by where they stand at a line's start: `king`, `queen`, `f8-bishop`, `g8-knight`, `e-pawn`. */
-function names(pos: Position, us: Color): Map<number, string> {
+export function names(pos: Position, us: Color): Map<number, string> {
   const out = new Map<number, string>();
   const queens = [...pos.board.pieces(us, 'queen')].length;
   for (const s of pos.board[us]) {
@@ -396,6 +401,7 @@ export function development(rep: Repertoire): PieceMap[] {
         // chessops moves a castling king onto its rook: the squares they end on are read from the board after.
         const to = castle ? (squareFile(move.to) > squareFile(move.from) ? 6 : 2) + squareRank(move.from) * 8 : move.to;
         const first = !trail.has(name);
+        if (entry) share = weightOf(entry, san);
         const id = `${key}|${san}`;
         if (entry && !moves.has(id)) moves.set(id, { piece: name, san, to: makeSquare(to), first, key, fen: entry.fen, sans, startPly: (start.fullmoves - 1) * 2 + (start.turn === 'black' ? 1 : 0), reach: entry.reach, ply: entry.ply, setup: setupOf(pos) });
         nextWho.delete(move.from);

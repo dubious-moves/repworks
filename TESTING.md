@@ -988,3 +988,15 @@ q_extension (or give it to a session with q_extension attached), then run
   (asked first). Sync, and check the phone shows the same chapters.
 - Checked by unit tests and Playwright with the fake data repo (desktop and emulated phone); not
   on a device.
+
+## Model games: the plans and goals from a position (§5.141, 2026-10-31)
+- Checked by unit tests (hand-made games in the generator's format) and by a pilot on
+  `modelgames_Scandi_gambit_accepted_-_Early_d3.pgn` (50 games) in the cloud container, with the
+  vendored lite Stockfish and Maia under Node. Nothing in the app changes.
+- Read the pilot summary (`plans-Scandi_gambit_accepted_-_Early_d3.md`, sent in the session): is it
+  the right length and depth, are the sections the ones you want, and are the rules of thumb ones
+  you would use at the board? Say what to add or drop; the skill's format follows.
+- Give the skill another position's model games, ideally with Lc0 as White, and check that the
+  report reads it (the side, the end of prep, the evals) without help.
+- Do you want the plans trainable? The skill offers an idea deck from the games (cards at the
+  turning points and the rare moves); say if that should be the default.

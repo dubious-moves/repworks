@@ -1889,6 +1889,20 @@ The technical calls, each with its reason:
   blunder." The shallow search's noise, through mistake-lab's win-% curve, made a top move a
   blunder; the cost is a second search only on the moves told bad.
 
+## Revision of 2026-10-31 (model games: the plans and goals from a position, PLAN.md §5.141)
+- **Model games are read by tools, as repertoires are.** A new skill (`.claude/skills/model-games`)
+  and `scripts/ideas/games.ts` read the owner's generated games (Lc0 against Maia from one
+  position): the plan, its goals, where the games tip and how the mistakes are punished, every
+  number counted from the games and every chess claim checked with Stockfish, Maia and `look`. The
+  summary is a Markdown report delivered as a file, not data in the owner's repos; training it
+  goes through the idea-deck format the owner already approved. Why: the owner asked for a skill
+  to summarize plans and goals from model games (2026-10-31), and the idea decks showed that
+  Claude's claims about boards need tools behind them.
+- **A repertoire can be read with our moves' shares** (`readRepertoire`'s `ourShares`), for model
+  games, where the strong side varies. Without it, as for every repertoire so far, our moves keep
+  all of their games. Why: read as a repertoire, the games would otherwise count each of Lc0's
+  choices at a position once per game through it.
+
 ## Revision of 2026-10-30 (ChessDB's evals asked again until they settle, PLAN.md §5.138)
 - **The explorer panel asks ChessDB about the position after its best move, and again about the
   position itself until two asks 15 s or more apart agree** (the same scored moves, each within
