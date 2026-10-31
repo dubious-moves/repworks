@@ -1021,8 +1021,8 @@ q_extension (or give it to a session with q_extension attached), then run
   at a position where you hesitate between moves: beside each line, Lc0's share of its first move;
   where two or more lines are within 0.30, Lc0's pick is the one highlighted. Is the pick useful?
   Is 0.30 the right width for "close"?
-- The row under the lines: Lc0's eval and win / draw / loss for the side at the bottom of the
-  board (a Black chapter: Black's), and its three likeliest moves.
+- The row under the lines: Lc0's eval from White's side (as Stockfish's), its win / draw / loss
+  for the side at the bottom of the board (a Black chapter: Black's), and its three likeliest moves.
   Step through a line with the arrows: it should follow within a fraction of a second.
 - On the phone: the same, and how fast it answers there (about 80 ms a position under Node on the
   container's CPU; a phone may take a few times that).

@@ -4,7 +4,7 @@
 // line to preview on the board (◀ ▶ Back), which the preview bar's Add puts in the chapter. The
 // eval bar sits by the board, and the arrows go to the board as auto shapes. With Lc0 on (§5.143):
 // its policy share beside each line's first move, its pick marked where two or more lines are
-// close, and a row of its own: its eval and W/D/L for the board's side, and the moves it likes most.
+// close, and a row of its own: its eval (White's side), W/D/L for the board's side, its likeliest moves.
 import { useEffect, useMemo, useRef } from 'preact/hooks';
 import { Chess, type Position } from 'chessops/chess';
 import { makeFen, parseFen } from 'chessops/fen';
@@ -167,9 +167,9 @@ function Lc0Switch() {
 }
 
 /**
- * Lc0's view of the board's position: its eval and W/D/L for the side at the bottom of the board
- * (the owner, 2026-10-31: "in the perspective of the board, not always white"), its three
- * likeliest moves. The eval's colour still says who is ahead, as the lines' do.
+ * Lc0's view of the board's position: its eval from White's side, as the lines', and its win / draw
+ * / loss for the side at the bottom of the board (the owner, 2026-10-31: the percentages "in the
+ * perspective of the board", the eval staying White's), its three likeliest moves.
  */
 function Lc0Row(props: { answer: Lc0Answer | undefined; board: Position | undefined }) {
   const a = props.answer;
@@ -183,17 +183,15 @@ function Lc0Row(props: { answer: Lc0Answer | undefined; board: Position | undefi
     );
   }
   const bottom = side.value;
-  // Lc0's W/D/L is the mover's: turned to the board's side when the other side is to move.
-  const w = props.board.turn === bottom ? a.wdl : { win: a.wdl.loss, draw: a.wdl.draw, loss: a.wdl.win };
-  const cp = lc0Centipawns(w);
-  const whiteAhead = bottom === 'white' ? cp > 0 : cp < 0;
+  // Lc0's W/D/L is the mover's: turned to a side when the other side is to move.
+  const forSide = (color: 'white' | 'black') => (props.board!.turn === color ? a.wdl : { win: a.wdl.loss, draw: a.wdl.draw, loss: a.wdl.win });
+  const cp = lc0Centipawns(forSide('white'));
+  const w = forSide(bottom);
   const pct = (x: number) => `${Math.round(x * 100)}%`;
   return (
     <div class="lc0-row" aria-label="Lc0">
       <span class="lc0-tag">Lc0</span>
-      <span class={`engine-eval ${cp === 0 ? 'even' : whiteAhead ? 'white' : 'black'}`} title={`Lc0’s eval for ${bottom === 'white' ? 'White' : 'Black'}`}>
-        {formatScore({ cp })}
-      </span>
+      <span class={`engine-eval ${cp === 0 ? 'even' : cp > 0 ? 'white' : 'black'}`}>{formatScore({ cp })}</span>
       <span class="lc0-wdl" title={`Lc0’s chances for ${bottom === 'white' ? 'White' : 'Black'}: win, draw, loss`}>
         {pct(w.win)} / {pct(w.draw)} / {pct(w.loss)}
       </span>

@@ -7858,10 +7858,10 @@ I'm not sure."
     line whose first move Lc0 likes most, its share marked. Fewer than two close lines, no mark
     (nothing to choose). Not for the threat's lines.
   - **Its own row** under the lines (shown with Stockfish off too): its eval (Lc0's
-    `90·tan(1.5637541897·Q)`) and win / draw / loss **for the side at the bottom of the board**,
-    its three likeliest moves. The eval's colour still says who is ahead. (Built first from White's
-    side, as Stockfish's lines; the owner, 2026-10-31: "should be in the perspective of the board,
-    not always white".)
+    `90·tan(1.5637541897·Q)`) from White's side, as Stockfish's lines; win / draw / loss **for the
+    side at the bottom of the board**; its three likeliest moves. (Built first with both from
+    White's side; the owner, 2026-10-31: the percentages "in the perspective of the board", the
+    eval staying White's.)
   - **Its history**: the line from the chapter's start to the board (its last 30 positions), as
     Lc0 reads 8 positions back and repetitions; a FEN-started chapter's start is repeated as Lc0's
     `HistoryFill=fen_only` does. Shares at Lc0's policy temperature, 1.359 (its "P").
