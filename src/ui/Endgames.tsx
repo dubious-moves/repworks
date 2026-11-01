@@ -1,14 +1,15 @@
 // Endgames (PLAN.md §5.145): the theoretical endgames by group, each with its board, its task and
 // where it stands (new, due, or solved n times running and when it comes back); and one played for
-// its goal against Stockfish: a move that throws the goal away stops the game ("Kd5 lets the win
+// its goal against Maia's defence checked by Stockfish (§5.147), or Stockfish's alone without Maia: a move that throws the goal away stops the game ("Kd5 lets the win
 // slip") until it is taken back, the move that kept it a press away; the method, open before a
 // first try and a press away after; the result and what it counted for.
 import { useEffect, useMemo, useState } from 'preact/hooks';
-import { endgameStandings, startEndgame } from '../app/endgames.ts';
+import { checkEndgameMaia, endgameMaiaHere, endgameStandings, startEndgame } from '../app/endgames.ts';
+import { maiaDialog } from '../app/maia.ts';
 import { analyseFrom, entryKey, open } from '../app/mode.ts';
 import { canTakeBack, leavePractice, parkPractice, playOnAfterSlip, practice, practiceHint, practiceMove, showSlipMove, stopPractice, takeBack, takeUpPractice, type PracticeGame } from '../app/practice.ts';
 import { decidingNow } from '../app/time.ts';
-import { endgameById, ENDGAMES, GROUPS, nextEndgame, sideOf, solvedBy, taskOf, type Endgame, type Standing } from '../core/endgames/endgames.ts';
+import { endgameById, ENDGAMES, GROUPS, MAIA_ELO, nextEndgame, sideOf, solvedBy, taskOf, type Endgame, type Standing } from '../core/endgames/endgames.ts';
 import { positionOf } from '../core/storm/walk.ts';
 import { Back } from './Back.tsx';
 import { MiniBoard } from './CommentOffer.tsx';
@@ -59,6 +60,7 @@ function EndgameList() {
   const due = ENDGAMES.filter((e) => standings.get(e.id)?.state === 'due').length;
   const fresh = ENDGAMES.filter((e) => standings.get(e.id)?.state === 'new').length;
   const soonest = Math.min(...ENDGAMES.map((e) => standings.get(e.id)?.next ?? Infinity));
+  useEffect(checkEndgameMaia, []);
   return (
     <div class="games endgames">
       <div class="chapter-head">
@@ -69,9 +71,10 @@ function EndgameList() {
       </div>
       <section class="card endgames-intro">
         <p>
-          The endgames every player needs, each played against Stockfish’s best defence. A move that throws the goal away stops the game: take it back and find a better one. A
-          try counts once, whatever happens after a take-back or a hint; a solved endgame comes back after 1, 3, 7, 14, 30 and 60 days.
+          The endgames every player needs, each played against a defence that sets the traps a strong player sets. A move that throws the goal away stops the game: take it
+          back and find a better one. A try counts once, whatever happens after a take-back or a hint; a solved endgame comes back after 1, 3, 7, 14, 30 and 60 days.
         </p>
+        <OpponentNote />
         <div class="actions">
           {next ? (
             <a class="button primary" href={`#/endgames/${next.id}`} data-testid="endgame-next">
@@ -96,6 +99,27 @@ function EndgameList() {
         </section>
       ))}
     </div>
+  );
+}
+
+/** Who the opponent is: Maia checked by Stockfish, or Stockfish alone with the offer of Maia. */
+function OpponentNote() {
+  const here = endgameMaiaHere.value;
+  if (here === undefined) return null;
+  return (
+    <p class="muted endgame-opponent" data-testid="endgame-opponent">
+      {here ? (
+        <>The opponent: Maia {MAIA_ELO} plays the move a strong player would try, among the moves Stockfish finds sound.</>
+      ) : (
+        <>
+          The opponent: Stockfish alone. It knows a lost position is lost whichever move it plays, so it often plays one that sets no problem; Maia plays the testing move a strong
+          player would try.{' '}
+          <button type="button" class="link" onClick={() => (maiaDialog.value = true)}>
+            Get Maia…
+          </button>
+        </>
+      )}
+    </p>
   );
 }
 
@@ -194,7 +218,7 @@ function EndgameGame(props: { game: PracticeGame; endgame: Endgame; method: bool
           ? hint
             ? 'Your move: the hint is on the board'
             : 'Your move'
-          : 'Stockfish is thinking…';
+          : `${endgameMaiaHere.value ? 'Maia' : 'Stockfish'} is thinking…`;
   const solved = over && p.end && solvedBy(e.goal, p.end.result);
   const restart = () => {
     // Started again before the end: the try so far is given up (Stop counts it as missed).

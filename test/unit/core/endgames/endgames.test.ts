@@ -1,5 +1,6 @@
 // Endgames (PLAN.md §5.145): the positions as written, the goal move by move, the spacing of the
-// tries read back from practice results, the next one to play, and the attacker's pressing move.
+// tries read back from practice results, the next one to play, the attacker's pressing move, and
+// the opponent's pick (§5.147): Maia's likeliest move that Stockfish finds sound.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Chess } from 'chessops/chess';
@@ -17,7 +18,10 @@ import {
   INTERVAL_DAYS,
   keepsGoal,
   materialFor,
+  MAIA_MIN,
+  MAIA_TOP,
   nextEndgame,
+  opponentPick,
   pressingMove,
   sideOf,
   slips,
@@ -216,4 +220,83 @@ test('material for a side, and the attacker pressing rather than handing a drawn
   // Only lines within 30 cp count; with none keeping material, the best.
   assert.equal(pressingMove([{ cp: 0, pv: ['e6e7', 'd8e7'] }, { cp: -31, pv: ['e5d5', 'd8e7'] }], material(g2)), 'e6e7');
   assert.equal(pressingMove([], material(g2)), undefined);
+});
+
+test('the opponent: Maia’s likeliest move that Stockfish finds sound, else Stockfish’s own', () => {
+  const material = (fen: string) => (pv: readonly string[]) => {
+    const p = pos(fen);
+    for (const uci of pv) {
+      const m = parseUci(uci);
+      if (!m || !p.isLegal(m)) return undefined;
+      p.play(m);
+    }
+    return materialFor(p, pos(fen).turn);
+  };
+  const over = (fen: string) => (uci: string) => {
+    const p = pos(fen);
+    p.play(parseUci(uci)!);
+    return p.isEnd();
+  };
+  const lines = (...ls: { cp: number; pv: string[] }[]) => (uci: string) => ls.find((l) => l.pv[0] === uci);
+
+  // A lost defence (the user's win kept whatever is played): Maia's Kf7 though Stockfish scores
+  // Ke7 a little longer, as every move loses.
+  const kp = '5k2/8/8/3K4/4P3/8/8/8 b - - 1 1';
+  const ke7 = { cp: -6480, pv: ['f8e7', 'd5e5'] };
+  const kf7 = { cp: -6500, pv: ['f8f7', 'd5d6'] };
+  assert.deepEqual(opponentPick('win', [ke7], [{ uci: 'f8f7', prob: 0.6 }, { uci: 'f8e7', prob: 0.3 }], lines(ke7, kf7), material(kp), over(kp)), { uci: 'f8f7', maia: true });
+  // Maia's first move Stockfish's own: taken as Maia's, with no line of its own needed.
+  assert.deepEqual(opponentPick('win', [ke7], [{ uci: 'f8e7', prob: 0.6 }], () => undefined, material(kp), over(kp)), { uci: 'f8e7', maia: true });
+  // No Maia (not on the device): Stockfish's best.
+  assert.deepEqual(opponentPick('win', [ke7], [], () => undefined, material(kp), over(kp)), { uci: 'f8e7', maia: false });
+  // A move with no line (not searched), or a line that isn't the move's, is passed over.
+  assert.deepEqual(opponentPick('win', [ke7], [{ uci: 'f8g8', prob: 0.6 }], lines(ke7), material(kp), over(kp)), { uci: 'f8e7', maia: false });
+  // Under MAIA_MIN, or past Maia's first MAIA_TOP moves, not taken.
+  assert.equal(MAIA_TOP, 3);
+  assert.deepEqual(opponentPick('win', [ke7], [{ uci: 'f8f7', prob: MAIA_MIN - 0.01 }], lines(ke7, kf7), material(kp), over(kp)), { uci: 'f8e7', maia: false });
+  // Kg8 and Ke8 not searched: Kg7, the second, taken; without it, Kf7 is the fourth, past MAIA_TOP.
+  const kg7 = { cp: -6400, pv: ['f8g7', 'd5e6'] };
+  assert.deepEqual(
+    opponentPick('win', [ke7], [{ uci: 'f8g8', prob: 0.3 }, { uci: 'f8g7', prob: 0.3 }, { uci: 'f8e8', prob: 0.2 }, { uci: 'f8f7', prob: 0.1 }], lines(ke7, kf7, kg7), material(kp), over(kp)),
+    { uci: 'f8g7', maia: true },
+  );
+  assert.deepEqual(
+    opponentPick('win', [ke7], [{ uci: 'f8g8', prob: 0.3 }, { uci: 'f8g7', prob: 0.3 }, { uci: 'f8e8', prob: 0.2 }, { uci: 'f8f7', prob: 0.1 }], lines(ke7, kf7), material(kp), over(kp)),
+    { uci: 'f8e7', maia: false },
+  );
+
+  // A defence: Maia's Ra8+ hangs the rook (Kxa8), Stockfish's Rb2 doesn't: Maia's next, Rc2, kept.
+  const rook = '1K6/1P2k3/8/8/8/8/r7/3R4 b - - 0 1';
+  const rb2 = { cp: -900, pv: ['a2b2', 'd1d4'] };
+  const ra8 = { cp: -1500, pv: ['a2a8', 'b8a8'] };
+  const rc2 = { cp: -950, pv: ['a2c2', 'd1d4'] };
+  assert.deepEqual(opponentPick('win', [rb2], [{ uci: 'a2a8', prob: 0.4 }, { uci: 'a2c2', prob: 0.3 }], lines(rb2, ra8, rc2), material(rook), over(rook)), { uci: 'a2c2', maia: true });
+  assert.deepEqual(opponentPick('win', [rb2], [{ uci: 'a2a8', prob: 0.4 }], lines(rb2, ra8), material(rook), over(rook)), { uci: 'a2b2', maia: false });
+
+  // The attacker against a draw: Maia's Ke6 is stalemate, the drill over for nothing; its Kd6
+  // within 30 cp of the best is kept; one 31 cp worse is not, the pressing move then.
+  const st = '4k3/4P3/8/4K3/8/8/8/8 w - - 0 1';
+  const kf5 = { cp: 0, pv: ['e5f5', 'e8e7'] };
+  const kd5 = { cp: 0, pv: ['e5d5', 'e8f7'] };
+  const ke6 = { cp: 0, pv: ['e5e6'] };
+  const kd6 = { cp: -30, pv: ['e5d6', 'e8f7'] };
+  assert.ok(over(st)('e5e6'));
+  // Kf5 gives the pawn (Kxe7): the pressing move is Kd5.
+  assert.deepEqual(opponentPick('draw', [kf5, kd5], [], () => undefined, material(st), over(st)), { uci: 'e5d5', maia: false });
+  assert.deepEqual(opponentPick('draw', [kf5, kd5], [{ uci: 'e5e6', prob: 0.7 }, { uci: 'e5d6', prob: 0.2 }], lines(kf5, kd5, ke6, kd6), material(st), over(st)), { uci: 'e5d6', maia: true });
+  assert.deepEqual(
+    opponentPick('draw', [kf5, kd5], [{ uci: 'e5e6', prob: 0.7 }, { uci: 'e5d6', prob: 0.2 }], lines(kf5, kd5, ke6, { ...kd6, cp: -31 }), material(st), over(st)),
+    { uci: 'e5d5', maia: false },
+  );
+  // Maia's Kf5 gives the pawn away, as Stockfish's first line did: passed over too.
+  assert.deepEqual(opponentPick('draw', [kf5, kd5], [{ uci: 'e5f5', prob: 0.7 }], lines(kf5, kd5), material(st), over(st)), { uci: 'e5d5', maia: false });
+
+  // A win let go earlier (the opponent no longer lost): the score counts again, a worse move not taken.
+  const held = { cp: 0, pv: ['f8e7', 'd5e5'] };
+  const worse = { cp: -250, pv: ['f8g7', 'd5e6'] };
+  assert.deepEqual(opponentPick('win', [held], [{ uci: 'f8g7', prob: 0.6 }], lines(held, worse), material(kp), over(kp)), { uci: 'f8e7', maia: false });
+  assert.ok(GOAL_CP.win > 0);
+
+  // No lines: nothing.
+  assert.equal(opponentPick('win', [], [{ uci: 'f8f7', prob: 0.6 }], lines(kf7), material(kp), over(kp)), undefined);
 });

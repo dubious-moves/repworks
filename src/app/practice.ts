@@ -31,11 +31,12 @@ import { readSaved, resumable, type Saved } from '../core/games/resume.ts';
 import { covered, scanCandidate, tacticCandidates, TACTIC, type DetectedTactic, type Pv } from '../core/games/detect.ts';
 import type { Color } from '../core/games/record.ts';
 import { historyCard, practiceCard } from '../core/progress/cards.ts';
-import { ENDGAME_PRESET, firstSlip, GOAL_CP, held, keepsGoal, materialFor, pressingMove, slips, wonAfter, type Endgame } from '../core/endgames/endgames.ts';
+import { ENDGAME_PRESET, firstSlip, GOAL_CP, held, keepsGoal, MAIA_ELO, MAIA_MIN, MAIA_TOP, materialFor, opponentPick, pressingMove, slips, wonAfter, type Endgame, type OpponentLine } from '../core/endgames/endgames.ts';
 import type { Grade } from '../core/progress/events.ts';
 import { positionOf } from '../core/storm/walk.ts';
 import { onWorker, postToWorker } from './explorer.ts';
-import { maiaPolicy, maiaPrefs } from './maia.ts';
+import { maiaPolicies, maiaPolicy, maiaPrefs } from './maia.ts';
+import type { MaiaMove } from '../core/maia/encode.ts';
 import { recordEvent } from './state.ts';
 import { analyseForStorm } from './stormEngine.ts';
 import { trainData } from './train.ts';
@@ -221,15 +222,28 @@ function explorerGames(fen: string, o: Opponent): Promise<PracticeReply | null> 
 }
 
 /**
- * An endgame's opponent (§5.145): Stockfish's best at the judges' depth, the defence of a win; the
- * attacker against a draw presses, never simply giving material away (`pressingMove`). The user
- * waits on it, so it goes ahead of the judges searching in the background.
+ * Maia's moves for an endgame's opponent at `MAIA_ELO` (§5.147), once its files are on this device
+ * (the switch can stay off); null without them, or when it doesn't answer within 30 s of starting
+ * and 5 s of being asked (Stockfish alone then).
+ */
+export async function endgameMaia(fen: string): Promise<MaiaMove[] | null> {
+  const asked = maiaPolicies(fen, [MAIA_ELO]).then((r) => r?.[0] ?? null);
+  return Promise.race([asked, new Promise<null>((r) => setTimeout(() => r(null), 35_000))]);
+}
+
+/**
+ * An endgame's opponent (§5.147, the owner's request): Maia's likeliest move that Stockfish finds
+ * sound (`opponentPick`), its moves searched alone at the judges' depth; Stockfish's own (its best
+ * in a defence, `pressingMove` against a draw) when Maia isn't on this device or none of its moves
+ * is sound. The user waits on it, so its searches go ahead of the judges in the background.
  */
 async function endgameReply(fen: string, goal: 'win' | 'draw'): Promise<{ uci: string; source: string; dbFailed: boolean } | undefined> {
   const pos = positionOf(fen);
   if (!pos) return undefined;
-  const a = await search(fen, goal === 'draw' ? 3 : 1, narrow() ? 16 : 18, 6000, undefined, true);
-  const lines = (a?.lines ?? []).filter((l) => l.pv.length).map((l) => ({ cp: moverScore(l.score, pos.turn), pv: l.pv }));
+  const depth = narrow() ? 16 : 18;
+  const [a, maia] = await Promise.all([search(fen, goal === 'draw' ? 3 : 1, depth, 6000, undefined, true), endgameMaia(fen)]);
+  const scored = (r: typeof a): OpponentLine[] => (r?.lines ?? []).filter((l) => l.pv.length).map((l) => ({ cp: moverScore(l.score, pos.turn), pv: l.pv }));
+  const lines = scored(a);
   const material = (pv: readonly string[]) => {
     const p = pos.clone();
     for (const uci of pv) {
@@ -239,8 +253,23 @@ async function endgameReply(fen: string, goal: 'win' | 'draw'): Promise<{ uci: s
     }
     return materialFor(p, pos.turn);
   };
-  const best = goal === 'draw' ? pressingMove(lines, material) : lines[0]?.pv[0];
-  return best ? { uci: best, source: 'Stockfish', dbFailed: false } : undefined;
+  // Maia's moves Stockfish's lines don't cover, searched alone: only up to the first that is
+  // Stockfish's own move (no search needed after it).
+  const base = goal === 'draw' ? pressingMove(lines, material) : lines[0]?.pv[0];
+  const candidates = (maia ?? []).slice(0, MAIA_TOP).filter((m) => m.prob >= MAIA_MIN);
+  const upTo = candidates.findIndex((m) => m.uci === base);
+  const rest = (upTo < 0 ? candidates : candidates.slice(0, upTo)).map((m) => m.uci).filter((u) => !lines.some((l) => l.pv[0] === u));
+  const more = rest.length ? scored(await search(fen, rest.length, depth, 6000, rest, true)) : [];
+  const lineOf = (uci: string) => [...lines, ...more].find((l) => l.pv[0] === uci);
+  const over = (uci: string) => {
+    const p = pos.clone();
+    const m = parseUciMove(p, uci);
+    if (!m) return true;
+    p.play(m);
+    return p.isEnd();
+  };
+  const pick = opponentPick(goal, lines, candidates, lineOf, material, over);
+  return pick ? { uci: pick.uci, source: pick.maia ? `Maia ${MAIA_ELO}` : 'Stockfish', dbFailed: false } : undefined;
 }
 
 /** The opponent's move: the database, then Maia, then Stockfish; undefined when none answers. */

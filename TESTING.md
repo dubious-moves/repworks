@@ -1078,3 +1078,19 @@ q_extension (or give it to a session with q_extension attached), then run
   each drill played out with the app's own judge), the pages by unit tests and Playwright with a
   fake engine (desktop and emulated phone), screenshots in headless Chromium. Not on your devices,
   and not with the real engine in the browser.
+
+## Endgames defended by Maia (§5.147, 2026-11-01)
+
+- Home → Endgames without Maia on the device: the list says "The opponent: Stockfish alone…" with
+  Get Maia…. Download it there (about 60 MB, on Wi-Fi): the note says Maia 2600 defends now. Does
+  the explanation read right?
+- Play the ones where the test felt too easy (the king-and-pawn endings, Philidor, the rook mate):
+  does the defence now put up the resistance a strong player would, the tricky moves included?
+  Is any defending move silly (a piece hung, a stalemate that ends the drill)? Say which, with the
+  position: Stockfish should have vetoed it.
+- On the phone: is the answer still quick ("Maia is thinking…")? The first answer of a try may
+  wait a moment for Maia to load.
+- Checked: the measurement under Node (Stockfish 18 lite, Maia 3, Lc0; PLAN.md §5.147's table),
+  the pick by unit tests, the page by Playwright on desktop and the emulated phone with the real
+  Maia in Chromium and a fake Stockfish. Not on your devices, and not with the real Stockfish in
+  the browser.

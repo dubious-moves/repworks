@@ -7,7 +7,7 @@ where the build differed). What remains is live: the spike's re-run (§4.2), the
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
 with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
-for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Storm positions shared between devices through the data repo, and an overnight gather (§5.102), are built (2026-10-12). Lc0 on the study page, its pick among close moves (§5.143), is built (2026-10-31). Endgames, the theoretical endgames each played for its goal against Stockfish (§5.145), are built (2026-10-31), their moves judged in the background since (§5.146, the owner's request of 2026-11-01). Read with `DECISIONS.md`, which this plan updates (its
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Storm positions shared between devices through the data repo, and an overnight gather (§5.102), are built (2026-10-12). Lc0 on the study page, its pick among close moves (§5.143), is built (2026-10-31). Endgames, the theoretical endgames each played for its goal against Stockfish (§5.145), are built (2026-10-31), their moves judged in the background since (§5.146, the owner's request of 2026-11-01), and defended by Maia checked by Stockfish (§5.147, the owner's request). Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -7960,7 +7960,8 @@ about technique once Maia or the database answers. This adds that, built on the 
   plays one.
 - **The game**: a practice game of a new kind, `endgame`, from the position, the user's side the
   side to move. The opponent is **Stockfish alone** at the judges' depth (18, 16 on a phone):
-  neither the database nor Maia, which answer as people do, not as a defence. Every move of the
+  neither the database nor Maia, which answer as people do, not as a defence. (Since §5.147, the owner's
+  request: Maia 2600's move that Stockfish finds sound, Stockfish alone without Maia.) Every move of the
   user's is judged as practice judges (§5.57, with §5.136's deeper second search for a move told
   bad), and **the opponent waits for the judge**, as in an advantage drill (since §5.146 it answers at once, the judge in the background).
 - **The goal, move by move** (`core/endgames/endgames.ts`): a win is kept while the user's score
@@ -8090,3 +8091,65 @@ marked move in `MoveList`. Tests: `firstSlip` in `test/unit/core/endgames/endgam
 `test/e2e/endgames.spec.ts` with the fake engine at 1 s a search: Kd2 answered before its deeper
 search, Ke3 played meanwhile, the game stopped back on Kd2 with four moves on the list, taken back
 with them, the event at Kd2 (`mv` 1); the breakthrough's end waiting for its judges. Live: TESTING.md.
+
+#### 5.147 Endgames: Maia's defence, checked by Stockfish (the owner's request, 2026-11-01)
+
+The owner: "it might be better to use Lc0 or high elo Maia for the endgame practice. The problem
+with stockfish is that it doesn't always play the critical/tricky moves (as it knows all moves
+lose), making the endgame test too easy."
+
+- **Measured** (2026-11-01, cloud container, `scripts/endgame-defence.ts`, the vendored Stockfish
+  18 lite, Maia 3 and Lc0 791556 under Node). A defence is hard when it leaves the user few ways
+  to keep the goal, so for each position with the opponent to move, every opponent move was scored
+  by **the user's replies that keep the goal after it** (every reply searched, depth 14; 10 in the
+  rook endings, too slow at 14), and each engine's pick read against that. The games: each
+  endgame played out twice for 20 plies (once for 14 in the rook endings), the user's side
+  Stockfish's best or now and then another move that keeps the goal; the queen against a pawn cut
+  short (its searches the slowest). Positions where the opponent's moves all leave the same number
+  of ways don't count ("real" below).
+
+  | Along Stockfish's defence (§5.145), 147 real of 160 | Leaves the fewest ways | Leaves an only move | Ways left, mean |
+  | --- | --- | --- | --- |
+  | Stockfish (as the app played it) | 83 | 48 | 8.5 |
+  | Maia 3 at 2200 | 118 | 58 | 7.5 |
+  | Maia 3 at 2600 | 117 | 58 | 7.5 |
+  | Lc0, its policy | 91 | 51 | 8.1 |
+  | Lc0, a 100-node search | 95 | 51 | 8.1 |
+
+  Along the new opponent's own games (125 real of 140, all but the rook endings): Stockfish's pick
+  would have left the fewest ways in 76 and an only move in 38, the app's in 104 and 47 (of 53
+  possible). By endgame, Maia's move was as testing or more in every one, most clearly in the
+  king-and-pawn endings ("Take the opposition": the fewest in 17 of 20, Stockfish 8), Philidor
+  (an only move in 6 of 7, Stockfish 4) and the rook mate (17 of 19, Stockfish 10); Lucena alike
+  for all. A typical case, Philidor after 1…Kf8: Stockfish's 2.Ra8+ leaves three of four replies
+  holding, Maia's 2.Kf6 one of sixteen. Maia's move alone twice ended a drill for nothing (a
+  stalemate in "Hold with the opposition"), so it is checked.
+- **Decided** (Claude's calls):
+  - **Maia, not Lc0**: Lc0 was little better than Stockfish, and its search costs about 100 ms a
+    node on wasm, seconds a move on a phone; Maia is one network run.
+  - **At 2600**, its highest (2200 measured the same): the owner's "high elo Maia".
+  - **Checked by Stockfish** (`opponentPick` in `core/endgames/endgames.ts`): Maia's likeliest of
+    its first three moves (5% and more) that Stockfish, searching them alone at the judges' depth,
+    finds sound: the game not over after it; its score within 0.30 of the best, or any score when
+    the opponent is lost whatever it plays (the user's win kept); its next two plies giving no
+    more material away than Stockfish's own move's. Else Stockfish's move as before (its best, or
+    the pressing move against a draw).
+  - **Without Maia on the device, Stockfish alone**, as before. Maia is never downloaded for it
+    unasked: the endgames' list says who the opponent is and offers "Get Maia…" (the existing
+    dialog); once Maia's files are stored the switch can stay off. Maia is started with each try,
+    so its first answer doesn't wait on its loading; its moves and Stockfish's search run side by
+    side, then one search of Maia's moves before Stockfish's own when they aren't among its lines.
+  - Stockfish still judges every move and gives the hint: what counts doesn't change.
+
+**As built** (2026-11-01): `opponentPick`, `MAIA_ELO`, `MAIA_TOP`, `MAIA_MIN` in
+`src/core/endgames/endgames.ts`; `endgameMaia` and the new `endgameReply` in `src/app/practice.ts`;
+`endgameMaiaHere` and `checkEndgameMaia` in `src/app/endgames.ts`; the opponent's note and "Get
+Maia…" in `src/ui/Endgames.tsx`, "Maia is thinking…"; the Maia dialog's sentence;
+`scripts/endgame-defence.ts` (the measurement). Tests: `opponentPick` in
+`test/unit/core/endgames/endgames.test.ts` (a lost defence taking Maia's move whatever its score,
+Maia's first move Stockfish's own, no Maia, a move without a line, `MAIA_MIN` and `MAIA_TOP`, a
+hung rook passed over, the attacker's stalemate passed over, the 0.30 line, a won game let go);
+`test/e2e/endgames.spec.ts` on desktop and the emulated phone ("Stockfish alone" with its offer;
+King in front of the pawn, 1.Kd5 Kf7 by Stockfish alone; Maia downloaded from the list, the note
+saying so; 1.Kd5 Ke7, Maia's real move, searched alone by the fake Stockfish and played). Live:
+TESTING.md.

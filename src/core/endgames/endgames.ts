@@ -246,6 +246,58 @@ export function pressingMove(lines: readonly { cp: number; pv: readonly string[]
   return best.pv[0];
 }
 
+/** Maia's rating for the opponent (§5.147): its highest. */
+export const MAIA_ELO = 2600;
+/** Maia's likeliest moves looked at, and the least likely of them still taken. */
+export const MAIA_TOP = 3;
+export const MAIA_MIN = 0.05;
+
+/** A line of the opponent's: its score for the opponent (a mate ±10000, as `moverScore`) and its moves. */
+export interface OpponentLine {
+  cp: number;
+  pv: readonly string[];
+}
+
+/**
+ * The opponent's move (the owner's request, 2026-11-01, §5.147): Stockfish knows every move of a
+ * lost defence loses and plays any of them, often not the one that tests the user; Maia plays the
+ * move a strong player tries, which (measured) leaves the user the fewest ways to keep the goal
+ * far more often. So Maia's likeliest move (of its first `MAIA_TOP`, from `MAIA_MIN`) that
+ * Stockfish finds sound: the game not over after it, its score within `PRESS_CP` of the best
+ * (any score when the opponent is lost whatever it plays: the user's win kept), and its line's
+ * next two plies giving no more material away than Stockfish's own move's. Else Stockfish's move
+ * (`pressingMove` against a draw being held, the best otherwise). `best` are Stockfish's lines,
+ * best first; `lineOf` a line for one of Maia's moves (searched alone, or one of `best`);
+ * `material` the opponent's balance after a line's first moves; `over` whether the game ends
+ * after a move.
+ */
+export function opponentPick(
+  goal: Goal,
+  best: readonly OpponentLine[],
+  maia: readonly { uci: string; prob: number }[],
+  lineOf: (uci: string) => OpponentLine | undefined,
+  material: (pv: readonly string[]) => number | undefined,
+  over: (uci: string) => boolean,
+): { uci: string; maia: boolean } | undefined {
+  const top = best[0];
+  const base = goal === 'draw' ? pressingMove(best, material) : top?.pv[0];
+  if (!top || !base) return undefined;
+  const baseLine = best.find((l) => l.pv[0] === base)!;
+  const floor = material(baseLine.pv.slice(0, 2)) ?? material([]);
+  const lost = goal === 'win' && top.cp <= -GOAL_CP.win;
+  for (const m of maia.slice(0, MAIA_TOP)) {
+    if (m.prob < MAIA_MIN) break;
+    if (m.uci === base) return { uci: base, maia: true };
+    const l = lineOf(m.uci);
+    if (!l?.pv.length || l.pv[0] !== m.uci || over(m.uci)) continue;
+    if (!lost && l.cp < top.cp - PRESS_CP) continue;
+    const after = material(l.pv.slice(0, 2));
+    if (after === undefined || floor === undefined || after < floor) continue;
+    return { uci: m.uci, maia: true };
+  }
+  return { uci: base, maia: false };
+}
+
 /* ------------------------------------------------------------------ the record and its spacing */
 
 export interface Attempt {

@@ -2010,3 +2010,15 @@ The technical calls, each with its reason:
   judged; a mate given counts at once. The deeper second search (§5.136) runs for an endgame's move
   only when it looks like a slip.
 
+## Revision of 2026-11-01 (endgames defended by Maia, PLAN.md §5.147)
+- **An endgame's opponent is Maia 3 at 2600, checked by Stockfish**: Maia's likeliest move (of its
+  first three) that Stockfish finds sound (the game not over, within 0.30 of the best unless the
+  opponent is lost anyway, no more material given than Stockfish's own move gives); Stockfish's
+  move otherwise, and Stockfish alone when Maia isn't on the device. Replaces §5.145's "Stockfish
+  alone". Why: the owner, 2026-11-01: Stockfish "doesn't always play the critical/tricky moves (as
+  it knows all moves lose), making the endgame test too easy". Measured over about 300 positions
+  of the ten endgames: Maia's move left the user the fewest ways to keep the goal in 117 of 147
+  real choices, Stockfish's in 83, Lc0's in 91 to 95; Lc0 also costs seconds a move on a phone.
+  Unchecked, Maia once stalemated a drill away, hence Stockfish's check.
+- **Maia isn't downloaded for it unasked**: the list says who the opponent is and offers the
+  existing download. Stockfish still judges the moves and gives the hint.

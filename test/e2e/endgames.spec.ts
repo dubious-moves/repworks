@@ -6,6 +6,8 @@
 // shown as an arrow, Ke3 played and Stockfish's answer; the try counted once as missed (one
 // `practice` event, synced, at Kd2), the list saying so. Then the breakthrough solved first time
 // along Stockfish's own line (b6 cxb6 a6 bxa6 c6 b5 c7 b4 c8=Q), the list saying when it comes back.
+// And the opponent (§5.147): Stockfish alone without Maia, then, Maia downloaded from the list, Maia
+// 2600's move (the real network) once Stockfish, searching it alone, finds it sound.
 import { test, expect, type Page } from '@playwright/test';
 import type { FakeGit } from '../support/fakeGit.ts';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
@@ -41,9 +43,24 @@ const BREAKTHROUGH: [string, string, string[]?][] = [
   ['8/p1P4k/p7/8/1p6/8/8/7K w - -', 'c7c8q', ['c7c8r', 'h1g2']],
 ];
 
+/** King in front of the pawn, and after Kd5: Stockfish's first line Kf7, Maia 2600's likeliest move Ke7. */
+const KING_IN_FRONT = '5k2/8/8/8/3KP3/8/8/8 w - -';
+const AFTER_KD5_KIF = '5k2/8/8/3K4/4P3/8/8/8 b - -';
+
 let site: SiteServer;
 test.beforeAll(async () => {
   const extra: Record<string, [number, number, string][]> = {
+    [KING_IN_FRONT]: [
+      [1, 6480, 'd4d5 f8e7'],
+      [2, 0, 'd4e5 f8e7'],
+      [3, 0, 'e4e5 f8e7'],
+    ],
+    [AFTER_KD5_KIF]: [[1, -6480, 'f8f7 d5d6']],
+    // Maia's moves before Stockfish's own (Ke7 72%, Ke8 19%, Kf7 7%), searched alone together.
+    [`${AFTER_KD5_KIF}|f8e7 f8e8`]: [
+      [1, -6500, 'f8e7 d5e5'],
+      [2, -6500, 'f8e8 d5e6'],
+    ],
     // Ke3 keeps the win; Kc3 and Kd2 let it go (scores for the side to move).
     [OPPOSITION]: [
       [1, 900, 'd3e3 e5d6'],
@@ -92,6 +109,7 @@ test('an endgame: a move that lets the win slip, found after playing on, taken b
   await expect(page).toHaveURL(/#\/endgames$/);
   await expect(page.getByTestId('endgame-counts')).toHaveText('0 due · 10 new');
   await expect(page.getByTestId('endgame-next')).toHaveText('Next new: Queen mate');
+  await expect(page.getByTestId('endgame-opponent')).toContainText('The opponent: Stockfish alone.');
   await page.getByRole('link', { name: 'Take the opposition', exact: true }).click();
   await expect(page).toHaveURL(/#\/endgames\/opposition$/);
   const game = page.getByTestId('endgame-game');
@@ -197,4 +215,32 @@ test('an endgame solved first time: the breakthrough along Stockfish’s line, t
   expect(endgameEvents(git)[0]).toMatchObject({ card: `x|${BREAKTHROUGH[0]![0]}`, res: 'win', preset: 'endgame', mv: 5 });
   await page.evaluate(() => (location.hash = '#/endgames'));
   await expect(page.locator('[data-endgame="breakthrough"] [data-testid="endgame-standing"]')).toHaveText('Solved once · back tomorrow ✓');
+});
+
+test('the opponent: Stockfish alone without Maia; with Maia, its move once Stockfish finds it sound', async ({ page }) => {
+  test.setTimeout(180_000);
+  await setUp(page);
+  await page.evaluate(() => (location.hash = '#/endgames/king-in-front'));
+  const game = page.getByTestId('endgame-game');
+  const moves = page.getByTestId('practice-moves');
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  await clickSquare(page, 'd4', 'white');
+  await clickSquare(page, 'd5', 'white');
+  await expect(moves).toHaveText('1. Kd5 Kf7', { timeout: ENGINE_MS * 4 });
+
+  // Maia from the list's offer: the note says it defends now.
+  await page.evaluate(() => (location.hash = '#/endgames'));
+  const note = page.getByTestId('endgame-opponent');
+  await note.getByRole('button', { name: 'Get Maia…' }).click();
+  await page.getByRole('dialog', { name: 'Enable Maia' }).getByRole('button', { name: /^Download/ }).click();
+  await expect(note).toHaveText('The opponent: Maia 2600 plays the move a strong player would try, among the moves Stockfish finds sound.', { timeout: 120_000 });
+
+  // Again: Maia's Ke7, searched alone by Stockfish (lost either way, no material given) and played.
+  await page.evaluate(() => (location.hash = '#/endgames/king-in-front'));
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  await expect(moves).toHaveText('');
+  await clickSquare(page, 'd4', 'white');
+  await clickSquare(page, 'd5', 'white');
+  await expect(moves).toHaveText('1. Kd5 Ke7', { timeout: 30_000 });
+  expect(commands(site.requests).some((c) => / searchmoves f8e7 f8e8$/.test(c))).toBe(true);
 });
