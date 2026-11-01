@@ -7,7 +7,8 @@
 // `practice` event, synced, at Kd2), the list saying so. Then the breakthrough solved first time
 // along Stockfish's own line (b6 cxb6 a6 bxa6 c6 b5 c7 b4 c8=Q), the list saying when it comes back.
 // And the opponent (§5.147): Stockfish alone without Maia, then, Maia downloaded from the list, Maia
-// 2600's move (the real network) once Stockfish, searching it alone, finds it sound.
+// 2600's move (the real network) once Stockfish, searching it alone, finds it sound. And a draw's
+// attacker (§5.148) not going back to a position seen, and pushing its pawn once a third is held.
 import { test, expect, type Page } from '@playwright/test';
 import type { FakeGit } from '../support/fakeGit.ts';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
@@ -47,9 +48,64 @@ const BREAKTHROUGH: [string, string, string[]?][] = [
 const KING_IN_FRONT = '5k2/8/8/8/3KP3/8/8/8 w - -';
 const AFTER_KD5_KIF = '5k2/8/8/3K4/4P3/8/8/8 b - -';
 
+/** Hold with the opposition: the user's positions (Black to move) and the attacker's (White). */
+const HOLD = {
+  u0: '4k3/8/8/4K3/4P3/8/8/8 b - -',
+  a1: '8/4k3/8/4K3/4P3/8/8/8 w - -',
+  u1: '8/4k3/8/3K4/4P3/8/8/8 b - -',
+  a2: '8/3k4/8/3K4/4P3/8/8/8 w - -',
+  u2: '8/3k4/8/4K3/4P3/8/8/8 b - -',
+  u3: '8/4k3/8/5K2/4P3/8/8/8 b - -',
+  a3: '8/5k2/8/5K2/4P3/8/8/8 w - -',
+};
+
 let site: SiteServer;
 test.beforeAll(async () => {
   const extra: Record<string, [number, number, string][]> = {
+    // The user's moves hold (0.00), the others lose; the attacker's first line is Kd5 where the
+    // board is A1 (twice: Kd5 a repetition the second time, Kf5 then), Ke5 at A2, Kg5 at A3 with
+    // e5 within 0.30.
+    [HOLD.u0]: [
+      [1, 0, 'e8e7 e5d5'],
+      [2, -1100, 'e8d8 e5d6'],
+      [3, -1100, 'e8f8 e5f6'],
+    ],
+    // A line for each legal move: the search asks for five.
+    [HOLD.a1]: [
+      [1, 0, 'e5d5 e7d7'],
+      [2, 0, 'e5f5 e7f7'],
+      [3, -400, 'e5d4 e7d6'],
+      [4, -400, 'e5f4 e7f6'],
+    ],
+    [HOLD.u1]: [
+      [1, 0, 'e7d7 d5e5'],
+      [2, -1100, 'e7e8 d5d6'],
+      [3, -1100, 'e7f6 d5d6'],
+    ],
+    [HOLD.a2]: [
+      [1, 0, 'd5e5 d7e7'],
+      [2, -400, 'd5c5 d7e6'],
+      [3, -400, 'd5c4 d7e6'],
+      [4, -400, 'd5d4 d7e6'],
+      [5, -400, 'e4e5 d7e7'],
+    ],
+    [HOLD.u2]: [
+      [1, 0, 'd7e7 e5d5'],
+      [2, -1100, 'd7c7 e5e6'],
+      [3, -1100, 'd7d8 e5e6'],
+    ],
+    [HOLD.u3]: [
+      [1, 0, 'e7f7 f5g5'],
+      [2, -1100, 'e7d6 f5f6'],
+      [3, -1100, 'e7e8 f5f6'],
+    ],
+    [HOLD.a3]: [
+      [1, 10, 'f5g5 f7e7'],
+      [2, 0, 'e4e5 f7e7'],
+      [3, -400, 'f5e5 f7e7'],
+      [4, -400, 'f5f4 f7f6'],
+      [5, -400, 'f5g4 f7f6'],
+    ],
     [KING_IN_FRONT]: [
       [1, 6480, 'd4d5 f8e7'],
       [2, 0, 'd4e5 f8e7'],
@@ -243,4 +299,27 @@ test('the opponent: Stockfish alone without Maia; with Maia, its move once Stock
   await clickSquare(page, 'd5', 'white');
   await expect(moves).toHaveText('1. Kd5 Ke7', { timeout: 30_000 });
   expect(commands(site.requests).some((c) => / searchmoves f8e7 f8e8$/.test(c))).toBe(true);
+});
+
+test('a draw’s attacker: no going back to a position seen, and the pawn pushed once a third is held', async ({ page }) => {
+  await setUp(page);
+  await page.evaluate(() => (location.hash = '#/endgames/hold-opposition'));
+  const game = page.getByTestId('endgame-game');
+  const moves = page.getByTestId('practice-moves');
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  const play = async (from: string, to: string, n: number) => {
+    await clickSquare(page, from, 'black');
+    await clickSquare(page, to, 'black');
+    await expect(game).toHaveAttribute('data-moves', String(n), { timeout: ENGINE_MS * 6 });
+    await expect(game).toHaveAttribute('data-phase', 'user');
+  };
+  await play('e8', 'e7', 2);
+  await play('e7', 'd7', 4);
+  await play('d7', 'e7', 6);
+  // Kd5 again would be a position seen: Kf5, as good.
+  await expect(moves).toContainText('4. Kf5');
+  // Four moves held of twelve: e5, Kg5 Stockfish's first line.
+  await play('e7', 'f7', 8);
+  await expect(moves).toContainText('4. Kf5 Kf7 5. e5');
+  await expect(game.locator('.train-counters')).toHaveText('Black to play and draw (hold 12 moves) · held 4 of 12');
 });

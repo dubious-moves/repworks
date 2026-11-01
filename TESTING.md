@@ -1090,6 +1090,10 @@ q_extension (or give it to a session with q_extension attached), then run
   position: Stockfish should have vetoed it.
 - On the phone: is the answer still quick ("Maia is thinking…")? The first answer of a try may
   wait a moment for Maia to load.
+- Philidor (§5.148): after five moves held, the pawn comes to e6 when it is safe; then the rook
+  goes behind and checks. Does the drill now cover the whole method? "Hold with the opposition":
+  the pawn walks on after four moves. Is a third of the drill the right moment, or should the push
+  come earlier or later? Does the attacker still ever repeat moves until a threefold repetition?
 - Checked: the measurement under Node (Stockfish 18 lite, Maia 3, Lc0; PLAN.md §5.147's table),
   the pick by unit tests, the page by Playwright on desktop and the emulated phone with the real
   Maia in Chromium and a fake Stockfish. Not on your devices, and not with the real Stockfish in

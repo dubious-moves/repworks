@@ -2022,3 +2022,12 @@ The technical calls, each with its reason:
   Unchecked, Maia once stalemated a drill away, hence Stockfish's check.
 - **Maia isn't downloaded for it unasked**: the list says who the opponent is and offers the
   existing download. Stockfish still judges the moves and gives the hint.
+
+## Revision of 2026-11-01 (a draw's attacker pushes on, PLAN.md §5.148)
+- **Once a third of a draw drill is held, the attacker pushes a pawn whenever a push is sound**
+  (the same check as Maia's moves: not ending the game, within 0.30, no material given), and it
+  never goes back to a position of the game while an equally good move doesn't. Why: the owner,
+  2026-11-01: in Philidor "Maia (and stockfish) never move the pawn forward so the user never gets
+  to practice the method fully"; in a drawn position every move scores 0.00, and the play-outs
+  also showed the attacker repeating checks until the app called a threefold repetition. One rule
+  for every draw drill, not a script per endgame.

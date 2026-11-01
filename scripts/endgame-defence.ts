@@ -18,7 +18,7 @@ import type { Position } from 'chessops/chess';
 import { makeFen } from 'chessops/fen';
 import { parseUci } from 'chessops/util';
 import { makeSan } from 'chessops/san';
-import { ENDGAMES, keepsGoal, MAIA_ELO, MAIA_TOP, materialFor, opponentPick, pressingMove, sideOf, type Endgame } from '../src/core/endgames/endgames.ts';
+import { ENDGAMES, keepsGoal, MAIA_ELO, MAIA_TOP, materialFor, opponentPick, pawnPushes, pressingMove, pushNow, sideOf, type Endgame } from '../src/core/endgames/endgames.ts';
 import { lc0Planes, lc0Policy, wdlFrom } from '../src/core/lc0/encode.ts';
 import { lc0Search, type Net } from '../src/core/lc0/search.ts';
 import { clampElo, maiaTokens, policyFrom } from '../src/core/maia/encode.ts';
@@ -51,6 +51,8 @@ const legal = (pos: Position): string[] => {
   }
   return out;
 };
+/** A position for repetitions: pieces, side to move, castling, en passant. */
+const keyOf = (p: Position) => makeFen(p.toSetup()).split(' ').slice(0, 4).join(' ');
 const sqName = (s: number) => 'abcdefgh'[s & 7]! + String((s >> 3) + 1);
 /** A score from White's side for `side`, a mate as ±(10000 − n). */
 const forSide = (cpWhite: number, side: 'white' | 'black') => (side === 'white' ? cpWhite : -cpWhite);
@@ -98,12 +100,14 @@ async function stockfishPick(e: Endgame, pos: Position): Promise<string> {
 }
 
 /** The app's opponent since §5.147 (`opponentPick`): Maia's likeliest move that Stockfish finds sound. */
-async function repworksPick(e: Endgame, pos: Position): Promise<string> {
+async function repworksPick(e: Endgame, pos: Position, userMoves: number, history: readonly Position[]): Promise<string> {
+  const seen = new Set(history.map(keyOf));
   const fen = makeFen(pos.toSetup());
+  const pushes = pushNow(e, userMoves) ? pawnPushes(pos) : [];
   const scored = (s: Awaited<ReturnType<typeof sf.search>>) => s.lines.map((l) => ({ cp: forSide(cpOf(l.score), pos.turn), pv: l.pv }));
-  const best = scored(await sf.search(fen, { depth: DEPTH_PLAY, lines: e.goal === 'draw' ? 3 : 1 }));
+  const best = scored(await sf.search(fen, { depth: DEPTH_PLAY, lines: e.goal === 'draw' ? 5 : 1 }));
   const maia = (await maiaMoves(pos, MAIA_ELO)).slice(0, MAIA_TOP);
-  const rest = maia.map((m) => m.uci).filter((u) => !best.some((l) => l.pv[0] === u));
+  const rest = [...new Set([...pushes, ...maia.map((m) => m.uci)])].filter((u) => !best.some((l) => l.pv[0] === u));
   const more = rest.length ? scored(await sf.search(fen, { depth: DEPTH_PLAY, lines: rest.length, moves: rest })) : [];
   const lineOf = (uci: string) => [...best, ...more].find((l) => l.pv[0] === uci);
   const material = (pv: readonly string[]) => {
@@ -111,7 +115,7 @@ async function repworksPick(e: Endgame, pos: Position): Promise<string> {
     for (const u of pv) p = play(p, u);
     return materialFor(p, pos.turn);
   };
-  return opponentPick(e.goal, best, maia, lineOf, material, (uci) => play(pos, uci).isEnd())!.uci;
+  return opponentPick(e.goal, best, maia, lineOf, material, (uci) => play(pos, uci).isEnd(), { pushes, repeats: (uci) => seen.has(keyOf(play(pos, uci))) })!.uci;
 }
 
 /** The user's move in the played-out games: Stockfish's best, or now and then its second when that keeps the goal. */
@@ -147,10 +151,13 @@ for (const e of ENDGAMES.filter((x) => !ids.length || ids.includes(x.id))) {
     const rnd = mulberry(1000 * g + e.id.length);
     let pos = positionOf(e.fen);
     const history: Position[] = [pos];
+    const sans: string[] = [];
     for (let ply = 0; ply < PLIES && !pos.isEnd(); ply++) {
       const userTurn = pos.turn === sideOf(e);
       if (userTurn) {
-        pos = play(pos, await userMove(e, pos, rnd));
+        const u = await userMove(e, pos, rnd);
+        sans.push(makeSan(pos, parseUci(u)!));
+        pos = play(pos, u);
         history.push(pos);
         continue;
       }
@@ -168,15 +175,18 @@ for (const e of ENDGAMES.filter((x) => !ids.length || ids.includes(x.id))) {
         maia2600: await maiaTop(pos, 2600),
         lc0policy: lc0?.policy[0]!.uci ?? '',
         lc0search: searched?.uci ?? '',
-        repworks: await repworksPick(e, pos),
+        repworks: await repworksPick(e, pos, Math.ceil((history.length - 1) / 2), history),
       };
       const row: Row = { id: e.id, fen: makeFen(pos.toSetup()), options, picks };
       rows.push(row);
       process.stdout.write(`${JSON.stringify(row)}\n`);
       // The game goes on along Stockfish's move, as the app played it (§5.145), or FOLLOW's.
-      pos = play(pos, picks[(process.env['FOLLOW'] as Picker | undefined) ?? 'stockfish'] || picks.stockfish);
+      const o = picks[(process.env['FOLLOW'] as Picker | undefined) ?? 'stockfish'] || picks.stockfish;
+      sans.push(makeSan(pos, parseUci(o)!));
+      pos = play(pos, o);
       history.push(pos);
     }
+    process.stderr.write(`${e.id} game ${g + 1}: ${sans.join(' ')}\n`);
   }
 }
 sf.quit();

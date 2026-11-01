@@ -31,7 +31,7 @@ import { readSaved, resumable, type Saved } from '../core/games/resume.ts';
 import { covered, scanCandidate, tacticCandidates, TACTIC, type DetectedTactic, type Pv } from '../core/games/detect.ts';
 import type { Color } from '../core/games/record.ts';
 import { historyCard, practiceCard } from '../core/progress/cards.ts';
-import { ENDGAME_PRESET, firstSlip, GOAL_CP, held, keepsGoal, MAIA_ELO, MAIA_MIN, MAIA_TOP, materialFor, opponentPick, pressingMove, slips, wonAfter, type Endgame, type OpponentLine } from '../core/endgames/endgames.ts';
+import { ENDGAME_PRESET, firstSlip, GOAL_CP, held, keepsGoal, MAIA_ELO, MAIA_MIN, MAIA_TOP, materialFor, opponentPick, pawnPushes, pushNow, slips, wonAfter, type Endgame, type OpponentLine } from '../core/endgames/endgames.ts';
 import type { Grade } from '../core/progress/events.ts';
 import { positionOf } from '../core/storm/walk.ts';
 import { onWorker, postToWorker } from './explorer.ts';
@@ -221,6 +221,9 @@ function explorerGames(fen: string, o: Opponent): Promise<PracticeReply | null> 
   });
 }
 
+/** Stockfish's lines for a draw's attacker: room for a line that doesn't repeat (§5.148). */
+const DRAW_LINES = 5;
+
 /**
  * Maia's moves for an endgame's opponent at `MAIA_ELO` (§5.147), once its files are on this device
  * (the switch can stay off); null without them, or when it doesn't answer within 30 s of starting
@@ -237,11 +240,14 @@ export async function endgameMaia(fen: string): Promise<MaiaMove[] | null> {
  * in a defence, `pressingMove` against a draw) when Maia isn't on this device or none of its moves
  * is sound. The user waits on it, so its searches go ahead of the judges in the background.
  */
-async function endgameReply(fen: string, goal: 'win' | 'draw'): Promise<{ uci: string; source: string; dbFailed: boolean } | undefined> {
+async function endgameReply(fen: string, e: Endgame, userMoves: number, seen: ReadonlySet<string> = new Set()): Promise<{ uci: string; source: string; dbFailed: boolean } | undefined> {
   const pos = positionOf(fen);
   if (!pos) return undefined;
+  const goal = e.goal;
+  // A draw's attacker pushes on once a third of the drill is held (§5.148).
+  const pushes = pushNow(e, userMoves) ? pawnPushes(pos) : [];
   const depth = narrow() ? 16 : 18;
-  const [a, maia] = await Promise.all([search(fen, goal === 'draw' ? 3 : 1, depth, 6000, undefined, true), endgameMaia(fen)]);
+  const [a, maia] = await Promise.all([search(fen, goal === 'draw' ? DRAW_LINES : 1, depth, 6000, undefined, true), endgameMaia(fen)]);
   const scored = (r: typeof a): OpponentLine[] => (r?.lines ?? []).filter((l) => l.pv.length).map((l) => ({ cp: moverScore(l.score, pos.turn), pv: l.pv }));
   const lines = scored(a);
   const material = (pv: readonly string[]) => {
@@ -254,21 +260,28 @@ async function endgameReply(fen: string, goal: 'win' | 'draw'): Promise<{ uci: s
     return materialFor(p, pos.turn);
   };
   // Maia's moves Stockfish's lines don't cover, searched alone: only up to the first that is
-  // Stockfish's own move (no search needed after it).
-  const base = goal === 'draw' ? pressingMove(lines, material) : lines[0]?.pv[0];
+  // Stockfish's own move (no search needed after it, unless it repeats); and the pawn pushes when
+  // asked for.
+  const base = goal === 'draw' ? undefined : lines[0]?.pv[0];
   const candidates = (maia ?? []).slice(0, MAIA_TOP).filter((m) => m.prob >= MAIA_MIN);
   const upTo = candidates.findIndex((m) => m.uci === base);
-  const rest = (upTo < 0 ? candidates : candidates.slice(0, upTo)).map((m) => m.uci).filter((u) => !lines.some((l) => l.pv[0] === u));
+  const rest = [...new Set([...pushes, ...(upTo < 0 ? candidates : candidates.slice(0, upTo)).map((m) => m.uci)])].filter((u) => !lines.some((l) => l.pv[0] === u));
   const more = rest.length ? scored(await search(fen, rest.length, depth, 6000, rest, true)) : [];
   const lineOf = (uci: string) => [...lines, ...more].find((l) => l.pv[0] === uci);
-  const over = (uci: string) => {
+  const after = (uci: string) => {
     const p = pos.clone();
     const m = parseUciMove(p, uci);
-    if (!m) return true;
+    if (!m) return undefined;
     p.play(m);
-    return p.isEnd();
+    return p;
   };
-  const pick = opponentPick(goal, lines, candidates, lineOf, material, over);
+  const over = (uci: string) => after(uci)?.isEnd() ?? true;
+  const repeats = (uci: string) => {
+    const p = after(uci);
+    const key = p && keyFen(makeFen(p.toSetup()))?.key;
+    return !!key && seen.has(key);
+  };
+  const pick = opponentPick(goal, lines, candidates, lineOf, material, over, { pushes, repeats });
   return pick ? { uci: pick.uci, source: pick.maia ? `Maia ${MAIA_ELO}` : 'Stockfish', dbFailed: false } : undefined;
 }
 
@@ -678,6 +691,11 @@ function claimCheck(g: number, i: number): void {
   patch(g, () => ({ track: t.track, claim: t.claim }));
 }
 
+/** The positions of the game so far, the ones before its start included, by key. */
+function seenKeys(p: PracticeGame): Set<string> {
+  return new Set([...(p.setup.before ?? []), ...[p.setup.fen, ...p.moves.map((m) => m.fen)].map((f) => keyFen(f)?.key ?? f)]);
+}
+
 /** The game's end at its last position: mate, stalemate, insufficient material, then repetition (the positions before its start counted) and fifty moves. */
 function endOf(p: PracticeGame, byUser: boolean): EndReason | undefined {
   const pos = positionOf(fenAfter(p));
@@ -696,7 +714,7 @@ async function opponentTurn(g: number): Promise<void> {
   if (!p || p.gen !== g || p.phase !== 'opponent' || p.slip || p.ending) return;
   const fen = fenAfter(p);
   const at = p.moves.length;
-  const m = p.setup.kind === 'endgame' ? await endgameReply(fen, p.setup.endgame!.goal) : await opponentMove(fen, p.setup.opponent);
+  const m = p.setup.kind === 'endgame' ? await endgameReply(fen, p.setup.endgame!, p.moves.filter((m) => m.isUser).length, seenKeys(p)) : await opponentMove(fen, p.setup.opponent);
   const q = practice.peek();
   // An endgame stopped on a slip meanwhile lets the answer go; one played on asks again, and the
   // first answer in is the one played.

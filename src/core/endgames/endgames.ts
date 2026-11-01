@@ -9,6 +9,7 @@
 // at the judges' depths (16 and 18) before they were written here (§5.145's table): the goal is
 // kept by a clear margin on one side of `GOAL_CP` and lost by a clear margin on the other.
 import type { Position } from 'chessops/chess';
+import { makeSquare as squareName } from 'chessops/util';
 import type { PositionKey } from '../chess/positionKey.ts';
 
 export type Goal = 'win' | 'draw';
@@ -269,7 +270,9 @@ export interface OpponentLine {
  * (`pressingMove` against a draw being held, the best otherwise). `best` are Stockfish's lines,
  * best first; `lineOf` a line for one of Maia's moves (searched alone, or one of `best`);
  * `material` the opponent's balance after a line's first moves; `over` whether the game ends
- * after a move.
+ * after a move; `extra.pushes` the pawn pushes to try first, as sound by the same rule, the best
+ * scored taken (a draw's attacker making progress, `pushNow`); `extra.repeats` whether a move goes
+ * back to a position of the game's (a draw's attacker plays none while it has a sound other).
  */
 export function opponentPick(
   goal: Goal,
@@ -278,24 +281,56 @@ export function opponentPick(
   lineOf: (uci: string) => OpponentLine | undefined,
   material: (pv: readonly string[]) => number | undefined,
   over: (uci: string) => boolean,
-): { uci: string; maia: boolean } | undefined {
+  extra: { pushes?: readonly string[]; repeats?: (uci: string) => boolean } = {},
+): { uci: string; maia: boolean; push?: boolean } | undefined {
   const top = best[0];
-  const base = goal === 'draw' ? pressingMove(best, material) : top?.pv[0];
-  if (!top || !base) return undefined;
+  if (!top) return undefined;
+  // A draw's attacker doesn't go back to a position already seen while another line as good is
+  // there (§5.148): a repetition ends the drill before its method is shown.
+  const repeats = goal === 'draw' ? (extra.repeats ?? (() => false)) : () => false;
+  const fresh = best.filter((l) => l.pv.length && !repeats(l.pv[0]!) && l.cp >= top.cp - PRESS_CP);
+  const pool = fresh.length ? fresh : best;
+  const base = goal === 'draw' ? pressingMove(pool, material) : top.pv[0];
+  if (!base) return undefined;
   const baseLine = best.find((l) => l.pv[0] === base)!;
   const floor = material(baseLine.pv.slice(0, 2)) ?? material([]);
   const lost = goal === 'win' && top.cp <= -GOAL_CP.win;
+  const sound = (uci: string): OpponentLine | undefined => {
+    const l = lineOf(uci);
+    if (!l?.pv.length || l.pv[0] !== uci || over(uci) || repeats(uci)) return undefined;
+    if (!lost && l.cp < top.cp - PRESS_CP) return undefined;
+    const after = material(l.pv.slice(0, 2));
+    return after === undefined || floor === undefined || after < floor ? undefined : l;
+  };
+  // Progress first (§5.148): the soundest pawn push, when asked for.
+  const pushed = (extra.pushes ?? []).map(sound).filter((l): l is OpponentLine => !!l).sort((a, b) => b.cp - a.cp)[0];
+  if (pushed) return { uci: pushed.pv[0]!, maia: maia.some((m) => m.uci === pushed.pv[0]), push: true };
   for (const m of maia.slice(0, MAIA_TOP)) {
     if (m.prob < MAIA_MIN) break;
     if (m.uci === base) return { uci: base, maia: true };
-    const l = lineOf(m.uci);
-    if (!l?.pv.length || l.pv[0] !== m.uci || over(m.uci)) continue;
-    if (!lost && l.cp < top.cp - PRESS_CP) continue;
-    const after = material(l.pv.slice(0, 2));
-    if (after === undefined || floor === undefined || after < floor) continue;
-    return { uci: m.uci, maia: true };
+    if (sound(m.uci)) return { uci: m.uci, maia: true };
   }
   return { uci: base, maia: false };
+}
+
+/**
+ * Whether a draw's attacker should push on now (§5.148, the owner's note of 2026-11-01): Maia and
+ * Stockfish both kept Philidor's pawn on the 5th, every move scoring 0.00, so the defence's second
+ * stage (the checks from behind once the pawn reaches the 6th) never came. Once the user has held
+ * a third of the drill, the attacker plays a pawn push whenever one is sound.
+ */
+export const pushNow = (e: Endgame, userMoves: number): boolean => e.goal === 'draw' && userMoves >= Math.ceil((e.hold ?? 0) / 3);
+
+/** The side to move's pawn moves straight ahead (a promotion to a queen): a draw's attacker's progress. */
+export function pawnPushes(pos: Position): string[] {
+  const out: string[] = [];
+  for (const from of pos.board.pawn.intersect(pos.board[pos.turn])) {
+    for (const to of pos.dests(from)) {
+      if ((to & 7) !== (from & 7)) continue;
+      out.push(`${squareName(from)}${squareName(to)}${to >> 3 === 0 || to >> 3 === 7 ? 'q' : ''}`);
+    }
+  }
+  return out;
 }
 
 /* ------------------------------------------------------------------ the record and its spacing */

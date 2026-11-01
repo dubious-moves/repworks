@@ -7,7 +7,7 @@ where the build differed). What remains is live: the spike's re-run (§4.2), the
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
 with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
-for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Storm positions shared between devices through the data repo, and an overnight gather (§5.102), are built (2026-10-12). Lc0 on the study page, its pick among close moves (§5.143), is built (2026-10-31). Endgames, the theoretical endgames each played for its goal against Stockfish (§5.145), are built (2026-10-31), their moves judged in the background since (§5.146, the owner's request of 2026-11-01), and defended by Maia checked by Stockfish (§5.147, the owner's request). Read with `DECISIONS.md`, which this plan updates (its
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Storm positions shared between devices through the data repo, and an overnight gather (§5.102), are built (2026-10-12). Lc0 on the study page, its pick among close moves (§5.143), is built (2026-10-31). Endgames, the theoretical endgames each played for its goal against Stockfish (§5.145), are built (2026-10-31), their moves judged in the background since (§5.146, the owner's request of 2026-11-01), defended by Maia checked by Stockfish (§5.147, the owner's request), and a draw's attacker pushing on so the whole method comes up (§5.148, the owner's note). Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -8153,3 +8153,41 @@ hung rook passed over, the attacker's stalemate passed over, the 0.30 line, a wo
 King in front of the pawn, 1.Kd5 Kf7 by Stockfish alone; Maia downloaded from the list, the note
 saying so; 1.Kd5 Ke7, Maia's real move, searched alone by the fake Stockfish and played). Live:
 TESTING.md.
+
+#### 5.148 Endgames: a draw's attacker pushes on (the owner's note, 2026-11-01)
+
+The owner, after §5.147: "It's better now, but not perfect. For example, in the philidor position -
+Maia (and stockfish) never move the pawn forward so the user never gets to practice the method
+fully." In a drawn position every attacking move scores about 0.00, and neither engine has a reason
+to push: Philidor's second stage (the pawn on the 6th, the rook to the far end, checks from
+behind) never came, nor in "Hold with the opposition" the pawn's walk to the 7th. Measured
+(Stockfish 18 lite, depth 16) in Philidor after 1…Rb6: e6 scores 0.00 against Ra3's +0.15 with the
+king on f5 guarding the pawn; with the king on f4, e6 loses the pawn to Rxe6.
+
+- **Decided** (Claude's calls):
+  - **Pawn pushes first, once a third of the drill is held** (`pushNow`: Philidor after 5 moves,
+    "Hold with the opposition" after 4, Réti after 4): the attacker's soundest pawn push straight
+    ahead (`pawnPushes`), by `opponentPick`'s rule (the game not over, within 0.30 of the best, no
+    material given in its next two plies), searched alone with Maia's moves when it isn't among
+    Stockfish's lines. Before that, the first stage is drilled as in §5.147. Not per endgame: the
+    same rule gives every draw drill its later stages.
+  - **No going back to a position seen** (a draw's attacker only): its moves that repeat a position
+    of the game are passed over while a line within 0.30 of the best doesn't. The play-outs showed
+    Ra8+ Ra7+ over and over once the white king stood in front of its pawn, which the app ends as a
+    threefold repetition, the drill held for nothing. Its search asks for five lines (three before)
+    to have the others. A win's defender may repeat: avoiding it is the user's task.
+- **Played out** (the measurement script, the attacker as the app plays it, the user's side
+  Stockfish's best or another holding move): Philidor three times, e6 in each (after the user's
+  5th, 9th and 10th move, the later two after the passive 1…Kf8, the white king on the 6th until
+  it was checked away), then the checks from behind (game 2: 1…Rb6 2.Rh7 Ra6 3.Rb7 Rc6 4.Rh7 Ra6
+  5.Rg7 Rh6 6.e6 Rh1 7.e7 Rh6); "Hold with the opposition" twice, e5 on the 4th move, e6, e7+ and
+  the stalemate its method names; Réti unchanged (Black's h-pawn runs anyway). No repetition.
+
+**As built** (2026-11-01): `pushNow`, `pawnPushes`, `opponentPick`'s `extra` (`pushes`,
+`repeats`) in `src/core/endgames/endgames.ts`; `endgameReply` given the endgame, the user's moves
+and the game's positions (`seenKeys`), `DRAW_LINES` in `src/app/practice.ts`; the script's games
+printed. Tests: `test/unit/core/endgames/endgames.test.ts` (the third, the pushes found, e6 taken in
+Philidor and not when it drops the pawn or is 0.31 worse or not searched; the repetition passed
+over, kept against a losing move, allowed to a win's defender); `test/e2e/endgames.spec.ts` on
+desktop and phone ("Hold with the opposition": Kd5 again passed over for Kf5, then e5 after four
+moves held). Live: TESTING.md.

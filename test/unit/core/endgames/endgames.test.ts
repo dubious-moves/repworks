@@ -1,6 +1,7 @@
 // Endgames (PLAN.md §5.145): the positions as written, the goal move by move, the spacing of the
 // tries read back from practice results, the next one to play, the attacker's pressing move, and
-// the opponent's pick (§5.147): Maia's likeliest move that Stockfish finds sound.
+// the opponent's pick (§5.147): Maia's likeliest move that Stockfish finds sound, and a draw's
+// attacker pushing on once a third is held (§5.148).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Chess } from 'chessops/chess';
@@ -22,7 +23,9 @@ import {
   MAIA_TOP,
   nextEndgame,
   opponentPick,
+  pawnPushes,
   pressingMove,
+  pushNow,
   sideOf,
   slips,
   solvedBy,
@@ -299,4 +302,68 @@ test('the opponent: Maia’s likeliest move that Stockfish finds sound, else Sto
 
   // No lines: nothing.
   assert.equal(opponentPick('win', [], [{ uci: 'f8f7', prob: 0.6 }], lines(kf7), material(kp), over(kp)), undefined);
+});
+
+test('a draw’s attacker pushes on: from a third of the hold, the soundest pawn push first', () => {
+  const philidor = endgameById('philidor')!;
+  assert.equal(pushNow(philidor, 4), false);
+  assert.equal(pushNow(philidor, 5), true);
+  assert.equal(pushNow(endgameById('hold-opposition')!, 4), true);
+  assert.equal(pushNow(endgameById('lucena')!, 10), false);
+
+  // The pawns' moves straight ahead: one and two squares, a queen's promotion, no captures, the side to move's only.
+  assert.deepEqual(pawnPushes(pos('4k3/8/8/8/8/8/4P3/4K3 w - - 0 1')).sort(), ['e2e3', 'e2e4']);
+  assert.deepEqual(pawnPushes(pos('4k3/4P3/8/8/8/8/8/4K3 w - - 0 1')), []);
+  assert.deepEqual(pawnPushes(pos('8/1P6/8/8/8/8/8/k3K3 w - - 0 1')), ['b7b8q']);
+  assert.deepEqual(pawnPushes(pos('4k3/8/8/3p4/4P3/8/8/4K3 w - - 0 1')), ['e4e5']);
+  assert.deepEqual(pawnPushes(pos('4k3/8/8/3p4/4P3/8/8/4K3 b - - 0 1')), ['d5d4']);
+
+  const material = (fen: string) => (pv: readonly string[]) => {
+    const p = pos(fen);
+    for (const uci of pv) {
+      const m = parseUci(uci);
+      if (!m || !p.isLegal(m)) return undefined;
+      p.play(m);
+    }
+    return materialFor(p, pos(fen).turn);
+  };
+  const over = (fen: string) => (uci: string) => {
+    const p = pos(fen);
+    p.play(parseUci(uci)!);
+    return p.isEnd();
+  };
+  const lines = (...ls: { cp: number; pv: string[] }[]) => (uci: string) => ls.find((l) => l.pv[0] === uci);
+  // Philidor held on the 6th, the king on f5 guarding the pawn (Stockfish 18 at depth 16: Ra3
+  // +0.15, e6 0.00): e6 comes, the checks from behind next.
+  const f5 = '4k3/R7/1r6/4PK2/8/8/8/8 w - - 1 2';
+  const ra3 = { cp: 15, pv: ['a7a3', 'b6b1'] };
+  const e6 = { cp: 0, pv: ['e5e6', 'b6b2'] };
+  const maia = [{ uci: 'a7a3', prob: 0.5 }];
+  assert.deepEqual(opponentPick('draw', [ra3], maia, lines(ra3, e6), material(f5), over(f5), { pushes: ['e5e6'] }), { uci: 'e5e6', maia: false, push: true });
+  // Not asked for: Maia's Ra3.
+  assert.deepEqual(opponentPick('draw', [ra3], maia, lines(ra3, e6), material(f5), over(f5)), { uci: 'a7a3', maia: true });
+  // The king on f4: e6 drops the pawn (Rxe6), so no push.
+  const f4 = '4k3/R7/1r6/4P3/5K2/8/8/8 w - - 1 2';
+  const kf5 = { cp: 11, pv: ['f4f5', 'b6b1'] };
+  const e6x = { cp: 1, pv: ['e5e6', 'b6e6'] };
+  assert.deepEqual(opponentPick('draw', [kf5], [], lines(kf5, e6x), material(f4), over(f4), { pushes: ['e5e6'] }), { uci: 'f4f5', maia: false });
+  // Nor one more than 0.30 worse than the best, or one not searched.
+  assert.deepEqual(opponentPick('draw', [ra3], [], lines(ra3, { ...e6, cp: -16 }), material(f5), over(f5), { pushes: ['e5e6'] }), { uci: 'a7a3', maia: false });
+  assert.deepEqual(opponentPick('draw', [ra3], [], lines(ra3), material(f5), over(f5), { pushes: ['e5e6'] }), { uci: 'a7a3', maia: false });
+});
+
+test('a draw’s attacker doesn’t repeat while it has a sound other move', () => {
+  const material = () => 0;
+  const over = () => false;
+  // Ra8+ goes back to a position seen: Ra6, as good, instead; Maia's Ra8+ passed over too.
+  const ra8 = { cp: 0, pv: ['a7a8', 'f8g7'] };
+  const ra6 = { cp: -10, pv: ['a7a6', 'b1b2'] };
+  const lose = { cp: -400, pv: ['e6d7', 'b1d1'] };
+  const lines = (...ls: { cp: number; pv: string[] }[]) => (uci: string) => ls.find((l) => l.pv[0] === uci);
+  const repeats = (uci: string) => uci === 'a7a8';
+  assert.deepEqual(opponentPick('draw', [ra8, ra6], [{ uci: 'a7a8', prob: 0.8 }], lines(ra8, ra6), material, over, { repeats }), { uci: 'a7a6', maia: false });
+  // Every sound other move worse than 0.30: the repetition rather than a losing move.
+  assert.deepEqual(opponentPick('draw', [ra8, lose], [], lines(ra8, lose), material, over, { repeats }), { uci: 'a7a8', maia: false });
+  // A win's defence may repeat: the user has to avoid it.
+  assert.deepEqual(opponentPick('win', [{ cp: -900, pv: ['a7a8'] }], [], lines(), material, over, { repeats }), { uci: 'a7a8', maia: false });
 });
