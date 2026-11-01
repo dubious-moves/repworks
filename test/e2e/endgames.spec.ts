@@ -1,20 +1,30 @@
 // Endgames (PLAN.md §5.145), on a desktop viewport and an emulated phone, with the fake engine's
 // lines scripted per position: the list from the home screen; "Take the opposition" with Kd2
-// throwing the win away (judged again deeper, then stopped: "lets the win slip"), taken back, the
-// move that keeps it shown as an arrow, Ke3 played and Stockfish's answer; the try counted once as
-// missed (one `practice` event, synced), the list saying so. Then the breakthrough solved first
-// time along Stockfish's own line (b6 cxb6 a6 bxa6 c6 b5 c7 b4 c8=Q), the list saying when it comes
-// back.
+// throwing the win away: Stockfish answers at once while the move is judged in the background
+// (§5.146), the user plays on, and the judge (searched again deeper) stops the game back on Kd2
+// ("lets the win slip"), the moves after it dimmed; taken back with them, the move that keeps it
+// shown as an arrow, Ke3 played and Stockfish's answer; the try counted once as missed (one
+// `practice` event, synced, at Kd2), the list saying so. Then the breakthrough solved first time
+// along Stockfish's own line (b6 cxb6 a6 bxa6 c6 b5 c7 b4 c8=Q), the list saying when it comes back.
 import { test, expect, type Page } from '@playwright/test';
 import type { FakeGit } from '../support/fakeGit.ts';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
 import { clickSquare } from './board.ts';
-import { commands, fakeEngine, SLOW } from './engine.ts';
+import { commands, fakeEngine } from './engine.ts';
 import { serveGithub, world } from './github.ts';
 import { serveSite, type SiteServer } from './server.ts';
 
 const OPPOSITION = '8/8/8/4k3/8/3K4/4P3/8 w - -';
 const AFTER_KE3 = '8/8/8/4k3/8/4K3/4P3/8 b - -';
+/** Kd2, Kd5 and Ke3: played on while Kd2 is judged. */
+const AFTER_KD2 = '8/8/8/4k3/8/8/3KP3/8 b - -';
+const AFTER_KD5 = '8/8/8/3k4/8/8/3KP3/8 w - -';
+const AFTER_KD2_KE3 = '8/8/8/3k4/8/4K3/4P3/8 b - -';
+/**
+ * The fake engine's search, ms: long enough that a move is played in the time a judge's second,
+ * deeper search takes (the board's two clicks well inside it).
+ */
+const ENGINE_MS = 1000;
 /**
  * The breakthrough along Stockfish 18's line at depth 18: each position, the move played there,
  * and at the user's the two lines after it (a judge asks for three, as Stockfish always gives).
@@ -41,9 +51,16 @@ test.beforeAll(async () => {
       [3, 0, 'd3d2 e5d4'],
     ],
     [AFTER_KE3]: [[1, -900, 'e5d6 e3e4']],
+    [AFTER_KD2]: [[1, 0, 'e5d5 d2d3']],
+    [AFTER_KD5]: [
+      [1, 0, 'd2e3 d5e5'],
+      [2, 0, 'd2d3 d5e5'],
+      [3, 0, 'e2e4 d5e4'],
+    ],
+    [AFTER_KD2_KE3]: [[1, 0, 'd5e5 e3d3']],
   };
   for (const [key, uci, others] of BREAKTHROUGH) extra[key] = [[1, key.includes(' w ') ? 700 : -700, uci], ...(others ?? []).map((m, i): [number, number, string] => [i + 2, 0, m])];
-  site = await serveSite({ engine: fakeEngine(SLOW, extra) });
+  site = await serveSite({ engine: fakeEngine(ENGINE_MS, extra) });
 });
 test.afterAll(async () => {
   await site.close();
@@ -68,7 +85,8 @@ function endgameEvents(git: FakeGit): Record<string, unknown>[] {
 
 const sq = (uci: string, i: number) => uci.slice(i, i + 2);
 
-test('an endgame: a move that lets the win slip, taken back, the keeping move shown; the try counted once as missed', async ({ page }) => {
+test('an endgame: a move that lets the win slip, found after playing on, taken back, the keeping move shown; the try counted once as missed', async ({ page }) => {
+  test.setTimeout(60_000);
   const git = await setUp(page);
   await page.getByRole('link', { name: 'Endgames' }).click();
   await expect(page).toHaveURL(/#\/endgames$/);
@@ -83,15 +101,30 @@ test('an endgame: a move that lets the win slip, taken back, the keeping move sh
   // A first try: the method is open.
   await expect(page.locator('.endgame-method')).toHaveAttribute('open', '');
 
-  // Kd2: searched again deeper with the lines' moves, still a draw: the game stops on it.
+  // Kd2: Stockfish answers at once, the move still being judged; Ke3 played on meanwhile. The
+  // judge, searched again deeper with the lines' moves (after the answer, which went first), still
+  // a draw: the game stops back on Kd2, the moves after it waiting with it.
   await clickSquare(page, 'd3', 'white');
   await clickSquare(page, 'd2', 'white');
-  await expect(game).toHaveAttribute('data-phase', 'slip');
+  await page.waitForSelector('[data-testid="endgame-game"][data-moves="2"][data-phase="user"]', { timeout: ENGINE_MS * 3 });
+  await expect(feedback).toHaveText('Your move');
+  await clickSquare(page, 'd2', 'white');
+  await clickSquare(page, 'e3', 'white');
+  await expect(game).toHaveAttribute('data-phase', 'slip', { timeout: ENGINE_MS * 8 });
   await expect(feedback).toHaveText('Kd2 lets the win slip. Take it back and find a better move.');
-  expect(commands(site.requests).some((c) => /^go depth \d+ movetime 15000 searchmoves d3e3 d3c3 d3d2$/.test(c))).toBe(true);
+  await expect(page.getByTestId('endgame-slip-later')).toBeVisible();
+  await expect(game).toHaveAttribute('data-moves', '4');
+  await expect(page.getByTestId('practice-moves')).toHaveText('1. Kd2 Kd5 2. Ke3 Ke5');
+  await expect(page.locator('.game-move.endgame-slip-move')).toHaveText('1. Kd2');
+  await expect(page.locator('.game-move.endgame-after-slip')).toHaveCount(3);
+  const cmds = commands(site.requests);
+  const recheck = cmds.findIndex((c) => /^go depth \d+ movetime 15000 searchmoves d3e3 d3c3 d3d2$/.test(c));
+  expect(recheck).toBeGreaterThan(-1);
+  // Stockfish's answer to Kd2 was searched before the judge's deeper search.
+  expect(cmds.slice(0, recheck).some((c) => c.startsWith(`position fen ${AFTER_KD2} `))).toBe(true);
   // Nothing answers it while it waits.
-  await page.waitForTimeout(SLOW * 2);
-  await expect(game).toHaveAttribute('data-moves', '1');
+  await page.waitForTimeout(ENGINE_MS * 2);
+  await expect(game).toHaveAttribute('data-moves', '4');
   await page.getByTestId('endgame-takeback').click();
   await expect(game).toHaveAttribute('data-phase', 'user');
   await expect(game).toHaveAttribute('data-moves', '0');
@@ -100,7 +133,8 @@ test('an endgame: a move that lets the win slip, taken back, the keeping move sh
   await clickSquare(page, 'd3', 'white');
   await clickSquare(page, 'd2', 'white');
   await expect(game).toHaveAttribute('data-phase', 'slip');
-  // Analysed from there and back: the game still waits on the slip.
+  await expect(feedback).toHaveText('Kd2 lets the win slip. Take it back and find a better move.');
+  // Analysed from there and back (the board at Kd2): the game still waits on the slip.
   await game.getByRole('button', { name: 'Analyse', exact: true }).click();
   await expect(page).toHaveURL(/#\/analysis\?.*line=Kd2&.*back=%23%2Fendgames%2Fopposition/);
   await page.getByRole('button', { name: /^← Back/ }).click();
@@ -118,7 +152,7 @@ test('an endgame: a move that lets the win slip, taken back, the keeping move sh
   await expect(page.getByTestId('practice-moves')).toContainText('1. Ke3 Kd6');
   await expect(game).toContainText('This try counts as missed: play it out, or start again.');
 
-  // One event for the try, however many slips: a draw (the win let go) at the start's position.
+  // One event for the try, however many slips: a draw (the win let go) at the start's position, at Kd2.
   await expect(page.locator('.chip')).toHaveText('1 change waiting');
   await page.locator('.chip').click();
   await expect.poll(() => endgameEvents(git).length, { timeout: 15_000 }).toBe(1);
@@ -153,7 +187,8 @@ test('an endgame solved first time: the breakthrough along Stockfish’s line, t
     await expect(game).toHaveAttribute('data-moves', String(i + 2));
     await expect(game).toHaveAttribute('data-phase', 'user');
   }
-  await expect(game).toHaveAttribute('data-phase', 'over');
+  // The end waits for the judges still out.
+  await expect(game).toHaveAttribute('data-phase', 'over', { timeout: ENGINE_MS * 8 });
   await expect(page.getByTestId('endgame-feedback')).toHaveText('The pawn queens: the win is yours.');
   await expect(page.getByTestId('endgame-counted')).toHaveText('Solved first time: it comes back in a while.');
   await expect(page.locator('.chip')).toHaveText('1 change waiting');

@@ -6145,6 +6145,16 @@ a.button.disabled {
   color: var(--good-text);
 }
 
+/* The first slip in the move list, and the moves played on past it before its judge came in. */
+.game-move.endgame-slip-move {
+  color: var(--warn);
+  font-weight: 600;
+}
+
+.game-move.endgame-after-slip {
+  opacity: 0.45;
+}
+
 .endgame-method {
   margin-top: 8px;
 }

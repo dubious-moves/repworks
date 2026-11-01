@@ -285,7 +285,8 @@ function VoiceControls() {
 }
 
 /** The game's moves while it is played, the user's with their symbols when feedback is shown. */
-export function MoveList(props: { moves: readonly PracticeMove[]; baseFen: string; marks: boolean }) {
+/** The game's moves; `slipAt`, an endgame's slip: that move marked, the moves played on past it dimmed. */
+export function MoveList(props: { moves: readonly PracticeMove[]; baseFen: string; marks: boolean; slipAt?: number | undefined }) {
   const [, turn, , , , n] = props.baseFen.split(' ');
   let number = Number(n) || 1;
   let white = turn !== 'b';
@@ -297,7 +298,7 @@ export function MoveList(props: { moves: readonly PracticeMove[]; baseFen: strin
         white = !white;
         const cls = props.marks && m.classification ? CLASSIFICATION[m.classification] : undefined;
         return (
-          <span key={i} class="game-move">
+          <span key={i} class={`game-move${props.slipAt === undefined ? '' : i === props.slipAt ? ' endgame-slip-move' : i > props.slipAt ? ' endgame-after-slip' : ''}`}>
             {label && <span class="muted">{label}</span>}
             {m.san}
             {cls && m.isUser && cls.symbol && (

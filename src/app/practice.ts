@@ -31,7 +31,7 @@ import { readSaved, resumable, type Saved } from '../core/games/resume.ts';
 import { covered, scanCandidate, tacticCandidates, TACTIC, type DetectedTactic, type Pv } from '../core/games/detect.ts';
 import type { Color } from '../core/games/record.ts';
 import { historyCard, practiceCard } from '../core/progress/cards.ts';
-import { ENDGAME_PRESET, GOAL_CP, held, keepsGoal, materialFor, pressingMove, slips, wonAfter, type Endgame } from '../core/endgames/endgames.ts';
+import { ENDGAME_PRESET, firstSlip, GOAL_CP, held, keepsGoal, materialFor, pressingMove, slips, wonAfter, type Endgame } from '../core/endgames/endgames.ts';
 import type { Grade } from '../core/progress/events.ts';
 import { positionOf } from '../core/storm/walk.ts';
 import { onWorker, postToWorker } from './explorer.ts';
@@ -156,12 +156,19 @@ export interface PracticeGame {
   /** A draw offered at the position after `at` moves: the opponent answering, or declined there. */
   drawOffer?: { at: number; state: 'pending' | 'declined' };
   /**
-   * An endgame's move that threw its goal away (§5.145): the game waits for Take back (or Play on),
-   * the move that kept it ready to show.
+   * An endgame's move that threw its goal away (§5.145), the first, found by its judge in the
+   * background, perhaps after the user has played on: the game waits there for Take back (or Play
+   * on), the move that kept it (`uci`, `san`) ready to show.
    */
   slip?: { at: number; uci?: string; san?: string };
   /** This endgame try already counted as missed (a slip, a hint): nothing more is recorded for it. */
   failed?: boolean;
+  /** The try's first slip, kept for its end's words when the move itself has been taken back. */
+  missed?: { fenBefore: string; san: string; keep?: string };
+  /** An endgame's end reached, waiting for the judges still out (a slip found meanwhile stops the game there instead). */
+  ending?: EndReason;
+  /** The moves before this one were played on past a slip (Play on): no slip is looked for among them. */
+  playedOn?: number;
 }
 
 export const practice = signal<PracticeGame | undefined>(undefined);
@@ -215,12 +222,13 @@ function explorerGames(fen: string, o: Opponent): Promise<PracticeReply | null> 
 
 /**
  * An endgame's opponent (§5.145): Stockfish's best at the judges' depth, the defence of a win; the
- * attacker against a draw presses, never simply giving material away (`pressingMove`).
+ * attacker against a draw presses, never simply giving material away (`pressingMove`). The user
+ * waits on it, so it goes ahead of the judges searching in the background.
  */
 async function endgameReply(fen: string, goal: 'win' | 'draw'): Promise<{ uci: string; source: string; dbFailed: boolean } | undefined> {
   const pos = positionOf(fen);
   if (!pos) return undefined;
-  const a = await search(fen, goal === 'draw' ? 3 : 1, narrow() ? 16 : 18, 6000);
+  const a = await search(fen, goal === 'draw' ? 3 : 1, narrow() ? 16 : 18, 6000, undefined, true);
   const lines = (a?.lines ?? []).filter((l) => l.pv.length).map((l) => ({ cp: moverScore(l.score, pos.turn), pv: l.pv }));
   const material = (pv: readonly string[]) => {
     const p = pos.clone();
@@ -277,11 +285,11 @@ export function analyse(fen: string, lines: number) {
   return search(fen, lines, narrow() ? 16 : 18, 8000);
 }
 
-function search(fen: string, lines: number, depth: number, movetime: number, moves?: readonly string[]) {
+function search(fen: string, lines: number, depth: number, movetime: number, moves?: readonly string[], urgent = false) {
   const key = `${fen}|${lines}|${depth}|${moves?.join(' ') ?? ''}`;
   let p = searches.get(key);
   if (!p) {
-    p = analyseForStorm(fen, lines, depth, movetime, moves);
+    p = analyseForStorm(fen, lines, depth, movetime, moves, urgent);
     searches.set(key, p);
     if (searches.size > 80) searches.delete(searches.keys().next().value!);
   }
@@ -303,9 +311,10 @@ function sanLine(fen: string, pv: readonly string[]): string[] {
 /**
  * Judges a move from its position (the trainer's rule): the classification, the loss, the scores
  * for the mover. A move judged worse than good is searched again deeper, with the lines' moves, and
- * judged by that search (§5.136).
+ * judged by that search (§5.136); only when `recheckIf` says so, given it (an endgame's move, only
+ * when it looks like a slip: nothing else about it is shown).
  */
-export async function judge(fenBefore: string, uci: string, fenAfter: string): Promise<Partial<PracticeMove> | undefined> {
+export async function judge(fenBefore: string, uci: string, fenAfter: string, recheckIf?: (bestCp: number, afterCp: number) => boolean): Promise<Partial<PracticeMove> | undefined> {
   const pos = positionOf(fenBefore);
   if (!pos) return undefined;
   const moverLines = (a: Awaited<ReturnType<typeof analyse>>): MoverLine[] => (a?.lines ?? []).filter((l) => l.pv.length).map((l) => ({ move: l.pv[0]!, cp: moverScore(l.score, pos.turn) }));
@@ -322,7 +331,7 @@ export async function judge(fenBefore: string, uci: string, fenAfter: string): P
   }
   let j = judgeMove(lines, uci, afterCp);
   if (!j) return undefined;
-  if (!ended && needsRecheck(j)) {
+  if (!ended && needsRecheck(j) && (recheckIf?.(j.bestCp, afterCp ?? j.bestCp - j.cpLoss) ?? true)) {
     const moves = recheckMoves(lines, uci);
     const deep = await search(fenBefore, moves.length, narrow() ? RECHECK.phoneDepth : RECHECK.depth, RECHECK.movetime, moves);
     const deepLines = moverLines(deep);
@@ -347,7 +356,8 @@ function judgeAt(g: number, i: number): Promise<void> {
   const mv = p?.moves[i];
   if (!p || !mv) return Promise.resolve();
   pendingBy.set(g, (pendingBy.get(g) ?? 0) + 1);
-  const job = judge(mv.fenBefore, mv.uci, mv.fen).then((j) => {
+  const e = p.setup.endgame;
+  const job = judge(mv.fenBefore, mv.uci, mv.fen, e && ((best, after) => slips(e.goal, best, after))).then((j) => {
     patch(g, (q) => {
       const moves = [...q.moves];
       const { judging: _j, ...rest } = moves[i]!;
@@ -367,6 +377,12 @@ function judgeAt(g: number, i: number): Promise<void> {
   });
 }
 
+/** A judge come in, as the game reads it: an endgame looks for its first slip, the rest count towards Claim Victory. */
+function judgedAt(g: number, i: number): void {
+  if (practice.peek()?.setup.kind === 'endgame') endgameJudged(g);
+  else claimCheck(g, i);
+}
+
 /* ------------------------------------------------------------------ the game */
 
 export function startPractice(setup: PracticeSetup): void {
@@ -375,6 +391,7 @@ export function startPractice(setup: PracticeSetup): void {
   gen++;
   practice.value = { gen, setup, moves: [], phase: pos.turn === setup.color ? 'user' : 'opponent', track: startTrack(setup.peakCp ?? null), claim: false, judged: true };
   if (pos.turn !== setup.color) void opponentTurn(gen);
+  else ponder(practice.peek()!);
 }
 
 export function leavePractice(): void {
@@ -416,7 +433,7 @@ export function takeUpPractice(entry: string): boolean {
   }
   if (p.phase === 'over') return true;
   // Played on from where it was left, from memory: a game of a move or none isn't kept on the device.
-  resumePractice({ savedAt: Date.now(), game: { setup: p.setup, moves: p.moves, track: p.track, claim: p.claim, ...(p.source ? { source: p.source } : {}), ...(p.repIgnored ? { repIgnored: true } : {}), ...(p.tried ? { tried: p.tried } : {}), ...(p.failed ? { failed: true } : {}), ...(p.slip ? { slip: p.slip } : {}) } });
+  resumePractice({ savedAt: Date.now(), game: { setup: p.setup, moves: p.moves, track: p.track, claim: p.claim, ...(p.source ? { source: p.source } : {}), ...(p.repIgnored ? { repIgnored: true } : {}), ...(p.tried ? { tried: p.tried } : {}), ...(p.failed ? { failed: true } : {}), ...(p.slip ? { slip: p.slip } : {}), ...(p.missed ? { missed: p.missed } : {}), ...(p.ending ? { ending: p.ending } : {}), ...(p.playedOn !== undefined ? { playedOn: p.playedOn } : {}) } });
   return true;
 }
 
@@ -432,9 +449,12 @@ interface SavedGame {
   source?: string;
   repIgnored?: boolean;
   tried?: PracticeGame['tried'];
-  /** An endgame's try missed already, and its slip waiting (kept in memory only: endgames aren't saved). */
+  /** An endgame's try missed already, its slip waiting, its end waiting on the judges (kept in memory only: endgames aren't saved). */
   failed?: boolean;
   slip?: PracticeGame['slip'];
+  missed?: PracticeGame['missed'];
+  ending?: EndReason;
+  playedOn?: number;
 }
 const isSavedGame = (g: unknown): g is SavedGame => {
   const o = g as SavedGame | null;
@@ -488,16 +508,20 @@ export function resumePractice(s: Saved<SavedGame>): void {
     ...(g0.tried ? { tried: g0.tried } : {}),
     ...(g0.failed ? { failed: true } : {}),
     ...(g0.slip ? { slip: g0.slip } : {}),
+    ...(g0.missed ? { missed: g0.missed } : {}),
+    ...(g0.ending ? { ending: g0.ending } : {}),
+    ...(g0.playedOn !== undefined ? { playedOn: g0.playedOn } : {}),
   };
-  // An endgame waits on its last move's judge (a slip stops it there), and on Take back after a slip.
-  const lastJudging = g0.setup.kind === 'endgame' && opponentToMove && g0.moves.at(-1)?.judging ? g0.moves.length - 1 : -1;
   g0.moves.forEach((m, i) => {
-    if (!m.judging) return;
-    const job = judgeAt(g, i);
-    if (i === lastJudging) void endgameMove(g, i, job);
-    else void job.then(() => claimCheck(g, i));
+    if (m.judging) void judgeAt(g, i).then(() => judgedAt(g, i));
   });
-  if (opponentToMove && !g0.slip && lastJudging < 0) void opponentTurn(g);
+  // An endgame waits on Take back after a slip, and its end on the judges still out.
+  if (g0.slip) return;
+  if (g0.setup.kind === 'endgame') {
+    if (g0.ending) return endgameJudged(g);
+    if (!opponentToMove) ponder(practice.peek()!);
+  }
+  if (opponentToMove) void opponentTurn(g);
 }
 
 // Saved at every change of a game in play; cleared when it ends.
@@ -520,7 +544,7 @@ effect(() => {
 /** The user's move (standard UCI). */
 export async function practiceMove(uci: string): Promise<void> {
   const p = practice.peek();
-  if (!p || p.phase !== 'user') return;
+  if (!p || p.phase !== 'user' || p.slip || p.ending) return;
   const before = fenAfter(p);
   const after = played(before, uci);
   if (!after) return;
@@ -546,7 +570,12 @@ export async function practiceMove(uci: string): Promise<void> {
   });
   if (!next) return;
   const job = judgeAt(g, i);
-  if (p.setup.kind === 'endgame') return endgameMove(g, i, job);
+  // An endgame's move is judged in the background while Stockfish answers (the owner's request,
+  // 2026-11-01: waiting for the judge was slow on a phone); a slip stops the game once it is found.
+  if (p.setup.kind === 'endgame') {
+    void job.then(() => endgameJudged(g));
+    return endgameAfterUser(g);
+  }
   // An advantage drill waits for the judge: a collapse ends it before the opponent answers.
   if (p.setup.kind === 'advantage') {
     await job;
@@ -578,28 +607,36 @@ export const canTakeBack = (p: PracticeGame): boolean => p.setup.kind !== 'advan
 export function takeBack(): void {
   const p = practice.peek();
   if (!p || !canTakeBack(p)) return;
-  let n = p.moves.length;
-  while (n > 0 && !p.moves[n - 1]!.isUser) n--;
-  const moves = p.moves.slice(0, n - 1);
+  // An endgame's slip is taken back with every move played after it.
+  let cut = p.moves.length;
+  if (p.slip) cut = p.slip.at;
+  else {
+    while (cut > 0 && !p.moves[cut - 1]!.isUser) cut--;
+    cut--;
+  }
+  const moves = p.moves.slice(0, cut);
   gen++;
   const g = gen;
   let track = startTrack(p.setup.peakCp ?? null);
   let claim = false;
   for (const m of moves)
     if (m.isUser && m.afterCp !== undefined) ({ track, claim } = trackAdvantage(track, m.afterCp, m.wpDrop ?? 0, false));
-  const { deviation: _d, hint: _h, premove: _p, drawOffer: _o, slip: _s, ...rest } = p;
+  const { deviation: _d, hint: _h, premove: _p, drawOffer: _o, slip: _s, ending: _e, playedOn, ...rest } = p;
   const lastSource = [...moves].reverse().find((m) => !m.isUser)?.source;
   const next: PracticeGame = { ...rest, gen: g, moves, phase: 'user', track, claim, judged: !moves.some((m) => m.judging) };
   if (lastSource) next.source = lastSource;
   else delete next.source;
+  // Played on past a slip that is still on the board: the moves before it are still passed over.
+  if (playedOn !== undefined && Math.min(playedOn, cut) > 0) next.playedOn = Math.min(playedOn, cut);
   // A move that corrected the repertoire check, taken back: the move first tried there is still remembered.
-  const off = p.moves[n - 1]!;
+  const off = p.moves[cut]!;
   const key = off.repTried && keyFen(off.fenBefore)?.key;
   if (key) next.tried = { key, ...off.repTried! };
   practice.value = next;
   moves.forEach((m, i) => {
-    if (m.judging) void judgeAt(g, i).then(() => claimCheck(g, i));
+    if (m.judging) void judgeAt(g, i).then(() => judgedAt(g, i));
   });
+  ponder(next);
 }
 
 /** The Claim Victory count, as each move's judge comes in (a game not drilled for an advantage). */
@@ -627,18 +664,22 @@ function endOf(p: PracticeGame, byUser: boolean): EndReason | undefined {
 
 async function opponentTurn(g: number): Promise<void> {
   const p = practice.peek();
-  if (!p || p.gen !== g || p.phase !== 'opponent') return;
+  if (!p || p.gen !== g || p.phase !== 'opponent' || p.slip || p.ending) return;
   const fen = fenAfter(p);
+  const at = p.moves.length;
   const m = p.setup.kind === 'endgame' ? await endgameReply(fen, p.setup.endgame!.goal) : await opponentMove(fen, p.setup.opponent);
   const q = practice.peek();
-  if (!q || q.gen !== g || q.phase !== 'opponent') return;
+  // An endgame stopped on a slip meanwhile lets the answer go; one played on asks again, and the
+  // first answer in is the one played.
+  if (!q || q.gen !== g || q.phase !== 'opponent' || q.moves.length !== at || q.slip || q.ending) return;
   if (!m) return void finish(g, 'interrupted');
   const after = played(fen, m.uci);
   if (!after) return void finish(g, 'interrupted');
   const note = m.dbFailed && !q.note && !q.setup.silent ? 'The database is unavailable (a Lichess login is needed): Maia or Stockfish answers.' : q.note;
   const now = patch(g, (r) => ({ moves: [...r.moves, { san: after.san, uci: m.uci, isUser: false, fenBefore: fen, fen: after.fen, source: m.source }], source: m.source, phase: 'user', ...(note ? { note } : {}) }));
   const end = now && endOf(now, false);
-  if (end) return finish(g, end);
+  if (end) return now.setup.kind === 'endgame' ? conclude(g, end) : finish(g, end);
+  if (now) ponder(now);
   // The premove, played now when it is legal here (mistake-lab's: always a queen; dropped when illegal).
   const pre = practice.peek()?.premove;
   if (pre) {
@@ -700,7 +741,7 @@ export function ignoreRepertoire(): void {
 /** The hint (practising from a position): the piece first, then the move; the repertoire's move, else Stockfish's. */
 export async function practiceHint(): Promise<void> {
   const p = practice.peek();
-  if (!p || p.phase !== 'user' || (p.setup.kind !== 'practice' && p.setup.kind !== 'endgame')) return;
+  if (!p || p.phase !== 'user' || p.slip || p.ending || (p.setup.kind !== 'practice' && p.setup.kind !== 'endgame')) return;
   const fen = fenAfter(p);
   const g = p.gen;
   if (p.hint?.fen === fen) {
@@ -812,70 +853,132 @@ async function writeHistory(g: number, reason: EndReason, result: 'win' | 'draw'
 /* ------------------------------------------------------------------ endgames (§5.145) */
 
 /**
- * An endgame's move, once judged: one that throws the goal away waits for Take back (the try
- * counted as missed); else the game ends where the goal is reached (mate, the pawn queened, a
- * bare king, the draw held) or by the rules, or the defence answers.
+ * An endgame's position with the user to move, searched while they think: the judge of their move
+ * starts from these lines, so it is mostly in by the time Stockfish has answered.
  */
-async function endgameMove(g: number, i: number, job: Promise<void>): Promise<void> {
-  await job;
+function ponder(p: PracticeGame): void {
+  if (p.setup.kind === 'endgame' && p.phase === 'user') void analyse(fenAfter(p), 3);
+}
+
+/**
+ * After the user's move in an endgame, its judge still out: the end where the game ends (mate, the
+ * rules) or the goal looks reached (a promotion, a bare king, the draw held), else the defence
+ * answers at once.
+ */
+function endgameAfterUser(g: number): void {
   const q = practice.peek();
   if (!q || q.gen !== g || q.phase === 'over') return;
   const e = q.setup.endgame!;
-  const mv = q.moves[i]!;
-  if (mv.afterCp === undefined || mv.bestCp === undefined) return void finish(g, 'interrupted');
-  if (slips(e.goal, mv.bestCp, mv.afterCp)) {
-    const keep = mv.bestMoveUci || undefined;
-    const san = keep ? played(mv.fenBefore, keep)?.san : undefined;
-    patch(g, () => ({ slip: { at: i, ...(keep ? { uci: keep } : {}), ...(san ? { san } : {}) } }));
-    endgameMiss(g, e.goal === 'win' && mv.afterCp > -GOAL_CP.win ? 'draw' : 'loss');
-    return;
-  }
   const end = endOf(q, true);
-  if (end) return void finish(g, end);
+  if (end) return conclude(g, end);
+  const mv = q.moves.at(-1)!;
   const after = positionOf(mv.fen);
   const userMoves = q.moves.filter((m) => m.isUser).length;
-  if (after && keepsGoal(e.goal, mv.afterCp) && (wonAfter(e, after, mv.uci.length === 5) || held(e, userMoves))) return void finish(g, 'goal');
-  setTimeout(() => void opponentTurn(g), 500);
+  if (after && (wonAfter(e, after, mv.uci.length === 5) || held(e, userMoves))) return conclude(g, 'goal');
+  void opponentTurn(g);
 }
 
-/** The endgame's try counted as missed, once: a `practice` event at its start with the preset `endgame`. */
-function endgameMiss(g: number, res: 'draw' | 'loss'): void {
+/**
+ * An endgame's end reached: it counts once the judges still out are in (a slip among them stops the
+ * game there instead, to be taken back). A mate given is the goal whatever they say.
+ */
+function conclude(g: number, reason: EndReason): void {
+  if (reason === 'mate') return finish(g, 'mate');
+  if (!patch(g, () => ({ ending: reason }))) return;
+  endgameJudged(g);
+}
+
+/**
+ * An endgame's judges, as they come in: the first slip stops the game there (the board back on it,
+ * the moves played after it waiting with it), counted as missed once; an end reached waits for the
+ * last judge, then counts.
+ */
+function endgameJudged(g: number): void {
+  const q = practice.peek();
+  if (!q || q.gen !== g || q.phase === 'over' || q.slip) return;
+  const e = q.setup.endgame!;
+  const from = q.playedOn ?? 0;
+  // A judge that gave nothing (Stockfish gone): nothing can be told, nothing counts.
+  if (q.moves.some((m, i) => i >= from && m.isUser && !m.judging && m.afterCp === undefined)) return finish(g, 'interrupted');
+  const at = firstSlip(e.goal, q.moves, from);
+  if (typeof at === 'number') return slipAt(g, at);
+  if (at === 'pending' || !q.ending || q.moves.some((m) => m.isUser && m.judging)) return;
+  // The goal reached, as its last move's judge has it: a promotion that loses the new queen, say, isn't.
+  const last = q.moves.at(-1)!;
+  if (q.ending === 'goal' && !(last.afterCp !== undefined && keepsGoal(e.goal, last.afterCp))) {
+    replace(g, (r) => {
+      const { ending: _e, ...rest } = r;
+      return rest;
+    });
+    return void opponentTurn(g);
+  }
+  finish(g, q.ending);
+}
+
+/** The game stopped on the user's move `i`, which threw the goal away. */
+function slipAt(g: number, i: number): void {
+  const q = practice.peek();
+  if (!q || q.gen !== g) return;
+  const e = q.setup.endgame!;
+  const mv = q.moves[i]!;
+  const keep = mv.bestMoveUci || undefined;
+  const san = keep ? played(mv.fenBefore, keep)?.san : undefined;
+  replace(g, (r) => {
+    const { ending: _e, hint: _h, premove: _p, ...rest } = r;
+    return { ...rest, slip: { at: i, ...(keep ? { uci: keep } : {}), ...(san ? { san } : {}) }, ...(r.missed ? {} : { missed: { fenBefore: mv.fenBefore, san: mv.san, ...(san ? { keep: san } : {}) } }) };
+  });
+  endgameMiss(g, e.goal === 'win' && mv.afterCp! > -GOAL_CP.win ? 'draw' : 'loss', i + 1);
+}
+
+/**
+ * The endgame's try counted as missed, once: a `practice` event at its start with the preset
+ * `endgame`, its score and moves as they stood after the first `upTo` moves (a slip's, though the
+ * user may have played on past it before its judge came in).
+ */
+function endgameMiss(g: number, res: 'draw' | 'loss', upTo?: number): void {
   const p = practice.peek();
   if (!p || p.gen !== g || p.setup.kind !== 'endgame' || p.failed) return;
   patch(g, () => ({ failed: true }));
-  recordEndgame(p, res);
+  recordEndgame(p, res, upTo);
 }
 
-function recordEndgame(p: PracticeGame, res: 'win' | 'draw' | 'loss'): void {
+function recordEndgame(p: PracticeGame, res: 'win' | 'draw' | 'loss', upTo = p.moves.length): void {
   const key = keyFen(p.setup.fen)?.key;
   if (!key) return;
-  const cp = lastAfterCp(p);
+  const moves = p.moves.slice(0, upTo);
+  const cp = [...moves].reverse().find((m) => m.isUser && m.afterCp !== undefined)?.afterCp;
   const white = cp === undefined ? undefined : p.setup.color === 'white' ? cp : -cp;
-  void recordEvent({ t: new Date().toISOString(), k: 'practice', card: practiceCard(key), res, preset: ENDGAME_PRESET, ...(white !== undefined ? { cp: Math.round(white) } : {}), mv: p.moves.filter((m) => m.isUser).length });
+  void recordEvent({ t: new Date().toISOString(), k: 'practice', card: practiceCard(key), res, preset: ENDGAME_PRESET, ...(white !== undefined ? { cp: Math.round(white) } : {}), mv: moves.filter((m) => m.isUser).length });
 }
 
 /** An endgame's end: its result as the game's, recorded when the try hasn't been already. No history entry, no tactic scan. */
 function finishEndgame(p: PracticeGame, reason: EndReason): void {
   const e = p.setup.endgame!;
   const result: 'win' | 'draw' | 'loss' = reason === 'goal' ? (e.goal === 'win' ? 'win' : 'draw') : reason === 'mate' ? 'win' : isDraw(reason) ? 'draw' : 'loss';
-  const { slip: _s, ...rest } = p;
+  const { slip: _s, ending: _e, ...rest } = p;
   practice.value = { ...rest, phase: 'over', end: { reason, result }, claim: false };
   const userMoves = p.moves.filter((m) => m.isUser).length;
   if (!p.failed && reason !== 'interrupted' && userMoves > 0) recordEndgame(p, result);
 }
 
-/** After a slip, the game played on as it is (the try is missed already): the defence answers. */
+/**
+ * After a slip, the game played on from where it had got to (the try is missed already): the moves
+ * on the board are no longer looked at for a slip; an end reached meanwhile counts, else the
+ * defence answers or the user moves.
+ */
 export function playOnAfterSlip(): void {
   const p = practice.peek();
   if (!p?.slip || p.phase === 'over') return;
   const g = p.gen;
   const next = replace(g, (q) => {
     const { slip: _s, ...rest } = q;
-    return rest;
+    return { ...rest, playedOn: q.moves.length };
   });
-  const end = next && endOf(next, true);
-  if (end) return finish(g, end);
-  void opponentTurn(g);
+  if (!next) return;
+  if (next.moves.at(-1)?.isUser) return endgameAfterUser(g);
+  const end = endOf(next, false);
+  if (end) return conclude(g, end);
+  ponder(next);
 }
 
 /** After a slip, the move taken back and the one that kept the goal shown, as a hint's arrow. */

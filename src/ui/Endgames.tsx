@@ -168,15 +168,16 @@ function EndgameDrill(props: { endgame: Endgame }) {
 function EndgameGame(props: { game: PracticeGame; endgame: Endgame; method: boolean; onMethod(on: boolean): void }) {
   const p = props.game;
   const e = props.endgame;
-  const fen = p.moves.length ? p.moves[p.moves.length - 1]!.fen : e.fen;
-  const last = p.moves[p.moves.length - 1];
-  const lastUser = [...p.moves].reverse().find((m) => m.isUser);
-  const userMoves = p.moves.filter((m) => m.isUser).length;
-  const hint = p.hint?.fen === fen && p.hint.uci ? p.hint : undefined;
-  const arrows = hint ? [{ orig: hint.uci!.slice(0, 2), ...(hint.level === 2 ? { dest: hint.uci!.slice(2, 4) } : {}), brush: 'blue' }] : [];
   const over = p.phase === 'over';
   const slip = !over ? p.slip : undefined;
   const slipped = slip ? p.moves[slip.at] : undefined;
+  // Each move is judged while the game goes on: a slip found after the user played on puts the board back on it.
+  const last = slipped ?? p.moves[p.moves.length - 1];
+  const fen = last ? last.fen : e.fen;
+  const playedPast = !!slip && slip.at < p.moves.length - 1;
+  const userMoves = p.moves.filter((m) => m.isUser).length;
+  const hint = p.hint?.fen === fen && p.hint.uci ? p.hint : undefined;
+  const arrows = hint ? [{ orig: hint.uci!.slice(0, 2), ...(hint.level === 2 ? { dest: hint.uci!.slice(2, 4) } : {}), brush: 'blue' }] : [];
   const slippedPos = slipped && positionOf(slipped.fen);
   const stalemate = slippedPos?.isStalemate();
   // In a long mate, the fifty-move rule draws a win that takes too long: Stockfish sees it coming.
@@ -187,12 +188,12 @@ function EndgameGame(props: { game: PracticeGame; endgame: Endgame; method: bool
     ? endText(p, e)
     : slip
       ? `${slipped?.san ?? 'That move'} ${e.goal === 'win' ? 'lets the win slip' : 'loses the draw'}${stalemate ? ': stalemate' : fiftyNear ? ': the fifty-move rule comes first' : ''}. Take it back and find a better move.`
-      : p.phase === 'user'
-        ? hint
-          ? 'Your move: the hint is on the board'
-          : 'Your move'
-        : lastUser?.judging
-          ? 'Checking your move…'
+      : p.ending
+        ? 'Checking your moves…'
+        : p.phase === 'user'
+          ? hint
+            ? 'Your move: the hint is on the board'
+            : 'Your move'
           : 'Stockfish is thinking…';
   const solved = over && p.end && solvedBy(e.goal, p.end.result);
   const restart = () => {
@@ -201,8 +202,8 @@ function EndgameGame(props: { game: PracticeGame; endgame: Endgame; method: bool
     startEndgame(e);
   };
   return (
-    <div class="train-grid practice-game endgame-game" data-phase={over ? 'over' : slip ? 'slip' : p.phase} data-moves={p.moves.length} data-testid="endgame-game">
-      <MoveBoard fen={fen} orientation={p.setup.color} movable={p.phase === 'user' && !slip} lastUci={last?.uci} arrows={arrows} onMove={(u) => void practiceMove(u)} />
+    <div class="train-grid practice-game endgame-game" data-phase={over ? 'over' : slip ? 'slip' : p.ending ? 'ending' : p.phase} data-moves={p.moves.length} data-testid="endgame-game">
+      <MoveBoard fen={fen} orientation={p.setup.color} movable={p.phase === 'user' && !slip && !p.ending} lastUci={last?.uci} arrows={arrows} onMove={(u) => void practiceMove(u)} />
       <div class="train-panel">
         <p class="train-counters">
           {taskOf(e)}
@@ -212,9 +213,14 @@ function EndgameGame(props: { game: PracticeGame; endgame: Endgame; method: bool
         <p class={`feedback train-feedback${slip ? ' endgame-slip' : over ? (solved ? ' endgame-solved' : ' endgame-missed') : ''}`} role="status" data-testid="endgame-feedback">
           {feedback}
         </p>
+        {playedPast && (
+          <p class="muted" data-testid="endgame-slip-later">
+            Found after you had played on: the board is back on that move, and Take back takes the moves after it too.
+          </p>
+        )}
         {over && <p class="muted" data-testid="endgame-counted">{countedText(p, e)}</p>}
         {!over && p.failed && !slip && <p class="muted">This try counts as missed: play it out, or start again.</p>}
-        <MoveList moves={p.moves} baseFen={e.fen} marks={false} />
+        <MoveList moves={p.moves} baseFen={e.fen} marks={false} slipAt={slip?.at} />
         <div class="actions train-actions">
           {slip ? (
             <>
@@ -252,7 +258,7 @@ function EndgameGame(props: { game: PracticeGame; endgame: Endgame; method: bool
               </button>
             </>
           )}
-          <button type="button" class="secondary" title="The analysis board at this position; ← comes back here" onClick={() => analyseFrom({ fen: e.fen, ...(p.moves.length ? { line: p.moves.map((m) => m.san) } : {}), side: p.setup.color })}>
+          <button type="button" class="secondary" title="The analysis board at this position; ← comes back here" onClick={() => analyseFrom({ fen: e.fen, ...(p.moves.length ? { line: p.moves.slice(0, slip ? slip.at + 1 : undefined).map((m) => m.san) } : {}), side: p.setup.color })}>
             Analyse
           </button>
         </div>
@@ -308,10 +314,21 @@ function endText(p: PracticeGame, e: Endgame): string {
   }
 }
 
-/** What the try counted for. */
+/** "3.Kd2", "3…Kd7": a move with its number, from the position before it. */
+function numbered(fenBefore: string, san: string): string {
+  const [, turn, , , , n] = fenBefore.split(' ');
+  return `${n ?? 1}${turn === 'b' ? '…' : '.'}${san}`;
+}
+
+/** What the try counted for, and its first slip when it had one. */
 function countedText(p: PracticeGame, e: Endgame): string {
   if (p.end?.reason === 'interrupted') return '';
   const solved = solvedBy(e.goal, p.end!.result);
-  if (p.failed) return solved ? 'Reached after a take-back or a hint: the try counts as missed.' : 'The try counts as missed.';
+  const m = p.missed;
+  if (p.failed && m) {
+    const keep = m.keep ? ` (${numbered(m.fenBefore, m.keep)} kept ${GOAL_WORD[e.goal]})` : '';
+    return `${solved ? 'Reached after a take-back' : 'The try counts as missed'}: the first slip was ${numbered(m.fenBefore, m.san)}${keep}.${solved ? ' The try counts as missed.' : ''}`;
+  }
+  if (p.failed) return solved ? 'Reached after a hint or a take-back: the try counts as missed.' : 'The try counts as missed.';
   return solved ? 'Solved first time: it comes back in a while.' : 'The try counts as missed: it stays due.';
 }

@@ -10,6 +10,7 @@ import {
   ENDGAME_PRESET,
   ENDGAMES,
   endgameById,
+  firstSlip,
   GOAL_CP,
   GROUPS,
   held,
@@ -72,6 +73,27 @@ test('the goal: kept at +2 (a win) or −2 (a draw); a slip is from kept to lost
   assert.equal(slips('draw', -30, -60), false);
   assert.equal(slips('draw', -9, -417), true);
   assert.equal(slips('draw', -500, -900), false);
+});
+
+test('the first slip, among moves judged in the background: never one past a move still judged', () => {
+  const ok = { isUser: true, bestCp: 900, afterCp: 850 };
+  const slip = { isUser: true, bestCp: 900, afterCp: 0 };
+  const reply = { isUser: false };
+  const out = { isUser: true, judging: true };
+  assert.equal(firstSlip('win', []), undefined);
+  assert.equal(firstSlip('win', [ok, reply, ok, reply]), undefined);
+  // Played on past it: the slip is the first, whatever the moves after it.
+  assert.equal(firstSlip('win', [ok, reply, slip, reply, out, reply]), 2);
+  assert.equal(firstSlip('win', [ok, reply, slip, reply, { isUser: true, bestCp: 0, afterCp: -900 }]), 2);
+  // A later slip found first waits for the judge before it: that move may be the first.
+  assert.equal(firstSlip('win', [ok, reply, out, reply, slip]), 'pending');
+  assert.equal(firstSlip('win', [out]), 'pending');
+  // From a move on (played on past a slip): the moves before it aren't looked at.
+  assert.equal(firstSlip('win', [slip, reply, ok, reply, slip], 2), 4);
+  assert.equal(firstSlip('win', [slip, reply, ok], 2), undefined);
+  // A judge that gave nothing is passed over; a draw's slip as a draw's.
+  assert.equal(firstSlip('win', [{ isUser: true }, reply, slip]), 2);
+  assert.equal(firstSlip('draw', [{ isUser: true, bestCp: -9, afterCp: -60 }, reply, { isUser: true, bestCp: -9, afterCp: -417 }]), 2);
 });
 
 test('a win is reached by mate, by a promotion, or by a bare king, as each endgame says', () => {

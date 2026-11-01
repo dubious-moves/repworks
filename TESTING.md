@@ -1058,9 +1058,13 @@ q_extension (or give it to a session with q_extension attached), then run
   desktop: are the small boards readable, and is the list the right length, or should it grow
   (more rook endings, the two bishops, knight and bishop)?
 - Play a few, including one you know well: does Stockfish defend (and, in Philidor and "Hold with
-  the opposition", attack) the way you'd expect? Each of your moves is checked before Stockfish
-  answers: is the wait acceptable on the phone ("Checking your move…"; a move that looks bad is
-  searched again, up to 15 s)?
+  the opposition", attack) the way you'd expect? Since §5.146 Stockfish answers at once and your
+  moves are checked in the background: on the phone, is the answer quick now? At the end the game
+  waits for the checks still out ("Checking your moves…"): is that wait short?
+- Throw a win away and play on quickly (e.g. Kd2 in "Take the opposition", then another move
+  before anything happens): the game stops back on Kd2 ("Found after you had played on…"), the
+  later moves dimmed; Take back goes to before Kd2. Is it clear which move was the mistake? If a
+  game finishes after a slip, the end names it ("the first slip was 1.Kd2 (1.Ke3 kept the win)").
 - Throw a win away on purpose (e.g. Kd2 in "Take the opposition"): the game stops with "Kd2 lets
   the win slip", Take back, "Show a move that keeps it" (its arrow), Play on. Is any good move ever
   stopped as a slip? Say which, with the position: the line is +2 (a win) or −2 (a draw) on

@@ -1998,3 +1998,15 @@ The technical calls, each with its reason:
 - **Against a draw, the attacker presses**: of Stockfish's three lines within 0.30 of the best, the
   first whose next two plies give no material away. Why: in a drawn position its first line often
   gave the pawn away and ended the drill in a few moves.
+
+## Revision of 2026-11-01 (endgames judged in the background, PLAN.md §5.146)
+- **An endgame's moves are judged in the background**: Stockfish answers the user's move at once,
+  its search ahead of the judges', and the user may play on; the first move that threw the goal
+  away stops the game when its judge comes in, the board back on that move, Take back taking the
+  moves after it too. Replaces §5.145's "the opponent waits for the judge". Why: the owner, on the
+  phone: waiting for the evaluation before each answer "feels slow and clunky"; the owner accepted
+  that several bad moves may be played before the first is shown, as long as the first is clear.
+- **The end waits for the judges**, so a try is never counted solved over a slip still being
+  judged; a mate given counts at once. The deeper second search (§5.136) runs for an endgame's move
+  only when it looks like a slip.
+

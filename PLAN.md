@@ -7,7 +7,7 @@ where the build differed). What remains is live: the spike's re-run (§4.2), the
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
 with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
-for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Storm positions shared between devices through the data repo, and an overnight gather (§5.102), are built (2026-10-12). Lc0 on the study page, its pick among close moves (§5.143), is built (2026-10-31). Endgames, the theoretical endgames each played for its goal against Stockfish (§5.145), are built (2026-10-31). Read with `DECISIONS.md`, which this plan updates (its
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Storm positions shared between devices through the data repo, and an overnight gather (§5.102), are built (2026-10-12). Lc0 on the study page, its pick among close moves (§5.143), is built (2026-10-31). Endgames, the theoretical endgames each played for its goal against Stockfish (§5.145), are built (2026-10-31), their moves judged in the background since (§5.146, the owner's request of 2026-11-01). Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -7962,7 +7962,7 @@ about technique once Maia or the database answers. This adds that, built on the 
   side to move. The opponent is **Stockfish alone** at the judges' depth (18, 16 on a phone):
   neither the database nor Maia, which answer as people do, not as a defence. Every move of the
   user's is judged as practice judges (§5.57, with §5.136's deeper second search for a move told
-  bad), and **the opponent waits for the judge**, as in an advantage drill.
+  bad), and **the opponent waits for the judge**, as in an advantage drill (since §5.146 it answers at once, the judge in the background).
 - **The goal, move by move** (`core/endgames/endgames.ts`): a win is kept while the user's score
   is +2 or better, a draw while it is −2 or better (`GOAL_CP`). A move that takes the score from
   kept to lost **stops the game**: "Kd2 lets the win slip. Take it back and find a better move." (":
@@ -8046,3 +8046,47 @@ desktop and the emulated phone (the list; Kd2 searched again and stopped, taken 
 move's arrow, Ke3 and the answer, one event synced for the try, the list saying it is due; the
 breakthrough solved along Stockfish's line, the promotion, the event, "back tomorrow"). Live:
 TESTING.md.
+
+#### 5.146 Endgames: each move judged in the background (the owner's request, 2026-11-01)
+
+The owner, after the first endgames: "we wait for stockfish evaluation before continuing... this
+feels slow and clunky, at least on a mobile device. Let's make the stockfish evaluation happen in
+the background instead. The user might be able to play multiple losing moves but the first mistake
+should be clear in the end." §5.145 had the defence wait for each move's judge (two searches a
+move on the phone, up to 15 s more when a move looked bad); now it doesn't.
+
+- **Stockfish answers at once**: after the user's move the defence's search runs first, and the
+  judge of the move runs behind it. The engine's queue (`analyseForStorm`'s `urgent`) puts the
+  answer ahead of every waiting search and, on the one worker, ahead of a background search under
+  way, which is stopped and starts again (over its warm hash) once the answer is in.
+- **Searched while the user thinks**: the position with the user to move is searched at once
+  (the judge's first search, three lines at the judges' depth), so a move's judge is mostly in by
+  the time Stockfish has answered; the hint reads the same search.
+- **The deeper second search only for a likely slip**: §5.136's recheck runs for an endgame's move
+  only when the first search says it throws the goal away (it confirms or clears the slip);
+  nothing else about the move is shown, and a recheck of a good-enough move would only hold the
+  engine up.
+- **The first slip stops the game, wherever it is** (`firstSlip`): when a judge finds a move that
+  threw the goal away, the game stops there, even when the user has played on past it meanwhile:
+  the board goes back to the position after that move, the move is marked in the list and the
+  moves after it dimmed, with "Kd2 lets the win slip. Take it back and find a better move." and,
+  when moves were played after it, "Found after you had played on: the board is back on that move,
+  and Take back takes the moves after it too." A slip is shown only once every move of the user's
+  before it is judged, so the one shown is always the first. Take back and "Show a move that keeps
+  it" go back to before that move, Analyse opens the board at it, Play on carries on from where the
+  game had got to (no slip is looked for among the moves already played).
+- **The end waits for the judges**: mate, the goal reached (a promotion, a bare king, the draw
+  held) and the rules' draws are counted once the judges still out are in ("Checking your
+  moves…", the board still); a slip among them stops the game at it instead. A mate given ends the
+  game at once. The try's event is as before, its score and moves those at the first slip
+  (`mv` counts the user's moves up to it); the end's words name the first slip: "The try counts as
+  missed: the first slip was 1.Kd2 (1.Ke3 kept the win)."
+
+**As built** (2026-11-01): `firstSlip` in `src/core/endgames/endgames.ts`; in `src/app/practice.ts`
+`ponder`, `endgameAfterUser`, `conclude`, `endgameJudged`, `slipAt` (in place of `endgameMove`),
+the game's `ending`, `playedOn` and `missed`, Take back cutting at the slip, the answer let go when
+the game has stopped on a slip or moved on; the `urgent` search in `src/app/stormEngine.ts`; the
+marked move in `MoveList`. Tests: `firstSlip` in `test/unit/core/endgames/endgames.test.ts`;
+`test/e2e/endgames.spec.ts` with the fake engine at 1 s a search: Kd2 answered before its deeper
+search, Ke3 played meanwhile, the game stopped back on Kd2 with four moves on the list, taken back
+with them, the event at Kd2 (`mv` 1); the breakthrough's end waiting for its judges. Live: TESTING.md.

@@ -161,6 +161,31 @@ export const keepsGoal = (goal: Goal, cp: number): boolean => cp >= GOAL_CP[goal
 /** A move that throws the goal away: kept before it (by the best move's score), not after it. */
 export const slips = (goal: Goal, bestCp: number, afterCp: number): boolean => keepsGoal(goal, bestCp) && !keepsGoal(goal, afterCp);
 
+/** A move of the game as the slip's search reads it: the user's or not, its judge out or in. */
+export interface JudgedMove {
+  isUser: boolean;
+  judging?: boolean;
+  bestCp?: number;
+  afterCp?: number;
+}
+
+/**
+ * The first of the user's moves from `from` on that threw the goal away, its index (the owner's
+ * request, 2026-11-01: the moves are judged in the background while the game goes on, so the
+ * user may have played on past a slip before its judge comes in; the one shown is always the
+ * first). `pending` while a move before any slip found is still being judged; undefined when
+ * none slipped. A move whose judge gave nothing is passed over (the caller ends the game then).
+ */
+export function firstSlip(goal: Goal, moves: readonly JudgedMove[], from = 0): number | 'pending' | undefined {
+  for (let i = from; i < moves.length; i++) {
+    const m = moves[i]!;
+    if (!m.isUser) continue;
+    if (m.judging) return 'pending';
+    if (m.bestCp !== undefined && m.afterCp !== undefined && slips(goal, m.bestCp, m.afterCp)) return i;
+  }
+  return undefined;
+}
+
 /** Whether only the king is left of `side`'s pieces. */
 function bare(pos: Position, side: 'white' | 'black'): boolean {
   return pos.board[side].size() === 1;
