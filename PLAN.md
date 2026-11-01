@@ -8191,3 +8191,84 @@ Philidor and not when it drops the pawn or is 0.31 worse or not searched; the re
 over, kept against a losing move, allowed to a win's defender); `test/e2e/endgames.spec.ts` on
 desktop and phone ("Hold with the opposition": Kd5 again passed over for Kf5, then e5 after four
 moves held). Live: TESTING.md.
+
+#### 5.149 Repertoire endgames: the endgames the user's own openings lead to (the owner's request, 2026-11-01)
+
+The owner: "Let's plan and implement a new feature - repertoire endgames. Either as part of storm
+(as a separate tag and separate gather) or in the new endgame practice page. Figure out the
+conditions and categories to use."
+
+- **Where: the Endgames page, not the storm** (Claude's call). An endgame is technique over many
+  moves, which the endgame drill already trains (a goal kept move by move, Maia's defence checked
+  by Stockfish, the first slip stopped, §5.145–§5.148); the storm asks for one move against the
+  clock and grades it in win% bands, which says little in a won or drawn ending. The storm's walks
+  also stop 16 plies past a line's end and at a decided score, where endgames are rarely reached.
+  The gather is its own, reusing the storm's: its line ends, the explorer's named games
+  (`stormGames`, the relaxed filter, up to four top and four recent games), Lichess's export, and
+  the storm's Stockfish.
+- **The condition** (`isEndgame`, `core/endgames/repertoire.ts`): at most two pieces a side
+  besides the king and pawns, at most four in all, worth at most 20 together (Q 9, R 5, minor 3),
+  and a pawn on the board. Lichess's own phase line (six pieces or fewer) lets in two rooks and a
+  minor piece a side, a middlegame to drill; queen and rook a side (28) is left out, two rooks a
+  side (20) and queen against queen kept; a pawnless ending is a theoretical one, not the
+  opening's.
+- **The position drilled** (`endgameInGame`): each game is walked from the start through the line
+  end (by any move order) to the first position of its endgame, then on to the first with the
+  user to move (the chapter's side), not in check, the last move no capture (not halfway through a
+  trade), the material still an endgame's, within 6 plies; else the game gives none. One position
+  a game, at most three a line end a gather, at most 400 kept.
+- **The goal** (`goalFor`), from Stockfish's score for the user at the judges' depth (18, 16 on a
+  phone): **+3 or better a win**, until a pawn queens that keeps it, a bare king, mate, or **5
+  points of material ahead** (`until: 'convert'`, `CONVERT_LEAD`; a win already 5 up isn't kept);
+  **−1 to +1.5 a draw held for 15 moves** (or better). Between +1.5 and +3, and below −1, none:
+  each goal starts a pawn clear of the judge's lines (±2, `GOAL_CP`), as the theoretical
+  positions do, so a good move isn't stopped as a slip by the search's noise.
+- **The categories** (`categoryOf`, by the pieces besides kings and pawns): *Rook endings* (a rook
+  each), *Pawn endings*, *Minor-piece endings* (the same number of minor pieces each), *Rook and
+  minor piece* (a rook and a minor each), *Queens and two rooks* (queens, or two rooks each),
+  *Material imbalances* (the sides' queens, rooks or minor pieces differ: a rook against a minor,
+  the exchange, a piece against pawns). Each has a few sentences of technique (standard endgame
+  theory, no course content), folded under the board. The title names the material from the
+  user's side ("R+B vs R+N · pawns 4 v 3"), with "opposite bishops" when each side has one
+  bishop on squares of opposite colours.
+- **The page**: "From your repertoire" under the intro: Gather from your repertoire (Gather more
+  once some are kept; Stop), its progress and note; the category chips with their counts (the
+  choice kept per device); "Next due / Next new" within the chosen category; the list, due first,
+  then new, then the rest, 12 shown until "Show all", each with its board, task, the chapter and
+  the line's last moves, where it stands, and Remove. The drill is the theoretical endgames'
+  (`#/endgames/r-<hash>`), with where it came from under the board (the chapter and line, the
+  players, the move, how many moves after the line's end, Stockfish's score, a link to the game),
+  and Next within its category. The home's "Endgames · n due" counts them too.
+- **What counts, and the spacing**: as §5.145's: a `practice` event with `preset: "endgame"` at
+  the start's position (no new data format), back after 1, 3, 7, 14, 30 and 60 days.
+- **Kept on this device** (the storm store's `meta`, D5's cache tier), like the storm's positions
+  before §5.102: the tries cross devices with the log, the positions don't; another device gathers
+  its own (one Stockfish search a game, so a phone can). Shared files in the data repo are the step
+  after, if the owner wants them (a data format: the owner's call).
+- **Older games**: each line end's games are remembered as walked (the line end and the game's
+  id); once a gather has walked every line end, the next asks the explorer for games 4 months
+  older (`until`), then 8, and so on.
+
+**Checked** (2026-11-01, cloud container): the condition and the goal over the 17 distinct games
+of `test/fixtures/games/analyzed_games.json` (GM bullet; a "line end" after ply 8, each side: 34
+game-sides), scored by the vendored Stockfish 18 lite at depth 16: 22 reached a drillable endgame
+(the other 12 ended in a mate or a resignation first); 14 were kept, 13 draws and one win (Q
+against R at +5.0), and 8 had no goal (5 worse, 2 between +1.5 and +3, 1 already 5 up). Those kept:
+2 rook endings, 5 rook and minor piece (2 of them, one game from each side, with opposite
+bishops), 2 two rooks each, 5 imbalances (B+B against R, R+R against R+B, Q against R). Bullet
+games reach endgames less often than slower ones; the gather reads the storm's relaxed filter
+(every speed). Not checked against the real Lichess explorer: the container has no Lichess login.
+
+**As built** (2026-11-01): `src/core/endgames/repertoire.ts` (`REP`, `isEndgame`, `categoryOf`,
+`CATEGORIES`, `oppositeBishops`, `titleOf`, `endgameInGame`, `goalFor`, `repertoireEndgame`,
+`repertoireId`, `asEndgame`, `readRepertoireEndgame`, `addEndgames`, `inListOrder`); in
+`endgames.ts` `until: 'convert'`, `CONVERT_LEAD`, a list for `attemptsByEndgame` and
+`nextEndgame`; `src/app/repertoireEndgames.ts` (the gather, the kept list, the standings);
+`stormRequest` exported from `src/app/storm.ts`; the section, the drill's source and Next in
+`src/ui/Endgames.tsx`; the home's count. Tests: `test/unit/core/endgames/repertoire.test.ts` (the
+condition, each category, the title, a game walked through a capture to Black's and White's
+positions, by another move order, and its refusals, the goal's bands, the record and the drill,
+a converted win, the list's merge and order); `test/e2e/endgames.spec.ts` on desktop and the
+emulated phone (two games named at three line ends, a draw and a win kept from six games read; the
+list by category; one played, its hint counted at its position, synced; kept over a reload, due;
+filtered, one removed; gathered again from older games, none new). Live: TESTING.md.

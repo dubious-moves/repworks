@@ -11,15 +11,21 @@
 import type { Position } from 'chessops/chess';
 import { makeSquare as squareName } from 'chessops/util';
 import type { PositionKey } from '../chess/positionKey.ts';
+import type { Category } from './repertoire.ts';
 
 export type Goal = 'win' | 'draw';
-/** When a win counts as done: mate, the pawn queened, or the defender left with a bare king. */
-export type Until = 'mate' | 'promote' | 'bare';
+/**
+ * When a win counts as done: mate, the pawn queened, or the defender left with a bare king; for a
+ * repertoire endgame (§5.149) `convert`: a pawn queened, a bare king, or `CONVERT_LEAD` points of
+ * material ahead.
+ */
+export type Until = 'mate' | 'promote' | 'bare' | 'convert';
 export type Group = 'mates' | 'pawns' | 'rooks' | 'queen';
 
 export interface Endgame {
   id: string;
-  group: Group;
+  /** A theoretical endgame's group, or a repertoire endgame's category (§5.149). */
+  group: Group | Category;
   title: string;
   fen: string;
   goal: Goal;
@@ -143,7 +149,7 @@ export const sideOf = (e: Endgame): 'white' | 'black' => (e.fen.split(' ')[1] ==
 export function taskOf(e: Endgame): string {
   const side = sideOf(e) === 'white' ? 'White' : 'Black';
   if (e.goal === 'draw') return `${side} to play and draw (hold ${e.hold ?? 0} moves)`;
-  const end = e.until === 'promote' ? 'queen a pawn' : e.until === 'bare' ? 'win the pawn' : 'mate';
+  const end = e.until === 'promote' ? 'queen a pawn' : e.until === 'bare' ? 'win the pawn' : e.until === 'convert' ? `queen a pawn or go ${CONVERT_LEAD} points up` : 'mate';
   return `${side} to play and win (${end})`;
 }
 
@@ -192,9 +198,13 @@ function bare(pos: Position, side: 'white' | 'black'): boolean {
   return pos.board[side].size() === 1;
 }
 
+/** A repertoire endgame's win is home this many points of material ahead (§5.149). */
+export const CONVERT_LEAD = 5;
+
 /**
  * Whether a win's goal is reached after the user's move, which kept it (the caller has judged
- * that): mate, a promotion, or the defender with a bare king. A draw's goal is reached by holding
+ * that): mate, a promotion, or the defender with a bare king; converting, also a lead of
+ * `CONVERT_LEAD`. A draw's goal is reached by holding
  * (`held`) or by the rules' draws, which the game itself ends on.
  */
 export function wonAfter(e: Endgame, after: Position, promoted: boolean): boolean {
@@ -202,6 +212,7 @@ export function wonAfter(e: Endgame, after: Position, promoted: boolean): boolea
   if (after.isCheckmate()) return true;
   if (e.until === 'promote') return promoted;
   if (e.until === 'bare') return bare(after, after.turn);
+  if (e.until === 'convert') return promoted || bare(after, after.turn) || materialFor(after, after.turn === 'white' ? 'black' : 'white') >= CONVERT_LEAD;
   return false;
 }
 
@@ -370,10 +381,10 @@ export function standingOf(goal: Goal, attempts: readonly Attempt[], now: number
   return next <= now ? { state: 'due', ...base } : { state: 'later', next, ...base };
 }
 
-/** The attempts at each endgame, from practice results (`practice` events) at their start positions. */
-export function attemptsByEndgame(results: readonly { key: PositionKey; res: Attempt['res']; preset?: string; t: number }[], keyOf: (e: Endgame) => PositionKey | undefined): Map<string, Attempt[]> {
+/** The attempts at each endgame of `list`, from practice results (`practice` events) at their start positions. */
+export function attemptsByEndgame(results: readonly { key: PositionKey; res: Attempt['res']; preset?: string; t: number }[], keyOf: (e: Pick<Endgame, 'id' | 'fen'>) => PositionKey | undefined, list: readonly Pick<Endgame, 'id' | 'fen'>[] = ENDGAMES): Map<string, Attempt[]> {
   const byKey = new Map<string, string>();
-  for (const e of ENDGAMES) {
+  for (const e of list) {
     const k = keyOf(e);
     if (k) byKey.set(k, e.id);
   }
@@ -389,9 +400,9 @@ export function attemptsByEndgame(results: readonly { key: PositionKey; res: Att
   return out;
 }
 
-/** The next endgame to play: the first due in the list's order, else the first never tried. */
-export function nextEndgame(standings: ReadonlyMap<string, Standing>, after?: string): Endgame | undefined {
-  const order = after ? [...ENDGAMES.slice(ENDGAMES.findIndex((e) => e.id === after) + 1), ...ENDGAMES] : ENDGAMES;
+/** The next endgame of `list` to play: the first due in the list's order, else the first never tried. */
+export function nextEndgame<E extends { id: string } = Endgame>(standings: ReadonlyMap<string, Standing>, after?: string, list: readonly E[] = ENDGAMES as unknown as readonly E[]): E | undefined {
+  const order = after ? [...list.slice(list.findIndex((e) => e.id === after) + 1), ...list] : list;
   const pick = (state: Standing['state']) => order.find((e) => e.id !== after && (standings.get(e.id)?.state ?? 'new') === state);
   return pick('due') ?? pick('new');
 }

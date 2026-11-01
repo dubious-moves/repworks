@@ -2031,3 +2031,19 @@ The technical calls, each with its reason:
   to practice the method fully"; in a drawn position every move scores 0.00, and the play-outs
   also showed the attacker repeating checks until the app called a threefold repetition. One rule
   for every draw drill, not a script per endgame.
+
+## Revision of 2026-11-01 (repertoire endgames, PLAN.md §5.149)
+- **The endgames the repertoire leads to, on the Endgames page**: gathered from the games the
+  explorer names at each line end, each walked to its first quiet endgame position with the user
+  to move, and played for a goal as the theoretical endgames are. Not in the storm: an endgame is
+  technique over many moves, which the endgame drill trains and a one-move storm card doesn't.
+  Why: the owner's request of 2026-11-01, with the place left to Claude.
+- **An endgame**: at most two pieces a side besides king and pawns, four in all, worth 20 at most,
+  with a pawn. **The goal** from Stockfish's score for the user: +3 or better a win (a pawn
+  queened, a bare king, or 5 points of material ahead), −1 to +1.5 a draw held for 15 moves; none
+  in between or below, so each goal starts a pawn clear of the judge's ±2. **Six categories** by
+  the pieces: rook endings, pawn endings, minor pieces, rook and minor piece, queens and two rooks,
+  material imbalances.
+- **Kept on the device** (D5's cache tier); the tries are §5.145's `practice` events, so they
+  cross devices with no new data format. Sharing the positions through the data repo is left for
+  the owner to ask for.

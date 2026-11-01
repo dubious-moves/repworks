@@ -19,6 +19,7 @@ import { RepertoireCheckScreen } from './RepertoireCheck.tsx';
 import { ChecklistDrill, ChecklistScreen } from './Checklist.tsx';
 import { EndgamesScreen } from './Endgames.tsx';
 import { endgameStandings } from '../app/endgames.ts';
+import { loadRepEndgames, repStandings } from '../app/repertoireEndgames.ts';
 import { Debug } from './Debug.tsx';
 import { Guard } from './Guard.tsx';
 import { IdeasScreen } from './Ideas.tsx';
@@ -267,10 +268,12 @@ function Home() {
 
 /** Endgames (§5.145), with how many are due: none tried yet says nothing more. */
 function EndgamesLink() {
-  const standings = [...endgameStandings(decidingNow()).values()];
+  // The repertoire's endgames (§5.149) count once read.
+  useEffect(() => void loadRepEndgames(), []);
+  const standings = [...endgameStandings(decidingNow()).values(), ...repStandings(decidingNow()).values()];
   const due = standings.filter((s) => s.state === 'due').length;
   return (
-    <a class="button secondary" href="#/endgames" title="The theoretical endgames, each played for its goal against Stockfish">
+    <a class="button secondary" href="#/endgames" title="The theoretical endgames and your repertoire's, each played for its goal">
       Endgames{due > 0 && <span class="home-tool-count"> · {due} due</span>}
     </a>
   );

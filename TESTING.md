@@ -1098,3 +1098,23 @@ q_extension (or give it to a session with q_extension attached), then run
   the pick by unit tests, the page by Playwright on desktop and the emulated phone with the real
   Maia in Chromium and a fake Stockfish. Not on your devices, and not with the real Stockfish in
   the browser.
+
+## Repertoire endgames (§5.149, 2026-11-01)
+
+- Endgames → From your repertoire → Gather from your repertoire (needs the Lichess login the
+  storm's gather uses). It walks every line end's named games: how long does it take on the
+  desktop and on the phone, and how many does it keep? Is the progress line clear?
+- The list by category: are the categories the right ones, and are the positions ones worth
+  drilling (an endgame you'd recognise from your openings, not a random late-game mess)? Say
+  which are not, with the position: the condition (four pieces at most, a pawn, the first quiet
+  moment with you to move) and the goal's bands (+3 a win, −1 to +1.5 a draw) can move.
+- Play a few of each goal: a win ends when a pawn queens or you're 5 points up: is that the
+  right moment to call it won? A draw is held for 15 moves: enough?
+- Is the source under the board (chapter, line, players, moves after your line's end, the game's
+  link) useful? Remove, the category chips, Next within the category.
+- Gather more: older games (4 months back each time a gather finishes): does it keep finding new
+  ones? On a second device the list is empty until it gathers too, but the tries made on the first
+  show once it has the same positions.
+- Checked: the condition, categories, walk and goal by unit tests and over 17 fixture games with
+  Stockfish 18 lite under Node; the page by Playwright with a fake explorer, game export and engine
+  (desktop and emulated phone). Not against the real explorer, not on your devices.

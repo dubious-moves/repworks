@@ -113,6 +113,8 @@ function ask(m: DistributiveOmit<Extract<ToWorker, { type: 'stormGames' | 'gameP
   });
 }
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+/** The worker's explorer, game exports and ChessDB, as the gathers ask them (the repertoire endgames' too, §5.149). */
+export const stormRequest = ask;
 
 export interface Spent {
   explorer: number;

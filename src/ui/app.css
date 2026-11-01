@@ -6178,3 +6178,25 @@ a.button.disabled {
 .endgame-fifty {
   color: var(--warn);
 }
+
+/* The repertoire's endgames (Endgames.tsx, PLAN.md §5.149): the categories as chips, each item's source. */
+.endgame-repertoire > p {
+  margin-top: 0;
+}
+
+.endgame-cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 12px;
+}
+
+.endgame-source {
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.endgame-remove {
+  align-self: flex-start;
+  font-size: 0.85rem;
+}

@@ -39,7 +39,7 @@
 //                                       a checklist line's drill at a difficulty (§5.62), the line by
 //                                       its moves (§5.130); the old #/checklist/<sid>/<n> opens the list
 //   #/endgames                          the theoretical endgames, each played for its goal (§5.145)
-//   #/endgames/<id>                     one endgame, played against Stockfish
+//   #/endgames/<id>                     one endgame, played for its goal (a repertoire one: r-<hash>, §5.149)
 //   #/migrate                           the migration from mistake-lab (§5.64)
 // A setup link (#setup?…) is read and removed before any of this (src/app/setup.ts).
 import { isId } from '../study/ids.ts';

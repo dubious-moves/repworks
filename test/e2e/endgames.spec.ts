@@ -9,11 +9,16 @@
 // And the opponent (§5.147): Stockfish alone without Maia, then, Maia downloaded from the list, Maia
 // 2600's move (the real network) once Stockfish, searching it alone, finds it sound. And a draw's
 // attacker (§5.148) not going back to a position seen, and pushing its pawn once a third is held.
+// And the repertoire's endgames (§5.149): gathered from two games the fake explorer names at every
+// line end (each walked to its first quiet endgame position past 3...cxd4, scored by the fake
+// Stockfish: a draw and a win), listed by category, one played and its hint counted, kept over a
+// reload, filtered, and one removed.
 import { test, expect, type Page } from '@playwright/test';
 import type { FakeGit } from '../support/fakeGit.ts';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
 import { clickSquare } from './board.ts';
 import { commands, fakeEngine } from './engine.ts';
+import { lichessLogin } from './explorer.ts';
 import { serveGithub, world } from './github.ts';
 import { serveSite, type SiteServer } from './server.ts';
 
@@ -59,9 +64,23 @@ const HOLD = {
   a3: '8/5k2/8/5K2/4P3/8/8/8 w - -',
 };
 
+/**
+ * Two legal games past the fixture's 3...cxd4 (made for the tests by a random walk that prefers
+ * captures, not real ones), and Black's first quiet endgame position in each: R+N against R+N
+ * after 23.Ra5 (scored −0.40: a draw to hold), two rooks each after 18.Ke3 (+4.50: a win).
+ */
+const REP_GAMES = [
+  ['RepGameA', 'e4 c5 Nf3 d6 d4 cxd4 Qxd4 Na6 Bxa6 bxa6 O-O Qb6 Qxd6 exd6 Ne5 Qxb2 Nxf7 Bd7 Bxb2 Kxf7 Bxg7 Kxg7 Rd1 Bh3 Rxd6 Bxg2 Rxa6 Bxe4 Rxa7+ Rxa7 h4 Bxc2 Nc3 Rxa2 Rxa2 Bf5 Kg2 Ba3 Rxa3 Ne7 Kf3 Be4+ Kxe4 Ra8 Ra5 Nf5 Ne2'],
+  ['RepGameB', 'e4 c5 Nf3 d6 d4 cxd4 Ba6 Nxa6 O-O f6 Qxd4 Nh6 Bxh6 gxh6 Qxd6 Qxd6 Nd4 Qa3 Nxa3 Nc5 Rad1 Nxe4 Rb1 Nxf2 Kxf2 Bf5 Nxf5 O-O-O Nxe7+ Bxe7 Nc4 Bd6 Nxd6+ Rxd6 Ke3 Rd3+ Kf2 Rd4'],
+] as const;
+const REP_DRAW = 'r7/4n1kp/8/R7/4K2P/2N5/5P2/8 b - -';
+const REP_WIN = '2k4r/pp5p/3r1p1p/8/8/4K3/PPP3PP/1R3R2 b - -';
+
 let site: SiteServer;
 test.beforeAll(async () => {
   const extra: Record<string, [number, number, string][]> = {
+    [REP_DRAW]: [[1, -40, 'a8a5 c3a4']],
+    [REP_WIN]: [[1, 450, 'd6d2 b1d1']],
     // The user's moves hold (0.00), the others lose; the attacker's first line is Kd5 where the
     // board is A1 (twice: Kd5 a repetition the second time, Kf5 then), Ke5 at A2, Kg5 at A3 with
     // e5 within 0.30.
@@ -139,9 +158,11 @@ test.afterAll(async () => {
   await site.close();
 });
 
-async function setUp(page: Page): Promise<FakeGit> {
+/** Signed in, synced; `routes` laid over GitHub's (a later route wins). */
+async function setUp(page: Page, routes?: () => Promise<void>): Promise<FakeGit> {
   const { git, github } = world();
   await serveGithub(page, github);
+  await routes?.();
   await page.goto(`${site.url}#setup?repo=${encodeURIComponent(REPO)}&token=${TOKEN}&name=desktop`);
   await expect(page.locator('.chip')).toHaveText(/^synced/);
   return git;
@@ -322,4 +343,88 @@ test('a draw’s attacker: no going back to a position seen, and the pawn pushed
   await play('e7', 'f7', 8);
   await expect(moves).toContainText('4. Kf5 Kf7 5. e5');
   await expect(game.locator('.train-counters')).toHaveText('Black to play and draw (hold 12 moves) · held 4 of 12');
+});
+
+/** The explorer naming the two games at every line end, and Lichess's export of them. */
+async function serveGames(page: Page): Promise<string[]> {
+  const requests: string[] = [];
+  const cors = { 'access-control-allow-origin': '*', 'content-type': 'application/json' };
+  await page.route('https://explorer.lichess.org/**', async (route) => {
+    if (route.request().method() === 'OPTIONS') {
+      return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'Authorization', 'access-control-allow-methods': 'GET,OPTIONS' } });
+    }
+    const url = new URL(route.request().url());
+    requests.push(`explorer${url.searchParams.get('until') ? ` until=${url.searchParams.get('until')}` : ''}`);
+    await route.fulfill({ status: 200, headers: cors, body: JSON.stringify({ white: 10, draws: 2, black: 8, moves: [], topGames: REP_GAMES.map(([id]) => ({ id })), recentGames: [] }) });
+  });
+  await page.route('https://lichess.org/api/games/export/**', async (route) => {
+    requests.push(`export ${route.request().postData()}`);
+    const pgn = REP_GAMES.map(([id, moves]) => `[Event "Rated blitz game"]\n[GameId "${id}"]\n[White "Alice"]\n[Black "Bob"]\n[Result "*"]\n\n${moves} *\n\n\n`).join('');
+    await route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*', 'content-type': 'application/x-chess-pgn' }, body: pgn });
+  });
+  return requests;
+}
+
+test('the repertoire’s endgames: gathered from the games at the line ends, by category, played, kept, removed', async ({ page }) => {
+  test.setTimeout(90_000);
+  await lichessLogin(page);
+  let requests: string[] = [];
+  const git = await setUp(page, async () => void (requests = await serveGames(page)));
+  await page.getByRole('link', { name: 'Endgames' }).click();
+  const section = page.getByTestId('endgame-repertoire');
+  await expect(section.getByRole('heading', { name: 'From your repertoire' })).toBeVisible();
+  await section.getByRole('button', { name: 'Gather from your repertoire' }).click();
+  // Three line ends, each naming both games; only 3...cxd4's games reach it. A draw and a win kept.
+  await expect(page.getByTestId('rep-endgame-gather')).toHaveText('Every line end walked: 2 kept from 6 games. The next gather reads older games.', { timeout: ENGINE_MS * 10 });
+  expect(requests.filter((r) => r === 'explorer')).toHaveLength(3);
+  expect(requests.filter((r) => r.startsWith('export'))).toHaveLength(3);
+  await expect(page.getByTestId('rep-endgame-counts')).toHaveText('2 kept · 0 due · 2 new');
+  const items = section.locator('.endgame-item');
+  await expect(items).toHaveCount(2);
+  // Rook and minor piece before queens and two rooks.
+  const draw = items.nth(0);
+  await expect(draw.locator('.endgame-title')).toHaveText('R+N vs R+N · pawns 1 v 2');
+  await expect(draw).toContainText('Black to play and draw (hold 15 moves)');
+  await expect(draw.locator('.endgame-source')).toHaveText('Main line, …2. Nf3 d6 3. d4 cxd4');
+  await expect(items.nth(1).locator('.endgame-title')).toHaveText('R+R vs R+R · pawns 5 v 5');
+  await expect(items.nth(1)).toContainText('Black to play and win (queen a pawn or go 5 points up)');
+  await expect(section.getByRole('button', { name: /^Rook and minor piece/ })).toHaveText('Rook and minor piece 1');
+  await expect(section.getByRole('button', { name: /^Rook endings/ })).toBeDisabled();
+
+  // Played: the drill as the theoretical ones', its source under the board; a hint counts the try missed.
+  await section.getByTestId('rep-endgame-next').click();
+  await expect(page).toHaveURL(/#\/endgames\/r-[0-9a-f]{8}$/);
+  const game = page.getByTestId('endgame-game');
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  await expect(game.locator('.train-counters')).toHaveText('Black to play and draw (hold 15 moves) · held 0 of 15');
+  await expect(page.getByTestId('endgame-source')).toContainText('From Main line, …2. Nf3 d6 3. d4 cxd4: Alice–Bob, move 23, 20 moves after your line’s end (after Ra5). Stockfish at the start: -0.40.');
+  await expect(page.locator('.study-title')).toHaveText('Rook and minor piece · R+N vs R+N · pawns 1 v 2');
+  await game.getByRole('button', { name: 'Hint' }).click();
+  await expect(game).toContainText('This try counts as missed: play it out, or start again.');
+  await expect(page.locator('.chip')).toHaveText('1 change waiting');
+  await page.locator('.chip').click();
+  await expect.poll(() => endgameEvents(git).length, { timeout: 15_000 }).toBe(1);
+  expect(endgameEvents(git)[0]).toMatchObject({ card: `x|${REP_DRAW}`, res: 'loss', preset: 'endgame', mv: 0 });
+
+  // Back on the list, and after a reload: kept on the device, the missed one due.
+  await page.locator('.chapter-head .back').click();
+  await page.reload();
+  await expect(page.getByTestId('rep-endgame-counts')).toHaveText('2 kept · 1 due · 1 new');
+  await expect(section.locator('[data-category="rook-minor"] [data-testid="endgame-standing"]')).toHaveText('Due · missed last time ✗');
+  await expect(section.getByTestId('rep-endgame-next')).toHaveText('Next due: R+N vs R+N · pawns 1 v 2');
+
+  // A category chosen; one removed.
+  await section.getByRole('button', { name: /^Queens and two rooks/ }).click();
+  await expect(items).toHaveCount(1);
+  await expect(page.getByTestId('rep-endgame-counts')).toHaveText('1 kept · 0 due · 1 new');
+  await items.getByRole('button', { name: 'Remove' }).click();
+  await expect(items).toHaveCount(0);
+  await section.getByRole('button', { name: /^All/ }).click();
+  await expect(items).toHaveCount(1);
+
+  // Gathered again: older games asked for, none new.
+  await section.getByRole('button', { name: 'Gather more' }).click();
+  await expect(page.getByTestId('rep-endgame-gather')).toContainText('Every line end walked (games up to ', { timeout: ENGINE_MS * 10 });
+  expect(requests.filter((r) => r.startsWith('explorer until='))).toHaveLength(3);
+  expect(requests.filter((r) => r.startsWith('export'))).toHaveLength(3);
 });
