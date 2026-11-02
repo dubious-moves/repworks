@@ -1118,3 +1118,23 @@ q_extension (or give it to a session with q_extension attached), then run
 - Checked: the condition, categories, walk and goal by unit tests and over 17 fixture games with
   Stockfish 18 lite under Node; the page by Playwright with a fake explorer, game export and engine
   (desktop and emulated phone). Not against the real explorer, not on your devices.
+
+## More endgames (§5.150, 2026-11-02)
+
+- Home → Endgames: 23 positions in six groups, two of them new (Rook against a pawn or a minor
+  piece; Minor pieces). On the phone the page is long now: is it still easy to find one, or would
+  the groups be better folded, or with their own "Next"?
+- Play the new ones (the square of the pawn, the rook's pawn, Vancura, rook against a pawn, knight
+  and bishop against the rook, the wrong bishop, knight against a pawn, opposite bishops, queen
+  against a rook's and a bishop's pawn): is the first move the decision the title promises, and
+  does the method read right? Is any good move stopped as a slip? Say which, with the position.
+- The two bishops' and the bishop and knight's mates are judged on their own line (+1.00 and
+  +0.50, Stockfish scoring them about +2.4 and +1.6): a hung bishop or knight is stopped, a slow
+  move isn't. The bishop and knight takes up to about 30 moves from this start; past 30 moves
+  without a capture the fifty-move count shows. Does Maia defend them the way a person would
+  (running for the wrong corner)?
+- Rook against a pawn: won when the pawn falls, "The pawn has fallen: the rest is a rook mate."
+- Checked: every start's first moves at depths 16 and 18 and play-outs with the app's judge and
+  opponent under Node (Stockfish 18 lite, Maia 3; `scripts/endgame-check.ts`, PLAN.md §5.150), the
+  pages by unit tests and Playwright with a fake engine (desktop and emulated phone), a screenshot
+  of the list in headless Chromium. Not on your devices, not with the real engine in the browser.

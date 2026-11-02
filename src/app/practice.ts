@@ -31,7 +31,7 @@ import { readSaved, resumable, type Saved } from '../core/games/resume.ts';
 import { covered, scanCandidate, tacticCandidates, TACTIC, type DetectedTactic, type Pv } from '../core/games/detect.ts';
 import type { Color } from '../core/games/record.ts';
 import { historyCard, practiceCard } from '../core/progress/cards.ts';
-import { ENDGAME_PRESET, firstSlip, GOAL_CP, held, keepsGoal, MAIA_ELO, MAIA_MIN, MAIA_TOP, materialFor, opponentPick, pawnPushes, pushNow, slips, wonAfter, type Endgame, type OpponentLine } from '../core/endgames/endgames.ts';
+import { ENDGAME_PRESET, firstSlip, GOAL_CP, held, keepsGoal, lineOf, MAIA_ELO, MAIA_MIN, MAIA_TOP, materialFor, opponentPick, pawnPushes, pushNow, slips, wonAfter, type Endgame, type OpponentLine } from '../core/endgames/endgames.ts';
 import type { Grade } from '../core/progress/events.ts';
 import { positionOf } from '../core/storm/walk.ts';
 import { onWorker, postToWorker } from './explorer.ts';
@@ -267,7 +267,7 @@ async function endgameReply(fen: string, e: Endgame, userMoves: number, seen: Re
   const upTo = candidates.findIndex((m) => m.uci === base);
   const rest = [...new Set([...pushes, ...(upTo < 0 ? candidates : candidates.slice(0, upTo)).map((m) => m.uci)])].filter((u) => !lines.some((l) => l.pv[0] === u));
   const more = rest.length ? scored(await search(fen, rest.length, depth, 6000, rest, true)) : [];
-  const lineOf = (uci: string) => [...lines, ...more].find((l) => l.pv[0] === uci);
+  const lineFor = (uci: string) => [...lines, ...more].find((l) => l.pv[0] === uci);
   const after = (uci: string) => {
     const p = pos.clone();
     const m = parseUciMove(p, uci);
@@ -281,7 +281,7 @@ async function endgameReply(fen: string, e: Endgame, userMoves: number, seen: Re
     const key = p && keyFen(makeFen(p.toSetup()))?.key;
     return !!key && seen.has(key);
   };
-  const pick = opponentPick(goal, lines, candidates, lineOf, material, over, { pushes, repeats });
+  const pick = opponentPick(goal, lines, candidates, lineFor, material, over, { pushes, repeats, line: lineOf(e) });
   return pick ? { uci: pick.uci, source: pick.maia ? `Maia ${MAIA_ELO}` : 'Stockfish', dbFailed: false } : undefined;
 }
 
@@ -399,7 +399,7 @@ function judgeAt(g: number, i: number): Promise<void> {
   if (!p || !mv) return Promise.resolve();
   pendingBy.set(g, (pendingBy.get(g) ?? 0) + 1);
   const e = p.setup.endgame;
-  const job = judge(mv.fenBefore, mv.uci, mv.fen, e && ((best, after) => slips(e.goal, best, after))).then((j) => {
+  const job = judge(mv.fenBefore, mv.uci, mv.fen, e && ((best, after) => slips(e.goal, best, after, lineOf(e)))).then((j) => {
     patch(g, (q) => {
       const moves = [...q.moves];
       const { judging: _j, ...rest } = moves[i]!;
@@ -947,12 +947,12 @@ function endgameJudged(g: number): void {
   const from = q.playedOn ?? 0;
   // A judge that gave nothing (Stockfish gone): nothing can be told, nothing counts.
   if (q.moves.some((m, i) => i >= from && m.isUser && !m.judging && m.afterCp === undefined)) return finish(g, 'interrupted');
-  const at = firstSlip(e.goal, q.moves, from);
+  const at = firstSlip(e.goal, q.moves, from, lineOf(e));
   if (typeof at === 'number') return slipAt(g, at);
   if (at === 'pending' || !q.ending || q.moves.some((m) => m.isUser && m.judging)) return;
   // The goal reached, as its last move's judge has it: a promotion that loses the new queen, say, isn't.
   const last = q.moves.at(-1)!;
-  if (q.ending === 'goal' && !(last.afterCp !== undefined && keepsGoal(e.goal, last.afterCp))) {
+  if (q.ending === 'goal' && !(last.afterCp !== undefined && keepsGoal(e.goal, last.afterCp, lineOf(e)))) {
     replace(g, (r) => {
       const { ending: _e, ...rest } = r;
       return rest;

@@ -12,7 +12,7 @@ import { maiaDialog } from '../app/maia.ts';
 import { analyseFrom, entryKey, open } from '../app/mode.ts';
 import { canTakeBack, leavePractice, parkPractice, playOnAfterSlip, practice, practiceHint, practiceMove, showSlipMove, stopPractice, takeBack, takeUpPractice, type PracticeGame } from '../app/practice.ts';
 import { decidingNow } from '../app/time.ts';
-import { CONVERT_LEAD, endgameById, ENDGAMES, GROUPS, MAIA_ELO, nextEndgame, sideOf, solvedBy, taskOf, type Endgame, type Standing } from '../core/endgames/endgames.ts';
+import { bareTarget, CONVERT_LEAD, endgameById, ENDGAMES, GROUPS, MAIA_ELO, nextEndgame, sideOf, solvedBy, taskOf, type Endgame, type Standing } from '../core/endgames/endgames.ts';
 import { asEndgame, CATEGORIES, categoryById, isRepertoireId, REP, type Category, type RepertoireEndgame } from '../core/endgames/repertoire.ts';
 import { lineTail } from '../core/storm/sources.ts';
 import { positionOf } from '../core/storm/walk.ts';
@@ -515,7 +515,7 @@ function endText(p: PracticeGame, e: Endgame): string {
       return `Checkmate in ${n} move${n === 1 ? '' : 's'}.`;
     case 'goal':
       if (e.goal === 'draw') return `Held for ${n} moves: the draw is safe.`;
-      if (e.until === 'bare') return 'The pawn has fallen: the rest is a queen mate.';
+      if (e.until === 'bare') return bareText(e, p);
       if (e.until === 'convert' && p.moves.at(-1)?.uci.length !== 5) return `${CONVERT_LEAD} points of material ahead: the win is home.`;
       return 'The pawn queens: the win is yours.';
     case 'stalemate':
@@ -535,6 +535,16 @@ function endText(p: PracticeGame, e: Endgame): string {
     default:
       return 'Over.';
   }
+}
+
+/** A bare king reached: "The pawn has fallen: the rest is a queen mate." */
+function bareText(e: Endgame, p: PracticeGame): string {
+  const target = bareTarget(e);
+  const fallen = `${target[0]!.toUpperCase()}${target.slice(1)} ${target === 'the pawns' ? 'have' : 'has'} fallen`;
+  const board = positionOf(p.moves.at(-1)?.fen ?? e.fen)?.board;
+  const mine = board?.[p.setup.color];
+  const piece = mine && board ? (mine.intersect(board.queen).nonEmpty() ? 'queen' : mine.intersect(board.rook).nonEmpty() ? 'rook' : undefined) : undefined;
+  return piece ? `${fallen}: the rest is a ${piece} mate.` : `${fallen}: the win is yours.`;
 }
 
 /** "3.Kd2", "3…Kd7": a move with its number, from the position before it. */

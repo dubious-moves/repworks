@@ -12,7 +12,10 @@
 // And the repertoire's endgames (§5.149): gathered from two games the fake explorer names at every
 // line end (each walked to its first quiet endgame position past 3...cxd4, scored by the fake
 // Stockfish: a draw and a win), listed by category, one played and its hint counted, kept over a
-// reload, filtered, and one removed.
+// reload, filtered, and one removed. And the endgames added in §5.150: the list's new groups; the
+// bishop and knight's own goal line (+0.50: Stockfish scores the whole mate about +1.6), a hung
+// bishop stopped as a slip where +2's line would stop nothing; the rook against a pawn played to its
+// end, the king first, the pawn won.
 import { test, expect, type Page } from '@playwright/test';
 import type { FakeGit } from '../support/fakeGit.ts';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
@@ -73,6 +76,30 @@ const REP_GAMES = [
   ['RepGameA', 'e4 c5 Nf3 d6 d4 cxd4 Qxd4 Na6 Bxa6 bxa6 O-O Qb6 Qxd6 exd6 Ne5 Qxb2 Nxf7 Bd7 Bxb2 Kxf7 Bxg7 Kxg7 Rd1 Bh3 Rxd6 Bxg2 Rxa6 Bxe4 Rxa7+ Rxa7 h4 Bxc2 Nc3 Rxa2 Rxa2 Bf5 Kg2 Ba3 Rxa3 Ne7 Kf3 Be4+ Kxe4 Ra8 Ra5 Nf5 Ne2'],
   ['RepGameB', 'e4 c5 Nf3 d6 d4 cxd4 Ba6 Nxa6 O-O f6 Qxd4 Nh6 Bxh6 gxh6 Qxd6 Qxd6 Nd4 Qa3 Nxa3 Nc5 Rad1 Nxe4 Rb1 Nxf2 Kxf2 Bf5 Nxf5 O-O-O Nxe7+ Bxe7 Nc4 Bd6 Nxd6+ Rxd6 Ke3 Rd3+ Kf2 Rd4'],
 ] as const;
+/** Bishop and knight: 1.Kd2 Kd4, then 2.Bc4?? hanging the bishop (Kxc4: a knight can't mate). */
+const BN = {
+  u0: '8/8/8/4k3/8/8/8/1N2KB2 w - -',
+  a1: '8/8/8/4k3/8/8/3K4/1N3B2 b - -',
+  u1: '8/8/8/8/3k4/8/3K4/1N3B2 w - -',
+  bc4: '8/8/8/8/2Bk4/8/3K4/1N6 b - -',
+};
+/**
+ * Rook against a pawn along Stockfish's line (1.Ke4 Kc4 2.Rc8+ Kb4 3.Kd3 Ka3 4.Kc3 Ka2 5.Ra8+ Kb1
+ * 6.Kxb3): each position, the lines there (the user's three, the defence's one), the move played.
+ */
+const ROOK_PAWN: [string, [number, number, string][], string?][] = [
+  ['3R4/8/8/1k3K2/8/1p6/8/8 w - -', [[1, 5169, 'f5e4 b5c4'], [2, 3, 'd8h8 b5c4'], [3, 0, 'd8b8 b5c4']], 'f5e4'],
+  ['3R4/8/8/1k6/4K3/1p6/8/8 b - -', [[1, -5169, 'b5c4 d8c8']]],
+  ['3R4/8/8/8/2k1K3/1p6/8/8 w - -', [[1, 2000, 'd8c8 c4b4'], [2, 1800, 'e4e3 b3b2'], [3, 0, 'd8b8 c4c3']], 'd8c8'],
+  ['2R5/8/8/8/2k1K3/1p6/8/8 b - -', [[1, -2000, 'c4b4 e4d3']]],
+  ['2R5/8/8/8/1k2K3/1p6/8/8 w - -', [[1, 2500, 'e4d3 b4a3'], [2, 2400, 'e4d4 b3b2'], [3, 0, 'c8b8 b4c3']], 'e4d3'],
+  ['2R5/8/8/8/1k6/1p1K4/8/8 b - -', [[1, -2500, 'b4a3 d3c3']]],
+  ['2R5/8/8/8/8/kp1K4/8/8 w - -', [[1, 5000, 'd3c3 a3a2'], [2, 4000, 'c8a8 a3b2'], [3, 0, 'd3d2 b3b2']], 'd3c3'],
+  ['2R5/8/8/8/8/kpK5/8/8 b - -', [[1, -5000, 'a3a2 c8a8']]],
+  ['2R5/8/8/8/8/1pK5/k7/8 w - -', [[1, 6000, 'c8a8 a2b1'], [2, 5000, 'c3b4 b3b2'], [3, 0, 'c8c4 b3b2']], 'c8a8'],
+  ['R7/8/8/8/8/1pK5/k7/8 b - -', [[1, -6000, 'a2b1 c3b3']]],
+  ['R7/8/8/8/8/1pK5/8/1k6 w - -', [[1, 7000, 'c3b3 b1c1'], [2, 6500, 'a8b8 b1c1'], [3, 6000, 'a8a3 b1b2']], 'c3b3'],
+];
 const REP_DRAW = 'r7/4n1kp/8/R7/4K2P/2N5/5P2/8 b - -';
 const REP_WIN = '2k4r/pp5p/3r1p1p/8/8/4K3/PPP3PP/1R3R2 b - -';
 
@@ -150,7 +177,28 @@ test.beforeAll(async () => {
       [3, 0, 'e2e4 d5e4'],
     ],
     [AFTER_KD2_KE3]: [[1, 0, 'd5e5 e3d3']],
+    // Every move of the bishop and knight's mate about +1.6; Bc4 hangs the bishop (0.00), confirmed
+    // by the deeper search of the lines' moves and it.
+    [BN.u0]: [
+      [1, 165, 'e1d2 e5d4'],
+      [2, 164, 'e1f2 e5e4'],
+      [3, 164, 'e1e2 e5d4'],
+    ],
+    [BN.a1]: [[1, -165, 'e5d4 f1d3']],
+    [BN.u1]: [
+      [1, 160, 'f1d3 d4c5'],
+      [2, 158, 'b1c3 d4c4'],
+      [3, 157, 'd2e2 d4e4'],
+    ],
+    [BN.bc4]: [[1, 0, 'd4c4 d2e3']],
+    [`${BN.u1}|f1d3 b1c3 d2e2 f1c4`]: [
+      [1, 160, 'f1d3 d4c5'],
+      [2, 158, 'b1c3 d4c4'],
+      [3, 157, 'd2e2 d4e4'],
+      [4, 0, 'f1c4 d4c4'],
+    ],
   };
+  for (const [key, lines] of ROOK_PAWN) extra[key] = lines;
   for (const [key, uci, others] of BREAKTHROUGH) extra[key] = [[1, key.includes(' w ') ? 700 : -700, uci], ...(others ?? []).map((m, i): [number, number, string] => [i + 2, 0, m])];
   site = await serveSite({ engine: fakeEngine(ENGINE_MS, extra) });
 });
@@ -184,7 +232,11 @@ test('an endgame: a move that lets the win slip, found after playing on, taken b
   const git = await setUp(page);
   await page.getByRole('link', { name: 'Endgames' }).click();
   await expect(page).toHaveURL(/#\/endgames$/);
-  await expect(page.getByTestId('endgame-counts')).toHaveText('0 due · 10 new');
+  await expect(page.getByTestId('endgame-counts')).toHaveText('0 due · 23 new');
+  // Six groups, the two added in §5.150 among them.
+  await expect(page.locator('#endgame-group-rook-vs')).toHaveText('Rook against a pawn or a minor piece');
+  await expect(page.locator('#endgame-group-minors')).toHaveText('Minor pieces');
+  await expect(page.locator('[data-endgame="rook-vs-pawn"] .muted').first()).toHaveText('White to play and win (win the pawn)');
   await expect(page.getByTestId('endgame-next')).toHaveText('Next new: Queen mate');
   await expect(page.getByTestId('endgame-opponent')).toContainText('The opponent: Stockfish alone.');
   await page.getByRole('link', { name: 'Take the opposition', exact: true }).click();
@@ -260,7 +312,7 @@ test('an endgame: a move that lets the win slip, found after playing on, taken b
   await page.locator('.chapter-head .back').click();
   await expect(page).toHaveURL(/#\/endgames$/);
   await expect(page.locator('[data-endgame="opposition"] [data-testid="endgame-standing"]')).toHaveText('Due · missed last time ✗');
-  await expect(page.getByTestId('endgame-counts')).toHaveText('1 due · 9 new');
+  await expect(page.getByTestId('endgame-counts')).toHaveText('1 due · 22 new');
   await expect(page.getByTestId('endgame-next')).toHaveText('Next due: Take the opposition');
   await expect(page.locator('.chip')).toHaveText(/^synced/);
   expect(endgameEvents(git).length).toBe(1);
@@ -292,6 +344,50 @@ test('an endgame solved first time: the breakthrough along Stockfish’s line, t
   expect(endgameEvents(git)[0]).toMatchObject({ card: `x|${BREAKTHROUGH[0]![0]}`, res: 'win', preset: 'endgame', mv: 5 });
   await page.evaluate(() => (location.hash = '#/endgames'));
   await expect(page.locator('[data-endgame="breakthrough"] [data-testid="endgame-standing"]')).toHaveText('Solved once · back tomorrow ✓');
+});
+
+test('bishop and knight: its own goal line, a hung bishop stopped though every move scores under +2', async ({ page }) => {
+  await setUp(page);
+  await page.evaluate(() => (location.hash = '#/endgames/bishop-knight'));
+  const game = page.getByTestId('endgame-game');
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  await expect(game.locator('.train-counters')).toHaveText('White to play and win (mate)');
+  // Kd2 at +1.65: kept, and answered.
+  await clickSquare(page, 'e1', 'white');
+  await clickSquare(page, 'd2', 'white');
+  await expect(game).toHaveAttribute('data-moves', '2');
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  // Bc4 hangs the bishop: 0.00 from +1.60, stopped (on +2's line nothing here could be).
+  await clickSquare(page, 'f1', 'white');
+  await clickSquare(page, 'c4', 'white');
+  await expect(game).toHaveAttribute('data-phase', 'slip', { timeout: ENGINE_MS * 8 });
+  await expect(page.getByTestId('endgame-feedback')).toHaveText('Bc4 lets the win slip. Take it back and find a better move.');
+  await page.getByTestId('endgame-takeback').click();
+  await expect(game).toHaveAttribute('data-moves', '2');
+  await expect(game).toHaveAttribute('data-phase', 'user');
+});
+
+test('rook against a pawn: the king first, the pawn won, the rest a rook mate', async ({ page }) => {
+  test.setTimeout(90_000);
+  await setUp(page);
+  await page.evaluate(() => (location.hash = '#/endgames/rook-vs-pawn'));
+  const game = page.getByTestId('endgame-game');
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  await expect(game.locator('.train-counters')).toHaveText('White to play and win (win the pawn)');
+  const moves = ROOK_PAWN.filter(([, , uci]) => uci).map(([, , uci]) => uci!);
+  for (const [i, uci] of moves.entries()) {
+    await clickSquare(page, sq(uci, 0), 'white');
+    await clickSquare(page, sq(uci, 2), 'white');
+    if (i === moves.length - 1) break;
+    await expect(game).toHaveAttribute('data-moves', String(2 * i + 2), { timeout: ENGINE_MS * 4 });
+    await expect(game).toHaveAttribute('data-phase', 'user');
+  }
+  // The pawn taken: the defender's king bare, once the judges are in. Played this fast, each answer
+  // stopped the search of the position before it (the answer goes first, §5.146), so the six judges
+  // run one after another now, a search each.
+  await expect(game).toHaveAttribute('data-phase', 'over', { timeout: ENGINE_MS * 14 });
+  await expect(page.getByTestId('endgame-feedback')).toHaveText('The pawn has fallen: the rest is a rook mate.');
+  await expect(page.getByTestId('endgame-counted')).toHaveText('Solved first time: it comes back in a while.');
 });
 
 test('the opponent: Stockfish alone without Maia; with Maia, its move once Stockfish finds it sound', async ({ page }) => {

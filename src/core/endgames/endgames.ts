@@ -6,8 +6,9 @@
 // the preset `endgame`, and the spacing of the next try is read back from those events. Pure.
 //
 // Every position, its goal and the moves that keep it were checked with the vendored Stockfish 18
-// at the judges' depths (16 and 18) before they were written here (§5.145's table): the goal is
-// kept by a clear margin on one side of `GOAL_CP` and lost by a clear margin on the other.
+// at the judges' depths (16 and 18) before they were written here (§5.145's and §5.150's tables,
+// `scripts/endgame-check.ts`): the goal is kept by a clear margin on one side of its line
+// (`GOAL_CP`, or the endgame's own) and lost by a clear margin on the other.
 import type { Position } from 'chessops/chess';
 import { makeSquare as squareName } from 'chessops/util';
 import type { PositionKey } from '../chess/positionKey.ts';
@@ -20,7 +21,7 @@ export type Goal = 'win' | 'draw';
  * material ahead.
  */
 export type Until = 'mate' | 'promote' | 'bare' | 'convert';
-export type Group = 'mates' | 'pawns' | 'rooks' | 'queen';
+export type Group = 'mates' | 'pawns' | 'rooks' | 'rook-vs' | 'minors' | 'queen';
 
 export interface Endgame {
   id: string;
@@ -33,6 +34,12 @@ export interface Endgame {
   until?: Until;
   /** A draw held for this many of the user's moves counts as held (`goal` draw only). */
   hold?: number;
+  /**
+   * The goal's line for this endgame, in centipawns for the user, where Stockfish scores its won
+   * positions below `GOAL_CP`'s (the bishops' mates, about +2.4 and +1.6 at the judges' depths,
+   * while a hung piece there falls to 0.00): kept at or above it (`lineOf`).
+   */
+  line?: number;
   /** The method, in a few sentences: shown before a first try and on request. */
   idea: string;
 }
@@ -41,6 +48,8 @@ export const GROUPS: readonly { id: Group; title: string }[] = [
   { id: 'mates', title: 'Mating the bare king' },
   { id: 'pawns', title: 'King and pawns' },
   { id: 'rooks', title: 'Rook endings' },
+  { id: 'rook-vs', title: 'Rook against a pawn or a minor piece' },
+  { id: 'minors', title: 'Minor pieces' },
   { id: 'queen', title: 'Queen against pawn' },
 ];
 
@@ -65,6 +74,35 @@ export const ENDGAMES: readonly Endgame[] = [
     goal: 'win',
     until: 'mate',
     idea: 'Cut the king off along a rank or a file with the rook, then bring your king up. When the kings stand face to face, check: the king has to step back a line. When they don’t, make a waiting move with the rook along its line, far from the enemy king. Repeat until it is mated on the edge.',
+  },
+  {
+    id: 'two-bishops',
+    group: 'mates',
+    title: 'Two bishops’ mate',
+    fen: '8/8/8/4k3/8/8/8/2B1KB2 w - - 0 1',
+    goal: 'win',
+    until: 'mate',
+    line: 100,
+    idea: 'Side by side on neighbouring diagonals, the bishops make a wall the king can’t cross. With your king beside them, push the king to the edge and then into a corner: two bishops can only mate there. Keep the bishops out of the king’s reach, a few squares away, and once it is cornered, check that it still has a move before each quiet move.',
+  },
+  {
+    id: 'bishop-knight',
+    group: 'mates',
+    title: 'Bishop and knight mate',
+    fen: '8/8/8/4k3/8/8/8/1N2KB2 w - - 0 1',
+    goal: 'win',
+    until: 'mate',
+    line: 50,
+    idea: 'The mate only comes in a corner of the bishop’s colour, here a8 or h1. Drive the king to the edge with all three pieces. If it runs to a wrong corner (h8 or a1), push it along the edge to a right one: the knight walks a W (from h8 towards a8: f7, e5, d7, c5, b7) while the bishop and your king take the squares it needs. It can take more than 30 moves, so the fifty-move rule leaves little room to wander.',
+  },
+  {
+    id: 'square',
+    group: 'pawns',
+    title: 'The square of the pawn',
+    fen: '8/8/8/6k1/1P6/8/8/7K b - - 0 1',
+    goal: 'draw',
+    hold: 8,
+    idea: 'Can the king catch a pawn on its own? Draw a square from the pawn to its queening rank: from b4, the square b4–f4–f8–b8. A king that can step into it catches the pawn; one that can’t is too late. Here only a step onto the f-file gets in, then walk after the pawn.',
   },
   {
     id: 'king-in-front',
@@ -92,6 +130,15 @@ export const ENDGAMES: readonly Endgame[] = [
     goal: 'draw',
     hold: 12,
     idea: 'Defend from in front of the pawn and keep the opposition: when the white king steps to one side, step to the same side to face it. When the pawn advances, step straight back, never to the side, so you can face the king again. On the last rank, a pawn on the 7th with check leaves you stalemated or wins it.',
+  },
+  {
+    id: 'rook-pawn',
+    group: 'pawns',
+    title: 'Rook’s pawn: the corner holds',
+    fen: '8/3k4/1K6/P7/8/8/8/8 b - - 0 1',
+    goal: 'draw',
+    hold: 10,
+    idea: 'Against a rook’s pawn the defending king draws once it gets to the corner or next to it: it can’t be driven out without stalemate. Kc8! keeps the white king off b7, from where it would shut you out of the corner. Then step between a8, b8 and c8: the pawn never queens.',
   },
   {
     id: 'breakthrough',
@@ -130,6 +177,69 @@ export const ENDGAMES: readonly Endgame[] = [
     idea: 'While the pawn is on the 5th, keep your rook on your third rank (the 6th) so the white king can’t come forward. Once the pawn steps to the 6th, its king has no shelter left in front of it: swing the rook to the far end of the board and check it from behind. Your king stays in front of the pawn.',
   },
   {
+    id: 'vancura',
+    group: 'rooks',
+    title: 'Vancura: attack the pawn from the side',
+    fen: 'R7/6k1/P4r2/1K6/8/8/8/8 b - - 0 1',
+    goal: 'draw',
+    hold: 12,
+    idea: 'A rook’s pawn on the 6th with the white rook in front of it: put your rook on the 6th rank, attacking the pawn from the side, and keep your king on g7 and h7. Only the white king can guard the pawn, and when it comes near, check it from the side until it walks away. If the pawn goes on to a7, take your rook behind it, to the a-file.',
+  },
+  {
+    id: 'rook-vs-pawn',
+    group: 'rook-vs',
+    title: 'Rook against a pawn: the king first',
+    fen: '3R4/8/8/1k3K2/8/1p6/8/8 w - - 0 1',
+    goal: 'win',
+    until: 'bare',
+    idea: 'A rook beats a pawn when its king comes back in time. Count, and bring your king first, the shortest way to the pawn’s path (here Ke4 and Kd3, for c2); a check from the rook only drives the defending king to its pawn, and together they hold. Once your king covers the queening square, the pawn falls.',
+  },
+  {
+    id: 'rook-vs-knight',
+    group: 'rook-vs',
+    title: 'Rook against knight: keep them together',
+    fen: '8/8/8/8/3k4/8/3n4/3K3R b - - 0 1',
+    goal: 'draw',
+    hold: 12,
+    idea: 'A rook against a knight is usually a draw while the knight stays next to its king. Apart, the knight is hunted down, or the king is mated on the edge with the knight in its way. Keep the knight a step from your king, and your king in the centre, away from the edges and corners.',
+  },
+  {
+    id: 'rook-vs-bishop',
+    group: 'rook-vs',
+    title: 'Rook against bishop: the safe corner',
+    fen: '6k1/8/1b6/7K/8/5R2/8/8 b - - 0 1',
+    goal: 'draw',
+    hold: 12,
+    idea: 'A rook against a bishop is a draw when the king keeps to the middle or goes to a safe corner, one the bishop doesn’t cover (a light corner, a8 or h1, against a dark-squared bishop): there a check is blocked by the bishop beside the king, and pressing on gives stalemate. In a corner of the bishop’s colour (h8, a1) the king is mated. Kg7! now, off the edge; h7 and h8 lose.',
+  },
+  {
+    id: 'wrong-bishop',
+    group: 'minors',
+    title: 'The wrong bishop',
+    fen: '8/8/4k2P/8/5K2/5B2/8/8 b - - 0 1',
+    goal: 'draw',
+    hold: 10,
+    idea: 'A bishop that doesn’t control the queening square (h8, a dark square, against a light-squared bishop) can’t drive the king out of that corner, and the rook’s pawn alone gives only stalemate. Run for the corner the shortest way: Kf7! and Kg8. Anything slower, and the white king shuts you out. Once there, shuttle between h8 and the squares beside it.',
+  },
+  {
+    id: 'knight-vs-pawn',
+    group: 'minors',
+    title: 'Knight against a pawn on the 7th',
+    fen: '4K3/8/8/4N3/8/6k1/4p3/8 w - - 0 1',
+    goal: 'draw',
+    hold: 10,
+    idea: 'A knight stops a pawn on the 7th from a square that covers the queening square: here Nd3!, covering e1, so that …e1=Q is met by Nxe1. Then keep it covering e1, moving between the squares that do (d3, f3, g2, c2) or checking the king away when it comes to guard the pawn, while your king comes back.',
+  },
+  {
+    id: 'opposite-bishops',
+    group: 'minors',
+    title: 'Opposite bishops: two pawns down',
+    fen: '8/8/2P5/7k/4P3/8/2B5/b3K3 b - - 0 1',
+    goal: 'draw',
+    hold: 12,
+    idea: 'With bishops on squares of different colours, two pawns are often not enough. Stop one pawn with your bishop from a diagonal it can’t be driven off (here c7, from b8–h2 or a5–d8), and the other with your king in front of it, on squares of your bishop’s colour, which theirs can’t attack. With one file between the pawns this holds; further apart, they usually win.',
+  },
+  {
     id: 'queen-vs-pawn',
     group: 'queen',
     title: 'Queen against a pawn on the 7th',
@@ -138,6 +248,24 @@ export const ENDGAMES: readonly Endgame[] = [
     until: 'bare',
     idea: 'Check, and pin when you can, until the king has to step in front of its own pawn: that gives your king a free move to come closer. Repeat until the pawn falls. This works against a centre or knight’s pawn; against a rook’s or bishop’s pawn the defender has stalemate tricks.',
   },
+  {
+    id: 'queen-vs-rook-pawn',
+    group: 'queen',
+    title: 'Queen against a rook’s pawn',
+    fen: '7K/8/8/8/8/8/p1k5/4Q3 b - - 0 1',
+    goal: 'draw',
+    hold: 10,
+    idea: 'The defender’s stalemate: a king in front of its rook’s pawn, on a1, has no move, so the queen can’t gain the free move her king needs to come closer. Keep your king beside the pawn and go to a1 when driven back, never away from the corner. Kb2! now; the queen alone can’t win.',
+  },
+  {
+    id: 'queen-vs-bishop-pawn',
+    group: 'queen',
+    title: 'Queen against a bishop’s pawn',
+    fen: '8/8/8/3K4/8/8/1kp1Q3/8 b - - 0 1',
+    goal: 'draw',
+    hold: 10,
+    idea: 'Against a bishop’s pawn the defender has another stalemate. The pawn is pinned, so step into the corner: Ka1!, leaving it to be taken, and Qxc2 is stalemate. When checked, go to the corner side (a1, a2, b1), never to d1 or d2, where the queen wins the time her king needs.',
+  },
 ];
 
 export const endgameById = (id: string): Endgame | undefined => ENDGAMES.find((e) => e.id === id);
@@ -145,11 +273,22 @@ export const endgameById = (id: string): Endgame | undefined => ENDGAMES.find((e
 /** The user's side: the side to move at the start. */
 export const sideOf = (e: Endgame): 'white' | 'black' => (e.fen.split(' ')[1] === 'b' ? 'black' : 'white');
 
+const PIECE_NAME: Record<string, string> = { p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen' };
+
+/** What a win by a bare king (`until: 'bare'`) takes from the defender: "the pawn", "the rook", "the pawns", "every piece". */
+export function bareTarget(e: Pick<Endgame, 'fen'>): string {
+  const [board = '', turn] = e.fen.split(' ');
+  // The defender is the side not to move at the start, lower case when it is Black.
+  const theirs = [...board].filter((c) => /[pnbrq]/i.test(c) && (turn === 'w') === (c === c.toLowerCase())).map((c) => c.toLowerCase());
+  if (theirs.length && theirs.every((c) => c === 'p')) return theirs.length === 1 ? 'the pawn' : 'the pawns';
+  return theirs.length === 1 ? `the ${PIECE_NAME[theirs[0]!]}` : 'every piece';
+}
+
 /** "White to play and win (queen the pawn)". */
 export function taskOf(e: Endgame): string {
   const side = sideOf(e) === 'white' ? 'White' : 'Black';
   if (e.goal === 'draw') return `${side} to play and draw (hold ${e.hold ?? 0} moves)`;
-  const end = e.until === 'promote' ? 'queen a pawn' : e.until === 'bare' ? 'win the pawn' : e.until === 'convert' ? `queen a pawn or go ${CONVERT_LEAD} points up` : 'mate';
+  const end = e.until === 'promote' ? 'queen a pawn' : e.until === 'bare' ? `win ${bareTarget(e)}` : e.until === 'convert' ? `queen a pawn or go ${CONVERT_LEAD} points up` : 'mate';
   return `${side} to play and win (${end})`;
 }
 
@@ -163,10 +302,13 @@ export function taskOf(e: Endgame): string {
  */
 export const GOAL_CP = { win: 200, draw: -200 } as const;
 
-export const keepsGoal = (goal: Goal, cp: number): boolean => cp >= GOAL_CP[goal];
+/** An endgame's line between keeping its goal and losing it: its own, else `GOAL_CP`'s. */
+export const lineOf = (e: Pick<Endgame, 'goal' | 'line'>): number => e.line ?? GOAL_CP[e.goal];
+
+export const keepsGoal = (goal: Goal, cp: number, line: number = GOAL_CP[goal]): boolean => cp >= line;
 
 /** A move that throws the goal away: kept before it (by the best move's score), not after it. */
-export const slips = (goal: Goal, bestCp: number, afterCp: number): boolean => keepsGoal(goal, bestCp) && !keepsGoal(goal, afterCp);
+export const slips = (goal: Goal, bestCp: number, afterCp: number, line: number = GOAL_CP[goal]): boolean => keepsGoal(goal, bestCp, line) && !keepsGoal(goal, afterCp, line);
 
 /** A move of the game as the slip's search reads it: the user's or not, its judge out or in. */
 export interface JudgedMove {
@@ -183,12 +325,12 @@ export interface JudgedMove {
  * first). `pending` while a move before any slip found is still being judged; undefined when
  * none slipped. A move whose judge gave nothing is passed over (the caller ends the game then).
  */
-export function firstSlip(goal: Goal, moves: readonly JudgedMove[], from = 0): number | 'pending' | undefined {
+export function firstSlip(goal: Goal, moves: readonly JudgedMove[], from = 0, line: number = GOAL_CP[goal]): number | 'pending' | undefined {
   for (let i = from; i < moves.length; i++) {
     const m = moves[i]!;
     if (!m.isUser) continue;
     if (m.judging) return 'pending';
-    if (m.bestCp !== undefined && m.afterCp !== undefined && slips(goal, m.bestCp, m.afterCp)) return i;
+    if (m.bestCp !== undefined && m.afterCp !== undefined && slips(goal, m.bestCp, m.afterCp, line)) return i;
   }
   return undefined;
 }
@@ -283,7 +425,8 @@ export interface OpponentLine {
  * `material` the opponent's balance after a line's first moves; `over` whether the game ends
  * after a move; `extra.pushes` the pawn pushes to try first, as sound by the same rule, the best
  * scored taken (a draw's attacker making progress, `pushNow`); `extra.repeats` whether a move goes
- * back to a position of the game's (a draw's attacker plays none while it has a sound other).
+ * back to a position of the game's (a draw's attacker plays none while it has a sound other);
+ * `extra.line` the endgame's goal line (`lineOf`), below which the opponent counts as lost.
  */
 export function opponentPick(
   goal: Goal,
@@ -292,7 +435,7 @@ export function opponentPick(
   lineOf: (uci: string) => OpponentLine | undefined,
   material: (pv: readonly string[]) => number | undefined,
   over: (uci: string) => boolean,
-  extra: { pushes?: readonly string[]; repeats?: (uci: string) => boolean } = {},
+  extra: { pushes?: readonly string[]; repeats?: (uci: string) => boolean; line?: number } = {},
 ): { uci: string; maia: boolean; push?: boolean } | undefined {
   const top = best[0];
   if (!top) return undefined;
@@ -305,7 +448,7 @@ export function opponentPick(
   if (!base) return undefined;
   const baseLine = best.find((l) => l.pv[0] === base)!;
   const floor = material(baseLine.pv.slice(0, 2)) ?? material([]);
-  const lost = goal === 'win' && top.cp <= -GOAL_CP.win;
+  const lost = goal === 'win' && top.cp <= -(extra.line ?? GOAL_CP.win);
   const sound = (uci: string): OpponentLine | undefined => {
     const l = lineOf(uci);
     if (!l?.pv.length || l.pv[0] !== uci || over(uci) || repeats(uci)) return undefined;

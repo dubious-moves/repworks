@@ -2047,3 +2047,21 @@ The technical calls, each with its reason:
 - **Kept on the device** (D5's cache tier); the tries are §5.145's `practice` events, so they
   cross devices with no new data format. Sharing the positions through the data repo is left for
   the owner to ask for.
+
+## Revision of 2026-11-02 (more endgames, PLAN.md §5.150)
+- **The endgames page has 23 theoretical positions in six groups** (was ten in four): the two
+  bishops' and the bishop and knight's mates; the square of the pawn and the rook's pawn's corner;
+  Vancura; a new group *Rook against a pawn or a minor piece* (the king first; the knight kept
+  next to its king; the bishop's safe corner); a new group *Minor pieces* (the wrong bishop, the
+  knight against a pawn on the 7th, opposite bishops two pawns down); the queen against a rook's
+  and a bishop's pawn. Why: the owner's request of 2026-11-02 ("add more built in positions and
+  categories"), the positions and groups left to Claude. Each start checked by Stockfish (one to
+  three moves keep the goal, the rest clearly lose it) and played out with the app's own judge
+  and opponent, with no good move stopped.
+- **An endgame may have its own goal line**, below +2: the two bishops' mate is kept at +1.00 and
+  the bishop and knight's at +0.50, where Stockfish scores the whole win about +2.4 and +1.6 and a
+  hung piece, a stalemate or the fifty-move rule exactly 0.00. Replaces "kept at +2 (a win) or −2 (a draw)" for those two only. Why: on +2's
+  line a slow bishop move would be stopped by the search's noise, and in the bishop and knight no
+  blunder could be stopped at all.
+- Left out: Saavedra's study, because neither Maia nor Stockfish sets its trap, so its point (the
+  underpromotion) would hardly ever come; the queen against a rook, a long win scored about +2.3.

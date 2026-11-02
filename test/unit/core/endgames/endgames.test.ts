@@ -9,6 +9,7 @@ import { parseFen } from 'chessops/fen';
 import { parseUci } from 'chessops/util';
 import {
   attemptsByEndgame,
+  bareTarget,
   ENDGAME_PRESET,
   ENDGAMES,
   endgameById,
@@ -18,6 +19,7 @@ import {
   held,
   INTERVAL_DAYS,
   keepsGoal,
+  lineOf,
   materialFor,
   MAIA_MIN,
   MAIA_TOP,
@@ -52,6 +54,8 @@ test('every endgame is a legal position with the user to move, a goal and its en
     assert.ok(GROUPS.some((g) => g.id === e.group), e.id);
     if (e.goal === 'win') assert.ok(e.until && e.hold === undefined, e.id);
     else assert.ok(e.hold && e.hold > 0 && e.until === undefined, e.id);
+    // An endgame's own line only lowers a win's, and stays clear of a blunder's 0.00 (§5.150).
+    if (e.line !== undefined) assert.ok(e.goal === 'win' && e.line >= 50 && e.line < GOAL_CP.win, e.id);
     assert.ok(e.idea.length > 80, e.id);
     assert.equal(endgameById(e.id), e);
   }
@@ -65,6 +69,14 @@ test('the task says the side, the goal and its end', () => {
   assert.equal(taskOf(endgameById('lucena')!), 'White to play and win (queen a pawn)');
   assert.equal(taskOf(endgameById('queen-vs-pawn')!), 'White to play and win (win the pawn)');
   assert.equal(taskOf(endgameById('philidor')!), 'Black to play and draw (hold 15 moves)');
+  // A bare king names what is to be won.
+  assert.equal(taskOf(endgameById('rook-vs-pawn')!), 'White to play and win (win the pawn)');
+  assert.equal(taskOf(endgameById('two-bishops')!), 'White to play and win (mate)');
+  assert.equal(taskOf(endgameById('queen-vs-bishop-pawn')!), 'Black to play and draw (hold 10 moves)');
+  assert.equal(bareTarget({ fen: '8/8/8/8/8/1pp5/8/K1Q1k3 w - - 0 1' }), 'the pawns');
+  assert.equal(bareTarget({ fen: '8/8/8/8/8/1pb5/8/K1Q1k3 w - - 0 1' }), 'every piece');
+  assert.equal(bareTarget({ fen: '8/8/8/8/8/1P6/8/K1q1k3 b - - 0 1' }), 'the pawn');
+  assert.equal(bareTarget({ fen: '8/8/1KP5/3r4/8/8/8/k7 w - - 0 1' }), 'the rook');
 });
 
 test('the goal: kept at +2 (a win) or −2 (a draw); a slip is from kept to lost', () => {
@@ -80,6 +92,26 @@ test('the goal: kept at +2 (a win) or −2 (a draw); a slip is from kept to lost
   assert.equal(slips('draw', -30, -60), false);
   assert.equal(slips('draw', -9, -417), true);
   assert.equal(slips('draw', -500, -900), false);
+});
+
+test('an endgame’s own line: the bishops’ mates are kept from +1 or so, the rest at ±2', () => {
+  // Stockfish scores the two bishops' mate about +2.4 and a hung bishop 0.00 (§5.150).
+  const bishops = endgameById('two-bishops')!;
+  assert.equal(lineOf(bishops), 100);
+  assert.equal(lineOf(endgameById('bishop-knight')!), 50);
+  assert.equal(lineOf(endgameById('lucena')!), GOAL_CP.win);
+  assert.equal(lineOf(endgameById('philidor')!), GOAL_CP.draw);
+  assert.equal(keepsGoal('win', 150, lineOf(bishops)), true);
+  assert.equal(keepsGoal('win', 99, lineOf(bishops)), false);
+  // A slow move at +1.5 is no slip on its line, though it would be on +2's; a hung bishop is.
+  assert.equal(slips('win', 240, 150, lineOf(bishops)), false);
+  assert.equal(slips('win', 240, 150), true);
+  assert.equal(slips('win', 240, 0, lineOf(bishops)), true);
+  const slow = { isUser: true, bestCp: 240, afterCp: 150 };
+  const reply = { isUser: false };
+  assert.equal(firstSlip('win', [slow, reply], 0, lineOf(bishops)), undefined);
+  assert.equal(firstSlip('win', [slow, reply]), 0);
+  assert.equal(firstSlip('win', [slow, reply, { isUser: true, bestCp: 240, afterCp: 0 }], 0, lineOf(bishops)), 2);
 });
 
 test('the first slip, among moves judged in the background: never one past a move still judged', () => {
@@ -241,6 +273,14 @@ test('the opponent: Maia’s likeliest move that Stockfish finds sound, else Sto
     return p.isEnd();
   };
   const lines = (...ls: { cp: number; pv: string[] }[]) => (uci: string) => ls.find((l) => l.pv[0] === uci);
+
+  // On an endgame's own line, a defence at −1.50 is lost already: Maia's move taken though it
+  // scores 1.50 worse; on +2's line it isn't, and Stockfish's own is played.
+  const bb = '8/8/8/4k3/8/8/5K2/2B2B2 b - - 1 1';
+  const kd4 = { cp: -150, pv: ['e5d4', 'c1e3'] };
+  const ke4 = { cp: -300, pv: ['e5e4', 'f1d3'] };
+  assert.deepEqual(opponentPick('win', [kd4], [{ uci: 'e5e4', prob: 0.6 }], lines(kd4, ke4), material(bb), over(bb), { line: 100 }), { uci: 'e5e4', maia: true });
+  assert.deepEqual(opponentPick('win', [kd4], [{ uci: 'e5e4', prob: 0.6 }], lines(kd4, ke4), material(bb), over(bb)), { uci: 'e5d4', maia: false });
 
   // A lost defence (the user's win kept whatever is played): Maia's Kf7 though Stockfish scores
   // Ke7 a little longer, as every move loses.
