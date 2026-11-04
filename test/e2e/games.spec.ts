@@ -271,7 +271,7 @@ test('games read from the Gist and Lichess, a game opened, the day’s cards ans
   expect(overflow).toBeLessThanOrEqual(0);
 });
 
-test('a move tried again is judged at once, ahead of the engine line’s search, its own search to depth 15 (14 on a phone) (§5.151)', async ({ page, isMobile }) => {
+test('a move tried again is judged ahead of the engine line’s search, which starts again after (§5.151)', async ({ page, isMobile }) => {
   // The end of the line after the blunder takes 5 s to search here: the move tried next doesn't wait for it.
   const slow = await serveSite({ engine: fakeEngine(SLOW, ENGINE_LINES, false, undefined, { [G2_LINE_END.key]: 5000 }) });
   try {
@@ -293,18 +293,18 @@ test('a move tried again is judged at once, ahead of the engine line’s search,
     await expect(card).toHaveAttribute('data-phase', 'asking');
     await play(page, 'a2a3');
     await expect(page.getByTestId('game-feedback')).toHaveText('Good · −2.9%', { timeout: 3000 });
-    // The line's end was being searched: stopped for the move, the move's position searched at its
-    // depth, then the line's end searched again.
-    const lines = isMobile ? 16 : 18;
+    // The line's end was being searched: stopped for the move, the move's position searched (at the
+    // judges' depth), then the line's end searched again.
+    const go = `go depth ${isMobile ? 16 : 18} movetime 8000`;
     const at = (cmds: string[]) => cmds.findIndex((c) => c.startsWith(`position fen ${G2_A3.key} `));
     await expect.poll(() => commands(slow.requests).slice(at(commands(slow.requests)) - 3)).toEqual([
       `position fen ${G2_LINE_END.fen}`,
-      `go depth ${lines} movetime 8000`,
+      go,
       'stop',
       `position fen ${G2_A3.fen}`,
-      `go depth ${isMobile ? 14 : 15} movetime 8000`,
+      go,
       `position fen ${G2_LINE_END.fen}`,
-      `go depth ${lines} movetime 8000`,
+      go,
     ]);
   } finally {
     await slow.close();

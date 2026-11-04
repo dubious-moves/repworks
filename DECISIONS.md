@@ -2066,14 +2066,16 @@ The technical calls, each with its reason:
 - Left out: Saavedra's study, because neither Maia nor Stockfish sets its trap, so its point (the
   underpromotion) would hardly ever come; the queen against a rook, a long win scored about +2.3.
 
-## Revision of 2026-11-04 (a game card's move judged sooner, PLAN.md §5.151)
-- **A game card's move outside the position's three lines is searched to depth 15 (14 on a
-  phone)**, over the lines' warm hash, and the card's own searches (its lines, the move's) go
-  ahead of the engine line's searches in the engine's queue. Was (§5.55): the move's search to
-  depth 18 (16 on a phone), the lines' depth, behind any search the line had started. Why: the
-  owner, 2026-11-04: "When retrying a move in game review, the 'Stockfish is judging...' takes a
-  pretty long while, even on PC." Measured with the real engine: 430 to 1,350 ms a try before,
-  50 to 190 ms after; under Node the shallower search told none of 40 tried moves right or wrong
-  differently on the desktop's settings, one of 40 on the phone's. The first try's grade reads the
-  same search: the difference it adds (~7 cp on average) is the size of the noise the judge
-  already had. The practice game's judge (§5.136) is unchanged.
+## Revision of 2026-11-04 (what held up a game card's judge, PLAN.md §5.151)
+- **A game card's own searches go first**: its three lines and a move's search are put ahead of
+  the engine line's background searches (its end, a step past it, a branch), and stop one under
+  way, which starts again after. Was (§5.55): one queue, in turn, so a move tried soon after a
+  wrong one waited for the line's searches. The judge's depth is unchanged (18, 16 on a phone).
+- **Leaving the storm leaves one engine on the device's threads**: focused scoring's workers
+  (§5.103, one thread each) are no longer kept for the game cards, practice and the endgames.
+- Why: the owner, 2026-11-04: "When retrying a move in game review, the 'Stockfish is
+  judging...' takes a pretty long while, even on PC." A first build the same day searched a move
+  outside the lines to depth 15 (14 on a phone) instead; reverted: "I didn't want to lower depth.
+  15 is too low." Measured since: in a sharp position depth 18 itself takes 3 to 8 s on Stockfish
+  19 or on several threads, about a second on Stockfish 18 on one thread; which way to go there is
+  the owner's (PLAN.md §5.151).

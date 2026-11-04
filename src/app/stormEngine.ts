@@ -213,7 +213,11 @@ export function cancelStormEngine(): void {
   }
 }
 
-/** Nothing more is wanted: the queue answered with nothing, the workers ended. */
+/**
+ * Nothing more is wanted: the queue answered with nothing, the workers ended, and the next search
+ * starts the one engine on the device's threads (§5.151): focused scoring's workers, one thread
+ * each, aren't left for the game cards, practice or the endgames.
+ */
 export function endStormEngine(): void {
   for (const j of queue.splice(0)) j.resolve(null);
   for (const lane of lanes) {
@@ -223,5 +227,6 @@ export function endStormEngine(): void {
     lane.proc = undefined;
     lane.search = undefined;
   }
+  lanes = [{}];
   failed = false;
 }

@@ -7,7 +7,7 @@ where the build differed). What remains is live: the spike's re-run (§4.2), the
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
 with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
-for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Storm positions shared between devices through the data repo, and an overnight gather (§5.102), are built (2026-10-12). Lc0 on the study page, its pick among close moves (§5.143), is built (2026-10-31). Endgames, the theoretical endgames each played for its goal against Stockfish (§5.145), are built (2026-10-31), their moves judged in the background since (§5.146, the owner's request of 2026-11-01), defended by Maia checked by Stockfish (§5.147, the owner's request), and a draw's attacker pushing on so the whole method comes up (§5.148, the owner's note). The endgames of the user's own repertoire (§5.149) are built (2026-11-01), and thirteen more theoretical endgames in two more groups (§5.150, the owner's request of 2026-11-02). A game card's move tried again is judged at once (§5.151, the owner's request of 2026-11-04). Read with `DECISIONS.md`, which this plan updates (its
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Storm positions shared between devices through the data repo, and an overnight gather (§5.102), are built (2026-10-12). Lc0 on the study page, its pick among close moves (§5.143), is built (2026-10-31). Endgames, the theoretical endgames each played for its goal against Stockfish (§5.145), are built (2026-10-31), their moves judged in the background since (§5.146, the owner's request of 2026-11-01), defended by Maia checked by Stockfish (§5.147, the owner's request), and a draw's attacker pushing on so the whole method comes up (§5.148, the owner's note). The endgames of the user's own repertoire (§5.149) are built (2026-11-01), and thirteen more theoretical endgames in two more groups (§5.150, the owner's request of 2026-11-02). A game card's move judged without waiting on the engine line's searches or the storm's workers (§5.151, the owner's request of 2026-11-04). Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -5055,12 +5055,11 @@ Live: (desktop and phone) a real day's game cards; the engine's waits on the pho
 **As built** (2026-10-07): `src/app/gameTrainer.ts` and the session in `Games.tsx`. A mistake: the
 position's three lines searched as the card opens (the storm's Stockfish client, depth 18, 16 on a
 narrow screen, 8 s), the move judged from them or from one search after it (a mate +10,000, a
-stalemate 0; that search to depth 15, 14 on a phone, and ahead of the line's searches since
-§5.151), mistake-lab's word and colour, the first try's grade recorded at once; Try again up
-to three tries, Show the move, Hint (the piece, then the arrow: Again); Skip (Again), Next, View
-the game, Analyse, Drop. A tactic: its live lines through `core/games/tactic.ts` (the replies after
-0.4 s, a move of another line switching to it, the next line from where the opponent's reply
-differs; a line leaving a solved one at the user's own move is mistake-lab's optional kind and not
+stalemate 0; both ahead of the engine line's searches since §5.151), mistake-lab's word and
+colour, the first try's grade recorded at once; Try again up to three tries, Show the move, Hint
+(the piece, then the arrow: Again); Skip (Again), Next, View the game, Analyse, Drop. A tactic:
+its live lines through `core/games/tactic.ts` (the replies after 0.4 s, a move of another line
+switching to it, the next line from where the opponent's reply differs; a line leaving a solved one at the user's own move is mistake-lab's optional kind and not
 asked), Drop this line. Advantages are left out of the session until §5.57 and counted. Tests:
 `test/unit/core/games/tactic.test.ts`; `test/e2e/games.spec.ts` (desktop and phone: the Gist and
 Lichess read, a game opened and stepped to its mistake, a mistake answered best (Easy), one with a
@@ -8365,38 +8364,58 @@ on desktop and the emulated phone (23 positions, the new groups; the bishop and 
 stopped though every move scores under +2, taken back; the rook against a pawn played to its end,
 "The pawn has fallen: the rest is a rook mate."). Live: TESTING.md.
 
-#### 5.151 Game cards: a move tried again judged at once (the owner's request, 2026-11-04)
+#### 5.151 Game cards: what held up a move's judge (the owner's request, 2026-11-04)
 
 The owner: "When retrying a move in game review, the 'Stockfish is judging...' takes a pretty
-long while, even on PC. Can we improve this?" A move outside the position's three lines was
-judged by a search of its own of the position after it, to depth 18 (16 on a phone), the same
-depth as the lines; and after a wrong move the engine line's end was searched in the background
-(the line's next step), so a move tried soon after waited for that search first, in turn.
+long while, even on PC. Can we improve this?" Then, after a first build that searched the move
+less deeply: "I didn't want to lower depth. 15 is too low. I just felt like it shouldn't take 5+
+seconds to reach a decent depth with single PV on PC? I thought it might be something more than
+the depth wrong currently". The judge stays as §5.55 has it: the position's three lines at depth 18
+(16 on a phone), a move outside them by a search of its own of the position after it at the same
+depth, 8 s at most. Found and fixed:
 
-- **The move's own search is shallower**: to depth 15 (14 on a phone). The position's lines are
-  searched as the card opens and leave the hash warm, so a shallow search of a move from there
-  scores it about as the deep one did. Checked under Node (the vendored Stockfish 18 lite, one
-  thread, 32 MB; 16 MB and depth 16 for the phone) over eight middlegames, the lines searched
-  first as the app does: for the lines' own moves, the position after each searched alone was on
-  average 2.8 cp (depth 13) to 6.7 cp (depth 17 and 18) from the line's score; for 40 moves outside the
-  lines (each position's next five by a shallow ranking, the moves a person tries), against the
-  search to 18 the search to 15 was 7.3 cp off on average (at most 30) and told none of them right
-  or wrong differently (the 5% line), in 243 ms against 871 on average; on the phone's settings,
-  14 against 16 was 7.2 cp off (at most 25), one of 40 told differently, 144 ms against 358. The
-  first try's grade comes from the same search: the difference it adds (~7 cp) is the size of the
-  one the judge already had between the lines' score and the deep search after the move (~7 cp).
-- **The card's own searches go first**: the lines and the move's search are asked as the storm
-  engine's `urgent` (§5.146): ahead of the line's searches waiting, and of one under way on the
-  one worker, which stops and starts again (over its warm hash) once the move is judged. The line's
-  own searches (its end, a step past it, a branch) and the tactic's refutation are as before.
-- **Measured** in headless Chromium here with the real engine (one thread, a Sicilian middlegame,
-  three tries outside the lines): the time on "Stockfish is judging…" was 430 to 1,350 ms a try,
-  the slowest a quick retry that waited for the line's search; now 50 to 190 ms, the verdicts
-  within 1.1% of the old ones (−40.2/−42.3/−37.9% against −41.3/−43.2/−38.4%).
+- **The judge waited behind the engine line's searches.** After a wrong move the line's end is
+  searched in the background (the line's next step, mistake-lab's prepareEngineLineExtension), and
+  each step past the end, or a branch, adds another; the storm engine's queue took them in turn, so
+  a move tried soon after waited for every one of them first. Now the card's own searches (its
+  lines and a move's) are asked as `urgent` (§5.146): ahead of the line's searches waiting, and of
+  one under way on the one worker, which stops and starts again (over its warm hash) once the move
+  is judged.
+- **Focused scoring's workers outlived the storm.** Focused scoring (§5.103) splits the storm
+  engine into a single-threaded worker a core (64 MB each); leaving the storm ended the workers
+  but kept the split, which only a storm session put back. So after the storm's home had scored
+  with Focused on, the game cards, practice and the endgames ran on those workers: the threads set
+  for the device ignored, a search asked while another ran sent to a worker of its own (started
+  then, about 0.6 s, its hash empty), and `urgent` unable to put anything first (it acts on the
+  one worker). Now `endStormEngine` leaves one engine on the device's threads.
 
-**As built** (2026-11-04): in `src/app/gameTrainer.ts` `linesDepth`, `moveDepth` and `analyse`'s
-depth and `judge` (the cache keyed by depth too). Tests: `test/e2e/games.spec.ts` on desktop and
-the emulated phone, with the fake engine's new per-position search time (`fakeEngine`'s `slowAt`):
-the line's end after the blunder searched for 5 s, a3 tried again, judged "Good · −2.9%" within
-3 s; the commands show the line's end stopped, a3's position searched at depth 15 (14), the line's
-end searched again. Live: TESTING.md.
+**The engine's own time to depth 18**, measured in headless Chromium on this 4-core container
+(the real builds, a 32 MB hash; five middlegames, a Sicilian with castling on opposite sides, a
+Ruy Lopez, a King's Indian, a Queen's Gambit and a French, each its three lines then four moves
+outside them searched alone, single PV; three threads where threaded):
+
+| Engine | Median a move | Slowest |
+| --- | --- | --- |
+| Stockfish 18, one thread | 0.83 s | 1.3 s |
+| Stockfish 18, three threads | 0.61 to 0.68 s (two runs) | 1.6 to 5.3 s |
+| Stockfish 19, one thread | 1.1 to 1.3 s | 3.1 to 3.3 s |
+| Stockfish 19, three threads | 0.9 to 1.0 s | 8.0 s (the cap) |
+
+The Sicilian's four moves alone, three times over: Stockfish 19 on three threads took 3.6 s at the
+median (0.8 to 8.0 s), on one thread 1.2 s (0.7 to 3.3 s); Stockfish 18 on three threads 1.3 s
+(0.4 to 3.3 s). The best move comes the moment depth 18 is reached (no slow stop): the time is in
+the last iterations, depths 16 to 18 taking seconds each in that position. So a sharp position
+(a mistake card's often is) on Stockfish 19 or several threads can take 3 to 8 s at depth 18,
+where Stockfish 18 on one thread stays near a second. Not changed: which way to go is the
+owner's (their settings on the PC; the judge on one thread, or Stockfish 18 for the judge, or the
+likely moves searched while the user thinks).
+
+**As built** (2026-11-04): `analyse`'s `judge` in `src/app/gameTrainer.ts`; `endStormEngine` in
+`src/app/stormEngine.ts`. A first build the same day searched a move outside the lines to depth 15
+(14 on a phone); reverted at the owner's word. Tests: `test/e2e/games.spec.ts` on desktop and the
+emulated phone, with the fake engine's new per-position search time (`fakeEngine`'s `slowAt`): the
+line's end after the blunder searched for 5 s, a3 tried again, judged "Good · −2.9%" within 3 s,
+the commands showing the line's end stopped, a3's position searched, the line's end searched again
+(it fails on the old queue); `test/e2e/storm.spec.ts`'s focused scoring, then an endgame opened
+from the storm: one engine with the device's hash, not a focused worker's (it fails without the
+fix). Live: TESTING.md.

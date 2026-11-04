@@ -751,7 +751,7 @@ test('a list over two depths (§5.120): each move scored the mean of the depth s
   }
 });
 
-test('focused scoring: an engine a core but one, each searching a position of its own, then one engine for a session (§5.103)', async ({ page, isMobile }) => {
+test('focused scoring: an engine a core but one, each searching a position of its own, then one engine for an endgame and a session (§5.103, §5.151)', async ({ page, isMobile }) => {
   const depth = isMobile ? 22 : 24;
   const start = site.requests.length;
   const mine = () => commands(site.requests.slice(start));
@@ -772,6 +772,16 @@ test('focused scoring: an engine a core but one, each searching a position of it
   await expect(progress).toContainText('3 engines at once');
   await expect(page.getByTestId('storm-deep-recent').locator('li').first()).toContainText(`depth ${depth} of ${depth}`);
   await expect(page.getByTestId('storm-deep-recent').locator('li').first()).toContainText('kept');
+  // Left for an endgame (§5.151): its search starts the one engine on the device's threads, its
+  // hash the study page's, not a focused worker's. (Read from the requests since: the fake engine
+  // numbers each worker's commands on their own.)
+  const left = site.requests.length;
+  const since = () => commands(site.requests.slice(left));
+  await page.evaluate(() => (location.hash = '#/endgames/king-in-front'));
+  await expect(page.getByTestId('endgame-game')).toHaveAttribute('data-phase', 'user');
+  await expect.poll(() => since().filter((c) => c.startsWith('setoption name Hash'))).toEqual([`setoption name Hash value ${isMobile ? 16 : 32}`]);
+  await page.goBack();
+  await expect(page.getByRole('button', { name: 'Start storm' })).toBeVisible();
   // A session goes back to the one engine: the three end, and no focused one starts again.
   const before = mine().length;
   await page.getByRole('button', { name: 'Start storm' }).click();
