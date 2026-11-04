@@ -1138,3 +1138,15 @@ q_extension (or give it to a session with q_extension attached), then run
   opponent under Node (Stockfish 18 lite, Maia 3; `scripts/endgame-check.ts`, PLAN.md §5.150), the
   pages by unit tests and Playwright with a fake engine (desktop and emulated phone), a screenshot
   of the list in headless Chromium. Not on your devices, not with the real engine in the browser.
+
+## A game card's move tried again judged at once (§5.151, 2026-11-04)
+
+- Games → Review, on the PC and the phone: play a wrong move, then Try again and other moves,
+  quickly too (while the engine line is still showing). Is "Stockfish is judging…" now short
+  enough? It was 0.4 to 1.4 s a try in headless Chromium here, and now 0.05 to 0.2 s.
+- The move is searched less deeply now (15, 14 on the phone; the lines stay at 18 and 16): does any
+  verdict look wrong, a good move told bad or a bad one told good? Say which, with the position
+  (Analyse from the card). The first try's grade reads the same search.
+- Checked: the depths' agreement under Node (Stockfish 18 lite, eight middlegames, 40 moves), the
+  timing in headless Chromium with the real engine (one thread), the order of the searches by
+  Playwright with the fake engine (desktop and emulated phone). Not on your devices.

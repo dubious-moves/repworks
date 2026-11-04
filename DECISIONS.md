@@ -2065,3 +2065,15 @@ The technical calls, each with its reason:
   blunder could be stopped at all.
 - Left out: Saavedra's study, because neither Maia nor Stockfish sets its trap, so its point (the
   underpromotion) would hardly ever come; the queen against a rook, a long win scored about +2.3.
+
+## Revision of 2026-11-04 (a game card's move judged sooner, PLAN.md §5.151)
+- **A game card's move outside the position's three lines is searched to depth 15 (14 on a
+  phone)**, over the lines' warm hash, and the card's own searches (its lines, the move's) go
+  ahead of the engine line's searches in the engine's queue. Was (§5.55): the move's search to
+  depth 18 (16 on a phone), the lines' depth, behind any search the line had started. Why: the
+  owner, 2026-11-04: "When retrying a move in game review, the 'Stockfish is judging...' takes a
+  pretty long while, even on PC." Measured with the real engine: 430 to 1,350 ms a try before,
+  50 to 190 ms after; under Node the shallower search told none of 40 tried moves right or wrong
+  differently on the desktop's settings, one of 40 on the phone's. The first try's grade reads the
+  same search: the difference it adds (~7 cp on average) is the size of the noise the judge
+  already had. The practice game's judge (§5.136) is unchanged.

@@ -5,7 +5,8 @@
 // best move (Easy), one with a blunder then the best move (Again), and the tactic through its two
 // lines (Easy); the reviews synced. The engine's line after a move (PLAN.md §6, item 1): shown after
 // the right move at a press and hidden; after the blunder at once, at the reply, stepped, extended
-// past its end, branched by a move on the board, and stepped back before the move to try again.
+// past its end, branched by a move on the board, and stepped back before the move to try again;
+// a move tried again while the line's end is searched, judged ahead of that search (§5.151).
 // The games' own explorer (§6, item 4): the games by position, filtering the list, and the opening
 // name titling a practice game from there. "Hide time trouble" (§6, item 5): the queen's gambit
 // game's mistake was made with 40 s left after 5 s spent. Then (§5.56) a mistake made into a sequence on the analysis
@@ -17,7 +18,7 @@ import { parseSan } from 'chessops/san';
 import type { FakeGit } from '../support/fakeGit.ts';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
 import { clickSquare } from './board.ts';
-import { fakeEngine, SLOW } from './engine.ts';
+import { commands, fakeEngine, SLOW } from './engine.ts';
 import { serveGithub, world } from './github.ts';
 import { serveSite, type SiteServer } from './server.ts';
 
@@ -38,31 +39,33 @@ const G2_LINE_END = after([...G2.slice(0, 6), 'g4', 'Nxg4', 'e3']);
 const G2_BRANCH = after([...G2.slice(0, 6), 'g4', 'Nxg4', 'h3']);
 const TACTIC_FEN = 'r1bqk1nr/pppnppbp/3p2p1/8/2BPP3/5N2/PPP2PPP/RNBQK2R w KQkq - 2 5';
 const SEQ_AT = after([...G1.slice(0, 6), 'Nxd4', 'exd4']);
+const G2_A3 = after([...G2.slice(0, 6), 'a3']);
+
+const ENGINE_LINES: Record<string, [number, number, string][]> = {
+  [G1_AT.key]: [
+    [1, 60, 'f3d4 e5d4'],
+    [2, 20, 'e1g1 g8f6'],
+    [3, 10, 'c2c3 d4f3'],
+  ],
+  [G2_AT.key]: [
+    [1, 40, 'g1f3 f8e7'],
+    [2, 35, 'c1g5 f8e7'],
+    [3, 30, 'e2e3 f8e7'],
+  ],
+  [G2_G4.key]: [[1, 350, 'f6g4 e2e3']],
+  [G2_LINE_END.key]: [[1, 300, 'g4e3 f2e3']],
+  [G2_BRANCH.key]: [[1, 400, 'g4f6 g1f3']],
+  [SEQ_AT.key]: [
+    [1, 30, 'e1g1 g8f6'],
+    [2, 20, 'd2d3 g8f6'],
+    [3, -50, 'c2c3 d4c3'],
+  ],
+  [G2_A3.key]: [[1, -20, 'f8e7 g1f3']],
+};
 
 let site: SiteServer;
 test.beforeAll(async () => {
-  site = await serveSite({
-    engine: fakeEngine(SLOW, {
-      [G1_AT.key]: [
-        [1, 60, 'f3d4 e5d4'],
-        [2, 20, 'e1g1 g8f6'],
-        [3, 10, 'c2c3 d4f3'],
-      ],
-      [G2_AT.key]: [
-        [1, 40, 'g1f3 f8e7'],
-        [2, 35, 'c1g5 f8e7'],
-        [3, 30, 'e2e3 f8e7'],
-      ],
-      [G2_G4.key]: [[1, 350, 'f6g4 e2e3']],
-      [G2_LINE_END.key]: [[1, 300, 'g4e3 f2e3']],
-      [G2_BRANCH.key]: [[1, 400, 'g4f6 g1f3']],
-      [SEQ_AT.key]: [
-        [1, 30, 'e1g1 g8f6'],
-        [2, 20, 'd2d3 g8f6'],
-        [3, -50, 'c2c3 d4c3'],
-      ],
-    }),
-  });
+  site = await serveSite({ engine: fakeEngine(SLOW, ENGINE_LINES) });
 });
 test.afterAll(async () => {
   await site.close();
@@ -108,7 +111,7 @@ interface World {
   requests: string[];
 }
 
-async function setUp(page: Page): Promise<World> {
+async function setUp(page: Page, on: SiteServer = site): Promise<World> {
   const { git, github } = world();
   await serveGithub(page, github);
   const requests: string[] = [];
@@ -124,7 +127,7 @@ async function setUp(page: Page): Promise<World> {
   });
   await page.route('https://api.chess.com/**', (route) => route.abort('failed'));
   await page.addInitScript(() => localStorage.setItem('repworks-games', JSON.stringify({ gist: 'https://gist.github.com/me/0123456789abcdef0123', lichess: 'me' })));
-  await page.goto(`${site.url}#setup?repo=${encodeURIComponent(REPO)}&token=${TOKEN}&name=desktop`);
+  await page.goto(`${on.url}#setup?repo=${encodeURIComponent(REPO)}&token=${TOKEN}&name=desktop`);
   await expect(page.locator('.chip')).toHaveText(/^synced/);
   return { git, requests };
 }
@@ -266,6 +269,46 @@ test('games read from the Gist and Lichess, a game opened, the day’s cards ans
   // Nothing wider than the phone.
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);
+});
+
+test('a move tried again is judged at once, ahead of the engine line’s search, its own search to depth 15 (14 on a phone) (§5.151)', async ({ page, isMobile }) => {
+  // The end of the line after the blunder takes 5 s to search here: the move tried next doesn't wait for it.
+  const slow = await serveSite({ engine: fakeEngine(SLOW, ENGINE_LINES, false, undefined, { [G2_LINE_END.key]: 5000 }) });
+  try {
+    await setUp(page, slow);
+    await page.getByRole('link', { name: 'Games', exact: true }).click();
+    await page.getByRole('button', { name: 'Refresh' }).click();
+    await expect(page.getByTestId('games-status')).toContainText('Gist: 3 games read');
+    await page.getByRole('link', { name: 'Review' }).click();
+    const card = page.locator('.game-card');
+    await expect(card).toHaveAttribute('data-card', 'm|GameOne1_7');
+    await play(page, 'f3d4');
+    await expect(page.getByTestId('game-feedback')).toHaveText('★ Best move!');
+    await page.getByRole('button', { name: 'Next' }).click();
+    await expect(card).toHaveAttribute('data-card', 'm|GameTwo2_7');
+    await play(page, 'g2g4');
+    await expect(page.getByTestId('game-feedback')).toHaveText(/Blunder/);
+    await expect(page.getByTestId('engine-line')).toHaveText(/4\. g4 Nxg4 5\. e3/);
+    await page.getByRole('button', { name: 'Try again' }).click();
+    await expect(card).toHaveAttribute('data-phase', 'asking');
+    await play(page, 'a2a3');
+    await expect(page.getByTestId('game-feedback')).toHaveText('Good · −2.9%', { timeout: 3000 });
+    // The line's end was being searched: stopped for the move, the move's position searched at its
+    // depth, then the line's end searched again.
+    const lines = isMobile ? 16 : 18;
+    const at = (cmds: string[]) => cmds.findIndex((c) => c.startsWith(`position fen ${G2_A3.key} `));
+    await expect.poll(() => commands(slow.requests).slice(at(commands(slow.requests)) - 3)).toEqual([
+      `position fen ${G2_LINE_END.fen}`,
+      `go depth ${lines} movetime 8000`,
+      'stop',
+      `position fen ${G2_A3.fen}`,
+      `go depth ${isMobile ? 14 : 15} movetime 8000`,
+      `position fen ${G2_LINE_END.fen}`,
+      `go depth ${lines} movetime 8000`,
+    ]);
+  } finally {
+    await slow.close();
+  }
 });
 
 test('a mistake made into a sequence on the analysis board, checked, saved in its place and drilled (§5.56)', async ({ page }) => {

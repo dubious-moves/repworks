@@ -34,13 +34,15 @@ export const SLOW = 400;
  * `slow`: how long a search takes to reach its depth, in ms; `extra`: more positions' lines; `ask`:
  * a position with none scripted asks the site for its lines (serveSite's `engineLines`); `before`:
  * the depth before the one asked for is given too, each line's score shifted by its entry (by
- * MultiPV, 0 when none), as a real engine's scores move between depths.
+ * MultiPV, 0 when none), as a real engine's scores move between depths; `slowAt`: a position's own
+ * search time in place of `slow` (keyed as `extra`).
  */
-export function fakeEngine(slow = SLOW, extra: Record<string, [number, number, string][]> = {}, ask = false, before?: Record<number, number>): string {
+export function fakeEngine(slow = SLOW, extra: Record<string, [number, number, string][]> = {}, ask = false, before?: Record<number, number>, slowAt: Record<string, number> = {}): string {
   return `
 const LINES = ${JSON.stringify({ ...LINES, ...extra })};
 const ASK = ${ask};
 const BEFORE = ${JSON.stringify(before ?? null)};
+const SLOW_AT = ${JSON.stringify(slowAt)};
 const linesOf = (f) => {
   if (LINES[f] || !ASK) return;
   const x = new XMLHttpRequest();
@@ -81,10 +83,11 @@ onmessage = (e) => {
     now = !moves ? LINES[fen] || [] : LINES[fen + '|' + only] || (LINES[fen] || []).filter((l) => moves.includes(l[2].split(' ')[0])).map((l, i) => [i + 1, l[1], l[2]]);
     const asked = Number((/depth (\\d+)/.exec(c) || [])[1]);
     const target = asked > 20 && asked <= 30 ? asked : 20;
+    const ms = SLOW_AT[fen] ?? ${slow};
     timers.push(setTimeout(() => emit(8), 20));
-    if (BEFORE) timers.push(setTimeout(() => emit(target - 1, BEFORE), ${slow} / 2));
-    timers.push(setTimeout(() => emit(target), ${slow}));
-    timers.push(setTimeout(finish, ${slow} + 20));
+    if (BEFORE) timers.push(setTimeout(() => emit(target - 1, BEFORE), ms / 2));
+    timers.push(setTimeout(() => emit(target), ms));
+    timers.push(setTimeout(finish, ms + 20));
   }
   if (c === 'stop') finish();
 };

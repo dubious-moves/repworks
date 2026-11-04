@@ -1,11 +1,12 @@
 // The game cards' session (PLAN.md §5.55), mistake-lab's mistake and tactic modes on the site's
 // SRS. A mistake: the position before it, the user's move judged by Stockfish (the position's
-// lines, searched as the card opens, then the position after the move when it isn't one of them),
-// the grade recorded on the first try; a wrong move offers Try again, three at most, then the best
-// move; the engine's line after a move (mistake-lab's ENGINE LINES, PLAN.md §6) opens at once after
-// a wrong one and at a press after a right one, stepped, extended and branched on the board. A
-// tactic: its lines played through, the opponent's replies after 0.4 s. An advantage: the practice
-// game's drill from its peak (§5.57), graded by its outcome.
+// lines, searched as the card opens, then the position after the move when it isn't one of them,
+// shallower and ahead of the engine line's searches, §5.151), the grade recorded on the first try;
+// a wrong move offers Try again, three at most, then the best move; the engine's line after a move
+// (mistake-lab's ENGINE LINES, PLAN.md §6) opens at once after a wrong one and at a press after a
+// right one, stepped, extended and branched on the board. A tactic: its lines played through, the
+// opponent's replies after 0.4 s. An advantage: the practice game's drill from its peak (§5.57),
+// graded by its outcome.
 import { signal } from '@preact/signals';
 import { makeFen } from 'chessops/fen';
 import { makeSanAndPlay } from 'chessops/san';
@@ -96,12 +97,25 @@ const setRun = (patch: Partial<CardRun>, phase?: TrainerPhase) => {
 
 /* ------------------------------------------------------------------ the engine's view of a card */
 
+/** The position's lines, and the engine's lines on the board: depth 18, 16 on a phone (§5.55). */
+const linesDepth = () => (narrow() ? 16 : 18);
+/**
+ * A move outside the position's lines, searched alone (§5.151): over the lines' warm hash a
+ * search to 15 (14 on a phone) scores a move as close to theirs as one to 18 (16) did, in a
+ * quarter of the time (two fifths on a phone).
+ */
+const moveDepth = () => (narrow() ? 14 : 15);
+
 const searches = new Map<string, Promise<EngineAnswer | null>>();
-function analyse(fen: string, lines: number): Promise<EngineAnswer | null> {
-  const key = `${fen}|${lines}`;
+/**
+ * A position's search, kept for the card. `judge`: the card's own judge (its lines and a move's
+ * search), ahead of the line's searches waiting, and of one under way, which starts again after.
+ */
+function analyse(fen: string, lines: number, depth = linesDepth(), judge = false): Promise<EngineAnswer | null> {
+  const key = `${fen}|${lines}|${depth}`;
   let p = searches.get(key);
   if (!p) {
-    p = analyseForStorm(fen, lines, narrow() ? 16 : 18, 8000);
+    p = analyseForStorm(fen, lines, depth, 8000, undefined, judge);
     searches.set(key, p);
     if (searches.size > 50) searches.delete(searches.keys().next().value!);
   }
@@ -217,7 +231,7 @@ function nextCard(): void {
     run.tactic = startTactic(liveLines(item, drops));
   } else {
     // The position's lines, searched while the user thinks (mistake-lab's pre-analysis).
-    void analyse(item.fenBefore, 3).then((a) => {
+    void analyse(item.fenBefore, 3, linesDepth(), true).then((a) => {
       const best = a?.lines[0];
       const r = gameSession.value?.run;
       if (best?.pv[0] && r && r.card === card) setRun({ bestUci: best.pv[0], bestSan: sanLine(item.fenBefore, best.pv)[0] ?? best.pv[0], bestLine: sanLine(item.fenBefore, best.pv) });
@@ -248,7 +262,7 @@ async function mistakeMove(item: MistakeItem, uci: string): Promise<void> {
   const after = playOn(r.fen, uci);
   if (!after) return;
   setRun({ board: after, lastUci: uci }, 'judging');
-  const answer = await analyse(r.fen, 3);
+  const answer = await analyse(r.fen, 3, linesDepth(), true);
   const lines = moverLines(r.fen, answer);
   let afterCp: number | undefined;
   // The engine's line after the move: its own line when the move is one of the position's, else the search after it.
@@ -258,7 +272,7 @@ async function mistakeMove(item: MistakeItem, uci: string): Promise<void> {
     const pos = positionOf(after);
     if (pos?.isEnd()) afterCp = pos.isCheckmate() ? 10000 : 0;
     else {
-      const a = await analyse(after, 1);
+      const a = await analyse(after, 1, moveDepth(), true);
       const m = moverLines(after, a)[0];
       if (m) afterCp = -m.cp;
       played = { uci, cont: a?.lines[0]?.pv ?? [], cpWhite: whiteCp(a?.lines[0]) };
