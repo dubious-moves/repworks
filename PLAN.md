@@ -7,7 +7,7 @@ where the build differed). What remains is live: the spike's re-run (§4.2), the
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
 with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
-for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Storm positions shared between devices through the data repo, and an overnight gather (§5.102), are built (2026-10-12). Lc0 on the study page, its pick among close moves (§5.143), is built (2026-10-31). Endgames, the theoretical endgames each played for its goal against Stockfish (§5.145), are built (2026-10-31), their moves judged in the background since (§5.146, the owner's request of 2026-11-01), defended by Maia checked by Stockfish (§5.147, the owner's request), and a draw's attacker pushing on so the whole method comes up (§5.148, the owner's note). The endgames of the user's own repertoire (§5.149) are built (2026-11-01), and thirteen more theoretical endgames in two more groups (§5.150, the owner's request of 2026-11-02). A game card's move judged without waiting on the engine line's searches or the storm's workers (§5.151, the owner's request of 2026-11-04). Show and grade in the storm, every move of a deepened position shown by its band (§5.152, the owner's request of 2026-11-06), is built. Read with `DECISIONS.md`, which this plan updates (its
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Storm positions shared between devices through the data repo, and an overnight gather (§5.102), are built (2026-10-12). Lc0 on the study page, its pick among close moves (§5.143), is built (2026-10-31). Endgames, the theoretical endgames each played for its goal against Stockfish (§5.145), are built (2026-10-31), their moves judged in the background since (§5.146, the owner's request of 2026-11-01), defended by Maia checked by Stockfish (§5.147, the owner's request), and a draw's attacker pushing on so the whole method comes up (§5.148, the owner's note). The endgames of the user's own repertoire (§5.149) are built (2026-11-01), and thirteen more theoretical endgames in two more groups (§5.150, the owner's request of 2026-11-02). A game card's move judged without waiting on the engine line's searches or the storm's workers (§5.151, the owner's request of 2026-11-04). Show and grade in the storm, every move of a deepened position shown by its band (§5.152, the owner's request of 2026-11-06), is built. A robotic board, the Chessnut Move, in the storm's untimed sessions and in practice is planned (§5.153, the owner's request of 2026-11-06), not built. Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -8482,3 +8482,203 @@ bands, the best wider than a mistake, the buttons in view above the list (under 
 phone), Found going on at once, Missed keeping the card, a move named from the list graded "Good
 move · #3 of 12" with the blue line, the review's words and arrows, the three events written and
 the record. Live: TESTING.md.
+
+#### 5.153 A robotic board: the Chessnut Move in the storm's untimed sessions and in practice (the owner's request, 2026-11-06)
+
+"I'm planning on buying the 'Chessnut Move' board and I want to be able to use it with Repworks.
+The most important part is that Storm (not timed) and practice mode works. Research and plan the
+integration of Chessnut Move into Repworks. No need to implement anything yet."
+
+Planned, not built. All of it can be built and tested before the board arrives (a simulated board
+in the tests); what only the real board can show is under Live, and part (a), a spike page, checks
+it in minutes on the day it comes.
+
+**The board** (Chessnut's pages and published API; nothing seen live). Each of its 34 pieces (a
+spare queen a side) has its own motor, battery and wheels and drives itself; the board knows every
+piece by kind and place (1 mm, 10 Hz, by Chessnut's specs) and lights each square. Bluetooth 5.0
+and Wi-Fi; the board charges by USB-C, the pieces on a pad. It takes one Bluetooth connection at a
+time, so Chessnut's own app must let go of it first. The protocol, over Bluetooth Low Energy:
+
+- Name `Chessnut Move`. Service `1b7e8261-2877-41c3-b46e-cf057c562023` holds the position reports
+  (`1b7e8262-…`, notify); service `1b7e8271-…` the command write (`1b7e8272-…`) and the responses
+  (`1b7e8273-…`, notify). The UUIDs are those of Chessnut's other boards; the commands differ.
+- `21 01 00` (written with response) starts the reports; the board answers `23 …` (undocumented,
+  seen by the Rust SDK below). A report is 38 bytes: bytes 2–33 are the 64 squares, two a byte,
+  h8, g8 … a8, h7 … a1, the first of each pair in the low nibble; 0 empty, 1 q, 2 k, 3 b, 4 p,
+  5 n, 6 R, 7 P, 8 r, 9 B, 10 N, 11 Q, 12 K. Bytes 0–1 and 34–37 aren't documented and are ignored.
+- **The robot**: `42 21`, the position wanted in the same 32 bytes, and a flag (0: force, the
+  robot goes on whatever a hand does; 1: a hand on a piece stops it): 35 bytes. The board plans
+  the drive itself, every piece at once where it can. `42 21` and 33 zeros stops it. Nothing says
+  "done": it is done when the board reports the position sent. Chessnut's README says the reports
+  stop during a drive; Chessnut's own app guards against "intermediate FENs while the motor is
+  moving". Decision 4 copes with either.
+- Lights: `43 20` and 32 bytes in the same order, a colour a square: 0 off, 1 red, 2 green, 3 blue
+  in the README; Chessnut's app also sends 4 dark green, 5 bright green, 6 yellow, 7 orange.
+- Battery: `41 01 0c` → `41 03 0c <charging> <percent>`. Pieces: `41 01 0b` → 34 × (kind, x, y,
+  battery %), White's P×8 R×2 N×2 B×2 Q×2 K then Black's; x = y = 0 for a piece off the board.
+- No button is reported (MoveAPiece's sniffer notes, `egdels/moveapiece` at `7e6129b`,
+  `tools/chessnut-sniffer/CHESSNUT_PROTOCOL.md`); the board's reset button sends every piece home
+  by itself.
+
+**Checked for this plan** (2026-11-06, clones and scratch code outside the repo):
+
+| What | Finding | How |
+| --- | --- | --- |
+| Chessnut's API | The protocol above | `chessnutech/chess_move_api` at `c9b1dc6` (2025-08-08) |
+| Chessnut's own app is open source, GPL-3.0 like this repo | ChessnutNext (Flutter) drives the Move as above, with its auto-move flag at 0 (force) by default. Its puzzle and storm screens take a move once the board has held it `fenDelay` (800 ms by default), put a wrong move back with the robot after `moveRestoreDelay` (2 s), and ignore the reports while a position sent isn't reached (`_moveBoardTargetFen`). A Black player sits at the near edge through a 180° `reversed` mapping. Its move-quality lights are green for best, great and good, blue for an inaccuracy, red for a mistake or a blunder | `chessnutech/ChessnutNext` at `6954f72` (2026-09-22): `lib/services/physical_board_protocol.dart`, `physical_board_orientation.dart`, `move_quality_lights_service.dart`, `board_settings_service.dart`, `lib/screens/puzzle_screen.dart` |
+| A community SDK | `chessnut-move` 1.0.2 (Rust, Apache-2.0), "based on Chessnut's published Move API and some manual testing": the same bytes, the start order (subscribe to the reports, `21 01 00`, subscribe to the responses), the `23` reply, the one-connection note; its tests give vectors | the crate from crates.io, read in full (`src/protocol`, `src/transport/gatt.rs`) |
+| The byte order | ChessnutNext's encoder and the README's decoder round-trip four positions (1. e4, a middlegame, two kings, queens in opposite corners); the SDK's example (byte 2 `0x21`) decodes as h8 black queen, g8 black king | a 30-line scratch check |
+| Web Bluetooth in browsers | Shipped with no flag in Chrome on Android (6.0 or later) and Windows (10 1703 or later), and in Edge; not in Firefox, nor in Safari or any iPhone browser. `getDevices()` and persistent permissions are still behind flags: after a reload the board is picked in the chooser again (one tap); while a page lives, a lost link reconnects without it | `WebBluetoothCG/web-bluetooth`'s `implementation-status.md` at `2e451c1` (2026-06-03) |
+| **Brave turns Web Bluetooth off by default, everywhere** | `kBraveWebBluetoothAPI` is `FEATURE_DISABLED_BY_DEFAULT`, and Brave's Bluetooth delegate answers "globally disabled" unless it is on. The switch is `brave://flags/#brave-web-bluetooth-api` ("Web Bluetooth API", on every platform). The owner uses Brave on Windows and on Android 10, and Chrome for the installed app on the phone (§4.2's runs, D4) | `brave/brave-core` at `e48ff9a` (2026-11-06): `browser/about_flags.cc`, `chromium_src/third_party/blink/common/features.cc`, `browser/bluetooth/brave_bluetooth_delegate.cc` |
+| The site's side | Screens change in the hash, so one Connect lasts the app's session. A move enters the storm by `answerMove(uci)` and practice by `practiceMove(uci)`, the calls a move on the screen makes. A storm card keeps the move that reached it and the position before (`StoredPosition.arrived`). `Train.tsx` already holds a screen wake lock | `src/app/storm.ts`, `src/app/practice.ts`, `src/core/storm/harvest.ts`, `src/ui/Train.tsx` |
+
+Not checked, only the board can show it: the reports during a drive; how long a storm card takes
+to set up (Chessnut says seconds, a move under 3 s on average; no independent timing found); which
+of codes 4–7 light; how the 600 ms window feels; castling, en passant and promotions read by hand;
+the robot with a hand in the way; the link after the board's idle power-off and after the phone's
+screen locks; whether Chrome on Android 10 asks for Location in the chooser (Android's rule for
+Bluetooth scans before Android 12; not read here).
+
+**For the owner's devices**: Chrome on the phone needs nothing (Android 10); Brave needs the flag
+above, on the phone and on the Windows desktop (or Chrome or Edge there), and the desktop a
+Bluetooth LE adapter. Not on an iPhone or iPad.
+
+**Decisions** (technical calls, each with its reason; in DECISIONS.md's revision log):
+1. **Web Bluetooth from the page**: no app, no bridge, no server (D2). Only if a device can't use
+   it: a small local bridge on the Rust SDK, reached as explorerdb is on localhost (§5.25); not
+   planned.
+2. **The site is the truth; the board shows it and is a second way to move.** Each position a
+   board session shows on the screen is sent to the board whole, in force mode (Chessnut's app's
+   default: the site's position wins over a stray hand). A move read on the board goes in by the
+   same call as a move on the screen; a move made on the screen is driven on the board. Either way
+   works at any time. Nothing new is written: answers given on the board are ordinary `storm` and
+   `practice` events, no new field, no change to a data format.
+3. **Reading a move**: the reported placement against each legal move's result from the position
+   the site expects (chessops), Chessnut's own method; a match the board holds for 600 ms (Chessnut
+   800; a setting, 300–1500 ms) is the move. Castling, en passant and promotion come out of the
+   same comparison, and a promotion reads the piece put down (each piece is known by kind), most
+   often the spare queen. A rook moved first when castling and then left reads as a rook move:
+   "castle with the king first", as on every electronic board, said once on the screen. A pawn left
+   on the last rank: the promotion picker on the screen, then the robot swaps the piece.
+4. **The robot's driving never reads as a move.** While a position sent isn't reported, the
+   reports are only compared with it, whether the board reports on the way or not; once it is
+   reported the board is in sync and moves are read again. Not reached in 20 s (a piece stuck, a
+   flat battery, a piece missing): the screen names the squares that differ, the board lights them
+   red, and Send again or set them by hand (each light goes out as its square comes right).
+5. **A wrong position put back.** Reported, no legal move, and held 2 s (Chessnut's default; a
+   setting): the robot sets the expected position again. During the opponent's turn and while the
+   site grades or shows a verdict, a hand's move is put back the same way. No premoves from the
+   board.
+6. **The user's side nearest them.** A position the user plays as Black is set up turned 180°
+   (Chessnut's `reversed`), so every card and game comes from the near edge as the screen turns it.
+   A storm changes sides from card to card, and the robot turns the board while setting up anyway.
+   A setting keeps White at the near edge. A move read is turned back the same way.
+7. **Lights** (a setting turns them off): the move that reached the position blue; the user's
+   move in its band's colour once graded (the top move and Great bright green, Good green,
+   Inaccuracy yellow, Mistake orange, Blunder red); the best move, when shown, green; a hint blue
+   (the piece, then the square); squares to put right red. Codes 4–7 are used if they light (the
+   spike says); else Chessnut's own three: green up to Good, blue an inaccuracy, red a mistake or a
+   blunder. Off at the next card or move.
+8. **Positions the pieces can't make.** 8 pawns, 2 rooks, 2 knights, 2 bishops, 2 queens and a
+   king a side, so a third queen or a third knight can't be set up. A storm card like that isn't
+   dealt while the board is linked (rare at the repertoire's frontiers); a practice game that
+   reaches one (a third queen, an under-promotion's third knight) goes on on the screen, said so.
+9. **The screen kept awake** while a board session runs (the Screen Wake Lock, as `Train.tsx`): the
+   eyes are on the board, and a phone that sleeps freezes the page and drops the link. A page
+   hidden drops it; it reconnects, with no chooser, when the page shows again.
+10. **Speech, optional** (off by default; §5.63's `speak`): the band and the best move said, the
+    opponent's move said in practice, for a session played without looking at the screen.
+11. **Keys and the ring** as they are (Space, `2`, `4`, the media keys): the board has no buttons
+    to read.
+12. **Code.** `src/core/board/` (pure, the clock passed in): `chessnut.ts` (the codec: reports, the
+    robot's command and stop, lights, battery, pieces), `orient.ts` (the turn), `read.ts` (a move
+    from a placement; whether the pieces can make a position), `link.ts` (the link as a reducer: a
+    report, a position sent or a tick in, what to do out: a move, a put-back, a timeout, the
+    lights). A port, `PhysicalBoard`, in core as `Remote` and `Clock` are: connect, reports, send a
+    position, stop, lights, battery, pieces, disconnects. `src/platform/chessnut.ts` over
+    `navigator.bluetooth` (its few types declared there; no new dependency). `src/app/boardLink.ts`
+    (the link's signal, each screen's position, moves routed to `answerMove` or `practiceMove`,
+    reconnect, the wake lock), `src/ui/BoardLink.tsx`. The codec is written new from the README and
+    tested against ChessnutNext's encoder and the SDK's vectors; both licences (GPL-3.0,
+    Apache-2.0) fit this repo's.
+
+**The link.** A "Board" chip in the head, shown only where `navigator.bluetooth` exists: Connect
+(the chooser, filtered to `Chessnut Move`), then the board's battery and state (in sync, setting
+up, differs, reconnecting). Its dialog: the board as reported (a small board), the pieces'
+batteries (low ones named), the settings (lights, side nearest, the window, the put-back, speech,
+"Play the move that reached a card"), Reset the pieces (the start position), Disconnect. A board
+session runs where the site has a position to play from: the storm's cards and practice games;
+elsewhere the board stays as it is, lights off.
+
+**The set and show and grade on the board** (the owner's priority, the untimed storm):
+- A card: the robot sets up its position, turned to the user, the move that reached it lit blue;
+  "Setting up the board…" on the screen until the board is in sync. With "Play the move that
+  reached a card" (off by default) the robot sets up the position before and then plays that move,
+  as an opponent would.
+- The move played on the board goes in as on the screen and is graded; the verdict is on the
+  screen and in the lights (and said, with speech).
+- Great or good: the next card comes after 2.6 s by itself while the board is linked (a set's Next
+  waits for a press now; Pause, `P`, as in the storm), since the hands are on the board. A held
+  card: after 2 s the robot takes the move back and the card waits for the next try (Try again
+  without a press; the tries counted as now); taking it back by hand does the same. Show the move
+  (a key, the ring or the screen): the robot plays the best move, lit green. Then Next.
+- Show and grade: the moves are shown on the screen (twelve arrows can't be lit; the board lights
+  the top move green); Found and Missed by the keys and the ring; a move played on the board names
+  it and is graded as in a set.
+- Puzzles: the robot plays each reply.
+- The review: the board follows the row chosen, a second after the last step (so stepping through
+  doesn't send the robot to and fro), the move played and the best lit.
+- The timed storm (built after the set): setting up is a phase before the card waits for a move,
+  so the clock, which runs only while a card waits for a move (§5.43), never runs during it.
+
+**Practice on the board** (§5.57; the advantage and checklist drills and the endgames, §5.145, are
+practice games and come with it):
+- The robot sets up the start. The user's move goes in as on the screen; the opponent's (the
+  database, Maia, Stockfish) is driven by the robot and lit blue, and the next move is read once the
+  board shows it.
+- The repertoire check's take-back: the robot takes the move back, lit red, the study move named
+  (and said). Take back: the robot takes back both moves. Hint: lit blue. With "Move feedback" on,
+  the move's class in the lights once its judge is in.
+- The end: the result on the screen (and said); the board left as it is until Reset the pieces or
+  the next game.
+
+**Not in this plan** (later, if asked): the repertoire trainer and Learn (the robot playing the
+line's other side), the study page and the analysis board followed by the board, Chessnut's other
+boards (Air, Evo: the same UUIDs, other commands), the board's Wi-Fi and stored games.
+
+**Build order** (each part tested and pushed on its own):
+- (a) **The spike page**, `board.html` (as `spike.html`, §4.2): whether this browser has Web
+  Bluetooth (and if not why, Brave's flag named), Connect, the reports as hex and as a FEN, Set a
+  FEN with the time until the board reports it and every report on the way, each light code 0–7 on
+  a rank of its own, battery, pieces, a log to copy. Without a board it already says whether the
+  browser can; with one, five minutes check what this plan assumes.
+- (b) `core/board` and its unit tests: the codec against the README's example, the SDK's vectors
+  and ChessnutNext's encoder; the turn; every kind of move read both ways round (castling on both
+  wings for both sides, en passant, each promotion, a capture lifted in either order); the
+  transients (a piece lifted, a capture's two steps, a rook-first castle inside the window and
+  past it); a placement no legal move makes; which positions the pieces can make; the reducer
+  (reports on the way ignored, the sync, the 20 s timeout, the window, the put-back, a hand during
+  the opponent's turn). Controls in the files' headers, as usual.
+- (c) The port, `platform/chessnut.ts`, and a simulated Move for the e2e (`test/e2e/chessnut.ts`,
+  put in as `navigator.bluetooth` by `addInitScript`: the chooser answered, the GATT services, a
+  robot that reaches a position after a delay with a report on the way, and a hand the test moves).
+- (d) The link: the chip, the dialog, reconnect, the wake lock. e2e: Connect, the battery, a drop
+  and the reconnect, no chip without Web Bluetooth.
+- (e) Practice on the board. e2e (desktop and phone): the start set up, a move by hand read and
+  played, the opponent's move driven, a hand during the opponent's turn put back, the repertoire's
+  take-back, Take back, a game as Black set up turned.
+- (f) The set, show and grade, puzzles. e2e: a set of 6 on the simulated board: each card set up
+  with nothing counted meanwhile, a great move by hand and the next card by itself, a held card
+  taken back and tried again, Show the move driven, show and grade named on the board, a puzzle's
+  reply driven, the events as from the screen, the lights sent each time.
+- (g) The timed storm and the review. e2e: the clock stopped while setting up; the review
+  followed.
+
+Live (TESTING.md once built; the owner's board): (a) first; then a set, a show and grade and a
+practice game on the board, on the phone (Chrome; Brave with the flag) and on the desktop: the
+setup times, the window and the put-back's feel, the lights, a session of ten minutes with the
+screen untouched.
+
+Risks: the time to set up a card (the untimed sessions only cost patience; the timed storm doesn't
+count it); Brave's flag; the link on a phone that sleeps (decision 9); the undocumented parts (the
+`23` reply, codes 4–7): only the documented parts are relied on.

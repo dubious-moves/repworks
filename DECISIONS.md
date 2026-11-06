@@ -2094,3 +2094,26 @@ The technical calls, each with its reason:
   trainer's (§5.9), so the ring works here too; naming the move keeps an exact grade for whoever
   wants one.
 
+
+## Revision of 2026-11-06 (the Chessnut Move planned, PLAN.md §5.153)
+- **A robotic board through Web Bluetooth, from the page**: no app, bridge or server (D2 kept).
+  Chessnut publishes the Move's protocol, and its own app (ChessnutNext, GPL-3.0) and a Rust SDK
+  confirm it. Web Bluetooth ships in Chrome on Android and Windows; **Brave has it off by default
+  on every platform** (`brave://flags/#brave-web-bluetooth-api`, read in brave-core), so Brave
+  needs the flag, Chrome nothing. No iPhone.
+- **The site stays the truth; the board shows its position and is a second way to move.** Each
+  position is sent whole (the robot drives every piece there); a move is read by comparing the
+  board's report with each legal move's result, once held 600 ms; the robot's own driving is never
+  read; a wrong position held 2 s is put back by the robot; a Black player's positions are set up
+  turned 180°, so the user's side is always nearest.
+- **Nothing new is synced or written**: answers given on the board are ordinary `storm` and
+  `practice` events, with no new field; the board's settings stay on the device.
+- **Scope first**: the set, show and grade (with puzzles) and practice (with the drills and the
+  endgames), then the timed storm with its clock stopped while the board sets up; the repertoire
+  trainer and the study's boards later, if asked. A spike page comes first, to check on the day
+  the board arrives what the plan takes from documentation (the reports while the robot drives,
+  the setup time, the extra light colours).
+- Why: the owner, 2026-11-06: "I'm planning on buying the 'Chessnut Move' board and I want to be
+  able to use it with Repworks. The most important part is that Storm (not timed) and practice
+  mode works. Research and plan the integration … No need to implement anything yet." Planned
+  only; the build waits for the owner's word.
