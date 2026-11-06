@@ -9,6 +9,8 @@
 // to depth 24, §5.45, §5.84), several engines at once (§5.103).
 //
 // Usage: node scripts/storm-gather.ts <data-repo checkout> [options]
+//   --study S          only this study's lines (its name, any case, or its id), walked and scored
+//   --chapter C        only this chapter's (with --study, or alone when one study has a chapter so named)
 //   --overnight        keep going over older games, pass after pass (§5.102), scoring between them
 //   --minutes N        stop walking after N minutes (the gather's own scoring included)
 //   --score-minutes N  then score for N minutes at most (default: until every position is scored)
@@ -18,7 +20,9 @@
 //   --elo N[,N…]       Maia's ratings beyond its ladder (default: those the devices' positions carry)
 //   --no-maia, --no-deepen     leave those to the devices
 //   --score-only       no gathering: Stockfish scores the cloud's positions short of the standard
-//                      (for --score-minutes at most), and that is all
+//                      (every device's with --all-devices; for --score-minutes at most), and that is all
+//   --all-devices      Stockfish scores every device's positions, not only the cloud's: each one
+//                      scored is written to the cloud's files, and the devices take its list from there
 //   --push             commit the cloud's files and push them (the checkout on its default branch)
 // Environment: LICHESS_TOKEN (the explorer wants a login; without one only invented lines),
 //   STOCKFISH=<native binary> or STOCKFISH_LITE=19 (default: the vendored Stockfish 18 lite).
@@ -36,7 +40,7 @@ import { deepenedPosition, engineList, judges, needsDeepening, type StoredPositi
 import { keptPolicy, missingRatings } from '../src/core/storm/maia.ts';
 import { positionOf } from '../src/core/storm/walk.ts';
 import { readTree } from './read-tree.ts';
-import { addPositions, CLOUD_DEVICE, cloudDevice, maiaElos, ownFileChanges, readRepertoire, readShared, wholeRepertoire } from './storm/data.ts';
+import { addPositions, CLOUD_DEVICE, cloudDevice, findScope, gatherScope, maiaElos, ownFileChanges, positionsToWork, readRepertoire, readShared, withList } from './storm/data.ts';
 import { startEngines } from './storm/engine.ts';
 import { maiaPolicies } from './storm/maia.ts';
 
@@ -44,6 +48,8 @@ import { maiaPolicies } from './storm/maia.ts';
 
 interface Options {
   dir: string;
+  study?: string;
+  chapter?: string;
   overnight: boolean;
   minutes?: number;
   scoreMinutes?: number;
@@ -54,21 +60,29 @@ interface Options {
   elos?: number[];
   maia: boolean;
   deepen: boolean;
-  /** No walking (and no explorer, no Maia): the cloud's positions scored, nothing else. */
+  /** No walking (and no explorer, no Maia): the positions scored, nothing else. */
   scoreOnly: boolean;
+  /** The other devices' positions scored too, and so written to the cloud's files. */
+  allDevices: boolean;
   push: boolean;
 }
 
 function options(argv: string[]): Options {
-  const o: Options = { dir: '', overnight: false, source: 'both', minPly: STORM.minPly, maxPly: STORM.maxPly, engines: availableParallelism(), maia: true, deepen: true, scoreOnly: false, push: false };
+  const o: Options = { dir: '', overnight: false, source: 'both', minPly: STORM.minPly, maxPly: STORM.maxPly, engines: availableParallelism(), maia: true, deepen: true, scoreOnly: false, allDevices: false, push: false };
   const num = (flag: string, v: string | undefined) => {
     const n = Number(v);
     if (!v || !Number.isFinite(n) || n <= 0) throw new Error(`${flag} wants a positive number`);
     return n;
   };
+  const text = (flag: string, v: string | undefined) => {
+    if (!v?.trim() || v.startsWith('--')) throw new Error(`${flag} wants a name`);
+    return v;
+  };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
-    if (a === '--overnight') o.overnight = true;
+    if (a === '--study') o.study = text(a, argv[++i]);
+    else if (a === '--chapter') o.chapter = text(a, argv[++i]);
+    else if (a === '--overnight') o.overnight = true;
     else if (a === '--minutes') o.minutes = num(a, argv[++i]);
     else if (a === '--score-minutes') o.scoreMinutes = num(a, argv[++i]);
     else if (a === '--source') {
@@ -82,6 +96,7 @@ function options(argv: string[]): Options {
     else if (a === '--no-maia') o.maia = false;
     else if (a === '--no-deepen') o.deepen = false;
     else if (a === '--score-only') o.scoreOnly = true;
+    else if (a === '--all-devices') o.allDevices = true;
     else if (a === '--push') o.push = true;
     else if (a.startsWith('--')) throw new Error(`unknown option ${a}`);
     else if (!o.dir) o.dir = a;
@@ -89,6 +104,7 @@ function options(argv: string[]): Options {
   }
   if (!o.dir) throw new Error('usage: node scripts/storm-gather.ts <data-repo checkout> [--overnight] [--minutes N] [--score-only] [--push] …');
   if (o.scoreOnly && !o.deepen) throw new Error('--score-only and --no-deepen leave nothing to do');
+  if (o.allDevices && !o.deepen) throw new Error('--all-devices is for the scoring, which --no-deepen leaves out');
   if (o.scoreOnly && (o.overnight || o.minutes)) throw new Error('--score-only gathers nothing: --overnight and --minutes don’t apply (--score-minutes does)');
   return o;
 }
@@ -207,13 +223,15 @@ async function main(): Promise<void> {
 
   const c = withPlyRange(STORM, o.minPly, o.maxPly);
   const rep = readRepertoire(files, started, c);
-  const scope = wholeRepertoire(rep.lines, c);
+  const where = findScope(rep, o.study, o.chapter);
+  const scope = gatherScope(rep.lines, c, where.scope);
   const device = cloudDevice(files, Math.random, new Date(started).toISOString());
   const shared = readShared(files, device.id);
   const store = shared.positions;
   const isOwn = (p: StoredPosition) => !p.from;
   const ownAtStart = [...store.values()].filter(isOwn).length;
-  say(`repertoire: ${rep.chapters.length} chapters, ${rep.lines.length} lines${rep.paused ? ` (${rep.paused} paused, left out)` : ''}, ${scope.frontiers.length} line ends, ${scope.decisions.length} decision points`);
+  say(`repertoire: ${rep.chapters.length} chapters, ${rep.lines.length} lines${rep.paused ? ` (${rep.paused} paused, left out)` : ''}`);
+  say(`scope: ${where.title}: ${scope.frontiers.length} line ends, ${scope.decisions.length} decision points`);
   say(`device "${CLOUD_DEVICE}" ${device.id}${device.file ? ' (new)' : ''}: ${ownAtStart} positions of its own, ${shared.theirs} from other devices, ${rep.done.size} answered well lately`);
   for (const [path, n] of shared.unread) say(`${path}: ${n} line(s) this version can't read (never rewritten)`);
 
@@ -284,14 +302,16 @@ async function main(): Promise<void> {
   let lastShare = Date.now();
   const SHARE_EVERY_MS = 15 * 60_000;
 
-  // The positions in the repertoire's lines (paused ones left out), the cloud's own, not done.
-  const keep = new Set(rep.lines.map((l) => `${l.sid}/${l.cid}/${l.path.join(' ')}`));
-  const ownToWork = () => [...store.values()].filter((p) => isOwn(p) && !rep.done.has(p.card) && p.lines.some((r) => keep.has(`${r.sid}/${r.cid}/${r.path.join(' ')}`)));
-
-  /** Stockfish to the desktop's standard (§5.45, §5.84) over the cloud's positions, every engine at once (§5.103). */
+  // The positions on the scope's lines (paused ones left out), not done: the cloud's own for Maia,
+  // and for Stockfish every device's with --all-devices.
   const target = STORM.deepenDepth.desktop;
+  const ownToWork = () => positionsToWork(store.values(), rep.lines, where.scope, rep.done, false);
+  const toScore = () => positionsToWork(store.values(), rep.lines, where.scope, rep.done, o.allDevices).filter((p) => needsDeepening(p, target));
+  let adopted = 0;
+
+  /** Stockfish to the desktop's standard (§5.45, §5.84) over the scope's positions, every engine at once (§5.103). */
   const deepen = async (halt: () => boolean, untilMs?: number): Promise<{ done: number; kept: number }> => {
-    const todo = ownToWork().filter((p) => needsDeepening(p, target));
+    const todo = toScore();
     for (let i = todo.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [todo[i], todo[j]] = [todo[j]!, todo[i]!];
@@ -300,7 +320,8 @@ async function main(): Promise<void> {
     const total = order.length;
     let done = 0;
     let kept = 0;
-    if (total) say(`scoring ${total} positions: MultiPV ${STORM.deepenMultipv} to depth ${target}, ${engines.width} at once`);
+    const theirs = todo.filter((p) => !isOwn(p)).length;
+    if (total) say(`scoring ${total} positions${theirs ? ` (${theirs} of them other devices')` : ''}: MultiPV ${STORM.deepenMultipv} to depth ${target}, ${engines.width} at once`);
     const lane = async () => {
       for (let p = order.shift(); p; p = order.shift()) {
         if (halt() || (untilMs !== undefined && Date.now() > untilMs)) return;
@@ -313,7 +334,11 @@ async function main(): Promise<void> {
         if (d) {
           kept++;
           const cur = store.get(p.card);
-          if (cur) store.set(p.card, { ...cur, scored: d.scored, src: d.src, depth: d.depth });
+          if (cur) {
+            // Another device's becomes the cloud's own, so its list reaches the devices (--all-devices).
+            if (o.allDevices && !isOwn(cur)) adopted++;
+            store.set(p.card, withList(cur, d, o.allDevices));
+          }
         }
         say(`scored ${done} of ${total}: depth ${a?.depth ?? 0} in ${((Date.now() - t0) / 1000).toFixed(0)} s${d ? '' : ', not kept'} (${p.names[0] ?? 'a line'})`);
         if (Date.now() - lastShare > SHARE_EVERY_MS) {
@@ -327,7 +352,7 @@ async function main(): Promise<void> {
   };
 
   /** Maia's ratings (§5.82) for the cloud's positions lacking some. */
-  const elos = maiaElos(store.values(), o.elos);
+  const elos = maiaElos(shared.elsewhere, o.elos);
   const rate = async (): Promise<number> => {
     const todo = ownToWork().filter((p) => missingRatings(p.maia, elos[0]!, elos).length);
     if (!todo.length) return 0;
@@ -360,7 +385,7 @@ async function main(): Promise<void> {
   const own = () => [...store.values()].filter(isOwn).length;
   if (!o.scoreOnly) {
     const ask = explorer(token);
-    say(`gathering${o.overnight ? ' overnight' : ''}${o.minutes ? ` for ${minutes(o.minutes)} at most` : ''}: ${o.source === 'both' ? 'line ends and replies' : o.source === 'ends' ? 'line ends' : 'replies'}, plies ${c.minPly}–${c.maxPly} past the end`);
+    say(`gathering${o.overnight ? ' overnight' : ''}${o.minutes ? ` for ${minutes(o.minutes)} at most` : ''} over ${where.title}: ${o.source === 'both' ? 'line ends and replies' : o.source === 'ends' ? 'line ends' : 'replies'}, plies ${c.minPly}–${c.maxPly} past the end`);
     const g = await runGather(scope, { source: o.source, overnight: o.overnight, config: c }, {
       io: (count, until, strict) => serviceIo(ask, engines.analyse, count, guard, STORM, Math.random, until, strict),
       positions: async () => [...store.values()],
@@ -385,7 +410,8 @@ async function main(): Promise<void> {
     });
     clearTimeout(walkTimer);
     show({ ...g, running: false });
-    say(`gathered: ${own() - ownAtStart} new positions of its own (${own()} in all)`);
+    // Those taken over from other devices by the scoring between passes aren't gathered.
+    say(`gathered: ${own() - ownAtStart - adopted} new positions of its own (${own()} in all)`);
   }
 
   // Then what the storm's home does with them: Maia's ratings, Stockfish's standard.
@@ -400,8 +426,8 @@ async function main(): Promise<void> {
   }
   await share();
   engines.quit();
-  const left = ownToWork().filter((p) => needsDeepening(p, target)).length;
-  say(`done in ${((Date.now() - started) / 60_000).toFixed(1)} min: ${own()} positions of its own${left ? `, ${left} still to score (a device's deepening finishes them)` : ''}${o.push ? `, ${pushed} push(es)` : ', not pushed (--push)'}`);
+  const left = toScore().length;
+  say(`done in ${((Date.now() - started) / 60_000).toFixed(1)} min: ${own()} positions of its own${adopted ? ` (${adopted} scored for other devices)` : ''}${left ? `, ${left} still to score in ${where.title} (a device's deepening finishes them)` : ''}${o.push ? `, ${pushed} push(es)` : ', not pushed (--push)'}`);
 }
 
 main().then(

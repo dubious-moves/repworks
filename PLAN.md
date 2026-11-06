@@ -8628,11 +8628,38 @@ it".
   of the non-scored positions?") skips the walk, the explorer and Maia. Stockfish scores the
   cloud's own positions short of the standard, for `--score-minutes` at most, and they are written
   and pushed as usual.
-  - Other devices' positions are left to them: the cloud writes only its own folder, and a
-    device's store deepens what it merged on the storm's home anyway.
+  - Other devices' positions are left to them unless `--all-devices` (below).
   - It can't be combined with `--overnight` or `--minutes`, nor with `--no-deepen`.
   - Tried on a scratch copy of the data repo: it found the first run's 272 unscored positions and
     scored 11 in 2 minutes, rewriting only the cloud's file.
+- **`--all-devices`** (the owner's request, 2026-11-06: "I want the cloud session to be able to
+  score all positions from all devices"): Stockfish scores every device's positions short of the
+  standard, not only the cloud's, in the scoring after a gather, between overnight passes and with
+  `--score-only`.
+  - A device's own deepening of another device's position stays on that device (only what it
+    gathered is in its files). So a position the cloud scores for another device becomes the
+    cloud's own: it goes into the cloud's files with its lines, time and ratings as they were.
+  - Every device merging those files takes the better list (`mergeShared`, §5.102), the device
+    that gathered it as well: that one keeps it as its own and writes the list into its own file.
+  - No new file kind and no change to the app. The cost is copies: the cloud's folder holds the
+    positions it scored for others. A device that cleared one doesn't take it back (the copy keeps
+    the time it was gathered, before the clearing); a device set up later gets it from the cloud.
+  - Maia's ratings beyond the ladder are now read from the other devices' files as they are, not
+    from the merged store, so the positions the cloud takes over don't stop counting.
+- **`--study S` and `--chapter C`** (the same request: "focus on positions from a specific study
+  and chapter, both when it comes to scoring and gathering") limit a run as the storm's home's
+  scopes do (§14.21, `scopeData`). Only the scope's line ends and decision points are walked, found
+  over the whole repertoire so a walk that leaves the chapter's lines for another chapter's still
+  re-enters the repertoire. Maia and Stockfish work only on the positions on the scope's lines.
+  - A name is matched in any case, or an id given. A chapter's name alone does when one repertoire
+    study has a chapter so named.
+  - A name that matches nothing, or more than one, is refused with the names there are. So is a
+    reference study.
+  - Tried on a scratch copy of the data repo, chapter "Accepted - Main lines" of "Scandi Gambit"
+    (48 line ends, 248 decision points):
+    - `--score-only --all-devices` found 102 positions short of depth 24, all of them other
+      devices', and scored 18 in 3.5 minutes. They went into three of the cloud's files.
+    - 3 minutes' walking kept 11 positions, every one on that chapter's lines.
 
 Run from a cloud session with both repos (a command there runs two hours at most, so the minutes):
 
@@ -8647,6 +8674,12 @@ Or only the scoring of what the cloud gathered before:
 node scripts/storm-gather.ts ../repworks-data --score-only --score-minutes 100 --push
 ```
 
+Or one chapter, gathered, then every device's positions in it scored:
+
+```sh
+node scripts/storm-gather.ts ../repworks-data --study "Scandi Gambit" --chapter "Accepted - Main lines" --minutes 45 --score-minutes 60 --all-devices --push
+```
+
 Tests: `test/unit/core/storm/gather.test.ts` (over a fake host):
 - breadth first, one game at every line end and then the rest;
 - a position kept once;
@@ -8659,15 +8692,19 @@ Tests: `test/unit/core/storm/gather.test.ts` (over a fake host):
 
 `test/unit/scripts/stormGather.test.ts` (the fixture data repo):
 - the repertoire and what is done;
+- a run's scope found by name (a study, a chapter in it, a chapter alone; nothing or two
+  answering), and a chapter's line ends and decision points;
 - the cloud's device found again or made;
 - the other devices' positions marked with their device, and the better list and the Maia
   ratings merged in;
 - the store's cap;
+- the positions a run scores (the scope's, not done; the cloud's own or every device's), one
+  scored for another device written to the cloud's files and its list taken by that device;
 - the cloud's own files: by day, those changed only, a file it can't read left alone;
 - Maia's ratings;
 - Stockfish's lanes under Node.
 
-Each file has three controls in its header. `storm.spec.ts` is unchanged and passes.
+The loop's file has three controls in its header, the script's six. `storm.spec.ts` is unchanged and passes.
 
 Measured (2026-11-06, a 4-core cloud container, on copies of the owner's data repo):
 - **3 minutes of walking** gathered 47 positions, for 54 explorer requests, 14 game exports, 210

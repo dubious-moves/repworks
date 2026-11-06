@@ -1,7 +1,8 @@
 // The cloud gather's data (PLAN.md §5.155), read from a data repo's checkout as the app reads it:
 // the repertoire's chapters and lines (paused lines left out, §5.70), the cards answered well
 // lately (from every device's progress log, §5.41), the cloud's own device and its storm files, the
-// other devices' storm files merged in (§5.102); and what the cloud writes back: its own files,
+// other devices' storm files merged in (§5.102); the scope a run is limited to (a study or a
+// chapter, as the storm's home scopes it, §14.21); and what the cloud writes back: its own files,
 // those that changed, never one this version can't read in full (as `app/stormShare.ts`).
 import { classifyPath, chapterPath, devicePath, stormDir } from '../../src/core/data/layout.ts';
 import { parseChapterFile } from '../../src/core/pgn/parse.ts';
@@ -13,7 +14,7 @@ import type { StormConfig } from '../../src/core/storm/config.ts';
 import type { StoredPosition } from '../../src/core/storm/harvest.ts';
 import { MAIA_LADDER } from '../../src/core/storm/maia.ts';
 import { mergeShared, parseSharedFile, sharedFiles } from '../../src/core/storm/shared.ts';
-import { decisions, frontiers, stormLines, type StormLine } from '../../src/core/storm/sources.ts';
+import { decisions, frontiers, inScope, lineInScope, stormLines, type StormLine, type StormScope } from '../../src/core/storm/sources.ts';
 import { stormHistories } from '../../src/core/storm/store.ts';
 import type { Chapter } from '../../src/core/study/model.ts';
 import { freshId } from '../../src/core/study/ids.ts';
@@ -26,6 +27,8 @@ import type { GatherScope } from '../../src/core/storm/gather.ts';
 export const CLOUD_DEVICE = 'cloud';
 
 export interface Repertoire {
+  /** Every study, by name; only the repertoire's are stormed. */
+  studies: { sid: string; name: string; repertoire: boolean }[];
   /** Repertoire chapters, in the study list's order. */
   chapters: { sid: string; chapter: Chapter }[];
   /** The storm's lines: every repertoire chapter's, the paused ones left out. */
@@ -71,13 +74,75 @@ export function readRepertoire(files: ReadonlyMap<string, string>, now: number, 
   const all = stormLines(chapters);
   const lines = all.filter((l) => !pausedKeys.has(`${l.sid}/${l.cid}/${l.path.join(' ')}`));
   const done = new Set([...stormHistories(replay.states.keys(), eventsOf, now, c)].filter(([, h]) => h.done).map(([card]) => card));
-  return { chapters, lines, paused: all.length - lines.length, done };
+  const studies = metas.map((m) => ({ sid: m.sid, name: m.name, repertoire: m.kind === 'repertoire' }));
+  return { studies, chapters, lines, paused: all.length - lines.length, done };
 }
 
-/** The whole repertoire's line ends and decision points, as the storm's scope has them. */
-export function wholeRepertoire(lines: StormLine[], c: StormConfig): GatherScope {
+/** A chapter's name, as the app shows it: its `ChapterName`, else its id. */
+export const chapterName = (ch: Chapter): string => ch.headers.find(([k]) => k === 'ChapterName')?.[1] ?? ch.id;
+
+/** A run's scope and how it is named. */
+export interface Where {
+  scope: StormScope;
+  title: string;
+}
+
+/**
+ * The scope named by a study and a chapter (each by its name, any case, or its id): the whole
+ * repertoire with neither, a chapter alone if its name is in one repertoire study only. Throws, with
+ * the names there are, when nothing or more than one answers.
+ */
+export function findScope(rep: Repertoire, study?: string, chapter?: string): Where {
+  const same = (name: string, id: string, asked: string) => id === asked || name.trim().toLowerCase() === asked.trim().toLowerCase();
+  const quote = (names: string[]) => names.map((n) => `"${n}"`).join(', ');
+  let sid: string | undefined;
+  if (study !== undefined) {
+    const found = rep.studies.filter((s) => same(s.name, s.sid, study));
+    if (!found.length) throw new Error(`no study named "${study}"; the repertoire's: ${quote(rep.studies.filter((s) => s.repertoire).map((s) => s.name))}`);
+    if (found.length > 1) throw new Error(`${found.length} studies are named "${study}": give the id (${found.map((s) => s.sid).join(', ')})`);
+    if (!found[0]!.repertoire) throw new Error(`"${found[0]!.name}" is a reference study: the storm walks repertoire studies only`);
+    sid = found[0]!.sid;
+  }
+  const studyName = (id: string) => rep.studies.find((s) => s.sid === id)?.name ?? id;
+  if (chapter === undefined) return sid ? { scope: { kind: 'study', sid }, title: studyName(sid) } : { scope: { kind: 'all' }, title: 'the whole repertoire' };
+  const among = rep.chapters.filter((ch) => !sid || ch.sid === sid);
+  const found = among.filter((ch) => same(chapterName(ch.chapter), ch.chapter.id, chapter));
+  if (!found.length) throw new Error(`no chapter named "${chapter}"${sid ? ` in "${studyName(sid)}"; its chapters: ${quote(among.map((ch) => chapterName(ch.chapter)))}` : ' in a repertoire study'}`);
+  if (found.length > 1) throw new Error(`${found.length} chapters are named "${chapter}": ${found.map((ch) => `"${studyName(ch.sid)}" (${ch.chapter.id})`).join(', ')}; name the study${sid ? ' and give the chapter’s id' : ''}`);
+  const ch = found[0]!;
+  return { scope: { kind: 'chapter', sid: ch.sid, cid: ch.chapter.id }, title: `${studyName(ch.sid)} › ${chapterName(ch.chapter)}` };
+}
+
+/**
+ * The scope's line ends and decision points, as the storm's home has them (`app/storm.ts`'s
+ * `scopeData`): found over the whole repertoire, so coverage stays the repertoire's, then those of
+ * the scope's lines kept.
+ */
+export function gatherScope(lines: StormLine[], c: StormConfig, scope: StormScope = { kind: 'all' }): GatherScope {
   const f = frontiers(lines, c);
-  return { lines, frontiers: f.frontiers, decisions: decisions(lines).points, cont: f.cont };
+  return { lines, frontiers: inScope(f.frontiers, lines, scope), decisions: inScope(decisions(lines).points, lines, scope), cont: f.cont };
+}
+
+const lineKey = (r: { sid: string; cid: string; path: readonly string[] }) => `${r.sid}/${r.cid}/${r.path.join(' ')}`;
+
+/**
+ * The positions a run works on (`app/storm.ts`'s `storedInScope`): those on the scope's lines (the
+ * paused ones are out of `lines` already), not done; the cloud's own only, or every device's.
+ */
+export function positionsToWork(positions: Iterable<StoredPosition>, lines: readonly StormLine[], scope: StormScope, done: ReadonlySet<string>, everyDevice: boolean): StoredPosition[] {
+  const keep = new Set(lines.filter((l) => lineInScope(l, scope)).map(lineKey));
+  return [...positions].filter((p) => (everyDevice || !p.from) && !done.has(p.card) && p.lines.some((r) => keep.has(lineKey(r))));
+}
+
+/**
+ * A position with Stockfish's list put in. Another device's (`adopt`) becomes the cloud's own, so
+ * it is written to the cloud's files: every device merging them takes the better list (§5.102's
+ * `mergeShared`), the device that gathered it as well. Its lines, time and ratings stay as they were.
+ */
+export function withList(p: StoredPosition, d: Pick<StoredPosition, 'scored' | 'src' | 'depth'>, adopt: boolean): StoredPosition {
+  const out: StoredPosition = { ...p, scored: d.scored, src: d.src, depth: d.depth };
+  if (adopt) delete out.from;
+  return out;
 }
 
 /**
@@ -110,6 +175,8 @@ export interface Shared {
   positions: Map<string, StoredPosition>;
   /** Of them, those from other devices. */
   theirs: number;
+  /** The other devices' positions, each as its file has it (not merged): their Maia ratings are the devices' own. */
+  elsewhere: StoredPosition[];
   /** Storm lines this version couldn't read, by file. */
   unread: Map<string, number>;
 }
@@ -137,7 +204,7 @@ export function readShared(files: ReadonlyMap<string, string>, dev: string): Sha
       positions.set(p.card, next);
     }
   }
-  return { positions, theirs, unread };
+  return { positions, theirs, elsewhere: others.flatMap((o) => o.positions), unread };
 }
 
 /** The positions to drop for `over` too many: those in `spare` first, then the oldest (the app's store's rule). */
@@ -172,14 +239,15 @@ export function ownFileChanges(files: ReadonlyMap<string, string>, positions: It
 }
 
 /**
- * The ratings Maia is asked at (§5.82): the ladder's, and those the other devices' positions are
- * rated at most often beyond it (the user's rating and level up's on those devices), or `extra`.
+ * The ratings Maia is asked at (§5.82): the ladder's, and those the other devices' positions
+ * (`elsewhere`, as their files have them) are rated at most often beyond it (the user's rating and
+ * level up's on those devices), or `extra`.
  */
-export function maiaElos(positions: Iterable<StoredPosition>, extra?: readonly number[]): number[] {
+export function maiaElos(elsewhere: Iterable<StoredPosition>, extra?: readonly number[]): number[] {
   if (extra?.length) return [...new Set([...MAIA_LADDER, ...extra])].sort((a, b) => a - b);
   const sets = new Map<string, number>();
-  for (const p of positions) {
-    if (!p.from || !p.maia?.length) continue;
+  for (const p of elsewhere) {
+    if (!p.maia?.length) continue;
     const k = p.maia.map((r) => r.elo).filter((e) => !MAIA_LADDER.includes(e)).sort((a, b) => a - b).join(',');
     sets.set(k, (sets.get(k) ?? 0) + 1);
   }

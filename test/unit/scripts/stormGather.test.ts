@@ -1,36 +1,42 @@
 // The cloud gather's data and engines (PLAN.md §5.155, scripts/storm): the repertoire and what is
-// done read from a data repo's checkout as the app reads them, the cloud's device found or made,
-// every device's storm files read and merged, the store's cap, the cloud's own files written back
-// (never one it can't read), Maia's ratings taken from the devices', and Stockfish's lanes under
-// Node answering as the app's storm engine does.
+// done read from a data repo's checkout as the app reads them, a run's scope (a study, a chapter)
+// found by name, the cloud's device found or made, every device's storm files read and merged, the
+// store's cap, the positions a run scores (the cloud's, or every device's, taken over once scored
+// so the devices get the list), the cloud's own files written back (never one it can't read),
+// Maia's ratings taken from the devices', and Stockfish's lanes under Node answering as the app's
+// storm engine does.
 //
 // Controls (each assertion was seen to fail with the code changed, then the change undone):
 // - `readShared` taking another device's position as the cloud's own (no `from`): "the other
 //   devices' positions come in marked" fails;
 // - `ownFileChanges` rewriting a file with an unreadable line: "a file this version can't read" fails;
-// - `cloudDevice` ignoring the device named cloud: "the cloud's device is found again" fails.
+// - `cloudDevice` ignoring the device named cloud: "the cloud's device is found again" fails;
+// - `gatherScope` keeping every line end whatever the scope: "a chapter's scope" fails;
+// - `withList` leaving another device's `from` on: "every device's positions scored" fails (its
+//   list never reaches the cloud's files);
+// - `positionsToWork` taking other devices' positions without `everyDevice`: the same test fails.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { STORM } from '../../../src/core/storm/config.ts';
 import type { StoredPosition } from '../../../src/core/storm/harvest.ts';
-import { positionLine } from '../../../src/core/storm/shared.ts';
-import { parsePositionLine } from '../../../src/core/storm/shared.ts';
+import { mergeShared, parsePositionLine, parseSharedFile, positionLine } from '../../../src/core/storm/shared.ts';
+import { lineInScope } from '../../../src/core/storm/sources.ts';
 import { readTree } from '../../../scripts/read-tree.ts';
-import { addPositions, cloudDevice, maiaElos, ownFileChanges, readRepertoire, readShared, wholeRepertoire } from '../../../scripts/storm/data.ts';
+import { addPositions, cloudDevice, findScope, gatherScope, maiaElos, ownFileChanges, positionsToWork, readRepertoire, readShared, withList } from '../../../scripts/storm/data.ts';
 import { startEngines } from '../../../scripts/storm/engine.ts';
 
 const FIXTURE = join(import.meta.dirname, '..', '..', 'fixtures', 'data-repo');
 const DAY = Date.UTC(2026, 10, 6, 12);
 
 /** A stored position at `fen`, gathered at `at`, its list from `src` at `depth`. */
-function pos(fen: string, at: number, o: Partial<Pick<StoredPosition, 'src' | 'depth' | 'maia'>> = {}): StoredPosition {
+function pos(fen: string, at: number, o: Partial<Pick<StoredPosition, 'src' | 'depth' | 'maia' | 'lines'>> = {}): StoredPosition {
   const line = JSON.stringify({
     v: 1,
     fen,
     side: 'white',
     ply: 2,
-    lines: [{ sid: 'Rep0Najd', cid: 'Ch1Najdf', path: ['e4', 'c5'] }],
+    lines: o.lines ?? [{ sid: 'Rep0Najd', cid: 'Ch1Najdf', path: ['e4', 'c5'] }],
     names: ['Najdorf'],
     arrived: null,
     scored: [
@@ -58,7 +64,8 @@ test('the repertoire as the app reads it: the chapters, their lines and line end
   assert.ok(none.lines.length > 0);
   assert.equal(none.paused, 0);
   assert.equal(none.done.size, 0);
-  const scope = wholeRepertoire(none.lines, STORM);
+  assert.deepEqual(none.studies, [{ sid: 'Rep0Najd', name: 'Test repertoire', repertoire: true }]);
+  const scope = gatherScope(none.lines, STORM);
   assert.ok(scope.frontiers.length > 0 && scope.decisions.length > 0);
   // A storm answer, great, from a device's log: done for 60 days.
   const card = `s|${A.split(' ').slice(0, 4).join(' ')}`;
@@ -66,6 +73,40 @@ test('the repertoire as the app reads it: the chapters, their lines and line end
   more.set('progress/Phone001/2026-11-06.jsonl', `{"v":1,"n":100,"t":"2026-11-06T10:00:00.000Z","k":"storm","card":"${card}","b":"great","u":"g1f3","wp":0}\n`);
   assert.deepEqual([...readRepertoire(more, DAY, STORM).done], [card]);
   assert.equal(readRepertoire(more, DAY + 61 * 86_400_000, STORM).done.size, 0);
+});
+
+test('a run’s scope by name: a study, a chapter in it, a chapter alone; what doesn’t answer, or answers twice, said with the names there are', () => {
+  const files = new Map(readTree(FIXTURE));
+  const rep = readRepertoire(files, DAY, STORM);
+  assert.deepEqual(findScope(rep), { scope: { kind: 'all' }, title: 'the whole repertoire' });
+  assert.deepEqual(findScope(rep, ' test REPERTOIRE '), { scope: { kind: 'study', sid: 'Rep0Najd' }, title: 'Test repertoire' });
+  assert.deepEqual(findScope(rep, 'Rep0Najd', 'alapin'), { scope: { kind: 'chapter', sid: 'Rep0Najd', cid: 'Ch2Alapn' }, title: 'Test repertoire › Alapin' });
+  assert.deepEqual(findScope(rep, undefined, 'Main line').scope, { kind: 'chapter', sid: 'Rep0Najd', cid: 'Ch1Najdf' });
+  assert.deepEqual(findScope(rep, undefined, 'Ch1Najdf').scope, { kind: 'chapter', sid: 'Rep0Najd', cid: 'Ch1Najdf' });
+  assert.throws(() => findScope(rep, 'Scandi'), /no study named "Scandi"; the repertoire's: "Test repertoire"/);
+  assert.throws(() => findScope(rep, 'Test repertoire', 'Najdorf'), /no chapter named "Najdorf" in "Test repertoire"; its chapters: "Main line", "Alapin"/);
+  // A second repertoire study with an Alapin: the chapter's name alone no longer does.
+  files.set('studies/Rep1Alap/study.json', JSON.stringify({ format: 1, id: 'Rep1Alap', name: 'Anti-Sicilians', kind: 'repertoire', chapters: ['Ch3Alapn'] }));
+  files.set('studies/Rep1Alap/Ch3Alapn.pgn', '[ChapterName "Alapin"]\n[Orientation "white"]\n\n1. e4 c5 2. c3 d5 *\n');
+  files.set('studies/Ref0Book/study.json', JSON.stringify({ format: 1, id: 'Ref0Book', name: 'Model games', kind: 'reference', chapters: [] }));
+  const two = readRepertoire(files, DAY, STORM);
+  assert.throws(() => findScope(two, undefined, 'Alapin'), /2 chapters are named "Alapin": "Anti-Sicilians" \(Ch3Alapn\), "Test repertoire" \(Ch2Alapn\); name the study/);
+  assert.deepEqual(findScope(two, 'Anti-Sicilians', 'Alapin').scope, { kind: 'chapter', sid: 'Rep1Alap', cid: 'Ch3Alapn' });
+  assert.throws(() => findScope(two, 'model games'), /"Model games" is a reference study/);
+});
+
+test('a chapter’s scope: its line ends and decision points only, found over the whole repertoire', () => {
+  const rep = readRepertoire(readTree(FIXTURE), DAY, STORM);
+  const all = gatherScope(rep.lines, STORM);
+  const main = { kind: 'chapter', sid: 'Rep0Najd', cid: 'Ch1Najdf' } as const;
+  const ch = gatherScope(rep.lines, STORM, main);
+  assert.ok(ch.frontiers.length > 0 && ch.frontiers.length < all.frontiers.length);
+  for (const f of [...ch.frontiers, ...ch.decisions]) assert.ok(f.lines.some((r) => r.cid === 'Ch1Najdf'));
+  // What leaves the chapter's lines but re-enters the repertoire is still known (the walks' coverage).
+  assert.equal(ch.lines, rep.lines);
+  assert.deepEqual(ch.cont, all.cont);
+  assert.ok(ch.cont.black.size > 0);
+  assert.ok(rep.lines.some((l) => !lineInScope(l, main)));
 });
 
 test('the cloud’s device is found again by its name, the earliest if several; else made, with an id no device has', () => {
@@ -99,6 +140,8 @@ test('the other devices’ positions come in marked with their device; one the c
   assert.deepEqual(a.maia?.map((r) => r.elo), [2150]);
   assert.equal(s.positions.get(pos(B, 0).card)!.from, 'Desktop1');
   assert.deepEqual([...s.unread], [['storm/Desktop1/2026-11-04.1.jsonl', 1]]);
+  // The desktop's positions as its file has them, for Maia's ratings.
+  assert.deepEqual(s.elsewhere.map((p) => [p.card, p.from, p.maia?.length ?? 0]), [[pos(A, 0).card, undefined, 1], [pos(B, 0).card, undefined, 0]]);
 });
 
 test('the store’s cap: a position kept once; the done first to make room, then the oldest', () => {
@@ -127,8 +170,48 @@ test('the cloud’s own files written back: by day, those changed only, another 
   assert.deepEqual([...changes], [['storm/Cloud001/2026-11-01.1.jsonl', null]]);
 });
 
+test('every device’s positions scored: the scope’s, not done; one scored becomes the cloud’s, and the device that gathered it takes the list', () => {
+  const rep = readRepertoire(readTree(FIXTURE), DAY, STORM);
+  const main = rep.lines.find((l) => l.cid === 'Ch1Najdf')!;
+  const alapin = rep.lines.find((l) => l.cid === 'Ch2Alapn')!;
+  const ref = (l: typeof main) => [{ sid: l.sid, cid: l.cid, path: l.path }];
+  const desktops = pos(A, DAY - 86_400_000, { lines: ref(main) });
+  const files = new Map<string, string>([
+    ['storm/Cloud001/2026-11-06.1.jsonl', positionLine(pos(B, DAY, { lines: ref(main) })) + '\n'],
+    ['storm/Desktop1/2026-11-05.1.jsonl', [desktops, pos(C, DAY - 86_400_000, { lines: ref(alapin) })].map(positionLine).join('\n') + '\n'],
+  ]);
+  const store = readShared(files, 'Cloud001').positions;
+  const chapter = { kind: 'chapter', sid: 'Rep0Najd', cid: 'Ch1Najdf' } as const;
+  const cards = (ps: StoredPosition[]) => ps.map((p) => p.card).sort();
+  assert.deepEqual(cards(positionsToWork(store.values(), rep.lines, chapter, new Set(), false)), [pos(B, 0).card]);
+  assert.deepEqual(cards(positionsToWork(store.values(), rep.lines, chapter, new Set(), true)), cards([pos(A, 0), pos(B, 0)]));
+  assert.equal(positionsToWork(store.values(), rep.lines, { kind: 'all' }, new Set(), true).length, 3);
+  assert.deepEqual(cards(positionsToWork(store.values(), rep.lines, chapter, new Set([pos(B, 0).card]), true)), [pos(A, 0).card]);
+  // Paused lines are out of `rep.lines`: a position on them alone is not worked on.
+  assert.equal(positionsToWork(store.values(), rep.lines.filter((l) => l !== alapin), { kind: 'all' }, new Set(), true).length, 2);
+
+  // The desktop's position scored in the cloud: the cloud's own now, so in its file, the time and lines kept.
+  const list = { scored: [{ u: 'd2d4', s: 35 }, { u: 'g1f3', s: 28 }, { u: 'b1c3', s: 12 }], src: 'sf' as const, depth: 24 };
+  const theirs = store.get(desktops.card)!;
+  assert.equal(theirs.from, 'Desktop1');
+  const mine = withList(theirs, list, true);
+  assert.ok(!('from' in mine));
+  assert.equal(mine.at, desktops.at);
+  assert.deepEqual(mine.lines, desktops.lines);
+  assert.equal(withList(theirs, list, false).from, 'Desktop1');
+  store.set(mine.card, mine);
+  const changes = ownFileChanges(files, store.values(), 'Cloud001');
+  assert.deepEqual([...changes.keys()], ['storm/Cloud001/2026-11-05.1.jsonl']);
+  const written = parseSharedFile(changes.get('storm/Cloud001/2026-11-05.1.jsonl')!).positions;
+  assert.deepEqual(written.map((p) => [p.card, p.src, p.depth]), [[desktops.card, 'sf', 24]]);
+  // The desktop merging the cloud's file: its own position, still its own, with the cloud's list.
+  const merged = mergeShared(desktops, written[0]!, 'Cloud001')!;
+  assert.equal(merged.from, undefined);
+  assert.deepEqual([merged.src, merged.depth, merged.scored[0]!.u], ['sf', 24, 'd2d4']);
+});
+
 test('Maia’s ratings: the ladder, and the ratings beyond it the devices’ positions carry most often; or those given', () => {
-  const rated = (elos: number[]) => ({ ...pos(A, 0, { maia: elos.map((elo) => ({ elo, moves: [['g1f3', 1] as [string, number]] })) }), from: 'Desktop1' });
+  const rated = (elos: number[]) => pos(A, 0, { maia: elos.map((elo) => ({ elo, moves: [['g1f3', 1] as [string, number]] })) });
   const ps = [rated([1000, 1400, 1800, 2150, 2200, 2600]), rated([1000, 1400, 1800, 2150, 2200, 2600]), rated([1000, 1400, 1800, 1900, 2200, 2600])];
   assert.deepEqual(maiaElos(ps), [1000, 1400, 1800, 2150, 2200, 2600]);
   assert.deepEqual(maiaElos([]), [1000, 1400, 1800, 2200, 2600]);

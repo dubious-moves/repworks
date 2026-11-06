@@ -1199,7 +1199,14 @@ q_extension (or give it to a session with q_extension attached), then run
   the next sync.
 - The cloud shows up in the data repo as `devices/<id>.json` named `cloud`, with commits named
   `cloud: n storm positions`. Is that the name you want?
+- After a run with `--all-devices` (and `--study`/`--chapter`): on the device that gathered a
+  position the cloud scored, sync, then open the storm on that chapter. Does "Show and grade (n)"
+  count more positions at depth 24? A position the PC already deepened itself is scored again in
+  the cloud (it can't see the PC's store), which costs time only.
 - Checked: a live run in this cloud container pushed 386 positions to your data repo (device
   `cloud`, `y1ZUwuqC`, 2026-11-06), 114 of them scored to depth 24, and the repo validates. Also
   unit tests of the loop and the script's data side, and the storm's Playwright tests with the
   app's gather now through core (desktop and emulated phone). Not yet on your devices.
+- Checked for `--all-devices`, `--study` and `--chapter`: unit tests, and runs on a scratch copy
+  of your data repo ("Scandi Gambit" › "Accepted - Main lines": 18 of the devices' positions
+  scored into the cloud's files; 11 gathered, all on that chapter's lines). Nothing pushed.

@@ -2169,3 +2169,11 @@ The technical calls, each with its reason:
   on each device, not in the repo.
 - **Stockfish 18 lite, the app's default**, rather than a native build, so the lists are the ones
   a device would make. A native binary is an option (`STOCKFISH`).
+- **With `--all-devices` the cloud scores other devices' positions too, and a position it scores
+  becomes its own**, written to its folder. Why: the owner asked for every device's positions
+  scored; a device keeps its deepening of another device's position to itself, so the cloud's
+  files are the only way its lists reach the devices, and every device already takes the better
+  list of a position it has (§5.102). No new file kind and no app change; the cost is copies in
+  the cloud's folder. Rejected: a file of lists alone (a new file kind, and an app change).
+- **`--study` and `--chapter` scope a run as the storm's home's scopes do** (§14.21), for the
+  walking and the scoring alike.
