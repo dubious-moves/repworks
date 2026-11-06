@@ -4600,6 +4600,20 @@ a.button.primary {
   .storm-card .storm-status {
     min-height: 64px;
   }
+
+  /* Show and grade (§5.152): its buttons right under the board, as §5.133's, where a thumb
+     presses them card after card; what they answer (the status, the twelve moves) below. */
+  .storm-card[data-mode='show'] > .storm-panel > * {
+    order: 2;
+  }
+
+  .storm-card[data-mode='show'] > .storm-panel > .storm-hud {
+    order: -1;
+  }
+
+  .storm-card[data-mode='show'] > .storm-panel > .train-actions {
+    order: 1;
+  }
 }
 
 /* The review: the session's result, the position picked, every position. */
@@ -4760,6 +4774,68 @@ a.button.primary {
 .storm-later {
   margin: 0;
 }
+
+/* Show and grade's moves (§5.152): one row a move, its band's colour on the left as in the
+   review's list; two columns of rows on a wide panel so twelve fit beside the board. */
+.storm-show-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15em, 1fr));
+  gap: 0 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.storm-show-move {
+  display: grid;
+  grid-template-columns: 1.4em minmax(3.2em, 1fr) minmax(0, 1.5fr) 3.4em 3.2em;
+  gap: 4px;
+  width: 100%;
+  min-height: 30px;
+  padding: 3px 6px;
+  border: 0;
+  border-left: 3px solid var(--band-color, transparent);
+  border-radius: 0;
+  background: none;
+  color: var(--text);
+  font-size: 0.88rem;
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+}
+
+.storm-show-move:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
+.storm-show-move:not(:disabled):hover {
+  background: var(--storm-cell);
+}
+
+.storm-show-move > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.storm-show-rank,
+.storm-show-wp {
+  color: var(--muted);
+}
+
+.storm-show-band {
+  color: var(--band-color, var(--muted));
+}
+
+.storm-show-san {
+  font-weight: 600;
+}
+
+.storm-show-move.mine {
+  background: rgb(var(--ink) / 9%);
+  box-shadow: inset 0 0 0 1px var(--info);
+}
+
 
 .storm-counted {
   margin: 0;

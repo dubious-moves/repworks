@@ -51,6 +51,9 @@ test('← from training goes back past the lines trained to the page it was open
   await page.getByRole('link', { name: 'Test repertoire', exact: true }).click();
   await expect(page).toHaveURL(/#\/study\/Rep0Najd/);
   await page.goto(`${site.url}#/train/Rep0Najd`);
+  // The app stamps an entry in its hashchange handler; a second address typed before that runs
+  // would leave the first unstamped (no person types that fast), so it is waited for.
+  await page.waitForFunction(() => typeof (history.state as { rw?: unknown } | null)?.rw === 'number');
   await page.goto(`${site.url}#/train/Rep0Najd/Ch1Najdf?at=e4,c5,Nf3,Nc6,d4`);
   await expect(page.locator('.train-grid')).toBeVisible();
   await back(page).click();

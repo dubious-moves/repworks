@@ -58,7 +58,17 @@ async function sync(page: Page) {
 async function lines(page: Page, started = false): Promise<Locator> {
   const list = page.getByRole('complementary', { name: 'Lines to train' });
   if (started) await expect(list.getByRole('button', { name: /Show lines/ })).toHaveAttribute('aria-expanded', 'false');
-  if ((await list.getByRole('button', { name: /Show lines/ }).count()) > 0) await list.getByRole('button', { name: /Show lines/ }).click();
+  if (!started) {
+    if ((await list.getByRole('button', { name: /Show lines/ }).count()) > 0) await list.getByRole('button', { name: /Show lines/ }).click();
+    return list;
+  }
+  // A session starting folds the list (Train.tsx's `Lines`), and one taken up on arrival can start a
+  // frame after the screen is drawn, folding a click made in that frame: clicked until it stays open.
+  const head = list.locator('.train-list-head');
+  await expect(async () => {
+    if ((await head.getAttribute('aria-expanded')) !== 'true') await head.click();
+    await expect(head).toHaveAttribute('aria-expanded', 'true', { timeout: 1000 });
+  }).toPass();
   return list;
 }
 

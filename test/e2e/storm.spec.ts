@@ -432,7 +432,8 @@ test('overnight (§5.102): the gather goes on over older games, Stockfish scorin
   await page.getByRole('button', { name: 'Gather positions' }).click();
   await expect(page.getByTestId('storm-overnight-note')).toBeVisible();
   await expect(page.locator('.storm-gather')).toContainText('Pass 1 of 13');
-  expect(await page.evaluate(() => (window as unknown as { locks: string[] }).locks)).toContain('screen');
+  // The wake lock is asked for in an effect and granted by a promise: polled, not read once.
+  await expect.poll(() => page.evaluate(() => (window as unknown as { locks: string[] }).locks)).toContain('screen');
   await expect(page.locator('.storm-gather')).toContainText(/Pass 1[0-3] of 13|Every pass walked/, { timeout: 60_000 });
   await expect(page.locator('.storm-gather')).toContainText('Every pass walked', { timeout: 60_000 });
   await expect(page.getByTestId('storm-overnight-note')).toHaveCount(0);
@@ -731,6 +732,100 @@ test('Stockfish’s standard: the kept positions searched with MultiPV 12 to dep
   await play(page, ranked(await cardFen(page))[0]!);
   await expect(page.getByTestId('storm-verdict')).toContainText('the top move');
   expect(mine().filter((c) => c.startsWith('go ')).length).toBe(before);
+});
+
+test('show and grade (§5.152): every move shown by its band, found and missed with 2 and 4, a move named graded, the review, and the answers written', async ({ page, isMobile }) => {
+  const w = await setUp(page, { deepen: true });
+  const ready = await gathered(page, w);
+  // Only positions whose list may judge are dealt: here every one, once Stockfish has scored them.
+  await expect(page.getByTestId('storm-deep')).toContainText(`${ready} of ${ready} scored`, { timeout: 30_000 });
+  await expect(page.getByTestId('storm-show-start')).toHaveText(`Show and grade (${ready})`);
+  await page.getByTestId('storm-show-start').click();
+  await expect(page.locator('.study-title')).toHaveText(/^Show and grade · /);
+  await expect(page.getByTestId('storm-verdict')).toContainText('Think of a move');
+  // No clock, nothing on the board, no list until shown.
+  await expect(page.getByTestId('storm-clock')).toHaveCount(0);
+  await expect(page.getByTestId('storm-show-list')).toHaveCount(0);
+  expect(await shapes(page)).toBe(0);
+  const scoredMoves = (fen: string) => Math.min(12, ranked(fen).length);
+  const list = page.getByTestId('storm-show-list').locator('.storm-show-move');
+
+  // 2 shows every move Stockfish scored, an arrow each, best first with its band (the ladder at
+  // +0.20: 5 cp behind is Great, 45 and 60 Good, 80 an Inaccuracy, 120 a Mistake).
+  const first = await cardFen(page);
+  await page.keyboard.press('2');
+  await expect(page.getByTestId('storm-verdict')).toContainText('Was yours a good one?');
+  await expect(list).toHaveCount(scoredMoves(first));
+  await expect.poll(() => shapes(page)).toBe(scoredMoves(first));
+  await expect(list.locator('.storm-show-band')).toHaveText(['Best', 'Great', 'Good', 'Good', 'Inaccuracy', 'Inaccuracy', 'Mistake', 'Mistake', 'Mistake', 'Mistake', 'Mistake', 'Mistake'].slice(0, scoredMoves(first)));
+  await expect(list.first()).toHaveClass(/band-great best/);
+  // The buttons in view above the twelve moves (right under the board on a phone).
+  const found = page.getByRole('button', { name: /^Found/ });
+  await expect(found).toBeInViewport();
+  expect((await found.boundingBox())!.y).toBeLessThan((await list.first().boundingBox())!.y);
+  if (isMobile) expect((await found.boundingBox())!.y).toBeLessThan((await page.getByTestId('storm-verdict').boundingBox())!.y);
+  // The arrows' looks: the best widest and most solid, a mistake thin and faint.
+  const looks = await page.evaluate(() =>
+    [...document.querySelectorAll('cg-container svg.cg-shapes g[cgHash] line')].map((l) => ({ stroke: l.getAttribute('stroke'), width: Number(l.getAttribute('stroke-width')) })),
+  );
+  const best = looks.find((l) => l.stroke === '#3fbf72');
+  const bad = looks.find((l) => l.stroke === '#d6a13a');
+  expect(best && bad && best.width > bad.width).toBe(true);
+  // 2 again: found, and the next card at once.
+  await page.keyboard.press('2');
+  await expect.poll(() => cardFen(page)).not.toBe(first);
+  await expect(page.getByTestId('storm-show-found')).toHaveText('1 of 1');
+  await expect(page.getByTestId('storm-verdict')).toContainText('Think of a move');
+  await expect.poll(() => shapes(page)).toBe(0);
+
+  // 4 on a card not shown: the moves shown and the card missed; it stays until the next press.
+  const second = await cardFen(page);
+  await page.keyboard.press('4');
+  await expect(page.getByTestId('storm-verdict')).toContainText('Missed');
+  await expect(list).toHaveCount(scoredMoves(second));
+  await expect(page.getByTestId('storm-show-found')).toHaveText('1 of 2');
+  await page.waitForTimeout(500);
+  expect(await cardFen(page)).toBe(second);
+  await page.keyboard.press('4');
+  await expect.poll(() => cardFen(page)).not.toBe(second);
+
+  // Shown with the button, then the third move named from the list: graded from the stored list,
+  // the board kept on the card's position with every arrow and the move named in blue over its own.
+  const third = await cardFen(page);
+  await page.getByRole('button', { name: /^Show the moves/ }).click();
+  await list.nth(2).click();
+  await expect(page.getByTestId('storm-verdict')).toContainText(/Good move.*#3 of 12/);
+  expect(await cardFen(page)).toBe(third);
+  await expect(page.locator('.storm-show-move.mine')).toHaveCount(1);
+  await expect.poll(() => shapes(page)).toBe(scoredMoves(third) + 1);
+  await expect(page.getByTestId('storm-show-found')).toHaveText('2 of 3');
+
+  // The review: the three answers in their words, and every move again behind "Every move".
+  await page.getByRole('button', { name: /^End/ }).click();
+  await expect(page.getByTestId('storm-summary')).toContainText('2 of 3 found');
+  const rows = page.locator('.storm-row');
+  await expect(rows).toHaveCount(3);
+  await expect(rows.locator(':scope > span:nth-child(3)')).toHaveText(['Found', 'Missed', 'Good']);
+  await rows.nth(1).click();
+  await expect(page.locator('.storm-status .storm-title')).toHaveText('Missed');
+  await page.keyboard.press('b');
+  await expect.poll(() => shapes(page)).toBe(scoredMoves(second));
+  await expect(page.getByRole('button', { name: /^Another show and grade/ })).toBeVisible();
+
+  // Written as ordinary storm answers of an unhurried session: found as Good and missed as a
+  // Mistake with no move, the move named with its move and win% given up.
+  await page.getByRole('button', { name: 'Done' }).click();
+  await expect(page.getByTestId('storm-count')).toContainText(`${ready - 2} positions ready`);
+  await expect(page.getByTestId('storm-count')).toContainText('2 done for now');
+  await page.locator('.chip').click();
+  const log = () => [...w.git.textsOf()].filter(([p]) => p.startsWith('progress/')).map(([, t]) => t).join('');
+  await expect.poll(() => (log().match(/"k":"storm"/g) ?? []).length, { timeout: 15_000 }).toBe(3);
+  expect(log()).toMatch(/"b":"good","m":"set","c":/);
+  expect(log()).toMatch(/"b":"bad","m":"set","c":/);
+  expect(log()).toMatch(/"b":"good","u":"[a-h][1-8][a-h][1-8]","wp":\d+,"m":"set"/);
+  await expect(page.locator('.storm-record').first()).toContainText('3 answered · 67% found');
+  const wide = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(wide).toBeLessThanOrEqual(0);
 });
 
 test('a list over two depths (§5.120): each move scored the mean of the depth searched to and the one before', async ({ page }) => {

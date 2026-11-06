@@ -3,7 +3,7 @@
 // (every position, the best move behind a press, Try again, Analyse). Neither the engine panel nor
 // the explorer is on this screen: during a card they would name the answer. Analyse opens the
 // analysis board with the session kept, and "Back to the storm" comes back to it (§18.4).
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { chessgroundDests } from 'chessops/compat';
 import { normalizeMove } from 'chessops/chess';
 import { makeUci, parseSquare } from 'chessops/util';
@@ -38,7 +38,10 @@ import {
   saveStormMistake,
   scopeData,
   setStormPrefs,
+  selfGrade,
+  showGradePress,
   showMove,
+  showMoves,
   startStorm,
   stopGathering,
   stormHome,
@@ -67,7 +70,10 @@ import { STORM } from '../core/storm/config.ts';
 import { focusedWidth, stormEngineProgress, stormEngineWidth } from '../app/stormEngine.ts';
 import { averageWp, blankRow, foundShare, recordOver, type RecordRow } from '../core/storm/record.ts';
 import { setTally } from '../core/storm/set.ts';
-import { bestLine, formatWp, gapNote, sourceTitle, verdictLine, type CardFacts } from '../core/storm/verdict.ts';
+import { bestLine, formatCp, formatWp, gapNote, sourceTitle, verdictLine, type CardFacts } from '../core/storm/verdict.ts';
+import { arrowTier, drawingOrder, shownMoves, type ArrowTier, type ShownMove } from '../core/storm/show.ts';
+import { pressOf } from '../core/train/showGrade.ts';
+import { holdMediaKeys } from '../platform/mediaKeys.ts';
 import { positionLineKey, positionLineLabel, storedList, type StoredPosition } from '../core/storm/harvest.ts';
 import { fenAfterUci, positionOf, uciToSan } from '../core/storm/walk.ts';
 import { themeLabel } from '../core/puzzles/dataset.ts';
@@ -89,8 +95,26 @@ const TITLE_WORD: Record<string, string> = { great: 'Great move', good: 'Good mo
 const topFound = (v: StormAnswer, puzzle: boolean) => !puzzle && (v.band === 'great' || v.band === 'good') && isTopMove(v);
 const BANDS = ['great', 'good', 'ok', 'bad', 'blunder'] as const;
 
+/** Show and grade's own grade, in a word (§5.152). */
+const SELF_WORD: Record<string, string> = { found: 'Found', missed: 'Missed' };
+/** A band's word, or show and grade's own when the user graded it. */
+const bandWord = (a: StormAnswer, puzzle: boolean): string => (a.self ? SELF_WORD[a.self]! : ((puzzle ? PUZZLE_WORD[a.band] : undefined) ?? BAND_WORD[a.band] ?? ''));
 /** An answer in a few words: the move and its band ("Qe7 · Good"). */
-const answerWords = (a: StormAnswer, puzzle: boolean): string => `${a.userSan || '—'} · ${(puzzle ? PUZZLE_WORD[a.band] : undefined) ?? BAND_WORD[a.band] ?? ''}`;
+const answerWords = (a: StormAnswer, puzzle: boolean): string => (a.self ? bandWord(a, puzzle) : `${a.userSan || '—'} · ${bandWord(a, puzzle)}`);
+/** A self-graded answer's line (§5.152). */
+const selfLine = (a: StormAnswer): string => (a.self === 'found' ? 'Your word: a good move found · counted as Good' : 'Your word: not found · counted as a Mistake, so it comes back');
+/** The first line of an answer, a self-graded one in its own words. */
+const answerLine = (a: StormAnswer, f: CardFacts): string => (a.self ? selfLine(a) : verdictLine(a, f));
+
+/** The board's brush for each look of arrow (Board.tsx's `BAND_BRUSHES`). */
+const TIER_BRUSH: Record<ArrowTier, string> = { best: 'bandBest', great: 'bandGreat', good: 'bandGood', ok: 'bandOk', bad: 'bandBad', blunder: 'bandBlunder' };
+type Arrow = { orig: string; dest: string; brush: string; lineWidth?: number };
+/** Every move shown as an arrow by its band, the worst underneath; the user's own move a thin blue line on top. */
+function bandArrows(moves: readonly ShownMove[], mine?: string): Arrow[] {
+  const all: Arrow[] = drawingOrder(moves).map((m) => ({ orig: m.uci.slice(0, 2), dest: m.uci.slice(2, 4), brush: TIER_BRUSH[arrowTier(m)] }));
+  if (mine) all.push({ orig: mine.slice(0, 2), dest: mine.slice(2, 4), brush: 'blue', lineWidth: 4 });
+  return all;
+}
 
 /** What a puzzle says once answered: its rating, how deep its game went into the line, its themes. */
 function puzzleFacts(p: NonNullable<StormItem['puzzle']>): string {
@@ -129,9 +153,9 @@ function KindsNote(props: { p: StoredPosition; elo: number }) {
 
 /** A session's name: the classic storm or set, or its focus ("Quiet + Retreat storm"). */
 function sessionName(s: StormSession): string {
-  const what = s.mode === 'storm' ? 'storm' : `set of ${STORM.setSize}`;
+  const what = s.mode === 'storm' ? 'storm' : s.mode === 'show' ? 'show and grade' : `set of ${STORM.setSize}`;
   if (s.focus?.length) return `${focusTitle(s.focus)} ${what}`;
-  return s.mode === 'storm' ? 'Storm' : `Set of ${STORM.setSize}`;
+  return s.mode === 'storm' ? 'Storm' : s.mode === 'show' ? 'Show and grade' : `Set of ${STORM.setSize}`;
 }
 
 /** How far past the line a card is, in words: a claim about a game, or about an invented line, or an uncovered reply. */
@@ -270,10 +294,20 @@ function Home(props: { scope: StormScopeData; where: StormWhere }) {
           <button type="button" class="secondary" disabled={!canStart || g?.running} onClick={() => void startStorm(scope, 'set', { focus, puzzles: prefs.focusPuzzles })}>
             Set of {STORM.setSize}
           </button>
+          <button
+            type="button"
+            class="secondary"
+            data-testid="storm-show-start"
+            disabled={!home?.showable || g?.running}
+            title={home?.showable ? 'No clock: think of a move, show every move Stockfish scored, and say whether yours was a good one' : `Only positions Stockfish has scored to depth ${STORM.judgeDepth} or more can be shown: let it re-score them on this page`}
+            onClick={() => void startStorm(scope, 'show', { focus })}
+          >
+            Show and grade{home ? ` (${home.showable})` : ''}
+          </button>
         </div>
         <p class="muted storm-about">
           <strong>Storm:</strong> {STORM.sessionMs / 60000} minutes; the clock runs only while a position waits for your move. <strong>Set:</strong> {STORM.setSize} positions, no clock, a
-          mistake held until you find a good move. A move is graded by how much of the game it gives up against the best: within {STORM.greatWp}% is great, within {STORM.goodWp}% good.
+          mistake held until you find a good move. <strong>Show and grade:</strong> no clock; think of a move, show every move Stockfish scored (coloured, sized and faded by how good it is), then say whether yours was a good one (2 or 4, or a ring’s buttons) or play it to have it graded; positions scored to depth {STORM.judgeDepth} only. A move is graded by how much of the game it gives up against the best: within {STORM.greatWp}% is great, within {STORM.goodWp}% good.
           {focus.length ? ` With a focus, only the positions that match it are dealt${prefs.focusPuzzles && prefs2.share > 0 ? `, and puzzles at ${prefs2.share}%` : ', and no puzzles'}.` : ''}
         </p>
       </section>
@@ -787,7 +821,7 @@ function Record(props: { r: RecordRow; title: string }) {
  * A card's board: the position, or once a move is played the position after it (the move stays
  * while it is graded and the verdict is read); arrows drawn on it stay until the next card.
  */
-function CardBoard(props: { item: StormItem; asking: boolean; onMove(uci: string): void; arrows?: { orig: string; dest: string; brush: string }[]; sketch: string; draw?: boolean; burst?: string | undefined }) {
+function CardBoard(props: { item: StormItem; asking: boolean; onMove(uci: string): void; arrows?: Arrow[]; sketch: string; draw?: boolean; burst?: string | undefined }) {
   const p = props.item.card;
   const puzzle = props.item.puzzle;
   const step = props.item.step ?? 0;
@@ -853,6 +887,22 @@ function Clock(props: { s: StormSession }) {
 /** The storm's head: the clock, the points, and the streak towards its next multiplier (§8.1). */
 function Hud(props: { s: StormSession }) {
   const s = props.s;
+  if (s.mode === 'show') {
+    const graded = s.history.filter((h) => h.answer && h.answer.band !== 'unanswered' && h.answer.band !== 'unknown');
+    const found = graded.filter((h) => h.answer!.band === 'great' || h.answer!.band === 'good').length;
+    return (
+      <div class="storm-hud storm-hud-set" data-testid="storm-show">
+        <div class="storm-hud-cell">
+          <span class="storm-hud-label">Position</span>
+          <span class="storm-hud-value">{`${s.history.length} of ${s.total}`}</span>
+        </div>
+        <div class="storm-hud-cell">
+          <span class="storm-hud-label">Found</span>
+          <span class="storm-hud-value" data-testid="storm-show-found">{`${found} of ${graded.length}`}</span>
+        </div>
+      </div>
+    );
+  }
   if (s.mode === 'set') {
     const t = setTally(s.history);
     return (
@@ -904,7 +954,7 @@ function Strip(props: { s: StormSession }) {
     <ol class="storm-strip" aria-label="This session’s answers">
       {shown.map((it, i) => {
         const b = it.answer?.band;
-        const word = b ? (it.puzzle ? (PUZZLE_WORD[b] ?? BAND_WORD[b]) : BAND_WORD[b]) : 'Now';
+        const word = it.answer ? (it.puzzle ? (PUZZLE_WORD[it.answer.band] ?? BAND_WORD[it.answer.band]) : bandWord(it.answer, false)) : 'Now';
         const top = !!it.answer && topFound(it.answer, !!it.puzzle);
         return <li key={i} class={b ? `band-${b}${top ? ' best' : ''}` : 'current'} title={`${it.answer?.userSan ? it.answer.userSan + ' · ' : ''}${top ? 'Best move' : word}`} />;
       })}
@@ -927,6 +977,18 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
       if (e.ctrlKey || e.metaKey || e.altKey || document.querySelector('dialog[open]')) return;
       const now = stormSession.peek();
       if (!now || now.phase === 'done') return;
+      // Show and grade (§5.152): 2 and 4 as in the trainer's (§5.9), a held key one press; Space or
+      // Enter shows the moves too.
+      const press = now.mode === 'show' ? pressOf(e.key) : undefined;
+      if (press === 'next' || press === 'wrong') {
+        e.preventDefault();
+        if (!e.repeat) showGradePress(press);
+        return;
+      }
+      if (now.mode === 'show' && (e.key === ' ' || e.key === 'Enter') && now.phase === 'solving' && !now.movesShown) {
+        e.preventDefault();
+        return showMoves();
+      }
       if (e.key === 'Escape') endStorm('stop');
       else if ((e.key === ' ' || e.key === 'Enter') && now.phase === 'verdict') nextCard();
       else if (e.key === 'p' && now.phase === 'verdict' && now.nextAt !== undefined) pauseVerdict();
@@ -939,6 +1001,13 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [props.scope.route]);
+  // The ring's buttons, when they come as media keys rather than key events (§5.9).
+  const showing = s.mode === 'show';
+  useEffect(() => {
+    if (!showing) return;
+    const keys = holdMediaKeys({ onNext: () => showGradePress('next'), onPrevious: () => showGradePress('wrong') });
+    return () => keys.stop();
+  }, [showing]);
   if (!item) return <p class="muted">Dealing…</p>;
   const f = facts(item.card);
   const v = item.answer;
@@ -954,23 +1023,43 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
   const burst = top ? `${item.card.card}|${s.pass}|${item.attempts ?? 0}` : undefined;
   // The best move stays off the panel while a set holds the card, or offers more tries, and it
   // wasn't asked for (§17.3); the top move played is the best.
-  const showBest = !!v && (s.mode === 'storm' || (!held && !more) || s.revealed || top);
+  const showBest = !!v && (s.mode !== 'set' || (!held && !more) || s.revealed || top);
   const best = storedList(item.card)[0];
-  const arrows = s.revealed && best && !item.puzzle ? [{ orig: best.uci.slice(0, 2), dest: best.uci.slice(2, 4), brush: 'green' }] : [];
+  // Show and grade (§5.152): every move by its band once shown or answered, on the card's own
+  // position (the move named is a thin blue line over its arrow).
+  const moves = showing && !item.puzzle && (s.movesShown || v) ? shownMoves(storedList(item.card), STORM) : [];
+  const arrows: Arrow[] = showing ? bandArrows(moves, v?.userUci) : s.revealed && best && !item.puzzle ? [{ orig: best.uci.slice(0, 2), dest: best.uci.slice(2, 4), brush: 'green' }] : [];
+  const boardItem = showing && v ? { ...item, played: undefined } : item;
   const turn = positionOf(item.puzzle ? puzzleFen(item) : item.card.fen)?.turn ?? item.card.side;
   const band = v?.band ?? (phase === 'grading' ? 'checking' : 'none');
-  const title = v ? (item.puzzle ? (PUZZLE_WORD[v.band] ?? '') : top ? 'Best move!' : (TITLE_WORD[v.band] ?? '')) : phase === 'grading' && !item.puzzle ? 'Checking…' : 'Find a good move';
+  const title = v
+    ? v.self
+      ? SELF_WORD[v.self]!
+      : item.puzzle
+        ? (PUZZLE_WORD[v.band] ?? '')
+        : top
+          ? 'Best move!'
+          : (TITLE_WORD[v.band] ?? '')
+    : phase === 'grading' && !item.puzzle
+      ? 'Checking…'
+      : showing
+        ? s.movesShown
+          ? 'Was yours a good one?'
+          : 'Think of a move'
+        : 'Find a good move';
   const left = STORM.setRetryMax - (item.attempts ?? 0);
   // A card tried again (or back in the second pass): its first answer is the one that counts.
   const counted = s.history.find((h) => h.card.card === item.card.card)?.answer;
   const line = v
     ? item.puzzle
       ? `${v.userSan || '—'}${v.points ? ` · ${v.points > 0 ? '+' : ''}${v.points}` : ''}`
-      : verdictLine(s.mode === 'storm' ? { ...v, points: 0 } : v, f)
-    : `${turn === 'white' ? 'White' : 'Black'} to play`;
+      : answerLine(s.mode === 'storm' ? { ...v, points: 0 } : v, f)
+    : showing && s.movesShown
+      ? 'Found if it was a green arrow, Missed if not; or play it to have it graded'
+      : `${turn === 'white' ? 'White' : 'Black'} to play${showing ? ', then show the moves' : ''}`;
   return (
-    <div class="train-grid storm-card" data-phase={phase} data-fen={item.card.fen} data-side={item.card.side} data-card={item.card.card} data-step={item.step ?? 0} data-line={item.puzzle ? '' : positionLineKey(item.card)}>
-      <CardBoard item={item} asking={asking} onMove={(u) => void answerMove(u)} arrows={arrows} sketch={sketch} draw={draw} burst={burst} />
+    <div class="train-grid storm-card" data-mode={s.mode} data-phase={phase} data-fen={item.card.fen} data-side={item.card.side} data-card={item.card.card} data-step={item.step ?? 0} data-line={item.puzzle ? '' : positionLineKey(item.card)}>
+      <CardBoard item={boardItem} asking={asking} onMove={(u) => void answerMove(u)} arrows={arrows} sketch={sketch} draw={draw} burst={burst} />
       <div class="train-panel storm-panel">
         <Hud s={s} />
         <Strip s={s} />
@@ -1011,6 +1100,22 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
           </div>
         )}
         <div class="actions train-actions">
+          {showing && asking && (
+            <>
+              {s.movesShown ? (
+                <button type="button" class="primary" title="Your move was a good one (a green arrow): counted as Good, and on to the next" onClick={() => selfGrade(true)}>
+                  Found <kbd>2</kbd>
+                </button>
+              ) : (
+                <button type="button" class="primary" onClick={showMoves}>
+                  Show the moves <kbd>2</kbd>
+                </button>
+              )}
+              <button type="button" class="secondary" title="Your move wasn’t a good one, or you had none: counted as a Mistake, and the position comes back" onClick={() => selfGrade(false)}>
+                Missed <kbd>4</kbd>
+              </button>
+            </>
+          )}
           {again && (
             <button type="button" class={held ? 'primary' : 'secondary'} onClick={tryAgain}>
               Try again <kbd>T</kbd>
@@ -1023,7 +1128,7 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
           )}
           {phase === 'verdict' && (
             <button type="button" class="primary" onClick={nextCard}>
-              {s.mode === 'set' ? 'Next position' : 'Next'} <kbd>Space</kbd>
+              {s.mode === 'storm' ? 'Next' : 'Next position'} <kbd>{showing ? '2' : 'Space'}</kbd>
             </button>
           )}
           {phase === 'verdict' && s.mode === 'storm' && s.nextAt !== undefined && (
@@ -1037,7 +1142,11 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
             class="secondary"
             disabled={phase === 'grading'}
             title={
-              s.mode === 'set'
+              s.mode === 'show'
+                ? asking
+                  ? 'Pass this position and open the analysis board: nothing is counted'
+                  : 'Open the analysis board here'
+                : s.mode === 'set'
                 ? (held || asking) && !s.revealed
                   ? 'Show the move and open the analysis board; it counts as shown, and the position comes back in the second pass'
                   : 'Open the analysis board here; the set waits'
@@ -1058,8 +1167,40 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
           </button>
         </div>
         {phase === 'verdict' && s.mode === 'storm' && s.nextAt === undefined && <p class="muted storm-hint">Paused: the clock is stopped until the next position.</p>}
+        {/* Under the buttons, so twelve rows never push them out of view. */}
+        {moves.length > 0 && <ShowList item={item} moves={moves} pick={asking ? (u) => void answerMove(u) : undefined} />}
       </div>
     </div>
+  );
+}
+
+/**
+ * Show and grade's moves (§5.152): every move Stockfish scored, best first, with its band, score
+ * and win% given up; while the card waits, a tap names the move the user had in mind and grades it.
+ */
+function ShowList(props: { item: StormItem; moves: readonly ShownMove[]; pick: ((uci: string) => void) | undefined }) {
+  const pos = positionOf(props.item.card.fen);
+  const mine = props.item.answer?.userUci;
+  return (
+    <ol class="storm-show-list" data-testid="storm-show-list" aria-label="Every move Stockfish scored">
+      {props.moves.map((m) => (
+        <li key={m.uci}>
+          <button
+            type="button"
+            class={`storm-show-move band-${m.band}${m.top ? ' best' : ''}${m.uci === mine ? ' mine' : ''}`}
+            disabled={!props.pick}
+            title={props.pick ? 'This was my move: grade it' : m.uci === mine ? 'Your move' : ''}
+            onClick={() => props.pick?.(m.uci)}
+          >
+            <span class="storm-show-rank">{m.rank}</span>
+            <span class="storm-show-san">{pos ? uciToSan(pos, m.uci) : m.uci}</span>
+            <span class="storm-show-band">{m.top ? 'Best' : BAND_WORD[m.band]}</span>
+            <span class="storm-show-cp">{formatCp(m.score)}</span>
+            <span class="storm-show-wp">{typeof m.wp === 'number' && m.wp >= 0.05 ? `−${formatWp(m.wp)}` : ''}</span>
+          </button>
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -1124,14 +1265,19 @@ function Review(props: { s: StormSession; scope: StormScopeData }) {
       /* kept for this page only */
     }
   };
+  // The keys read the row picked as rendered: an effect registered again after each pick ran a
+  // frame late, and a key pressed in that frame acted on the row before.
+  const keyed = useRef({ at, items, setAt, route: props.scope.route });
+  keyed.current = { at, items, setAt, route: props.scope.route };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = (e.target as HTMLElement | null)?.tagName;
       if (t === 'SELECT' || t === 'INPUT' || t === 'TEXTAREA' || e.ctrlKey || e.metaKey || e.altKey || document.querySelector('dialog[open]')) return;
       const now = stormSession.peek();
+      const { at, items, setAt, route } = keyed.current;
       if (e.key === 'b') toggleShown(at);
       else if (e.key === 't') retryFromReview(now?.retry ? undefined : at);
-      else if (e.key === 'a' && items[at]) analyse(items[at]!, props.scope.route, at);
+      else if (e.key === 'a' && items[at]) analyse(items[at]!, route, at);
       else if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === 'j') setAt(at + 1);
       else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft' || e.key === 'k') setAt(at - 1);
       else return;
@@ -1139,12 +1285,17 @@ function Review(props: { s: StormSession; scope: StormScopeData }) {
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [at, items.length, props.scope.route]);
+  }, []);
   const tally = s.mode === 'set' ? setTally(items) : undefined;
   const shown = item?.shown;
   const best = item ? storedList(item.card)[0] : undefined;
   const mine = item?.answer?.userUci;
-  const arrows = item?.puzzle ? [] : [...(shown && best ? [{ orig: best.uci.slice(0, 2), dest: best.uci.slice(2, 4), brush: 'green' }] : []), ...(mine && mine !== best?.uci ? [{ orig: mine.slice(0, 2), dest: mine.slice(2, 4), brush: 'red' }] : [])];
+  // Show and grade's review shows every move again with the best (§5.152).
+  const arrows: Arrow[] = item?.puzzle
+    ? []
+    : s.mode === 'show' && shown
+      ? bandArrows(shownMoves(storedList(item!.card), STORM), mine)
+      : [...(shown && best ? [{ orig: best.uci.slice(0, 2), dest: best.uci.slice(2, 4), brush: 'green' }] : []), ...(mine && mine !== best?.uci ? [{ orig: mine.slice(0, 2), dest: mine.slice(2, 4), brush: 'red' }] : [])];
   // The session's own figures: answered (an unanswered card aside), found, given up, the bands.
   const answered = items.filter((i) => i.answer && i.answer.band !== 'unanswered');
   const graded = answered.filter((i) => i.answer!.band !== 'unknown');
@@ -1152,7 +1303,7 @@ function Review(props: { s: StormSession; scope: StormScopeData }) {
   const wps = graded.map((i) => i.answer!.wp).filter((w): w is number => typeof w === 'number');
   const bands = { great: 0, good: 0, ok: 0, bad: 0, blunder: 0, unknown: 0 } as RecordRow['bands'];
   for (const i of graded) bands[i.answer!.band as keyof RecordRow['bands']]++;
-  const again = s.mode === 'storm' ? 'Another storm' : 'Another set';
+  const again = s.mode === 'storm' ? 'Another storm' : s.mode === 'show' ? 'Another show and grade' : 'Another set';
   const label = (it: StormItem) => (it.puzzle ? 'Puzzle' : positionLineLabel(it.card));
   // The row's title: where it is, and Maia's difficulty when known (§5.82).
   const rowTitle = (it: StormItem) => {
@@ -1167,6 +1318,13 @@ function Review(props: { s: StormSession; scope: StormScopeData }) {
             <div class="storm-result-score">
               <strong>{s.points}</strong>
               <span>point{Math.abs(s.points) === 1 ? '' : 's'}</span>
+            </div>
+          ) : s.mode === 'show' ? (
+            <div class="storm-result-score">
+              <strong>
+                {found}/{graded.length}
+              </strong>
+              <span>found</span>
             </div>
           ) : (
             tally && (
@@ -1184,6 +1342,10 @@ function Review(props: { s: StormSession; scope: StormScopeData }) {
               {s.mode === 'storm' ? (
                 <>
                   <strong>{s.points}</strong> point{Math.abs(s.points) === 1 ? '' : 's'} from {answered.length} answered
+                </>
+              ) : s.mode === 'show' ? (
+                <>
+                  <strong>{found}</strong> of {graded.length} found{answered.some((i) => i.answer!.self) ? ' · found and missed are your word, a move played is graded' : ''}
                 </>
               ) : (
                 tally && (
@@ -1241,8 +1403,8 @@ function Review(props: { s: StormSession; scope: StormScopeData }) {
             ) : (
               item.answer && (
                 <div class={`storm-status band-${item.answer.band}`}>
-                  <p class="storm-title">{item.puzzle ? PUZZLE_WORD[item.answer.band] : TITLE_WORD[item.answer.band]}</p>
-                  <p class="storm-line">{item.puzzle ? item.answer.userSan || '—' : verdictLine(item.answer, facts(item.card))}</p>
+                  <p class="storm-title">{item.answer.self ? SELF_WORD[item.answer.self] : item.puzzle ? PUZZLE_WORD[item.answer.band] : TITLE_WORD[item.answer.band]}</p>
+                  <p class="storm-line">{item.puzzle ? item.answer.userSan || '—' : answerLine(item.answer, facts(item.card))}</p>
                 </div>
               )
             )}
@@ -1261,7 +1423,7 @@ function Review(props: { s: StormSession; scope: StormScopeData }) {
             {shown && item.answer && !item.puzzle && <KindsNote p={item.card} elo={s.elo} />}
             <div class="actions">
               <button type="button" class="secondary" onClick={() => toggleShown(at)}>
-                {shown ? 'Hide best move' : 'Best move'} <kbd>B</kbd>
+                {s.mode === 'show' ? (shown ? 'Hide the moves' : 'Every move') : shown ? 'Hide best move' : 'Best move'} <kbd>B</kbd>
               </button>
               <button type="button" class="secondary" onClick={() => retryFromReview(retry ? undefined : at)}>
                 {retry ? 'Back to the review' : 'Try again'} <kbd>T</kbd>
@@ -1289,7 +1451,7 @@ function Review(props: { s: StormSession; scope: StormScopeData }) {
                     >
                       <span class="storm-row-n">{i + 1}</span>
                       <span>{it.answer?.userSan || '—'}</span>
-                      <span>{it.answer ? (it.puzzle ? (PUZZLE_WORD[it.answer.band] ?? '') : BAND_WORD[it.answer.band]) : ''}</span>
+                      <span>{it.answer ? bandWord(it.answer, !!it.puzzle) : ''}</span>
                       <span>{it.answer && typeof it.answer.wp === 'number' ? formatWp(it.answer.wp) : '—'}</span>
                       <span>{it.shown && it.answer ? (it.puzzle ? (it.puzzle.plies[0]?.san ?? '') : facts(it.card).bestSan) : '…'}</span>
                       {lines && (

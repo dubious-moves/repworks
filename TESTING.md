@@ -1150,3 +1150,21 @@ q_extension (or give it to a session with q_extension attached), then run
 - Checked: the order of the searches by Playwright with the fake engine (desktop and emulated
   phone), the engine back to one after focused scoring, the engines' times to depth 18 in headless
   Chromium on a 4-core container. Not on your devices.
+
+## Show and grade in the storm (§5.152, 2026-11-06)
+
+- Storm → "Show and grade (n)": n is the positions Stockfish has scored to depth 20 or more. Is it
+  a useful number on your repertoire, or should the home deepen more before it's worth it?
+- A card: think, press 2 (or Show the moves). Are the arrows readable on the real board, phone
+  and PC: the best mint and widest, Great and Good green, Inaccuracy grey, Mistake amber, Blunder
+  red and faint? With twelve arrows, is it too busy? (Options: leave out blunders, or show only
+  Good and better until asked.)
+- Found (2) goes straight on; Missed (4) keeps the card for a look, the next press goes on. Tap a
+  row or play the move for an exact grade. Does the flow feel right, and with the ring (its media
+  keys, screen on and off)?
+- On the phone: the buttons right under the board, the moves below. In view without scrolling?
+- Found is written as Good and Missed as a Mistake (no move): does the storm's record read right
+  to you with them in it?
+- Checked: by unit tests and Playwright with a fake engine (desktop and emulated phone),
+  screenshots in headless Chromium. Not on your devices, not with the real engine's lists.
+

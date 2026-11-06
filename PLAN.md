@@ -7,7 +7,7 @@ where the build differed). What remains is live: the spike's re-run (§4.2), the
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
 with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
-for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Storm positions shared between devices through the data repo, and an overnight gather (§5.102), are built (2026-10-12). Lc0 on the study page, its pick among close moves (§5.143), is built (2026-10-31). Endgames, the theoretical endgames each played for its goal against Stockfish (§5.145), are built (2026-10-31), their moves judged in the background since (§5.146, the owner's request of 2026-11-01), defended by Maia checked by Stockfish (§5.147, the owner's request), and a draw's attacker pushing on so the whole method comes up (§5.148, the owner's note). The endgames of the user's own repertoire (§5.149) are built (2026-11-01), and thirteen more theoretical endgames in two more groups (§5.150, the owner's request of 2026-11-02). A game card's move judged without waiting on the engine line's searches or the storm's workers (§5.151, the owner's request of 2026-11-04). Read with `DECISIONS.md`, which this plan updates (its
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Storm positions shared between devices through the data repo, and an overnight gather (§5.102), are built (2026-10-12). Lc0 on the study page, its pick among close moves (§5.143), is built (2026-10-31). Endgames, the theoretical endgames each played for its goal against Stockfish (§5.145), are built (2026-10-31), their moves judged in the background since (§5.146, the owner's request of 2026-11-01), defended by Maia checked by Stockfish (§5.147, the owner's request), and a draw's attacker pushing on so the whole method comes up (§5.148, the owner's note). The endgames of the user's own repertoire (§5.149) are built (2026-11-01), and thirteen more theoretical endgames in two more groups (§5.150, the owner's request of 2026-11-02). A game card's move judged without waiting on the engine line's searches or the storm's workers (§5.151, the owner's request of 2026-11-04). Show and grade in the storm, every move of a deepened position shown by its band (§5.152, the owner's request of 2026-11-06), is built. Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -8419,3 +8419,66 @@ the commands showing the line's end stopped, a3's position searched, the line's 
 (it fails on the old queue); `test/e2e/storm.spec.ts`'s focused scoring, then an endgame opened
 from the storm: one engine with the device's hash, not a focused worker's (it fails without the
 fix). Live: TESTING.md.
+
+#### 5.152 Show and grade in the storm (the owner's request, 2026-11-06)
+
+"Let's implement 'show and grade' in storm. We can show which moves are best and the other
+categories with different arrow colour, size and/or opacity. In case of a position that's been
+deepened, we should have access to the 12 best moves right? The 'show and grade' could be
+limited to these positions."
+
+Yes: the deepening (§5.45, §5.84) keeps Stockfish's MultiPV 12 list, each move scored over its
+last two depths (§5.120), and the storm already grades a move from it. What was decided:
+
+- **A third session beside Start storm and Set of 6**: "Show and grade (n)" on the storm's home,
+  n the positions ready (in the focus chosen) whose list may judge a move, so it can be shown:
+  Stockfish's at `judgeDepth` (20) or deeper, which in practice is the deepened MultiPV 12. The
+  rest wait for the deepening; with none, the button is greyed out and says why. No clock, no
+  puzzles; the focus applies as to the other sessions. The look-ahead stays off (every card judges
+  already, and a list deepened under the user's eyes would move the arrows).
+- **A card**: "Think of a move". **Show the moves** (`2`, Space or Enter) draws every move of the
+  list as an arrow by its band (`core/storm/show.ts`): the top move (rank 1 or level with it) mint,
+  widest and solid; Great green; Good olive; Inaccuracy grey; Mistake amber; Blunder red, each
+  narrower and fainter than the one before, the worst drawn first so the better lie on top
+  (chessground brushes `bandBest` … `bandBlunder` in `Board.tsx`, the storm's band colours). Under
+  the buttons, the same moves as a list: rank, move, band, score, win% given up.
+- **The grade**, as the trainer's show and grade (§5.9): **Found** (`2`): a good move was in mind,
+  counted as Good, and the next card at once. **Missed** (`4`, also before showing, which shows
+  them): counted as a Mistake; the card stays with its moves until the next press (`2` or `4`).
+  Or **name the move**: play it on the board or tap its row, and it is graded exactly as in a set
+  (from the list at once; a move outside it by one search), the moves shown with the verdict on
+  the card's own position, the move named a thin blue line over its arrow and its row marked.
+  The ring's media keys work as in the trainer (`holdMediaKeys`). No Try again: every move is on
+  the board already.
+- **Written** as ordinary `storm` events of an unhurried session (`m:"set"`, as a set's first
+  answer): a move named with its move and win% given up; Found as `b:"good"` and Missed as
+  `b:"bad"` with neither. No new field, so older devices read them, the record's found share and
+  what is done or comes back follow as for any answer, and its average win% given up leaves the
+  self-graded ones out. Their band bar shows them as Good and Mistake.
+- **The review**: the answers as Found, Missed or the move's band; "Every move" (`b`) draws the
+  arrows again; "Another show and grade".
+- **On a phone** (under 900 px) the buttons sit right under the board, the status and the moves
+  below them (§5.133's rule); on a desktop the buttons come before the list, so twelve rows never
+  push them out of view.
+- Found on the way, fixed: the review's keys read the row picked through an effect registered
+  again after each pick, a frame late, so a key pressed in that frame (`b`, `t`, `a`) acted on the
+  row before. They read the row as rendered now.
+- Found in this container's full run, failing on `e17a077` too (CI had passed it), all test
+  races fixed in the tests: the checklist's block named on arrival unfolded by the page a frame
+  after it is drawn, so a click read as folded folded it again (`checklist.spec.ts`'s `block`);
+  two addresses typed before the app's `hashchange` handler stamped the first (`back.spec.ts`);
+  the training list folded by a session starting a frame after a click opened it
+  (`priority.spec.ts`'s `lines`); the wake lock read once before its effect ran (`storm.spec.ts`'s
+  overnight). A clean run after: 346 passed, none flaky.
+
+**As built** (2026-11-06): `src/core/storm/show.ts` (`showable`, `shownMoves`, `arrowTier`,
+`drawingOrder`, `selfBand`, `showPress`), `src/app/storm.ts` (mode `show`, `showMoves`,
+`selfGrade`, `showGradePress`, the home's `showable` count), `src/ui/Storm.tsx`, `src/ui/Board.tsx`
+(the band brushes), `app.css`. Tests: `test/unit/core/storm/show.test.ts` (which lists are shown,
+the bands and the top move, the drawing order, the self-graded bands, the two keys), with three
+controls in its header; `test/e2e/storm.spec.ts` (desktop and phone, the fake engine's ladder):
+only deepened positions counted, nothing shown before `2`, twelve arrows and rows with their
+bands, the best wider than a mistake, the buttons in view above the list (under the board on the
+phone), Found going on at once, Missed keeping the card, a move named from the list graded "Good
+move · #3 of 12" with the blue line, the review's words and arrows, the three events written and
+the record. Live: TESTING.md.

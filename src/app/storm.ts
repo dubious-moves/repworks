@@ -15,6 +15,7 @@ import { setHeld, setOutcome, type SetOutcome } from '../core/storm/set.ts';
 import { behind, chapterShare, decisions, drawBalanced, frontiers, inScope, lineInScope, stormLines, type DecisionPoint, type Frontier, type StormLine, type StormScope } from '../core/storm/sources.ts';
 import { drawOrder, noteRecent, stormAnswer, stormHistories, takeSpread, type StormHistory } from '../core/storm/store.ts';
 import type { Verdict } from '../core/storm/verdict.ts';
+import { selfBand, showable, showPress, type ShowState } from '../core/storm/show.ts';
 import { gameCard } from '../core/progress/cards.ts';
 import { practiceMistakeOf, practiceMistakeSaved, stormMistakeItem } from '../core/games/saved.ts';
 import { savedDeck } from './games.ts';
@@ -256,6 +257,8 @@ export interface StormHome {
   shared: number;
   /** Ready positions too easy to deal (§5.105): Maia at the user's rating finds a great move almost always. */
   tooEasy: number;
+  /** Of `matching`, those show and grade deals (§5.152): their list may judge, so it can be shown. */
+  showable: number;
 }
 export const stormHome = signal<StormHome | undefined>(undefined);
 
@@ -288,6 +291,7 @@ export async function refreshHome(s: StormScopeData): Promise<void> {
   const focus = stormPrefs.value.focus;
   let matching = 0;
   let tooEasy = 0;
+  let canShow = 0;
   for (const p of ready) {
     if (tooEasyAt(p.maia, elo, storedList(p), STORM)) {
       tooEasy++;
@@ -295,11 +299,14 @@ export async function refreshHome(s: StormScopeData): Promise<void> {
     }
     const t = positionTags(p, storedList(p), elo, tc);
     for (const f of t) tags[f]++;
-    if (matchesFocus(t, p.kind, focus)) matching++;
+    if (matchesFocus(t, p.kind, focus)) {
+      matching++;
+      if (showable(storedList(p), STORM)) canShow++;
+    }
   }
   const maiaHere = await maiaStored().catch(() => false);
   const shared = all.filter((p) => p.from).length;
-  stormHome.value = { stored: all.length, done, ready: ready.length, deep, lines, maiaHere, rated, elo, tags, matching, shared, tooEasy };
+  stormHome.value = { stored: all.length, done, ready: ready.length, deep, lines, maiaHere, rated, elo, tags, matching, shared, tooEasy, showable: canShow };
 }
 
 /* ------------------------------------------------------------------ the gather (§5.42) */
@@ -754,7 +761,9 @@ const lookTried = new Set<string>();
  */
 async function lookAhead(): Promise<void> {
   const s = stormSession.value;
-  if (!s || s.phase === 'done' || lookBusy) return;
+  // Show and grade deals only positions that judge already (§5.152): nothing to look ahead for,
+  // and a list deepened under the user's eyes would move the arrows.
+  if (!s || s.phase === 'done' || s.mode === 'show' || lookBusy) return;
   const run = ++lookRun;
   lookBusy = true;
   try {
@@ -822,11 +831,14 @@ function swapIn(d: StoredPosition): void {
 
 /* ------------------------------------------------------------------ a session (§5.43, §5.44) */
 
-export type SessionMode = 'storm' | 'set';
+/** The timed storm, the set of six, and show and grade (§5.152: untimed, every move shown). */
+export type SessionMode = 'storm' | 'set' | 'show';
 type Phase = 'solving' | 'grading' | 'verdict' | 'held' | 'done';
 
 export interface StormAnswer extends Verdict {
   band: Band | 'unanswered';
+  /** Show and grade's own grade (§5.152): the user's word, no move. */
+  self?: 'found' | 'missed';
 }
 
 export interface StormItem {
@@ -890,6 +902,8 @@ export interface StormSession {
   nextIn?: number;
   /** Where the review was (its row), kept across a visit to the analysis board. */
   reviewAt?: number;
+  /** Show and grade (§5.152): the card's moves are on the board. */
+  movesShown?: boolean;
 }
 
 export const stormSession = signal<StormSession | undefined>(undefined);
@@ -987,7 +1001,9 @@ export async function startStorm(s: StormScopeData, mode: SessionMode, o: { focu
   const elo = maiaElo.peek();
   const focus = cleanFocus(o.focus ?? []);
   queue = await dealt(s, focus, elo);
-  share = focus.length && !o.puzzles ? 0 : puzzlePrefs.value.share;
+  // Show and grade: only the positions whose list may judge, so every move can be shown; no puzzles.
+  if (mode === 'show') queue = queue.filter((p) => showable(storedList(p), STORM));
+  share = mode === 'show' || (focus.length && !o.puzzles) ? 0 : puzzlePrefs.value.share;
   const data = trainData.value;
   const ready = share > 0 ? await readyPuzzles(s) : [];
   puzzleQueue = data ? drawOrder(ready.map((p) => ({ card: 'z|' + p.id, p })), histories(data), Math.random, STORM.reachTop).map((x) => x.p) : [];
@@ -1056,7 +1072,7 @@ function deal(): void {
     return deal();
   }
   if (!item) return endStorm(s.history.length ? 'out' : 'empty');
-  const { nextAt: _a, nextIn: _b, practice: _c, ...rest } = stormSession.value!;
+  const { nextAt: _a, nextIn: _b, practice: _c, movesShown: _d, ...rest } = stormSession.value!;
   stormSession.value = { ...rest, item, revealed: false, history: s.pass === 1 ? [...s.history, item] : s.history };
   setPhase('solving');
   void lookAhead();
@@ -1115,6 +1131,15 @@ function settle(item: StormItem, uci: string, v: StormAnswer): void {
     const wait = pts > 0 ? STORM.verdictFastMs : STORM.verdictMs;
     update({ nextAt: Date.now() + wait, nextIn: wait });
     verdictTimer = setTimeout(() => deal(), wait);
+    return;
+  }
+  if (now.mode === 'show') {
+    // Show and grade (§5.152): the move named is graded as a set's first answer would be, unhurried,
+    // and the card's moves are shown with the verdict.
+    void recordEvent({ t: new Date().toISOString(), ...stormAnswer(card.card, band, { uci, wp: v.wp ?? null, set: true, chapter: chapterOf(card) }) });
+    const done: StormItem = { ...item, answer: v, attempts };
+    update({ item: done, history: now.history.map((h) => (h.card.card === item.card.card ? done : h)), movesShown: true });
+    setPhase('verdict');
     return;
   }
   // The set (§17): a clean answer resolves, a worse one holds the card.
@@ -1220,7 +1245,8 @@ export function isTopMove(v: StormAnswer): boolean {
  */
 export function canTryAgain(s: StormSession | undefined): boolean {
   const item = s?.item;
-  if (!s || !item) return false;
+  // Show and grade has every move on the board already.
+  if (!s || !item || s.mode === 'show') return false;
   if (s.phase === 'held') return s.mode === 'set' && (item.attempts ?? 0) < STORM.setRetryMax;
   return s.phase === 'verdict';
 }
@@ -1280,6 +1306,52 @@ function giveUp(s: StormSession & { item: StormItem }): void {
   const done: StormItem = { ...s.item, answer: v };
   update({ item: done, history: s.history.map((h) => (h.card.card === done.card.card ? done : h)), streak: 0 });
   setPhase('verdict');
+}
+
+/* ------------------------------------------------------------------ show and grade (§5.152) */
+
+/** Show and grade: the card's moves shown on the board, each by its band. */
+export function showMoves(): void {
+  const s = stormSession.value;
+  if (!s?.item || s.mode !== 'show' || s.phase !== 'solving') return;
+  update({ movesShown: true });
+}
+
+/**
+ * Show and grade: the user's word on the card. Found is written as Good, missed as a Mistake, with
+ * no move (`selfBand`); found goes on to the next card at once, missed keeps the card and its moves
+ * on the board until the next press.
+ */
+export function selfGrade(found: boolean): void {
+  const s = stormSession.value;
+  const item = s?.item;
+  if (!s || !item || s.mode !== 'show' || s.phase !== 'solving') return;
+  gradeSeq++;
+  const band = selfBand(found);
+  void recordEvent({ t: new Date().toISOString(), ...stormAnswer(item.card.card, band, { set: true, chapter: chapterOf(item.card) }) });
+  const v: StormAnswer = { verdict: band, band, self: found ? 'found' : 'missed', userSan: '' };
+  const done: StormItem = { ...item, answer: v, attempts: 1 };
+  update({ item: done, history: s.history.map((h) => (h.card.card === item.card.card ? done : h)), movesShown: true });
+  if (found) return deal();
+  setPhase('verdict');
+}
+
+/** Where show and grade's card stands, for the two keys. */
+export function showState(s: StormSession): ShowState {
+  if (s.phase === 'verdict' || s.phase === 'held') return 'answered';
+  if (s.phase !== 'solving') return 'busy';
+  return s.movesShown ? 'shown' : 'hidden';
+}
+
+/** A press of show and grade's two keys (§5.9's 2 and 4, and the ring's media keys). */
+export function showGradePress(press: 'next' | 'wrong'): void {
+  const s = stormSession.value;
+  if (!s?.item || s.mode !== 'show') return;
+  const action = showPress(showState(s), press);
+  if (action === 'show') showMoves();
+  else if (action === 'found') selfGrade(true);
+  else if (action === 'missed') selfGrade(false);
+  else if (action === 'next') nextCard();
 }
 
 /** A storm's verdict kept on the board: the next card waits for Next. */

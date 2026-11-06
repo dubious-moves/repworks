@@ -99,8 +99,12 @@ async function sync(page: Page) {
 async function block(page: Page) {
   const b = page.locator('[data-testid="checklist-study"][data-study="Rep0Najd"][data-side="black"]');
   const head = b.locator('.checklist-head');
-  if ((await head.getAttribute('aria-expanded')) !== 'true') await head.click();
-  await expect(head).toHaveAttribute('aria-expanded', 'true');
+  // A block named on arrival (`?sid=`) is unfolded by the page itself, a frame after it is drawn:
+  // a click read as folded just before that would fold it again, so it is tried until open.
+  await expect(async () => {
+    if ((await head.getAttribute('aria-expanded')) !== 'true') await head.click();
+    await expect(head).toHaveAttribute('aria-expanded', 'true', { timeout: 1000 });
+  }).toPass();
   return b;
 }
 

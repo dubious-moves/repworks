@@ -2079,3 +2079,18 @@ The technical calls, each with its reason:
   15 is too low." Measured since: in a sharp position depth 18 itself takes 3 to 8 s on Stockfish
   19 or on several threads, about a second on Stockfish 18 on one thread; which way to go there is
   the owner's (PLAN.md §5.151).
+
+## Revision of 2026-11-06 (show and grade in the storm, PLAN.md §5.152)
+- **The storm has a third session, show and grade**, over the positions whose Stockfish list may
+  judge (depth 20 or more: the deepened MultiPV 12): every move shown as an arrow by its band, then
+  Found (`2`), Missed (`4`) or the move named on the board or the list.
+- **A self-graded answer is an ordinary `storm` event**: Found `b:"good"`, Missed `b:"bad"`, no
+  move and no win%, `m:"set"` (unhurried); a move named is written as a set's first answer. No new
+  field, so every device reads them and the record and what is done follow unchanged; the band bar
+  counts the self-graded ones as Good and Mistake.
+- Why: the owner, 2026-11-06: "Let's implement 'show and grade' in storm. We can show which moves
+  are best and the other categories with different arrow colour, size and/or opacity … The 'show
+  and grade' could be limited to these positions [the deepened ones]." The two keys are the
+  trainer's (§5.9), so the ring works here too; naming the move keeps an exact grade for whoever
+  wants one.
+

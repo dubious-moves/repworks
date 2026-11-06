@@ -10,7 +10,7 @@ import '@lichess-org/chessground/assets/chessground.brown.css';
 import cburnett from '@lichess-org/chessground/assets/chessground.cburnett.css?inline';
 import type { Api } from '@lichess-org/chessground/api';
 import type { Config } from '@lichess-org/chessground/config';
-import type { DrawShape } from '@lichess-org/chessground/draw';
+import type { DrawBrush, DrawBrushes, DrawShape } from '@lichess-org/chessground/draw';
 import type { Key } from '@lichess-org/chessground/types';
 import { createElement } from 'preact';
 import { useEffect, useLayoutEffect, useRef } from 'preact/hooks';
@@ -69,6 +69,19 @@ pieces.textContent = cburnett.replaceAll('.cg-wrap piece', ':is(.cg-wrap, .board
 document.head.append(pieces);
 
 const BRUSHES: readonly string[] = ['green', 'red', 'blue', 'yellow'];
+
+/**
+ * Arrows for a storm position's moves by band (§5.152): the storm's band colours (app.css's
+ * `--band-*`), the better the wider and the more solid. Only drawn by the app, never by the user.
+ */
+export const BAND_BRUSHES: Record<string, DrawBrush> = {
+  bandBest: { key: 'bbest', color: '#3fbf72', opacity: 0.95, lineWidth: 15 },
+  bandGreat: { key: 'bgreat', color: '#4fa846', opacity: 0.85, lineWidth: 12 },
+  bandGood: { key: 'bgood', color: '#8fae6a', opacity: 0.8, lineWidth: 10 },
+  bandOk: { key: 'bok', color: '#8a8a8a', opacity: 0.6, lineWidth: 8 },
+  bandBad: { key: 'bbad', color: '#d6a13a', opacity: 0.55, lineWidth: 7 },
+  bandBlunder: { key: 'bblunder', color: '#d9604a', opacity: 0.5, lineWidth: 6 },
+};
 
 const toDraw = (shapes: readonly Shape[]): DrawShape[] => shapes.map((s) => ({ orig: s.orig, ...(s.dest ? { dest: s.dest } : {}), brush: s.brush }));
 const fromDraw = (shapes: readonly DrawShape[]): Shape[] =>
@@ -130,6 +143,8 @@ export function Board(p: BoardProps) {
       drawable: {
         ...config(props.current, toDraw(own(props.current))).drawable,
         enabled: true,
+        // Merged into chessground's own brushes.
+        brushes: BAND_BRUSHES as unknown as DrawBrushes,
         onChange: (shapes) => {
           if (drawing) {
             drawing = false;
