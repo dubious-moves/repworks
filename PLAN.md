@@ -8624,12 +8624,27 @@ it".
   - Ctrl-C or SIGTERM stops everything.
   - Either way, what was kept is written and pushed.
   - A checkout with errors (`validateDataRepo`) is refused before anything is gathered.
+- **`--score-only`** (the owner's question, 2026-11-06: "Can I run only Stockfish deepening/scoring
+  of the non-scored positions?") skips the walk, the explorer and Maia. Stockfish scores the
+  cloud's own positions short of the standard, for `--score-minutes` at most, and they are written
+  and pushed as usual.
+  - Other devices' positions are left to them: the cloud writes only its own folder, and a
+    device's store deepens what it merged on the storm's home anyway.
+  - It can't be combined with `--overnight` or `--minutes`, nor with `--no-deepen`.
+  - Tried on a scratch copy of the data repo: it found the first run's 272 unscored positions and
+    scored 11 in 2 minutes, rewriting only the cloud's file.
 
 Run from a cloud session with both repos (a command there runs two hours at most, so the minutes):
 
 ```sh
 git -C ../repworks-data checkout main && git -C ../repworks-data pull -q
 node scripts/storm-gather.ts ../repworks-data --minutes 60 --score-minutes 40 --push
+```
+
+Or only the scoring of what the cloud gathered before:
+
+```sh
+node scripts/storm-gather.ts ../repworks-data --score-only --score-minutes 100 --push
 ```
 
 Tests: `test/unit/core/storm/gather.test.ts` (over a fake host):

@@ -61,7 +61,8 @@ tests at it: `REPWORKS_CHROMIUM=/opt/pw-browsers/chromium npm run e2e`.
 
 The storm's "Gather positions" from a cloud session, as a device named `cloud` (PLAN.md §5.155),
 with the data repo checked out on `main`:
-`node scripts/storm-gather.ts ../repworks-data --minutes 60 --score-minutes 40 --push`.
+`node scripts/storm-gather.ts ../repworks-data --minutes 60 --score-minutes 40 --push`; only
+Stockfish over the cloud's positions not yet scored: `--score-only --score-minutes 100 --push`.
 
 ## Rules the code keeps
 

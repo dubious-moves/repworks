@@ -17,6 +17,8 @@
 //   --engines N        Stockfish engines at once (default: one a core)
 //   --elo N[,N…]       Maia's ratings beyond its ladder (default: those the devices' positions carry)
 //   --no-maia, --no-deepen     leave those to the devices
+//   --score-only       no gathering: Stockfish scores the cloud's positions short of the standard
+//                      (for --score-minutes at most), and that is all
 //   --push             commit the cloud's files and push them (the checkout on its default branch)
 // Environment: LICHESS_TOKEN (the explorer wants a login; without one only invented lines),
 //   STOCKFISH=<native binary> or STOCKFISH_LITE=19 (default: the vendored Stockfish 18 lite).
@@ -52,11 +54,13 @@ interface Options {
   elos?: number[];
   maia: boolean;
   deepen: boolean;
+  /** No walking (and no explorer, no Maia): the cloud's positions scored, nothing else. */
+  scoreOnly: boolean;
   push: boolean;
 }
 
 function options(argv: string[]): Options {
-  const o: Options = { dir: '', overnight: false, source: 'both', minPly: STORM.minPly, maxPly: STORM.maxPly, engines: availableParallelism(), maia: true, deepen: true, push: false };
+  const o: Options = { dir: '', overnight: false, source: 'both', minPly: STORM.minPly, maxPly: STORM.maxPly, engines: availableParallelism(), maia: true, deepen: true, scoreOnly: false, push: false };
   const num = (flag: string, v: string | undefined) => {
     const n = Number(v);
     if (!v || !Number.isFinite(n) || n <= 0) throw new Error(`${flag} wants a positive number`);
@@ -77,12 +81,15 @@ function options(argv: string[]): Options {
     else if (a === '--elo') o.elos = (argv[++i] ?? '').split(',').map((e) => num(a, e));
     else if (a === '--no-maia') o.maia = false;
     else if (a === '--no-deepen') o.deepen = false;
+    else if (a === '--score-only') o.scoreOnly = true;
     else if (a === '--push') o.push = true;
     else if (a.startsWith('--')) throw new Error(`unknown option ${a}`);
     else if (!o.dir) o.dir = a;
     else throw new Error(`one checkout only (${a})`);
   }
-  if (!o.dir) throw new Error('usage: node scripts/storm-gather.ts <data-repo checkout> [--overnight] [--minutes N] [--push] …');
+  if (!o.dir) throw new Error('usage: node scripts/storm-gather.ts <data-repo checkout> [--overnight] [--minutes N] [--score-only] [--push] …');
+  if (o.scoreOnly && !o.deepen) throw new Error('--score-only and --no-deepen leave nothing to do');
+  if (o.scoreOnly && (o.overnight || o.minutes)) throw new Error('--score-only gathers nothing: --overnight and --minutes don’t apply (--score-minutes does)');
   return o;
 }
 
@@ -211,10 +218,9 @@ async function main(): Promise<void> {
   for (const [path, n] of shared.unread) say(`${path}: ${n} line(s) this version can't read (never rewritten)`);
 
   const token = process.env['LICHESS_TOKEN'] ?? '';
-  if (!token) say('no LICHESS_TOKEN: the explorer wants a login, so only invented lines (Stockfish’s) are gathered');
+  if (!token && !o.scoreOnly) say('no LICHESS_TOKEN: the explorer wants a login, so only invented lines (Stockfish’s) are gathered');
   const engines = startEngines(o.engines);
   say(`${engines.width} × ${engines.label}, one thread and a 64 MB hash each`);
-  const ask = explorer(token);
 
   // Two stops: the walking's (`--minutes`), after which the positions are still rated and scored,
   // and everything's (Ctrl-C, SIGTERM). Either gives up the request under way and answers the
@@ -351,36 +357,39 @@ async function main(): Promise<void> {
     lastLine = line;
     say(line);
   };
-  say(`gathering${o.overnight ? ' overnight' : ''}${o.minutes ? ` for ${minutes(o.minutes)} at most` : ''}: ${o.source === 'both' ? 'line ends and replies' : o.source === 'ends' ? 'line ends' : 'replies'}, plies ${c.minPly}–${c.maxPly} past the end`);
-  const g = await runGather(scope, { source: o.source, overnight: o.overnight, config: c }, {
-    io: (count, until, strict) => serviceIo(ask, engines.analyse, count, guard, STORM, Math.random, until, strict),
-    positions: async () => [...store.values()],
-    add: async (fresh, spare) => addPositions(store, fresh, c.storeMax, spare),
-    done: () => rep.done,
-    // Between passes the cloud scores everything that came in (focused, §5.105): it has the cores.
-    score: async () => void (o.deepen && !walkStopped ? await deepen(() => walkStopped) : undefined),
-    share: async () => {
-      lastShare = Date.now();
-      return share();
-    },
-    show,
-    refresh: async () => {
-      if (Date.now() - lastShare < SHARE_EVERY_MS) return;
-      lastShare = Date.now();
-      await share();
-    },
-    stopped: () => walkStopped,
-    wait: (ms) => guard(sleep(ms)).then(() => undefined),
-    now: () => Date.now(),
-    rnd: Math.random,
-  });
-  clearTimeout(walkTimer);
-  show({ ...g, running: false });
   const own = () => [...store.values()].filter(isOwn).length;
-  say(`gathered: ${own() - ownAtStart} new positions of its own (${own()} in all)`);
+  if (!o.scoreOnly) {
+    const ask = explorer(token);
+    say(`gathering${o.overnight ? ' overnight' : ''}${o.minutes ? ` for ${minutes(o.minutes)} at most` : ''}: ${o.source === 'both' ? 'line ends and replies' : o.source === 'ends' ? 'line ends' : 'replies'}, plies ${c.minPly}–${c.maxPly} past the end`);
+    const g = await runGather(scope, { source: o.source, overnight: o.overnight, config: c }, {
+      io: (count, until, strict) => serviceIo(ask, engines.analyse, count, guard, STORM, Math.random, until, strict),
+      positions: async () => [...store.values()],
+      add: async (fresh, spare) => addPositions(store, fresh, c.storeMax, spare),
+      done: () => rep.done,
+      // Between passes the cloud scores everything that came in (focused, §5.105): it has the cores.
+      score: async () => void (o.deepen && !walkStopped ? await deepen(() => walkStopped) : undefined),
+      share: async () => {
+        lastShare = Date.now();
+        return share();
+      },
+      show,
+      refresh: async () => {
+        if (Date.now() - lastShare < SHARE_EVERY_MS) return;
+        lastShare = Date.now();
+        await share();
+      },
+      stopped: () => walkStopped,
+      wait: (ms) => guard(sleep(ms)).then(() => undefined),
+      now: () => Date.now(),
+      rnd: Math.random,
+    });
+    clearTimeout(walkTimer);
+    show({ ...g, running: false });
+    say(`gathered: ${own() - ownAtStart} new positions of its own (${own()} in all)`);
+  }
 
   // Then what the storm's home does with them: Maia's ratings, Stockfish's standard.
-  if (!stopping && o.maia) {
+  if (!stopping && o.maia && !o.scoreOnly) {
     const n = await rate();
     if (n) say(`Maia rated ${n} positions`);
   }
