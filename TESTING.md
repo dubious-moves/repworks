@@ -1188,3 +1188,17 @@ q_extension (or give it to a session with q_extension attached), then run
 - Checked: by unit tests and Playwright with a fake engine (desktop and emulated phone), the
   Maia reply with the real Maia model in headless Chromium, screenshots of each state. Not on your
   devices, not with the real engine's lines.
+
+## The storm's gather from a cloud session (§5.155, 2026-11-06)
+
+- On each device, sync, then open the storm. The positions the cloud gathered come in "from other
+  devices", and "Show and grade (n)" counts the ones it scored to depth 24.
+  - Deal some. Do they read like the ones the PC gathers: the line names, the move that arrived,
+    the verdicts?
+- Clear on one device. The cloud's positions should go from that device only, and stay gone after
+  the next sync.
+- The cloud shows up in the data repo as `devices/<id>.json` named `cloud`, with commits named
+  `cloud: n storm positions`. Is that the name you want?
+- Checked: a run against a scratch copy of your data repo in this cloud container. Also unit tests
+  of the loop and the script's data side, and the storm's Playwright tests with the app's gather now
+  through core (desktop and emulated phone). Not yet on your devices.

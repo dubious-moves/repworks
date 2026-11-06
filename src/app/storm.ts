@@ -5,14 +5,15 @@
 import { signal } from '@preact/signals';
 import type { Mode, StormMode } from '../core/app/fsm.ts';
 import { positionKeyOf } from '../core/chess/positionKey.ts';
-import type { FromWorker, ToWorker } from '../core/explorer/service.ts';
+import type { ToWorker } from '../core/explorer/service.ts';
 import type { DeviceEvent } from '../core/progress/replay.ts';
 import { STORM, withPlyRange, type Band, type StormConfig } from '../core/storm/config.ts';
 import { engineLoss, grade, moveLoss, moverCp, nextStreak, points, settledValue, type ScoredList } from '../core/storm/grade.ts';
-import { cdbList, deepenedPosition, engineList, explorerUntil, harvestDecision, harvestFrontier, judges, needsDeepening, positionLineKey, storedList, storedPosition, type HarvestIo, type StoredPosition } from '../core/storm/harvest.ts';
+import { deepenedPosition, engineList, judges, needsDeepening, positionLineKey, storedList, type HarvestIo, type StoredPosition } from '../core/storm/harvest.ts';
 import { stormRecord, type StormRecord } from '../core/storm/record.ts';
 import { setHeld, setOutcome, type SetOutcome } from '../core/storm/set.ts';
-import { behind, chapterShare, decisions, drawBalanced, frontiers, inScope, lineInScope, stormLines, type DecisionPoint, type Frontier, type StormLine, type StormScope } from '../core/storm/sources.ts';
+import { decisions, frontiers, inScope, lineInScope, stormLines, type DecisionPoint, type Frontier, type StormLine, type StormScope } from '../core/storm/sources.ts';
+import { GATHER_STOPPED, runGather, serviceIo, type Gathering, type Spent, type StormAsk, type StormReply } from '../core/storm/gather.ts';
 import { drawOrder, noteRecent, stormAnswer, stormHistories, takeSpread, type StormHistory } from '../core/storm/store.ts';
 import type { Verdict } from '../core/storm/verdict.ts';
 import { selfBand, showable, showPress, type ShowState } from '../core/storm/show.ts';
@@ -20,7 +21,7 @@ import { continuedCard, followUps, maiaReply, rootCard, type FollowUp } from '..
 import { gameCard } from '../core/progress/cards.ts';
 import { practiceMistakeOf, practiceMistakeSaved, stormMistakeItem } from '../core/games/saved.ts';
 import { savedDeck } from './games.ts';
-import { drawFrontier, fenAfterUci, kept, positionOf, uciToSan } from '../core/storm/walk.ts';
+import { fenAfterUci, positionOf, uciToSan } from '../core/storm/walk.ts';
 import type { Chapter } from '../core/study/model.ts';
 import { positionAt } from '../core/study/tree.ts';
 import type { Score } from '../core/engine/uci.ts';
@@ -95,11 +96,10 @@ export function stormStore(): StormStore {
 
 /* ------------------------------------------------------------------ the worker's answers */
 
-type StormReply = Extract<FromWorker, { type: 'stormGames' | 'gamePgns' | 'scores' }>;
 let nextId = 1;
 const waiting = new Map<number, (m: StormReply) => void>();
 let listening = false;
-function ask(m: DistributiveOmit<Extract<ToWorker, { type: 'stormGames' | 'gamePgns' | 'scores' }>, 'id'>): Promise<StormReply> {
+function ask(m: StormAsk): Promise<StormReply> {
   if (!listening) {
     listening = true;
     onWorker((r) => {
@@ -115,59 +115,12 @@ function ask(m: DistributiveOmit<Extract<ToWorker, { type: 'stormGames' | 'gameP
     postToWorker({ ...m, id } as ToWorker);
   });
 }
-type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 /** The worker's explorer, game exports and ChessDB, as the gathers ask them (the repertoire endgames' too, §5.149). */
 export const stormRequest = ask;
 
-export interface Spent {
-  explorer: number;
-  games: number;
-  chessdb: number;
-  searches: number;
-}
-const blankSpent = (): Spent => ({ explorer: 0, games: 0, chessdb: 0, searches: 0 });
-
-/** A failure no wait mends (a Lichess login wanted): it ends even an overnight gather. */
-class GatherEnd extends Error {}
-
-/**
- * The gather's requests, each counted as it goes out (`spent`, then `tick` so the page shows it at
- * once) and each given up the moment the gather is stopped (`guard` rejects then). `until`: the
- * explorer's games up to that month. `strict` (overnight): a failed explorer request or game
- * export throws, to be waited out, rather than reading as a line end without games.
- */
-function harvestIo(spent: Spent, tick: () => void, guard: <T>(p: Promise<T>) => Promise<T>, until?: string, strict = false): HarvestIo {
-  const count = (k: keyof Spent) => {
-    spent[k]++;
-    tick();
-  };
-  return {
-    explorer: async (fen) => {
-      count('explorer');
-      const r = await guard(ask(until ? { type: 'stormGames', fen, until } : { type: 'stormGames', fen }));
-      if (strict && 'error' in r) throw r.error.login ? new GatherEnd(r.error.message) : new Error(r.error.message);
-      return r.type === 'stormGames' && 'games' in r ? { total: r.games.total, moves: r.games.moves, gameIds: r.games.gameIds ?? [] } : null;
-    },
-    pgns: async (ids) => {
-      count('games');
-      const r = await guard(ask({ type: 'gamePgns', ids }));
-      if (strict && 'error' in r) throw new Error(r.error.message);
-      return r.type === 'gamePgns' && 'text' in r ? r.text : '';
-    },
-    cdb: async (fen) => {
-      count('chessdb');
-      const r = await guard(ask({ type: 'scores', fen }));
-      return r.type === 'scores' && 'evals' in r ? cdbList(r.evals) : 'error';
-    },
-    engine: async (fen, lines, depth) => {
-      count('searches');
-      const a = await guard(analyseForStorm(fen, lines, depth, 8000));
-      const pos = positionOf(fen);
-      return a && pos ? engineList(a.lines, pos.turn, a.depth, STORM, a.scores) : null;
-    },
-    rnd: Math.random,
-  };
-}
+/** The gather's requests (core's `serviceIo`) over the explorer worker and this device's Stockfish. */
+const harvestIo = (count: (k: keyof Spent) => void, guard: <T>(p: Promise<T>) => Promise<T>, until?: string, strict = false): HarvestIo =>
+  serviceIo(ask, analyseForStorm, count, guard, STORM, Math.random, until, strict);
 
 /* ------------------------------------------------------------------ the scope and its sources */
 
@@ -313,29 +266,10 @@ export async function refreshHome(s: StormScopeData): Promise<void> {
 
 /* ------------------------------------------------------------------ the gather (§5.42) */
 
-export interface Overnight {
-  /** The pass under way, from 1: the first walks today's games, each after it older ones (§5.102). */
-  pass: number;
-  passes: number;
-  doing: 'walking' | 'scoring' | 'waiting';
-  /** Failures waited out. */
-  errors: number;
-}
-
-export interface Gathering {
-  running: boolean;
-  frontiers: number;
-  of: number;
-  stored: number;
-  spent: Spent;
-  note: string;
-  /** Kept going until stopped (§5.102). */
-  overnight?: Overnight;
-}
+export type { Gathering, Overnight } from '../core/storm/gather.ts';
 export const gathering = signal<Gathering | undefined>(undefined);
 let stopGather = false;
 let stopNow: (() => void) | undefined;
-const STOPPED = new Error('stopped');
 
 /** The cards answered well lately: the first to make room in the store. */
 const doneCards = (): Set<string> => {
@@ -345,183 +279,47 @@ const doneCards = (): Set<string> => {
 };
 
 /**
- * Walks the scope's line ends (and replies) until stopped or done, storing what passes. Overnight
- * (§5.102) it goes on: Stockfish re-scores what came in for as long as the pass took, then the
- * line ends are walked again over older games (the explorer up to `overnightStepMonths` earlier
- * each pass), until `overnightPasses`, the store full, or Stop; a failure is waited out (a minute,
- * then longer each time in a row, up to 15) instead of ending it. The positions are written out to
- * the data repo after every pass and at the end.
+ * Walks the scope's line ends (and replies) until stopped or done, storing what passes: core's
+ * gather (core/storm/gather.ts, §5.155) over the explorer worker, this device's Stockfish and its
+ * store. Overnight (§5.102) it goes on: Stockfish re-scores what came in for as long as the pass
+ * took (focused: all of it, §5.105), then the line ends are walked again over older games; the
+ * positions are written out to the data repo after every pass and at the end.
  */
 export async function gather(s: StormScopeData, overnight = false): Promise<void> {
   if (gathering.value?.running) return;
   stopDeepening();
   stopGather = false;
-  const spent = blankSpent();
   // Stop gives up the request under way: the walk it was part of is left out, nothing waits on it.
-  const stopped = new Promise<never>((_, reject) => (stopNow = () => reject(STOPPED)));
+  const stopped = new Promise<never>((_, reject) => (stopNow = () => reject(GATHER_STOPPED)));
   stopped.catch(() => undefined);
   const guard = <T>(p: Promise<T>) => Promise.race([p, stopped]);
   // The counts as requests go out, at most four times a second, the last always shown.
   let later: ReturnType<typeof setTimeout> | undefined;
-  const tick = () => {
-    later ??= setTimeout(() => {
-      later = undefined;
-      if (g.running) show();
-    }, 250);
-  };
-  const io = harvestIo(spent, tick, guard, undefined, overnight);
-  const c = config();
-  const source = stormPrefs.value.source;
-  const ends = source === 'replies' ? [] : s.frontiers.slice();
-  const points = source === 'ends' ? [] : s.decisions.slice().sort((a, b) => b.n - a.n);
-  // Breadth first: one game at every line end, then (a second pass) the rest of each one's games.
-  const again: { f: Frontier; lines: Frontier['lines']; walked: Set<string> }[] = [];
-  const more = Math.max(0, STORM.gatherGamesPerFrontier - 1);
-  const of = ends.length + points.length;
-  const g: Gathering = { running: true, frontiers: 0, of, stored: 0, spent, note: of ? '' : 'Nothing to walk: no line in this scope ends past 4 plies.' };
-  if (overnight) g.overnight = { pass: 1, passes: STORM.overnightPasses, doing: 'walking', errors: 0 };
-  const show = () => (gathering.value = { ...g, spent: { ...spent }, ...(g.overnight ? { overnight: { ...g.overnight } } : {}) });
-  show();
-  let spare = doneCards();
-  const keep = async (cands: Parameters<typeof storedPosition>[0][], from: Parameters<typeof storedPosition>[1]) => {
-    const fresh = cands.filter(kept).map((x) => storedPosition(x, from, Date.now())).filter((p): p is StoredPosition => !!p);
-    g.stored += await stormStore().addPositions(fresh, STORM.storeMax, spare);
-  };
-  // Every line end's games walked in this gather, and how often each is reached (the first pass's count).
-  const walkedBy = new Map<string, Set<string>>();
-  const reach = new Map<string, number | null>();
-  const walked = (f: Frontier, ids: readonly string[] | undefined) => {
-    const set = walkedBy.get(f.key) ?? new Set<string>();
-    for (const id of ids ?? []) set.add(id);
-    walkedBy.set(f.key, set);
-    return set;
-  };
-  // One frontier's walk. Overnight a failure is waited out and the walk tried again; else it ends the gather.
-  let fails = 0;
-  const step = async (walk: () => Promise<void>) => {
-    for (;;) {
-      try {
-        await walk();
-        fails = 0;
-        return;
-      } catch (e) {
-        if (e === STOPPED || e instanceof GatherEnd || !g.overnight) throw e;
-        fails++;
-        g.overnight.errors++;
-        g.overnight.doing = 'waiting';
-        const min = Math.min(15, 2 ** Math.min(4, fails - 1));
-        g.note = `Waiting ${min} min after a failure: ${e instanceof Error ? e.message : String(e)}`;
-        show();
-        await guard(new Promise((r) => setTimeout(r, min * 60_000)));
-        g.overnight.doing = 'walking';
-        g.note = '';
-        show();
-      }
-    }
-  };
-  // Each chapter's positions not yet answered well per line, read before every walk (§5.116).
-  const shareNow = async () => chapterShare(s.lines, (await stormStore().positions()).filter((p) => !spare.has(p.card)));
-  const weighted = <T extends { n: number }>(among: T[]): T => drawFrontier(among.slice(), Math.random)!;
   try {
-    let passStart = Date.now();
-    while (!stopGather && (ends.length || points.length || again.length)) {
-      // Line ends and replies taken in turn, so a gather stopped early has some of each; each from
-      // the chapter furthest behind its share, a line end's second pass once its chapter's first is done.
-      const share = await shareNow();
-      const endsTurn = (ends.length || again.length) && (!points.length || g.frontiers % 2 === 0);
-      const lowAgain = again.reduce((m, a) => Math.min(m, behind(a, share)), Infinity);
-      if (endsTurn && ends.length && ends.some((f) => behind(f, share) <= lowAgain)) {
-        const f = drawBalanced(ends, share, weighted)!;
-        await step(async () => {
-          const h = await harvestFrontier(f, s.cont, io, c, more ? 1 : STORM.gatherGamesPerFrontier);
-          reach.set(f.key, h.games ?? null);
-          walked(f, h.walked);
-          await keep(h.candidates, { lines: f.lines, names: f.names, games: h.games ?? null });
-          if (more && h.walked?.length && (h.gameIds?.length ?? 0) > h.walked.length) {
-            again.push({ f, lines: f.lines, walked: new Set(h.walked) });
-            g.of++;
-          }
-        });
-      } else if (endsTurn) {
-        const { f, walked: before } = drawBalanced(again, share, (among) => among[Math.floor(Math.random() * among.length)]!)!;
-        await step(async () => {
-          const h = await harvestFrontier(f, s.cont, io, c, more, before);
-          walked(f, h.walked);
-          await keep(h.candidates, { lines: f.lines, names: f.names, games: h.games ?? null });
-        });
-      } else {
-        const d = drawBalanced(points, share, (among) => among[0]!)!;
-        await step(async () => {
-          const h = await harvestDecision(d, io, c);
-          for (const cand of h.candidates) await keep([cand], { lines: d.lines, names: d.names, games: cand.unc?.games ?? null });
-        });
-      }
-      g.frontiers++;
-      show();
-      await refreshHome(s);
-    }
-    g.note = stopGather ? 'Stopped.' : of ? 'Every line end and reply walked.' : g.note;
-    const o = g.overnight;
-    if (o && of) {
-      const pool0 = source === 'replies' ? [] : s.frontiers;
-      for (let pass = 2; pass <= o.passes && !stopGather && pool0.length; pass++) {
-        // What the pass found, scored by Stockfish (and written out) before the next goes on.
-        await shareOwn(stormStore());
-        o.doing = 'scoring';
-        g.note = '';
-        show();
-        // Focused (§5.105): every position scored before the next pass; else for as long as the pass took.
-        await deepen(s, { gather: true, untilMs: stormPrefs.value.focused ? undefined : Date.now() + Math.max(STORM.deepenMs, Date.now() - passStart) });
-        // Stopped while scoring: the note was cleared for it.
-        if (stopGather) {
-          g.note = 'Stopped.';
-          break;
-        }
-        await shareOwn(stormStore());
-        const all = await stormStore().positions();
-        spare = doneCards();
-        if (all.filter((p) => !spare.has(p.card)).length >= STORM.storeMax) {
-          g.note = `The store is full: ${STORM.storeMax} positions not yet answered well.`;
-          break;
-        }
-        passStart = Date.now();
-        o.pass = pass;
-        o.doing = 'walking';
-        const until = explorerUntil(Date.now(), (pass - 1) * STORM.overnightStepMonths);
-        const older = harvestIo(spent, tick, guard, until, true);
-        const pool = pool0.slice();
-        g.frontiers = 0;
-        g.of = pool.length;
-        show();
-        while (pool.length && !stopGather) {
-          const f = drawBalanced(pool, await shareNow(), weighted)!;
-          await step(async () => {
-            // Only games not walked yet: a line end whose window names none is passed for its one request.
-            const h = await harvestFrontier(f, s.cont, older, c, STORM.gatherGamesPerFrontier, walkedBy.get(f.key) ?? new Set());
-            walked(f, h.walked);
-            await keep(h.candidates, { lines: f.lines, names: f.names, games: reach.get(f.key) ?? h.games ?? null });
-          });
-          g.frontiers++;
-          show();
-          await refreshHome(s);
-        }
-        g.note = stopGather ? 'Stopped.' : `Pass ${pass} walked: games up to ${until}.`;
-      }
-      if (!stopGather && !g.note.startsWith('The store is full')) g.note = `Every pass walked, back to ${explorerUntil(Date.now(), (o.passes - 1) * STORM.overnightStepMonths)}.`;
-      if (!stopGather) {
-        o.doing = 'scoring';
-        show();
-        await deepen(s, { gather: true });
-      }
-    }
-  } catch (e) {
-    g.note = e === STOPPED ? 'Stopped.' : `The gather stopped: ${e instanceof Error ? e.message : String(e)}`;
+    await runGather(s, { source: stormPrefs.value.source, overnight, config: config() }, {
+      io: (count, until, strict) => harvestIo(count, guard, until, strict),
+      positions: () => stormStore().positions(),
+      add: (fresh, spare) => stormStore().addPositions(fresh, STORM.storeMax, spare),
+      done: doneCards,
+      // Focused (§5.105): every position scored before the next pass; else for as long as the pass took.
+      score: (passMs) => deepen(s, { gather: true, ...(passMs === undefined || stormPrefs.value.focused ? {} : { untilMs: Date.now() + Math.max(STORM.deepenMs, passMs) }) }),
+      share: () => shareOwn(stormStore()),
+      show: (g) => (gathering.value = g),
+      counted: (current) => {
+        later ??= setTimeout(() => {
+          later = undefined;
+          const g = current();
+          if (g.running) gathering.value = g;
+        }, 250);
+      },
+      refresh: () => refreshHome(s),
+      stopped: () => stopGather,
+      wait: (ms) => guard(new Promise<void>((resolve) => setTimeout(resolve, ms))),
+      now: () => Date.now(),
+      rnd: Math.random,
+    });
   } finally {
     stopNow = undefined;
-    g.running = false;
-    show();
-    await refreshHome(s);
-    await shareOwn(stormStore());
   }
 }
 

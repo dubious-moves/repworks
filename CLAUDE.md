@@ -59,6 +59,10 @@ npm run e2e      # vite build, then Playwright (desktop and emulated phone)
 In a cloud container whose preinstalled Chromium doesn't match the Playwright version, point the
 tests at it: `REPWORKS_CHROMIUM=/opt/pw-browsers/chromium npm run e2e`.
 
+The storm's "Gather positions" from a cloud session, as a device named `cloud` (PLAN.md §5.155),
+with the data repo checked out on `main`:
+`node scripts/storm-gather.ts ../repworks-data --minutes 60 --score-minutes 40 --push`.
+
 ## Rules the code keeps
 
 - `src/core` is pure: no DOM, fetch, storage, clock or randomness. Time and random sources are

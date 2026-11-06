@@ -8577,3 +8577,100 @@ continued card's Mistake not held, Try again on the continued position, Next to 
 card, the review's two rows and one event written; the timed storm's Continue by `c`, the clock
 stopped, no points, the next card held, `r` and Escape, Next with the clock running; and in the
 Maia test, Continue answered by "Maia 1500". Live: TESTING.md.
+
+#### 5.155 The storm's gather from a cloud session (the owner's request, 2026-11-06)
+
+"In a claude code session (cloud) with access to my data repository (like this one), is it
+possible to "Gather positions" for storm, similarly to how I would do it in app?", then "yes, build
+it".
+
+- **One gather, two hosts.** The gather's loop moved from `app/storm.ts` to
+  `core/storm/gather.ts` (`runGather`), with everything it touches injected (`GatherHost`): the
+  requests, the store, the scoring between passes, the files, the clock, randomness and the waits.
+  The requests moved too (`serviceIo`: the explorer service's storm messages and Stockfish, which
+  were the app's `harvestIo`). The storm's home is now one host of it and does what it did before
+  (`storm.spec.ts` passes unchanged).
+- **`scripts/storm-gather.ts` is the other**, run in Node over a data repo's checkout as a device of
+  its own named `cloud` (`devices/<id>.json`, written with its first positions and found again by
+  that name after). What it uses is the app's code or the same thing in Node:
+  - The repertoire is read as the app reads it, paused lines left out (§5.70); what is done comes
+    from every device's log.
+  - Every device's storm files are read and merged as a device merges them (§5.102).
+  - The explorer is core's service over fetch with a memory cache, with the Lichess token from
+    `LICHESS_TOKEN`. That keeps the same limiter, filter and game exports.
+  - Stockfish is the 18 lite build (the app's default) under Node through core's search: one
+    single-threaded engine a core, each with a 64 MB hash (focused scoring's lanes, §5.103).
+  - Maia 3 runs on onnxruntime-web with core's batching.
+- **The positions arrive finished.** After the gather the script does what the storm's home does:
+  - Maia rates the cloud's positions (§5.82) at its ladder plus the ratings beyond it that the
+    devices' positions carry most often (the user's rating and level up's, which are settings on
+    each device; 2150 on the owner's).
+  - Then Stockfish scores them to the desktop's standard (MultiPV 12 to depth 24, at most 600 s a
+    search, §5.45, §5.84), every engine at once.
+  - Overnight (`--overnight`, §5.102), everything that came in is scored between passes, as
+    Focused does (§5.105).
+- **Written as any device's files**: `storm/<cloud id>/<day>.<k>.jsonl` (core's `sharedFiles`),
+  changed files only, and never a file it can't read in full. They are written every 15 minutes,
+  after every pass and at the end.
+  - `--push` commits them as `cloud: n storm positions` and pushes them to the data repo's default
+    branch (the checkout must be on it): `pull --rebase` first, and a failed push tried again
+    after 2, 4, 8 and 16 s.
+  - It touches only the cloud's folder and its device file, so it never conflicts with a device.
+  - Each device merges them at its next sync, like any other device's; the home counts them under
+    "from other devices".
+- **Stops**:
+  - `--minutes N` stops the walking (the request under way is given up); the rating and scoring
+    still run after it, for `--score-minutes N` at most.
+  - Ctrl-C or SIGTERM stops everything.
+  - Either way, what was kept is written and pushed.
+  - A checkout with errors (`validateDataRepo`) is refused before anything is gathered.
+
+Run from a cloud session with both repos (a command there runs two hours at most, so the minutes):
+
+```sh
+git -C ../repworks-data checkout main && git -C ../repworks-data pull -q
+node scripts/storm-gather.ts ../repworks-data --minutes 60 --score-minutes 40 --push
+```
+
+Tests: `test/unit/core/storm/gather.test.ts` (over a fake host):
+- breadth first, one game at every line end and then the rest;
+- a position kept once;
+- nothing to walk;
+- Stop;
+- a failure ending a gather that isn't overnight;
+- overnight: the windows and the games not walked, the scoring between passes and at the end, a
+  failure waited out (1 min, then 2), a login wanted ending it, the store full ending it (the done
+  ones not counted).
+
+`test/unit/scripts/stormGather.test.ts` (the fixture data repo):
+- the repertoire and what is done;
+- the cloud's device found again or made;
+- the other devices' positions marked with their device, and the better list and the Maia
+  ratings merged in;
+- the store's cap;
+- the cloud's own files: by day, those changed only, a file it can't read left alone;
+- Maia's ratings;
+- Stockfish's lanes under Node.
+
+Each file has three controls in its header. `storm.spec.ts` is unchanged and passes.
+
+Measured (2026-11-06, a 4-core cloud container, on copies of the owner's data repo):
+- **3 minutes of walking** gathered 47 positions, for 54 explorer requests, 14 game exports, 210
+  ChessDB requests and 91 Stockfish searches. The explorer's limiter sets that pace: about 18
+  requests a minute.
+- **Maia rated those 47 positions** at six ratings in 28 s.
+- **Scoring is the slow part**: 24 to 105 s a position at MultiPV 12 to depth 24, four engines at
+  once, about 3.6 positions a minute. A run of an hour's walking and 40 minutes' scoring leaves
+  most positions to a device's deepening, which finishes them.
+- **`--push` into a local bare copy** wrote two commits (`cloud: 16 storm positions`), the checkout
+  in step with its remote after each.
+
+Two flakes, each seen once in a full Playwright run, are fixed in the tests:
+- `train.spec.ts` reloaded the page before the last answer had been written to IndexedDB. It now
+  waits until the device's log holds the answer.
+- `studies.spec.ts`'s "train ↔ study" (phone) played cxd4 and saw it taken back and asked again:
+  most likely a click on the wrong square while the page still settled. It didn't happen again in
+  110 runs alone or under load. `board.ts`'s `square` now measures the board again after a frame
+  until it holds still, and the test waits for the trainer's `teach` phase before the move.
+
+Live: TESTING.md.

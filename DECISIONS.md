@@ -2154,3 +2154,18 @@ The technical calls, each with its reason:
   prompted to make a move again, which gets graded … Also add 'Show line' after great/best."
   Recording continued answers would put positions into the record that no gather kept, and that
   no later session deals again; kept as practice, they need nothing new on other devices.
+
+## Revision of 2026-11-06 (the storm's gather from a cloud session, PLAN.md §5.155)
+- **The gather's loop is core's** (`core/storm/gather.ts`), with the storm's home and a cloud
+  script (`scripts/storm-gather.ts`) as its two hosts. Why: the owner asked for the app's gather
+  from a cloud session, and with one loop a later change to the gather reaches both.
+- **The cloud is a device of its own, `cloud`**, writing only its own `storm/<id>/` folder (and its
+  `devices/<id>.json`), through git rather than the app's sync. Why: format 1 already lets any
+  device add a folder that every other device merges (§5.102), and a folder only one writer
+  touches never conflicts. No new file kind, and the format stays 1.
+- **The cloud's positions arrive rated by Maia and scored to the desktop's depth (24).** Why: the
+  cloud has the cores and the time, and a phone doesn't deepen by default (§5.45). Maia rates them
+  at the ratings the devices' positions carry, since the user's rating and level up's are settings
+  on each device, not in the repo.
+- **Stockfish 18 lite, the app's default**, rather than a native build, so the lists are the ones
+  a device would make. A native binary is an option (`STOCKFISH`).

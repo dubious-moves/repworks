@@ -39,6 +39,24 @@ async function setUp(page: Page): Promise<FakeGit> {
 }
 
 const feedback = (page: Page) => page.locator('.train-feedback');
+/** Whether the device's log in IndexedDB holds an event for `card`: then a reload finds the answer. */
+const logged = (page: Page, card: string) =>
+  page.evaluate(
+    (c) =>
+      new Promise<boolean>((resolve) => {
+        const open = indexedDB.open('repworks');
+        open.onerror = () => resolve(false);
+        open.onsuccess = () => {
+          const req = open.result.transaction('log').objectStore('log').getAll();
+          req.onerror = () => resolve(false);
+          req.onsuccess = () => {
+            resolve((req.result as { raw: string }[]).some((e) => e.raw.includes(c)));
+            open.result.close();
+          };
+        };
+      }),
+    card,
+  );
 async function play(page: Page, from: string, to: string) {
   await clickSquare(page, from, 'black');
   await clickSquare(page, to, 'black');
@@ -84,7 +102,9 @@ test('train: the counts, a due move asked, a wrong move taken back, new lines ta
   await play(page, 'c5', 'd4');
   await expect(feedback(page)).toHaveText(/^Line done · Next: /);
 
-  // A reload in the middle carries on from the log: c5 and cxd4 are answered, Nc6 comes next.
+  // A reload in the middle carries on from the log: c5 and cxd4 are answered, Nc6 comes next. The
+  // answer is written to IndexedDB just after it is shown: the reload waits for it.
+  await expect.poll(() => logged(page, CXD4)).toBe(true);
   await page.reload();
   await expect(feedback(page)).toHaveText('New move: play Nc6');
   await expect(page.locator('.train-counters')).toContainText('0 due · 2 new');

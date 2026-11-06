@@ -326,6 +326,7 @@ test('train ↔ study: the line on the board opened editable, edited, and the se
   await expect(feedback).toHaveText('New move: play cxd4');
   await expect(page.locator('.train-line')).toContainText('1. e4 c5 2. Nf3 d6 3. d4');
   await expect(page.locator('.train-counters')).toContainText('0 due · 4 new');
+  await expect(page.locator('.train-grid')).toHaveAttribute('data-phase', 'teach');
   await clickSquare(page, 'c5', 'black');
   await clickSquare(page, 'd4', 'black');
   await expect(feedback).toHaveText('New move: play Nf6');

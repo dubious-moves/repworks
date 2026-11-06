@@ -5,15 +5,28 @@ import type { Page } from '@playwright/test';
 export async function square(page: Page, name: string, orientation: 'white' | 'black'): Promise<{ x: number; y: number }> {
   // The board can be drawn anew between finding it and measuring it (chessground redraws on a
   // new chapter or position): measured again on the board that replaced it.
-  let box: { x: number; y: number; width: number; height: number } | null = null;
-  for (let tries = 1; !box; tries++) {
-    try {
-      await page.locator('cg-board').scrollIntoViewIfNeeded();
-      box = await page.locator('cg-board').boundingBox();
-    } catch (e) {
-      if (tries >= 5 || !/not attached/.test(String(e))) throw e;
+  const measure = async () => {
+    let box: { x: number; y: number; width: number; height: number } | null = null;
+    for (let tries = 1; !box; tries++) {
+      try {
+        await page.locator('cg-board').scrollIntoViewIfNeeded();
+        box = await page.locator('cg-board').boundingBox();
+      } catch (e) {
+        if (tries >= 5 || !/not attached/.test(String(e))) throw e;
+      }
+      if (!box && tries >= 5) throw new Error('cg-board has no box');
     }
-    if (!box && tries >= 5) throw new Error('cg-board has no box');
+    return box;
+  };
+  // A page still settling (a line of text arriving above the board on a phone) moves the board:
+  // measured again after a frame until it holds still, so the click lands on the square meant.
+  let box = await measure();
+  for (let tries = 0; tries < 10; tries++) {
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => resolve(null))));
+    const again = await measure();
+    const still = again.x === box.x && again.y === box.y && again.width === box.width && again.height === box.height;
+    box = again;
+    if (still) break;
   }
   const file = name.charCodeAt(0) - 97;
   const rank = Number(name[1]) - 1;
