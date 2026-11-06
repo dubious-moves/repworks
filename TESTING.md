@@ -1199,6 +1199,7 @@ q_extension (or give it to a session with q_extension attached), then run
   the next sync.
 - The cloud shows up in the data repo as `devices/<id>.json` named `cloud`, with commits named
   `cloud: n storm positions`. Is that the name you want?
-- Checked: a run against a scratch copy of your data repo in this cloud container. Also unit tests
-  of the loop and the script's data side, and the storm's Playwright tests with the app's gather now
-  through core (desktop and emulated phone). Not yet on your devices.
+- Checked: a live run in this cloud container pushed 386 positions to your data repo (device
+  `cloud`, `y1ZUwuqC`, 2026-11-06), 114 of them scored to depth 24, and the repo validates. Also
+  unit tests of the loop and the script's data side, and the storm's Playwright tests with the
+  app's gather now through core (desktop and emulated phone). Not yet on your devices.

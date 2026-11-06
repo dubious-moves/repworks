@@ -8664,6 +8664,15 @@ Measured (2026-11-06, a 4-core cloud container, on copies of the owner's data re
   most positions to a device's deepening, which finishes them.
 - **`--push` into a local bare copy** wrote two commits (`cloud: 16 storm positions`), the checkout
   in step with its remote after each.
+- **The first live run** pushed to the data repo as device `cloud` (`y1ZUwuqC`), with 30 minutes'
+  walking and 20 minutes' scoring, 55 minutes in all:
+  - 425 of 4,142 walks kept 386 positions, about 13 a minute. That took 426 explorer requests, 91
+    game exports, 1,586 ChessDB requests and 1,354 Stockfish searches.
+  - Of the 386, 287 came from games and 99 from invented lines; 254 are past line ends and 132 are
+    replies.
+  - Maia rated all 386 in 3 min 44 s.
+  - The scoring took 114 to depth 24, leaving 272 for a device's deepening.
+  - 4 pushes, and the data repo validates.
 
 Two flakes, each seen once in a full Playwright run, are fixed in the tests:
 - `train.spec.ts` reloaded the page before the last answer had been written to IndexedDB. It now
