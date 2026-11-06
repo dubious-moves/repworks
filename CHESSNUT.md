@@ -711,6 +711,11 @@ Changes in `src/ui/Storm.tsx`:
   `fen` = `card.arrived.before` while `setupAt === 'before'`.
 - Show the move: nothing new (the screen drops `played` and draws the best arrow; the board
   follows: the move taken back, the best lit).
+- Since this plan was written (PLAN.md §5.154, 2026-11-06), `CardBoard` also takes a `view`: an
+  engine line shown on the card (Show refutation, Show line). The mirror follows `view.fen` while
+  it is there, and a move read from the board then goes to `view.onMove` (it branches the line),
+  not `answerMove`. A continued card (Continue) needs nothing: it is a card of its own, its
+  `arrived` the opponent's reply, driven as any card's arrival.
 - The setup state: "Setting up the board…" in the status block, the dot in the head.
 
 Tests (e2e, the storm's seeded store and ladder from `storm.spec.ts`):

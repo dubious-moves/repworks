@@ -648,6 +648,132 @@ test('Try again always (the owner’s request, 2026-10-28): after a set’s firs
   await expect(page.getByTestId('storm-clock')).not.toHaveClass(/stopped/);
 });
 
+/** The position after `ucis` from `fen`, as the app writes it. */
+function after(fen: string, ...ucis: string[]): string {
+  const pos = positionOf(fen);
+  for (const u of ucis) pos.play(normalizeMove(pos, parseUci(u)!));
+  return makeFen(pos.toSetup());
+}
+
+// Controls run (2026-11-06, desktop), each failing this test at its own assertion: Continue
+// without `practice` (the continued card's Mistake held, its phase `held`); Escape left to the
+// session while a line is shown (the session ended, no verdict).
+test('after a verdict (§5.154): a mistake’s refutation, a great move’s line, and Continue against the opponent’s reply, as practice', async ({ page }) => {
+  test.setTimeout(60_000);
+  const w = await setUp(page);
+  await gathered(page, w);
+  await page.getByRole('button', { name: /^Set of/ }).click();
+  await expect(page.locator('.storm-card')).toBeVisible();
+  const first = await cardFen(page);
+  const root = (await page.locator('.storm-card').getAttribute('data-card'))!;
+  const moves = ranked(first);
+  const worst = moves[Math.min(moves.length, LADDER.length) - 1]!;
+  await play(page, worst);
+  await expect(page.getByTestId('storm-verdict')).toContainText('Mistake');
+  // A mistake: its refutation, not its line or Continue.
+  await expect(page.getByRole('button', { name: /^Show line/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^Continue/ })).toHaveCount(0);
+  await page.getByRole('button', { name: /^Show refutation/ }).click();
+  const box = page.getByTestId('storm-line');
+  await expect(box).toHaveAttribute('data-kind', 'refutation');
+  await expect(box).toContainText('Refutation of');
+  // Opened on the answer: the opponent's best reply to the move, on the board.
+  const reply = ranked(after(first, worst))[0]!;
+  const line = page.getByTestId('engine-line');
+  await expect(line).toHaveAttribute('data-idx', '1');
+  await expect.poll(() => pieceOn(page, reply.slice(0, 2))).toBe('');
+  expect(await pieceOn(page, reply.slice(2, 4))).not.toBe('');
+  await expect(page.getByRole('button', { name: /^Show refutation/ })).toHaveCount(0);
+  // ← → step it; past its end Stockfish extends it.
+  await page.keyboard.press('ArrowLeft');
+  await expect(line).toHaveAttribute('data-idx', '0');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  await expect(line).toHaveAttribute('data-idx', '2');
+  // Escape puts the line away, not the session; Try again sets the card back.
+  await page.keyboard.press('Escape');
+  await expect(box).toHaveCount(0);
+  await expect(page.getByTestId('storm-verdict')).toContainText('Mistake');
+  await page.getByRole('button', { name: /^Try again/ }).click();
+  await play(page, moves[0]!);
+  await expect(page.getByTestId('storm-verdict')).toContainText('Best move!');
+  // The top move: its line and Continue, no refutation.
+  await expect(page.getByRole('button', { name: /^Show refutation/ })).toHaveCount(0);
+  await page.getByRole('button', { name: /^Show line/ }).click();
+  await expect(box).toHaveAttribute('data-kind', 'after');
+  await expect(box).toContainText('Line after');
+  await expect(line).toHaveAttribute('data-idx', '0');
+
+  // Continue: Stockfish replies (Maia isn't on this device), and the position after it is asked.
+  await page.getByRole('button', { name: /^Continue/ }).click();
+  await expect(box).toHaveCount(0);
+  const cont = after(first, moves[0]!, ranked(after(first, moves[0]!))[0]!);
+  await expect(page.locator('.storm-card')).toHaveAttribute('data-fen', cont);
+  await expect(page.locator('.storm-card')).toHaveAttribute('data-card', `${root}~1`);
+  await expect(page.getByTestId('storm-verdict')).toContainText('Find a good move');
+  await expect(page.getByTestId('storm-verdict')).toContainText(/Stockfish answered \d+(\.|…) \S+ · (White|Black) to play · not counted/);
+  // Graded as any card, and practice: no hold, no Show the move, the first answer not in view.
+  const contMoves = ranked(cont);
+  await play(page, contMoves[Math.min(contMoves.length, LADDER.length) - 1]!);
+  await expect(page.getByTestId('storm-verdict')).toContainText('Mistake');
+  await expect(page.locator('.storm-card')).toHaveAttribute('data-phase', 'verdict');
+  await expect(page.getByRole('button', { name: /^Show the move/ })).toHaveCount(0);
+  await expect(page.getByTestId('storm-counted')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^Show refutation/ })).toBeVisible();
+  // Try again sets back the continued position, not the dealt one.
+  await page.keyboard.press('t');
+  await expect(page.getByTestId('storm-verdict')).toContainText('Stockfish answered');
+  await expect(page.locator('.storm-card')).toHaveAttribute('data-fen', cont);
+  await play(page, contMoves[0]!);
+  await expect(page.getByTestId('storm-verdict')).toContainText('Best move!');
+  await expect(page.getByRole('button', { name: /^Continue/ })).toBeVisible();
+  // Next: the set's next card, dealt.
+  await page.getByRole('button', { name: /^Next position/ }).click();
+  await expect.poll(() => page.locator('.storm-card').getAttribute('data-card')).not.toContain('~');
+  await expect(page.getByTestId('storm-set')).toContainText('2 of 6');
+  await page.getByRole('button', { name: /^End/ }).click();
+  // The review keeps the dealt cards only, the first counted as answered.
+  const rows = page.locator('.storm-row');
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(0)).toContainText('Mistake');
+  // Only the dealt card's first answer was written.
+  await page.locator('.chip').click();
+  const stormEvents = () => ([...w.git.textsOf()].filter(([p]) => p.startsWith('progress/')).map(([, t]) => t).join('').match(/"k":"storm"/g) ?? []).length;
+  await expect.poll(stormEvents, { timeout: 15_000 }).toBeGreaterThan(0);
+  expect(stormEvents()).toBe(1);
+
+  // The timed storm: Continue holds the next card and the clock; the continued answer scores nothing.
+  await page.locator('.storm-result').getByRole('button', { name: 'Storm', exact: true }).click();
+  await expect(page.getByTestId('storm-verdict')).toContainText('Find a good move');
+  const timed = await cardFen(page);
+  const timedMoves = ranked(timed);
+  await play(page, timedMoves[0]!);
+  await expect(page.getByTestId('storm-verdict')).toContainText('Best move!');
+  await page.keyboard.press('c');
+  await expect(page.getByTestId('storm-verdict')).toContainText('Stockfish answered');
+  await expect(page.getByTestId('storm-clock')).toHaveClass(/stopped/);
+  const points = await page.getByTestId('storm-points').textContent();
+  const clock = await page.getByTestId('storm-clock').textContent();
+  const contTimed = await cardFen(page);
+  expect(contTimed).toBe(after(timed, timedMoves[0]!, ranked(after(timed, timedMoves[0]!))[0]!));
+  const ctm = ranked(contTimed);
+  await play(page, ctm[Math.min(ctm.length, LADDER.length) - 1]!);
+  await expect(page.getByTestId('storm-verdict')).toContainText('Mistake');
+  await page.waitForTimeout(STORM_VERDICT_MS + 500);
+  expect(await cardFen(page)).toBe(contTimed);
+  await expect(page.getByTestId('storm-points')).toHaveText(points!);
+  await expect(page.getByTestId('storm-clock')).toHaveText(clock!);
+  await page.keyboard.press('r');
+  await expect(page.getByTestId('storm-line')).toHaveAttribute('data-kind', 'refutation');
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('storm-line')).toHaveCount(0);
+  await expect(page.locator('.storm-card')).toBeVisible();
+  await page.getByRole('button', { name: /^Next/ }).click();
+  await expect.poll(() => page.locator('.storm-card').getAttribute('data-card')).not.toContain('~');
+  await expect(page.getByTestId('storm-verdict')).toContainText('Find a good move');
+  await expect(page.getByTestId('storm-clock')).not.toHaveClass(/stopped/);
+});
+
 test('the set: a mistake held, tried again, shown, and the second pass', async ({ page, isMobile }) => {
   const w = await setUp(page);
   await gathered(page, w);
@@ -1049,4 +1175,17 @@ test('Maia: got from the storm’s page, the kept positions rated, and an unintu
   await expect(page.locator('.storm-review [data-testid=storm-maia]')).toHaveCount(0);
   await page.getByRole('button', { name: /^Best move/ }).click();
   await expect(page.locator('.storm-review [data-testid=storm-maia]')).toContainText('Difficulty');
+
+  // Continue (§5.154): with Maia here, the opponent's reply is Maia's, at the user's rating.
+  await page.locator('.storm-result').getByRole('button', { name: /^Set of/ }).click();
+  await expect(page.locator('.storm-card')).toBeVisible();
+  const dealt = await cardFen(page);
+  await play(page, ranked(dealt)[0]!);
+  await expect(page.getByTestId('storm-verdict')).toContainText('Best move!');
+  await page.getByRole('button', { name: /^Continue/ }).click();
+  await expect(page.getByTestId('storm-verdict')).toContainText(/Maia 1500 answered \d+(\.|…) \S+ · (White|Black) to play · not counted/);
+  await expect(page.locator('.storm-card')).toHaveAttribute('data-card', /~1$/);
+  // Maia's move is on the board: the position two plies on from the card's.
+  const now = await cardFen(page);
+  expect(ranked(after(dealt, ranked(dealt)[0]!)).some((u) => after(dealt, ranked(dealt)[0]!, u) === now)).toBe(true);
 });

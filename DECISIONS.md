@@ -2139,3 +2139,18 @@ The technical calls, each with its reason:
   ready the day the board arrives and its answers can change the later parts before they're built.
 - Why: the owner, 2026-11-06: "You can make this into it's own plan document. Make it extensive and
   make it as easy as possible to implement, whenever the time comes."
+
+## Revision of 2026-11-06 (after a storm verdict: refutation, line, Continue, PLAN.md §5.154)
+- **A storm verdict offers follow-ups**: Show refutation after a Mistake or a Blunder, Show line
+  after a Great move or the top move, and Continue after a Good or Great move, which plays the
+  opponent's reply (Maia's at the user's rating, Stockfish's without Maia) and asks the position
+  after it.
+- **A continued position's answers are practice**: graded and shown, never written as `storm`
+  events, scored or held; the record, what is done and the review speak only of the gathered
+  positions dealt. No new data format.
+- Why: the owner, 2026-11-06: "Let's implement 'show refutation' during a storm when the user
+  makes a mistake/blunder … After making a good/great/best move - let's add the option to
+  continue in the resulting position. We let maia make a move for the opponent then the user is
+  prompted to make a move again, which gets graded … Also add 'Show line' after great/best."
+  Recording continued answers would put positions into the record that no gather kept, and that
+  no later session deals again; kept as practice, they need nothing new on other devices.

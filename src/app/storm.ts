@@ -16,6 +16,7 @@ import { behind, chapterShare, decisions, drawBalanced, frontiers, inScope, line
 import { drawOrder, noteRecent, stormAnswer, stormHistories, takeSpread, type StormHistory } from '../core/storm/store.ts';
 import type { Verdict } from '../core/storm/verdict.ts';
 import { selfBand, showable, showPress, type ShowState } from '../core/storm/show.ts';
+import { continuedCard, followUps, maiaReply, rootCard, type FollowUp } from '../core/storm/after.ts';
 import { gameCard } from '../core/progress/cards.ts';
 import { practiceMistakeOf, practiceMistakeSaved, stormMistakeItem } from '../core/games/saved.ts';
 import { savedDeck } from './games.ts';
@@ -28,7 +29,8 @@ import { importShared, shareOwn, shareSoon } from './stormShare.ts';
 import { onWorker, postToWorker } from './explorer.ts';
 import { entryKey, open } from './mode.ts';
 import { recordEvent } from './state.ts';
-import { analyseForStorm, cancelStormEngine, endStormEngine, focusedWidth, setStormEngineWidth, stormSearchSoFar } from './stormEngine.ts';
+import { analyseForStorm, cancelStormEngine, endStormEngine, focusedWidth, setStormEngineWidth, stormSearchSoFar, type EngineAnswer } from './stormEngine.ts';
+import { lineView } from './lineView.ts';
 import { trainData, type TrainData } from './train.ts';
 import { puzzlePrefs, readyPuzzles } from './puzzles.ts';
 import { keptPolicy, missingRatings, type MaiaRating } from '../core/storm/maia.ts';
@@ -860,6 +862,8 @@ export interface StormItem {
   /** In the history: a set's later attempts (Try again, the second pass), kept beside the first
    *  answer (`answer`), which alone counts. */
   later?: StormAnswer[];
+  /** A continued card (§5.154): who played the reply that made it ("Maia 1500", "Stockfish"). */
+  by?: string;
 }
 
 export interface StormSession {
@@ -904,6 +908,10 @@ export interface StormSession {
   reviewAt?: number;
   /** Show and grade (§5.152): the card's moves are on the board. */
   movesShown?: boolean;
+  /** Continue (§5.154): the opponent's reply is being chosen. */
+  replying?: boolean;
+  /** What became of a Continue that found no position to ask (no reply, or a reply that ends the game). */
+  followNote?: string;
 }
 
 export const stormSession = signal<StormSession | undefined>(undefined);
@@ -1072,7 +1080,8 @@ function deal(): void {
     return deal();
   }
   if (!item) return endStorm(s.history.length ? 'out' : 'empty');
-  const { nextAt: _a, nextIn: _b, practice: _c, movesShown: _d, ...rest } = stormSession.value!;
+  cardLine.close();
+  const { nextAt: _a, nextIn: _b, practice: _c, movesShown: _d, replying: _e, followNote: _f, ...rest } = stormSession.value!;
   stormSession.value = { ...rest, item, revealed: false, history: s.pass === 1 ? [...s.history, item] : s.history };
   setPhase('solving');
   void lookAhead();
@@ -1102,7 +1111,8 @@ export async function answerMove(uci: string): Promise<void> {
   const now = stormSession.value;
   if (!now || seq !== gradeSeq) return;
   if (retry) return update({ retry: { ...played, answer: v } });
-  settle(played, uci, v);
+  // The card as graded: deepened when the look-ahead's search was kept (its list names the rank's "of").
+  settle({ ...played, card }, uci, v);
 }
 
 /** A verdict reached: scored and written (the storm), or resolved or held (the set). */
@@ -1267,8 +1277,9 @@ export function tryAgain(): void {
   const s = stormSession.value;
   if (!s?.item || !canTryAgain(s)) return;
   clearTimeout(verdictTimer);
+  cardLine.close();
   const { answer: _gone, played: _move, ...rest } = s.item;
-  const { nextAt: _a, nextIn: _b, ...session } = s;
+  const { nextAt: _a, nextIn: _b, followNote: _c, ...session } = s;
   const practice = s.mode === 'storm' || !!(s.pass === 1 ? s.item.outcome : s.item.secondOutcome);
   stormSession.value = { ...session, item: s.item.puzzle ? { ...rest, step: 0 } : rest, revealed: false, ...(practice ? { practice } : {}) };
   setPhase('solving');
@@ -1377,6 +1388,7 @@ export function nextCard(): void {
 
 /** Ends the session: the card on the board kept, unanswered (§14.10c). */
 export function endStorm(why: 'time' | 'out' | 'empty' | 'stop'): void {
+  cardLine.close();
   pauseLookAhead();
   clearInterval(tick);
   clearTimeout(verdictTimer);
@@ -1389,11 +1401,13 @@ export function endStorm(why: 'time' | 'out' | 'empty' | 'stop'): void {
     history = history.map((h) => (h === s.item ? unanswered : h));
   }
   const note = why === 'empty' ? 'Nothing to deal: gather positions first, or every position here is done for now.' : why === 'out' ? 'Every position dealt.' : why === 'time' ? 'Time.' : '';
-  stormSession.value = { ...s, history, phase: 'done', item: undefined, endsAt: undefined, left: why === 'time' ? 0 : clockLeft(s), note };
+  const { replying: _r, followNote: _f, ...ended } = s;
+  stormSession.value = { ...ended, history, phase: 'done', item: undefined, endsAt: undefined, left: why === 'time' ? 0 : clockLeft(s), note };
   if (scopeNow) void refreshHome(scopeNow);
 }
 
 export function endStormSession(): void {
+  cardLine.close();
   pauseLookAhead();
   clearInterval(tick);
   clearTimeout(verdictTimer);
@@ -1418,6 +1432,7 @@ export function leaveStorm(): void {
  * opened on another entry starts afresh (the owner's request, 2026-10-08: ← comes back to it).
  */
 export function suspendStorm(): void {
+  cardLine.close();
   pauseVerdict();
   pauseLookAhead();
   stopGathering();
@@ -1476,6 +1491,130 @@ export function retryFromReview(index: number | undefined): void {
   }
 }
 
+/* ------------------------------------------------------------------ after a verdict (§5.154) */
+
+const lineSearches = new Map<string, Promise<EngineAnswer | null>>();
+/**
+ * A line's search (Show refutation, Show line): depth 18 (16 on a phone), 8 s at most, ahead of the
+ * look-ahead (the user waits on it). Kept for the session's lines; one that gave nothing is asked
+ * again next time.
+ */
+function lineSearch(fen: string, lines: number): Promise<EngineAnswer | null> {
+  const key = `${fen}|${lines}`;
+  let p = lineSearches.get(key);
+  if (!p) {
+    const asked = analyseForStorm(fen, lines, phone() ? 16 : 18, 8000, undefined, true);
+    p = asked;
+    lineSearches.set(key, asked);
+    void asked.then((a) => {
+      if (!a && lineSearches.get(key) === asked) lineSearches.delete(key);
+    });
+    if (lineSearches.size > 50) lineSearches.delete(lineSearches.keys().next().value!);
+  }
+  return p;
+}
+
+/** The engine's line on the card's board: a mistake's refutation, or the line after a great move. */
+const cardLine = lineView(lineSearch);
+export const stormLine = cardLine.view;
+export const stormLineStep = cardLine.step;
+export const stormLineToMain = cardLine.toMain;
+export const stormLineToAlt = cardLine.toAlt;
+export const stormLineMove = cardLine.move;
+export const closeStormLine = cardLine.close;
+
+/** Whose answer a line is: the card, its pass and attempt, and the move (a line from before is never shown on a later answer). */
+export const stormLineAbout = (s: StormSession, item: StormItem): string => `${item.card.card}|${s.pass}|${item.attempts ?? 0}|${item.answer?.userUci ?? ''}`;
+
+/** The line shown for the card on the board now, if any. */
+export function stormLineNow(s: StormSession | undefined): ReturnType<typeof stormLine.peek> {
+  const l = stormLine.value;
+  return s?.item && l && l.about === stormLineAbout(s, s.item) ? l : undefined;
+}
+
+/** What the verdict on the board offers past its grade: Show refutation, Show line, Continue. */
+export function followUpsOf(s: StormSession | undefined): FollowUp[] {
+  const item = s?.item;
+  const v = item?.answer;
+  if (!s || !item || !v || s.replying || (s.phase !== 'verdict' && s.phase !== 'held')) return [];
+  const all = followUps({ band: v.band, userUci: v.self ? undefined : v.userUci, top: isTopMove(v), puzzle: !!item.puzzle, show: s.mode === 'show' }, item.card.fen);
+  // Continue goes on from a verdict, not from a set's held card (a held card is never a good move).
+  return s.phase === 'verdict' ? all : all.filter((f) => f !== 'continue');
+}
+
+/**
+ * Show refutation (a Mistake or a Blunder: the move and the opponent's best answer, opened on the
+ * answer) or Show line (a Great move or the top move: the move and Stockfish's line after it), on
+ * the card's board; a timed storm's next card waits (its clock is stopped already).
+ */
+export function showStormLine(kind: 'refutation' | 'after'): void {
+  const s = stormSession.value;
+  const item = s?.item;
+  const v = item?.answer;
+  if (!s || !item || !v?.userUci || !followUpsOf(s).includes(kind === 'after' ? 'line' : 'refutation')) return;
+  pauseVerdict();
+  const about = stormLineAbout(s, item);
+  if (stormLine.peek()?.about === about && stormLine.peek()?.kind === kind) return;
+  const san = v.userSan || uciToSan(positionOf(item.card.fen)!, v.userUci);
+  if (kind === 'refutation') cardLine.showRefutation(about, item.card.fen, v.userUci, san);
+  else cardLine.showAfter(about, item.card.fen, v.userUci, san);
+}
+
+/**
+ * The opponent's reply at `fen`: Maia's at the user's rating (`elo`), drawn at `replyPrecision`;
+ * Stockfish's best when Maia's files aren't on this device or it hasn't answered in time.
+ */
+async function opponentReply(fen: string, elo: number): Promise<{ uci: string; by: string } | undefined> {
+  const policy = await Promise.race([
+    maiaPolicies(fen, [elo]).then(
+      (r) => r?.[0] ?? null,
+      () => null,
+    ),
+    new Promise<null>((r) => setTimeout(() => r(null), STORM.replyMaiaMs)),
+  ]);
+  const maia = maiaReply(policy, STORM, Math.random);
+  if (maia) return { uci: maia, by: `Maia ${elo}` };
+  const a = await analyseForStorm(fen, 1, engineDepth(), STORM.enginePhaseMs, undefined, true);
+  const best = a?.lines[0]?.pv[0];
+  return best ? { uci: best, by: 'Stockfish' } : undefined;
+}
+
+/**
+ * Continue (after a Good or Great move): the opponent's reply is played on the board, and the
+ * position after it is asked as a card of its own (`continuedCard`), graded as any card is (the
+ * look-ahead searches it while the user thinks). From here the card is practice: nothing scored or
+ * recorded, the review keeping the dealt card's answer, a timed storm's clock stopped until Next.
+ * A continued card can be continued in turn, tried again, refuted or shown its line.
+ */
+export async function continueCard(): Promise<void> {
+  const s = stormSession.value;
+  const item = s?.item;
+  const uci = item?.answer?.userUci;
+  if (!s || !item || !uci || !followUpsOf(s).includes('continue')) return;
+  clearTimeout(verdictTimer);
+  cardLine.close();
+  const seq = ++gradeSeq;
+  const { nextAt: _a, nextIn: _b, followNote: _c, ...rest } = s;
+  stormSession.value = { ...rest, practice: true, replying: true };
+  setPhase('grading');
+  const after = fenAfterUci(item.card.fen, uci)!;
+  const reply = await opponentReply(after, s.elo);
+  const now = stormSession.value;
+  if (!now || seq !== gradeSeq || now.item !== item) return;
+  const { replying: _r, ...was } = now;
+  const back = (followNote: string) => {
+    stormSession.value = { ...was, followNote };
+    setPhase('verdict');
+  };
+  if (!reply) return back('No reply: neither Maia nor Stockfish answered here.');
+  const c = continuedCard(item.card, uci, reply.uci, Date.now());
+  if (c.kind === 'illegal') return back(`${reply.by}'s reply couldn't be played here.`);
+  if (c.kind === 'over') return back(`${reply.by} would answer ${c.san}, and the game is over: ${c.mate ? 'checkmate' : 'a draw'}.`);
+  stormSession.value = { ...was, item: { card: c.card, attempts: 0, by: reply.by }, revealed: false };
+  setPhase('solving');
+  void lookAhead();
+}
+
 /* ------------------------------------------------------------------ save as a mistake (§5.74) */
 
 /** What a storm card saves as a mistake: its position, and the move played when it went wrong (not a puzzle's). */
@@ -1485,7 +1624,8 @@ function stormMistake(item: StormItem) {
   const v = item.answer;
   const wrong = !item.puzzle && v && (v.band === 'ok' || v.band === 'bad' || v.band === 'blunder') && v.userUci && v.userSan;
   const move = wrong ? { san: v.userSan!, uci: v.userUci!, wpDrop: v.wp ?? 0, cpLoss: v.loss ?? 0 } : undefined;
-  return { fen, color, move, item: stormMistakeItem({ fen, color, ...(move ? { move } : {}), now: Date.now(), from: item.card.card }) };
+  // A continued card (§5.154) names the card dealt: its own id is the session's only.
+  return { fen, color, move, item: stormMistakeItem({ fen, color, ...(move ? { move } : {}), now: Date.now(), from: rootCard(item.card.card) }) };
 }
 
 /** Whether the card is in the game cards already (its position, and the same move or none). */

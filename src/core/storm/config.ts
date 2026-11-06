@@ -97,6 +97,13 @@ export interface StormConfig {
   deepenMs: number;
   engineDepth: { desktop: number; mobile: number };
   enginePhaseMs: number;
+  /**
+   * Continue after a good move (§5.154): Maia's reply at the user's rating, drawn at this
+   * precision (practice's `maiaPick`: 1 its likeliest move, 0.75 practice's default); Stockfish's
+   * best when Maia isn't on the device or hasn't answered within `replyMaiaMs`.
+   */
+  replyPrecision: number;
+  replyMaiaMs: number;
   /** Puzzles (DESIGN-storm-puzzles.md §3): the anchor band, the ratings, per anchor, the drop list. */
   puzzleAnchorMinPly: number;
   puzzleAnchorMaxPly: number;
@@ -198,6 +205,8 @@ export const STORM: StormConfig = {
   deepenMs: 600_000,
   engineDepth: { desktop: 20, mobile: 20 },
   enginePhaseMs: 8000,
+  replyPrecision: 0.75,
+  replyMaiaMs: 20_000,
   puzzleAnchorMinPly: 12,
   puzzleAnchorMaxPly: 24,
   puzzleRatingMin: 1200,

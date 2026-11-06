@@ -60,6 +60,15 @@ import {
   refreshShared,
   setLevelUp,
   tagConfig,
+  closeStormLine,
+  continueCard,
+  followUpsOf,
+  showStormLine,
+  stormLineMove,
+  stormLineNow,
+  stormLineStep,
+  stormLineToAlt,
+  stormLineToMain,
   type StormAnswer,
   type StormItem,
   type StormScopeData,
@@ -86,6 +95,9 @@ import { useWakeLock } from './Train.tsx';
 import { collect, fillBodies, puzzlePrefs, puzzleState, refreshPuzzles, setPuzzlePrefs, SHARD_MB, SHARES, SHARDS_PER_COLLECT, stopPuzzles, WORKING_SET } from '../app/puzzles.ts';
 import { Back, Stuck } from './Back.tsx';
 import { NoteButton } from './CardNote.tsx';
+import { EngineLinePanel } from './EngineLinePanel.tsx';
+import { lineFen, moveAt } from '../core/games/engineLine.ts';
+import type { ShownLine } from '../app/lineView.ts';
 
 const PUZZLE_WORD: Record<string, string> = { great: 'Solved', blunder: 'Not the solution', unanswered: 'Not answered' };
 const BAND_WORD: Record<string, string> = { great: 'Great', good: 'Good', ok: 'Inaccuracy', bad: 'Mistake', blunder: 'Blunder', unknown: 'No verdict', unanswered: 'Not answered' };
@@ -817,28 +829,40 @@ function Record(props: { r: RecordRow; title: string }) {
 
 /* ------------------------------------------------------------------ the board */
 
+/** A line shown on a card's board (§5.154): its position, its last move, and whether a move there branches it. */
+interface BoardView {
+  fen: string;
+  lastUci: string | undefined;
+  movable: boolean;
+  onMove(uci: string): void;
+}
+
 /**
  * A card's board: the position, or once a move is played the position after it (the move stays
- * while it is graded and the verdict is read); arrows drawn on it stay until the next card.
+ * while it is graded and the verdict is read); arrows drawn on it stay until the next card. With a
+ * line shown (`view`), the line's position instead, one board throughout.
  */
-function CardBoard(props: { item: StormItem; asking: boolean; onMove(uci: string): void; arrows?: Arrow[]; sketch: string; draw?: boolean; burst?: string | undefined }) {
+function CardBoard(props: { item: StormItem; asking: boolean; onMove(uci: string): void; arrows?: Arrow[]; sketch: string; draw?: boolean; burst?: string | undefined; view?: BoardView | undefined }) {
   const p = props.item.card;
   const puzzle = props.item.puzzle;
   const step = props.item.step ?? 0;
   const base = puzzle ? puzzleFen(props.item) : p.fen;
   const played = props.item.played;
-  const fen = (played && fenAfterUci(base, played)) || base;
+  const view = props.view;
+  const fen = view?.fen ?? ((played && fenAfterUci(base, played)) || base);
   const pos = useMemo(() => positionOf(fen)!, [fen]);
   const [promotion, setPromotion] = useState<{ orig: Key; dest: Key } | undefined>(undefined);
   // Only the side asked moves, and only before its move is played (a puzzle's reply is the board's).
   const mine = pos.turn === (puzzle ? puzzle.solver : p.side);
-  const dests = props.asking && mine && fen === base ? (chessgroundDests(pos) as Map<Key, Key[]>) : new Map<Key, Key[]>();
-  const lastUci = played ?? (puzzle && step ? puzzle.plies[step - 1]!.uci : p.arrived?.uci);
+  const dests = (view ? view.movable : props.asking && mine && fen === base) ? (chessgroundDests(pos) as Map<Key, Key[]>) : new Map<Key, Key[]>();
+  const lastUci = view ? view.lastUci : (played ?? (puzzle && step ? puzzle.plies[step - 1]!.uci : p.arrived?.uci));
   const last = lastUci ? ([sq(lastUci, 0), sq(lastUci, 2)] as [Key, Key]) : undefined;
+  const send = view ? view.onMove : props.onMove;
+  const burst = view ? undefined : props.burst;
   const onMove = (orig: Key, dest: Key) => {
     const piece = pos.board.get(parseSquare(orig)!);
     if (piece?.role === 'pawn' && (dest[1] === '8' || dest[1] === '1')) return setPromotion({ orig, dest });
-    props.onMove(makeUci(normalizeMove(pos, { from: parseSquare(orig)!, to: parseSquare(dest)! })));
+    send(makeUci(normalizeMove(pos, { from: parseSquare(orig)!, to: parseSquare(dest)! })));
   };
   return (
     <div class="train-board">
@@ -854,15 +878,15 @@ function CardBoard(props: { item: StormItem; asking: boolean; onMove(uci: string
         drawMode={!!props.draw}
         brush="green"
         onMove={onMove}
-        badge={props.burst && played ? { square: played.slice(2, 4), symbol: CLASSIFICATION.best.symbol, colour: CLASSIFICATION.best.colour, word: CLASSIFICATION.best.word } : undefined}
-        celebrate={props.burst && played ? { square: played.slice(2, 4), key: props.burst } : undefined}
+        badge={burst && played ? { square: played.slice(2, 4), symbol: CLASSIFICATION.best.symbol, colour: CLASSIFICATION.best.colour, word: CLASSIFICATION.best.word } : undefined}
+        celebrate={burst && played ? { square: played.slice(2, 4), key: burst } : undefined}
         sketchKey={props.sketch}
         promotion={
           promotion && {
             dest: promotion.dest,
             onPick: (role) => {
               setPromotion(undefined);
-              if (role) props.onMove(makeUci({ from: parseSquare(promotion.orig)!, to: parseSquare(promotion.dest)!, promotion: role }));
+              if (role) send(makeUci({ from: parseSquare(promotion.orig)!, to: parseSquare(promotion.dest)!, promotion: role }));
             },
           }
         }
@@ -977,6 +1001,14 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
       if (e.ctrlKey || e.metaKey || e.altKey || document.querySelector('dialog[open]')) return;
       const now = stormSession.peek();
       if (!now || now.phase === 'done') return;
+      // A line shown (§5.154): ← → step it, Escape puts it away (not the session).
+      if (stormLineNow(now) && (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'Escape')) {
+        e.preventDefault();
+        if (e.key === 'Escape') closeStormLine();
+        else stormLineStep(e.key === 'ArrowLeft' ? -1 : 1);
+        return;
+      }
+      const follow = followUpsOf(now);
       // Show and grade (§5.152): 2 and 4 as in the trainer's (§5.9), a held key one press; Space or
       // Enter shows the moves too.
       const press = now.mode === 'show' ? pressOf(e.key) : undefined;
@@ -994,6 +1026,9 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
       else if (e.key === 'p' && now.phase === 'verdict' && now.nextAt !== undefined) pauseVerdict();
       else if (e.key === 't' && canTryAgain(now)) tryAgain();
       else if (e.key === 's' && (now.phase === 'held' || triesGoOn(now))) showMove();
+      else if (e.key === 'r' && follow.includes('refutation')) showStormLine('refutation');
+      else if (e.key === 'l' && follow.includes('line')) showStormLine('after');
+      else if (e.key === 'c' && follow.includes('continue')) void continueCard();
       else if (e.key === 'a' && now.item && now.phase !== 'grading') analyse(now.item, props.scope.route);
       else return;
       e.preventDefault();
@@ -1031,8 +1066,24 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
   const arrows: Arrow[] = showing ? bandArrows(moves, v?.userUci) : s.revealed && best && !item.puzzle ? [{ orig: best.uci.slice(0, 2), dest: best.uci.slice(2, 4), brush: 'green' }] : [];
   const boardItem = showing && v ? { ...item, played: undefined } : item;
   const turn = positionOf(item.puzzle ? puzzleFen(item) : item.card.fen)?.turn ?? item.card.side;
-  const band = v?.band ?? (phase === 'grading' ? 'checking' : 'none');
-  const title = v
+  // After the verdict (§5.154): the line shown, what the verdict offers, and a continued card's reply.
+  const shown = stormLineNow(s);
+  const lineNow = shown?.line;
+  const view: BoardView | undefined = lineNow
+    ? {
+        fen: shown.pendingFen ?? lineFen(lineNow),
+        lastUci: shown.pendingFen ? undefined : (moveAt(lineNow, lineNow.currentIdx)?.uci ?? item.card.arrived?.uci),
+        movable: !shown.busy,
+        onMove: stormLineMove,
+      }
+    : undefined;
+  const follow = followUpsOf(s);
+  const replying = !!s.replying;
+  const continued = !!item.by;
+  const band = replying ? 'checking' : (v?.band ?? (phase === 'grading' ? 'checking' : 'none'));
+  const title = replying
+    ? 'Opponent to move…'
+    : v
     ? v.self
       ? SELF_WORD[v.self]!
       : item.puzzle
@@ -1050,16 +1101,21 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
   const left = STORM.setRetryMax - (item.attempts ?? 0);
   // A card tried again (or back in the second pass): its first answer is the one that counts.
   const counted = s.history.find((h) => h.card.card === item.card.card)?.answer;
-  const line = v
+  const arrived = item.card.arrived;
+  const line = replying
+    ? `${v?.userSan || 'Your move'} played: the reply comes next`
+    : v
     ? item.puzzle
       ? `${v.userSan || '—'}${v.points ? ` · ${v.points > 0 ? '+' : ''}${v.points}` : ''}`
       : answerLine(s.mode === 'storm' ? { ...v, points: 0 } : v, f)
     : showing && s.movesShown
       ? 'Found if it was a green arrow, Missed if not; or play it to have it graded'
-      : `${turn === 'white' ? 'White' : 'Black'} to play${showing ? ', then show the moves' : ''}`;
+      : continued && arrived
+        ? `${item.by} answered ${numbered(arrived.before, arrived.san)} · ${turn === 'white' ? 'White' : 'Black'} to play · not counted`
+        : `${turn === 'white' ? 'White' : 'Black'} to play${showing ? ', then show the moves' : ''}`;
   return (
     <div class="train-grid storm-card" data-mode={s.mode} data-phase={phase} data-fen={item.card.fen} data-side={item.card.side} data-card={item.card.card} data-step={item.step ?? 0} data-line={item.puzzle ? '' : positionLineKey(item.card)}>
-      <CardBoard item={boardItem} asking={asking} onMove={(u) => void answerMove(u)} arrows={arrows} sketch={sketch} draw={draw} burst={burst} />
+      <CardBoard item={boardItem} asking={asking} onMove={(u) => void answerMove(u)} arrows={view ? [] : arrows} sketch={sketch} draw={draw} burst={burst} view={view} />
       <div class="train-panel storm-panel">
         <Hud s={s} />
         <Strip s={s} />
@@ -1069,13 +1125,19 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
             {!v && <span class={`storm-side side-${turn}`} aria-hidden="true" />}
             {top && <span class="storm-star" aria-hidden="true">★</span>}
             {title}
-            {v && s.mode === 'storm' && typeof v.points === 'number' && v.points !== 0 && <span class={`storm-delta ${v.points > 0 ? 'up' : 'down'}`}>{`${v.points > 0 ? '+' : ''}${v.points}`}</span>}
+            {v && !replying && s.mode === 'storm' && typeof v.points === 'number' && v.points !== 0 && <span class={`storm-delta ${v.points > 0 ? 'up' : 'down'}`}>{`${v.points > 0 ? '+' : ''}${v.points}`}</span>}
           </p>
           <p class="storm-line">{line}</p>
         </div>
         {counted && counted !== v && !counted.unanswered && (
           <p class={`storm-counted band-${counted.band}`} data-testid="storm-counted">
             Counted: the first answer, <span>{answerWords(counted, !!item.puzzle)}</span>
+          </p>
+        )}
+        {shown && <LineBox shown={shown} fen={item.card.fen} />}
+        {s.followNote && (
+          <p class="muted storm-hint" data-testid="storm-follow-note">
+            {s.followNote}
           </p>
         )}
         {v && held && !s.revealed && (
@@ -1087,8 +1149,8 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
             {bestLine(v, f)}
           </p>
         )}
-        {v && showBest && !item.puzzle && v.band !== 'unanswered' && <MaiaNote p={item.card} elo={s.elo} />}
-        {v && showBest && !item.puzzle && v.band !== 'unanswered' && <KindsNote p={item.card} elo={s.elo} />}
+        {v && showBest && !item.puzzle && !continued && v.band !== 'unanswered' && <MaiaNote p={item.card} elo={s.elo} />}
+        {v && showBest && !item.puzzle && !continued && v.band !== 'unanswered' && <KindsNote p={item.card} elo={s.elo} />}
         {v && showBest && item.puzzle && (
           <p class="muted storm-best" data-testid="puzzle-facts">
             Solution: {solution(item.puzzle)} · {puzzleFacts(item.puzzle)}
@@ -1126,6 +1188,26 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
               Show the move <kbd>S</kbd>
             </button>
           )}
+          {follow.includes('refutation') && shown?.kind !== 'refutation' && (
+            <button type="button" class="secondary" title="Your move, and how the opponent punishes it: Stockfish’s line, stepped with ← →" onClick={() => showStormLine('refutation')}>
+              Show refutation <kbd>R</kbd>
+            </button>
+          )}
+          {follow.includes('line') && shown?.kind !== 'after' && (
+            <button type="button" class="secondary" title="Your move, and Stockfish’s line after it, stepped with ← →" onClick={() => showStormLine('after')}>
+              Show line <kbd>L</kbd>
+            </button>
+          )}
+          {follow.includes('continue') && (
+            <button
+              type="button"
+              class="secondary"
+              title={`The opponent replies (Maia at ${s.elo}, or Stockfish without Maia), and you find a good move again: graded, not counted`}
+              onClick={() => void continueCard()}
+            >
+              Continue <kbd>C</kbd>
+            </button>
+          )}
           {phase === 'verdict' && (
             <button type="button" class="primary" onClick={nextCard}>
               {s.mode === 'storm' ? 'Next' : 'Next position'} <kbd>{showing ? '2' : 'Space'}</kbd>
@@ -1147,10 +1229,10 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
                   ? 'Pass this position and open the analysis board: nothing is counted'
                   : 'Open the analysis board here'
                 : s.mode === 'set'
-                ? (held || asking) && !s.revealed
+                ? (held || (asking && !s.practice)) && !s.revealed
                   ? 'Show the move and open the analysis board; it counts as shown, and the position comes back in the second pass'
                   : 'Open the analysis board here; the set waits'
-                : asking
+                : asking && !s.practice
                   ? 'Pass this position and open the analysis board: no points, the streak ends, and the clock waits'
                   : 'Open the analysis board here; the clock waits'
             }
@@ -1170,6 +1252,40 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
         {/* Under the buttons, so twelve rows never push them out of view. */}
         {moves.length > 0 && <ShowList item={item} moves={moves} pick={asking ? (u) => void answerMove(u) : undefined} />}
       </div>
+    </div>
+  );
+}
+
+/** A move with its number, from the position it is played in ("14. Nf3", "14… Nf6"). */
+function numbered(fen: string, san: string): string {
+  const [, turn, , , , full] = fen.split(' ');
+  return `${Number(full) || 1}${turn === 'b' ? '…' : '.'} ${san}`;
+}
+
+/**
+ * The line on the card's board (§5.154): a mistake's refutation or the line after a great move,
+ * stepped with ← → or its moves, branched by a move on the board; ← Back (Escape) puts it away.
+ */
+function LineBox(props: { shown: ShownLine; fen: string }) {
+  const { shown } = props;
+  const title = shown.kind === 'refutation' ? `Refutation of ${numbered(props.fen, shown.san)}` : `Line after ${numbered(props.fen, shown.san)}`;
+  const back = (
+    <button type="button" class="secondary" onClick={closeStormLine}>
+      ← Back <kbd>Esc</kbd>
+    </button>
+  );
+  return (
+    <div class={`storm-line-box ${shown.kind}`} data-testid="storm-line" data-kind={shown.kind}>
+      {shown.line ? (
+        <EngineLinePanel line={shown.line} busy={shown.busy} title={title} hint="← → to step · a move on the board branches" onMain={stormLineToMain} onAlt={stormLineToAlt} onStep={stormLineStep}>
+          {back}
+        </EngineLinePanel>
+      ) : (
+        <div class="engine-line-box" data-testid="engine-line">
+          <p class="muted">{shown.busy ? `${title} · Stockfish is looking…` : 'Stockfish gave no line here.'}</p>
+          <div class="actions">{back}</div>
+        </div>
+      )}
     </div>
   );
 }

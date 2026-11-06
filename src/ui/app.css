@@ -5434,6 +5434,24 @@ a.button.disabled {
 .review-focus.refutation .engine-line-box {
   --line-colour: var(--loss);
 }
+/* A storm card's line (§5.154): the review's look, red for a refutation. */
+.storm-line-box .engine-line-box {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  padding: 10px 12px;
+  border-left: 3px solid var(--line-colour, var(--win));
+}
+.storm-line-box .engine-line-box > p:first-child {
+  margin: 0 0 4px;
+  color: var(--text);
+  font-weight: 700;
+}
+.storm-line-box .engine-line-box .actions {
+  margin: 8px 0 0;
+}
+.storm-line-box.refutation .engine-line-box {
+  --line-colour: var(--loss);
+}
 .review-card .actions {
   margin: 8px 0 0;
 }

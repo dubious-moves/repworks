@@ -1168,3 +1168,23 @@ q_extension (or give it to a session with q_extension attached), then run
 - Checked: by unit tests and Playwright with a fake engine (desktop and emulated phone),
   screenshots in headless Chromium. Not on your devices, not with the real engine's lists.
 
+## After a storm verdict: refutation, line, Continue (§5.154, 2026-11-06)
+
+- A Mistake or Blunder (a set, or a timed storm with Pause or `r` quickly): Show refutation. Is
+  the line the real punishment, ten plies with the real engine? Step it with ← → (or ‹ › on the
+  phone), past its end, and try a move of your own on the board. Escape or ← Back puts it away.
+- A Great move or the top move: Show line, the same way. Would you rather see the best move's
+  line here when yours was Great but not the top move? (Today it is your move's line.)
+- A Good or Great move: Continue. With Maia downloaded the reply says "Maia <your rating>"; do its
+  replies feel like your opponents' (too sharp, too random)? `STORM.replyPrecision` is 0.75, as
+  practice's default. Without Maia, Stockfish replies: is that worth keeping, or should Continue
+  wait for Maia?
+- The continued card's verdict: how long it takes on the phone and the PC (the look-ahead searches
+  it while you think; a quick move waits for two searches, up to about 16 s).
+- Nothing of a continued card is counted: check the session's points, the set's tally and the
+  record afterwards. Is that what you want, or should continued answers count somewhere?
+- The timed storm: after a good move the next card comes in 1.2 s; is that long enough to press
+  Continue (`c`), or should the buttons pause it?
+- Checked: by unit tests and Playwright with a fake engine (desktop and emulated phone), the
+  Maia reply with the real Maia model in headless Chromium, screenshots of each state. Not on your
+  devices, not with the real engine's lines.

@@ -7,7 +7,7 @@ where the build differed). What remains is live: the spike's re-run (§4.2), the
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
 with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
-for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Storm positions shared between devices through the data repo, and an overnight gather (§5.102), are built (2026-10-12). Lc0 on the study page, its pick among close moves (§5.143), is built (2026-10-31). Endgames, the theoretical endgames each played for its goal against Stockfish (§5.145), are built (2026-10-31), their moves judged in the background since (§5.146, the owner's request of 2026-11-01), defended by Maia checked by Stockfish (§5.147, the owner's request), and a draw's attacker pushing on so the whole method comes up (§5.148, the owner's note). The endgames of the user's own repertoire (§5.149) are built (2026-11-01), and thirteen more theoretical endgames in two more groups (§5.150, the owner's request of 2026-11-02). A game card's move judged without waiting on the engine line's searches or the storm's workers (§5.151, the owner's request of 2026-11-04). Show and grade in the storm, every move of a deepened position shown by its band (§5.152, the owner's request of 2026-11-06), is built. A robotic board, the Chessnut Move, in the storm's untimed sessions and in practice is planned in its own document, `CHESSNUT.md` (§5.153 points there; the owner's request of 2026-11-06), not built. Read with `DECISIONS.md`, which this plan updates (its
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Storm positions shared between devices through the data repo, and an overnight gather (§5.102), are built (2026-10-12). Lc0 on the study page, its pick among close moves (§5.143), is built (2026-10-31). Endgames, the theoretical endgames each played for its goal against Stockfish (§5.145), are built (2026-10-31), their moves judged in the background since (§5.146, the owner's request of 2026-11-01), defended by Maia checked by Stockfish (§5.147, the owner's request), and a draw's attacker pushing on so the whole method comes up (§5.148, the owner's note). The endgames of the user's own repertoire (§5.149) are built (2026-11-01), and thirteen more theoretical endgames in two more groups (§5.150, the owner's request of 2026-11-02). A game card's move judged without waiting on the engine line's searches or the storm's workers (§5.151, the owner's request of 2026-11-04). Show and grade in the storm, every move of a deepened position shown by its band (§5.152, the owner's request of 2026-11-06), is built. A robotic board, the Chessnut Move, in the storm's untimed sessions and in practice is planned in its own document, `CHESSNUT.md` (§5.153 points there; the owner's request of 2026-11-06), not built. After a storm verdict, Show refutation (a mistake or a blunder), Show line (a great move or the top move) and Continue against Maia's reply (a good move or better) are built (§5.154, the owner's request of 2026-11-06). Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -8508,3 +8508,72 @@ written and tested (23 tests) on 2026-11-06.
 
 The first version of this section (`aa4baa6`) is replaced by `CHESSNUT.md`; what changed is in
 `DECISIONS.md`'s revision log of 2026-11-06 ("the Chessnut Move's plan in its own document").
+
+#### 5.154 After a storm verdict: Show refutation, Show line, and Continue against Maia's reply (the owner's request, 2026-11-06)
+
+"1. Let's implement 'show refutation' during a storm when the user makes a mistake/blunder.
+2. After making a good/great/best move - let's add the option to continue in the resulting
+position. We let maia make a move for the opponent then the user is prompted to make a move again,
+which gets graded. 3. Also add 'Show line' after great/best."
+
+What was decided:
+
+- **Which verdict offers what** (`followUps` in `core/storm/after.ts`): a **Mistake or a Blunder**
+  offers **Show refutation** (`r`); a **Great move or the top move** offers **Show line** (`l`);
+  a **Good or Great move** offers **Continue** (`c`). An Inaccuracy offers none of them. Not for a
+  puzzle (it has its solution), an answer with no move (show and grade's Found or Missed, a card
+  passed or left unanswered), or a move that ends the game. A set's held card offers its
+  refutation too: it shows how the move is punished, not the move to find, so the tries go on.
+- **Show refutation** is the practice review's (mistake-lab's): the move, then Stockfish's best
+  answer and ten plies after it, opened on the answer. **Show line** is the move played and
+  Stockfish's line after it, ten plies, opened on the move (after a great move it is the user's
+  own line, not the best move's: the best move is named on the panel already, and Try again tries
+  others). Both on the card's own board, as the review's: ← → (or the moves, or ‹ ›) step it, a
+  step past its end extends it by a search there, a move on the board branches it; **← Back** or
+  Escape puts it away (Escape no longer ends the session while a line is shown). Searches at depth
+  18 (16 on a phone), 8 s at most, ahead of the look-ahead. A timed storm's next card waits once
+  a line is asked for (its clock is stopped during a verdict anyway). The viewer is shared with
+  the practice review (`app/lineView.ts`: `reviewLine.ts` is now an instance of it over
+  practice's searches, its behaviour unchanged).
+- **Continue**: the opponent's reply to the move is **Maia's at the user's rating** (Maia's own
+  setting, else the explorer's ratings', as the storm's difficulty uses), drawn at practice's default precision (0.75: mostly its
+  likeliest moves, sometimes another, as people play); **Stockfish's best** when Maia's files
+  aren't on the device or it hasn't answered in 20 s, the panel saying which ("Maia 1500
+  answered 14… Nf6 · White to play · not counted"). The position after the reply is asked as a
+  card of its own (`continuedCard`: the same side, lines and names, two plies further past the
+  line, no list yet, id `<card>~<n>`): the look-ahead searches it while the user thinks and the
+  move is graded exactly as any card's (from that list when it has reached depth 20, else the two
+  searches), with its own verdict, Try again, Show refutation, Show line and Continue again.
+- **Practice, not counted**: a continued card's answers are graded and shown but never scored,
+  recorded or held: no `storm` event (its position isn't a gathered one, and the record and what
+  is done speak of those), no points or streak, a set's outcome and second pass as they were, the
+  review showing the dealt cards only, each with its counted answer. A timed storm's clock stays
+  stopped and the next card waits from Continue until Next, as for a practice try (§5.135). Saving
+  a continued position as a mistake works as for any card (it names the dealt card as its source).
+- **Not in show and grade**: Continue needs Stockfish's whole list to show a position's moves,
+  which a continued position hasn't; Show refutation and Show line are there for a move named.
+- Found on the way, fixed: a card deepened by the look-ahead's search while a move was being
+  played (`keepSearchSoFar`) was graded from the deeper list but settled with the card as dealt,
+  so a rank read "#3 of 6" against ChessDB's count; the verdict keeps the card as graded now.
+- Seen once, not fixed: in one full run in this container, `studies.spec.ts`'s "train ↔ study"
+  failed on the phone, both tries: after Train took the session up again, its feedback went blank
+  and came back to "New move: play cxd4", as if the session had started a second time over the
+  first and swallowed the test's move. Not reproduced in 44 runs of it alone (16 of them 8 at
+  once), the phone project's whole run, or a second full run (348 passed, none flaky). This change
+  touches nothing on that page; a second `startSession` overlapping the first is the lead.
+
+**As built** (2026-11-06): `src/core/storm/after.ts` (`followUps`, `continuedCard`, `maiaReply`,
+the ids), `src/app/lineView.ts` (the viewer, from `reviewLine.ts`), `src/app/storm.ts`
+(`followUpsOf`, `showStormLine`, `continueCard`, `opponentReply`, the session's `replying` and
+`followNote`, the item's `by`), `src/ui/Storm.tsx` (the buttons and keys, `LineBox`, `CardBoard`'s
+`view`), `app.css`, `STORM.replyPrecision` and `replyMaiaMs`. Tests:
+`test/unit/core/storm/after.test.ts` (which verdict offers what, the game's end, show and grade,
+Maia's draw, the continued card and its ids, a reply that mates), `test/unit/app/lineView.test.ts`
+(a refutation and a line opened where they should be, stepped and extended, a late search
+dropped), each with controls in its header; `test/e2e/storm.spec.ts` (desktop and phone, the fake
+engine's ladder): a set's Mistake refuted, stepped with ← → and extended, put away by Escape with
+the session kept; the top move's line; Continue with Stockfish's reply (no Maia here), the
+continued card's Mistake not held, Try again on the continued position, Next to the next dealt
+card, the review's two rows and one event written; the timed storm's Continue by `c`, the clock
+stopped, no points, the next card held, `r` and Escape, Next with the clock running; and in the
+Maia test, Continue answered by "Maia 1500". Live: TESTING.md.
