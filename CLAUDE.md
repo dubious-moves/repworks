@@ -2,7 +2,8 @@
 
 Read `PLAN.md` and `DECISIONS.md` before changing anything; `TESTING.md` lists what waits for
 the owner's live testing. `DECISIONS.md` holds the binding
-decisions, with a revision log; `PLAN.md` §4 is Phase 0 in build order.
+decisions, with a revision log; `PLAN.md` §4 is Phase 0 in build order. `CHESSNUT.md` is the plan
+for a robotic board (the Chessnut Move), built only when the owner asks.
 
 ## How we work
 

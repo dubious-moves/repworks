@@ -2117,3 +2117,25 @@ The technical calls, each with its reason:
   able to use it with Repworks. The most important part is that Storm (not timed) and practice
   mode works. Research and plan the integration … No need to implement anything yet." Planned
   only; the build waits for the owner's word.
+
+## Revision of 2026-11-06 (the Chessnut Move's plan in its own document, CHESSNUT.md)
+- **The plan moved to `CHESSNUT.md`**, extensive and build-ready: the protocol as tables and byte
+  vectors, the design's decisions with their reasons, what the user sees on each screen, six build
+  parts each with its files, steps, named tests and "done", the live checks with what to change for
+  each answer, the prompts for the build sessions, and the TESTING.md entries. `PLAN.md` §5.153 now
+  points there. Built only when the owner asks.
+- **The core code is written and tested already** (the codec, reading moves, the link's reducer,
+  the lights, the port, the Web Bluetooth module and a simulated board): 23 tests, this repo's
+  strict TypeScript settings and its core boundary, in a scratch project on 2026-11-06; kept as
+  `CHESSNUT.md`'s appendices, not in `src`, since nothing is to be built yet.
+- **Changed from the first plan** (the entry above, `aa4baa6`): the board mirrors the screen's board
+  through one `mirror` prop on `MoveBoard` and `CardBoard`, so each screen opts in with the values
+  it already has; Show the move lights the best move instead of driving it (the screen draws an
+  arrow and keeps the card's position, and the board follows the screen); the link's rules made
+  exact: pieces only lifted are never put back (a hand still holds them), a move the site refuses
+  is put back after half a second, a held card's move taken back by hand is Try again; a card's
+  setup is a storm phase of its own, `setup`, so the clock never runs during it; the build starts
+  with the codec, the Web Bluetooth module, the simulated board and the spike page, so the spike is
+  ready the day the board arrives and its answers can change the later parts before they're built.
+- Why: the owner, 2026-11-06: "You can make this into it's own plan document. Make it extensive and
+  make it as easy as possible to implement, whenever the time comes."
