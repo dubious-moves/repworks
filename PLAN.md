@@ -7,7 +7,7 @@ where the build differed). What remains is live: the spike's re-run (§4.2), the
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
 with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
-for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Storm positions shared between devices through the data repo, and an overnight gather (§5.102), are built (2026-10-12). Lc0 on the study page, its pick among close moves (§5.143), is built (2026-10-31). Endgames, the theoretical endgames each played for its goal against Stockfish (§5.145), are built (2026-10-31), their moves judged in the background since (§5.146, the owner's request of 2026-11-01), defended by Maia checked by Stockfish (§5.147, the owner's request), and a draw's attacker pushing on so the whole method comes up (§5.148, the owner's note). The endgames of the user's own repertoire (§5.149) are built (2026-11-01), and thirteen more theoretical endgames in two more groups (§5.150, the owner's request of 2026-11-02). A game card's move judged without waiting on the engine line's searches or the storm's workers (§5.151, the owner's request of 2026-11-04). Show and grade in the storm, every move of a deepened position shown by its band (§5.152, the owner's request of 2026-11-06), is built. A robotic board, the Chessnut Move, in the storm's untimed sessions and in practice is planned in its own document, `CHESSNUT.md` (§5.153 points there; the owner's request of 2026-11-06), not built. After a storm verdict, Show refutation (a mistake or a blunder), Show line (a great move or the top move) and Continue against Maia's reply (a good move or better) are built (§5.154, the owner's request of 2026-11-06). Read with `DECISIONS.md`, which this plan updates (its
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Storm positions shared between devices through the data repo, and an overnight gather (§5.102), are built (2026-10-12). Lc0 on the study page, its pick among close moves (§5.143), is built (2026-10-31). Endgames, the theoretical endgames each played for its goal against Stockfish (§5.145), are built (2026-10-31), their moves judged in the background since (§5.146, the owner's request of 2026-11-01), defended by Maia checked by Stockfish (§5.147, the owner's request), and a draw's attacker pushing on so the whole method comes up (§5.148, the owner's note). The endgames of the user's own repertoire (§5.149) are built (2026-11-01), and thirteen more theoretical endgames in two more groups (§5.150, the owner's request of 2026-11-02). A game card's move judged without waiting on the engine line's searches or the storm's workers (§5.151, the owner's request of 2026-11-04). Show and grade in the storm, every move of a deepened position shown by its band (§5.152, the owner's request of 2026-11-06), is built. A robotic board, the Chessnut Move, in the storm's untimed sessions and in practice is planned in its own document, `CHESSNUT.md` (§5.153 points there; the owner's request of 2026-11-06), not built. After a storm verdict, Show refutation (a mistake or a blunder), Show line (a great move or the top move) and Continue against Maia's reply (a good move or better) are built (§5.154, the owner's request of 2026-11-06). A polish pass (§5.156, the owner's request of 2026-11-07) made the light theme readable and the folded settings panel free, and lists ideas waiting for the owner's word. Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -8733,5 +8733,138 @@ Two flakes, each seen once in a full Playwright run, are fixed in the tests:
   most likely a click on the wrong square while the page still settled. It didn't happen again in
   110 runs alone or under load. `board.ts`'s `square` now measures the board again after a frame
   until it holds still, and the test waits for the trainer's `teach` phase before the move.
+
+Live: TESTING.md.
+
+#### 5.156 A polish pass: the light theme, the folded settings, and ideas (the owner's request, 2026-11-07)
+
+"Come up with polish suggestions or ideas you can work with to improve repworks".
+
+**What was looked at.**
+- `npm run check`, `npm test` (1,031 tests) and `npm run e2e` (348) passed before anything changed,
+  none flaky.
+- Every page was screenshotted with three made-up studies:
+  - on a 1440-wide desktop, an emulated Pixel 7 and a 360-wide Galaxy S8, with no page scrolling
+    sideways;
+  - in the Forest, Paper and Slate themes;
+  - and a training session played through, a wrong move and the right one.
+- axe-core 4.10, not added to the project, scanned all 8 themes. It covered 16 pages plus the
+  line list, the ☰ menu, a move's menu, the training and explorer settings dialogs and the
+  settings panel.
+- Warm starts were timed on an emulated phone with the CPU slowed 4×. The made-up repertoire had
+  8 studies, 120 chapters and 3,000 reviewed cards (23,000 events). CPU profiles of the same
+  starts were taken unthrottled.
+
+**Built.**
+- **The light theme (Paper) readable.** `button` takes the accent's colours, and a transparent one
+  kept its text: near white, so on Paper's page it read 1.0 to 1.1:1. That hit:
+  - the training screen's Show and grade, Read, Analyse and Stop;
+  - the line list (its head, chapters and lines);
+  - the games' and practice's filters, and the endgame's Hint, Restart and Analyse.
+
+  Fixed:
+  - `button.secondary` takes the page's text, as `a.button.secondary` always did. In the dark
+    themes that is the page's text colour instead of the accent's, a shade dimmer, and both kinds
+    of secondary button now match.
+  - The line list's buttons and the chips inherit their text, so a filter chip takes its card's
+    and the sync chip in the phone's top bar the bar's. The `--chip-text` token went.
+  - On the accent (the current line, Show and grade's keys), the muted parts take the row's or
+    the key's own text, dimmed.
+  - The explorer's tab shown is white on its blue (`--on-select`). The blue's own light text read
+    2.4:1 on Paper, 2.8 on Mist and 4.5 at best elsewhere; it is now 6.0 on Paper and 3.4 to 5.3
+    elsewhere.
+  - White's study tag is in the page's text; its fixed light grey vanished on Paper's card.
+  - The sync chip's warning has the page's background when it sits in the phone's top bar. Amber
+    on Paper's green bar read 1.8:1, on Slate's blue 2.6:1.
+  - Paper's `--warn` went from #a86f00 to #8f5e00: 4.8:1 on the page, 5.5 on a card, white on it
+    5.6 (it read 3.6, 4.2 and 4.3).
+  - Paper's `--move-number` went from #8a847a to #6f6a60: 5.3:1 on a card, 4.7 in a variation.
+
+  axe on Paper went from 48 failures on 6 pages to none, menus and dialogs included.
+- **The settings panel folded costs nothing.** "Settings and debug" was drawn whole while folded,
+  and on every visit home and twice a sync it:
+  - replayed every device's log a second time;
+  - drew a table row per card ever reviewed.
+
+  Now its body is drawn, and the card states replayed, only while it is open.
+
+  With 3,000 reviewed cards and 120 chapters, at 4× slowdown (median of 3), the home's due counts
+  show 1.8 s after a reload instead of 3.2 s. Unthrottled the profile shows 0.65 s instead of
+  1.6 s, with no `cardStates` in it.
+- **ARIA.**
+  - The moves are a labelled group (`role="list"` held rows that weren't list items).
+  - The explorer's ⚙ is beside its tab list, not in it.
+  - The storm's breakdown has no empty header cell: the bands' column head is a plain cell of the
+    bar's class, hidden on a phone as the bars are. The rule that hid `th:last-child` went with it.
+
+**Not changed: the dark themes' remaining contrasts, for the owner.** All are under WCAG AA's
+4.5:1, readable but faint:
+- the move shown in the notation: white on #319a28 (Forest) reads 3.6:1, and Walnut and Midnight
+  are about the same;
+- Slate's muted grey reads 4.44:1 everywhere, and its primary blue with its text 3.0:1;
+- Mist's, Grove's and Fjord's tab shown reads 3.4 to 4.0:1, even in white;
+- a study card's due count reads 4.15:1 (Forest);
+- a chapter's due count in the line list reads about 3.9:1.
+
+Each is a nudge to a colour the owner chose in the themes' gallery (§5.86), so it waits for a yes.
+
+**Ideas, waiting for the owner's word** (most worth it first):
+1. **One "Today" card on the home**: what is due everywhere, with "Next" opening the first of it:
+   - repertoire moves and idea cards;
+   - game cards and endgames;
+   - the checklist's next line;
+   - storm positions ready.
+
+   Today the home shows the repertoire. Endgames shows its due count on its button. Games, the
+   storm and the checklist show nothing until opened.
+   - A small first step: "· n due" on the Games button and "· n ready" on the Storm button, as
+     Endgames has.
+   - This needs a count kept cheap, since the games' deck is read from the games' own store.
+2. **Shortcuts on the installed app's icon.** The manifest's `shortcuts` would add Train, Storm,
+   Games and Endgames: a long press on the phone, a right-click on the desktop. About ten lines,
+   on the hash routes the app already has.
+3. **Share to Repworks (Android) and open .pgn files (desktop).** The manifest's `share_target`
+   and `file_handlers` would send a PGN, or a Lichess study's link, from another app straight
+   into Import.
+4. **Sounds and a buzz.** A move, a capture, right and wrong, made with Web Audio (no files, no
+   licences); on the phone a short vibration on a wrong answer. One switch per device. Whether it
+   starts on is the owner's call.
+5. **The wrong move shown before it goes.** A wrong move is taken back at once, and only the line
+   under the board says so. A red mark on the square played, held for a second, would show what
+   the hand did.
+6. **"?" lists the screen's keys on a desktop.** Show and grade's buttons carry their 1, 2 and 4,
+   but Backspace (a misclick), the arrows, Escape and a headset's buttons are written only in
+   buttons' titles and here.
+7. **Empty states that say what to do.**
+   - The storm's disabled Start with 0 positions: "Gather positions first", pointing below.
+   - Progress's empty 14-day chart: one line instead of bare axes.
+   - The chart's days could carry their weekday.
+8. **Settings apart from debug.** Theme, engines, other devices and the token would sit under
+   "Settings". The requests, card states, time travel and "Record a test review" (which writes a
+   fake review into the real log) would go under "Debug". The remote spike's link could join them,
+   off every page's footer, once the installed app no longer needs it one tap away (§4.2's spike
+   is done; `shell.spec.ts` keeps the link there).
+9. **The dark themes' contrasts** above.
+10. **A faster start with a large repertoire, measured first.** Every start parses and indexes
+    every chapter again, which §3 meant to cache by blob SHA.
+    - In the made-up repertoire this is 0.33 s unthrottled (about 1.3 s at 4×) of the home's
+      start, and parse and index alone took 185 ms in Node.
+    - A stored copy reads back in about 45 ms, but it takes 9.4 MB per 120 chapters.
+    - Worth it only if the phone's debug panel shows "index built in" well over §5.1's 300 ms
+      target with the real repertoire. That is §5.1's own live check, still in TESTING.md.
+11. **TESTING.md as one walk through the app.** Its 80 sections are in date order. Grouped by
+    screen, newest first and with superseded items folded in, the one testing session would be one
+    pass per screen.
+
+Tests:
+- `themes.spec.ts`, desktop and phone, on Paper checks for 4.5:1 or more against what is behind:
+  - the training screen's four buttons;
+  - the line list's head, a chapter and a line;
+  - a games filter and Hide;
+  - the offline chip, in the top bar on the phone and the footer on the desktop.
+
+  It fails without the fix (1.12:1).
+- `guard.spec.ts`: folded, the settings panel draws nothing but its summary, and folded again its
+  card table goes.
 
 Live: TESTING.md.

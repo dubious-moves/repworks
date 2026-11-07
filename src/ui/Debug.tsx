@@ -81,7 +81,22 @@ function Repertoire() {
   );
 }
 
+/**
+ * Folded on the home. Its body is drawn, and the card states replayed from every log, only while it
+ * is open: folded, it cost a second replay of the whole history and a table row per card on every
+ * visit home and twice a sync (about 0.2 s on a desktop with 3,000 cards; PLAN.md §5.156).
+ */
 export function Debug() {
+  const [open, setOpen] = useState(false);
+  return (
+    <details class="card debug" open={open} onToggle={(e) => setOpen(e.currentTarget.open)}>
+      <summary>Settings and debug</summary>
+      {open && <DebugBody />}
+    </details>
+  );
+}
+
+function DebugBody() {
   const [state, setState] = useState<LocalState | undefined>(undefined);
   const [cards, setCards] = useState<CardRow[]>([]);
   const version = dataVersion.value;
@@ -96,8 +111,7 @@ export function Debug() {
   const s = syncStatus.value;
   const c = requestCounts.value;
   return (
-    <details class="card debug">
-      <summary>Settings and debug</summary>
+    <>
       <Look />
       <dl>
         <dt>Device</dt>
@@ -180,6 +194,6 @@ export function Debug() {
       )}
       <OtherDeviceCode />
       <SetupForm title="Change the token" />
-    </details>
+    </>
   );
 }

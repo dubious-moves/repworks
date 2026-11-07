@@ -128,7 +128,9 @@ h2 {
   border: 1px solid rgb(var(--ink) / 25%);
   border-radius: 18px;
   background: transparent;
-  color: var(--chip-text);
+  /* The text it sits on: the page's on a card (the games' filters), the bar's in the top bar. The
+     accent's text (a button's) is near white on the light theme's page. */
+  color: inherit;
   font: inherit;
   font-size: 0.85rem;
   cursor: pointer;
@@ -162,6 +164,13 @@ h2 {
   margin-right: 0;
   font-weight: 600;
   background: color-mix(in srgb, var(--warn) 12%, transparent);
+}
+
+/* On the phone the chip sits in the top bar, on the accent: the warning colour is drawn for the
+   page, so the chip takes the page's background there (amber on Paper's dark green bar read at
+   1.8:1, on Slate's blue at 2.6:1). */
+.topbar .chip-warn {
+  background: var(--bg);
 }
 
 .banner-warn {
@@ -419,8 +428,9 @@ label.check input {
   border: 1px solid rgb(var(--ink) / 20%);
 }
 
+/* The page's text in White's outlined tag: a fixed light grey vanished on the light theme's card. */
 .study-tag.tag-white {
-  color: #eee; /* fixed */
+  color: var(--text);
 }
 
 .study-tag.tag-black {
@@ -721,8 +731,11 @@ a.button {
   text-decoration: none;
 }
 
+/* Transparent, so in the page's text colour as a.button.secondary is: the accent's text a button
+   has is near white on the light theme's page. */
 button.secondary {
   background: transparent;
+  color: var(--text);
 }
 
 button.link {
@@ -2631,6 +2644,7 @@ button.comment-offer-chip.important {
   background: transparent;
   border: 0;
   border-radius: 0;
+  color: inherit;
   font-weight: 600;
   text-align: left;
 }
@@ -2680,6 +2694,7 @@ button.comment-offer-chip.important {
   background: transparent;
   border: 0;
   border-radius: 0;
+  color: inherit;
   text-align: left;
 }
 
@@ -2734,6 +2749,7 @@ button.comment-offer-chip.important {
   background: transparent;
   border: 0;
   border-radius: 0;
+  color: inherit;
   font-size: 0.85rem;
   text-align: left;
 }
@@ -2745,6 +2761,18 @@ button.comment-offer-chip.important {
 
 .line-list-line.current {
   background: var(--accent);
+  color: var(--accent-text);
+}
+
+/* On the accent, the line's moves and its label in the row's own text (muted grey and the label's
+   colour read 1.3 to 1.4:1 there on Paper). */
+.line-list-line.current .line-list-moves,
+.line-list-line.current .line-list-label {
+  color: inherit;
+}
+
+.line-list-line.current .line-list-moves {
+  opacity: 0.8;
 }
 
 .line-list-number {
@@ -2832,6 +2860,13 @@ button.comment-offer-chip.important {
 .press-next {
   background: var(--accent);
   color: var(--accent-text);
+}
+
+/* The key's hint, "(2)": the button's own text, dimmed (the page's muted grey on the accent read
+   1.4:1 on Paper, 3.7 on Forest). */
+.press .muted {
+  color: inherit;
+  opacity: 0.75;
 }
 
 .train-speech {
@@ -3150,12 +3185,21 @@ a.button.primary {
   text-align: left;
 }
 
-.explorer-tabs {
+.explorer-tabs,
+.explorer-tablist {
   display: flex;
   align-items: center;
   gap: 2px;
+}
+
+.explorer-tabs {
   padding: 4px 6px;
   background: var(--info-bg);
+}
+
+.explorer-tablist {
+  flex: 1;
+  min-width: 0;
 }
 
 .explorer-tabs button[role='tab'] {
@@ -3168,8 +3212,11 @@ a.button.primary {
   font-weight: 600;
 }
 
+/* The tab shown: white on the strong blue, as a selection is (the blue's own light text read at
+   2.4:1 on Paper, 2.8 on Mist, 4.5 at best on the others). */
 .explorer-tabs button[role='tab'].on {
   background: var(--info-strong);
+  color: var(--on-select);
 }
 
 .explorer-tabs .explorer-gear {
@@ -4876,7 +4923,6 @@ a.button.primary {
 }
 
 @media (max-width: 480px) {
-  .storm-chapters th:last-child,
   .storm-chapters .bar-cell {
     display: none;
   }

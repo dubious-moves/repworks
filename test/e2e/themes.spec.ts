@@ -1,7 +1,7 @@
 // The themes (src/ui/themes.css, src/app/theme.ts), on a desktop viewport and an emulated phone:
 // one chosen in the settings is on <html> at once and after a reload; the styles gallery shows
 // the app in a frame per theme, the frames follow each other, and they never reach GitHub.
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
 import { serveGithub, world } from './github.ts';
 import { serveSite, type SiteServer } from './server.ts';
@@ -23,6 +23,27 @@ async function setUp(page: Page): Promise<void> {
 
 const background = (page: Page) => page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor);
 
+/**
+ * WCAG 2's contrast of an element's text with what is behind it: the first opaque background up
+ * its ancestors (a half-transparent one is passed over), else the page's.
+ */
+const contrast = (target: Locator) =>
+  target.evaluate((el) => {
+    const rgba = (c: string) => (c.match(/[\d.]+/g) ?? []).map(Number);
+    const luminance = ([r, g, b]: number[]) => {
+      const f = (v: number) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+      return 0.2126 * f(r!) + 0.7152 * f(g!) + 0.0722 * f(b!);
+    };
+    let behind: number[] | undefined;
+    for (let e: Element | null = el; e && !behind; e = e.parentElement) {
+      const c = rgba(getComputedStyle(e).backgroundColor);
+      if (c.length === 3 || (c.length === 4 && c[3] === 1)) behind = c;
+    }
+    behind ??= rgba(getComputedStyle(document.documentElement).backgroundColor);
+    const [a, b] = [luminance(rgba(getComputedStyle(el).color)), luminance(behind)];
+    return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  });
+
 test('a theme chosen in the settings is shown at once and kept', async ({ page }) => {
   await setUp(page);
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'forest');
@@ -35,6 +56,37 @@ test('a theme chosen in the settings is shown at once and kept', async ({ page }
   await page.reload();
   await expect(page.locator('.chip')).toHaveText(/^synced/);
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'paper');
+});
+
+// The light theme (PLAN.md §5.156): a transparent button kept the accent's near-white text, so the
+// training screen's buttons, its line list and the games' filters were white on white (1.0 to 1.1:1);
+// the sync chip's warning was amber on the phone's dark green bar (1.8:1).
+test('on the light theme the training screen, its line list, the games’ filters and the offline chip read clearly', async ({ page, context }) => {
+  await page.addInitScript(() => localStorage.setItem('repworks-theme', 'paper'));
+  await setUp(page);
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'paper');
+
+  await page.goto(`${site.url}#/train`);
+  await expect(page.locator('.train-grid')).toHaveAttribute('data-phase', 'ask');
+  for (const name of [/^Show and grade/, 'Read', 'Analyse', 'Stop']) {
+    expect(await contrast(page.getByRole('button', { name, exact: typeof name === 'string' }).first())).toBeGreaterThanOrEqual(4.5);
+  }
+  await page.locator('.train-list-head').click();
+  // The line's own chapter comes unfolded.
+  await expect(page.locator('.line-list-line').first()).toBeVisible();
+  for (const part of ['.train-list-head', '.line-list-toggle', '.line-list-line']) {
+    expect(await contrast(page.locator(part).first()), part).toBeGreaterThanOrEqual(4.5);
+  }
+
+  await page.goto(`${site.url}#/games`);
+  expect(await contrast(page.locator('label.chip', { hasText: 'blitz' }))).toBeGreaterThanOrEqual(4.5);
+  expect(await contrast(page.getByRole('button', { name: 'Hide', exact: true }))).toBeGreaterThanOrEqual(4.5);
+
+  // Offline: in the top bar on the phone, in the footer on a desktop.
+  await context.setOffline(true);
+  await page.reload();
+  await expect(page.locator('.sync-chip')).toHaveText('offline');
+  expect(await contrast(page.locator('.sync-chip'))).toBeGreaterThanOrEqual(4.5);
 });
 
 test('the gallery: a frame per theme, following each other, never syncing', async ({ page }) => {

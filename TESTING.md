@@ -1210,3 +1210,20 @@ q_extension (or give it to a session with q_extension attached), then run
 - Checked for `--all-devices`, `--study` and `--chapter`: unit tests, and runs on a scratch copy
   of your data repo ("Scandi Gambit" › "Accepted - Main lines": 18 of the devices' positions
   scored into the cloud's files; 11 gathered, all on that chapter's lines). Nothing pushed.
+
+## The light theme readable, and a quicker home (§5.156, 2026-11-07)
+- Checked by the tests, by screenshots in headless Chromium (desktop, an emulated Pixel 7 and a
+  360-wide phone) and by an accessibility scan of every theme; nothing live yet.
+- Settings and debug → Theme → Paper, on the phone. Check these read clearly, dark on light:
+  - the training screen's Show and grade, Read, Analyse and Stop;
+  - the line list (Show lines), its chapters and its lines;
+  - the Games filters (bullet, blitz…) and Hide;
+  - an endgame's Hint and Restart.
+
+  Turn the network off: the "offline" chip in the top bar is amber on a light pill. Back on
+  Forest, the secondary buttons are a shade dimmer than before, the same as the Storm and Games
+  buttons beside them: say if you'd rather have them brighter.
+- The home after a reload, on the phone with your real history: the due counts should come
+  sooner than before (they waited for the folded settings panel to replay the whole history).
+  Settings and debug still opens with everything in it.
+- §5.156 lists eleven ideas and the dark themes' faint colours: say which to build.

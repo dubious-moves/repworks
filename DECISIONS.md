@@ -2177,3 +2177,16 @@ The technical calls, each with its reason:
   the cloud's folder. Rejected: a file of lists alone (a new file kind, and an app change).
 - **`--study` and `--chapter` scope a run as the storm's home's scopes do** (§14.21), for the
   walking and the scoring alike.
+
+## Revision of 2026-11-07 (a polish pass, PLAN.md §5.156)
+- **A transparent button or chip takes the text it sits on**, not the accent's text that `button`
+  gives. In the dark themes the secondary buttons are a shade dimmer, matching the secondary
+  links beside them. Why: on Paper, the one light theme, the accent's near-white text left them
+  white on white.
+- **Paper's warning amber and move numbers are darker** (#8f5e00, #6f6a60), to pass 4.5:1 on its
+  page and cards. The dark themes' colours are unchanged. Their remaining contrasts under 4.5:1
+  are listed in §5.156 for the owner, since each is a colour chosen in the gallery (§5.86).
+- **The settings panel's body is drawn only while it is open.** Why: folded, it replayed the
+  whole history a second time and drew a row per card on every visit home (1.8 s against 3.2 s to
+  the home's counts at 4× slowdown with 3,000 cards).
+- No data format changed.

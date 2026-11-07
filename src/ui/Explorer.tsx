@@ -343,12 +343,15 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
   return (
     <section class="explorer" aria-label="Explorer" ref={box} style={style}>
       <Grip box={box} />
-      <div class="explorer-tabs" role="tablist">
-        {TABS.map((t) => (
-          <button key={t.tab} type="button" role="tab" aria-selected={p.tab === t.tab} class={p.tab === t.tab ? 'on' : ''} onClick={() => setPrefs({ tab: t.tab })}>
-            {t.tab === 'lichess' ? lichessLabel : t.label}
-          </button>
-        ))}
+      <div class="explorer-tabs">
+        {/* The tabs alone in the tab list; the ⚙ beside it is a button of its own. */}
+        <div class="explorer-tablist" role="tablist" aria-label="Explorer source">
+          {TABS.map((t) => (
+            <button key={t.tab} type="button" role="tab" aria-selected={p.tab === t.tab} class={p.tab === t.tab ? 'on' : ''} onClick={() => setPrefs({ tab: t.tab })}>
+              {t.tab === 'lichess' ? lichessLabel : t.label}
+            </button>
+          ))}
+        </div>
         <button type="button" class="icon explorer-gear" aria-label="Explorer settings" title="Explorer settings" onClick={openExplorerSettings}>
           ⚙
         </button>

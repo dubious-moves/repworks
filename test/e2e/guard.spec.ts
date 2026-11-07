@@ -29,8 +29,13 @@ test('a card due past what a Date holds: home is drawn, the debug table says "?"
   await page.goto(`${site.url}#setup?repo=${encodeURIComponent(REPO)}&token=${TOKEN}&name=phone`);
   await expect(page.locator('.chip')).toHaveText(/^synced/);
   await expect(page.getByRole('heading', { name: 'Studies' })).toBeVisible();
+  // Folded, the panel draws nothing of its own, and replays nothing (PLAN.md §5.156).
+  await expect(page.locator('details.debug > :not(summary)')).toHaveCount(0);
   await page.getByText('Settings and debug').click();
   await expect(page.locator('table.cards tr', { hasText: 'm|Far00001_4' }).locator('td').nth(2)).toHaveText('?');
   await expect(page.locator('.guard')).toHaveCount(0);
+  // Folded again, it lets its contents go.
+  await page.getByText('Settings and debug').click();
+  await expect(page.locator('details.debug table.cards')).toHaveCount(0);
   expect(errors).toEqual([]);
 });

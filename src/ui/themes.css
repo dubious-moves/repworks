@@ -35,7 +35,6 @@
   --accent-border: #3f6b50;
   --accent-hover: #2f5a3f;
   --accent-hover-border: #5f9a73;
-  --chip-text: #e8efe9;
   /* A repertoire study's badge, on the accent. */
   --badge-text: #9fd3a8;
   --primary-bg: #2f6b3e;
@@ -122,7 +121,6 @@
   --accent-border: #4a7bb3;
   --accent-hover: #3a6ea8;
   --accent-hover-border: #6b98cc;
-  --chip-text: #f2f6fb;
   --badge-text: #cfe3f7;
   --primary-bg: #3692e7;
   --primary-border: #5aa8ef;
@@ -152,7 +150,6 @@
   --accent-border: #6e4c2c;
   --accent-hover: #5c3f24;
   --accent-hover-border: #8f6a43;
-  --chip-text: #f6ead9;
   --badge-text: #e3b36a;
   --primary-bg: #8a5a24;
   --primary-border: #b07a3c;
@@ -191,7 +188,6 @@
   --accent-border: #1f6a82;
   --accent-hover: #0f4c61;
   --accent-hover-border: #3a93ad;
-  --chip-text: #e9fbff;
   --badge-text: #7fe0f4;
   --primary-bg: #0e7490;
   --primary-border: #22a3c4;
@@ -233,11 +229,11 @@
   --accent-border: #4f7d62;
   --accent-hover: #3b6f52;
   --accent-hover-border: #2f5d43;
-  --chip-text: #fbfaf6;
   --badge-text: #e6f2ea;
   --primary-bg: #2f7d4a;
   --primary-border: #256a3d;
-  --warn: #a86f00;
+  /* 4.8:1 on the page, 5.5 on a card, white on it 5.6 (#a86f00 read 3.6, 4.2 and 4.3). */
+  --warn: #8f5e00;
   --on-warn: #fff;
   --error: #b3402e;
   --danger: #c0392b;
@@ -264,7 +260,8 @@
   --move-hover: #dce6ef;
   --move-current: #2f7d4a;
   --on-current: #fff;
-  --move-number: #8a847a;
+  /* The muted text's: 5.3:1 on a card, 4.7 in a variation (#8a847a read 3.6 and 3.3). */
+  --move-number: #6f6a60;
   --glyph-current: #fff3b0;
   --comment: #1f6f8b;
   --on-comment: #fff;
@@ -315,7 +312,6 @@
   --accent-border: #3b4248;
   --accent-hover: #353b40;
   --accent-hover-border: #56606a;
-  --chip-text: #e4e8ea;
   --badge-text: #a8c7bf;
   --primary-bg: #4a6961;
   --primary-border: #6a8a81;
@@ -397,7 +393,6 @@
   --accent-border: #3a7350;
   --accent-hover: #285c3d;
   --accent-hover-border: #5f9a73;
-  --chip-text: #eaf3ec;
   --badge-text: #a6dcb1;
   --primary-bg: #2a7341;
   --primary-border: #4fa368;
@@ -479,7 +474,6 @@
   --accent-border: #25616a;
   --accent-hover: #19474d;
   --accent-hover-border: #3a8790;
-  --chip-text: #e6f6f5;
   --badge-text: #8fe3d8;
   --primary-bg: #11666f;
   --primary-border: #2fa3ad;

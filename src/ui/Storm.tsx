@@ -776,7 +776,8 @@ function Breakdown(props: { title: string; head: string; rows: BreakdownRow[] })
             <th>Answered</th>
             <th>Found</th>
             <th>Given up</th>
-            <th />
+            {/* The bands' bar has no heading: a cell, not an empty header. */}
+            <td class="bar-cell" />
           </tr>
         </thead>
         <tbody>

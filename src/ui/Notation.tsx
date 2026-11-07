@@ -163,7 +163,7 @@ export function Notation(props: { chapter: Chapter }) {
   const badges = useMemo(() => badgesOf(t, index, s?.sid, s?.cid), [t, index, s?.sid, s?.cid]);
   return (
     <Badges.Provider value={badges}>
-      <div class="notation" role="list" aria-label="Moves">
+      <div class="notation" role="group" aria-label="Moves">
         <div class="start-row">
           <span class={`move start${startCurrent ? ' current' : ''}`} data-path="" onClick={() => goTo([])} onContextMenu={menuAt([])}>
             Start
