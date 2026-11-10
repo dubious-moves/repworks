@@ -2220,3 +2220,12 @@ The technical calls, each with its reason:
 - **The dark themes' faint colours are nudged to 4.6:1**, each keeping its hue; the list is in
   §5.159. A unit test now keeps six text/background pairs at 4.5:1 in every theme.
 - No data format changed.
+
+## Revision of 2026-11-10, later still (TESTING.md by screen; PLAN.md §5.160)
+- **TESTING.md is grouped by screen, newest first within each**, with each item's live checks
+  apart from its "Checked" line. Why: the owner plans one testing session over everything; by
+  screen it is one pass per screen instead of 80 dated sections.
+- **Items replaced by later changes are folded into those, and closed ones dropped** (the list is
+  in §5.160). §5.159's reason for keeping the spike's link in the footer was wrong (its re-run was
+  reported on 2026-10-07); the link stays, harmlessly.
+- No data format changed.
