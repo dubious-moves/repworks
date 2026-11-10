@@ -10,12 +10,15 @@
 // - `unintuitive` true on an unjudged top move → "unintuitive".
 // Controls run on `unlistedLikely` (2026-11-10), each failing "the likely moves outside the list":
 // listed moves kept; the threshold read as strictly above; a list that can't judge allowed.
+// Controls run on `likelyToSearch` (2026-11-10), each failing "the likely moves to search at several
+// ratings": the moves searched already kept; only the first rating read; ordered by the first
+// rating's likelihood instead of the highest.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { STORM as C } from '../../../../src/core/storm/config.ts';
 import type { ScoredList, ScoredMove } from '../../../../src/core/storm/grade.ts';
 import { deepenedPosition, type StoredPosition } from '../../../../src/core/storm/harvest.ts';
-import { difficulty, difficultyWords, foundShare, judgeMove, keptPolicy, MAIA_LADDER, maiaChoice, maiaLine, missingRatings, unintuitive, unlistedLikely, type MaiaRating } from '../../../../src/core/storm/maia.ts';
+import { difficulty, difficultyWords, foundShare, judgeMove, keptPolicy, MAIA_LADDER, maiaChoice, maiaLine, likelyToSearch, missingRatings, unintuitive, unlistedLikely, type MaiaRating } from '../../../../src/core/storm/maia.ts';
 
 // Win% lost against the best (0): 30 cp ≈ 2.7 (great), 60 ≈ 5.5 (good), 100 ≈ 9.1 (inaccuracy),
 // 200 ≈ 17.6 (mistake), 400 a blunder.
@@ -138,4 +141,13 @@ test('the likely moves outside the list (§5.157): at the user’s rating, at le
   assert.deepEqual(unlistedLikely(ratings, 1500, sf(14), 0.2, C), []);
   assert.deepEqual(unlistedLikely(ratings, 1500, cdb(), 0.2, C), []);
   assert.equal(C.prepMaiaMin, 0.2);
+});
+
+test('the likely moves to search at several ratings (§5.161): each once, by its highest likelihood, those searched already left out', () => {
+  const ratings = [rating(1000, [['a2a3', 0.6], ['h2h3', 0.21]]), rating(1500, [['e2e4', 0.3], ['h2h3', 0.25], ['a2a3', 0.2], ['g2g3', 0.19]]), rating(2200, [['f2f4', 0.22]])];
+  assert.deepEqual(likelyToSearch(ratings, [1500], sf(20), [], 0.2, C), ['h2h3', 'a2a3']);
+  assert.deepEqual(likelyToSearch(ratings, [1000, 1500, 2200], sf(20), [], 0.2, C), ['a2a3', 'h2h3', 'f2f4']);
+  assert.deepEqual(likelyToSearch(ratings, [1500, 1000], sf(20), ['a2a3'], 0.2, C), ['h2h3']);
+  assert.deepEqual(likelyToSearch(ratings, [1500], sf(14), [], 0.2, C), []);
+  assert.deepEqual(likelyToSearch(undefined, [1500], sf(20), [], 0.2, C), []);
 });

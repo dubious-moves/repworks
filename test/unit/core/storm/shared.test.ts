@@ -6,6 +6,10 @@
 // - `sharedFiles` keeping the positions marked `from` → "the device's files";
 // - `mergeShared` taking any Stockfish list over the kept one (no depth compared) → "a merge";
 // - `explorerUntil` counting months from 1 (`% 12` without the + 1) → "the explorer's window".
+// Controls run on the searches after moves (§5.161, 2026-11-10), each failing exactly the named
+// assertions: `positionLine` leaving `after` out → "searches after moves"; `unionAfter` keeping
+// ours whatever the depth → "searches after moves merged"; the line's version raised to 2 → "searches
+// after moves" (a build before them would no longer read the line).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { positionKey } from '../../../../src/core/chess/positionKey.ts';
@@ -99,4 +103,40 @@ test("the explorer's window: months back from now, across a year's turn; none fo
   assert.equal(explorerUntil(Date.UTC(2026, 1, 1), 4), '2025-10');
   assert.equal(explorerUntil(Date.UTC(2026, 11, 31), 11), '2026-01');
   assert.equal(explorerUntil(Date.UTC(2026, 9, 12), 48), '2022-10');
+});
+
+test('searches after moves (§5.161): written and read back in the same version of the line; a line without them reads as before; a malformed one is not guessed', () => {
+  const after = [
+    { u: 'h7h6', s: 35, d: 20 },
+    { u: 'a7a5', s: -12, d: 22 },
+  ];
+  const p = pos(FEN, T0, { src: 'sf', depth: 24, after });
+  const line = positionLine(p);
+  assert.deepEqual(parsePositionLine(line), p);
+  // Still version 1: a build that doesn't know the field reads every other field as before.
+  assert.equal(JSON.parse(line).v, 1);
+  const { after: _, ...without } = p;
+  assert.deepEqual(parsePositionLine(positionLine(without)), without);
+  assert.ok(!positionLine(without).includes('"after"'));
+  assert.equal(parsePositionLine(line.replace('"d":20', '"d":"20"')), null);
+  // An empty list is the same as none.
+  assert.deepEqual(parsePositionLine(line.replace(/"after":\[[^\]]*\]/, '"after":[]')), without);
+});
+
+test('searches after moves merged: each move’s deeper search, the rest kept; nothing new, no change', () => {
+  const mine = pos(FEN, T0, { src: 'sf', depth: 24, after: [{ u: 'h7h6', s: 35, d: 20 }, { u: 'a7a5', s: -12, d: 22 }] });
+  const theirs = pos(FEN, T0, { src: 'sf', depth: 24, after: [{ u: 'h7h6', s: 40, d: 21 }, { u: 'a7a5', s: 0, d: 20 }, { u: 'g7g5', s: 300, d: 20 }] });
+  const m = mergeShared(mine, theirs, 'Other123')!;
+  assert.deepEqual(
+    [...m.after!].sort((a, b) => (a.u < b.u ? -1 : 1)),
+    [
+      { u: 'a7a5', s: -12, d: 22 },
+      { u: 'g7g5', s: 300, d: 20 },
+      { u: 'h7h6', s: 40, d: 21 },
+    ],
+  );
+  assert.equal(mergeShared(m, theirs, 'Other123'), null);
+  assert.equal(mergeShared(m, pos(FEN, T0, { src: 'sf', depth: 24 }), 'Other123'), null);
+  // A position not kept here comes in with its searches.
+  assert.deepEqual(mergeShared(undefined, theirs, 'Other123')!.after, theirs.after);
 });

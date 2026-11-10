@@ -7,7 +7,7 @@ where the build differed). What remains is live: the spike's re-run (§4.2), the
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
 with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
-for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Storm positions shared between devices through the data repo, and an overnight gather (§5.102), are built (2026-10-12). Lc0 on the study page, its pick among close moves (§5.143), is built (2026-10-31). Endgames, the theoretical endgames each played for its goal against Stockfish (§5.145), are built (2026-10-31), their moves judged in the background since (§5.146, the owner's request of 2026-11-01), defended by Maia checked by Stockfish (§5.147, the owner's request), and a draw's attacker pushing on so the whole method comes up (§5.148, the owner's note). The endgames of the user's own repertoire (§5.149) are built (2026-11-01), and thirteen more theoretical endgames in two more groups (§5.150, the owner's request of 2026-11-02). A game card's move judged without waiting on the engine line's searches or the storm's workers (§5.151, the owner's request of 2026-11-04). Show and grade in the storm, every move of a deepened position shown by its band (§5.152, the owner's request of 2026-11-06), is built. A robotic board, the Chessnut Move, in the storm's untimed sessions and in practice is planned in its own document, `CHESSNUT.md` (§5.153 points there; the owner's request of 2026-11-06), not built. After a storm verdict, Show refutation (a mistake or a blunder), Show line (a great move or the top move) and Continue against Maia's reply (a good move or better) are built (§5.154, the owner's request of 2026-11-06). A polish pass (§5.156, the owner's request of 2026-11-07) made the light theme readable and the folded settings panel free, and lists ideas waiting for the owner's word. The positions after Maia's likely moves (20% or more) outside a storm card's list are searched while the user thinks (§5.157, the owner's request of 2026-11-10). Of §5.156's ideas the owner said to build all but the faster start (2026-11-10): Today on the home, the icon's shortcuts, the wrong move shown, "?" for the keys and the empty pages are built (§5.158). Share to Repworks and .pgn files opened with it, sounds, Settings apart from Debug and the dark themes' contrasts are built (§5.159). TESTING.md is one walk through the app, by screen (§5.160). Read with `DECISIONS.md`, which this plan updates (its
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Storm positions shared between devices through the data repo, and an overnight gather (§5.102), are built (2026-10-12). Lc0 on the study page, its pick among close moves (§5.143), is built (2026-10-31). Endgames, the theoretical endgames each played for its goal against Stockfish (§5.145), are built (2026-10-31), their moves judged in the background since (§5.146, the owner's request of 2026-11-01), defended by Maia checked by Stockfish (§5.147, the owner's request), and a draw's attacker pushing on so the whole method comes up (§5.148, the owner's note). The endgames of the user's own repertoire (§5.149) are built (2026-11-01), and thirteen more theoretical endgames in two more groups (§5.150, the owner's request of 2026-11-02). A game card's move judged without waiting on the engine line's searches or the storm's workers (§5.151, the owner's request of 2026-11-04). Show and grade in the storm, every move of a deepened position shown by its band (§5.152, the owner's request of 2026-11-06), is built. A robotic board, the Chessnut Move, in the storm's untimed sessions and in practice is planned in its own document, `CHESSNUT.md` (§5.153 points there; the owner's request of 2026-11-06), not built. After a storm verdict, Show refutation (a mistake or a blunder), Show line (a great move or the top move) and Continue against Maia's reply (a good move or better) are built (§5.154, the owner's request of 2026-11-06). A polish pass (§5.156, the owner's request of 2026-11-07) made the light theme readable and the folded settings panel free, and lists ideas waiting for the owner's word. The positions after Maia's likely moves (20% or more) outside a storm card's list are searched while the user thinks (§5.157, the owner's request of 2026-11-10). Of §5.156's ideas the owner said to build all but the faster start (2026-11-10): Today on the home, the icon's shortcuts, the wrong move shown, "?" for the keys and the empty pages are built (§5.158). Share to Repworks and .pgn files opened with it, sounds, Settings apart from Debug and the dark themes' contrasts are built (§5.159). TESTING.md is one walk through the app, by screen (§5.160). The home's deepening searches Maia's likely moves too, and those searches are kept with the position (§5.161). Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -9057,3 +9057,63 @@ first within each screen. What was decided:
 
 No code changed. Tests: none (a document); `npm run check`, `npm test` and `npm run e2e` pass as
 before.
+
+#### 5.161 Maia's likely moves searched in the home's deepening, and kept with the position (§5.157's "not built", approved 2026-11-10)
+
+§5.157 searched the positions after Maia's likely moves (20% or more at the user's rating,
+outside the card's list) only while a session waits for a move, and kept nothing: the result lived
+in the engine's cache for the page. The owner approved the rest: the same searches in the home's
+deepening, with no session, stored with the position. What was decided:
+
+- **The stored format: one optional field, `after`, on a storm position**, in the device's store
+  and in its shared line (`storm/<dev>/<day>.<k>.jsonl`, §5.102): `[{ u, s, d }]`, the move
+  (UCI), the position after it scored from the side to move there in the grade's centipawns (the
+  value over the last two depths, §5.120), and the depth reached. The line stays version 1.
+  - **Old records read**: a line without `after` reads as before.
+  - **An older build never chokes on a new record**: its reader takes the fields it knows and
+    ignores the rest, so it reads a new line whole, less `after`. Checked by running the previous
+    commit's `parsePositionLine` and `mergeShared` on a new line (a one-off, not kept as a test).
+    Raising the version would have made every older build count those lines as unread.
+  - **Never a file it can't parse rewritten**: unchanged. A device writes only its own folder,
+    and the cloud's script still leaves alone any file with a line it can't read.
+  - Only a search that reached `judgeDepth` (20) is kept, and a deeper one replaces a shallower
+    one for the same move.
+  - A merge (§5.102) takes each move's deeper search from either side.
+- **The grade reads it first** (`afterScore`): a move outside a judging list whose position after
+  it was kept is graded with no search, as "the position after it was searched to depth N". A
+  search the grade makes itself is kept too, and so is one the look-ahead makes, so a move
+  searched once is never searched again on that device, or on another once shared.
+- **The home's deepening does it second**: once every list in the scope is deepened, it searches
+  the positions after the likely moves at the user's rating (`likelyToSearch`) of every judging
+  position not answered well, at random, one search each, as the grade would (MultiPV 1 to depth
+  20), with the deepening's time limit (600 s), focused on every engine where Focused is on
+  (§5.103). The deepening starts also when only likely moves are left. Its progress reads
+  "Scoring Maia's likely moves: n of m searched", and the home's Stockfish line says "· n of
+  Maia's likely moves to search". An overnight gather's scoring between passes runs it too.
+- **The cloud's gather** (`scripts/storm-gather.ts`, §5.155) keeps `after` as it reads and writes
+  positions, through the same core functions. After its scoring it searches the likely moves
+  itself, at every rating it rates at (the ladder and the devices' ratings beyond it), since it
+  doesn't know which is the user's. With `--all-devices`, a device's position it searched becomes
+  its own, as a scored list does.
+- **The shared positions in the data repo** (§5.102) need nothing else: a device's file gains
+  `after` on the positions it searched, at its next share.
+
+**As built** (2026-11-10): `src/core/storm/harvest.ts` (`after`, `AfterScore`, `afterOf`,
+`afterScore`, `withAfter`, `unionAfter`), `src/core/storm/maia.ts` (`likelyToSearch`),
+`src/core/storm/shared.ts` (written, read, merged), `src/app/storm.ts` (`deepenLikely`,
+`afterSearch`, `keepAfter`, the grade and the look-ahead), `src/ui/Storm.tsx`,
+`scripts/storm-gather.ts`.
+
+Tests:
+- `test/unit/core/storm/shared.test.ts`: written and read back, still version 1, a line without
+  it as before, a malformed one unread; merged by the deeper search. Three controls in its header.
+- `harvest.test.ts`: kept from depth 20, a deeper one replacing it, never a shallower; scored from
+  the side to move. Three controls.
+- `maia.test.ts`: the likely moves at several ratings, once each, by the highest likelihood,
+  those searched left out. Three controls.
+- `test/e2e/storm.spec.ts` (desktop and phone): after the lists, the home searches the position
+  after each card's 30% move outside its list (not the 10% one's) and keeps it; after a reload,
+  that move is graded with no search. Control: the grade ignoring what was kept fails its last
+  assertion.
+
+Live: TESTING.md.

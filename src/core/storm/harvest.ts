@@ -14,7 +14,7 @@ import type { PositionKey } from '../chess/positionKey.ts';
 import type { ChessdbAnswer } from '../explorer/search.ts';
 import type { DepthScores, EngineLine } from '../engine/search.ts';
 import type { StormConfig } from './config.ts';
-import { moverCp, settledCp, userEval, type ScoredList, type ScoredMove } from './grade.ts';
+import { moverCp, settledCp, settledValue, userEval, type ScoredList, type ScoredMove } from './grade.ts';
 import { gamesFromPgn } from './games.ts';
 import type { Coverage, DecisionPoint, ExplorerReply, Frontier, LineRef } from './sources.ts';
 import { lineRefKey, lineTail, uncoveredMoves } from './sources.ts';
@@ -199,6 +199,64 @@ export interface StoredPosition {
   kind?: StoredKind;
   /** The device whose shared file it came from (§5.102); absent for one gathered here. */
   from?: string;
+  /**
+   * The positions after moves the list leaves out, each searched as the grade searches one
+   * (§5.157, §5.161: MultiPV 1 to the grade's depth): kept so a move among them is graded with no
+   * search, on any device and after the page is gone. Absent when none was searched.
+   */
+  after?: AfterScore[];
+}
+
+/**
+ * One search of the position after a move (§5.161): the move (UCI), the position after it scored
+ * from the side to move there (the opponent), in the grade's centipawns (`moverCp` of the value
+ * over its last two depths, §5.120), and the depth the search reached.
+ */
+export interface AfterScore {
+  u: string;
+  s: number;
+  d: number;
+}
+
+/**
+ * A search of the position after `uci` (MultiPV 1, the grade's, §5.157) as kept (§5.161): its best
+ * line's value over the last two depths (§5.120), from the side to move there. Null with no line.
+ */
+export function afterOf(childFen: string, uci: string, a: { lines: readonly EngineLine[]; depth: number; scores: DepthScores } | null | undefined, c: StormConfig): AfterScore | null {
+  const l = a?.lines[0];
+  const pos = positionOf(childFen);
+  if (!a || !l || !pos) return null;
+  const s = moverCp(settledValue(l.score, l.depth, a.scores, pos.turn, c), pos.turn, c);
+  return s === null ? null : { u: uci, s, d: a.depth };
+}
+
+/** The kept search of the position after `uci` that may grade it (`judgeDepth` or deeper), if any. */
+export function afterScore(p: Pick<StoredPosition, 'after'>, uci: string, c: Pick<StormConfig, 'judgeDepth'>): AfterScore | undefined {
+  const a = p.after?.find((x) => x.u === uci);
+  return a && a.d >= c.judgeDepth ? a : undefined;
+}
+
+/**
+ * The position with a search of the position after a move kept (§5.161), or null when it changes
+ * nothing: a search short of `judgeDepth` (the grade would search again), or one no deeper than the
+ * search already kept for that move.
+ */
+export function withAfter(p: StoredPosition, a: AfterScore, c: Pick<StormConfig, 'judgeDepth'>): StoredPosition | null {
+  if (!Number.isFinite(a.s) || !(a.d >= c.judgeDepth)) return null;
+  const old = p.after?.find((x) => x.u === a.u);
+  if (old && old.d >= a.d) return null;
+  return { ...p, after: [...(p.after ?? []).filter((x) => x.u !== a.u), { u: a.u, s: a.s, d: a.d }] };
+}
+
+/** Two sets of searches after moves as one: each move's deeper search, `ours` where they tie. */
+export function unionAfter(ours: readonly AfterScore[] | undefined, theirs: readonly AfterScore[] | undefined): AfterScore[] | undefined {
+  if (!theirs?.length) return ours ? [...ours] : undefined;
+  const out = new Map((ours ?? []).map((a) => [a.u, a]));
+  for (const a of theirs) {
+    const o = out.get(a.u);
+    if (!o || a.d > o.d) out.set(a.u, a);
+  }
+  return [...out.values()];
 }
 
 export function storedPosition(cand: Candidate & { unc?: StoredPosition['unc'] }, from: { lines: LineRef[]; names: string[]; games?: number | null }, at: number): StoredPosition | null {

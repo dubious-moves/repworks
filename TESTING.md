@@ -534,6 +534,20 @@ later change replaced are folded into the later item; items already reported wor
 
 ## 5. The storm
 
+### Maia's likely moves searched by the home's deepening, and kept (§5.161, 2026-11-10)
+- On the PC, with Maia on and the positions rated: open the storm's home with "Stockfish re-scores
+  the positions" on. Once every list is scored, "Scoring Maia's likely moves: n of m searched"
+  should count up (open it for each engine's row), and the Stockfish line's "· n of Maia's likely
+  moves to search" go down. How long does it take on your repertoire?
+- Then, in a set or a storm (on the PC or, after a sync, on the phone): a natural-looking move
+  outside the 12 that Maia gave 20% or more at your rating should be graded at once, even on the
+  first card and after the app was closed.
+- On the phone (deepening is off there by default): positions the PC or the cloud searched should
+  grade such moves at once after a sync.
+- **Checked**: unit tests and Playwright (desktop and emulated phone, a fake engine: the searches
+  kept, and the move graded with no search after a reload); a previous build's reader run on a new
+  line (it reads it, less the new field). Nothing live yet.
+
 ### Maia's likely moves searched while you think (§5.157, 2026-11-10)
 - With Maia on the device and the positions rated: in a set, think for a few seconds, then play a
   natural-looking move that isn't among the 12 moves Show and grade would draw. If Maia gave it

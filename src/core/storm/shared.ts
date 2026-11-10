@@ -1,11 +1,11 @@
 // The gathered positions shared through the data repo (PLAN.md §5.102): each device writes the
 // positions it gathered itself to `storm/<dev>/<YYYY-MM-DD>.<k>.jsonl` (the UTC day each was
 // gathered, at most `SHARE_PER_FILE` to a file), and reads the other devices' files into its own
-// store. A position merged into one already kept takes the better Stockfish list and the Maia
-// ratings it lacks. Pure.
+// store. A position merged into one already kept takes the better Stockfish list, the Maia
+// ratings it lacks and the deeper searches after moves (§5.161). Pure.
 import { positionKeyOf } from '../chess/positionKey.ts';
 import { stormFilePath } from '../data/layout.ts';
-import type { StoredPosition } from './harvest.ts';
+import { unionAfter, type AfterScore, type StoredPosition } from './harvest.ts';
 import type { MaiaRating } from './maia.ts';
 import { positionOf } from './walk.ts';
 
@@ -35,6 +35,8 @@ export function positionLine(p: StoredPosition): string {
   };
   if (p.maia?.length) o['maia'] = p.maia;
   if (p.kind) o['kind'] = p.kind;
+  // §5.161: an optional field, so a build that doesn't know it reads the line as before.
+  if (p.after?.length) o['after'] = p.after.map((a) => ({ u: a.u, s: a.s, d: a.d }));
   return JSON.stringify(o);
 }
 
@@ -75,6 +77,8 @@ export function parsePositionLine(line: string): StoredPosition | null {
   if (maia !== undefined && !(Array.isArray(maia) && maia.every((r) => isObj(r) && isNum(r['elo']) && Array.isArray(r['moves']) && r['moves'].every((m) => Array.isArray(m) && isStr(m[0]) && isNum(m[1]))))) return null;
   const kind = o['kind'];
   if (kind !== undefined && !(isStr(kind) && KINDS.has(kind))) return null;
+  const after = o['after'];
+  if (after !== undefined && !(Array.isArray(after) && after.every((a) => isObj(a) && isStr(a['u']) && isNum(a['s']) && isNum(a['d'])))) return null;
   const key = positionKeyOf(pos);
   const out: StoredPosition = {
     card: 's|' + key,
@@ -95,6 +99,7 @@ export function parsePositionLine(line: string): StoredPosition | null {
   };
   if (maia !== undefined) out.maia = (maia as { elo: number; moves: [string, number][] }[]).map((r) => ({ elo: r.elo, moves: r.moves.map((m): [string, number] => [m[0], m[1]]) }));
   if (kind !== undefined) out.kind = kind as NonNullable<StoredPosition['kind']>;
+  if (Array.isArray(after) && after.length) out.after = (after as Record<string, unknown>[]).map((a): AfterScore => ({ u: a['u'] as string, s: a['s'] as number, d: a['d'] as number }));
   return out;
 }
 
@@ -150,11 +155,14 @@ function unionMaia(ours: readonly MaiaRating[] | undefined, theirs: readonly Mai
   return [...(ours ?? []), ...extra].sort((a, b) => a.elo - b.elo);
 }
 
+const sameAfter = (a: readonly AfterScore[], b: readonly AfterScore[] | undefined): boolean =>
+  a.length === (b?.length ?? 0) && a.every((x) => b!.some((y) => y.u === x.u && y.d === x.d && y.s === x.s));
+
 /**
  * A position from device `dev`'s file merged into what this device keeps (`local`, or nothing):
  * the position to keep, or null when nothing changes. One not kept here comes in marked `from`;
- * one kept here stays as it is (its `from`, lines and time) but for a better list and the Maia
- * ratings it lacks.
+ * one kept here stays as it is (its `from`, lines and time) but for a better list, the Maia
+ * ratings it lacks and the deeper searches after moves (§5.161).
  */
 export function mergeShared(local: StoredPosition | undefined, incoming: StoredPosition, dev: string): StoredPosition | null {
   if (!local) return { ...incoming, from: dev };
@@ -162,5 +170,8 @@ export function mergeShared(local: StoredPosition | undefined, incoming: StoredP
   if (betterList(incoming, local)) out = { ...local, scored: incoming.scored, src: incoming.src, depth: incoming.depth };
   const maia = unionMaia(local.maia, incoming.maia);
   if (maia && maia.length !== (local.maia?.length ?? 0)) out = { ...(out ?? local), maia };
+  // The searches after moves (§5.161): each move's deeper one.
+  const after = unionAfter(local.after, incoming.after);
+  if (after && !sameAfter(after, local.after)) out = { ...(out ?? local), after };
   return out;
 }

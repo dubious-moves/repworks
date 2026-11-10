@@ -129,6 +129,24 @@ export function unlistedLikely(ratings: readonly MaiaRating[] | undefined, elo: 
   return (at?.moves ?? []).filter(([uci, p]) => p >= min && !list.some((m) => m.uci === uci)).map(([uci]) => uci);
 }
 
+/**
+ * The likely moves (§5.157) at any of `elos` that the list leaves out and `searched` doesn't hold,
+ * each once, most likely first (by its highest likelihood at those ratings): the positions after
+ * them are what the home's deepening, the look-ahead and the cloud search and keep (§5.161).
+ */
+export function likelyToSearch(ratings: readonly MaiaRating[] | undefined, elos: readonly number[], list: ScoredList, searched: readonly string[], min: number, c: StormConfig): string[] {
+  const best = new Map<string, number>();
+  for (const elo of elos) {
+    const at = ratings?.find((r) => r.elo === elo);
+    for (const uci of unlistedLikely(ratings, elo, list, min, c)) {
+      if (searched.includes(uci)) continue;
+      const p = at?.moves.find((m) => m[0] === uci)?.[1] ?? 0;
+      best.set(uci, Math.max(best.get(uci) ?? 0, p));
+    }
+  }
+  return [...best].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).map(([uci]) => uci);
+}
+
 /** Unintuitive at `elo`: Maia's most likely move there is judged, and isn't a good move. */
 export function unintuitive(ratings: readonly MaiaRating[] | undefined, elo: number, list: ScoredList, c: StormConfig): boolean {
   const top = maiaChoice(ratings, elo);

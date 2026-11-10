@@ -1,13 +1,17 @@
 // The storm's producer (PLAN.md §5.42) over fake services: lichessable's `harvestFrontier` and
 // `harvestUncovered`, with §26.4's branch (games → the hybrid walk, none → the engine's invented
 // line) and §7's stage-0 band.
+//
+// Controls run on the searches after moves (§5.161, 2026-11-10), each failing exactly "a search
+// after a move": `withAfter` keeping one below depth 20; `withAfter` replacing a deeper one with a
+// shallower; `afterOf` scoring from White's side instead of the side to move.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseChapterFile } from '../../../../src/core/pgn/parse.ts';
 import type { Score } from '../../../../src/core/engine/uci.ts';
 import { STORM as C } from '../../../../src/core/storm/config.ts';
 import type { ScoredList, ScoredMove } from '../../../../src/core/storm/grade.ts';
-import { cdbList, deepenedPosition, engineList, harvestDecision, harvestFrontier, judges, needsDeepening, positionLineKey, positionLineLabel, storedList, storedPosition, type HarvestIo } from '../../../../src/core/storm/harvest.ts';
+import { afterOf, afterScore, cdbList, deepenedPosition, engineList, harvestDecision, harvestFrontier, judges, needsDeepening, positionLineKey, positionLineLabel, storedList, storedPosition, withAfter, type HarvestIo, type StoredPosition } from '../../../../src/core/storm/harvest.ts';
 import { decisions, frontiers, lineTail, numberedMoves, stormLines } from '../../../../src/core/storm/sources.ts';
 import { positionOf, uciToSan } from '../../../../src/core/storm/walk.ts';
 import { standardUci } from '../../../../src/core/chess/uci.ts';
@@ -249,4 +253,31 @@ test('a gather’s second pass: the games walked before left out, nothing asked 
   // No games at all: the invented line is the first pass's, not walked twice.
   const none = await harvestFrontier(fs[0]!, cont, io({ explorer: async () => null }, []), C, 3, new Set());
   assert.equal(none.refused, 'no game left to walk');
+});
+
+test('a search after a move (§5.161): kept from depth 20, a deeper one replacing it; read back only when it may grade; scored from the side to move there', () => {
+  const fen = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1';
+  const p = { card: 's|x', fen, scored: [], src: 'sf', depth: 24 } as unknown as StoredPosition;
+  assert.equal(withAfter(p, { u: 'e7e5', s: 20, d: 19 }, C), null);
+  const a = withAfter(p, { u: 'e7e5', s: 20, d: 20 }, C)!;
+  assert.deepEqual(a.after, [{ u: 'e7e5', s: 20, d: 20 }]);
+  assert.equal(p.after, undefined);
+  // No deeper: nothing changes; deeper: replaced, the others kept.
+  assert.equal(withAfter(a, { u: 'e7e5', s: 50, d: 20 }, C), null);
+  const b = withAfter(withAfter(a, { u: 'h7h6', s: 90, d: 21 }, C)!, { u: 'e7e5', s: 30, d: 22 }, C)!;
+  assert.deepEqual(b.after, [{ u: 'h7h6', s: 90, d: 21 }, { u: 'e7e5', s: 30, d: 22 }]);
+  assert.equal(withAfter(b, { u: 'e7e5', s: 99, d: 21 }, C), null);
+  assert.deepEqual(afterScore(b, 'e7e5', C), { u: 'e7e5', s: 30, d: 22 });
+  assert.equal(afterScore(b, 'd7d5', C), undefined);
+  assert.equal(afterScore({ after: [{ u: 'e7e5', s: 30, d: 18 }] }, 'e7e5', C), undefined);
+  // White to move after 1...e5: White's +0.40 at depth 20 (and +0.20 at 19) is +30 from White's side.
+  const child = 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2';
+  const scores = new Map([['g1f3', new Map<number, Score>([[19, { cp: 20 }], [20, { cp: 40 }]])]]);
+  assert.deepEqual(afterOf(child, 'e7e5', { lines: [{ multipv: 1, depth: 20, score: { cp: 40 }, pv: ['g1f3'] }], depth: 20, scores }, C), { u: 'e7e5', s: 30, d: 20 });
+  // Black to move: the same search from Black's side is −30.
+  const bChild = 'rnbqkbnr/pppppppp/8/8/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 1';
+  const bScores = new Map([['e7e5', new Map<number, Score>([[19, { cp: 20 }], [20, { cp: 40 }]])]]);
+  assert.deepEqual(afterOf(bChild, 'g1f3', { lines: [{ multipv: 1, depth: 20, score: { cp: 40 }, pv: ['e7e5'] }], depth: 20, scores: bScores }, C), { u: 'g1f3', s: -30, d: 20 });
+  assert.equal(afterOf(child, 'e7e5', { lines: [], depth: 0, scores: new Map() }, C), null);
+  assert.equal(afterOf(child, 'e7e5', null, C), null);
 });

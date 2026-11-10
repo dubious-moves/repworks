@@ -6,7 +6,9 @@
 // (§5.102), and every device takes them in at its next sync. After the gather it does what a
 // device does on the storm's home, so the positions arrive finished: Maia rates them at the
 // ratings the devices use (§5.82), and Stockfish scores them to the desktop's standard (MultiPV 12
-// to depth 24, §5.45, §5.84), several engines at once (§5.103).
+// to depth 24, §5.45, §5.84), several engines at once (§5.103), then searches the positions after
+// the moves Maia plays 20% of the time or more that a list leaves out, at the ratings it rated
+// (§5.157, §5.161), and keeps them with the position.
 //
 // Usage: node scripts/storm-gather.ts <data-repo checkout> [options]
 //   --study S          only this study's lines (its name, any case, or its id), walked and scored
@@ -36,9 +38,9 @@ import { CHESSDB_URL, EXPLORER_BASE, type ExplorerCache } from '../src/core/expl
 import { validateDataRepo } from '../src/core/data/validate.ts';
 import { STORM, withPlyRange } from '../src/core/storm/config.ts';
 import { GATHER_STOPPED, runGather, serviceIo, type Gathering, type GatherSource, type StormAsk, type StormReply } from '../src/core/storm/gather.ts';
-import { deepenedPosition, engineList, judges, needsDeepening, type StoredPosition } from '../src/core/storm/harvest.ts';
-import { keptPolicy, missingRatings } from '../src/core/storm/maia.ts';
-import { positionOf } from '../src/core/storm/walk.ts';
+import { afterOf, deepenedPosition, engineList, judges, needsDeepening, storedList, withAfter, type StoredPosition } from '../src/core/storm/harvest.ts';
+import { keptPolicy, likelyToSearch, missingRatings } from '../src/core/storm/maia.ts';
+import { fenAfterUci, positionOf } from '../src/core/storm/walk.ts';
 import { readTree } from './read-tree.ts';
 import { addPositions, CLOUD_DEVICE, cloudDevice, findScope, gatherScope, maiaElos, ownFileChanges, positionsToWork, readRepertoire, readShared, withList } from './storm/data.ts';
 import { startEngines } from './storm/engine.ts';
@@ -353,6 +355,37 @@ async function main(): Promise<void> {
 
   /** Maia's ratings (§5.82) for the cloud's positions lacking some. */
   const elos = maiaElos(shared.elsewhere, o.elos);
+
+  /**
+   * The positions after Maia's likely moves outside a list (§5.157, §5.161): those it plays 20% of
+   * the time or more at any rating the cloud rates at (it doesn't know which is the user's), each
+   * searched as the grade would (MultiPV 1 to depth 20) and kept with its position, on the
+   * positions whose lists judge. Another device's becomes the cloud's own (--all-devices), as a
+   * list does.
+   */
+  const likely = async (halt: () => boolean, untilMs?: number): Promise<number> => {
+    const jobs = positionsToWork(store.values(), rep.lines, where.scope, rep.done, o.allDevices)
+      .filter((p) => judges(p, STORM))
+      .flatMap((p) => likelyToSearch(p.maia, elos, storedList(p), (p.after ?? []).map((a) => a.u), STORM.prepMaiaMin, STORM).map((uci) => ({ card: p.card, uci, fen: fenAfterUci(p.fen, uci) })))
+      .filter((j): j is { card: string; uci: string; fen: string } => !!j.fen);
+    if (!jobs.length) return 0;
+    say(`searching ${jobs.length} positions after Maia's likely moves: MultiPV 1 to depth ${STORM.engineDepth.desktop}, ${engines.width} at once`);
+    let kept = 0;
+    const lane = async () => {
+      for (let j = jobs.shift(); j; j = jobs.shift()) {
+        if (halt() || (untilMs !== undefined && Date.now() > untilMs)) return;
+        const a = afterOf(j.fen, j.uci, await engines.analyse(j.fen, 1, STORM.engineDepth.desktop, STORM.deepenMs), STORM);
+        const cur = store.get(j.card);
+        const next = cur && a ? withAfter(cur, a, STORM) : null;
+        if (!cur || !next) continue;
+        kept++;
+        if (o.allDevices && !isOwn(cur)) adopted++;
+        store.set(j.card, withList(next, next, o.allDevices));
+      }
+    };
+    await Promise.all(Array.from({ length: engines.width }, lane));
+    return kept;
+  };
   const rate = async (): Promise<number> => {
     const todo = ownToWork().filter((p) => missingRatings(p.maia, elos[0]!, elos).length);
     if (!todo.length) return 0;
@@ -392,7 +425,11 @@ async function main(): Promise<void> {
       add: async (fresh, spare) => addPositions(store, fresh, c.storeMax, spare),
       done: () => rep.done,
       // Between passes the cloud scores everything that came in (focused, §5.105): it has the cores.
-      score: async () => void (o.deepen && !walkStopped ? await deepen(() => walkStopped) : undefined),
+      score: async () => {
+        if (!o.deepen || walkStopped) return;
+        await deepen(() => walkStopped);
+        await likely(() => walkStopped);
+      },
       share: async () => {
         lastShare = Date.now();
         return share();
@@ -423,6 +460,8 @@ async function main(): Promise<void> {
     const until = o.scoreMinutes ? Date.now() + o.scoreMinutes * 60_000 : undefined;
     const r = await deepen(() => stopping, until);
     if (r.done) say(`scored ${r.done}, ${r.kept} kept to the standard`);
+    const n = stopping ? 0 : await likely(() => stopping, until);
+    if (n) say(`kept ${n} searches after Maia's likely moves`);
   }
   await share();
   engines.quit();

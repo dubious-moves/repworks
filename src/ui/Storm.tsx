@@ -252,8 +252,8 @@ function Home(props: { scope: StormScopeData; where: StormWhere }) {
   const shown = record && where.sid ? recordOver(record, (k) => (where.cid ? k === `${where.sid}/${where.cid}` : k.startsWith(`${where.sid}/`))) : record;
   // Stockfish's standard while the home is open and nothing else runs (§5.45).
   useEffect(() => {
-    if (prefs.deepen && home && home.deep < home.stored && !g?.running && !deepening.value) void deepen(scope);
-  }, [prefs.deepen, home?.stored, home?.deep, g?.running]);
+    if (prefs.deepen && home && (home.deep < home.stored || home.likely > 0) && !g?.running && !deepening.value) void deepen(scope);
+  }, [prefs.deepen, home?.stored, home?.deep, home?.likely, g?.running]);
   // Focused or not (§5.103): a deepening under way starts again with the engines that now apply.
   const setFocused = (focused: boolean) => {
     setStormPrefs({ focused });
@@ -390,6 +390,7 @@ function Home(props: { scope: StormScopeData; where: StormWhere }) {
         {home && home.stored > 0 && (
           <p class="muted storm-deep" data-testid="storm-deep">
             Stockfish: {home.deep} of {home.stored} scored to depth {deepenTarget()}
+            {home.likely > 0 ? ` · ${home.likely} of Maia’s likely moves to search` : ''}
             {deepening.value ? (stormEngineWidth() > 1 ? ` · scoring, ${stormEngineWidth()} at once…` : ' · scoring…') : ''}
           </p>
         )}
@@ -1621,7 +1622,8 @@ function DeepenProgress() {
   return (
     <details class="storm-deep-progress muted" data-testid="storm-deep-progress">
       <summary>
-        {running ? 'Scoring' : 'Last scoring'}: {st.done} of {st.total} searched
+        {running ? 'Scoring' : 'Last scoring'}
+        {st.what === 'likely' ? ' Maia’s likely moves' : ''}: {st.done} of {st.total} searched
         {pace ? ` · ${seconds(pace)} a position` : ''}
         {running && pace && left > 0 ? ` · about ${duration(pace * left)} left` : ''}
       </summary>

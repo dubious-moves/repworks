@@ -2229,3 +2229,17 @@ The technical calls, each with its reason:
   in §5.160). §5.159's reason for keeping the spike's link in the footer was wrong (its re-run was
   reported on 2026-10-07); the link stays, harmlessly.
 - No data format changed.
+
+## Revision of 2026-11-10 (Maia's likely moves kept with the position; PLAN.md §5.161)
+- **The owner approved §5.157's "not built"**: the home's deepening searches the positions after
+  Maia's likely moves too, and the results are stored.
+- **A storm position gains one optional field, `after`** (`[{ u, s, d }]`), in the device's store
+  and its shared line, which stays version 1. Why: an older build reads the line whole, less the
+  new field, where a version 2 would leave it unread on every device not yet updated. Old lines
+  read as before; a device writes only its own folder; a file a version can't read is still
+  never rewritten.
+- **Kept only from depth 20, the deeper winning in a merge.** Why: a search the grade would repeat
+  is not worth keeping, and the merge rule follows the lists' (§5.102).
+- **The cloud searches the likely moves at every rating it rates at.** Why: it can't know which
+  rating is the user's; outside a list of 12, such moves are few.
+- Data format: the storm line's optional `after` field (backward compatible, above).

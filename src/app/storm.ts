@@ -9,7 +9,7 @@ import type { ToWorker } from '../core/explorer/service.ts';
 import type { DeviceEvent } from '../core/progress/replay.ts';
 import { STORM, withPlyRange, type Band, type StormConfig } from '../core/storm/config.ts';
 import { engineLoss, grade, moveLoss, moverCp, nextStreak, points, settledValue, type ScoredList } from '../core/storm/grade.ts';
-import { deepenedPosition, engineList, judges, needsDeepening, positionLineKey, storedList, type HarvestIo, type StoredPosition } from '../core/storm/harvest.ts';
+import { afterOf, afterScore, deepenedPosition, engineList, judges, needsDeepening, positionLineKey, storedList, withAfter, type AfterScore, type HarvestIo, type StoredPosition } from '../core/storm/harvest.ts';
 import { stormRecord, type StormRecord } from '../core/storm/record.ts';
 import { setHeld, setOutcome, type SetOutcome } from '../core/storm/set.ts';
 import { decisions, frontiers, inScope, lineInScope, stormLines, type DecisionPoint, type Frontier, type StormLine, type StormScope } from '../core/storm/sources.ts';
@@ -34,7 +34,7 @@ import { analyseForStorm, cancelStormEngine, endStormEngine, focusedWidth, setSt
 import { lineView } from './lineView.ts';
 import { trainData, type TrainData } from './train.ts';
 import { puzzlePrefs, readyPuzzles } from './puzzles.ts';
-import { keptPolicy, missingRatings, unlistedLikely, type MaiaRating } from '../core/storm/maia.ts';
+import { keptPolicy, likelyToSearch, missingRatings, type MaiaRating } from '../core/storm/maia.ts';
 import { cleanFocus, cleanLevelUp, easyAt, FOCUSES, LEVEL_DEFAULT, tooEasyAt, matchesFocus, positionTags, withLevelUp, type Focus, type LevelUp } from '../core/storm/kinds.ts';
 import { maiaElo, maiaPolicies, maiaStored } from './maia.ts';
 import type { ReadyPuzzle } from '../core/puzzles/puzzles.ts';
@@ -214,6 +214,8 @@ export interface StormHome {
   tooEasy: number;
   /** Of `matching`, those show and grade deals (§5.152): their list may judge, so it can be shown. */
   showable: number;
+  /** The positions after Maia's likely moves still to search (§5.161), in positions whose lists judge. */
+  likely: number;
 }
 export const stormHome = signal<StormHome | undefined>(undefined);
 
@@ -269,7 +271,9 @@ async function homeOf(s: StormScopeData): Promise<StormHome | undefined> {
   let matching = 0;
   let tooEasy = 0;
   let canShow = 0;
+  let likely = 0;
   for (const p of ready) {
+    if (judges(p, STORM)) likely += likelyToSearch(p.maia, [elo], storedList(p), (p.after ?? []).map((a) => a.u), STORM.prepMaiaMin, STORM).length;
     if (tooEasyAt(p.maia, elo, storedList(p), STORM)) {
       tooEasy++;
       continue;
@@ -283,7 +287,7 @@ async function homeOf(s: StormScopeData): Promise<StormHome | undefined> {
   }
   const maiaHere = await maiaStored().catch(() => false);
   const shared = all.filter((p) => p.from).length;
-  return { stored: all.length, done, ready: ready.length, deep, lines, maiaHere, rated, elo, tags, matching, shared, tooEasy, showable: canShow };
+  return { stored: all.length, done, ready: ready.length, deep, lines, maiaHere, rated, elo, tags, matching, shared, tooEasy, showable: canShow, likely };
 }
 
 /* ------------------------------------------------------------------ the gather (§5.42) */
@@ -400,6 +404,8 @@ function notKept(p: StoredPosition, depth: number, lines: number): string {
 }
 /** The deepening's run as it goes (§5.104), kept after it ends until the next starts. */
 export interface DeepenStats {
+  /** The lists (MultiPV 12), or the positions after Maia's likely moves (§5.161). */
+  what: 'lists' | 'likely';
   /** Positions to search when the run started, and those searched since. */
   total: number;
   done: number;
@@ -463,7 +469,7 @@ export async function deepen(s: StormScopeData, o: { gather?: boolean; untilMs?:
     const width = stormPrefs.value.focused ? focusedWidth() : 1;
     setStormEngineWidth(width);
     const target = deepenTarget();
-    deepenStats.value = { total: order.length, done: 0, kept: 0, short: 0, failed: 0, width, startedAt: Date.now(), recent: [], active: new Map() };
+    deepenStats.value = { what: 'lists', total: order.length, done: 0, kept: 0, short: 0, failed: 0, width, startedAt: Date.now(), recent: [], active: new Map() };
     console.info(`[storm deepen] ${order.length} positions to depth ${target}, MultiPV ${STORM.deepenMultipv}, ${width} at once, ${STORM.deepenMs / 1000} s each at most`);
     const one = async (): Promise<void> => {
       for (let p = order.shift(); p; p = order.shift()) {
@@ -496,9 +502,72 @@ export async function deepen(s: StormScopeData, o: { gather?: boolean; untilMs?:
       }
     };
     await Promise.all(Array.from({ length: width }, one));
+    if (busy()) return;
+    await deepenLikely(s, h, width, busy, stopped);
   } finally {
     if (run === deepenRun) deepening.value = false;
   }
+}
+
+/**
+ * The deepening's second part (§5.161): once the lists are done, the positions after the moves
+ * Maia at the user's rating plays 20% of the time or more that a list leaves out, each searched
+ * as the grade would search it (MultiPV 1 to depth 20) and kept with the position, so such a move
+ * is graded at once in a later session, on any device once shared. The positions whose lists may
+ * judge, at random; one search each, those kept already left out.
+ */
+async function deepenLikely(s: StormScopeData, h: Map<string, StormHistory>, width: number, busy: () => boolean, stopped: () => boolean): Promise<void> {
+  const elo = maiaElo.peek();
+  const jobs: { p: StoredPosition; uci: string; fen: string }[] = [];
+  for (const p of storedInScope(await stormStore().positions(), s)) {
+    if (!judges(p, STORM) || h.get(p.card)?.done) continue;
+    for (const uci of likelyToSearch(p.maia, [elo], storedList(p), (p.after ?? []).map((a) => a.u), STORM.prepMaiaMin, STORM)) {
+      const fen = fenAfterUci(p.fen, uci);
+      if (fen) jobs.push({ p, uci, fen });
+    }
+  }
+  if (!jobs.length) return;
+  for (let i = jobs.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [jobs[i], jobs[j]] = [jobs[j]!, jobs[i]!];
+  }
+  const depth = engineDepth();
+  deepenStats.value = { what: 'likely', total: jobs.length, done: 0, kept: 0, short: 0, failed: 0, width, startedAt: Date.now(), recent: [], active: new Map() };
+  console.info(`[storm deepen] ${jobs.length} positions after Maia's likely moves to depth ${depth}, MultiPV 1, ${width} at once`);
+  const one = async (): Promise<void> => {
+    for (let job = jobs.shift(); job; job = jobs.shift()) {
+      if (busy()) return;
+      const t0 = Date.now();
+      const pos = positionOf(job.p.fen)!;
+      const label = `${positionLabel(job.p)} after ${uciToSan(pos, job.uci)}`;
+      deepenStats.value?.active.set(job.fen, label);
+      const a = await afterSearch(job.fen, job.uci, STORM.deepenMs);
+      if (stopped()) return;
+      const kept = a ? await keepAfter(job.p.card, a) : false;
+      const done: DeepenDone = { card: `${job.p.card}|${job.uci}`, label, depth: a?.d ?? 0, target: depth, ms: Date.now() - t0, result: !a ? 'no answer' : kept ? 'kept' : a.d < STORM.judgeDepth ? `not kept: below depth ${STORM.judgeDepth}` : 'not kept' };
+      const st = deepenStats.value;
+      st?.active.delete(job.fen);
+      if (st && st.what === 'likely') {
+        deepenStats.value = { ...st, done: st.done + 1, kept: st.kept + (kept ? 1 : 0), short: st.short + (a && a.d < depth ? 1 : 0), failed: st.failed + (a ? 0 : 1), recent: [done, ...st.recent].slice(0, RECENT_DONE) };
+      }
+      console.info(`[storm deepen] ${label}: depth ${done.depth} of ${depth} in ${(done.ms / 1000).toFixed(1)} s, ${done.result} (${job.fen})`);
+      if (kept && !job.p.from) shareSoon(stormStore());
+    }
+  };
+  await Promise.all(Array.from({ length: width }, one));
+}
+
+/** One search of the position after `uci` as the grade's (§5.157, §5.161), as kept with the position. */
+async function afterSearch(childFen: string, uci: string, ms: number = STORM.enginePhaseMs): Promise<AfterScore | null> {
+  return afterOf(childFen, uci, await analyseForStorm(childFen, 1, engineDepth(), ms), STORM);
+}
+
+/** A search after a move kept with its position (§5.161), and in the session's cards; whether it was. */
+async function keepAfter(card: string, a: AfterScore): Promise<boolean> {
+  let kept: StoredPosition | null = null;
+  await stormStore().updatePosition(card, (cur) => (kept = withAfter(cur, a, STORM)) ?? cur);
+  if (kept) swapIn(kept, true);
+  return !!kept;
 }
 
 export function stopDeepening(): void {
@@ -577,11 +646,11 @@ const lookTried = new Set<string>();
 /** The positions after likely moves tried this session (§5.157), by FEN: one try each. */
 const childTried = new Set<string>();
 
-/** The positions after the card's likely moves outside its list still to search (§5.157). */
-function childrenToSearch(card: StoredPosition, elo: number): string[] {
-  return unlistedLikely(card.maia, elo, storedList(card), STORM.prepMaiaMin, STORM)
-    .map((uci) => fenAfterUci(card.fen, uci))
-    .filter((f): f is string => !!f && !childTried.has(f));
+/** The positions after the card's likely moves outside its list still to search (§5.157), those kept with it left out (§5.161). */
+function childrenToSearch(card: StoredPosition, elo: number): { card: StoredPosition; uci: string; fen: string }[] {
+  return likelyToSearch(card.maia, [elo], storedList(card), (card.after ?? []).filter((a) => a.d >= STORM.judgeDepth).map((a) => a.u), STORM.prepMaiaMin, STORM)
+    .map((uci) => ({ card, uci, fen: fenAfterUci(card.fen, uci) ?? '' }))
+    .filter((c) => !!c.fen && !childTried.has(c.fen));
 }
 
 /**
@@ -616,15 +685,20 @@ async function lookAhead(): Promise<void> {
       // A held card is tried again: its likely moves still matter.
       const onBoard = item && (!item.answer || now.phase === 'held') ? [item.card] : [];
       // The card on the board deepened, then its likely moves; then the cards to come, the same way.
-      const job = [() => deepen(unanswered), () => child(onBoard), () => deepen(toCome), () => child(toCome)].reduce<StoredPosition | string | undefined>((got, f) => got ?? f(), undefined);
+      const job = [() => deepen(unanswered), () => child(onBoard), () => deepen(toCome), () => child(toCome)].reduce<StoredPosition | ReturnType<typeof childrenToSearch>[number] | undefined>((got, f) => got ?? f(), undefined);
       if (!job) return;
-      if (typeof job === 'string') {
-        childTried.add(job);
-        lookChild = job;
-        await engineScore(job);
+      if (!('key' in job)) {
+        childTried.add(job.fen);
+        lookChild = job.fen;
+        const a = await afterSearch(job.fen, job.uci);
         lookChild = undefined;
         // Stopped by another move: tried again later (finished, the engine's cache answers it).
-        if (run !== lookRun) childTried.delete(job);
+        if (run !== lookRun) {
+          childTried.delete(job.fen);
+          continue;
+        }
+        // Kept with the position (§5.161): graded at once in later sessions too.
+        if (a) await keepAfter(job.card.card, a);
         continue;
       }
       const p = job;
@@ -679,13 +753,17 @@ async function keepSearchSoFar(card: StoredPosition): Promise<StoredPosition> {
   return d;
 }
 
-/** A deepened card in place of the one dealt, wherever the session holds it (cards match by id). */
-function swapIn(d: StoredPosition): void {
+/**
+ * A deepened card in place of the one dealt, wherever the session holds it (cards match by id).
+ * `afterOnly`: only its searches after moves changed (§5.161), so the card on the board takes it
+ * even once answered (a held card tried again), its list being the same.
+ */
+function swapIn(d: StoredPosition, afterOnly = false): void {
   queue = queue.map((c) => (c.card === d.card ? d : c));
   secondPass = secondPass.map((i) => (i.card.card === d.card ? { ...i, card: d } : i));
   const s = stormSession.value;
   if (!s) return;
-  const item = s.item && s.item.card.card === d.card && !s.item.answer ? { ...s.item, card: d } : s.item;
+  const item = s.item && s.item.card.card === d.card && (afterOnly || !s.item.answer) ? { ...s.item, card: d } : s.item;
   update({ item, history: s.history.map((h) => (h === s.item ? item! : h.card.card === d.card ? { ...h, card: d } : h)) });
 }
 
@@ -1543,13 +1621,15 @@ export async function gradeMove(card: StoredPosition, uci: string): Promise<Stor
   const child = fenAfterUci(card.fen, uci);
   if (!child) return { ...base, verdict: 'unknown', band: 'unknown' };
   if (deep) {
-    // One search of the position after it, against the stored engine list (§23).
-    const after = await engineScore(child);
+    // One search of the position after it, against the stored engine list (§23): the one kept
+    // with the position when there is one (§5.161), else searched now and kept.
+    const kept = afterScore(card, uci, STORM);
+    const after = kept ?? (await afterSearch(child, uci));
     if (after) {
+      if (!kept) void keepAfter(card.card, after);
       // The opponent's best there, from the opponent's side: moveLoss negates it.
-      const childBest = moverCp(after.score, positionOf(child)!.turn, STORM);
-      const ml = childBest === null ? null : moveLoss(list, uci, childBest, STORM);
-      if (ml) return fromLoss(ml, 'engine', { oneSearch: true, depth: after.depth, bestScore: list[0]!.score, bestSan: uciToSan(pos, list[0]!.uci) });
+      const ml = moveLoss(list, uci, after.s, STORM);
+      if (ml) return fromLoss(ml, 'engine', { oneSearch: true, depth: after.d, bestScore: list[0]!.score, bestSan: uciToSan(pos, list[0]!.uci) });
     }
   }
   // Two searches, both from one engine (§14.8).
