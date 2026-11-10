@@ -162,11 +162,11 @@ test('no games here: ChessDB’s moves are the rows, said above them; with Chess
   await expect(rows(page)).toHaveCount(0);
 });
 
-test('tabs: Lichess and Masters, which asks Lichess’s masters with no filter; no ChessDB tab', async ({ page }) => {
+test('tabs: Lichess, Masters and Study (§5.162); Masters asks Lichess’s masters with no filter; no ChessDB tab', async ({ page }) => {
   const fake = await setUp(page);
   await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf`);
   await expect(rows(page)).toHaveText(['e4', 'd4', 'Nf3', 'c4']);
-  await expect(panel(page).getByRole('tab')).toHaveText(['Lichess', 'Masters']);
+  await expect(panel(page).getByRole('tab')).toHaveText(['Lichess', 'Masters', 'Study']);
   await panel(page).getByRole('tab', { name: 'Masters' }).click();
   await expect.poll(() => fake.requests.some((r) => r.url.startsWith('https://explorer.lichess.org/masters?fen='))).toBe(true);
   expect(fake.requests.find((r) => r.url.includes('/masters'))!.url).not.toContain('speeds=');
@@ -446,4 +446,41 @@ test('columns hidden in the settings leave the rows, and come back', async ({ pa
   await dialog.getByRole('button', { name: 'Save' }).click();
   await expect(panel(page).locator('.ex-row', { hasText: 'e4' }).first().locator('.ex-eval')).toHaveText('+0.30');
   await expect(panel(page).locator('.ex-row', { hasText: 'e4' }).first().locator('.ex-count')).toHaveText('600');
+});
+
+test('the Study tab (§5.162): the study’s moves here from every chapter, with the explorer’s columns, its lines and its chapters; one chapter opened in one click', async ({ page }) => {
+  await setUp(page);
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf`);
+  await expect(rows(page)).toHaveText(['e4', 'd4', 'Nf3', 'c4']);
+  await panel(page).getByRole('tab', { name: 'Study' }).click();
+  await expect(panel(page).getByRole('tab', { name: 'Study' })).toHaveAttribute('aria-selected', 'true');
+  await expect(panel(page).getByRole('tab', { name: 'Lichess' })).toHaveAttribute('aria-selected', 'false');
+  // At the start: 1. e4 in both chapters, three lines (the main line's two and the Alapin's).
+  const study = panel(page).getByRole('list', { name: 'The study’s moves here' });
+  await expect(study.locator('.ex-san')).toHaveText(['e4']);
+  const e4 = study.locator('.ex-row').first();
+  await expect(e4).toHaveClass(/covered/);
+  await expect(e4.locator('.ex-eval')).toHaveText('+0.30');
+  await expect(e4.locator('.ex-share')).toHaveText('60%');
+  await expect(e4.locator('.ex-lines')).toHaveText('3');
+  await e4.locator('.ex-chapters').click();
+  await expect(study.locator('.study-tab-chapters button')).toHaveText(['Main line (this chapter)', 'Alapin']);
+  // A click on the row plays the move, as the explorer's rows do; then 1... c5.
+  await e4.locator('.ex-san').click();
+  await page.keyboard.press('ArrowRight');
+  // After 1. e4 c5: the main line's 2. Nf3 (two lines) first, the Alapin's 2. c3 (one) after it.
+  await expect(study.locator('.ex-san')).toHaveText(['Nf3', 'c3']);
+  await expect(study.locator('.ex-row').nth(0).locator('.ex-lines')).toHaveText('2');
+  await expect(study.locator('.ex-row').nth(0).locator('.ex-eval')).toHaveText('+0.33');
+  await expect(study.locator('.ex-row').nth(1)).not.toHaveClass(/covered/);
+  // One chapter: its name, and a click opens it at the move.
+  await expect(study.locator('.ex-row').nth(1).locator('.ex-chapters')).toHaveText('Alapin');
+  await study.locator('.ex-row').nth(1).locator('.ex-chapters').click();
+  await expect(page).toHaveURL(/#\/study\/Rep0Najd\/Ch2Alapn/);
+  await expect(page.locator('.move.current')).toHaveText(/c3/);
+  // The tab is kept: after 2. c3, the Alapin's 2... Nf6.
+  await expect(study.locator('.ex-san')).toHaveText(['Nf6']);
+  // Back to the games: the explorer's own rows.
+  await panel(page).getByRole('tab', { name: 'Lichess' }).click();
+  await expect(panel(page).getByRole('list', { name: 'The study’s moves here' })).toHaveCount(0);
 });

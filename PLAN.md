@@ -7,7 +7,7 @@ where the build differed). What remains is live: the spike's re-run (§4.2), the
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
 with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
-for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Storm positions shared between devices through the data repo, and an overnight gather (§5.102), are built (2026-10-12). Lc0 on the study page, its pick among close moves (§5.143), is built (2026-10-31). Endgames, the theoretical endgames each played for its goal against Stockfish (§5.145), are built (2026-10-31), their moves judged in the background since (§5.146, the owner's request of 2026-11-01), defended by Maia checked by Stockfish (§5.147, the owner's request), and a draw's attacker pushing on so the whole method comes up (§5.148, the owner's note). The endgames of the user's own repertoire (§5.149) are built (2026-11-01), and thirteen more theoretical endgames in two more groups (§5.150, the owner's request of 2026-11-02). A game card's move judged without waiting on the engine line's searches or the storm's workers (§5.151, the owner's request of 2026-11-04). Show and grade in the storm, every move of a deepened position shown by its band (§5.152, the owner's request of 2026-11-06), is built. A robotic board, the Chessnut Move, in the storm's untimed sessions and in practice is planned in its own document, `CHESSNUT.md` (§5.153 points there; the owner's request of 2026-11-06), not built. After a storm verdict, Show refutation (a mistake or a blunder), Show line (a great move or the top move) and Continue against Maia's reply (a good move or better) are built (§5.154, the owner's request of 2026-11-06). A polish pass (§5.156, the owner's request of 2026-11-07) made the light theme readable and the folded settings panel free, and lists ideas waiting for the owner's word. The positions after Maia's likely moves (20% or more) outside a storm card's list are searched while the user thinks (§5.157, the owner's request of 2026-11-10). Of §5.156's ideas the owner said to build all but the faster start (2026-11-10): Today on the home, the icon's shortcuts, the wrong move shown, "?" for the keys and the empty pages are built (§5.158). Share to Repworks and .pgn files opened with it, sounds, Settings apart from Debug and the dark themes' contrasts are built (§5.159). TESTING.md is one walk through the app, by screen (§5.160). The home's deepening searches Maia's likely moves too, and those searches are kept with the position (§5.161). Read with `DECISIONS.md`, which this plan updates (its
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) is built as the explorer's Study tab (§5.162, the owner's yes of 2026-11-10), §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Storm positions shared between devices through the data repo, and an overnight gather (§5.102), are built (2026-10-12). Lc0 on the study page, its pick among close moves (§5.143), is built (2026-10-31). Endgames, the theoretical endgames each played for its goal against Stockfish (§5.145), are built (2026-10-31), their moves judged in the background since (§5.146, the owner's request of 2026-11-01), defended by Maia checked by Stockfish (§5.147, the owner's request), and a draw's attacker pushing on so the whole method comes up (§5.148, the owner's note). The endgames of the user's own repertoire (§5.149) are built (2026-11-01), and thirteen more theoretical endgames in two more groups (§5.150, the owner's request of 2026-11-02). A game card's move judged without waiting on the engine line's searches or the storm's workers (§5.151, the owner's request of 2026-11-04). Show and grade in the storm, every move of a deepened position shown by its band (§5.152, the owner's request of 2026-11-06), is built. A robotic board, the Chessnut Move, in the storm's untimed sessions and in practice is planned in its own document, `CHESSNUT.md` (§5.153 points there; the owner's request of 2026-11-06), not built. After a storm verdict, Show refutation (a mistake or a blunder), Show line (a great move or the top move) and Continue against Maia's reply (a good move or better) are built (§5.154, the owner's request of 2026-11-06). A polish pass (§5.156, the owner's request of 2026-11-07) made the light theme readable and the folded settings panel free, and lists ideas waiting for the owner's word. The positions after Maia's likely moves (20% or more) outside a storm card's list are searched while the user thinks (§5.157, the owner's request of 2026-11-10). Of §5.156's ideas the owner said to build all but the faster start (2026-11-10): Today on the home, the icon's shortcuts, the wrong move shown, "?" for the keys and the empty pages are built (§5.158). Share to Repworks and .pgn files opened with it, sounds, Settings apart from Debug and the dark themes' contrasts are built (§5.159). TESTING.md is one walk through the app, by screen (§5.160). The home's deepening searches Maia's likely moves too, and those searches are kept with the position (§5.161). The explorer has a Study tab: the open study's moves at the board's position, across its chapters and move orders (§5.162, §5.27). Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -3647,6 +3647,9 @@ it. Not built: the Miller columns, the folding of forced runs, the Lichess scan 
 Recommended, because it answers §24's question ("standing here, what did the author cover")
 inside the page the owner already uses, for a fraction of the code. This part waits for the
 owner's answer; the parts before it don't depend on it.
+
+**Answered** (2026-11-10): yes to the recommendation, the Study tab, not the Miller columns. Built
+in §5.162.
 
 #### 5.28 Phase 2 acceptance test, and exit
 
@@ -9115,5 +9118,55 @@ Tests:
   after each card's 30% move outside its list (not the 10% one's) and keeps it; after a reload,
   that move is graded with no search. Control: the grade ignoring what was kept fails its last
   assertion.
+
+Live: TESTING.md.
+
+#### 5.162 The Study tab in the explorer (§5.27, answered yes 2026-11-10)
+
+The owner answered §5.27 with the recommendation: a "Study" tab in the explorer panel, not the
+Miller columns. What was decided:
+
+- **A third tab beside Lichess and Masters.** Its rows are the moves the open study plays at the
+  board's position: from every chapter, by every move order that reaches it (D10's position key,
+  so transpositions meet), merged by move. Most lines first, then most chapters, then the study's
+  own order (its chapters', then each tree's, main line first).
+- **Each row carries the explorer's columns** for its move (Eval, Games, Score, from the games tab
+  last chosen, Lichess or Masters, whose data the panel still asks for), then **Lines** (the line
+  ends through the move, in every chapter and order) and **Chapters**.
+  - One chapter: its name, and one click opens it at the move (in the open chapter, it goes there).
+  - Several: "n chapters", which unfolds the list under the row, each one click away; the open
+    chapter is marked "(this chapter)".
+- **A click on the row plays the move**, as the explorer's rows do. A move the open chapter plays
+  at this very place is on the explorer's lighter band.
+- **The data**: every chapter of the open study, indexed once per file text (`chapterMoves`); the
+  open chapter is the editor's, edits included, indexed again only when it changes. Read when the
+  tab is shown, and again on a sync. A chapter this version can't read is left out (never
+  rewritten). On the analysis board the tab shows its own chapter's moves.
+- **The choice of tab is kept on the device** (the explorer's settings, `study`). Practical and
+  Maia's columns stay on the games tabs: they rank candidate moves, where this tab shows what the
+  study covers.
+- Not built (as §5.27 said): the Miller columns, the folding of forced runs, the Lichess scan of a
+  column.
+
+**As built** (2026-11-10): `src/core/study/studyMoves.ts` (`chapterMoves`, `studyMovesAt`),
+`src/app/studyMoves.ts` (`readStudyIndex`, `studyIndex`), `src/ui/Explorer.tsx` (`StudyTab`),
+`src/app/explorer.ts` (the `study` setting), `src/ui/app.css`.
+
+Tests:
+- `test/unit/core/study/studyMoves.test.ts`:
+  - across three chapters, one reaching the position by another order: the moves merged, their
+    chapters and lines, each chapter's own path;
+  - a move ending a line counts one; a chapter from a FEN; one chapter playing the same move by
+    two orders is listed once and counts both lines.
+
+  Three controls in its header.
+- `test/e2e/explorer.spec.ts` (desktop and phone): the tab chosen, 1. e4's three lines in two
+  chapters with Lichess's eval and share, the chapter list, a row played, after 1. e4 c5 the main
+  line's 2. Nf3 (two lines) before the Alapin's 2. c3, the Alapin opened at 2. c3 in one click,
+  the tab kept there, and back to Lichess.
+- `explorer.spec.ts`'s test of the tabs lists three now.
+- Found in the full run, not this change's: `games.spec.ts`'s note on a game card was flaky on the
+  phone (a tap on the dialog's board before it took moves, 1 run in about 3; never alone in 12).
+  The test now waits for the knight to show as selected before moving it.
 
 Live: TESTING.md.

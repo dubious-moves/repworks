@@ -9,7 +9,7 @@
 // on its top edge drags it, saved per device, and the last position's rows stay, faded, until the
 // next answer.
 import { signal } from '@preact/signals';
-import { useEffect, useMemo, useRef } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { Position } from 'chessops/chess';
 import { makeFen } from 'chessops/fen';
 import { parseSan } from 'chessops/san';
@@ -31,6 +31,12 @@ import { askChildren, childAnswers, childKey, lookAt, lookup, pausedUntil, prefs
 import { maiaElo, maiaKey, maiaPrefs, maiaSeen, maiaState, requestPolicy, requestScores } from '../app/maia.ts';
 import { logInWithLichess } from '../app/lichess.ts';
 import { trainData } from '../app/train.ts';
+import { open } from '../app/mode.ts';
+import { readStudyIndex, studyIndex } from '../app/studyMoves.ts';
+import { dataVersion } from '../app/sync.ts';
+import { positionKeyOf } from '../core/chess/positionKey.ts';
+import { studyMovesAt, type StudyMove } from '../core/study/studyMoves.ts';
+import { goTo } from '../app/editor.ts';
 import { openExplorerSettings } from './ExplorerSettings.tsx';
 import { openTranspositions } from './Transpositions.tsx';
 
@@ -347,17 +353,43 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
         {/* The tabs alone in the tab list; the ⚙ beside it is a button of its own. */}
         <div class="explorer-tablist" role="tablist" aria-label="Explorer source">
           {TABS.map((t) => (
-            <button key={t.tab} type="button" role="tab" aria-selected={p.tab === t.tab} class={p.tab === t.tab ? 'on' : ''} onClick={() => setPrefs({ tab: t.tab })}>
+            <button key={t.tab} type="button" role="tab" aria-selected={!p.study && p.tab === t.tab} class={!p.study && p.tab === t.tab ? 'on' : ''} onClick={() => setPrefs({ tab: t.tab, study: false })}>
               {t.tab === 'lichess' ? lichessLabel : t.label}
             </button>
           ))}
+          {/* §5.162: the open study's moves here, the games tab's columns beside them. */}
+          <button
+            type="button"
+            role="tab"
+            aria-selected={p.study}
+            class={p.study ? 'on' : ''}
+            title={`The moves this study plays here, in all its chapters and move orders, with ${p.tab === 'lichess' ? lichessLabel : 'Masters'}’ columns beside them`}
+            onClick={() => setPrefs({ study: true })}
+          >
+            Study
+          </button>
         </div>
         <button type="button" class="icon explorer-gear" aria-label="Explorer settings" title="Explorer settings" onClick={openExplorerSettings}>
           ⚙
         </button>
       </div>
-      {prac && <PracticalDriver fen={fen} mine={mine} rows={table.rows} turn={turn} shares={shares} excludedKey={[...excludedAt(fen)].join()} />}
-      {wantedFens.length > 0 && <ChildDriver tab={p.tab} fens={wantedFens} filter={filter} />}
+      {p.study && s && (
+        <StudyTab
+          sid={s.sid}
+          cid={s.cid}
+          chapter={props.chapter}
+          path={props.path}
+          pos={pos}
+          rows={asking ? undefined : table.rows}
+          games={games}
+          cols={{ ...cols, prac: false, ml: false, ms: false }}
+          source={p.tab === 'lichess' ? lichessLabel : 'Masters'}
+        />
+      )}
+      {!p.study && prac && <PracticalDriver fen={fen} mine={mine} rows={table.rows} turn={turn} shares={shares} excludedKey={[...excludedAt(fen)].join()} />}
+      {!p.study && wantedFens.length > 0 && <ChildDriver tab={p.tab} fens={wantedFens} filter={filter} />}
+      {!p.study && (
+      <>
       <div class="explorer-head">
         <span class="ex-move">Move</span>
         {cols.eval && sortBy('eval', 'Eval', 'ex-eval', 'Sort by eval')}
@@ -504,7 +536,103 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
           )}
         </div>
       )}
+      </>
+      )}
     </section>
+  );
+}
+
+/** The Study tab's grid: Move, the explorer's columns shown, the bar, then Lines and Chapters. */
+const studyTemplate = (c: Cols): string =>
+  ['var(--ex-move-w)', c.eval && 'var(--ex-eval-w)', c.share && '34px', c.count && 'var(--ex-count-w)', c.bar ? 'minmax(48px, 1fr)' : 'minmax(0, 1fr)', '2.6rem', 'minmax(4.2rem, auto)'].filter(Boolean).join(' ');
+
+/**
+ * The Study tab (§5.27, §5.162): the moves the open study plays at the board's position, across
+ * all its chapters and the move orders that reach it, most lines first; each with the explorer's
+ * columns for it (the games tab's), its count of lines, and its chapters, which open a list: one
+ * click opens one at the move. A click on the row plays the move here, as the explorer's rows do.
+ */
+function StudyTab(props: { sid: string; cid: string; chapter: Chapter; path: Path; pos: Position; rows: readonly TableRow[] | undefined; games: boolean; cols: Cols; source: string }) {
+  const version = dataVersion.value;
+  useEffect(() => void readStudyIndex(props.sid, props.cid, props.chapter), [props.sid, props.cid, props.chapter, version]);
+  const unfolded = useRef(new Set<string>());
+  const [, redraw] = useState(0);
+  const idx = studyIndex.value?.sid === props.sid ? studyIndex.value : undefined;
+  const key = useMemo(() => positionKeyOf(props.pos), [props.pos]);
+  const moves = useMemo(() => (idx ? studyMovesAt(idx.chapters, key) : []), [idx, key]);
+  const names = useMemo(() => new Map(idx?.chapters.map((c) => [c.cid, c.name]) ?? []), [idx]);
+  const byMove = new Map((props.rows ?? []).filter((r) => !r.maiaOnly).map((r) => [moveKey(r.san), r] as const));
+  const here = new Set((nodeAt(props.chapter, props.path)?.children ?? []).map((c) => moveKey(c.san)));
+  const c = props.cols;
+  if (!idx) return <p class="explorer-note muted">Reading the study…</p>;
+  const toggle = (m: StudyMove) => {
+    const u = unfolded.current;
+    if (u.has(m.uci)) u.delete(m.uci);
+    else u.add(m.uci);
+    redraw((n) => n + 1);
+  };
+  const go = (cid: string, path: Path) => (cid === props.cid ? goTo(path) : open({ name: 'chapter', sid: props.sid, cid, at: [...path] }));
+  return (
+    <>
+      <div class="explorer-head study-tab-head" style={{ '--ex-cols': studyTemplate(c) }}>
+        <span class="ex-move">Move</span>
+        {c.eval && <span class="ex-eval">Eval</span>}
+        {(c.share || c.count) && <span class="ex-games" style={{ gridColumn: `span ${(c.share ? 1 : 0) + (c.count ? 1 : 0)}` }}>Games</span>}
+        <span class="ex-score" title={`${props.source}’s games`}>{c.bar ? 'Score' : ''}</span>
+        <span class="ex-lines" title="The lines through the move, in every chapter">Lines</span>
+        <span class="ex-chapters">Chapters</span>
+      </div>
+      {!moves.length && <p class="explorer-note muted" data-testid="study-tab-none">{idx.chapters.length ? 'The study plays nothing here.' : 'No chapter of this study can be read here.'}</p>}
+      {moves.length > 0 && (
+        <div class="explorer-rows study-tab" role="list" aria-label="The study’s moves here" style={{ '--ex-cols': studyTemplate(c) }}>
+          {moves.map((m) => {
+            const r = byMove.get(moveKey(m.san));
+            const open = unfolded.current.has(m.uci);
+            const one = m.chapters.length === 1;
+            return (
+              <div key={m.uci} class="study-tab-move" role="listitem">
+                <div class={`ex-row${here.has(moveKey(m.san)) ? ' covered' : ''}`} tabIndex={0} onClick={() => play(m.san)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), play(m.san))}>
+                  <span class="ex-move">
+                    <span class="ex-san">{m.san}</span>
+                  </span>
+                  {c.eval && <EvalCell value={r?.eval} missing={props.rows ? '' : '…'} />}
+                  {c.share && <span class="ex-share">{r && !r.novelty ? formatShare(r.share) : ''}</span>}
+                  {c.count && <span class="ex-count">{r && !r.novelty ? formatCount(r.games) : ''}</span>}
+                  {c.bar ? r && !r.novelty && props.games ? <Bar white={r.white} draws={r.draws} black={r.black} /> : <span class="ex-bar ex-novelty">{props.rows ? (props.games ? 'no games' : '') : ''}</span> : <span />}
+                  <span class="ex-lines">{m.lines}</span>
+                  <button
+                    type="button"
+                    class="ex-chapters link"
+                    {...(one ? {} : { 'aria-expanded': open })}
+                    title={m.chapters.map((x) => names.get(x.cid) ?? x.cid).join('\n')}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // One chapter: one click opens it; several: the list, each a click away.
+                      if (one) go(m.chapters[0]!.cid, m.chapters[0]!.path);
+                      else toggle(m);
+                    }}
+                  >
+                    {one ? (names.get(m.chapters[0]!.cid) ?? m.chapters[0]!.cid) : `${m.chapters.length} chapters`}
+                  </button>
+                </div>
+                {open && (
+                  <ul class="study-tab-chapters">
+                    {m.chapters.map((x) => (
+                      <li key={x.cid}>
+                        <button type="button" class="link" onClick={() => go(x.cid, x.path)}>
+                          {names.get(x.cid) ?? x.cid}
+                          {x.cid === props.cid ? ' (this chapter)' : ''}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </>
   );
 }
 

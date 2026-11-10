@@ -18,6 +18,11 @@ export interface ExplorerPrefs {
   /** The panel shown (Qchess's database button). */
   on: boolean;
   tab: ExplorerTab;
+  /**
+   * The Study tab shown (§5.162): the open study's moves here, with the games tab's (`tab`)
+   * columns beside them.
+   */
+  study: boolean;
   sort: SortMode;
   speeds: string[];
   ratings: number[];
@@ -64,6 +69,7 @@ export type ScoreView = 'games' | 'equal' | 'prepared';
 export const DEFAULT_PREFS: ExplorerPrefs = {
   on: true,
   tab: 'lichess',
+  study: false,
   sort: 'eval',
   speeds: ['blitz', 'rapid', 'classical'],
   ratings: [1600, 1800, 2000, 2200, 2500],

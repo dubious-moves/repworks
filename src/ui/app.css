@@ -3412,6 +3412,42 @@ a.button.primary {
   color: var(--info-text);
 }
 
+/* The Study tab (§5.162): Lines and Chapters after the explorer's columns. */
+.study-tab-head span {
+  font-weight: 400;
+  font-size: inherit;
+  color: inherit;
+}
+
+.ex-lines {
+  text-align: right;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.ex-chapters {
+  min-height: 0;
+  padding: 0 2px;
+  font-size: 0.75rem;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 12rem;
+}
+
+.study-tab-chapters {
+  list-style: none;
+  margin: 0 8px 6px 1.2rem;
+  padding: 0;
+  font-size: 0.8rem;
+}
+
+.study-tab-chapters button {
+  min-height: 28px;
+  text-align: left;
+}
+
 .ex-eval {
   text-align: right;
   font-weight: 700;

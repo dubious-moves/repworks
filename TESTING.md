@@ -65,6 +65,19 @@ later change replaced are folded into the later item; items already reported wor
 
 ## 2. Studies and the study page
 
+### The Study tab in the explorer (§5.162, 2026-11-10)
+- On a study made of many chapters (a Chessable course imported as a reference study is the case
+  it is for): the explorer's **Study** tab, beside Lichess and Masters. At each position, the moves
+  the study plays there from all its chapters, by any move order, most lines first, with the
+  explorer's Eval, Games and Score, then Lines and Chapters.
+- Step through a line: do the counts match what you know of the course? A move in one chapter
+  shows the chapter's name (one click opens it at the move); in several, "n chapters" opens the
+  list. Is that the right amount of clicking on the phone?
+- Your own repertoire study: does a move's line count help decide what to study or prune?
+- The tab stays chosen on the device; Lichess or Masters brings the explorer's own rows back.
+- **Checked**: unit tests and Playwright (desktop and emulated phone), a screenshot of each in
+  headless Chromium; not on a device, not on a real course.
+
 ### Lc0 vs Maia from a move (§5.144, 2026-10-31)
 - On the desktop, logged in to Lichess, right-click a move in a chapter → "Lc0 vs Maia
   continuation". Start (the first time, the download of Lc0's network and Maia). At 800 nodes a

@@ -2243,3 +2243,15 @@ The technical calls, each with its reason:
 - **The cloud searches the likely moves at every rating it rates at.** Why: it can't know which
   rating is the user's; outside a list of 12, such moves are few.
 - Data format: the storm line's optional `after` field (backward compatible, above).
+
+## Revision of 2026-11-10 (the explorer's Study tab; PLAN.md §5.162)
+- **§5.27 answered yes**: the course tree is a Study tab in the explorer panel, not lichessable's
+  Miller columns.
+- **Its rows are the study's moves at the position, the explorer's columns beside them**, with
+  Lines and Chapters. Why: the question §24 answered ("standing here, what did the author cover")
+  inside the panel already used, with the database's view of each move beside it.
+- **Merged by position, not by path**, so a chapter reaching the position by another order counts.
+  Ties keep the study's order, main line first.
+- **Practical and Maia's columns stay on the games tabs.** Why: they rank candidates; this tab
+  lists what the study covers.
+- No data format changed (the tab's choice is a device setting).

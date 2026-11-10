@@ -465,8 +465,13 @@ test('a note on a game card: written on its position with a line and an arrow, s
     await page.mouse.click(p.x, p.y);
   };
   await dialog.getByTestId('note-text').fill('Nxe5? drops a piece:');
-  // A line played on the board, into the words with its move numbers.
-  await click('f3');
+  // A line played on the board, into the words with its move numbers. Under a loaded machine the
+  // dialog's board may not take moves yet when it shows (it was flaky in the full run): the knight
+  // is picked up once it shows as selected, as a person would see it, then moved.
+  await expect(async () => {
+    await click('f3');
+    await expect(dialog.locator('cg-board square.selected')).toHaveCount(1, { timeout: 500 });
+  }).toPass();
   await click('e5');
   // Chessground reports a move a tick later (setTimeout): till then Black's pieces don't move.
   await expect(dialog.getByTestId('note-line')).toContainText('Line: 4. Nxe5');
