@@ -58,9 +58,10 @@ self.addEventListener('message', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const request = event.request;
-  if (request.method !== 'GET') return;
   const url = new URL(request.url);
   const scope = new URL(self.registration.scope);
+  if (request.method === 'POST' && url.origin === scope.origin && url.pathname === `${scope.pathname}share`) return event.respondWith(receiveShare(request, scope));
+  if (request.method !== 'GET') return;
   if (url.origin !== scope.origin || !url.pathname.startsWith(scope.pathname)) return;
   event.respondWith(respond(request, url, scope).then(async (r) => ((await isolating()) ? isolated(r) : r)));
 });
@@ -148,4 +149,26 @@ async function matchOlderShell(path: string): Promise<Response | undefined> {
     if (hit) return hit;
   }
   return undefined;
+}
+
+/**
+ * "Share to Repworks" (the manifest's share_target, PLAN.md §5.159): what another app shared,
+ * a PGN file or a link or text, kept in `repworks-share` for Import to take, then the app opened
+ * on Import. Kept as one JSON response; the next share replaces it.
+ */
+const SHARE = 'repworks-share';
+async function receiveShare(request: Request, scope: URL): Promise<Response> {
+  try {
+    const form = await request.formData();
+    const str = (k: string) => {
+      const v = form.get(k);
+      return typeof v === 'string' && v ? v : undefined;
+    };
+    const file = form.getAll('pgn').find((f): f is File => typeof f !== 'string');
+    const shared = { title: str('title'), text: str('text'), url: str('url'), ...(file ? { file: { name: file.name, text: await file.text() } } : {}) };
+    await (await caches.open(SHARE)).put('shared', new Response(JSON.stringify(shared), { headers: { 'content-type': 'application/json' } }));
+  } catch (error) {
+    console.error('the share could not be read', error);
+  }
+  return Response.redirect(`${scope.href}#/import`, 303);
 }

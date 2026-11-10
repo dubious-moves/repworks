@@ -1,7 +1,7 @@
 // Import a study (PLAN.md §4.10): a PGN file or pasted PGN (the Qchess export among them), or a
 // Lichess study; then a review where the owner names it, picks repertoire or reference, and
 // gives each chapter its side, with the import report.
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import qchessScript from '../../scripts/qchess-export.js?raw';
 import { extractStudyId, LichessError, type LichessStudyInfo } from '../core/import/lichess.ts';
 import { describeNote, headerCounts, readImport, sidesMissing, type ImportChoices, type ImportReading, type Side } from '../core/import/plan.ts';
@@ -10,6 +10,8 @@ import { lichess, lichessUser, logInWithLichess, logOutOfLichess } from '../app/
 import { open } from '../app/mode.ts';
 import { notice, saveImport } from '../app/state.ts';
 import { Back } from './Back.tsx';
+import { readShared } from '../core/import/shared.ts';
+import { pendingShare, takeShared } from '../app/share.ts';
 
 interface Read {
   reading: ImportReading;
@@ -33,9 +35,50 @@ export function ImportScreen() {
   );
 }
 
+/** A PGN read for the review, or why it can't be. */
+function readPgn(pgn: string, name: string): Read | string {
+  const reading = readImport(pgn);
+  if (reading.chapters.length === 0 && reading.refused.length === 0) return 'No game found in that PGN.';
+  const fallbackName =
+    name
+      .replace(/\.qchess\.pgn$|\.pgn$/i, '')
+      .replace(/_\d{4}-\d\d-\d\d$/, '')
+      .replace(/_/g, ' ') || 'Imported study';
+  return { reading, source: sourceOfFile(reading, name), fallbackName };
+}
+
+async function fetchLichess(id: string, name?: string): Promise<Read> {
+  const reading = readImport(await lichess.studyPgn(id));
+  return { reading, source: { kind: 'lichess', id, name: reading.studyName ?? name ?? id }, fallbackName: name ?? id };
+}
+
+const failure = (e: unknown) => (e instanceof LichessError ? e.message : `Something went wrong: ${e instanceof Error ? e.message : String(e)}`);
+
 function Sources(props: { onRead: (read: Read) => void }) {
+  // Shared from another app, or a .pgn opened with the app (§5.159): read at once.
+  const [shareNote, setShareNote] = useState<string | undefined>(undefined);
+  const sh = pendingShare.value;
+  useEffect(() => void takeShared(), []);
+  useEffect(() => {
+    if (!sh) return;
+    pendingShare.value = undefined;
+    const r = readShared(sh);
+    if (r.kind === 'pgn') {
+      const read = readPgn(r.pgn, r.name);
+      if (typeof read === 'string') setShareNote(read);
+      else props.onRead(read);
+    } else if (r.kind === 'lichess') {
+      setShareNote('Fetching the shared Lichess study…');
+      fetchLichess(r.id).then(props.onRead, (e: unknown) => setShareNote(failure(e)));
+    } else setShareNote(r.why);
+  }, [sh]);
   return (
     <>
+      {shareNote && (
+        <p class="card share-note" role="status" data-testid="share-note">
+          {shareNote}
+        </p>
+      )}
       <FileSource onRead={props.onRead} />
       <LichessSource onRead={props.onRead} />
       <QchessHelp />
@@ -49,15 +92,10 @@ function FileSource(props: { onRead: (read: Read) => void }) {
   const [text, setText] = useState('');
   const [error, setError] = useState<string | undefined>(undefined);
   const use = (pgn: string, name: string) => {
-    const reading = readImport(pgn);
-    if (reading.chapters.length === 0 && reading.refused.length === 0) return setError('No game found in that PGN.');
+    const read = readPgn(pgn, name);
+    if (typeof read === 'string') return setError(read);
     setError(undefined);
-    const fallbackName =
-      name
-        .replace(/\.qchess\.pgn$|\.pgn$/i, '')
-        .replace(/_\d{4}-\d\d-\d\d$/, '')
-        .replace(/_/g, ' ') || 'Imported study';
-    props.onRead({ reading, source: sourceOfFile(reading, name), fallbackName });
+    props.onRead(read);
   };
   const pick = async (e: Event) => {
     const file = (e.currentTarget as HTMLInputElement).files?.[0];
@@ -94,13 +132,12 @@ function LichessSource(props: { onRead: (read: Read) => void }) {
   const [error, setError] = useState<string | undefined>(undefined);
   const [list, setList] = useState<LichessStudyInfo[] | undefined>(undefined);
   const [who, setWho] = useState(user ?? '');
-  const fail = (e: unknown) => setError(e instanceof LichessError ? e.message : `Something went wrong: ${e instanceof Error ? e.message : String(e)}`);
+  const fail = (e: unknown) => setError(failure(e));
   const fetchStudy = async (id: string, name?: string) => {
     setBusy(true);
     setError(undefined);
     try {
-      const reading = readImport(await lichess.studyPgn(id));
-      props.onRead({ reading, source: { kind: 'lichess', id, name: reading.studyName ?? name ?? id }, fallbackName: name ?? id });
+      props.onRead(await fetchLichess(id, name));
     } catch (e) {
       fail(e);
     }

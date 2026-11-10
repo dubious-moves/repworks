@@ -40,7 +40,7 @@ async function device(browser: Browser, name: string, github: Parameters<typeof 
  */
 async function recordTwoReviews(page: Page) {
   await page.goto(`${site.url}#/`);
-  await page.getByText('Settings and debug').click();
+  await page.locator('details.debug > summary').click();
   await page.getByRole('button', { name: 'Record a test review' }).click();
   await page.getByRole('button', { name: 'Record a test review' }).click();
   await expect(page.locator('table.cards tr', { hasText: 'r|test|e2e4' }).locator('td').nth(1)).toHaveText('2');
@@ -54,7 +54,7 @@ async function syncNow(page: Page) {
 async function cardTable(page: Page): Promise<string> {
   await page.goto(`${site.url}#/`);
   const debug = page.locator('details.debug');
-  if (!(await debug.evaluate((d) => (d as HTMLDetailsElement).open))) await page.getByText('Settings and debug').click();
+  if (!(await debug.evaluate((d) => (d as HTMLDetailsElement).open))) await page.locator('details.debug > summary').click();
   return (await page.locator('table.cards').innerText()).trim();
 }
 

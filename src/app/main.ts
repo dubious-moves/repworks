@@ -11,6 +11,7 @@ import { installSelectFocusRelease } from './selectFocus.ts';
 import { takeSetupFromAddress } from './setup.ts';
 import { shellVersion, updateReady } from './shell.ts';
 import { startApp } from './state.ts';
+import { startFileLaunch } from './share.ts';
 import { applyTheme } from './theme.ts';
 
 // First of all: a setup link's token, or Lichess's login code, leaves the address bar before
@@ -27,6 +28,8 @@ document.addEventListener('touchstart', () => {}, { passive: true });
 // A frame of the styles gallery (styles.html): shown in another theme, never syncing.
 void startApp(link, lichessCallback, !new URLSearchParams(location.search).has('preview'));
 carryOverLocalLists();
+// A .pgn opened with the installed app (§5.159).
+startFileLaunch();
 
 if (import.meta.env.PROD) {
   registerServiceWorker(import.meta.env.BASE_URL, {

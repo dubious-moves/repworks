@@ -170,6 +170,52 @@ test('train: the counts, a due move asked, a wrong move taken back, new lines ta
   await expect(feedback(page)).toHaveText('');
 });
 
+test('sounds (§5.159): off until turned on in Settings; then a wrong move buzzes and a move sounds', async ({ page }) => {
+  // Count the notes started and the vibrations asked for: headless Chromium plays nothing.
+  await page.addInitScript(() => {
+    const w = window as unknown as { notes: number; buzzes: number };
+    w.notes = 0;
+    w.buzzes = 0;
+    const start = OscillatorNode.prototype.start;
+    OscillatorNode.prototype.start = function (this: OscillatorNode, ...a: Parameters<typeof start>) {
+      w.notes++;
+      return start.apply(this, a);
+    };
+    navigator.vibrate = () => (w.buzzes++, true);
+  });
+  const counts = () => page.evaluate(() => [(window as unknown as { notes: number }).notes, (window as unknown as { buzzes: number }).buzzes]);
+  await walkOnce(page);
+  await setUp(page);
+  // Off: a wrong move is silent.
+  await page.goto(`${site.url}#/train`);
+  await asked(page);
+  await play(page, 'e7', 'e5');
+  await expect(feedback(page)).toHaveText('Not in your repertoire: try again');
+  expect(await counts()).toEqual([0, 0]);
+  // On, in Settings: the switch plays one note, kept on this device.
+  await page.goto(`${site.url}#/`);
+  await page.reload();
+  await expect(page.locator('.chip')).toHaveText(/^synced/);
+  await page.locator('details.settings > summary').click();
+  await page.getByLabel(/Sounds:/).check();
+  await expect.poll(counts).toEqual([1, 0]);
+  await page.reload();
+  await expect(page.locator('.chip')).toHaveText(/^synced/);
+  await page.locator('details.settings > summary').click();
+  await expect(page.getByLabel(/Sounds:/)).toBeChecked();
+  await page.goto(`${site.url}#/train`);
+  await asked(page);
+  const [before] = await counts();
+  await play(page, 'e7', 'e5');
+  await expect.poll(async () => (await counts())[1]).toBe(1);
+  const [afterWrong] = await counts();
+  expect(afterWrong!).toBeGreaterThan(before!);
+  // The right move: the board goes one ply on, a knock.
+  await play(page, 'c7', 'c5');
+  await expect.poll(async () => (await counts())[0]).toBeGreaterThan(afterWrong!);
+  expect((await counts())[1]).toBe(1);
+});
+
 test('Analyse (the owner’s request, 2026-10-16): the board at the move asked, counted as hinted, and back to the session as it was, by ← and by the browser’s Back', async ({ page }) => {
   await walkOnce(page);
   await setUp(page);
@@ -276,7 +322,7 @@ test('train one study from the study list and Escape stops', async ({ page, isMo
 
 test('the chapter view shows the move’s card and toggles its suspend; the debug panel lists conflicting moves', async ({ page }) => {
   const git = await setUp(page);
-  await page.locator('summary', { hasText: 'Settings and debug' }).click();
+  await page.locator('details.debug > summary').click();
   await expect(page.locator('.repertoire-stats')).toContainText('5 cards · 3 lines');
   await expect(page.locator('.repertoire-conflicts li')).toHaveText(['Test repertoire: e4 c5 Nf3 → d6, Nc6']);
 

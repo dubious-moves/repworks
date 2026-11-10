@@ -41,7 +41,7 @@ test('a recorded review is pushed into this device’s day file', async ({ page 
   await page.goto(setupUrl('desktop'));
   await expect(page.locator('.chip')).toHaveText(/^synced/);
   const id = (await deviceFile(git)).slice('devices/'.length, -'.json'.length);
-  await page.getByText('Settings and debug').click();
+  await page.locator('details.debug > summary').click();
   await page.getByRole('button', { name: 'Record a test review' }).click();
   await expect(page.locator('.chip')).toHaveText('1 change waiting');
   await page.getByRole('button', { name: 'Sync now' }).click();
@@ -68,7 +68,7 @@ test('a refused token keeps local work, says so, and a new token sends it', asyn
   await page.goto(setupUrl('desktop'));
   await expect(page.locator('.chip')).toHaveText(/^synced/);
   github.faults.set('commit', { kind: 'auth' });
-  await page.getByText('Settings and debug').click();
+  await page.locator('details.debug > summary').click();
   await page.getByRole('button', { name: 'Record a test review' }).click();
   // The review is stored before the sync is asked for, or the sync can run with nothing to push
   // and never meet the refused token (a flaky failure on the phone, 2026-10-31).
@@ -78,6 +78,7 @@ test('a refused token keeps local work, says so, and a new token sends it', asyn
   await expect(page.locator('.chip')).toHaveText('token refused');
   const commits = git.log().length;
   github.faults.set('commit', undefined);
+  await page.locator('details.settings > summary').click();
   await page.getByLabel('Token').fill(TOKEN);
   await page.getByRole('button', { name: 'Use this token' }).click();
   await expect(page.locator('.chip')).toHaveText(/^synced/);
@@ -101,8 +102,9 @@ test('the REST write path (write=rest in the link) pushes too', async ({ page })
   await page.goto(`${setupUrl('desktop')}&write=rest`);
   await expect(page.locator('.chip')).toHaveText(/^synced/);
   const id = (await deviceFile(git)).slice('devices/'.length, -'.json'.length);
-  await page.getByText('Settings and debug').click();
-  await expect(page.locator('.debug')).toContainText('writes via REST');
+  await page.locator('details.settings > summary').click();
+  await expect(page.locator('.settings')).toContainText('writes via REST');
+  await page.locator('details.debug > summary').click();
   await page.getByRole('button', { name: 'Record a test review' }).click();
   // The review is stored before the sync is asked for, or the sync can run with nothing to push.
   await expect(page.locator('.chip')).toHaveText('1 change waiting');
@@ -124,7 +126,7 @@ test('a device that starts offline says offline, keeps its studies, and syncs wh
   await page.reload();
   await expect(page.locator('.chip')).toHaveText('offline');
   await expect(page.locator('.studies')).toContainText('Test repertoire');
-  await page.getByText('Settings and debug').click();
+  await page.locator('details.debug > summary').click();
   await page.getByRole('button', { name: 'Record a test review' }).click();
   await expect(page.locator('.chip')).toHaveText('offline · 1 change waiting');
   const id = (await deviceFile(git)).slice('devices/'.length, -'.json'.length);

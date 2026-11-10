@@ -2208,3 +2208,15 @@ The technical calls, each with its reason:
 - **The wrong move is marked on its squares, red with a ✕, for about a second**, in training only:
   the storm keeps the move on the board, and game cards show their engine line.
 - No data format changed.
+
+## Revision of 2026-11-10, later (share, sounds, Settings and Debug, contrasts; PLAN.md §5.159)
+- **A share goes through the service worker** (POST to `./share`, kept in `repworks-share`, Import
+  takes it once). Why: Android shares files only by POST, and GitHub Pages can't answer one.
+  The cost: a share before the worker has run is refused.
+- **Sounds start off.** The owner left it to the build; a phone making sounds by surprise is the
+  worse mistake, and turning them on is one tick in Settings.
+- **Settings and Debug are two panels.** The remote spike's link stays in the footer while §4.2's
+  re-run waits.
+- **The dark themes' faint colours are nudged to 4.6:1**, each keeping its hue; the list is in
+  §5.159. A unit test now keeps six text/background pairs at 4.5:1 in every theme.
+- No data format changed.

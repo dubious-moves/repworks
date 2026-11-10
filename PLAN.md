@@ -7,7 +7,7 @@ where the build differed). What remains is live: the spike's re-run (§4.2), the
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
 with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
-for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Storm positions shared between devices through the data repo, and an overnight gather (§5.102), are built (2026-10-12). Lc0 on the study page, its pick among close moves (§5.143), is built (2026-10-31). Endgames, the theoretical endgames each played for its goal against Stockfish (§5.145), are built (2026-10-31), their moves judged in the background since (§5.146, the owner's request of 2026-11-01), defended by Maia checked by Stockfish (§5.147, the owner's request), and a draw's attacker pushing on so the whole method comes up (§5.148, the owner's note). The endgames of the user's own repertoire (§5.149) are built (2026-11-01), and thirteen more theoretical endgames in two more groups (§5.150, the owner's request of 2026-11-02). A game card's move judged without waiting on the engine line's searches or the storm's workers (§5.151, the owner's request of 2026-11-04). Show and grade in the storm, every move of a deepened position shown by its band (§5.152, the owner's request of 2026-11-06), is built. A robotic board, the Chessnut Move, in the storm's untimed sessions and in practice is planned in its own document, `CHESSNUT.md` (§5.153 points there; the owner's request of 2026-11-06), not built. After a storm verdict, Show refutation (a mistake or a blunder), Show line (a great move or the top move) and Continue against Maia's reply (a good move or better) are built (§5.154, the owner's request of 2026-11-06). A polish pass (§5.156, the owner's request of 2026-11-07) made the light theme readable and the folded settings panel free, and lists ideas waiting for the owner's word. The positions after Maia's likely moves (20% or more) outside a storm card's list are searched while the user thinks (§5.157, the owner's request of 2026-11-10). Of §5.156's ideas the owner said to build all but the faster start (2026-11-10): Today on the home, the icon's shortcuts, the wrong move shown, "?" for the keys and the empty pages are built (§5.158). Read with `DECISIONS.md`, which this plan updates (its
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Storm positions shared between devices through the data repo, and an overnight gather (§5.102), are built (2026-10-12). Lc0 on the study page, its pick among close moves (§5.143), is built (2026-10-31). Endgames, the theoretical endgames each played for its goal against Stockfish (§5.145), are built (2026-10-31), their moves judged in the background since (§5.146, the owner's request of 2026-11-01), defended by Maia checked by Stockfish (§5.147, the owner's request), and a draw's attacker pushing on so the whole method comes up (§5.148, the owner's note). The endgames of the user's own repertoire (§5.149) are built (2026-11-01), and thirteen more theoretical endgames in two more groups (§5.150, the owner's request of 2026-11-02). A game card's move judged without waiting on the engine line's searches or the storm's workers (§5.151, the owner's request of 2026-11-04). Show and grade in the storm, every move of a deepened position shown by its band (§5.152, the owner's request of 2026-11-06), is built. A robotic board, the Chessnut Move, in the storm's untimed sessions and in practice is planned in its own document, `CHESSNUT.md` (§5.153 points there; the owner's request of 2026-11-06), not built. After a storm verdict, Show refutation (a mistake or a blunder), Show line (a great move or the top move) and Continue against Maia's reply (a good move or better) are built (§5.154, the owner's request of 2026-11-06). A polish pass (§5.156, the owner's request of 2026-11-07) made the light theme readable and the folded settings panel free, and lists ideas waiting for the owner's word. The positions after Maia's likely moves (20% or more) outside a storm card's list are searched while the user thinks (§5.157, the owner's request of 2026-11-10). Of §5.156's ideas the owner said to build all but the faster start (2026-11-10): Today on the home, the icon's shortcuts, the wrong move shown, "?" for the keys and the empty pages are built (§5.158). Share to Repworks and .pgn files opened with it, sounds, Settings apart from Debug and the dark themes' contrasts are built (§5.159). Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -8963,3 +8963,68 @@ item, the checklist's next line; three controls in its header). Playwright, desk
 - `shell.spec.ts`: the four shortcuts in the manifest Chrome reads.
 
 Live: TESTING.md.
+
+#### 5.159 Share to Repworks, sounds, Settings apart from Debug, the dark themes' contrasts (§5.156's ideas 3, 4, 8 and 9, 2026-11-10)
+
+- **Share to Repworks** (idea 3), Android's share sheet: the manifest's `share_target` POSTs the
+  share (title, text, url, and a `pgn` file) to `./share`. The service worker answers it: it keeps
+  the share in the `repworks-share` cache and sends the app to `#/import`, where Import takes it
+  once (`takeShared` in `app/share.ts`). `readShared` (`core/import/shared.ts`) decides what to do
+  with it, in this order:
+  - a file is read as PGN;
+  - a Lichess study's link anywhere in the url, text or title (the Lichess app shares "<name>
+    <link>") is fetched;
+  - text that reads as PGN is read;
+  - anything else is said in a line above Import's sources.
+
+  Only an installed app whose worker is running receives a share; a share before the worker has
+  ever run can't reach the site (GitHub Pages refuses the POST).
+- **.pgn files opened with the app** (the desktop, Chrome and Edge): the manifest's
+  `file_handlers` with `launch_handler` `focus-existing`, and `window.launchQueue`'s consumer
+  (`startFileLaunch`), which reads the file and opens Import on it.
+- **Sounds and a buzz** (idea 4): made with Web Audio (`platform/sound.ts`), no files. One switch
+  per device in Settings, **off until turned on**: sound in a study app is unexpected on a phone
+  in company, and turning it on is one tick. On, the board plays a knock when its position goes
+  one ply on (whoever moved; stepping back or jumping makes none), a lower one for a capture, two
+  rising notes with the best move's burst, and a low buzz with a wrong move's mark, plus a 120 ms
+  vibration where there is one (Android).
+- **Settings apart from Debug** (idea 8): two folded panels on the home, each drawn only while
+  open.
+  - **Settings**: the theme and the sounds, this device and its data repo, the engines, other
+    devices, the token.
+  - **Debug**: the base commit, what is waiting, the requests, Sync now and Record a test review,
+    time travel, the repertoire's index, the card states.
+
+  The remote spike's link stays in every page's footer: §4.2's re-run is still in TESTING.md,
+  and the installed app reaches the spike only from there.
+- **The dark themes' contrasts** (idea 9): axe-core 4.10 (not added to the project) scanned the
+  home, a study, training, the storm, progress and endgames in all 8 themes. It found:
+  - the move shown at 3.6 to 3.8:1 in Forest, Walnut, Midnight and Slate;
+  - Slate's muted grey at 4.4 (3.9 on a study card) and its primary blue at 3.0;
+  - the explorer's tab shown at 3.4 to 4.0 in Mist, Grove and Fjord;
+  - the due count at 4.15 to 4.28 on a study card.
+
+  Each token was nudged, keeping its hue, to 4.6:1 or a little more. Forest's move shown went
+  #319a28 → #2b8623 and its due #e66464 → #e87272 (shared by Slate, Walnut and Midnight). Slate's
+  muted went #8b8987 → #989694, its primary #3692e7 → #2a72b4, its move shown → #2c78bd. Walnut's
+  muted went → #a09282 and its move shown → #a16925. Midnight's move shown went → #0c7f9f. The
+  strong blue under the tab shown went to #5a7894 in Mist, #5074b2 in Grove and #5175af in Fjord.
+  The same scan then found nothing.
+
+Tests:
+- `test/unit/core/import/shared.test.ts`: a file first, a link in the text with its punctuation
+  trimmed, PGN by its title, nothing to import; three controls in its header.
+- `test/unit/ui/themes.test.ts`: six text and background token pairs at 4.5:1 or more in every
+  theme, with two controls.
+- Playwright, desktop and phone:
+  - `import.spec.ts`: a POSTed share through the worker, as Android sends it: a file read, a
+    study link fetched, taken once, and text with nothing to import said.
+  - `train.spec.ts`: sounds off until ticked, kept after a reload, then a wrong move's notes and
+    buzz and the right move's knock (counted from the oscillators started and the vibrations
+    asked).
+  - `shell.spec.ts`: the share target and file handler in the manifest Chrome reads, with no
+    manifest error.
+  - `guard.spec.ts`: both panels draw nothing folded.
+
+Not tested: a real share sheet, a real file opened from the desktop, sound out of a speaker.
+These are in TESTING.md.

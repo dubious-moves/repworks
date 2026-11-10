@@ -62,3 +62,39 @@ test('a theme with its own board colours draws the flat board', () => {
 test("index.html reads the theme from theme.ts's key", () => {
   assert.ok(read('index.html').includes(`localStorage.getItem('${THEME_KEY}')`));
 });
+
+/** WCAG 2's contrast of two #rrggbb colours. */
+function contrast(a: string, b: string): number {
+  const lum = (h: string) => {
+    const [r, g, bl] = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r! + 0.7152 * g! + 0.0722 * bl!;
+  };
+  const [x, y] = [lum(a), lum(b)];
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+}
+
+// The pairs an accessibility scan found under 4.5:1 in the dark themes, nudged in §5.159. Controls
+// run (2026-11-10): Slate's muted grey back at #8b8987, and Forest's move shown at #319a28, each
+// fail this test for that theme alone.
+test('text reads at 4.5:1 or more on its token background, in every theme', () => {
+  const forest = block(themes, ":root,\n[data-theme='forest']");
+  const full = (h: string) => (h.length === 4 ? `#${[...h.slice(1)].map((c) => c + c).join('')}` : h);
+  const PAIRS: [string, string][] = [
+    ['--on-current', '--move-current'],
+    ['--accent-text', '--primary-bg'],
+    ['--on-select', '--info-strong'],
+    ['--muted', '--surface'],
+    ['--due', '--surface'],
+    ['--text', '--surface'],
+  ];
+  const low: string[] = [];
+  for (const t of THEMES) {
+    const own = t.id === 'forest' ? forest : block(themes, `[data-theme='${t.id}'] {`);
+    const v = (k: string) => full(own.get(k) ?? forest.get(k)!);
+    for (const [fg, bg] of PAIRS) {
+      const c = contrast(v(fg), v(bg));
+      if (c < 4.5) low.push(`${t.id} ${fg} on ${bg}: ${c.toFixed(2)}`);
+    }
+  }
+  assert.deepEqual(low, []);
+});

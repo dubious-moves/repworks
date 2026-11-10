@@ -1263,3 +1263,26 @@ q_extension (or give it to a session with q_extension attached), then run
 - **Empty pages**: the storm with nothing gathered says "Gather positions first" under Start (and,
   with positions but none for the focus, says so); Progress's charts say "nothing due" or "no
   training" in a line instead of empty bars, and each day carries its weekday's letter.
+
+## Share to Repworks, sounds, Settings and Debug, the dark themes (§5.159, 2026-11-10)
+- Checked by unit tests, Playwright (desktop and emulated phone; a share POSTed through the
+  service worker as Android sends it) and an accessibility scan of six pages in every theme;
+  nothing live yet.
+- **Share to Repworks**, on the Android phone with the app installed (it may need reinstalling,
+  or a day, to pick up the new manifest):
+  - In the Lichess app, open a study and Share → Repworks: Import opens and fetches it.
+  - In a file manager, share a .pgn → Repworks: Import opens on its chapters.
+  - Share a plain web page: Import says there is nothing to import in it.
+- **.pgn files on the desktop**: with the app installed from Chrome or Edge, right-click a .pgn →
+  Open with → Repworks (the first time, Chrome asks to allow it). Import opens on its chapters.
+- **Sounds**: Settings → Sounds (off until ticked). Then:
+  - a move and a capture each make a short knock, the capture lower;
+  - a wrong move in training a low buzz, with a short vibration on the phone;
+  - the best move found in the storm or the game cards two rising notes.
+
+  Too loud, too quiet, or wrong on the phone? (iOS doesn't vibrate.)
+- **Settings and Debug** are now two panels on the home. Is everything you use in Settings, and
+  is Debug what you'd rather not see daily?
+- **The dark themes**: the move shown (white on green in Forest), Slate's grey text and blue
+  buttons, and the explorer's tab shown in Mist, Grove and Fjord are a shade darker or lighter.
+  They now pass 4.5:1. Say if any looks off.

@@ -21,7 +21,7 @@ import { EndgamesScreen } from './Endgames.tsx';
 import { loadRepEndgames } from '../app/repertoireEndgames.ts';
 import { gameCountsNow } from '../app/games.ts';
 import { endgamesDue, TodayCard, useStormReady } from './Today.tsx';
-import { Debug } from './Debug.tsx';
+import { Debug, Settings } from './Debug.tsx';
 import { Guard } from './Guard.tsx';
 import { IdeasScreen } from './Ideas.tsx';
 import { ideaEnrolled, ideaQueueNow, startIdeaCards } from '../app/ideas.ts';
@@ -261,7 +261,10 @@ function Home() {
           </p>
         )}
       </section>
-      <Guard name="Settings and debug">
+      <Guard name="Settings">
+        <Settings />
+      </Guard>
+      <Guard name="Debug">
         <Debug />
       </Guard>
     </>

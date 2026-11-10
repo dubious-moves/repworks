@@ -72,7 +72,7 @@
 
   /* The notation */
   --move-hover: #2d5171;
-  --move-current: #319a28;
+  --move-current: #2b8623;
   --on-current: #fff;
   --move-number: #b9b3b3;
   --glyph-current: #ffe9a8;
@@ -84,7 +84,7 @@
   --branch-line: #555;
 
   /* Training */
-  --due: #e66464; /* 4.5:1 on the surfaces of Forest, Slate, Walnut and Midnight */
+  --due: #e87272; /* 4.5:1 on the surfaces and the cards of Forest, Slate, Walnut and Midnight */
   --learned: #319a28;
   --must: #e0b84a;
   --paused: #9aa0a6;
@@ -114,7 +114,7 @@
   --surface: #262421;
   --text: #cfcdca;
   --text-soft: #b5b3b0;
-  --muted: #8b8987;
+  --muted: #989694;
   --link: #6eb0f0;
   --accent: #2f5f93;
   --accent-text: #f2f6fb;
@@ -122,7 +122,7 @@
   --accent-hover: #3a6ea8;
   --accent-hover-border: #6b98cc;
   --badge-text: #cfe3f7;
-  --primary-bg: #3692e7;
+  --primary-bg: #2a72b4;
   --primary-border: #5aa8ef;
   --dialog-bg: #1e1d1a;
   --menu-bg: #302e2b;
@@ -131,7 +131,7 @@
   --switch-off: #403e3b;
   --switch-on: #3692e7;
   --move-hover: #3a3833;
-  --move-current: #3692e7;
+  --move-current: #2c78bd;
   --learned: #629924;
   --comment: #9cc9e8;
 }
@@ -143,7 +143,7 @@
   --surface: #28211b;
   --text: #e6dccf;
   --text-soft: #c9bcab;
-  --muted: #9a8b7a;
+  --muted: #a09282;
   --link: #e3b36a;
   --accent: #4a321c;
   --accent-text: #f6ead9;
@@ -163,7 +163,7 @@
   --switch-off: #46392d;
   --switch-on: #b5762a;
   --move-hover: #4a3a2a;
-  --move-current: #b5762a;
+  --move-current: #a16925;
   --move-number: #a99a89;
   --comment: #d9b98a;
   --comment-line: #e3b36a;
@@ -201,7 +201,7 @@
   --switch-off: #2a3038;
   --switch-on: #0ea5c9;
   --move-hover: #16303d;
-  --move-current: #0e8fb3;
+  --move-current: #0c7f9f;
   --move-number: #9aa3ad;
   --comment: #7fe0c8;
   --comment-line: #5fd4f4;
@@ -333,7 +333,7 @@
   --select-bg: #3d5a66;
   --on-select: #ffffff;
   --info: #7fa3c4;
-  --info-strong: #6b8fb0;
+  --info-strong: #5a7894;
   --info-bg: #2b3640;
   --info-text: #e3ebf2;
   --info-muted: #3e4a55;
@@ -414,7 +414,7 @@
   --select-bg: #2c4a7a;
   --on-select: #ffffff;
   --info: #6b93d6;
-  --info-strong: #5880c4;
+  --info-strong: #5074b2;
   --info-bg: #263a5a;
   --info-text: #e8eef8;
   --info-muted: #3e4d66;
@@ -495,7 +495,7 @@
   --select-bg: #2c4f7a;
   --on-select: #ffffff;
   --info: #6f97d6;
-  --info-strong: #5a82c2;
+  --info-strong: #5175af;
   --info-bg: #1d3049;
   --info-text: #e7eef8;
   --info-muted: #33465f;

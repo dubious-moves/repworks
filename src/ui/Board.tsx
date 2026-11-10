@@ -19,6 +19,7 @@ import type { Brush, Shape } from '../core/study/model.ts';
 import { toggleShape } from '../core/study/ops.ts';
 import { BOARD_MAX, BOARD_MIN, boardSize, setBoardSize } from '../app/boardSize.ts';
 import { MATERIAL_ROLES, material } from '../core/chess/material.ts';
+import { sound } from '../app/sound.ts';
 
 export interface BoardProps {
   fen: string;
@@ -230,6 +231,19 @@ export function Board(p: BoardProps) {
     if (api.current?.state.premovable.current && !p.premove?.current) api.current.cancelPremove();
   });
 
+  // Sounds (§5.159): a move or a capture as the position goes one ply on, whoever made it; stepping
+  // back, jumping, or a new card makes none.
+  const lastFen = useRef(p.fen);
+  useEffect(() => {
+    const was = lastFen.current;
+    lastFen.current = p.fen;
+    if (was === p.fen || !p.lastMove) return;
+    const a = plyOf(was);
+    const b = plyOf(p.fen);
+    if (a === undefined || b !== a + 1) return;
+    sound(piecesIn(p.fen) < piecesIn(was) ? 'capture' : 'move');
+  }, [p.fen]);
+
   return (
     <div class={`board${p.drawMode ? ' board-draw' : ''}`} ref={wrap}>
       <div class="cg-host" ref={el} />
@@ -376,6 +390,7 @@ function PromotionChoice(props: { dest: Key; onPick(role: Role | undefined): voi
 
 /** The best move's burst on its square: a glow, a ring and sparks, gone by themselves (app.css). */
 function Celebrate(props: { square: string; orientation: 'white' | 'black' }) {
+  useEffect(() => sound('right'), []);
   const file = props.square.charCodeAt(0) - 97;
   const rank = Number(props.square[1]) - 1;
   if (!(file >= 0 && file < 8 && rank >= 0 && rank < 8)) return null;
@@ -393,6 +408,16 @@ function Celebrate(props: { square: string; orientation: 'white' | 'black' }) {
   );
 }
 
+/** A FEN's ply from the game's start, from its move number and side; undefined without them. */
+function plyOf(fen: string): number | undefined {
+  const [, turn, , , , full] = fen.split(' ');
+  const n = Number(full);
+  if (!full || !Number.isInteger(n) || (turn !== 'w' && turn !== 'b')) return undefined;
+  return (n - 1) * 2 + (turn === 'b' ? 1 : 0);
+}
+
+const piecesIn = (fen: string) => (fen.split(' ')[0]!.match(/[a-z]/gi) ?? []).length;
+
 /** A square's place on the board, in eighths from the top left; undefined for no square. */
 function placeOf(square: string, orientation: 'white' | 'black'): { col: number; row: number } | undefined {
   const file = square.charCodeAt(0) - 97;
@@ -403,6 +428,7 @@ function placeOf(square: string, orientation: 'white' | 'black'): { col: number;
 
 /** A wrong move's squares: the one moved to red with a cross, the one moved from faintly; fading by themselves (app.css). */
 function Miss(props: { uci: string; orientation: 'white' | 'black' }) {
+  useEffect(() => sound('wrong'), []);
   const from = placeOf(props.uci.slice(0, 2), props.orientation);
   const to = placeOf(props.uci.slice(2, 4), props.orientation);
   if (!from || !to) return null;

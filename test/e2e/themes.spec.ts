@@ -48,7 +48,7 @@ test('a theme chosen in the settings is shown at once and kept', async ({ page }
   await setUp(page);
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'forest');
   const dark = await background(page);
-  await page.getByText('Settings and debug').click();
+  await page.locator('details.settings > summary').click();
   await page.getByLabel('Theme').selectOption('paper');
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'paper');
   expect(await background(page)).not.toBe(dark);

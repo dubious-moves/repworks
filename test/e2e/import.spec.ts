@@ -158,6 +158,62 @@ test('a public Lichess study imports from its URL, each chapter as Lichess expor
   expect(studiesIn(git).get('Rep')).toEqual({ kind: 'reference', chapters: chunks });
 });
 
+/** Another app's share, as Android sends it to the manifest's share_target: a POSTed form. */
+async function share(page: Page, fields: Record<string, string>, file?: { name: string; text: string }) {
+  await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
+  await page.evaluate(
+    ({ fields, file }) => {
+      const form = document.createElement('form');
+      form.method = 'post';
+      form.enctype = 'multipart/form-data';
+      form.action = new URL('share', location.href.split('#')[0]).href;
+      for (const [k, v] of Object.entries(fields)) {
+        const input = document.createElement('input');
+        input.name = k;
+        input.value = v;
+        form.append(input);
+      }
+      if (file) {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.name = 'pgn';
+        const dt = new DataTransfer();
+        dt.items.add(new File([file.text], file.name, { type: 'application/x-chess-pgn' }));
+        input.files = dt.files;
+        form.append(input);
+      }
+      document.body.append(form);
+      form.submit();
+    },
+    { fields, file },
+  );
+}
+
+test('shared to Repworks (§5.159): a PGN file, a Lichess study’s link, and text with nothing to import', async ({ page }) => {
+  await setUp(page);
+  await serveLichess(page, [{ id: 'AbCd1234', name: 'Rep', pgn: LICHESS_EXPORT }]);
+  // A file: read at once, named after it.
+  await share(page, { title: 'From the files app' }, { name: 'Sicilian.qchess.pgn', text: qchessExport() });
+  await expect(page).toHaveURL(/#\/import$/);
+  await expect(page.getByRole('heading', { name: 'Import 2 chapters' })).toBeVisible();
+  await expect(page.getByLabel('Study name')).toHaveValue('Sicilian');
+  // A study's link in the text, as the Lichess app shares it: fetched.
+  await page.goto(`${site.url}#/`);
+  await share(page, { title: 'Rep', text: 'Rep https://lichess.org/study/AbCd1234/WxYz5678' });
+  await expect(page).toHaveURL(/#\/import$/);
+  await expect(page.getByLabel('Study name')).toHaveValue('Rep');
+  await expect(page.getByLabel('Side of Najdorf')).toHaveValue('black');
+  // Taken once: Import opened again offers its sources.
+  await page.goto(`${site.url}#/`);
+  await page.goto(`${site.url}#/import`);
+  await expect(page.getByLabel('Study URL or ID')).toBeVisible();
+  await expect(page.getByTestId('share-note')).toHaveCount(0);
+  // Nothing to import: said, with the sources below.
+  await share(page, { text: 'hello there' });
+  await expect(page.getByTestId('share-note')).toHaveText('Nothing to import in what was shared: hello there');
+  await expect(page.getByLabel('Study URL or ID')).toBeVisible();
+});
+
 test('a private study needs the Lichess login; after it, the study list and the export carry the token', async ({ page }) => {
   await setUp(page);
   const seen = await serveLichess(page, [

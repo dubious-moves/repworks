@@ -1,5 +1,6 @@
-// The debug panel (PLAN.md §4.9, §4.11): this device, its remote and base, what is waiting, and
-// the day's GitHub requests against the limits; buttons to sync and to record a test review.
+// The home's Settings and Debug panels (PLAN.md §4.9, §4.11, §5.159): this device and its look,
+// engines and token; the sync's base, what is waiting, and the day's GitHub requests against the
+// limits, with buttons to sync and to record a test review.
 import { useEffect, useState } from 'preact/hooks';
 import { requestCounts } from '../app/requests.ts';
 import { device, localStore, recordTestReview, settings, syncNow } from '../app/state.ts';
@@ -14,6 +15,7 @@ import { TimeControl } from './TimeTravel.tsx';
 import { EngineFiles } from './Engines.tsx';
 import { isoDay } from './day.ts';
 import { isTheme, setTheme, theme, THEMES } from '../app/theme.ts';
+import { setSoundOn, soundOn } from '../app/sound.ts';
 
 /** The look (src/ui/themes.css): this device's theme, and the gallery that shows them side by side. */
 function Look() {
@@ -30,6 +32,9 @@ function Look() {
         </select>
       </label>{' '}
       <a href={`${import.meta.env.BASE_URL}styles.html`}>Compare the themes</a>
+      <label class="check">
+        <input type="checkbox" checked={soundOn.value} onChange={(e) => setSoundOn(e.currentTarget.checked)} /> Sounds: a move, a capture, the best move found, and a wrong move (with a short buzz on a phone)
+      </label>
     </div>
   );
 }
@@ -82,34 +87,36 @@ function Repertoire() {
 }
 
 /**
- * Folded on the home. Its body is drawn, and the card states replayed from every log, only while it
- * is open: folded, it cost a second replay of the whole history and a table row per card on every
- * visit home and twice a sync (about 0.2 s on a desktop with 3,000 cards; PLAN.md §5.156).
+ * The home's two folded panels (PLAN.md §5.159): Settings (the look, sounds, engines, this device,
+ * other devices, the token) and Debug (the sync's state and requests, the test review, time
+ * travel, the repertoire's index, the card states). Each body is drawn only while it is open:
+ * folded, the card states cost a second replay of the whole history and a table row per card on
+ * every visit home and twice a sync (about 0.2 s on a desktop with 3,000 cards; §5.156).
  */
+export function Settings() {
+  const [open, setOpen] = useState(false);
+  return (
+    <details class="card settings" open={open} onToggle={(e) => setOpen(e.currentTarget.open)}>
+      <summary>Settings</summary>
+      {open && <SettingsBody />}
+    </details>
+  );
+}
+
 export function Debug() {
   const [open, setOpen] = useState(false);
   return (
     <details class="card debug" open={open} onToggle={(e) => setOpen(e.currentTarget.open)}>
-      <summary>Settings and debug</summary>
+      <summary>Debug</summary>
       {open && <DebugBody />}
     </details>
   );
 }
 
-function DebugBody() {
-  const [state, setState] = useState<LocalState | undefined>(undefined);
-  const [cards, setCards] = useState<CardRow[]>([]);
-  const version = dataVersion.value;
-  const phase = syncStatus.value.phase;
-  useEffect(() => {
-    const store = localStore();
-    void store?.state().then(setState, () => setState(undefined));
-    if (store) void cardStates(store).then(setCards, () => setCards([]));
-  }, [version, phase]);
+function SettingsBody() {
   const d = device.value;
   const r = settings.value;
   const s = syncStatus.value;
-  const c = requestCounts.value;
   return (
     <>
       <Look />
@@ -123,13 +130,36 @@ function DebugBody() {
           {r?.repo} <code>{r?.branch || '(branch not read yet)'}</code> · writes via {r?.write === 'rest' ? 'REST' : 'GraphQL'}
           {r?.private === false && <strong class="warn"> · public!</strong>}
         </dd>
+        <dt>Last sync</dt>
+        <dd>{s.lastSynced ? formatTime(s.lastSynced) : 'never'}</dd>
+      </dl>
+      <EngineFiles />
+      <OtherDeviceCode />
+      <SetupForm title="Change the token" />
+    </>
+  );
+}
+
+function DebugBody() {
+  const [state, setState] = useState<LocalState | undefined>(undefined);
+  const [cards, setCards] = useState<CardRow[]>([]);
+  const version = dataVersion.value;
+  const phase = syncStatus.value.phase;
+  useEffect(() => {
+    const store = localStore();
+    void store?.state().then(setState, () => setState(undefined));
+    if (store) void cardStates(store).then(setCards, () => setCards([]));
+  }, [version, phase]);
+  const s = syncStatus.value;
+  const c = requestCounts.value;
+  return (
+    <>
+      <dl>
         <dt>Base commit</dt>
         <dd>
           <code>{state?.base?.commit.slice(0, 10) ?? 'none yet'}</code>
           {state?.base && <> · {state.base.files.size} files</>}
         </dd>
-        <dt>Last sync</dt>
-        <dd>{s.lastSynced ? formatTime(s.lastSynced) : 'never'}</dd>
         <dt>Waiting</dt>
         <dd>
           {s.waiting.files} file(s), {s.waiting.events} event(s){state?.pending.length ? ` · ${state.pending.length} commit(s) awaiting an answer` : ''}
@@ -154,12 +184,11 @@ function DebugBody() {
         <button type="button" onClick={syncNow}>
           Sync now
         </button>
-        <button type="button" onClick={() => void recordTestReview()}>
+        <button type="button" onClick={() => void recordTestReview()} title="Writes a made-up review of 1. e4 into this device's log">
           Record a test review
         </button>
       </div>
       <Repertoire />
-      <EngineFiles />
       <h3>Card states (replay of every device's log)</h3>
       {cards.length === 0 ? (
         <p class="muted">No reviews yet.</p>
@@ -192,8 +221,6 @@ function DebugBody() {
           </table>
         </div>
       )}
-      <OtherDeviceCode />
-      <SetupForm title="Change the token" />
     </>
   );
 }

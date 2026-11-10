@@ -38,6 +38,9 @@ test('the manifest parses and Chrome reports no installability errors', async ({
     const shortcuts = parsed.shortcuts as { name: string; url: string }[];
     expect(shortcuts.map((s) => s.name)).toEqual(['Train', 'Storm', 'Games', 'Endgames']);
     expect(shortcuts.map((s) => s.url)).toEqual(['./#/train', './#/storm', './#/games', './#/endgames']);
+    // Share to Repworks and .pgn files opened with it (§5.159), with no manifest error above.
+    expect(parsed.share_target).toMatchObject({ action: './share', method: 'POST', enctype: 'multipart/form-data' });
+    expect(parsed.file_handlers).toEqual([{ action: './', accept: { 'application/x-chess-pgn': ['.pgn'] } }]);
     const { installabilityErrors } = await cdp.send('Page.getInstallabilityErrors');
     expect(installabilityErrors).toEqual([]);
   } finally {

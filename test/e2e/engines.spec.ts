@@ -36,7 +36,7 @@ test('Stockfish is downloaded when asked, then served from its cache with the si
   expect(engineRequests(site)).toEqual([]);
   expect(await page.evaluate(async () => (await Promise.all((await caches.keys()).filter((k) => k.startsWith('repworks-shell-')).map(async (k) => (await caches.open(k)).keys()))).flat().filter((r) => r.url.includes('/engines/')).length)).toBe(0);
 
-  await page.getByText('Settings and debug').click();
+  await page.locator('details.settings > summary').click();
   const stockfish = page.locator('.engine-files', { hasText: 'Stockfish 18 · ' });
   await expect(stockfish).toContainText('7.3 MB · not stored');
   await stockfish.getByRole('button', { name: 'Download' }).click();
@@ -48,7 +48,7 @@ test('Stockfish is downloaded when asked, then served from its cache with the si
   // With the site gone, the stored files still answer, from the engines' cache.
   await site.close();
   await page.reload();
-  await page.getByText('Settings and debug').click();
+  await page.locator('details.settings > summary').click();
   await expect(page.locator('.engine-files', { hasText: 'Stockfish 18 · ' })).toHaveAttribute('data-stored', 'yes');
   const sizes = await page.evaluate(async () => {
     const keys = await (await caches.open('repworks-engines')).keys();
@@ -60,7 +60,7 @@ test('Stockfish is downloaded when asked, then served from its cache with the si
 
 test('Maia is downloaded, and a deploy keeps the engines it still names', async ({ page }) => {
   const offSite = await setUp(page);
-  await page.getByText('Settings and debug').click();
+  await page.locator('details.settings > summary').click();
   const maia = page.locator('.engine-files', { hasText: 'Maia 3' });
   await expect(maia).toContainText('59.9 MB · not stored');
   await maia.getByRole('button', { name: 'Download' }).click();
