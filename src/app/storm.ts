@@ -34,7 +34,7 @@ import { analyseForStorm, cancelStormEngine, endStormEngine, focusedWidth, setSt
 import { lineView } from './lineView.ts';
 import { trainData, type TrainData } from './train.ts';
 import { puzzlePrefs, readyPuzzles } from './puzzles.ts';
-import { keptPolicy, missingRatings, type MaiaRating } from '../core/storm/maia.ts';
+import { keptPolicy, missingRatings, unlistedLikely, type MaiaRating } from '../core/storm/maia.ts';
 import { cleanFocus, cleanLevelUp, easyAt, FOCUSES, LEVEL_DEFAULT, tooEasyAt, matchesFocus, positionTags, withLevelUp, type Focus, type LevelUp } from '../core/storm/kinds.ts';
 import { maiaElo, maiaPolicies, maiaStored } from './maia.ts';
 import type { ReadyPuzzle } from '../core/puzzles/puzzles.ts';
@@ -548,31 +548,64 @@ let lookRun = 0;
 let lookBusy = false;
 /** The card the look-ahead is searching, if any. */
 let lookCard: StoredPosition | undefined;
+/** The position after a likely move the look-ahead is searching (§5.157), if any: its FEN. */
+let lookChild: string | undefined;
 /** The cards searched this session, deepened or not: one try each. */
 const lookTried = new Set<string>();
+/** The positions after likely moves tried this session (§5.157), by FEN: one try each. */
+const childTried = new Set<string>();
+
+/** The positions after the card's likely moves outside its list still to search (§5.157). */
+function childrenToSearch(card: StoredPosition, elo: number): string[] {
+  return unlistedLikely(card.maia, elo, storedList(card), STORM.prepMaiaMin, STORM)
+    .map((uci) => fenAfterUci(card.fen, uci))
+    .filter((f): f is string => !!f && !childTried.has(f));
+}
 
 /**
  * While a session waits for a move, Stockfish deepens its cards still below the device's target
  * (MultiPV 12 at depth 24, 22 on a phone, §23, §5.84), the one on the board first, then those
- * still to come: a move on a deepened card is graded at once from its list. A move stops it
+ * still to come: a move on a deepened card is graded at once from its list. Once a card's list
+ * judges, the positions after the moves Maia at the user's rating plays often that the list leaves
+ * out are searched too, as the grade would (§5.157), so those moves are graded at once as well:
+ * the card on the board's before the deepening of the cards to come. A move stops it
  * (`pauseLookAhead`), its search kept when it has reached a depth that may judge
- * (`keepSearchSoFar`); the next deal, or the verdict, starts it again. A timed storm's queue is
- * drawn as it goes, so there it is mostly the card on the board.
+ * (`keepSearchSoFar`), or left to finish when it is of the position after that very move; the
+ * next deal, or the verdict, starts it again. A timed storm's queue is drawn as it goes, so there
+ * it is mostly the card on the board.
  */
 async function lookAhead(): Promise<void> {
   const s = stormSession.value;
-  // Show and grade deals only positions that judge already (§5.152): nothing to look ahead for,
-  // and a list deepened under the user's eyes would move the arrows.
-  if (!s || s.phase === 'done' || s.mode === 'show' || lookBusy) return;
+  if (!s || s.phase === 'done' || lookBusy) return;
   const run = ++lookRun;
   lookBusy = true;
   try {
     for (;;) {
       const now = stormSession.value;
       if (run !== lookRun || !now || now.phase === 'done') return;
-      const onBoard = now.item && !now.item.puzzle && !now.item.answer ? [now.item.card] : [];
-      const p = [...onBoard, ...queue, ...secondPass.map((i) => i.card)].find((c) => needsDeepening(c, deepenTarget()) && !lookTried.has(c.card));
-      if (!p) return;
+      const item = now.item && !now.item.puzzle ? now.item : undefined;
+      // Show and grade deals only positions that judge already (§5.152): none to deepen, and a list
+      // deepened under the user's eyes would move the arrows. A likely move's search moves nothing.
+      const deepens = now.mode !== 'show';
+      const unanswered = item && !item.answer ? [item.card] : [];
+      const toCome = [...queue, ...secondPass.map((i) => i.card)];
+      const deepen = (cs: StoredPosition[]) => (deepens ? cs.find((c) => needsDeepening(c, deepenTarget()) && !lookTried.has(c.card)) : undefined);
+      const child = (cs: StoredPosition[]) => cs.flatMap((c) => childrenToSearch(c, now.elo))[0];
+      // A held card is tried again: its likely moves still matter.
+      const onBoard = item && (!item.answer || now.phase === 'held') ? [item.card] : [];
+      // The card on the board deepened, then its likely moves; then the cards to come, the same way.
+      const job = [() => deepen(unanswered), () => child(onBoard), () => deepen(toCome), () => child(toCome)].reduce<StoredPosition | string | undefined>((got, f) => got ?? f(), undefined);
+      if (!job) return;
+      if (typeof job === 'string') {
+        childTried.add(job);
+        lookChild = job;
+        await engineScore(job);
+        lookChild = undefined;
+        // Stopped by another move: tried again later (finished, the engine's cache answers it).
+        if (run !== lookRun) childTried.delete(job);
+        continue;
+      }
+      const p = job;
       lookTried.add(p.card);
       lookCard = p;
       const a = await analyseForStorm(p.fen, STORM.deepenMultipv, deepenTarget(), STORM.deepenMs);
@@ -594,13 +627,18 @@ async function lookAhead(): Promise<void> {
   }
 }
 
-/** The look-ahead stopped, its search with it. */
-function pauseLookAhead(): void {
+/**
+ * The look-ahead stopped, its search with it; but a search of the position `keep` (the one after
+ * the move just played, §5.157) is left to finish, for the grade to take up.
+ */
+function pauseLookAhead(keep?: string): void {
   if (!lookBusy) return;
   lookRun++;
   lookBusy = false;
   lookCard = undefined;
-  cancelStormEngine();
+  const kept = !!keep && lookChild === keep;
+  lookChild = undefined;
+  if (!kept) cancelStormEngine();
 }
 
 /**
@@ -825,6 +863,7 @@ export async function startStorm(s: StormScopeData, mode: SessionMode, o: { focu
   }
   secondPass = [];
   lookTried.clear();
+  childTried.clear();
   stormSession.value = { mode, scopeKey: s.key, title: s.title, phase: 'solving', item: undefined, history: [], points: 0, streak: 0, left: STORM.sessionMs, endsAt: undefined, pass: 1, revealed: false, note: '', total, disguise: puzzleQueue.length > 0, elo, ...(focus.length ? { focus } : {}) };
   if (mode === 'storm') {
     tick = setInterval(() => {
@@ -903,7 +942,7 @@ export async function answerMove(uci: string): Promise<void> {
   // The grade's searches come first: the look-ahead waits for the verdict, its search of this
   // card kept if deep enough to judge.
   const card = await keepSearchSoFar(item.card);
-  pauseLookAhead();
+  pauseLookAhead(fenAfterUci(card.fen, uci));
   const v = await gradeMove(card, uci);
   void lookAhead();
   const now = stormSession.value;

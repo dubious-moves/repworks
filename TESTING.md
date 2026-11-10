@@ -1227,3 +1227,14 @@ q_extension (or give it to a session with q_extension attached), then run
   sooner than before (they waited for the folded settings panel to replay the whole history).
   Settings and debug still opens with everything in it.
 - §5.156 lists eleven ideas and the dark themes' faint colours: say which to build.
+
+## Maia's likely moves searched while you think (§5.157, 2026-11-10)
+- Checked by unit tests and the storm's Playwright tests (desktop and emulated phone, a fake
+  engine); nothing live yet.
+- With Maia on the device and the positions rated: in a set, think for a few seconds, then play a
+  natural-looking move that isn't among the 12 moves Show and grade would draw. If Maia gave it
+  20% or more at your rating, the verdict should come at once instead of after a second or two
+  (on the phone, up to 8 s before). Its source still reads "the position after it was searched to
+  depth 20".
+- The timed storm on the phone: does the extra searching while you think make the board feel
+  slower or the phone warmer?

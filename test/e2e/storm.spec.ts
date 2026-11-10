@@ -1030,6 +1030,61 @@ test('a storm’s look-ahead: the card on the board searched first, MultiPV 12 a
   expect(commands(site.requests.slice(before))).not.toContain('go depth 20 movetime 8000');
 });
 
+// Controls run (2026-11-10, desktop and phone), each failing this test at its own assertion: the
+// likely moves left out of the look-ahead (no search of the position after the move); the share
+// lowered to 5% (the rarer move's position searched too).
+test('a storm’s look-ahead (§5.157): the position after Maia’s likely move outside the list searched while the user thinks, and that move graded with no search of its own', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.addInitScript(() => localStorage.setItem('repworks-maia', JSON.stringify({ on: false, rating: 1500 })));
+  const w = await setUp(page, { deepen: true });
+  const ready = await gathered(page, w);
+  await expect(page.getByTestId('storm-deep')).toContainText(`${ready} of ${ready} scored`, { timeout: 60_000 });
+  // Maia at 1500, as if it had rated them (§5.82): the best move 40%, the 13th (outside the list
+  // of 12) 30%, the 14th 10% (under the 20% the look-ahead searches for).
+  const policies = Object.fromEntries((await keptPositions(page)).map((p) => [p.card, ranked(p.fen)]));
+  await page.evaluate(
+    (byCard) =>
+      new Promise<void>((resolve, reject) => {
+        const open = indexedDB.open('repworks-storm');
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const tx = open.result.transaction('positions', 'readwrite');
+          const req = tx.objectStore('positions').openCursor();
+          req.onsuccess = () => {
+            const c = req.result;
+            if (!c) return;
+            const m = byCard[c.value.card]!;
+            c.update({ ...c.value, maia: [{ elo: 1500, moves: [[m[0], 0.4], [m[12], 0.3], [m[13], 0.1]] }] });
+            c.continue();
+          };
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        };
+      }),
+    policies,
+  );
+  const start = site.requests.length;
+  const fresh = () => commands(site.requests.slice(start));
+  await page.getByRole('button', { name: /^Set of/ }).click();
+  await expect(page.locator('.storm-card')).toBeVisible();
+  const fen = await cardFen(page);
+  const moves = ranked(fen);
+  const likely = fen4(after(fen, moves[12]!));
+  const rare = fen4(after(fen, moves[13]!));
+  // The card judges already: the look-ahead goes to the position after the likely move, as the
+  // grade's one search (depth 20, 8 s at most), and not to the rarer move's.
+  await expect.poll(() => fresh().some((c) => c.startsWith('position fen ') && c.includes(likely))).toBe(true);
+  await expect.poll(() => fresh()).toContain('go depth 20 movetime 8000');
+  // Its search done (the fake engine takes 0.4 s), the move is graded with no search of its own
+  // (the engine's cache answers the grade's).
+  await page.waitForTimeout(800);
+  expect(fresh().some((c) => c.startsWith('position fen ') && c.includes(rare))).toBe(false);
+  const before = site.requests.length;
+  await play(page, moves[12]!);
+  await expect(page.getByTestId('storm-verdict')).toContainText('Mistake');
+  expect(commands(site.requests.slice(before)).some((c) => c.startsWith('position fen ') && c.includes(likely))).toBe(false);
+});
+
 interface Kept {
   card: string;
   fen: string;

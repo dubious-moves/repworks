@@ -115,7 +115,7 @@ export function sourceTitle(v: Verdict | null | undefined): string {
   const depth = v.depth ? ' to depth ' + v.depth : '';
   if (v.source === 'sflist') return 'This position was scored by Stockfish' + depth + ' before you moved, and your move is in that list: the best move and yours come from one search of one position.';
   if (v.source === 'engine') {
-    if (v.oneSearch) return 'Your move is not in the list Stockfish stored for this position, so the position after it was searched now' + depth + ' and compared with the stored score: one engine.';
+    if (v.oneSearch) return 'Your move is not in the list Stockfish stored for this position, so the position after it was searched' + depth + ' and compared with the stored score: one engine.';
     return 'Stockfish had not yet scored this position deeply enough to judge, so two searches' + depth + ' graded your move: the position and the position after it, from one engine.';
   }
   return '';

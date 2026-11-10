@@ -8,12 +8,14 @@
 //   share", "difficulty", "unintuitive", "Maia's line";
 // - the shallow list allowed to judge → "a move judged by the list", "difficulty", "unintuitive";
 // - `unintuitive` true on an unjudged top move → "unintuitive".
+// Controls run on `unlistedLikely` (2026-11-10), each failing "the likely moves outside the list":
+// listed moves kept; the threshold read as strictly above; a list that can't judge allowed.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { STORM as C } from '../../../../src/core/storm/config.ts';
 import type { ScoredList, ScoredMove } from '../../../../src/core/storm/grade.ts';
 import { deepenedPosition, type StoredPosition } from '../../../../src/core/storm/harvest.ts';
-import { difficulty, difficultyWords, foundShare, judgeMove, keptPolicy, MAIA_LADDER, maiaChoice, maiaLine, missingRatings, unintuitive, type MaiaRating } from '../../../../src/core/storm/maia.ts';
+import { difficulty, difficultyWords, foundShare, judgeMove, keptPolicy, MAIA_LADDER, maiaChoice, maiaLine, missingRatings, unintuitive, unlistedLikely, type MaiaRating } from '../../../../src/core/storm/maia.ts';
 
 // Win% lost against the best (0): 30 cp ≈ 2.7 (great), 60 ≈ 5.5 (good), 100 ≈ 9.1 (inaccuracy),
 // 200 ≈ 17.6 (mistake), 400 a blunder.
@@ -121,4 +123,19 @@ test('Maia’s line on an answered card', () => {
   assert.equal(maiaLine(undefined, 1500, sf(20), san, C), '');
   assert.equal(difficultyWords({ elo: 1000, edge: 'below' }), '1000 or less');
   assert.equal(difficultyWords({ elo: 2600, edge: 'above' }), 'over 2600');
+});
+
+test('the likely moves outside the list (§5.157): at the user’s rating, at least the share, most likely first, only beside a list that judges', () => {
+  const ratings = [rating(1000, [['a2a3', 0.6]]), rating(1500, [['e2e4', 0.3], ['h2h3', 0.25], ['a2a3', 0.2], ['g2g3', 0.19], ['d2d4', 0.06]])];
+  // e2e4 is listed (graded from the list); h2h3 and a2a3 are not, a2a3 at exactly the share.
+  assert.deepEqual(unlistedLikely(ratings, 1500, sf(20), 0.2, C), ['h2h3', 'a2a3']);
+  assert.deepEqual(unlistedLikely(ratings, 1500, sf(20), 0.21, C), ['h2h3']);
+  // Another rating's policy; a rating not kept.
+  assert.deepEqual(unlistedLikely(ratings, 1000, sf(20), 0.2, C), ['a2a3']);
+  assert.deepEqual(unlistedLikely(ratings, 1800, sf(20), 0.2, C), []);
+  assert.deepEqual(unlistedLikely(undefined, 1500, sf(20), 0.2, C), []);
+  // A list that can't judge is deepened first: nothing yet.
+  assert.deepEqual(unlistedLikely(ratings, 1500, sf(14), 0.2, C), []);
+  assert.deepEqual(unlistedLikely(ratings, 1500, cdb(), 0.2, C), []);
+  assert.equal(C.prepMaiaMin, 0.2);
 });

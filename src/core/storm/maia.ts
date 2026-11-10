@@ -117,6 +117,18 @@ export function maiaChoice(ratings: readonly MaiaRating[] | undefined, elo: numb
   return top ? { uci: top[0], prob: top[1] } : null;
 }
 
+/**
+ * The moves Maia at `elo` plays at least `min` of the time that the list leaves out, most likely
+ * first (§5.157): one of them played is graded by a search of the position after it, so that
+ * search can run while the user thinks. None unless the list may judge, since that one search is
+ * weighed against it (a list that can't judge is deepened first, and its moves change).
+ */
+export function unlistedLikely(ratings: readonly MaiaRating[] | undefined, elo: number, list: ScoredList, min: number, c: StormConfig): string[] {
+  if (!listJudges(list, c)) return [];
+  const at = ratings?.find((r) => r.elo === elo);
+  return (at?.moves ?? []).filter(([uci, p]) => p >= min && !list.some((m) => m.uci === uci)).map(([uci]) => uci);
+}
+
 /** Unintuitive at `elo`: Maia's most likely move there is judged, and isn't a good move. */
 export function unintuitive(ratings: readonly MaiaRating[] | undefined, elo: number, list: ScoredList, c: StormConfig): boolean {
   const top = maiaChoice(ratings, elo);

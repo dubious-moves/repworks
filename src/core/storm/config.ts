@@ -98,6 +98,12 @@ export interface StormConfig {
   engineDepth: { desktop: number; mobile: number };
   enginePhaseMs: number;
   /**
+   * The look-ahead (§5.157): the position after each move Maia at the user's rating plays at least
+   * this often, outside the card's list, searched as the grade would search it, so that move is
+   * graded at once.
+   */
+  prepMaiaMin: number;
+  /**
    * Continue after a good move (§5.154): Maia's reply at the user's rating, drawn at this
    * precision (practice's `maiaPick`: 1 its likeliest move, 0.75 practice's default); Stockfish's
    * best when Maia isn't on the device or hasn't answered within `replyMaiaMs`.
@@ -205,6 +211,7 @@ export const STORM: StormConfig = {
   deepenMs: 600_000,
   engineDepth: { desktop: 20, mobile: 20 },
   enginePhaseMs: 8000,
+  prepMaiaMin: 0.2,
   replyPrecision: 0.75,
   replyMaiaMs: 20_000,
   puzzleAnchorMinPly: 12,
