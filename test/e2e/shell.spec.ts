@@ -34,6 +34,10 @@ test('the manifest parses and Chrome reports no installability errors', async ({
     const parsed = JSON.parse(manifest.data ?? '{}') as Record<string, unknown>;
     expect(parsed.orientation).toBeUndefined();
     expect(parsed.display).toBe('standalone');
+    // The icon's shortcuts (§5.158): each a hash route beside the start URL, inside the scope.
+    const shortcuts = parsed.shortcuts as { name: string; url: string }[];
+    expect(shortcuts.map((s) => s.name)).toEqual(['Train', 'Storm', 'Games', 'Endgames']);
+    expect(shortcuts.map((s) => s.url)).toEqual(['./#/train', './#/storm', './#/games', './#/endgames']);
     const { installabilityErrors } = await cdp.send('Page.getInstallabilityErrors');
     expect(installabilityErrors).toEqual([]);
   } finally {

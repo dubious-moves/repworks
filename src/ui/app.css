@@ -323,6 +323,24 @@ label.check input {
   }
 }
 
+/* The home's Today card (§5.158): a row a kind of work, Next in its head. */
+.today-card .card-head .actions {
+  margin: 0;
+}
+
+.today-rows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.today-rows li {
+  white-space: nowrap;
+}
+
 /* The pages besides the studies: a row of their own under the studies' head; two by two on a phone. */
 .home-tools {
   display: flex;
@@ -1164,6 +1182,56 @@ textarea.script {
   font-weight: 700;
   line-height: 1;
   pointer-events: none;
+}
+
+/* A wrong move taken back (training, §5.158): its squares red for about a second, then fading.
+   With reduced motion it stays as long, then goes at once. */
+.board-miss {
+  position: absolute;
+  z-index: 3;
+  width: 12.5%;
+  aspect-ratio: 1;
+  pointer-events: none;
+  animation: miss-hold 1.4s ease-in forwards;
+}
+
+.board-miss.to {
+  background: rgb(214 60 50 / 55%); /* fixed */
+  box-shadow: inset 0 0 0 3px rgb(190 30 30 / 85%); /* fixed */
+}
+
+.board-miss.to::after {
+  content: '✕';
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff; /* fixed */
+  font-size: 2.2em;
+  font-weight: 700;
+  text-shadow: 0 0 4px rgb(0 0 0 / 60%); /* fixed */
+}
+
+.board-miss.from {
+  background: rgb(214 60 50 / 25%); /* fixed */
+}
+
+@keyframes miss-hold {
+  0%,
+  70% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .board-miss {
+    animation-timing-function: steps(1, end);
+  }
 }
 
 /* The best move found: a glow on its square, a ring going out and eight sparks, once (Board.tsx),
@@ -4267,6 +4335,11 @@ a.button.primary {
   min-width: 140px;
 }
 
+.storm-empty {
+  margin: 4px 0 0;
+  font-weight: 600;
+}
+
 .storm-about {
   margin: 4px 0 0;
   font-size: 0.85rem;
@@ -6101,6 +6174,20 @@ a.button.disabled {
   min-height: 1.4em;
 }
 
+.bar-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.bar-weekday {
+  opacity: 0.8;
+}
+
+.bars-empty {
+  margin: 8px 0;
+}
+
 .bar-track {
   flex: 1 1 auto;
   width: 100%;
@@ -6339,4 +6426,39 @@ a.button.disabled {
 .endgame-remove {
   align-self: flex-start;
   font-size: 0.85rem;
+}
+
+/* "?" lists the screen's keys (§5.158). */
+.keys-help {
+  max-width: min(520px, calc(100vw - 32px));
+}
+
+.keys-help h3 {
+  margin: 12px 0 4px;
+  font-size: 1rem;
+}
+
+.keys-help dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 0;
+}
+
+.keys-help dl > div {
+  display: contents;
+}
+
+.keys-help dd {
+  margin: 0;
+}
+
+.keys-help kbd {
+  display: inline-block;
+  padding: 0 6px;
+  border: 1px solid rgb(var(--ink) / 30%);
+  border-radius: 4px;
+  font: inherit;
+  font-size: 0.9em;
+  white-space: nowrap;
 }

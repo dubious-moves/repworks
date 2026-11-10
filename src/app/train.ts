@@ -210,6 +210,8 @@ export interface SessionView {
   asides?: TrainerView['asides'];
   /** After a wrong move, the move "Save as alternative" saves; an alternative just saved (§5.18). */
   wrongMove?: string;
+  /** The wrong move just played, marked on the board for a moment after it is taken back (§5.158); `n` counts them. */
+  miss?: { uci: string; n: number };
   savedAlt?: string;
   /** Show and grade's Space (§5.114): the alternatives saved for the move asked or shown, drawn in blue until the board moves. */
   alts?: { uci: string; san: string }[];
@@ -475,8 +477,12 @@ export function pickComment(key: string, on: boolean): void {
 export function seekSequence(ply: number): void {
   send({ type: 'seek', ply, now: Date.now() });
 }
+let movePlayed: string | undefined;
+let misses = 0;
 export function playMove(uci: string): void {
+  movePlayed = uci;
   send({ type: 'move', uci, now: Date.now() });
+  movePlayed = undefined;
 }
 
 /** Undoes the last suspend: the card is asked again from its next due day. */
@@ -721,6 +727,9 @@ function apply(t: Trainer, effects: readonly ShowGradeEffect[], always = false):
   else delete next.retry;
   if (v.wrongMove) next.wrongMove = v.wrongMove.san;
   else delete next.wrongMove;
+  // Marked only by the move that was wrong, not by what the wrong move leaves in the view after.
+  if (v.wrongMove && movePlayed === v.wrongMove.uci) next.miss = { uci: movePlayed, n: ++misses };
+  else if (!v.wrongMove) delete next.miss;
   if (v.savedAlt) next.savedAlt = v.savedAlt.san;
   else delete next.savedAlt;
   for (const k of ['comments', 'endQuiz', 'canQuiz', 'aside', 'asides'] as const) {

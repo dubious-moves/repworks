@@ -2190,3 +2190,21 @@ The technical calls, each with its reason:
   whole history a second time and drew a row per card on every visit home (1.8 s against 3.2 s to
   the home's counts at 4× slowdown with 3,000 cards).
 - No data format changed.
+
+## Revision of 2026-11-10 (Today, shortcuts, the wrong move shown, keys, empty pages; PLAN.md §5.158)
+- **The owner said to build §5.156's ideas but the faster start**, and to leave the Chessnut Move
+  until it is bought.
+- **Today is a card of its own above the training card**, not a rework of it: one row a kind of
+  work with Next, the training card's details kept below. Why: the training card's counts, links
+  and settings are tested and used daily; Today adds the kinds the home showed nothing of.
+- **The home counts the game cards from the deck's card ids kept on the device** by the Games
+  screen, not from the games. Why: the home would otherwise read and extract every game on each
+  visit (about 0.8 s per 1,000 games in Node). The cost: the count is as of the last visit to
+  Games, and absent on a device that never opened it. The ids are a local cache, not data in the
+  repo.
+- **The checklist's next line and the storm's positions count for Next** after everything with a
+  due date. They never run out, so with them Today rarely says "nothing due"; asked in
+  TESTING.md whether they should count only when nothing else is due.
+- **The wrong move is marked on its squares, red with a ✕, for about a second**, in training only:
+  the storm keeps the move on the board, and game cards show their engine line.
+- No data format changed.

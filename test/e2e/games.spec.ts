@@ -271,6 +271,26 @@ test('games read from the Gist and Lichess, a game opened, the day’s cards ans
   expect(overflow).toBeLessThanOrEqual(0);
 });
 
+test('the home counts today’s game cards from the deck as last read, after a reload too (§5.158)', async ({ page }) => {
+  await setUp(page);
+  // Never read on this device: no row, and Games says nothing more.
+  await expect(page.getByTestId('today')).toBeVisible();
+  await expect(page.getByTestId('today-games')).toHaveCount(0);
+  await page.getByRole('link', { name: 'Games', exact: true }).click();
+  await page.getByRole('button', { name: 'Refresh' }).click();
+  await expect(page.getByTestId('games-queue')).toContainText('0 due · 3 new today');
+  await page.evaluate(() => (location.hash = '#/'));
+  await expect(page.getByTestId('today-games')).toHaveText('Game cards 0 due · 3 new');
+  await expect(page.getByRole('navigation', { name: 'Pages' }).getByRole('link', { name: /^Games/ })).toHaveText('Games');
+  // A reload reads no game: the count comes from the deck kept.
+  await page.reload();
+  await expect(page.locator('.chip')).toHaveText(/^synced/);
+  await expect(page.getByTestId('today-games')).toHaveText('Game cards 0 due · 3 new');
+  await page.getByTestId('today-games').getByRole('link').click();
+  await expect(page).toHaveURL(/#\/games\/review$/);
+  await expect(page.locator('.game-card')).toHaveAttribute('data-card', 'm|GameOne1_7');
+});
+
 test('a move tried again is judged ahead of the engine line’s search, which starts again after (§5.151)', async ({ page, isMobile }) => {
   // The end of the line after the blunder takes 5 s to search here: the move tried next doesn't wait for it.
   const slow = await serveSite({ engine: fakeEngine(SLOW, ENGINE_LINES, false, undefined, { [G2_LINE_END.key]: 5000 }) });

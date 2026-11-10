@@ -168,11 +168,12 @@ const pieceOn = (page: Page, key: string) =>
 const shapes = (page: Page) => page.evaluate(() => document.querySelectorAll('cg-container svg.cg-shapes g, cg-container svg.cg-shapes-below g').length && [...document.querySelectorAll('cg-container svg.cg-shapes g, cg-container svg.cg-shapes-below g')].filter((g) => g.hasAttribute('cgHash')).length);
 
 async function gathered(page: Page, w: World) {
-  await page.getByRole('link', { name: 'Storm' }).click();
+  await page.getByRole('navigation', { name: 'Pages' }).getByRole('link', { name: /^Storm/ }).click();
   await expect(page).toHaveURL(/#\/storm$/);
   await expect(page.locator('.storm-home')).toContainText('3 line ends');
   await expect(page.getByTestId('storm-count')).toContainText('0 positions ready');
   await expect(page.getByRole('button', { name: 'Start storm' })).toBeDisabled();
+  await expect(page.getByTestId('storm-empty')).toHaveText(/^Gather positions first/);
   await page.getByRole('button', { name: 'Gather positions' }).click();
   await expect(page.locator('.storm-gather')).toContainText('Every line end and reply walked', { timeout: 30_000 });
   // Two exports per line end with games (one game at each first, then the rest), each a simple
@@ -186,12 +187,20 @@ async function gathered(page: Page, w: World) {
   expect(w.requests.filter((r) => r.startsWith('explorer')).every((r) => r === 'explorer 4')).toBe(true);
   const ready = Number((await page.getByTestId('storm-count').locator('strong').textContent()) ?? '0');
   expect(ready).toBeGreaterThan(3);
+  await expect(page.getByTestId('storm-empty')).toHaveCount(0);
   return ready;
 }
 
 test('the storm: positions gathered, a great move and a mistake scored, the review, the answers synced and the done position not dealt again', async ({ page }) => {
   const w = await setUp(page);
   const ready = await gathered(page, w);
+  // The home counts them (§5.158): on the Storm button and in the Today card.
+  await page.evaluate(() => (location.hash = '#/'));
+  const pages = page.getByRole('navigation', { name: 'Pages' });
+  await expect(pages.getByRole('link', { name: /^Storm/ })).toHaveText(`Storm · ${ready} ready`);
+  await expect(page.getByTestId('today-storm')).toHaveText(`Storm ${ready} ready`);
+  await pages.getByRole('link', { name: /^Storm/ }).click();
+  await expect(page.getByTestId('storm-count')).toContainText(`${ready} positions ready`);
 
   await page.getByRole('button', { name: 'Start storm' }).click();
   await expect(page.locator('.storm-card')).toBeVisible();
@@ -427,7 +436,7 @@ test('overnight (§5.102): the gather goes on over older games, Stockfish scorin
     });
   });
   await page.reload();
-  await page.getByRole('link', { name: 'Storm' }).click();
+  await page.getByRole('navigation', { name: 'Pages' }).getByRole('link', { name: /^Storm/ }).click();
   await page.getByLabel(/Keep going until stopped/).check();
   await page.getByRole('button', { name: 'Gather positions' }).click();
   await expect(page.getByTestId('storm-overnight-note')).toBeVisible();
@@ -474,7 +483,7 @@ test('overnight: a failure is waited out, not the end; Stop ends it', async ({ p
     }
     return route.fallback();
   });
-  await page.getByRole('link', { name: 'Storm' }).click();
+  await page.getByRole('navigation', { name: 'Pages' }).getByRole('link', { name: /^Storm/ }).click();
   await page.getByLabel(/Keep going until stopped/).check();
   await page.getByRole('button', { name: 'Gather positions' }).click();
   await expect(page.locator('.storm-gather')).toContainText('Waiting 1 min after a failure', { timeout: 30_000 });
@@ -497,7 +506,7 @@ test('shared (§5.102): positions gathered on one device are dealt on another af
   const context = await browser.newContext();
   const phone = await context.newPage();
   await setUp(phone, { world: shared, name: 'phone' });
-  await phone.getByRole('link', { name: 'Storm' }).click();
+  await phone.getByRole('navigation', { name: 'Pages' }).getByRole('link', { name: /^Storm/ }).click();
   await expect(phone.getByTestId('storm-count')).toContainText(`${ready} positions ready`);
   await expect(phone.getByTestId('storm-shared')).toContainText(`${ready} positions here came from your other devices`);
   // Only the device that gathered them writes them.
@@ -519,7 +528,7 @@ test('the gather: its requests counted as they go out, and Stop at once while on
   await setUp(page);
   // The game export never answers.
   await page.route('https://lichess.org/api/games/export/**', () => new Promise<void>(() => undefined));
-  await page.getByRole('link', { name: 'Storm' }).click();
+  await page.getByRole('navigation', { name: 'Pages' }).getByRole('link', { name: /^Storm/ }).click();
   await page.getByRole('button', { name: 'Gather positions' }).click();
   const status = page.locator('.storm-gather');
   await expect(status).toContainText('Gathering: 0 of');

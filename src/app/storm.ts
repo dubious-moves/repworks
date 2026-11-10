@@ -231,8 +231,30 @@ export async function refreshShared(s: StormScopeData): Promise<void> {
 }
 
 export async function refreshHome(s: StormScopeData): Promise<void> {
-  const data = trainData.value;
+  const h = await homeOf(s);
+  if (h) stormHome.value = h;
+}
+
+/** The positions Start deals over the whole repertoire, for the home (§5.158); undefined until counted. */
+export const stormReadyAll = signal<number | undefined>(undefined);
+const wholeScope = new WeakMap<TrainData, StormScopeData | string>();
+export async function refreshStormReady(): Promise<void> {
+  const data = trainData.peek();
   if (!data) return;
+  let s = wholeScope.get(data);
+  if (!s) wholeScope.set(data, (s = scopeData(data, {})));
+  if (typeof s === 'string') return;
+  try {
+    const h = await homeOf(s);
+    if (h) stormReadyAll.value = h.matching;
+  } catch (e) {
+    console.error('the storm positions could not be counted', e);
+  }
+}
+
+async function homeOf(s: StormScopeData): Promise<StormHome | undefined> {
+  const data = trainData.value;
+  if (!data) return undefined;
   const all = storedInScope(await stormStore().positions(), s);
   const h = histories(data);
   const done = all.filter((p) => h.get(p.card)?.done).length;
@@ -261,7 +283,7 @@ export async function refreshHome(s: StormScopeData): Promise<void> {
   }
   const maiaHere = await maiaStored().catch(() => false);
   const shared = all.filter((p) => p.from).length;
-  stormHome.value = { stored: all.length, done, ready: ready.length, deep, lines, maiaHere, rated, elo, tags, matching, shared, tooEasy, showable: canShow };
+  return { stored: all.length, done, ready: ready.length, deep, lines, maiaHere, rated, elo, tags, matching, shared, tooEasy, showable: canShow };
 }
 
 /* ------------------------------------------------------------------ the gather (§5.42) */

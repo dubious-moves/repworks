@@ -317,6 +317,15 @@ function Home(props: { scope: StormScopeData; where: StormWhere }) {
             Show and grade{home ? ` (${home.showable})` : ''}
           </button>
         </div>
+        {home && !canStart && !g?.running && (
+          <p class="storm-empty" data-testid="storm-empty">
+            {home.ready === 0
+              ? 'Gather positions first: Gather positions, below, finds them in the games played from your lines.'
+              : home.matching === 0 && home.tooEasy === home.ready
+                ? `Every position ready is too easy at your rating (Maia at ${home.elo} finds a great move): gather more, below.`
+                : 'No position ready matches this focus: pick another, or gather more below.'}
+          </p>
+        )}
         <p class="muted storm-about">
           <strong>Storm:</strong> {STORM.sessionMs / 60000} minutes; the clock runs only while a position waits for your move. <strong>Set:</strong> {STORM.setSize} positions, no clock, a
           mistake held until you find a good move. <strong>Show and grade:</strong> no clock; think of a move, show every move Stockfish scored (coloured, sized and faded by how good it is), then say whether yours was a good one (2 or 4, or a ring’s buttons) or play it to have it graded; positions scored to depth {STORM.judgeDepth} only. A move is graded by how much of the game it gives up against the best: within {STORM.greatWp}% is great, within {STORM.goodWp}% good.

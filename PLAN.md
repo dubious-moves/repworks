@@ -7,7 +7,7 @@ where the build differed). What remains is live: the spike's re-run (§4.2), the
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
 with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
-for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Storm positions shared between devices through the data repo, and an overnight gather (§5.102), are built (2026-10-12). Lc0 on the study page, its pick among close moves (§5.143), is built (2026-10-31). Endgames, the theoretical endgames each played for its goal against Stockfish (§5.145), are built (2026-10-31), their moves judged in the background since (§5.146, the owner's request of 2026-11-01), defended by Maia checked by Stockfish (§5.147, the owner's request), and a draw's attacker pushing on so the whole method comes up (§5.148, the owner's note). The endgames of the user's own repertoire (§5.149) are built (2026-11-01), and thirteen more theoretical endgames in two more groups (§5.150, the owner's request of 2026-11-02). A game card's move judged without waiting on the engine line's searches or the storm's workers (§5.151, the owner's request of 2026-11-04). Show and grade in the storm, every move of a deepened position shown by its band (§5.152, the owner's request of 2026-11-06), is built. A robotic board, the Chessnut Move, in the storm's untimed sessions and in practice is planned in its own document, `CHESSNUT.md` (§5.153 points there; the owner's request of 2026-11-06), not built. After a storm verdict, Show refutation (a mistake or a blunder), Show line (a great move or the top move) and Continue against Maia's reply (a good move or better) are built (§5.154, the owner's request of 2026-11-06). A polish pass (§5.156, the owner's request of 2026-11-07) made the light theme readable and the folded settings panel free, and lists ideas waiting for the owner's word. The positions after Maia's likely moves (20% or more) outside a storm card's list are searched while the user thinks (§5.157, the owner's request of 2026-11-10). Read with `DECISIONS.md`, which this plan updates (its
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) waits for the owner's answer, §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Storm positions shared between devices through the data repo, and an overnight gather (§5.102), are built (2026-10-12). Lc0 on the study page, its pick among close moves (§5.143), is built (2026-10-31). Endgames, the theoretical endgames each played for its goal against Stockfish (§5.145), are built (2026-10-31), their moves judged in the background since (§5.146, the owner's request of 2026-11-01), defended by Maia checked by Stockfish (§5.147, the owner's request), and a draw's attacker pushing on so the whole method comes up (§5.148, the owner's note). The endgames of the user's own repertoire (§5.149) are built (2026-11-01), and thirteen more theoretical endgames in two more groups (§5.150, the owner's request of 2026-11-02). A game card's move judged without waiting on the engine line's searches or the storm's workers (§5.151, the owner's request of 2026-11-04). Show and grade in the storm, every move of a deepened position shown by its band (§5.152, the owner's request of 2026-11-06), is built. A robotic board, the Chessnut Move, in the storm's untimed sessions and in practice is planned in its own document, `CHESSNUT.md` (§5.153 points there; the owner's request of 2026-11-06), not built. After a storm verdict, Show refutation (a mistake or a blunder), Show line (a great move or the top move) and Continue against Maia's reply (a good move or better) are built (§5.154, the owner's request of 2026-11-06). A polish pass (§5.156, the owner's request of 2026-11-07) made the light theme readable and the folded settings panel free, and lists ideas waiting for the owner's word. The positions after Maia's likely moves (20% or more) outside a storm card's list are searched while the user thinks (§5.157, the owner's request of 2026-11-10). Of §5.156's ideas the owner said to build all but the faster start (2026-11-10): Today on the home, the icon's shortcuts, the wrong move shown, "?" for the keys and the empty pages are built (§5.158). Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -8908,3 +8908,58 @@ three controls in its header; `test/e2e/storm.spec.ts` (desktop and phone, the f
 ladder, Maia's policy written into the store): the position after the 30% move outside the list
 searched while the card waits, not the 10% one's, and that move graded with no search of its own,
 with two controls. Live: TESTING.md.
+
+#### 5.158 Today, the icon's shortcuts, the wrong move shown, "?" and empty pages (the owner's word on §5.156, 2026-11-10)
+
+The owner's answer to §5.156's ideas: "I don't have any problems with slow start. You can also wait
+with the CHESSNUT plan, I haven't bought it yet. Other than that, start building." So every idea
+of §5.156 but the tenth (a faster start) is built, one by one, with §5.157's follow-on, §5.27's
+Study tab and §5.66. This part is ideas 1, 2, 5, 6 and 7.
+
+- **Today** (idea 1): a card at the top of the home, a row for each kind of work with something
+  to do, in Next's order (`todayRows` in `core/app/today.ts`):
+  - the repertoire's due and new moves (`#/train`);
+  - the idea cards (`#/ideas`);
+  - the game cards (`#/games/review`);
+  - the endgames due (Next opens the first due itself);
+  - the checklist's next line: in the checklists' order (the most recently drilled first), the
+    first line still in its study with a level not yet won, at that level (`nextChecklistLine`);
+  - the storm's positions ready (`#/storm`).
+
+  "Next: <kind>" opens the first row's work; with no row, "Nothing due". The training card below
+  keeps its details. The Games and Storm buttons carry "· n due" and "· n ready", as Endgames does.
+- **The game cards counted cheaply**: the home doesn't read or extract the games (about 0.8 s per
+  1,000 games in Node). The Games screen keeps the deck's card ids on the device
+  (`repworks-games-deck` in localStorage) whenever it builds the deck, and the home runs today's
+  queue over those ids and the replayed states (`gameCountsNow`). Never opened on a device, the
+  row and the count are left out. Saved items and plans made since the Games screen was last open
+  count from its next visit.
+- **The storm counted** over the whole repertoire (the storm page's `matching`: what Start would
+  deal with the focus chosen), a moment after the home is drawn and again after a sync
+  (`refreshStormReady`; the whole-repertoire scope cached per log).
+- **Found by the Today card's link**: Game cards → Review opened straight after a start dealt from
+  an empty deck ("Nothing to review"). It now waits for the games and the log to be read.
+- **The icon's shortcuts** (idea 2): the manifest's `shortcuts`, Train, Storm, Games and Endgames,
+  on the hash routes.
+- **The wrong move shown** (idea 5): in training (every session kind on the trainer), the wrong
+  move's square red with a ✕ and its origin faintly, for about a second after it is taken back
+  (`miss` on the board, the session view's `miss` set only by the move that was wrong).
+  With reduced motion it stays as long and goes at once.
+- **"?"** (idea 6) opens a dialog of the screen's keys (`src/ui/Keys.tsx`, written from each
+  screen's own handler). While it is open no key reaches the screen; Escape or ? closes it.
+- **Empty states** (idea 7): the storm's Start disabled says why under it (gather first; or none
+  for the focus; or all too easy). Progress's charts with nothing on any day say so in a line, and
+  each day carries its weekday's letter over its date.
+
+Tests: `test/unit/core/app/today.test.ts` (the order, the empty kinds left out, Next at the first
+item, the checklist's next line; three controls in its header). Playwright, desktop and phone:
+- `games.spec.ts`: no row before the Games screen is opened; "0 due · 3 new" after; kept after a
+  reload with no game read; the row's link deals the first card.
+- `storm.spec.ts`: "Gather positions first" with nothing gathered, gone after; the home's
+  "Storm · n ready" and the Today row equal to the storm page's count.
+- `train.spec.ts`: the wrong move's square marked, then hidden; ? lists the training keys, and
+  Escape closes the list and leaves the move asked.
+- `progress.spec.ts`: the weekday over the date, and the minutes' line instead of empty bars.
+- `shell.spec.ts`: the four shortcuts in the manifest Chrome reads.
+
+Live: TESTING.md.

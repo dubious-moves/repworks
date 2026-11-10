@@ -87,7 +87,21 @@ test('train: the counts, a due move asked, a wrong move taken back, new lines ta
   await play(page, 'e7', 'e5');
   await expect(feedback(page)).toHaveText('Not in your repertoire: try again');
   await expect(page.locator('cg-board piece.black.pawn')).toHaveCount(8);
+  // The wrong move's square marked for a moment, then gone (§5.158).
+  await expect(page.getByTestId('board-miss')).toHaveAttribute('data-square', 'e5');
+  await expect(page.getByTestId('board-miss')).toBeVisible();
+  await expect(page.getByTestId('board-miss')).toBeHidden({ timeout: 3000 });
+  // ? lists the screen's keys; Escape closes the list, not the session (§5.158).
+  await page.keyboard.press('?');
+  const keys = page.getByTestId('keys-help');
+  await expect(keys).toBeVisible();
+  await expect(keys.locator('h3').first()).toHaveText('Training');
+  await expect(keys).toContainText('A misclick: take the wrong move back, not counted');
+  await page.keyboard.press('Escape');
+  await expect(keys).toBeHidden();
+  await expect(page.locator('.train-grid')).toHaveAttribute('data-phase', 'wrong');
   await play(page, 'c7', 'c5');
+  await expect(page.getByTestId('board-miss')).toHaveCount(0);
   // The line's end waits for "Next line" (the default, "At a line's end: wait").
   await expect(feedback(page)).toHaveText(/^Line done · Next: /);
   await page.waitForTimeout(1500);

@@ -47,6 +47,11 @@ export interface BoardProps {
    * once for each `key` (a new key plays it again).
    */
   celebrate?: { square: string; key: string } | undefined;
+  /**
+   * A wrong move just taken back (training): its squares marked red for a moment, so the hand sees
+   * what it played. Played once for each `key`.
+   */
+  miss?: { uci: string; key: string } | undefined;
   /** Premoves for `color` while the other side is to move (a practice game): the one set, and its events. */
   premove?: { color: 'white' | 'black'; current: [Key, Key] | undefined; onSet(orig: Key, dest: Key): void; onUnset(): void };
   /**
@@ -230,6 +235,7 @@ export function Board(p: BoardProps) {
       <div class="cg-host" ref={el} />
       {p.badge && <Badge {...p.badge} orientation={p.orientation} />}
       {p.celebrate && <Celebrate key={p.celebrate.key} square={p.celebrate.square} orientation={p.orientation} />}
+      {p.miss && <Miss key={p.miss.key} uci={p.miss.uci} orientation={p.orientation} />}
       {p.promotion && <PromotionChoice {...p.promotion} orientation={p.orientation} />}
       <Material fen={p.fen} orientation={p.orientation} />
       <Resize board={wrap} />
@@ -384,6 +390,28 @@ function Celebrate(props: { square: string; orientation: 'white' | 'black' }) {
         </span>
       ))}
     </span>
+  );
+}
+
+/** A square's place on the board, in eighths from the top left; undefined for no square. */
+function placeOf(square: string, orientation: 'white' | 'black'): { col: number; row: number } | undefined {
+  const file = square.charCodeAt(0) - 97;
+  const rank = Number(square[1]) - 1;
+  if (!(file >= 0 && file < 8 && rank >= 0 && rank < 8)) return undefined;
+  return { col: orientation === 'white' ? file : 7 - file, row: orientation === 'white' ? 7 - rank : rank };
+}
+
+/** A wrong move's squares: the one moved to red with a cross, the one moved from faintly; fading by themselves (app.css). */
+function Miss(props: { uci: string; orientation: 'white' | 'black' }) {
+  const from = placeOf(props.uci.slice(0, 2), props.orientation);
+  const to = placeOf(props.uci.slice(2, 4), props.orientation);
+  if (!from || !to) return null;
+  const at = (p: { col: number; row: number }) => ({ left: `${p.col * 12.5}%`, top: `${p.row * 12.5}%` });
+  return (
+    <>
+      <span class="board-miss from" aria-hidden="true" style={at(from)} />
+      <span class="board-miss to" data-testid="board-miss" data-square={props.uci.slice(2, 4)} aria-hidden="true" style={at(to)} />
+    </>
   );
 }
 

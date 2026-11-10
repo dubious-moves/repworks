@@ -567,10 +567,13 @@ const GRADE_WORD = { 1: 'Again', 2: 'Hard', 3: 'Good', 4: 'Easy' } as const;
 
 function Review() {
   const s = gameSession.value;
+  // Opened straight after a start (a reload, the home's Today card), the cards are dealt once the
+  // games and the log are read: before that the deck is empty.
+  const loaded = gameRows.value !== undefined && !!trainData.value;
   useEffect(() => {
     // Left for another page and come back to by ←, the session goes on; ← here ends it.
-    enterGameSession(entryKey());
-  }, []);
+    if (loaded) enterGameSession(entryKey());
+  }, [loaded]);
   useWakeLock(!!s && s.phase !== 'done');
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -591,7 +594,7 @@ function Review() {
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, []);
-  if (!s) return <p class="muted">Dealing…</p>;
+  if (!s || !loaded) return <p class="muted">Dealing…</p>;
   if (s.phase === 'done') return <Done s={s} />;
   const r = s.run!;
   return <Card key={r.card.card} s={s} r={r} />;

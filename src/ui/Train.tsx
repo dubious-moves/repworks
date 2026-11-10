@@ -536,6 +536,7 @@ function Session(props: { s: SessionView }) {
             drawMode={false}
             brush="green"
             onMove={onMove}
+            miss={s.miss && !shownLine ? { uci: s.miss.uci, key: String(s.miss.n) } : undefined}
             promotion={promotion && { dest: promotion.dest, onPick: (role) => (role ? promote(role) : setPromotion(undefined)) }}
           />
         )}

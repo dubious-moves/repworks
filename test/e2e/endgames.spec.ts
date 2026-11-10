@@ -230,7 +230,7 @@ const sq = (uci: string, i: number) => uci.slice(i, i + 2);
 test('an endgame: a move that lets the win slip, found after playing on, taken back, the keeping move shown; the try counted once as missed', async ({ page }) => {
   test.setTimeout(60_000);
   const git = await setUp(page);
-  await page.getByRole('link', { name: 'Endgames' }).click();
+  await page.getByRole('navigation', { name: 'Pages' }).getByRole('link', { name: /^Endgames/ }).click();
   await expect(page).toHaveURL(/#\/endgames$/);
   await expect(page.getByTestId('endgame-counts')).toHaveText('0 due · 23 new');
   // Six groups, the two added in §5.150 among them.
@@ -466,7 +466,7 @@ test('the repertoire’s endgames: gathered from the games at the line ends, by 
   await lichessLogin(page);
   let requests: string[] = [];
   const git = await setUp(page, async () => void (requests = await serveGames(page)));
-  await page.getByRole('link', { name: 'Endgames' }).click();
+  await page.getByRole('navigation', { name: 'Pages' }).getByRole('link', { name: /^Endgames/ }).click();
   const section = page.getByTestId('endgame-repertoire');
   await expect(section.getByRole('heading', { name: 'From your repertoire' })).toBeVisible();
   await section.getByRole('button', { name: 'Gather from your repertoire' }).click();

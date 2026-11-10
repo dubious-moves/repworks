@@ -18,8 +18,9 @@ import { HistoryScreen, PracticeScreen } from './Practice.tsx';
 import { RepertoireCheckScreen } from './RepertoireCheck.tsx';
 import { ChecklistDrill, ChecklistScreen } from './Checklist.tsx';
 import { EndgamesScreen } from './Endgames.tsx';
-import { endgameStandings } from '../app/endgames.ts';
-import { loadRepEndgames, repStandings } from '../app/repertoireEndgames.ts';
+import { loadRepEndgames } from '../app/repertoireEndgames.ts';
+import { gameCountsNow } from '../app/games.ts';
+import { endgamesDue, TodayCard, useStormReady } from './Today.tsx';
 import { Debug } from './Debug.tsx';
 import { Guard } from './Guard.tsx';
 import { IdeasScreen } from './Ideas.tsx';
@@ -41,6 +42,7 @@ import { ExplorerSettingsDialog } from './ExplorerSettings.tsx';
 import { EngineSettingsDialog } from './EngineSettings.tsx';
 import { MaiaDialog } from './MaiaDialog.tsx';
 import { Lc0Dialog } from './Lc0Dialog.tsx';
+import { KeysHelp } from './Keys.tsx';
 import { confirmDeleteStudy, openNewStudy, openStudySettings, StudyDialogs } from './StudyDialogs.tsx';
 
 export function App() {
@@ -81,6 +83,7 @@ export function App() {
         <EngineSettingsDialog />
         <MaiaDialog />
         <Lc0Dialog />
+        <KeysHelp />
         <PriorityDialog />
       </Guard>
       <footer class="footer">
@@ -218,6 +221,9 @@ function Home() {
   }, [version]);
   return (
     <>
+      <Guard name="Today">
+        <TodayCard />
+      </Guard>
       <Guard name="The training card">
         <TrainCard />
       </Guard>
@@ -229,12 +235,8 @@ function Home() {
           </button>
         </div>
         <nav class="home-tools" aria-label="Pages">
-          <a class="button secondary" href="#/storm">
-            Storm
-          </a>
-          <a class="button secondary" href="#/games">
-            Games
-          </a>
+          <StormLink />
+          <GamesLink />
           <EndgamesLink />
           <a class="button secondary" href="#/analysis">
             Analysis board
@@ -266,12 +268,31 @@ function Home() {
   );
 }
 
+/** The storm, with the positions Start would deal over the whole repertoire (§5.158). */
+function StormLink() {
+  const ready = useStormReady();
+  return (
+    <a class="button secondary" href="#/storm">
+      Storm{!!ready && <span class="home-tool-count"> · {ready} ready</span>}
+    </a>
+  );
+}
+
+/** Games, with today's game cards due (§5.158): known once the Games screen has read the games. */
+function GamesLink() {
+  const c = gameCountsNow();
+  return (
+    <a class="button secondary" href="#/games">
+      Games{!!c?.due && <span class="home-tool-count"> · {c.due} due</span>}
+    </a>
+  );
+}
+
 /** Endgames (§5.145), with how many are due: none tried yet says nothing more. */
 function EndgamesLink() {
   // The repertoire's endgames (§5.149) count once read.
   useEffect(() => void loadRepEndgames(), []);
-  const standings = [...endgameStandings(decidingNow()).values(), ...repStandings(decidingNow()).values()];
-  const due = standings.filter((s) => s.state === 'due').length;
+  const due = endgamesDue(decidingNow()).due;
   return (
     <a class="button secondary" href="#/endgames" title="The theoretical endgames and your repertoire's, each played for its goal">
       Endgames{due > 0 && <span class="home-tool-count"> · {due} due</span>}

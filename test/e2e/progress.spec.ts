@@ -52,8 +52,12 @@ test('progress: recall against the scheduler, the moves, the days ahead and behi
   // c5, missed yesterday, comes back within the fortnight.
   await expect(page.getByTestId('progress-forecast').locator('h2')).toHaveText(/^Reviews ahead: [1-9]\d* in 14 days$/);
   await expect(page.getByTestId('progress-forecast').locator('.bar')).toHaveCount(14);
-  // Single answers, days apart: no minutes.
+  // Each day under its weekday (§5.158): the clock's 2026-10-08 is a Thursday.
+  await expect(page.getByTestId('progress-forecast').locator('.bar-day').first()).toHaveText('T8');
+  // Single answers, days apart: no minutes, said in a line instead of empty bars (§5.158).
   await expect(page.getByTestId('progress-minutes').locator('h2')).toHaveText(/^Last 14 days: 0 min on \d days$/);
+  await expect(page.getByTestId('progress-minutes').locator('.bar')).toHaveCount(0);
+  await expect(page.getByTestId('progress-minutes').getByTestId('bars-empty')).toHaveText('No minutes counted: the answers were more than five minutes apart.');
   await expect(page.getByTestId('progress-minutes')).toContainText('4 reviews and 0 new moves');
 
   // Both chapters play 1... c5: the same recall, so in the study's order.

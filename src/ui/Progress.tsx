@@ -179,10 +179,21 @@ function MovesCard(props: { stats: ProgressStats }) {
   );
 }
 
-/** One series of daily bars, labelled with the day's date; the biggest and the first carry their value. */
-function Bars(props: { days: readonly (Span & { value: number })[]; title: (value: number) => string; label: string }) {
+const weekday = (ms: number) => new Date(ms).toLocaleDateString([], { weekday: 'narrow' });
+
+/**
+ * One series of daily bars, labelled with the day's weekday and date; the biggest and the first
+ * carry their value. With nothing on any day, one line says so instead of bare axes (§5.158).
+ */
+function Bars(props: { days: readonly (Span & { value: number })[]; title: (value: number) => string; label: string; empty: string }) {
   const max = Math.max(1, ...props.days.map((d) => d.value));
   const top = props.days.findIndex((d) => d.value === max);
+  if (props.days.every((d) => d.value <= 0))
+    return (
+      <p class="muted bars-empty" data-testid="bars-empty">
+        {props.empty}
+      </p>
+    );
   return (
     <div class="bars" role="list" aria-label={props.label}>
       {props.days.map((d, i) => {
@@ -193,7 +204,10 @@ function Bars(props: { days: readonly (Span & { value: number })[]; title: (valu
             <span class="bar-track">
               <span class="bar-fill" style={{ height: `${(d.value / max) * 100}%` }} />
             </span>
-            <span class="bar-day">{new Date(d.start).getDate()}</span>
+            <span class="bar-day">
+              <span class="bar-weekday">{weekday(d.start)}</span>
+              {new Date(d.start).getDate()}
+            </span>
           </div>
         );
       })}
@@ -209,7 +223,7 @@ function Forecast(props: { stats: ProgressStats }) {
       <h2>
         Reviews ahead: {total.toLocaleString('en')} in {SPAN_DAYS} days
       </h2>
-      <Bars days={f.map((d) => ({ ...d, value: d.due }))} title={(v) => `${v} due`} label="Reviews due each day" />
+      <Bars days={f.map((d) => ({ ...d, value: d.due }))} title={(v) => `${v} due`} label="Reviews due each day" empty={`Nothing due in the next ${SPAN_DAYS} days.`} />
       <p class="muted">Today counts the overdue ones. Each move is counted as answered right on its day; misses and new moves add to it.</p>
     </section>
   );
@@ -227,7 +241,7 @@ function Minutes(props: { stats: ProgressStats }) {
         Last {SPAN_DAYS} days: {Math.round(minutes)} min on {trained.length} day
         {trained.length === 1 ? '' : 's'}
       </h2>
-      <Bars days={days.map((d) => ({ ...d, value: d.minutes }))} title={(v) => `${Math.round(v)} min`} label="Minutes trained each day" />
+      <Bars days={days.map((d) => ({ ...d, value: d.minutes }))} title={(v) => `${Math.round(v)} min`} label="Minutes trained each day" empty={trained.length ? 'No minutes counted: the answers were more than five minutes apart.' : `No training in the last ${SPAN_DAYS} days: today's moves are on the home's Train.`} />
       <p class="muted">
         {answers.toLocaleString('en')} review{answers === 1 ? '' : 's'} and {taught.toLocaleString('en')} new move{taught === 1 ? '' : 's'}
         {trained.length > 0 && <>, {Math.round(minutes / trained.length)} min a day on the days trained</>}. Minutes are the time between answers, a pause of over five minutes left out.

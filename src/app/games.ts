@@ -14,6 +14,7 @@ import { openingIndex, openingNameAt, type OpeningIndex } from '../core/games/op
 import { keyFen } from '../core/chess/positionKey.ts';
 import { replay, type Replayed } from '../core/games/positions.ts';
 import type { PositionKey } from '../core/chess/positionKey.ts';
+import type { CardId } from '../core/progress/cards.ts';
 import type { RepertoireIndex } from '../core/repertoire/index.ts';
 import { openGamesStore, type GamesStore, type StoredGame } from '../platform/gamesStore.ts';
 import { gistId, readGist } from '../platform/gist.ts';
@@ -154,6 +155,9 @@ export function startGames(): void {
     lastSince = since;
     rebuild();
   });
+  effect(() => {
+    if (gameRows.value) keepDeckIds(gameDeck.value.map((c) => c.card));
+  });
 }
 
 /* ------------------------------------------------------------------ the deck and today's queue */
@@ -216,6 +220,51 @@ export function gameQueueNow(now: number = decidingNow()) {
   const data = trainData.value;
   const d = dayOf(now);
   return gameQueue(gameDeck.value, data?.states ?? new Map(), d, gamesPrefs.value.newPerDay);
+}
+
+// The deck's cards kept on the device whenever the games are read (§5.158), so the home counts
+// today's game cards without reading and extracting every game (about 0.8 s a thousand in Node).
+const DECK_KEY = 'repworks-games-deck';
+function readDeckIds(): string[] | undefined {
+  try {
+    const raw = JSON.parse(localStorage.getItem(DECK_KEY) ?? 'null') as unknown;
+    return Array.isArray(raw) && raw.every((x) => typeof x === 'string') ? raw : undefined;
+  } catch {
+    return undefined;
+  }
+}
+const deckIds = signal<string[] | undefined>(readDeckIds());
+function keepDeckIds(ids: string[]): void {
+  const was = deckIds.peek();
+  if (was && was.length === ids.length && was.every((x, i) => x === ids[i])) return;
+  deckIds.value = ids;
+  try {
+    localStorage.setItem(DECK_KEY, JSON.stringify(ids));
+  } catch {
+    // counted on this page only
+  }
+}
+
+/**
+ * Today's game cards for the home (§5.158): from the deck itself once the games are read, else
+ * from the deck's cards as last kept; undefined before the Games screen has ever been opened.
+ */
+export function gameCountsNow(now: number = decidingNow()): { due: number; fresh: number } | undefined {
+  const data = trainData.value;
+  if (!data) return undefined;
+  if (gameRows.value) {
+    const q = gameQueueNow(now);
+    return { due: q.due.length, fresh: q.fresh.length };
+  }
+  const ids = deckIds.value;
+  if (!ids) return undefined;
+  const q = gameQueue(
+    ids.map((card) => ({ card: card as CardId })),
+    data.states,
+    dayOf(now),
+    gamesPrefs.value.newPerDay,
+  );
+  return { due: q.due.length, fresh: q.fresh.length };
 }
 
 /* ------------------------------------------------------------------ refreshing from the sources */

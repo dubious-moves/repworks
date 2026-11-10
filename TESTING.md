@@ -1238,3 +1238,28 @@ q_extension (or give it to a session with q_extension attached), then run
   depth 20".
 - The timed storm on the phone: does the extra searching while you think make the board feel
   slower or the phone warmer?
+
+## Today, the icon's shortcuts, the wrong move shown, "?" and empty pages (§5.158, 2026-11-10)
+- Checked by unit tests and Playwright (desktop and emulated phone); nothing live yet.
+- The home's **Today** card, above the training card: a row for each kind of work with something
+  to do (repertoire, ideas, game cards, endgames, the checklist's next line, storm), and **Next**
+  opening the first. Is the order right? Should the checklist and the storm, which never run
+  out, count for Next only when nothing else is due?
+- The game cards' row and "Games · n due" appear once the Games screen has been opened on that
+  device (the home reads the deck as the Games screen last saw it, not every game). Open Games
+  once, then reload the home: the row stays. New games from a Refresh show after the next visit
+  to Games.
+- "Storm · n ready" on the home's Storm button and the storm's row: the same n as the storm's
+  page shows for the whole repertoire with your focus.
+- Opened straight after a reload, Game cards → Review now waits for the games to be read instead
+  of saying "Nothing to review" (a bug the Today card's link found).
+- **Shortcuts on the installed app's icon**: long-press the Repworks icon on the phone (and
+  right-click it in the desktop's taskbar or dock): Train, Storm, Games and Endgames. The app may
+  need reinstalling, or a day, before the phone picks up the new manifest.
+- **A wrong move in training**: its square goes red with a ✕ (the square it came from faintly)
+  for about a second after it is taken back. Is it long enough, or too much?
+- **"?" on the desktop** lists the screen's keys (training, show and grade, the storm, game cards,
+  a study, Read, idea cards, endgames, practice). Escape closes it without stopping a session.
+- **Empty pages**: the storm with nothing gathered says "Gather positions first" under Start (and,
+  with positions but none for the focus, says so); Progress's charts say "nothing due" or "no
+  training" in a line instead of empty bars, and each day carries its weekday's letter.
