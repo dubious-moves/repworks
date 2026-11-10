@@ -17,6 +17,9 @@ import { makeFen } from 'chessops/fen';
 import { parseSan } from 'chessops/san';
 import type { FakeGit } from '../support/fakeGit.ts';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
+import { gamesPath } from '../../src/core/data/layout.ts';
+import { planGamesFiles } from '../../src/core/games/dataFile.ts';
+import { readGamesFile } from '../../src/core/games/record.ts';
 import { clickSquare } from './board.ts';
 import { commands, fakeEngine, SLOW } from './engine.ts';
 import { serveGithub, world } from './github.ts';
@@ -522,4 +525,34 @@ test('a note on a game card: written on its position with a line and an arrow, s
   await expect(page.getByTestId('note-arrows')).toHaveCount(0);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);
+});
+
+test('the analyzer’s games converted into the data repo (§5.163): read with nothing set up, a later month after a sync, never written by the device', async ({ page }) => {
+  const { git, github } = world();
+  // What scripts/games-to-data.mjs writes for the three analysed games (one UTC month).
+  const first = planGamesFiles(new Map(), readGamesFile(GAMES).games, gamesPath).write;
+  expect([...first.keys()]).toEqual(['games/2026-09.jsonl']);
+  git.commitIfHead(git.head, 'analyzer: 3 new game(s), 0 changed', first, []);
+  await serveGithub(page, github);
+  await page.route('https://api.chess.com/**', (route) => route.abort('failed'));
+  await page.goto(`${site.url}#setup?repo=${encodeURIComponent(REPO)}&token=${TOKEN}&name=desktop`);
+  await expect(page.locator('.chip')).toHaveText(/^synced/);
+  await page.getByRole('link', { name: 'Games', exact: true }).click();
+  // No gist and no name on this device: the repo's games come in by themselves.
+  await expect(page.getByTestId('games-count')).toHaveText('3 of 3');
+  await expect(page.getByTestId('games-queue')).toContainText('0 due · 3 new today');
+  await page.getByTestId('game-row').filter({ hasText: 'Blackburne' }).click();
+  await expect(page.getByTestId('game-item')).toHaveText(/Mistake at move 4 \(Nxe5/);
+  await page.goBack();
+  // The analyzer's next run: a game of the next month, converted and pushed from elsewhere.
+  const later = { ...GAMES, games: [{ ...GAMES.games[0]!, id: 'GameFou4', createdAt: Date.UTC(2026, 9, 2) }] };
+  const next = planGamesFiles(git.textsOf(), readGamesFile(later).games, gamesPath).write;
+  expect([...next.keys()]).toEqual(['games/2026-10.jsonl']);
+  git.commitIfHead(git.head, 'analyzer: 1 new game(s), 0 changed', next, []);
+  await page.reload();
+  await expect(page.getByTestId('games-count')).toHaveText('4 of 4');
+  await page.getByRole('button', { name: 'Refresh' }).click();
+  await expect(page.getByTestId('games-status')).toHaveText('Data repo: unchanged since the last read.');
+  // The device's own commits (its device file at setup, its syncs) leave the games' files as written.
+  expect(new Map([...git.textsOf()].filter(([path]) => path.startsWith('games/')))).toEqual(new Map([...first, ...next]));
 });

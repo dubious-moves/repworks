@@ -312,7 +312,7 @@ function Sources() {
             <input type="number" min={0} max={200} value={prefs.newPerDay} onChange={(e) => setGamesPrefs({ newPerDay: Math.max(0, Math.min(200, Number((e.target as HTMLInputElement).value) || 0)) })} />
           </label>
           <p class="muted">
-            The gist is read only, as mistake-lab reads it: the analyzer keeps writing its games there. Lichess’s own games come in too (with its analysis where you asked Lichess for one); chess.com’s only through the analyzer if chess.com doesn’t answer this page.{' '}
+            The analyzer’s games converted into the data repo (<code>games/</code>, by <code>scripts/games-to-data.mjs</code>) come in with every sync, with nothing to set up. The gist is read only, as mistake-lab reads it: the analyzer keeps writing its games there. Lichess’s own games come in too (with its analysis where you asked Lichess for one); chess.com’s only through the analyzer if chess.com doesn’t answer this page.{' '}
             <button type="button" class="link" onClick={() => void forgetGames()}>
               Forget the games on this device
             </button> ·{' '}

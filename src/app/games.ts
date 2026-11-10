@@ -1,5 +1,6 @@
-// The games on this device and their cards (PLAN.md §5.51–§5.54): the sources (mistake-lab's Gist,
-// read-only, until the owner's answer on §5.66; Lichess's own export; chess.com's archives where
+// The games on this device and their cards (PLAN.md §5.51–§5.54): the sources (the analyzer's games
+// in the data repo's `games/` files, §5.163, read after every sync; mistake-lab's Gist, read-only;
+// Lichess's own export; chess.com's archives where
 // they answer a page), the games kept in IndexedDB, the items found in them, and the deck of game
 // cards with today's queue. The cards' states come from the same replay as the repertoire's
 // (trainData), so a review recorded here is a progress event like any other.
@@ -18,6 +19,10 @@ import type { CardId } from '../core/progress/cards.ts';
 import type { RepertoireIndex } from '../core/repertoire/index.ts';
 import { openGamesStore, type GamesStore, type StoredGame } from '../platform/gamesStore.ts';
 import { gistId, readGist } from '../platform/gist.ts';
+import { classifyPath } from '../core/data/layout.ts';
+import { parseGamesFile } from '../core/games/dataFile.ts';
+import { localStore } from './state.ts';
+import { dataVersion } from './sync.ts';
 import { userGames } from '../platform/lichessGames.ts';
 import { lichessToken } from './lichess.ts';
 import { plansInDeck, startPlans } from './plans.ts';
@@ -158,6 +163,56 @@ export function startGames(): void {
   effect(() => {
     if (gameRows.value) keepDeckIds(gameDeck.value.map((c) => c.card));
   });
+  // The data repo's games (§5.163): read at the start and after every sync that changed them.
+  effect(() => {
+    dataVersion.value;
+    void importRepoGames().then(async (r) => {
+      if (r.changed) await readStored();
+    });
+  });
+}
+
+let importingRepo: Promise<RepoRead> | undefined;
+interface RepoRead {
+  /** The repo's month files. */
+  files: number;
+  /** Month files read (those whose blob changed since the last read), games in them, and new or changed. */
+  months: number;
+  games: number;
+  changed: number;
+  /** Lines this version couldn't read. */
+  unread: number;
+}
+
+/**
+ * The data repo's `games/<YYYY-MM>.jsonl` files (§5.163) whose blob changed since they were last
+ * read, into this device's games. Never written here: the converter is their only writer.
+ */
+export function importRepoGames(): Promise<RepoRead> {
+  return (importingRepo ??= run().finally(() => (importingRepo = undefined)));
+  async function run(): Promise<RepoRead> {
+    const out: RepoRead = { files: 0, months: 0, games: 0, changed: 0, unread: 0 };
+    const ls = localStore();
+    if (!ls) return out;
+    const shas = await ls.baseShas((path) => classifyPath(path).kind === 'games');
+    const s = gamesStore();
+    const seen = (await s.meta<Record<string, string>>('repo')) ?? {};
+    out.files = shas.size;
+    const changed = new Set([...shas].filter(([path, sha]) => seen[path] !== sha).map(([path]) => path));
+    if (!changed.size) return out;
+    const texts = await ls.read((path) => changed.has(path));
+    const read: StoredGame[] = [];
+    for (const text of texts.values()) {
+      const f = parseGamesFile(text);
+      out.unread += f.unread;
+      for (const game of f.games) read.push({ game, source: 'repo' });
+    }
+    out.months = texts.size;
+    out.games = read.length;
+    out.changed = await s.putGames(read);
+    await s.setMeta('repo', Object.fromEntries([...shas].filter(([path]) => texts.has(path) || seen[path] === shas.get(path))));
+    return out;
+  }
 }
 
 /* ------------------------------------------------------------------ the deck and today's queue */
@@ -288,6 +343,17 @@ export async function refreshGames(): Promise<void> {
   const s = gamesStore();
   let changed = 0;
 
+  // The data repo's games (§5.163): no setup, read whenever its files changed.
+  try {
+    const repo = await importRepoGames();
+    changed += repo.changed;
+    if (!repo.months && repo.files) lines.push('Data repo: unchanged since the last read.');
+    if (repo.months) lines.push(`Data repo: ${repo.games} games in ${repo.months} month file(s) read, ${repo.changed} new or changed${repo.unread ? `, ${repo.unread} line(s) unreadable` : ''}.`);
+  } catch (error) {
+    lines.push(`Data repo: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  const fromRepo = stored.some((g) => g.source === 'repo') || changed > 0;
+
   const gist = gistId(prefs.gist);
   if (prefs.gist.trim() && !gist) lines.push('Gist: that isn’t a gist’s ID or address.');
   if (gist) {
@@ -354,7 +420,7 @@ export async function refreshGames(): Promise<void> {
     }
   }
 
-  if (!gist && !name && !cc) lines.push('Nothing set up yet: enter mistake-lab’s gist, a Lichess name or a chess.com name.');
+  if (!gist && !name && !cc && !fromRepo) lines.push('Nothing set up yet: enter mistake-lab’s gist, a Lichess name or a chess.com name, or convert the analyzer’s games into the data repo.');
   if (changed) await readStored();
   say(lines, false);
 }

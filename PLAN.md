@@ -7,7 +7,7 @@ where the build differed). What remains is live: the spike's re-run (§4.2), the
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
 with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
-for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) is built as the explorer's Study tab (§5.162, the owner's yes of 2026-11-10), §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; where the analyzer's output lives waits for the owner's answer (§5.66), its acceptance test (§5.65) for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Storm positions shared between devices through the data repo, and an overnight gather (§5.102), are built (2026-10-12). Lc0 on the study page, its pick among close moves (§5.143), is built (2026-10-31). Endgames, the theoretical endgames each played for its goal against Stockfish (§5.145), are built (2026-10-31), their moves judged in the background since (§5.146, the owner's request of 2026-11-01), defended by Maia checked by Stockfish (§5.147, the owner's request), and a draw's attacker pushing on so the whole method comes up (§5.148, the owner's note). The endgames of the user's own repertoire (§5.149) are built (2026-11-01), and thirteen more theoretical endgames in two more groups (§5.150, the owner's request of 2026-11-02). A game card's move judged without waiting on the engine line's searches or the storm's workers (§5.151, the owner's request of 2026-11-04). Show and grade in the storm, every move of a deepened position shown by its band (§5.152, the owner's request of 2026-11-06), is built. A robotic board, the Chessnut Move, in the storm's untimed sessions and in practice is planned in its own document, `CHESSNUT.md` (§5.153 points there; the owner's request of 2026-11-06), not built. After a storm verdict, Show refutation (a mistake or a blunder), Show line (a great move or the top move) and Continue against Maia's reply (a good move or better) are built (§5.154, the owner's request of 2026-11-06). A polish pass (§5.156, the owner's request of 2026-11-07) made the light theme readable and the folded settings panel free, and lists ideas waiting for the owner's word. The positions after Maia's likely moves (20% or more) outside a storm card's list are searched while the user thinks (§5.157, the owner's request of 2026-11-10). Of §5.156's ideas the owner said to build all but the faster start (2026-11-10): Today on the home, the icon's shortcuts, the wrong move shown, "?" for the keys and the empty pages are built (§5.158). Share to Repworks and .pgn files opened with it, sounds, Settings apart from Debug and the dark themes' contrasts are built (§5.159). TESTING.md is one walk through the app, by screen (§5.160). The home's deepening searches Maia's likely moves too, and those searches are kept with the position (§5.161). The explorer has a Study tab: the open study's moves at the board's position, across its chapters and move orders (§5.162, §5.27). Read with `DECISIONS.md`, which this plan updates (its
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) is built as the explorer's Study tab (§5.162, the owner's yes of 2026-11-10), §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; the analyzer's output lives in the data repo through a converter (§5.66, the owner's choice of 2026-11-10, built in §5.163), its acceptance test (§5.65) waits for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Storm positions shared between devices through the data repo, and an overnight gather (§5.102), are built (2026-10-12). Lc0 on the study page, its pick among close moves (§5.143), is built (2026-10-31). Endgames, the theoretical endgames each played for its goal against Stockfish (§5.145), are built (2026-10-31), their moves judged in the background since (§5.146, the owner's request of 2026-11-01), defended by Maia checked by Stockfish (§5.147, the owner's request), and a draw's attacker pushing on so the whole method comes up (§5.148, the owner's note). The endgames of the user's own repertoire (§5.149) are built (2026-11-01), and thirteen more theoretical endgames in two more groups (§5.150, the owner's request of 2026-11-02). A game card's move judged without waiting on the engine line's searches or the storm's workers (§5.151, the owner's request of 2026-11-04). Show and grade in the storm, every move of a deepened position shown by its band (§5.152, the owner's request of 2026-11-06), is built. A robotic board, the Chessnut Move, in the storm's untimed sessions and in practice is planned in its own document, `CHESSNUT.md` (§5.153 points there; the owner's request of 2026-11-06), not built. After a storm verdict, Show refutation (a mistake or a blunder), Show line (a great move or the top move) and Continue against Maia's reply (a good move or better) are built (§5.154, the owner's request of 2026-11-06). A polish pass (§5.156, the owner's request of 2026-11-07) made the light theme readable and the folded settings panel free, and lists ideas waiting for the owner's word. The positions after Maia's likely moves (20% or more) outside a storm card's list are searched while the user thinks (§5.157, the owner's request of 2026-11-10). Of §5.156's ideas the owner said to build all but the faster start (2026-11-10): Today on the home, the icon's shortcuts, the wrong move shown, "?" for the keys and the empty pages are built (§5.158). Share to Repworks and .pgn files opened with it, sounds, Settings apart from Debug and the dark themes' contrasts are built (§5.159). TESTING.md is one walk through the app, by screen (§5.160). The home's deepening searches Maia's likely moves too, and those searches are kept with the position (§5.161). The explorer has a Study tab: the open study's moves at the board's position, across its chapters and move orders (§5.162, §5.27). The analyzer's games are converted into the data repo's `games/` files, which every device reads beside the Gist (§5.163, §5.66). Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -4812,7 +4812,7 @@ from §5.49.
   their own. pids: `<gameId>_<ply>` (mistake), `<gameId>_t<ply>` (tactic), `<gameId>_a<ply>`
   (advantage), `r_<key>` and `p_<key>`.
 
-**The owner's choice** (asked, not yet answered; nothing waits on it but §5.66):
+**The owner's choice** (answered 2026-11-10: (a), through the converter, built in §5.163):
 - **Where the analyzer's output lives once mistake-lab retires.** (a) **The data repo**, with the
   analyzer as its only writer: `games/<YYYY-MM>.jsonl`, one compact game a line, read by every
   device through the sync it already has (no second token, a month's file downloaded only when it
@@ -5400,6 +5400,8 @@ run synced with its six snapshots and both studies, the second run refused).
 used (D20); its analyzer still runs from its repo until the tools move (D8).
 
 #### 5.66 The analyzer's output in the data repo (the owner's choice first)
+
+**Answered** (2026-11-10): (a), through the converter. Built in §5.163.
 
 Built only if the owner chooses (a) above: `scripts/games-to-data.mjs` (the analyzer's
 `analyzed_games.json` → `games/<YYYY-MM>.jsonl` in a data repo checkout, compact records, a month
@@ -9168,5 +9170,77 @@ Tests:
 - Found in the full run, not this change's: `games.spec.ts`'s note on a game card was flaky on the
   phone (a tap on the dialog's board before it took moves, 1 run in about 3; never alone in 12).
   The test now waits for the knight to show as selected before moving it.
+
+Live: TESTING.md.
+
+#### 5.163 The analyzer's games in the data repo (§5.66, answered (a) 2026-11-10)
+
+The owner answered §5.66 with the recommendation: (a), the data repo, through a converter in this
+repo. It is a data format the owner's real games will be written in, so it was designed from
+§5.50–§5.53 and §5.66:
+
+- **Files: `games/<YYYY-MM>.jsonl`**, the games played that UTC month, oldest first (by time, then
+  id), one game a line. A new path kind in `layout.ts` (`games`, its month). Written only by the
+  converter; a device never writes one, and the sync's three-way merge takes theirs for it, as for
+  any file only one writer touches (§5.102's rule). The validator reads them and warns on a line it
+  can't read or a game in the wrong month.
+- **A line is the site's `GameRecord` (§5.50) in fewer bytes**, version 1:
+  `{"v":1,"id","platform","t" (ms),"speed","rated","color" (the user's side),"white":[name,id,rating?],"black":[…],"winner"?,"status","opening"?,"fen"?,"moves":"e4 c5 …","evals"?:[cp | "#n" | null …],"clocks"?:[seconds | null …],"tactics"?:[…]}`.
+  - The moves are SAN in one string; the evals White-relative, a mate as "#3" or "#-3", a ply
+    each; the clocks in seconds; the tactics as the site keeps them (their lines, found, swing,
+    the evals around them).
+  - **The user's side is decided by the converter**, by mistake-lab's rule over the analyzer
+    file's `usernames` (and `--name`), so every device reads the same games with the same pids.
+  - Why a record and not the analyzer's own JSON: it is what every device would compute from that
+    JSON anyway, and it drops what the site never reads (FENs a move, `lastMoveAt`, `perf`, the
+    clock settings). The fixture's 24 games take 35 KB as month files against 89 KB as the
+    analyzer wrote them. Why not the device's own store format: that is IndexedDB's, free to change.
+  - Every fixture game reads back as the same record, with the same items extracted (§5.52).
+- **The converter, `scripts/games-to-data.mjs`**:
+  `node scripts/games-to-data.mjs <analyzed_games.json> <data-repo checkout> [--name N] [--dry-run] [--commit] [--push]`.
+  - It reads the analyzer's file through the site's own reader (`readGamesFile`).
+  - It merges into the month files already there: a game written again replaces its line, every
+    other game is kept, so an analyzer file holding fewer months loses nothing.
+  - A month is written only when its text changes, and never when it holds a line this version
+    can't read. Games with no date are left out and said.
+  - `--commit` commits the changed month files alone ("analyzer: n new game(s), m changed"),
+    `--push` pushes them too.
+- **The site reads them as a source beside the Gist**, with nothing to set up:
+  - the month files whose blob changed since the last read, read when Games (or the repertoire
+    check) starts and again after every sync, as the storm's shared files are read (§5.102);
+  - kept as `repo` games, an analyzer's record as the Gist's is, which a page's own Lichess or
+    chess.com export never replaces;
+  - Refresh says "Data repo: n games in m month file(s) read, k new or changed", or "unchanged
+    since the last read".
+
+  The Gist, Lichess and chess.com sources stay as they were, and the migration (§5.64) still
+  reads the Gist.
+- **The real analyzer's output** isn't in the testing data repo, so everything here was checked
+  on `test/fixtures/games/analyzed_games.json` (16 real games through the real analyzer, eight
+  made for the rules).
+
+**As built** (2026-11-10): `src/core/games/dataFile.ts` (`gameLine`, `parseGameLine`,
+`parseGamesFile`, `gamesFileText`, `planGamesFiles`, `gameMonth`), `src/core/data/layout.ts`
+(`games`, `gamesPath`), `src/core/data/validate.ts`, `src/core/sync/trees.ts` (its comment),
+`scripts/games-to-data.mjs`, `src/platform/gamesStore.ts` (the `repo` source),
+`src/app/games.ts` (`importRepoGames`), `src/ui/Games.tsx` (the sources' note).
+
+Tests:
+- `test/unit/core/games/dataFile.test.ts`:
+  - every fixture game as a line and back (the same record and items, mates and tactics, a start
+    position, under half the analyzer's bytes);
+  - lines this version can't read counted, never guessed;
+  - the month files: one a month, oldest first, written only when changed, games kept, one
+    replaced, a file with an unreadable line left alone, read clean by the validator.
+
+  Three controls in its header.
+- `test/unit/scripts/gamesToData.test.ts`: the script on a scratch checkout (a dry run writes
+  nothing; `--commit` commits the six months alone; a second run changes nothing; a folder that
+  isn't a data repo refused).
+- `test/unit/core/data/layout.test.ts`: the `games` kind and the paths that aren't one.
+- `test/e2e/games.spec.ts` (desktop and phone): with nothing set up, the three games converted into
+  the fake data repo are listed and dealt; a later month committed elsewhere arrives after a
+  reload's sync; Refresh says the repo is unchanged; the device's commits leave the games' files as
+  the converter wrote them.
 
 Live: TESTING.md.

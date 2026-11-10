@@ -9,6 +9,9 @@
 //   devices/<dev>.json                 { "name", "created" }, written once by <dev>
 //   storm/<dev>/<YYYY-MM-DD>.<k>.jsonl the storm positions <dev> gathered that UTC day (§5.102),
 //                                      one JSON object a line, written only by <dev>
+//   games/<YYYY-MM>.jsonl              the analyzer's games played that UTC month (§5.163), one
+//                                      compact game a line, written only by the converter
+//                                      (scripts/games-to-data.mjs): never by a device, never merged
 import { isId } from '../study/ids.ts';
 
 export const FORMAT_FILE = 'repworks.json';
@@ -21,6 +24,7 @@ export const progressDayPath = (dev: string, day: string) => `progress/${dev}/${
 export const progressMonthPath = (dev: string, month: string) => `progress/${dev}/${month}.jsonl`;
 export const devicePath = (dev: string) => `devices/${dev}.json`;
 export const stormFilePath = (dev: string, day: string, k: number) => `storm/${dev}/${day}.${k}.jsonl`;
+export const gamesPath = (month: string) => `games/${month}.jsonl`;
 /** Where a device's storm files are. */
 export const stormDir = (dev: string) => `storm/${dev}/`;
 
@@ -34,6 +38,7 @@ export type DataPath =
   | { kind: 'progress-month'; dev: string; month: string }
   | { kind: 'device'; dev: string }
   | { kind: 'storm'; dev: string; day: string; k: number }
+  | { kind: 'games'; month: string }
   | { kind: 'other' };
 
 const DAY = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
@@ -63,6 +68,10 @@ export function classifyPath(path: string): DataPath {
   if (parts.length === 3 && top === 'storm' && isId(a) && b !== undefined) {
     const m = /^(\d{4}-\d{2}-\d{2})\.([1-9]\d{0,3})\.jsonl$/.exec(b);
     if (m && DAY.test(m[1]!)) return { kind: 'storm', dev: a, day: m[1]!, k: Number(m[2]) };
+  }
+  if (parts.length === 2 && top === 'games' && a !== undefined) {
+    const m = /^(\d{4}-\d{2})\.jsonl$/.exec(a);
+    if (m && MONTH.test(m[1]!)) return { kind: 'games', month: m[1]! };
   }
   return { kind: 'other' };
 }

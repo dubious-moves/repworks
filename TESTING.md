@@ -791,6 +791,20 @@ later change replaced are folded into the later item; items already reported wor
 
 ## 6. Game cards and Games
 
+### The analyzer's games in the data repo (§5.163, 2026-11-10)
+- After the analyzer's next run, on the PC with a checkout of your data repo:
+  `node scripts/games-to-data.mjs <mistake-lab>/analyzer/analyzed_games.json <repworks-data> --dry-run`
+  says how many games and months it would write. Then run it with `--commit` (or `--push`), or
+  commit `games/` yourself. Is the size of `games/` reasonable (about 1 KB a game)?
+- On each device after a sync, Games lists those games with nothing set up (the gist can stay or
+  go). The game count and today's game cards should match what the Gist gave.
+- Refresh says "Data repo: unchanged since the last read." until the converter writes again.
+- If your chess.com or Lichess names aren't in the analyzer's `usernames`, add them with `--name`:
+  is the side right in every game?
+- **Checked**: unit tests (every fixture game read back the same, with the same items; the script
+  on a scratch checkout) and Playwright (desktop and emulated phone, a fake data repo). Not on your
+  real analyzer output (it isn't in the testing data repo), not on your devices.
+
 ### A game card's move judged without waiting (§5.151, 2026-11-04)
 - Games → Review on the PC: play a wrong move, then Try again and other moves, quickly too (while
   the engine line is still showing, and after stepping it past its end). The judge no longer waits
@@ -869,7 +883,7 @@ later change replaced are folded into the later item; items already reported wor
      mistake-lab's Repertoire tab.
   3. Phone: the game cards after a sync; a practice game with voice; a plan card.
   4. A week with mistake-lab closed. Then mistake-lab retires (D20); its analyzer keeps running from
-     its repo (D8) until §5.66's answer.
+     its repo (D8), its output converted into the data repo (§5.163).
 
 ## 7. Practice and the checklist
 

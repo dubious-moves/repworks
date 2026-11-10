@@ -130,7 +130,8 @@ export function mergeTrees(sides: Sides, text: Text, ctx: FileMergeContext): Tre
         texts.set(sha, merged);
       }
     } else {
-      // Changed on both sides: theirs, but for this device's storm files (§5.102), which only it writes.
+      // Changed on both sides: theirs, but for this device's storm files (§5.102), which only it
+      // writes. The analyzer's games (§5.163) are never written by a device: theirs, never merged.
       const where = classifyPath(path);
       const mine = where.kind === 'storm' && where.dev === ctx.device;
       const v = o === t || t === b ? o : o === b ? t : mine ? o : t;

@@ -2255,3 +2255,20 @@ The technical calls, each with its reason:
 - **Practical and Maia's columns stay on the games tabs.** Why: they rank candidates; this tab
   lists what the study covers.
 - No data format changed (the tab's choice is a device setting).
+
+## Revision of 2026-11-10 (the analyzer's games in the data repo; PLAN.md §5.163)
+- **§5.66 answered (a)**: the analyzer's output goes into the data repo through a converter in
+  this repo (`scripts/games-to-data.mjs`), and the site reads it beside the Gist.
+- **A new file kind, `games/<YYYY-MM>.jsonl`** (format 1 gains a path kind, no version change):
+  the games played that UTC month, one compact game a line (`"v": 1`), oldest first. Written by
+  the converter only; never by a device, never merged (theirs). Why months: a month's file
+  changes only while its games are played, so a device downloads one small file a month.
+- **A line is the site's game record, not the analyzer's JSON**: SAN moves in one string, evals as
+  centipawns or "#n", clocks in seconds, the user's side decided once by the converter. Why: every
+  device would compute exactly this from the analyzer's JSON, and it is under half its size.
+- **The converter merges, never removes**: a game written again replaces its line, the rest is
+  kept, and a month holding a line it can't read is left alone. Why: the analyzer's file may keep
+  fewer months than the repo, and the app's rule on unreadable files holds for the converter too.
+- **Read with nothing to set up**, after every sync, as an analyzer record a page's export never
+  replaces. The Gist stays a source (and the migration's).
+- Data format: `games/<YYYY-MM>.jsonl` (above).

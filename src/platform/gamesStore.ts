@@ -8,17 +8,21 @@ const DB_NAME = 'repworks-games';
 /** A game kept, and where it came from: the analyzer's record replaces the page's own export. */
 export interface StoredGame {
   game: GameRecord;
-  source: 'gist' | 'lichess' | 'chesscom';
+  /** `repo`: the data repo's `games/` files (§5.163), the analyzer's as the Gist's are. */
+  source: 'gist' | 'repo' | 'lichess' | 'chesscom';
 }
 
 export interface GamesStore {
   games(): Promise<StoredGame[]>;
-  /** Stores games, an analyzer's (`gist`) record never replaced by a page's export. Returns how many were new or changed. */
+  /** Stores games, an analyzer's record (`gist`, `repo`) never replaced by a page's export. Returns how many were new or changed. */
   putGames(list: readonly StoredGame[]): Promise<number>;
   clear(): Promise<void>;
   meta<T>(key: string): Promise<T | undefined>;
   setMeta<T>(key: string, value: T): Promise<void>;
 }
+
+/** The analyzer's record (through the Gist or the data repo), which a page's export never replaces. */
+const analyzer = (g: StoredGame) => g.source === 'gist' || g.source === 'repo';
 
 function done(tx: IDBTransaction): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -57,7 +61,7 @@ export function openGamesStore(idb: IDBFactory = indexedDB, name = DB_NAME): Gam
       let changed = 0;
       for (const g of list) {
         const before = (await req(store.get(g.game.id))) as StoredGame | undefined;
-        if (before && before.source === 'gist' && g.source !== 'gist') continue;
+        if (before && analyzer(before) && !analyzer(g)) continue;
         if (before && JSON.stringify(before) === JSON.stringify(g)) continue;
         store.put(g, g.game.id);
         changed++;
