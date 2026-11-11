@@ -7,7 +7,7 @@ where the build differed). What remains is live: the spike's re-run (§4.2), the
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
 with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
-for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) is built as the explorer's Study tab (§5.162, the owner's yes of 2026-11-10), §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; the analyzer's output lives in the data repo through a converter (§5.66, the owner's choice of 2026-11-10, built in §5.163), its acceptance test (§5.65) waits for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Storm positions shared between devices through the data repo, and an overnight gather (§5.102), are built (2026-10-12). Lc0 on the study page, its pick among close moves (§5.143), is built (2026-10-31). Endgames, the theoretical endgames each played for its goal against Stockfish (§5.145), are built (2026-10-31), their moves judged in the background since (§5.146, the owner's request of 2026-11-01), defended by Maia checked by Stockfish (§5.147, the owner's request), and a draw's attacker pushing on so the whole method comes up (§5.148, the owner's note). The endgames of the user's own repertoire (§5.149) are built (2026-11-01), and thirteen more theoretical endgames in two more groups (§5.150, the owner's request of 2026-11-02). A game card's move judged without waiting on the engine line's searches or the storm's workers (§5.151, the owner's request of 2026-11-04). Show and grade in the storm, every move of a deepened position shown by its band (§5.152, the owner's request of 2026-11-06), is built. A robotic board, the Chessnut Move, in the storm's untimed sessions and in practice is planned in its own document, `CHESSNUT.md` (§5.153 points there; the owner's request of 2026-11-06), not built. After a storm verdict, Show refutation (a mistake or a blunder), Show line (a great move or the top move) and Continue against Maia's reply (a good move or better) are built (§5.154, the owner's request of 2026-11-06). A polish pass (§5.156, the owner's request of 2026-11-07) made the light theme readable and the folded settings panel free, and lists ideas waiting for the owner's word. The positions after Maia's likely moves (20% or more) outside a storm card's list are searched while the user thinks (§5.157, the owner's request of 2026-11-10). Of §5.156's ideas the owner said to build all but the faster start (2026-11-10): Today on the home, the icon's shortcuts, the wrong move shown, "?" for the keys and the empty pages are built (§5.158). Share to Repworks and .pgn files opened with it, sounds, Settings apart from Debug and the dark themes' contrasts are built (§5.159). TESTING.md is one walk through the app, by screen (§5.160). The home's deepening searches Maia's likely moves too, and those searches are kept with the position (§5.161). The explorer has a Study tab: the open study's moves at the board's position, across its chapters and move orders (§5.162, §5.27). The analyzer's games are converted into the data repo's `games/` files, which every device reads beside the Gist (§5.163, §5.66). Read with `DECISIONS.md`, which this plan updates (its
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) is built as the explorer's Study tab (§5.162, the owner's yes of 2026-11-10), §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; the analyzer's output lives in the data repo through a converter (§5.66, the owner's choice of 2026-11-10, built in §5.163), its acceptance test (§5.65) waits for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Storm positions shared between devices through the data repo, and an overnight gather (§5.102), are built (2026-10-12). Lc0 on the study page, its pick among close moves (§5.143), is built (2026-10-31). Endgames, the theoretical endgames each played for its goal against Stockfish (§5.145), are built (2026-10-31), their moves judged in the background since (§5.146, the owner's request of 2026-11-01), defended by Maia checked by Stockfish (§5.147, the owner's request), and a draw's attacker pushing on so the whole method comes up (§5.148, the owner's note). The endgames of the user's own repertoire (§5.149) are built (2026-11-01), and thirteen more theoretical endgames in two more groups (§5.150, the owner's request of 2026-11-02). A game card's move judged without waiting on the engine line's searches or the storm's workers (§5.151, the owner's request of 2026-11-04). Show and grade in the storm, every move of a deepened position shown by its band (§5.152, the owner's request of 2026-11-06), is built. A robotic board, the Chessnut Move, in the storm's untimed sessions and in practice is planned in its own document, `CHESSNUT.md` (§5.153 points there; the owner's request of 2026-11-06), not built. After a storm verdict, Show refutation (a mistake or a blunder), Show line (a great move or the top move) and Continue against Maia's reply (a good move or better) are built (§5.154, the owner's request of 2026-11-06). A polish pass (§5.156, the owner's request of 2026-11-07) made the light theme readable and the folded settings panel free, and lists ideas waiting for the owner's word. The positions after Maia's likely moves (20% or more) outside a storm card's list are searched while the user thinks (§5.157, the owner's request of 2026-11-10). Of §5.156's ideas the owner said to build all but the faster start (2026-11-10): Today on the home, the icon's shortcuts, the wrong move shown, "?" for the keys and the empty pages are built (§5.158). Share to Repworks and .pgn files opened with it, sounds, Settings apart from Debug and the dark themes' contrasts are built (§5.159). TESTING.md is one walk through the app, by screen (§5.160). The home's deepening searches Maia's likely moves too, and those searches are kept with the position (§5.161). The explorer has a Study tab: the open study's moves at the board's position, across its chapters and move orders (§5.162, §5.27). The analyzer's games are converted into the data repo's `games/` files, which every device reads beside the Gist (§5.163, §5.66). A second look (§5.164, the owner's request of 2026-11-11): a phone held sideways has the board whole at the left of every board page, long names no longer make a phone's page scroll sideways, and the page's title names the screen. Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -9244,3 +9244,116 @@ Tests:
   the converter wrote them.
 
 Live: TESTING.md.
+
+#### 5.164 A second look: a phone held sideways, long names, the page's title (the owner's request, 2026-11-11)
+
+"Look for ways that repworks can be improved further. UI, UX, features, anything."
+
+**What was looked at.**
+- `npm run check`, `npm test` (1,051 tests) and `npm run e2e` (364 passed, 12 skipped) before
+  anything changed, none flaky.
+- Every page was screenshotted with four made-up studies (ten chapters, a month of reviews on two
+  devices), at the sizes §5.156 looked at (a 1440-wide desktop, an emulated Pixel 7, a 360-wide
+  phone) and at those it didn't:
+  - a phone on its side (915×412, and 740×360, 844×390, 932×430, 998×448, 915×360);
+  - a tablet upright and on its side (820×1180, 1180×820);
+  - smaller windows (1366×625, 1280×720, 1280×500, 1000×700).
+- Each board page's board was measured at ten of those sizes: its box, whether it was whole on
+  screen, and what lay under it.
+- The same pages with long names: a study named by 100 characters, one by 72 with no space to
+  break at, a chapter by 130, 25 chapters in one study.
+- Eleven of the browser tests were run at 915×412 with touch (the storm and a set, a practice game
+  and its review, tactics, the games and the game cards, a checklist's drill, the idea cards, an
+  endgame, training), and their screens read from the traces' frames.
+
+**Found and fixed.**
+
+1. **A phone held sideways.** The manifest has no `orientation` (D7), so the installed app turns
+   with the phone, and no layout was made for it:
+   - 900px wide or more (a Pixel 7 is 915×412) it took the desktop's layout, which sizes the board
+     by the window's height less the page's frame: the study's board was 172px wide, the analysis
+     board's 140px (112 and 80 with the first run's notice showing);
+   - the training screens (training, show and grade, a line read or played, an endgame, practice)
+     kept the board at its least, 260px, over the panel: Hint, Show and grade, Analyse and Stop
+     were under it;
+   - narrower than 900px (an iPhone is 844×390) it took the phone's layout, the board's foot under
+     the window's and every button below it.
+
+   Now, in landscape with the window 520px high or less and 600px wide or more, a page with a
+   board has:
+   - **the board pinned at the left**, as tall as the window less its two material rows and 8px,
+     its side a multiple of 8px (chessground's squares): 360px at 915×412, 336 at 844×390, 304 at
+     740×360. The column beside it keeps 300px at least, and `--board-size` still caps the board;
+   - **everything else in one column beside it**, in the page's own order: the head, the line under
+     the board (a wrong move's "try again", Misclick), the panel, the line list. It scrolls with
+     the page; the board stays;
+   - **no top bar**: Home is in the head beside ←, as on a desktop. The footer ends the column
+     with the sync status (the status moves there whenever the phone is on its side);
+   - on the study page and the analysis board **the move buttons first**, as on a phone held
+     upright, then the engines, the notation (60% of the window's height at most) and the explorer;
+   - no eval bar and no size handle: the number is beside the engine's line, and the board is
+     already as large as the window lets it be.
+
+   What was decided:
+   - One rule set for every board page (`.cv-board` and `.train-board`), not a layout a screen,
+     so a screen added later has it too: the last block of `app.css`, keyed on the page having a
+     board (`:has`). The home and the pages of lists keep the phone's layout on their side; they
+     always scrolled.
+   - A desktop window as short takes it too (measured at 1280×500: a 448px board where it was 280,
+     and 228 on the analysis board).
+   - **A menu is never taller than the window**: the study's ☰ menu is 598px tall, and at 412px
+     its last items (Export PGN, Study settings) couldn't be reached. It scrolls now.
+   - **The engines are asked as a phone's while the phone is on its side.** "A phone" was a
+     window 768px wide or less, so a phone turned was a desktop: a 32 MB hash for 16, depth 24 for
+     22 in the storm, 18 for 16 elsewhere. It is now that, or a window 520px high or less under a
+     finger (`smallDevice`, `src/app/device.ts`), read when a search starts.
+   - Left as it is: a game card's note dialog, whose board and words are taller than a 412px
+     window; it scrolls inside the dialog.
+
+2. **Long names.** A dropdown is as wide as its longest option. The storm's Study and Chapter
+   dropdowns therefore grew with the longest study or chapter name, and on a phone the page
+   scrolled sideways (254px past the window with a 72-character name, 392px with a 100-character
+   one). A name with no space to break at (a file's name) did the same in the study page's head,
+   the storm's heading and its table of studies. The dropdowns now keep to their card, and those
+   names wrap. Every other page held (the home, the study page and its dialogs, training and its
+   line list, progress, the checklist, coverage, the games, import).
+
+3. **The page's title.** It was "Repworks" on every screen, so a browser's tabs, its history and
+   the installed app's window said nothing of where they were. It now names the screen in its
+   head's words, then the app (`pageTitle`, `src/core/app/title.ts`): "6. Bg5 · Najdorf ·
+   Repworks" on a study (the chapter first: one study's tabs are told apart by it), "Training ·
+   Najdorf · Repworks", "Endgame · Lucena: build a bridge · Repworks", "Repworks" alone at the
+   home. A name not read yet is left out, never shown as an id.
+
+**As built** (2026-11-11): `src/ui/app.css` (its last block; `.move-menu`; `.storm-scope`;
+`.study-title`, `h2`), `src/ui/phone.ts` (`SIDEWAYS`), `src/ui/App.tsx` (the sync status's place),
+`src/app/device.ts` (`smallDevice`, used by `engine.ts`, `stormEngine.ts`, `storm.ts`,
+`practice.ts`, `gameTrainer.ts`, `sequence.ts`, `repertoireEndgames.ts`),
+`src/core/app/title.ts`, `src/app/title.ts` (`keepTitle`), `src/app/main.ts`.
+
+Tests:
+- `test/e2e/sideways.spec.ts`, on both projects (the phone project turns its Pixel 7; the desktop
+  project is a window of the size):
+  - a study at 915×412 and 740×360: the board whole on screen and 300px (280px) or more, ←, Home,
+    ☰ and the move buttons beside it and on screen, a move taken by a tap, the board staying while
+    the column scrolls, the sync status in the footer, the ☰ menu inside the window and its last
+    item opening Study settings, and the page as it was once upright again;
+  - training at 740×360, 915×412 and 640×330: the buttons, the counters and a wrong move's line
+    beside the board, the right move taken, Next line beside it;
+  - the analysis board and an endgame at 915×412, and the engine's hash: 16 MB on the phone
+    turned, 32 MB in a desktop's short window.
+
+  Three controls in its header.
+- `test/e2e/names.spec.ts` (desktop and phone): with the long names, no sideways scroll on the
+  home, the study page, the storm (a study chosen, and the whole repertoire) and training; the
+  dropdowns end inside their card. Two controls in its header.
+- `test/unit/core/app/title.test.ts`: the home; a study with and without its chapter; 35 addresses
+  in their heads' words; names not known yet. Three controls in its header.
+- `test/e2e/back.spec.ts` (desktop and phone): the title on the home, a study and its other
+  chapter, training, progress, an endgame, and after ←. One control.
+- The ordinary layouts measured the same before and after at 1440×900, 1366×625 and 412×915 (every
+  board's box, to the pixel).
+
+Not tested: a real phone turned (the notch's side, the browser's bars coming and going, the
+keyboard). Live: TESTING.md.
+

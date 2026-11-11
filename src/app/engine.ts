@@ -12,6 +12,7 @@ import { createSearch, type Analysis, type Search, type SearchRequest } from '..
 import { ensure } from '../platform/blobs.ts';
 import { startStockfish, stockfishFiles, STOCKFISH_VERSIONS, type EngineProcess, type StockfishVersion } from '../platform/stockfish.ts';
 import { isolated, wantIsolation } from '../platform/isolation.ts';
+import { smallDevice } from './device.ts';
 
 export interface EnginePrefs {
   on: boolean;
@@ -104,7 +105,7 @@ let pendingShow: Analysis | undefined;
 let board: Position | undefined;
 let deeper = false;
 
-const hashMb = (): number => (matchMedia('(max-width: 768px)').matches ? 16 : 32);
+const hashMb = (): number => (smallDevice() ? 16 : 32);
 /** The threads the engine runs with: those chosen when the page is isolated, else one. */
 export const runningThreads = (): number => (isolated() ? Math.max(1, enginePrefs.peek().threads) : 1);
 let started = 1;

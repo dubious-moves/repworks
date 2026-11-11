@@ -101,6 +101,8 @@ a {
 h2 {
   font-size: 1.05rem;
   margin: 0 0 8px;
+  /* A heading may carry a study's name: one with no space to break at wraps (§5.164). */
+  overflow-wrap: anywhere;
 }
 
 .muted {
@@ -954,6 +956,8 @@ textarea.script {
 .study-title {
   color: var(--muted);
   font-size: 0.85rem;
+  /* A name with no space to break at (a file's name) wraps rather than widening the page (§5.164). */
+  overflow-wrap: anywhere;
 }
 
 /* A page's own title, when the head has nothing else to name (Training · …, Read · …, Games): the
@@ -1669,6 +1673,10 @@ textarea.script {
   display: flex;
   flex-direction: column;
   min-width: 160px;
+  /* Never taller than the window (a phone held sideways, §5.164): it scrolls, so every item can be reached. */
+  max-height: calc(100dvh - 8px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 4px 0;
   background: var(--menu-bg);
   border: 1px solid var(--control-border);
@@ -1684,6 +1692,10 @@ textarea.script {
   background: none;
   color: var(--control-text);
   font-size: 0.9rem;
+}
+
+.move-menu > * {
+  flex-shrink: 0;
 }
 
 .move-menu button:focus-visible {
@@ -4343,7 +4355,20 @@ a.button.primary {
   margin-bottom: 4px;
 }
 
+/* A dropdown is as wide as its longest option: with a long study or chapter name it was wider
+   than a phone's page, which then scrolled sideways (§5.164). Its label keeps to the card's
+   width and the dropdown gives way beside the word. */
+.storm-scope label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+
 .storm-scope select {
+  flex: 0 1 auto;
+  min-width: 0;
   max-width: 100%;
 }
 
@@ -5019,7 +5044,8 @@ a.button.primary {
   width: 30%;
 }
 
-/* A study's or chapter's name opens its scope. */
+/* A study's or chapter's name opens its scope. One with no space to break at wraps, so the
+   table keeps to the card (§5.164). */
 .storm-chapters td button {
   min-height: 0;
   padding: 0;
@@ -5029,6 +5055,7 @@ a.button.primary {
   font: inherit;
   text-align: left;
   cursor: pointer;
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 480px) {
@@ -6497,4 +6524,127 @@ a.button.disabled {
   font: inherit;
   font-size: 0.9em;
   white-space: nowrap;
+}
+
+/* A phone held sideways, or a window as short (PLAN.md §5.164). The wide layouts size the board
+   by the window's height less the page's frame and the phone's by its width, so here the board
+   came out at 80 to 170px, or at its least (260px) over the panel's buttons and past the screen's
+   foot. With a board on the page: the board is pinned at the left, as tall as the window (less its
+   material rows), the top bar and the footer go, and everything else (the head, the line under the
+   board, the panel, the line list) is one column beside it that scrolls with the page. */
+@media (orientation: landscape) and (max-height: 520px) and (min-width: 600px) {
+  .shell:has(:is(.cv-board, .train-board) > .board) {
+    --land-left: max(8px, env(safe-area-inset-left, 0px));
+    /* A multiple of 8px, as chessground draws its squares; the column beside it keeps 300px. */
+    --land-board: round(down, max(176px, min(100dvh - 2 * var(--material-h) - 8px, 100vw - var(--land-left) - 312px, var(--board-size, 100vw))), 8px);
+    height: auto;
+    min-height: 100dvh;
+    padding-left: calc(var(--land-left) + var(--land-board) + 12px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+
+  .shell:has(:is(.cv-board, .train-board) > .board) > .topbar {
+    display: none;
+  }
+
+  /* The footer, with the sync status (App.tsx puts it there when the phone is sideways), ends the column. */
+  .shell:has(:is(.cv-board, .train-board) > .board) > .footer {
+    padding: 4px 8px calc(4px + env(safe-area-inset-bottom)) 0;
+  }
+
+  .shell:has(:is(.cv-board, .train-board) > .board) > .content {
+    display: block;
+    padding: 6px 8px 8px 0;
+  }
+
+  /* The wide layouts' frames and grids give way: their parts follow one another in the column. A
+     frame that is a size container would also place the pinned board itself. */
+  .shell:has(:is(.cv-board, .train-board) > .board) :is(.chapter-view, .train, .train-main, .cv-grid, .train-grid) {
+    display: block;
+  }
+
+  .shell:has(:is(.cv-board, .train-board) > .board) :is(.cv-frame, .train-frame) {
+    container-type: normal;
+  }
+
+  .shell:has(:is(.cv-board, .train-board) > .board) :is(.cv-grid, .train-grid, .train-body) {
+    --board: var(--land-board);
+  }
+
+  .shell:has(:is(.cv-board, .train-board) > .board) .train-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .shell:has(:is(.cv-board, .train-board) > .board) .train-body .train-list {
+    order: 1;
+    max-height: none;
+  }
+
+  .shell:has(:is(.cv-board, .train-board) > .board) :is(.cv-board, .train-board) {
+    display: contents;
+  }
+
+  .shell:has(:is(.cv-board, .train-board) > .board) :is(.cv-board, .train-board) > .board {
+    position: fixed;
+    z-index: 1;
+    top: 4px;
+    left: var(--land-left);
+    width: var(--land-board);
+    min-width: 0;
+    margin: var(--material-h) 0;
+  }
+
+  /* The board is as large as the window lets it be: nothing to drag. */
+  .shell:has(:is(.cv-board, .train-board) > .board) :is(.board-resize, .eval-bar) {
+    display: none;
+  }
+
+  /* The head beside the board: Home is in it (the top bar's is gone), and it wraps. */
+  .shell:has(:is(.cv-board, .train-board) > .board) .chapter-head {
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+
+  .shell:has(:is(.cv-board, .train-board) > .board) .chapter-head .head-home {
+    display: inline-flex;
+  }
+
+  .shell:has(:is(.cv-board, .train-board) > .board) .cv-panel {
+    overflow: visible;
+  }
+
+  /* The move buttons first, as on a phone held upright, where they are right under the board. */
+  .shell:has(:is(.cv-board, .train-board) > .board) .cv-panel .controls {
+    order: -2;
+    border-top: 0;
+  }
+
+  .shell:has(:is(.cv-board, .train-board) > .board) .cv-panel .brushes {
+    order: -1;
+    border-top: 0;
+  }
+
+  .shell:has(:is(.cv-board, .train-board) > .board) .cv-panel .notation {
+    flex: none;
+    min-height: 0;
+    max-height: 60dvh;
+  }
+
+  .shell:has(:is(.cv-board, .train-board) > .board) .cv-board .fen-form {
+    max-width: none;
+  }
+
+  /* A practice game's review: its board is the pinned one; the eval bar beside it goes, as a
+     study's does (the number is by the engine's line), and its buttons lead the column. */
+  .shell:has(:is(.cv-board, .train-board) > .board) :is(.review-board-row, .review-board-main) {
+    display: contents;
+    container-type: normal;
+  }
+
+  .shell:has(:is(.cv-board, .train-board) > .board) .review-eval {
+    display: none;
+  }
 }

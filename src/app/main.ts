@@ -13,6 +13,7 @@ import { shellVersion, updateReady } from './shell.ts';
 import { startApp } from './state.ts';
 import { startFileLaunch } from './share.ts';
 import { applyTheme } from './theme.ts';
+import { keepTitle } from './title.ts';
 
 // First of all: a setup link's token, or Lichess's login code, leaves the address bar before
 // anything else runs.
@@ -21,6 +22,8 @@ const lichessCallback = takeLichessCallback();
 
 applyTheme();
 render(h(App, {}), document.getElementById('app')!);
+// The tab's title names the screen (§5.164).
+keepTitle();
 closeDialogsOnBackdrop();
 installSelectFocusRelease();
 // Safari on iOS shows :active (a button's press, app.css) only once the page listens for touches.

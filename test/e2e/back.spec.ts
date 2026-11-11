@@ -87,3 +87,27 @@ test('a line gone from the repertoire keeps ← and Home; Home is on every page 
   await page.getByRole('link', { name: 'Home' }).click();
   await expect(page.locator('.study-card').first()).toBeVisible();
 });
+
+// The tab's title names the screen (PLAN.md §5.164), so the browser's history and the installed
+// app's window say where each entry is. Control run on 2026-11-11: without `keepTitle()` in
+// main.ts the first title after the home's fails ("Main line · Test repertoire · Repworks",
+// received "Repworks").
+test('the page’s title names the screen: a study with its chapter, training, a tool, and the home again', async ({ page }) => {
+  await setUp(page);
+  await expect(page).toHaveTitle('Repworks');
+  await page.getByRole('link', { name: 'Test repertoire', exact: true }).click();
+  await expect(page).toHaveTitle('Main line · Test repertoire · Repworks');
+  await page.getByLabel('Chapter', { exact: true }).selectOption({ label: 'Alapin' });
+  await expect(page).toHaveTitle('Alapin · Test repertoire · Repworks');
+  await page.goto(`${site.url}#/train/Rep0Najd`);
+  await expect(page).toHaveTitle('Training · Test repertoire · Repworks');
+  await page.goto(`${site.url}#/progress`);
+  await expect(page).toHaveTitle('Progress · Repworks');
+  await page.goto(`${site.url}#/endgames/lucena`);
+  await expect(page).toHaveTitle('Endgame · Lucena: build a bridge · Repworks');
+  // ← goes back to the page before, and the title with it.
+  await back(page).click();
+  await expect(page).toHaveTitle('Progress · Repworks');
+  await page.goto(`${site.url}#/`);
+  await expect(page).toHaveTitle('Repworks');
+});

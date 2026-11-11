@@ -24,9 +24,10 @@ import { recordEvent } from './state.ts';
 import { gameQueueNow } from './games.ts';
 import { leavePractice, loadOpponent, practice, startPractice } from './practice.ts';
 import { trainData } from './train.ts';
+import { smallDevice } from './device.ts';
 
 export const MAX_TRIES = 3;
-const narrow = () => typeof matchMedia !== 'undefined' && matchMedia('(max-width: 768px)').matches;
+const narrow = smallDevice;
 
 export type TrainerPhase =
   /** The user's move is asked. */

@@ -14,6 +14,7 @@ import { parseSan } from 'chessops/san';
 import { gameDeck, savedDeck } from './games.ts';
 import { recordEvent } from './state.ts';
 import { analyseForStorm } from './stormEngine.ts';
+import { smallDevice } from './device.ts';
 
 /** The most positions checked; the rest are listed as unverified. */
 const MAX_CHECKED = 12;
@@ -29,7 +30,7 @@ export interface SequenceCheck {
 
 export type CheckResult = { ok: true; check: SequenceCheck } | { ok: false; error: string };
 
-const narrow = () => typeof matchMedia !== 'undefined' && matchMedia('(max-width: 768px)').matches;
+const narrow = smallDevice;
 
 /** The board's lines, checked by Stockfish; `progress` hears each position as it is asked. */
 export async function checkSequence(c: Chapter, progress: (done: number, of: number) => void = () => undefined): Promise<CheckResult> {

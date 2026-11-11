@@ -30,6 +30,7 @@ import { ImportScreen } from './Import.tsx';
 import { SetupForm } from './Setup.tsx';
 import { SyncBanners, SyncChip } from './Sync.tsx';
 import { HomeLink } from './Back.tsx';
+import { SIDEWAYS } from './phone.ts';
 import { MistakesView } from './Mistakes.tsx';
 import { ProgressView } from './Progress.tsx';
 import { ReadView } from './Read.tsx';
@@ -97,8 +98,11 @@ export function App() {
   );
 }
 
-/** A desktop's width, where the sync status sits in the footer rather than the head. */
-const wideQuery = typeof matchMedia === 'function' ? matchMedia('(min-width: 900px)') : undefined;
+/**
+ * A desktop's width, where the sync status sits in the footer rather than the head; and a phone
+ * held sideways, whose board pages have no top bar (§5.164).
+ */
+const wideQuery = typeof matchMedia === 'function' ? matchMedia(`(min-width: 900px), ${SIDEWAYS}`) : undefined;
 const wide = signal(wideQuery?.matches ?? false);
 wideQuery?.addEventListener('change', (e) => (wide.value = e.matches));
 

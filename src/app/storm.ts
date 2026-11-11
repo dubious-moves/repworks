@@ -38,6 +38,7 @@ import { keptPolicy, likelyToSearch, missingRatings, type MaiaRating } from '../
 import { cleanFocus, cleanLevelUp, easyAt, FOCUSES, LEVEL_DEFAULT, tooEasyAt, matchesFocus, positionTags, withLevelUp, type Focus, type LevelUp } from '../core/storm/kinds.ts';
 import { maiaElo, maiaPolicies, maiaStored } from './maia.ts';
 import type { ReadyPuzzle } from '../core/puzzles/puzzles.ts';
+import { smallDevice } from './device.ts';
 
 /* ------------------------------------------------------------------ settings (per device) */
 
@@ -62,7 +63,7 @@ export interface StormPrefs {
   levelUp: LevelUp;
 }
 const PREFS_KEY = 'repworks-storm';
-const DEFAULT_PREFS: StormPrefs = { minPly: STORM.minPly, maxPly: STORM.maxPly, source: 'both', deepen: typeof matchMedia === 'undefined' || !matchMedia('(max-width: 768px)').matches, maia: true, focus: [], focusPuzzles: false, overnight: false, focused: false, levelUp: LEVEL_DEFAULT };
+const DEFAULT_PREFS: StormPrefs = { minPly: STORM.minPly, maxPly: STORM.maxPly, source: 'both', deepen: !smallDevice(), maia: true, focus: [], focusPuzzles: false, overnight: false, focused: false, levelUp: LEVEL_DEFAULT };
 
 function loadPrefs(): StormPrefs {
   try {
@@ -428,7 +429,7 @@ export function positionLabel(p: StoredPosition): string {
   return `${p.names[0] ?? 'a line'}${p.ply ? `, ${p.ply} ${p.ply === 1 ? 'ply' : 'plies'} on` : ''}`;
 }
 
-const phone = () => typeof matchMedia !== 'undefined' && matchMedia('(max-width: 768px)').matches;
+const phone = smallDevice;
 /** The depth the deepening and the look-ahead aim for on this device (§5.84). */
 export const deepenTarget = (): number => (phone() ? STORM.deepenDepth.mobile : STORM.deepenDepth.desktop);
 

@@ -15,6 +15,7 @@ import { practiceResults } from './repertoireCheck.ts';
 import { scopeData, stormRequest, stormStore } from './storm.ts';
 import { analyseForStorm } from './stormEngine.ts';
 import { trainData } from './train.ts';
+import { smallDevice } from './device.ts';
 
 /** The kept endgames, and the games walked with the explorer's window reached, in the storm store's `meta`. */
 const LIST_KEY = 'repertoireEndgames';
@@ -89,7 +90,7 @@ let stopAsked = false;
 
 class GatherEnd extends Error {}
 
-const narrow = () => typeof matchMedia !== 'undefined' && matchMedia('(max-width: 768px)').matches;
+const narrow = smallDevice;
 
 /** Stockfish's score for the side to move at the judges' depth (the drill's), or undefined. */
 async function scoreOf(fen: string): Promise<{ cp: number; depth: number } | undefined> {

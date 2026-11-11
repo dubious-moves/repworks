@@ -10,6 +10,7 @@ import { positionOf } from '../core/storm/walk.ts';
 import { ensure } from '../platform/blobs.ts';
 import { startStockfish, stockfishFiles, type EngineProcess } from '../platform/stockfish.ts';
 import { enginePrefs, runningThreads } from './engine.ts';
+import { smallDevice } from './device.ts';
 
 export interface EngineAnswer {
   lines: EngineLine[];
@@ -43,7 +44,7 @@ interface Lane {
   timer?: ReturnType<typeof setTimeout>;
 }
 
-const phone = () => matchMedia('(max-width: 768px)').matches;
+const phone = smallDevice;
 /** A focused lane's hash: each searches a position of its own, so each gets more than the one engine's 32 MB. */
 const FOCUSED_HASH_MB = 64;
 

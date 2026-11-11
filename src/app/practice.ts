@@ -40,6 +40,7 @@ import type { MaiaMove } from '../core/maia/encode.ts';
 import { recordEvent } from './state.ts';
 import { analyseForStorm } from './stormEngine.ts';
 import { trainData } from './train.ts';
+import { smallDevice } from './device.ts';
 
 /** The opponent's strength: the explorer's ratings and speeds, Maia's rating and precision. */
 export interface Opponent {
@@ -175,7 +176,7 @@ export interface PracticeGame {
 export const practice = signal<PracticeGame | undefined>(undefined);
 let gen = 0;
 
-const narrow = () => typeof matchMedia !== 'undefined' && matchMedia('(max-width: 768px)').matches;
+const narrow = smallDevice;
 
 /** The game replaced as a whole (fields taken away), when it is still game `g`. */
 function replace(g: number, fn: (p: PracticeGame) => PracticeGame): PracticeGame | undefined {

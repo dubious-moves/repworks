@@ -1256,6 +1256,35 @@ Export PGN and Copy branch are under 2, Studies.)
 
 ## 13. The spike and installation
 
+### A phone held sideways, long names, the page's title (§5.164, 2026-11-11)
+- **Turn the phone on its side** on a study, the analysis board, training, show and grade, the
+  storm (a card and its review), a game card, a practice game and its review, an endgame, a
+  checklist's drill, an idea card and Read:
+  - the board whole at the left, as tall as the screen; nothing under it;
+  - beside it, in one column that scrolls: ←, Home, the page's name, the line that answers a move
+    (a wrong move's "try again", the storm's verdict), the buttons, then the rest;
+  - on a study the move buttons come first, then the engines, the notation and the explorer;
+  - the sync status at the column's end (scroll down), not in a top bar;
+  - **the notch's side**: is the board clear of the camera's cut-out with the phone turned either
+    way? Does the page still fit when Chrome's bars show and hide (in the browser, not installed)?
+  - the study's ☰ menu scrolls to Export PGN and Study settings;
+  - turned upright again, the page is as it was.
+- The home and the pages of lists keep their upright layout on their side. Should any of them
+  change?
+- A game card's **note** dialog is taller than the screen sideways (its board, the words and the
+  buttons): it scrolls inside the dialog. Say if it should be laid out for it.
+- The storm, practice and the engine panel **with the phone on its side** use the phone's depths
+  and hash (they used the desktop's: the phone was taken for one by its width).
+- **Long names**: on the phone, the storm's Study and Chapter dropdowns with your real course
+  names, the storm's table of studies, a study's head: no page scrolls sideways.
+- **The page's title**: the desktop's tabs and the installed app's window name the screen ("6. Bg5
+  · Najdorf · Repworks", "Training · Najdorf · Repworks"); the browser's history (hold ←) reads as
+  a list of places.
+- **Checked**: Playwright on a desktop window and an emulated Pixel 7 at 915×412, 740×360 and
+  640×330, with touch (the board's box, the controls beside it, a move by a tap, the menu, the
+  engine's hash, the titles, long names); eleven of the other browser tests run at 915×412 and
+  their screens read from the traces. Nothing on a real phone.
+
 ### Shortcuts on the icon, and "?" for the keys (§5.158, 2026-11-10)
 - **Shortcuts on the installed app's icon**: long-press the Repworks icon on the phone (and
   right-click it in the desktop's taskbar or dock): Train, Storm, Games and Endgames. The app may
