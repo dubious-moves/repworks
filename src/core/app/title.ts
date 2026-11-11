@@ -75,6 +75,8 @@ export function screenTitle(mode: Mode, names: TitleNames): string {
       return join('Checklist', names.study(mode.sid));
     case 'endgames':
       return mode.id ? join('Endgame', names.endgame(mode.id)) : 'Endgames';
+    case 'search':
+      return 'Search';
   }
 }
 

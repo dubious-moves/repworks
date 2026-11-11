@@ -83,6 +83,9 @@ walked and scored: `--study "Scandi Gambit" --chapter "Accepted - Main lines"`.
 - Routes live in the hash (`#/study/<sid>/<cid>`): GitHub Pages has no SPA fallback.
 - The service worker names its caches `repworks-*` and deletes only those.
 - The app never rewrites a data file it cannot parse.
+- A page built around a board puts it in `.train-board` (the study's is `.cv-board`), as that
+  element's direct child: the board's size and a phone held sideways (PLAN.md §5.164, the last
+  block of `app.css`) hang on it.
 
 ## Constraints
 

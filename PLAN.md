@@ -7,7 +7,7 @@ where the build differed). What remains is live: the spike's re-run (§4.2), the
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
 with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
-for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) is built as the explorer's Study tab (§5.162, the owner's yes of 2026-11-10), §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; the analyzer's output lives in the data repo through a converter (§5.66, the owner's choice of 2026-11-10, built in §5.163), its acceptance test (§5.65) waits for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Storm positions shared between devices through the data repo, and an overnight gather (§5.102), are built (2026-10-12). Lc0 on the study page, its pick among close moves (§5.143), is built (2026-10-31). Endgames, the theoretical endgames each played for its goal against Stockfish (§5.145), are built (2026-10-31), their moves judged in the background since (§5.146, the owner's request of 2026-11-01), defended by Maia checked by Stockfish (§5.147, the owner's request), and a draw's attacker pushing on so the whole method comes up (§5.148, the owner's note). The endgames of the user's own repertoire (§5.149) are built (2026-11-01), and thirteen more theoretical endgames in two more groups (§5.150, the owner's request of 2026-11-02). A game card's move judged without waiting on the engine line's searches or the storm's workers (§5.151, the owner's request of 2026-11-04). Show and grade in the storm, every move of a deepened position shown by its band (§5.152, the owner's request of 2026-11-06), is built. A robotic board, the Chessnut Move, in the storm's untimed sessions and in practice is planned in its own document, `CHESSNUT.md` (§5.153 points there; the owner's request of 2026-11-06), not built. After a storm verdict, Show refutation (a mistake or a blunder), Show line (a great move or the top move) and Continue against Maia's reply (a good move or better) are built (§5.154, the owner's request of 2026-11-06). A polish pass (§5.156, the owner's request of 2026-11-07) made the light theme readable and the folded settings panel free, and lists ideas waiting for the owner's word. The positions after Maia's likely moves (20% or more) outside a storm card's list are searched while the user thinks (§5.157, the owner's request of 2026-11-10). Of §5.156's ideas the owner said to build all but the faster start (2026-11-10): Today on the home, the icon's shortcuts, the wrong move shown, "?" for the keys and the empty pages are built (§5.158). Share to Repworks and .pgn files opened with it, sounds, Settings apart from Debug and the dark themes' contrasts are built (§5.159). TESTING.md is one walk through the app, by screen (§5.160). The home's deepening searches Maia's likely moves too, and those searches are kept with the position (§5.161). The explorer has a Study tab: the open study's moves at the board's position, across its chapters and move orders (§5.162, §5.27). The analyzer's games are converted into the data repo's `games/` files, which every device reads beside the Gist (§5.163, §5.66). A second look (§5.164, the owner's request of 2026-11-11): a phone held sideways has the board whole at the left of every board page, long names no longer make a phone's page scroll sideways, and the page's title names the screen. Read with `DECISIONS.md`, which this plan updates (its
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) is built as the explorer's Study tab (§5.162, the owner's yes of 2026-11-10), §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; the analyzer's output lives in the data repo through a converter (§5.66, the owner's choice of 2026-11-10, built in §5.163), its acceptance test (§5.65) waits for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Storm positions shared between devices through the data repo, and an overnight gather (§5.102), are built (2026-10-12). Lc0 on the study page, its pick among close moves (§5.143), is built (2026-10-31). Endgames, the theoretical endgames each played for its goal against Stockfish (§5.145), are built (2026-10-31), their moves judged in the background since (§5.146, the owner's request of 2026-11-01), defended by Maia checked by Stockfish (§5.147, the owner's request), and a draw's attacker pushing on so the whole method comes up (§5.148, the owner's note). The endgames of the user's own repertoire (§5.149) are built (2026-11-01), and thirteen more theoretical endgames in two more groups (§5.150, the owner's request of 2026-11-02). A game card's move judged without waiting on the engine line's searches or the storm's workers (§5.151, the owner's request of 2026-11-04). Show and grade in the storm, every move of a deepened position shown by its band (§5.152, the owner's request of 2026-11-06), is built. A robotic board, the Chessnut Move, in the storm's untimed sessions and in practice is planned in its own document, `CHESSNUT.md` (§5.153 points there; the owner's request of 2026-11-06), not built. After a storm verdict, Show refutation (a mistake or a blunder), Show line (a great move or the top move) and Continue against Maia's reply (a good move or better) are built (§5.154, the owner's request of 2026-11-06). A polish pass (§5.156, the owner's request of 2026-11-07) made the light theme readable and the folded settings panel free, and lists ideas waiting for the owner's word. The positions after Maia's likely moves (20% or more) outside a storm card's list are searched while the user thinks (§5.157, the owner's request of 2026-11-10). Of §5.156's ideas the owner said to build all but the faster start (2026-11-10): Today on the home, the icon's shortcuts, the wrong move shown, "?" for the keys and the empty pages are built (§5.158). Share to Repworks and .pgn files opened with it, sounds, Settings apart from Debug and the dark themes' contrasts are built (§5.159). TESTING.md is one walk through the app, by screen (§5.160). The home's deepening searches Maia's likely moves too, and those searches are kept with the position (§5.161). The explorer has a Study tab: the open study's moves at the board's position, across its chapters and move orders (§5.162, §5.27). The analyzer's games are converted into the data repo's `games/` files, which every device reads beside the Gist (§5.163, §5.66). A second look (§5.164, the owner's request of 2026-11-11): a phone held sideways has the board whole at the left of every board page, long names no longer make a phone's page scroll sideways, and the page's title names the screen. On the analysis board the explorer's third tab is the whole repertoire's moves at the position (§5.165), and a search page finds a study or a chapter by name, a comment by its words and a position by its moves or FEN (§5.166). What is next from that look is planned in §5.167: three parts to build, and five ideas waiting for the owner's word. Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -9356,4 +9356,173 @@ Tests:
 
 Not tested: a real phone turned (the notch's side, the browser's bars coming and going, the
 keyboard). Live: TESTING.md.
+
+#### 5.165 The repertoire's moves on the analysis board (found in §5.164's look, 2026-11-11)
+
+The explorer's third tab (§5.162) shows the open study's moves at the board's position. On the
+analysis board no study is open, so it read "The study plays nothing here." at every position,
+though a position played out there, or come to from a game card, a storm card or a training
+line, is where "what do I play here?" is asked. What was decided:
+
+- **On the analysis board the tab is "Repertoire"**: the moves the whole repertoire plays at the
+  board's position, from every repertoire study and chapter, by every move order that reaches it
+  (D10's key). The same table as the Study tab's: the explorer's columns for the move (the games
+  tab's last chosen), **Lines** (the line ends through it, everywhere) and **Chapters**.
+- **A chapter is named with its study** ("Najdorf Sicilian · 6. Bg5"): one chapter opens there at
+  the move in one click; several unfold as a list. A click on the row plays the move on the
+  board, as every explorer row does; a move that is the board's own next move is on the lighter
+  band.
+- **The data is what training has read**: the repertoire's chapters as parsed for the index
+  (`trainData`), each indexed by position once while its text is the same (`chapterMoves`, as the
+  Study tab's). Reference studies aren't in it: they aren't the repertoire, and the tab says so
+  when there is none ("No repertoire study yet"). Where the repertoire has nothing: "Your
+  repertoire plays nothing here."
+- In a study the tab is the study's, as before; the choice of tab is the one kept setting.
+- Not built: the moves told apart as the repertoire's own or the opponent's (a position in both a
+  White and a Black study is rare, and the chapter named says which); the whole repertoire as a
+  fourth tab inside a study, where the notation's `+k` badges (§5.11) already lead to the other
+  chapters.
+
+**As built** (2026-11-11): `src/app/studyMoves.ts` (`repertoireMoves`), `src/ui/Explorer.tsx`
+(`RepertoireTab`; `StudyMoves`, the table both tabs draw; the tab's name and title).
+
+Tests: `test/e2e/explorer.spec.ts` (desktop and phone): on the analysis board the tabs are
+Lichess, Masters and Repertoire; 1. e4 with its three lines and both chapters named with the
+study; the row played; a position the repertoire doesn't have; after 1. e4 c5 the main line's
+2. Nf3 before the Alapin's 2. c3, which opens its chapter at the move; and in the study the tab
+is the study's again. One control in its comment. The Study tab's own test and the tabs' test
+pass as they were.
+
+Live: TESTING.md.
+
+#### 5.166 Search: a name, a comment's words, a position (found in §5.164's look, 2026-11-11)
+
+Nothing found a thing by what is remembered of it: a chapter was reached through its study's
+dropdown, a comment by reading, a position by playing to it in the right study. With the real
+repertoire (eight studies, 120 chapters) that is a walk. What was decided:
+
+- **One page, `#/search`, opened from the home** ("Search", after Import), with one box. The hits
+  come as the words are typed, two letters or more, in this order:
+  1. **Position**, when the words read as one: moves from the start, numbered or not ("1.e4 c5
+     2.Nf3", "e4 c5 Nf3", with 0-0 and a trailing ! taken), or a FEN (its counters left off or
+     not). Every chapter that reaches the position, **by any move order** (D10's key), at its
+     first place in tree order, with its own line there and how many orders reach it. A line says
+     which position was read, with a link to the analysis board at it, and says so when no chapter
+     reaches it.
+  2. **Studies** whose name holds every word (with their chapters counted, a reference study
+     marked).
+  3. **Chapters**: every word in the chapter's name or its study's, one at least in the chapter's
+     own, so a study's name alone doesn't list all its chapters ("najdorf bg5" finds the Najdorf's
+     6. Bg5).
+  4. **Comments**: every word within one move's comments, named by its study, chapter and move
+     ("9... Qa3"; "Start" for the chapter's own), with the words around the first match (140
+     characters, cut at spaces).
+- **Words** match in any order and inside words, upper or lower case, accents folded ("grunfeld"
+  finds Grünfeld). The matches are marked in the hit.
+- **A hit is a link** to its place: a study, a chapter, or a chapter at the move. The address
+  carries the words (`?q=`), written over the same history entry as they are typed (0.3 s after
+  the last key, and at once when a hit is followed or Enter is pressed), so ← from a hit comes
+  back to the same words and hits, and no entry is left for each letter.
+- **Every study on the device is searched**, reference studies too: every chapter file read and
+  parsed once while its text is the same (`readSearchChapters`), again after a sync. A chapter
+  this version can't read is left out, never rewritten.
+- **Limits**: 40 chapters, 60 comments and 40 places shown; the rest are counted under their
+  group ("1,708 more not shown: add a word to narrow them"), never dropped silently.
+- Measured in Node on a made-up repertoire of 480 chapters, 20,452 moves and about 5,000
+  comments: 3 to 7 ms a search, 18 ms for the first position (each chapter's positions walked
+  once, then kept). Not measured on a phone.
+- Not built: a key for it ("/" on the home); search inside the games, the storm's positions or
+  the endgames; a move searched by its glyph; regular expressions.
+
+**As built** (2026-11-11): `src/core/study/search.ts` (`search`, `queryPosition`, `searchWords`),
+`src/app/search.ts` (`readSearchChapters`, `reachOf`), `src/ui/Search.tsx`, `src/core/app/fsm.ts`
+(the `search` mode and its address), `src/core/app/title.ts`, `src/ui/App.tsx` (the screen, the
+home's link), `src/ui/app.css`.
+
+Tests:
+- `test/unit/core/study/search.test.ts`: names (a study; a chapter by its own words or with its
+  study's; accents; no chapter for the study's name alone); comments (every word in one move's
+  comment, its move's label, a chapter's own comment, a chapter from a FEN, a long comment cut
+  around the match); a position by its moves in any order, by a FEN, at a chapter's start, and a
+  line no chapter plays; the query's forms, the hits' order and the limits. Three controls in its
+  header.
+- `test/unit/core/app/fsm.test.ts`: the address with words, a line's dots and a FEN's slashes;
+  an empty or unreadable `q`; characters an address reserves.
+- `test/e2e/search.spec.ts` (desktop and phone): opened from the home; a chapter found and
+  opened, ← back to the words; a comment by two words in the other order and case, opened at its
+  move, the hit followed before the address caught up; a position by its moves with the analysis
+  board's link, in two chapters, and one no chapter reaches; nothing found; one letter; the
+  address read after a reload. One control in its header (found by the test: a hit followed
+  within 0.3 s of the typing lost the words on the way back). The full run then showed it flaky
+  once (1 failure in 30 repeats alone): words typed straight after coming back to the page were
+  overwritten by the address's, set again by a step of the page's start that ran late under load.
+  Fixed in the page (`known` in `Search.tsx`); 80 repeats of 80 pass.
+
+Live: TESTING.md.
+
+#### 5.167 What is next from §5.164's look (planned 2026-11-11, not built)
+
+**To build, in this order** (each a feature's details, decided here; the session that builds one
+writes its "As built"):
+
+1. **Progress: the days trained, over half a year.** The page shows the last 14 days' minutes and
+   nothing longer, so whether the habit holds can't be seen.
+   - A calendar of the last 26 weeks under "Last 14 days": a column a week (Monday first), a
+     square a day, shaded by the answers that day in four steps (none; then thirds of the busiest
+     day's count), today's outlined; a day's title its date, answers, new moves and minutes.
+   - Over it: "n days in a row" (today counts once something is answered; a run still stands on a
+     day with nothing answered yet), "longest n", and the days trained of the last 30.
+   - `progressStats` already counts a day's work for the spans it is given (`past`): the page
+     passes 182 days where it passes 14, and the 14-day chart reads the last 14 of them. If that
+     costs more than 50 ms on the 30,000-review test log (§5.122's measure), the calendar's days
+     are counted apart from the reviews' times alone.
+   - Colours from the theme's accent at four opacities; each step 3:1 or more against the card in
+     every theme (WCAG's line for a graphic), checked in `themes.test.ts`.
+   - On a phone the 26 columns fit 360px (12px squares, 2px gaps); no sideways scroll.
+   - Tests: the runs (today empty, a gap, the longest), the shades' steps, a day across midnight
+     local time; Playwright on both projects.
+2. **A study's card on the home: how far it is learned.** The card says what is due and new
+   today, not how much of the study is known. Under its counts, a thin bar: mature, young and not
+   started moves as three shades (§5.122's `moves`, counted for the study), its title "n of m
+   moves started · k mature". Counted with the home's queue (no second replay), a move in two
+   studies counted in both, paused and suspended moves left out as the page's Moves leave them.
+   Reference studies and idea decks have none.
+3. **What a day's new moves will cost.** Training settings asks for "New moves a day" with nothing
+   to judge it by (proposal 4 of the review of 2026-10-17, §5.122). Under the field, as the number
+   is typed: "at n a day: about r reviews a day in two weeks, and the m moves left learned by
+   <date>", from the FSRS intervals of a move answered right each time (the first review after
+   `learnStepHours`, then the scheduler's own intervals at the set retention), added to
+   §5.122's forecast of the moves already started. A simulation in core, pure, tested on a
+   repertoire of known size.
+
+**Waiting for the owner's word** (each gives something up, costs something or changes the plan's
+shape; the recommendation first):
+
+1. **Opening names.** Lichess's `chess-openings` list bundled with the site (CC0 and about
+   3,500 named lines, as remembered: neither its licence nor its size was read in this session,
+   and both are checked before it is built): the opening's name under the analysis board and in a
+   game's head, and search finding "Najdorf" as a position. Recommended; it adds a data file to
+   every install, the first one that isn't code or an engine.
+2. **A tablet held upright.** Under 900px wide the page is the phone's, one column: at 820×1180
+   the board is 560px with the notation below it, the page 1,855px tall. Two columns from 700px
+   (the board at the left, the panel beside it) would fit it in one screen. Recommended only if a
+   tablet is used; it changes what a small desktop window between 700 and 900px shows.
+3. **FSRS fitted to your own answers** (proposal 5 of 2026-10-17). The scheduler runs on FSRS-5's
+   default weights; the log now holds enough answers to fit them (§5.122's bands show where the
+   defaults miss). It changes every interval from the day it is switched on and adds the weights
+   to the settings file (a data format), so it waits; not recommended before the progress page
+   has shown a gap that stays (three months of answers).
+4. **A deleted study brought back.** Delete is one confirm away on every card, and the way back
+   is the data repo's history, by hand. A "Deleted studies" list read from that history (GitHub's
+   commits for `studies/`) could restore one. It costs GitHub requests each time it is opened and
+   only works online. Not recommended unless a study has been lost.
+5. **The theme by the device's day and night.** A "Follow the device" choice: Paper by day, the
+   theme chosen by night. Not recommended: one theme was chosen from the gallery (§5.86).
+
+**Looked at and left** (said so they aren't looked at again): a badge on the installed app's icon
+(Chrome draws one on a desktop only, and it would show the count as the app last saw it, not
+today's); a notification when moves fall due (it needs a server); an "Install" button (the
+browser's own is one tap, and the app is installed); the home and the pages of lists on a phone's
+side (they scroll as they are); a game card's note dialog on a phone's side (it scrolls inside the
+dialog).
 

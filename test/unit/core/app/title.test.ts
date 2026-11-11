@@ -70,6 +70,8 @@ test('every screen is named in its head’s words', () => {
     ['#/checklist/Rep0Najd?side=black&line=e2e4,c7c5', 'Checklist · Najdorf'],
     ['#/endgames', 'Endgames'],
     ['#/endgames/lucena', 'Endgame · Lucena: build a bridge'],
+    ['#/search', 'Search'],
+    ['#/search?q=najdorf', 'Search'],
   ];
   for (const [hash, title] of titles) assert.equal(at(hash), `${title} · Repworks`, hash);
 });

@@ -26,13 +26,13 @@ import type { Occurrence } from '../core/repertoire/index.ts';
 import type { Chapter } from '../core/study/model.ts';
 import { nodeAt, positionAt, type Path } from '../core/study/tree.ts';
 import { movesFrom, transposedFrom, transpositions } from '../core/study/transpositions.ts';
-import { play, side as chapterSide, study } from '../app/editor.ts';
+import { play, SCRATCH, side as chapterSide, study } from '../app/editor.ts';
 import { askChildren, childAnswers, childKey, lookAt, lookup, pausedUntil, prefs, retryLookup, setPrefs, type ScoreView } from '../app/explorer.ts';
 import { maiaElo, maiaKey, maiaPrefs, maiaSeen, maiaState, requestPolicy, requestScores } from '../app/maia.ts';
 import { logInWithLichess } from '../app/lichess.ts';
 import { trainData } from '../app/train.ts';
 import { open } from '../app/mode.ts';
-import { readStudyIndex, studyIndex } from '../app/studyMoves.ts';
+import { readStudyIndex, repertoireMoves, studyIndex, type StudyChapterMoves } from '../app/studyMoves.ts';
 import { dataVersion } from '../app/sync.ts';
 import { positionKeyOf } from '../core/chess/positionKey.ts';
 import { studyMovesAt, type StudyMove } from '../core/study/studyMoves.ts';
@@ -145,6 +145,8 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
   }, [fen, maiaOn, maiaReady, elo]);
 
   const s = study.value;
+  /** The analysis board (§5.35): no study is open, so the third tab is the whole repertoire's (§5.165). */
+  const scratch = s?.sid === SCRATCH;
   const data = trainData.value;
   // Each legal move's position, so a move counts wherever its position is reached (the owner,
   // 2026-10-12: transpositions included).
@@ -357,35 +359,29 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
               {t.tab === 'lichess' ? lichessLabel : t.label}
             </button>
           ))}
-          {/* §5.162: the open study's moves here, the games tab's columns beside them. */}
+          {/* §5.162: the open study's moves here, the games tab's columns beside them. On the
+              analysis board, where no study is open, the whole repertoire's (§5.165). */}
           <button
             type="button"
             role="tab"
             aria-selected={p.study}
             class={p.study ? 'on' : ''}
-            title={`The moves this study plays here, in all its chapters and move orders, with ${p.tab === 'lichess' ? lichessLabel : 'Masters'}’ columns beside them`}
+            title={`The moves ${scratch ? 'your repertoire' : 'this study'} plays here, in all its ${scratch ? 'studies, ' : ''}chapters and move orders, with ${p.tab === 'lichess' ? lichessLabel : 'Masters'}’ columns beside them`}
             onClick={() => setPrefs({ study: true })}
           >
-            Study
+            {scratch ? 'Repertoire' : 'Study'}
           </button>
         </div>
         <button type="button" class="icon explorer-gear" aria-label="Explorer settings" title="Explorer settings" onClick={openExplorerSettings}>
           ⚙
         </button>
       </div>
-      {p.study && s && (
-        <StudyTab
-          sid={s.sid}
-          cid={s.cid}
-          chapter={props.chapter}
-          path={props.path}
-          pos={pos}
-          rows={asking ? undefined : table.rows}
-          games={games}
-          cols={{ ...cols, prac: false, ml: false, ms: false }}
-          source={p.tab === 'lichess' ? lichessLabel : 'Masters'}
-        />
-      )}
+      {p.study &&
+        s &&
+        (() => {
+          const shared = { chapter: props.chapter, path: props.path, pos, rows: asking ? undefined : table.rows, games, cols: { ...cols, prac: false, ml: false, ms: false }, source: p.tab === 'lichess' ? lichessLabel : 'Masters' };
+          return scratch ? <RepertoireTab {...shared} /> : <StudyTab sid={s.sid} cid={s.cid} {...shared} />;
+        })()}
       {!p.study && prac && <PracticalDriver fen={fen} mine={mine} rows={table.rows} turn={turn} shares={shares} excludedKey={[...excludedAt(fen)].join()} />}
       {!p.study && wantedFens.length > 0 && <ChildDriver tab={p.tab} fens={wantedFens} filter={filter} />}
       {!p.study && (
@@ -546,32 +542,60 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
 const studyTemplate = (c: Cols): string =>
   ['var(--ex-move-w)', c.eval && 'var(--ex-eval-w)', c.share && '34px', c.count && 'var(--ex-count-w)', c.bar ? 'minmax(48px, 1fr)' : 'minmax(0, 1fr)', '2.6rem', 'minmax(4.2rem, auto)'].filter(Boolean).join(' ');
 
+interface TabProps {
+  chapter: Chapter;
+  path: Path;
+  pos: Position;
+  rows: readonly TableRow[] | undefined;
+  games: boolean;
+  cols: Cols;
+  source: string;
+}
+
 /**
  * The Study tab (§5.27, §5.162): the moves the open study plays at the board's position, across
  * all its chapters and the move orders that reach it, most lines first; each with the explorer's
  * columns for it (the games tab's), its count of lines, and its chapters, which open a list: one
  * click opens one at the move. A click on the row plays the move here, as the explorer's rows do.
  */
-function StudyTab(props: { sid: string; cid: string; chapter: Chapter; path: Path; pos: Position; rows: readonly TableRow[] | undefined; games: boolean; cols: Cols; source: string }) {
+function StudyTab(props: TabProps & { sid: string; cid: string }) {
   const version = dataVersion.value;
   useEffect(() => void readStudyIndex(props.sid, props.cid, props.chapter), [props.sid, props.cid, props.chapter, version]);
+  const idx = studyIndex.value?.sid === props.sid ? studyIndex.value : undefined;
+  if (!idx) return <p class="explorer-note muted">Reading the study…</p>;
+  const go = (cid: string, path: Path) => (cid === props.cid ? goTo(path) : open({ name: 'chapter', sid: props.sid, cid, at: [...path] }));
+  return <StudyMoves {...props} chapters={idx.chapters} here={props.cid} go={go} label="The study’s moves here" none={idx.chapters.length ? 'The study plays nothing here.' : 'No chapter of this study can be read here.'} />;
+}
+
+/**
+ * The same tab on the analysis board (§5.165), where no study is open: the moves the whole
+ * repertoire plays at the board's position, in every repertoire study, chapter and move order. A
+ * chapter is named with its study and opens there at the move.
+ */
+function RepertoireTab(props: TabProps) {
+  const chapters = repertoireMoves.value;
+  if (!chapters) return <p class="explorer-note muted">Reading the repertoire…</p>;
+  const go = (key: string, path: Path) => open({ name: 'chapter', sid: key.slice(0, key.indexOf('/')), cid: key.slice(key.indexOf('/') + 1), at: [...path] });
+  return <StudyMoves {...props} chapters={chapters} go={go} label="The repertoire’s moves here" none={chapters.length ? 'Your repertoire plays nothing here.' : 'No repertoire study yet: a study of the Repertoire kind is read here.'} />;
+}
+
+/** The tab's table, over the open study's chapters or the whole repertoire's; `here` is the open chapter among them. */
+function StudyMoves(props: TabProps & { chapters: readonly StudyChapterMoves[]; here?: string; go: (cid: string, path: Path) => void; label: string; none: string }) {
   const unfolded = useRef(new Set<string>());
   const [, redraw] = useState(0);
-  const idx = studyIndex.value?.sid === props.sid ? studyIndex.value : undefined;
   const key = useMemo(() => positionKeyOf(props.pos), [props.pos]);
-  const moves = useMemo(() => (idx ? studyMovesAt(idx.chapters, key) : []), [idx, key]);
-  const names = useMemo(() => new Map(idx?.chapters.map((c) => [c.cid, c.name]) ?? []), [idx]);
+  const moves = useMemo(() => studyMovesAt(props.chapters, key), [props.chapters, key]);
+  const names = useMemo(() => new Map(props.chapters.map((c) => [c.cid, c.name])), [props.chapters]);
   const byMove = new Map((props.rows ?? []).filter((r) => !r.maiaOnly).map((r) => [moveKey(r.san), r] as const));
   const here = new Set((nodeAt(props.chapter, props.path)?.children ?? []).map((c) => moveKey(c.san)));
   const c = props.cols;
-  if (!idx) return <p class="explorer-note muted">Reading the study…</p>;
+  const go = props.go;
   const toggle = (m: StudyMove) => {
     const u = unfolded.current;
     if (u.has(m.uci)) u.delete(m.uci);
     else u.add(m.uci);
     redraw((n) => n + 1);
   };
-  const go = (cid: string, path: Path) => (cid === props.cid ? goTo(path) : open({ name: 'chapter', sid: props.sid, cid, at: [...path] }));
   return (
     <>
       <div class="explorer-head study-tab-head" style={{ '--ex-cols': studyTemplate(c) }}>
@@ -582,9 +606,9 @@ function StudyTab(props: { sid: string; cid: string; chapter: Chapter; path: Pat
         <span class="ex-lines" title="The lines through the move, in every chapter">Lines</span>
         <span class="ex-chapters">Chapters</span>
       </div>
-      {!moves.length && <p class="explorer-note muted" data-testid="study-tab-none">{idx.chapters.length ? 'The study plays nothing here.' : 'No chapter of this study can be read here.'}</p>}
+      {!moves.length && <p class="explorer-note muted" data-testid="study-tab-none">{props.none}</p>}
       {moves.length > 0 && (
-        <div class="explorer-rows study-tab" role="list" aria-label="The study’s moves here" style={{ '--ex-cols': studyTemplate(c) }}>
+        <div class="explorer-rows study-tab" role="list" aria-label={props.label} style={{ '--ex-cols': studyTemplate(c) }}>
           {moves.map((m) => {
             const r = byMove.get(moveKey(m.san));
             const open = unfolded.current.has(m.uci);
@@ -621,7 +645,7 @@ function StudyTab(props: { sid: string; cid: string; chapter: Chapter; path: Pat
                       <li key={x.cid}>
                         <button type="button" class="link" onClick={() => go(x.cid, x.path)}>
                           {names.get(x.cid) ?? x.cid}
-                          {x.cid === props.cid ? ' (this chapter)' : ''}
+                          {x.cid === props.here ? ' (this chapter)' : ''}
                         </button>
                       </li>
                     ))}

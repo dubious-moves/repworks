@@ -31,6 +31,21 @@ later change replaced are folded into the later item; items already reported wor
 
 ## 1. Home and Today
 
+### Search (§5.166, 2026-11-11)
+- **Search**, after Import on the home: one box over every study on the device.
+  - A chapter by a word of its name, or one of its study's and one of its own ("najdorf bg5").
+  - A comment by words remembered from it, in any order; the hit names its chapter and move, and
+    opens the chapter there.
+  - A position by its moves ("1.e4 c5 2.Nf3 d6", or "e4 c5 Nf3 d6", or another order that reaches
+    it) or a pasted FEN: every chapter that reaches it, and a link to the analysis board at it.
+  - ← from a hit comes back to the same words and hits.
+- With your real repertoire: are the hits there as fast as you type, on the phone too? (Measured
+  in Node only: 3 to 7 ms a search over 480 made-up chapters.) Are 40 chapters and 60 comments
+  enough to show before "add a word to narrow them"?
+- Should the hits' order be different (positions, studies, chapters, comments)? Should anything
+  else be searched (the games, the storm's positions)?
+- **Checked**: unit tests and Playwright (desktop and emulated phone); nothing live yet.
+
 ### Today, and the counts on Games and Storm (§5.158, 2026-11-10)
 - The home's **Today** card, above the training card: a row for each kind of work with something
   to do (repertoire, ideas, game cards, endgames, the checklist's next line, storm), and **Next**
@@ -64,6 +79,18 @@ later change replaced are folded into the later item; items already reported wor
   studies; what stands is the real repertoire.)
 
 ## 2. Studies and the study page
+
+### The repertoire's moves on the analysis board (§5.165, 2026-11-11)
+- On the **analysis board** the explorer's third tab is **Repertoire** (it was "Study", and read
+  "The study plays nothing here."): at the board's position, the moves your whole repertoire plays
+  there, with their lines and their chapters, each chapter named with its study and one click
+  away at the move.
+  - Open it from a game card's or a storm card's Analyse, or paste a FEN: does it answer "what do
+    I play here?" with the real repertoire, by other move orders too?
+  - Where the repertoire has nothing: "Your repertoire plays nothing here."
+- In a study the tab is still the study's own (§5.162).
+- **Checked**: Playwright (desktop and emulated phone) on the test repertoire, and headless
+  screenshots with three made-up studies; nothing live yet.
 
 ### The Study tab in the explorer (§5.162, 2026-11-10)
 - On a study made of many chapters (a Chessable course imported as a reference study is the case

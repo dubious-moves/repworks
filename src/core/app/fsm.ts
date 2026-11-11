@@ -106,7 +106,9 @@ export type Mode =
   /** A checklist line of a study's side, by its moves from the start (UCI), drilled at a preset (§5.62, §5.130). */
   | { name: 'checklist'; sid: string; side: 'white' | 'black'; line: string[]; preset: 'easy' | 'medium' | 'hard' }
   /** The theoretical endgames (§5.145); with `id`, one played for its goal. */
-  | { name: 'endgames'; id?: string };
+  | { name: 'endgames'; id?: string }
+  /** Search across the studies (§5.166): names, comments, a position by its moves or FEN. */
+  | { name: 'search'; q?: string };
 
 /** A page the analysis board was opened from and goes back to: any but the board itself. */
 export type BackMode = Exclude<Mode, { name: 'analysis' }>;
@@ -175,6 +177,8 @@ export function transition(mode: Mode, event: ModeEvent): Mode {
 const SAN = /^[A-Za-z0-9+#=-]+$/;
 /** The longest line the analysis board's address takes: a training line from its chapter's start. */
 const MAX_LINE = 300;
+/** The longest search the address keeps: a FEN is under 100 characters, a long line of moves 400. */
+const MAX_QUERY = 500;
 /** A game's id: Lichess's eight characters, `chesscom_<n>`, mistake-lab's `_practice_…`. */
 const GAME_ID = /^[A-Za-z0-9_]{1,60}$/;
 
@@ -227,6 +231,11 @@ export function parseHash(hash: string): Mode {
   if (parts.length === 1 && parts[0] === 'migrate') return { name: 'migrate' };
   if (parts.length === 1 && parts[0] === 'repertoire-check') return { name: 'repCheck' };
   if (parts.length === 1 && parts[0] === 'progress') return { name: 'progress' };
+  if (parts.length === 1 && parts[0] === 'search') {
+    const q = query.split('&').find((p) => p.startsWith('q='))?.slice(2);
+    const text = q === undefined ? undefined : decode(q);
+    return text ? { name: 'search', q: text.slice(0, MAX_QUERY) } : { name: 'search' };
+  }
   if (parts[0] === 'endgames' && parts.length === 1) return { name: 'endgames' };
   if (parts[0] === 'endgames' && parts.length === 2 && /^[a-z0-9-]{1,40}$/.test(parts[1]!)) return { name: 'endgames', id: parts[1]! };
   if (parts[0] === 'checklist') {
@@ -355,6 +364,8 @@ export function modeHash(mode: Mode): string {
       return '#/repertoire-check';
     case 'progress':
       return '#/progress';
+    case 'search':
+      return mode.q ? `#/search?q=${encodeURIComponent(mode.q)}` : '#/search';
     case 'endgames':
       return mode.id ? `#/endgames/${mode.id}` : '#/endgames';
     case 'checklists':

@@ -33,6 +33,7 @@ import { HomeLink } from './Back.tsx';
 import { SIDEWAYS } from './phone.ts';
 import { MistakesView } from './Mistakes.tsx';
 import { ProgressView } from './Progress.tsx';
+import { SearchScreen } from './Search.tsx';
 import { ReadView } from './Read.tsx';
 import { TrainPick, TrainScreen } from './Train.tsx';
 import { TrainCard } from './TrainCard.tsx';
@@ -204,6 +205,8 @@ function Screen() {
       return <RepertoireCheckScreen />;
     case 'progress':
       return <ProgressView />;
+    case 'search':
+      return <SearchScreen q={mode.value.q ?? ''} />;
     case 'checklist':
       return <ChecklistDrill key={`${mode.value.sid}/${mode.value.side}/${mode.value.line.join(',')}/${mode.value.preset}`} sid={mode.value.sid} side={mode.value.side} line={mode.value.line} preset={mode.value.preset} />;
     case 'checklists':
@@ -247,6 +250,9 @@ function Home() {
           </a>
           <a class="button secondary" href="#/import">
             Import
+          </a>
+          <a class="button secondary" href="#/search" title="A study or a chapter by name, a comment by its words, a position by its moves or FEN">
+            Search
           </a>
         </nav>
         {studies.value.length === 0 ? (

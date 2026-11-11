@@ -46,6 +46,11 @@ test('hashes parse to modes, and modes write back to the same hash', () => {
     ['#/progress', { name: 'progress' }],
     ['#/endgames', { name: 'endgames' }],
     ['#/endgames/lucena', { name: 'endgames', id: 'lucena' }],
+    // Search (§5.166): its words in the address, a FEN's slashes and a line's dots encoded.
+    ['#/search', { name: 'search' }],
+    ['#/search?q=najdorf%20bg5', { name: 'search', q: 'najdorf bg5' }],
+    ['#/search?q=1.e4%20c5%202.Nf3', { name: 'search', q: '1.e4 c5 2.Nf3' }],
+    ['#/search?q=1K1k4%2F1P6%2F8%2F8%2F8%2F8%2Fr7%2F2R5%20w%20-%20-', { name: 'search', q: '1K1k4/1P6/8/8/8/8/r7/2R5 w - -' }],
     ['#/difficult', { name: 'difficult' }],
     ['#/checklist', { name: 'checklists' }],
     ['#/checklist?sid=Rep0Najd', { name: 'checklists', sid: 'Rep0Najd' }],
@@ -73,6 +78,11 @@ test('hashes parse to modes, and modes write back to the same hash', () => {
     assert.deepEqual(parseHash(modeHash(mode)), mode);
   }
   assert.equal(modeHash({ name: 'chapter', sid: 'Rep0Najd', cid: 'Ch1Najdf', at: [] }), '#/study/Rep0Najd/Ch1Najdf');
+  // A search with no words, or words the address can't read, is the empty search.
+  assert.deepEqual(parseHash('#/search?q='), { name: 'search' });
+  assert.deepEqual(parseHash('#/search?q=%E0%A4%A'), { name: 'search' });
+  assert.equal(modeHash({ name: 'search', q: 'a&b=c #d' }), '#/search?q=a%26b%3Dc%20%23d');
+  assert.deepEqual(parseHash('#/search?q=a%26b%3Dc%20%23d'), { name: 'search', q: 'a&b=c #d' });
   // Anything else is the list: unknown pages, malformed IDs, a path with a stray character.
   for (const hash of ['#/mistakes/other', '#/pinned/x', '#/train/short', '#/train/Rep0Najd/x', '#/train/Rep0Najd/Ch1Najdf', '#/learn/Rep0Najd', '#/coverage', '#/coverage/bad', '#/nope', '#/study/short', '#/study/Rep0Najd/bad', '#/study/Rep0Najd/Ch1Najdf/x', '#/read/Rep0Najd', '#/play/Rep0Najd/bad', '#/endgames/Bad_Id', '#/endgames/a/b']) assert.deepEqual(parseHash(hash), { name: 'list' }, hash);
   assert.deepEqual(parseHash('#/study/Rep0Najd/Ch1Najdf?at=e4,<script>'), { name: 'chapter', sid: 'Rep0Najd', cid: 'Ch1Najdf' });

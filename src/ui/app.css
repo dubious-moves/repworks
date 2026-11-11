@@ -6526,6 +6526,73 @@ a.button.disabled {
   white-space: nowrap;
 }
 
+/* The search page (§5.166): one box, then the hits by kind, each a link to its place. */
+.search-box {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid rgb(var(--ink) / 20%);
+  border-radius: var(--radius);
+}
+
+.search-results {
+  margin-top: 12px;
+}
+
+.search-position {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.search-group {
+  margin-top: 16px;
+}
+
+.search-group h2 {
+  margin-bottom: 2px;
+}
+
+.search-hits {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.search-hit {
+  padding: 10px 0;
+  border-top: 1px solid rgb(var(--ink) / 10%);
+  overflow-wrap: anywhere;
+}
+
+.search-hit:first-child {
+  border-top: 0;
+}
+
+.search-hit a {
+  font-weight: 600;
+}
+
+.search-study {
+  font-weight: 400;
+}
+
+.search-snippet {
+  margin: 2px 0 0;
+  color: var(--text-soft);
+  font-size: 0.92rem;
+}
+
+.search mark {
+  padding: 0 1px;
+  border-radius: 2px;
+  background: var(--select-bg);
+  color: var(--on-select);
+}
+
 /* A phone held sideways, or a window as short (PLAN.md §5.164). The wide layouts size the board
    by the window's height less the page's frame and the phone's by its width, so here the board
    came out at 80 to 170px, or at its least (260px) over the panel's buttons and past the screen's

@@ -484,3 +484,43 @@ test('the Study tab (§5.162): the study’s moves here from every chapter, with
   await panel(page).getByRole('tab', { name: 'Lichess' }).click();
   await expect(panel(page).getByRole('list', { name: 'The study’s moves here' })).toHaveCount(0);
 });
+
+// The same tab on the analysis board (§5.165), where no study is open: the whole repertoire's
+// moves at the board's position, each chapter named with its study and opened there at the move.
+// Control run on 2026-11-11: with the analysis board given the Study tab as before, the test
+// fails at the tab's name ("Repertoire" not found; the tab read "The study plays nothing here.").
+test('on the analysis board the tab is the repertoire’s: its moves here in every study and chapter, one opened at the move', async ({ page }) => {
+  await setUp(page);
+  await page.goto(`${site.url}#/analysis`);
+  await expect(panel(page).getByRole('tab')).toHaveText(['Lichess', 'Masters', 'Repertoire']);
+  await panel(page).getByRole('tab', { name: 'Repertoire' }).click();
+  await expect(panel(page).getByRole('tab', { name: 'Repertoire' })).toHaveAttribute('aria-selected', 'true');
+  // At the start: 1. e4, three lines in the repertoire's two chapters, each named with its study.
+  const rep = panel(page).getByRole('list', { name: 'The repertoire’s moves here' });
+  await expect(rep.locator('.ex-san')).toHaveText(['e4']);
+  const e4 = rep.locator('.ex-row').first();
+  await expect(e4.locator('.ex-lines')).toHaveText('3');
+  await expect(e4.locator('.ex-eval')).toHaveText('+0.30');
+  // Nothing is played on the board yet: no move of the repertoire's is the board's own.
+  await expect(e4).not.toHaveClass(/covered/);
+  await e4.locator('.ex-chapters').click();
+  await expect(rep.locator('.study-tab-chapters button')).toHaveText(['Test repertoire · Main line', 'Test repertoire · Alapin']);
+  // The row plays the move on the board; a move the repertoire doesn't have says so.
+  await e4.locator('.ex-san').click();
+  await expect(page.locator('.move.current')).toHaveText(/e4/);
+  await expect(rep.locator('.ex-san')).toHaveText(['c5']);
+  await page.goto(`${site.url}#/analysis?line=e4,e5`);
+  await expect(panel(page).getByTestId('study-tab-none')).toHaveText('Your repertoire plays nothing here.');
+  // After 1. e4 c5: the main line's 2. Nf3 (two lines), then the Alapin's 2. c3, which opens its
+  // chapter at the move.
+  await page.goto(`${site.url}#/analysis?line=e4,c5`);
+  await expect(rep.locator('.ex-san')).toHaveText(['Nf3', 'c3']);
+  await expect(rep.locator('.ex-row').nth(0).locator('.ex-lines')).toHaveText('2');
+  await expect(rep.locator('.ex-row').nth(1).locator('.ex-chapters')).toHaveText('Test repertoire · Alapin');
+  await rep.locator('.ex-row').nth(1).locator('.ex-chapters').click();
+  await expect(page).toHaveURL(/#\/study\/Rep0Najd\/Ch2Alapn/);
+  await expect(page.locator('.move.current')).toHaveText(/c3/);
+  // In the study the tab is the study's again.
+  await expect(panel(page).getByRole('tab')).toHaveText(['Lichess', 'Masters', 'Study']);
+  await expect(panel(page).getByRole('list', { name: 'The study’s moves here' }).locator('.ex-san')).toHaveText(['Nf6']);
+});
