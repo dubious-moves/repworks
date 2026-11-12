@@ -11,6 +11,10 @@ import { goBack, mode, open } from '../app/mode.ts';
 import type { BackMode, Mode } from '../core/app/fsm.ts';
 import { positionAt } from '../core/study/tree.ts';
 import { Back } from './Back.tsx';
+import { RankSelect } from './Rank.tsx';
+import { cardRank } from '../app/games.ts';
+import { gameCard } from '../core/progress/cards.ts';
+import type { CardRank } from '../core/progress/events.ts';
 
 /** Where the board was opened from, when it can't go back to it (opened from a link): the storm, the chapter's move, or the list. */
 function parent(): Mode {
@@ -190,6 +194,8 @@ function SequenceDialog(props: { chapter: Chapter; seq: string | undefined; onCl
     };
   }, []);
   const source = sourceMistake(props.seq);
+  // The sequence takes the mistake's priority (§5.171): it stands for that card.
+  const [rank, setRank] = useState<CardRank>(() => (source ? cardRank(gameCard(source.pid)) : 'normal'));
   const check = result?.ok ? result.check : undefined;
   const show = (path: readonly string[]) => {
     goTo(path);
@@ -204,7 +210,7 @@ function SequenceDialog(props: { chapter: Chapter; seq: string | undefined; onCl
         noValidate
         onSubmit={(e) => {
           e.preventDefault();
-          if (check) void saveSequence(check, props.seq).then((card) => card && setSaved(true));
+          if (check) void saveSequence(check, props.seq, rank).then((card) => card && setSaved(true));
         }}
       >
         <h2 id="dialog-sequence">Save as a sequence</h2>
@@ -236,6 +242,9 @@ function SequenceDialog(props: { chapter: Chapter; seq: string | undefined; onCl
             {check.unverified.length > 0 && <p class="muted">Not checked: {check.unverified.map((u) => u.text).join(', ')}</p>}
             {check.duplicate && <p class="warn">This sequence is already saved.</p>}
             {source && <p class="muted">Saving takes the mistake ({source.san}) out of the game cards: the sequence stands for it.</p>}
+            <p>
+              <RankSelect value={rank} onPick={setRank} />
+            </p>
           </>
         )}
         {saved && (

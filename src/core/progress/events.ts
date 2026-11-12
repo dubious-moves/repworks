@@ -225,6 +225,18 @@ export interface PickEvent extends Base {
   m: string;
   on: boolean;
 }
+/** A game card's priority in review (the owner's request of 2026-11-12): `normal` when it has none. */
+export type CardRank = 'high' | 'normal' | 'low';
+export const CARD_RANKS: readonly CardRank[] = ['high', 'normal', 'low'];
+/**
+ * A game card (`m|…`, a sequence included) or a plan card (`p|…`) ranked: due cards of a higher
+ * rank are asked first, then new ones. The latest per card decides; `normal` clears it.
+ */
+export interface RankEvent extends Base {
+  k: 'rank';
+  card: string;
+  p: CardRank;
+}
 export type KnownEvent =
   | ReviewEvent
   | SuspendEvent
@@ -248,8 +260,9 @@ export type KnownEvent =
   | LineEvent
   | NoteEvent
   | ChecklistEvent
-  | PickEvent;
-export const KNOWN_KINDS = ['review', 'suspend', 'unsuspend', 'forget', 'taught', 'pin', 'unpin', 'drill', 'alt', 'storm', 'snapshot', 'drop', 'relapse', 'plan', 'idea', 'dismiss', 'saved', 'played', 'practice', 'line', 'note', 'checklist', 'pick'] as const;
+  | PickEvent
+  | RankEvent;
+export const KNOWN_KINDS = ['review', 'suspend', 'unsuspend', 'forget', 'taught', 'pin', 'unpin', 'drill', 'alt', 'storm', 'snapshot', 'drop', 'relapse', 'plan', 'idea', 'dismiss', 'saved', 'played', 'practice', 'line', 'note', 'checklist', 'pick', 'rank'] as const;
 
 /** A line as read. `event` is set for the kinds this code knows; `raw` is always the line itself. */
 export interface LogLine {
@@ -510,6 +523,12 @@ function knownEvent(o: Record<string, unknown>): KnownEvent | string {
       if (typeof on !== 'boolean') return 'on must be true or false';
       return { ...base, k: 'pick', color, m, on };
     }
+    case 'rank': {
+      if (!/^[mp]\|./.test(card)) return 'card must be a game card (m|…) or a plan card (p|…)';
+      const p = o['p'];
+      if (typeof p !== 'string' || !(CARD_RANKS as readonly string[]).includes(p)) return 'p must be high, normal or low';
+      return { ...base, k: 'rank', p: p as CardRank };
+    }
     default:
       return { ...base, k: 'forget' };
   }
@@ -545,6 +564,7 @@ export function formatEvent(event: KnownEvent): string {
     if (event.cut !== undefined) o['cut'] = event.cut;
   }
   if (event.k === 'pick') Object.assign(o, { color: event.color, m: event.m, on: event.on });
+  if (event.k === 'rank') o['p'] = event.p;
   if (event.k === 'saved') o['item'] = event.item;
   if (event.k === 'played') o['game'] = event.game;
   if (event.k === 'practice') {

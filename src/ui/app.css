@@ -6864,3 +6864,23 @@ a.button.disabled {
     display: none;
   }
 }
+
+/* A game card's priority (§5.171): High, Normal, Low under the card's answer; a select in a game's items. */
+.rank-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin: 6px 0;
+}
+.rank-row .muted {
+  margin-right: 4px;
+}
+.game-items .rank-select {
+  min-height: 0;
+  padding: 1px 4px;
+  font-size: 0.9em;
+}
+.game-items .rank-select.rank-high {
+  font-weight: 600;
+}

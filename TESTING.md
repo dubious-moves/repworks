@@ -826,6 +826,16 @@ later change replaced are folded into the later item; items already reported wor
 
 ## 6. Game cards and Games
 
+### A game card's priority (§5.171, 2026-11-12)
+- Games → a game: set a mistake's select to High priority; Review: is it asked first among the
+  day's cards? On a card under review, press Low: the next session asks it after the Normal ones
+  due. Does the row (Priority High · Normal · Low) sit well on the phone, before and after an
+  answer?
+- Make a sequence from a High mistake: does the dialog start at High, and the saved sequence keep it?
+- After a sync, does the other device show the same priorities?
+- **Checked**: unit tests and Playwright (desktop and emulated phone, fake data repo); not on your
+  devices.
+
 ### The analyzer's games in the data repo (§5.163, 2026-11-10)
 - After the analyzer's next run, on the PC with a checkout of your data repo:
   `node scripts/games-to-data.mjs <mistake-lab>/analyzer/analyzed_games.json <repworks-data> --dry-run`

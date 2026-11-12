@@ -357,6 +357,9 @@ test('a mistake made into a sequence on the analysis board, checked, saved in it
   // d3 is within 5 points of O-O there, and no line has it.
   await expect(dialog.getByTestId('sequence-warnings')).toContainText('d3 is as good');
   await expect(dialog).toContainText('takes the mistake (Nxe5) out');
+  // The sequence takes the mistake's priority, Normal here; saved as High (§5.171).
+  await expect(dialog.getByRole('combobox', { name: 'Priority' })).toHaveValue('normal');
+  await dialog.getByRole('combobox', { name: 'Priority' }).selectOption('high');
   await dialog.getByRole('button', { name: 'Save anyway' }).click();
   await expect(dialog.getByTestId('sequence-saved')).toBeVisible();
   await dialog.getByRole('link', { name: 'Back to the games' }).click();
@@ -380,6 +383,45 @@ test('a mistake made into a sequence on the analysis board, checked, saved in it
   const log = [...w.git.textsOf()].filter(([p]) => p.startsWith('progress/')).map(([, t]) => t).join('');
   expect(log).toContain('"k":"drop","card":"m|GameOne1_7","on":true');
   expect(log).toMatch(/"k":"saved","card":"m\|_practice_tactic_[^"]+","item":\{"kind":"tactic"/);
+  expect(log).toMatch(/"k":"rank","card":"m\|_practice_tactic_[^"]+","p":"high"/);
+});
+
+test('a game card’s priority: set on the game’s page and on the card, High asked first, Low set on the card under review, synced (§5.171)', async ({ page }) => {
+  const w = await setUp(page);
+  await page.getByRole('link', { name: 'Games', exact: true }).click();
+  await page.getByRole('button', { name: 'Refresh' }).click();
+  await expect(page.getByTestId('games-queue')).toContainText('0 due · 3 new today');
+  // By the drop alone, Blackburne's mistake comes first; the queen's gambit's, set High, goes before it.
+  await page.getByTestId('game-row').filter({ hasText: 'Queen’s Gambit' }).click();
+  const select = page.getByTestId('game-item').getByRole('combobox', { name: 'Priority' });
+  await expect(select).toHaveValue('normal');
+  await select.selectOption('high');
+  await expect(select).toHaveValue('high');
+  await page.locator('.back').click();
+
+  await page.getByRole('link', { name: 'Review' }).click();
+  const card = page.locator('.game-card');
+  await expect(card).toHaveAttribute('data-card', 'm|GameTwo2_7');
+  const rank = card.getByTestId('rank');
+  await expect(rank).toHaveAttribute('data-rank', 'high');
+  await expect(rank.getByRole('button', { name: 'High' })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Skip' }).click();
+  await expect(card).toHaveAttribute('data-card', 'm|GameOne1_7');
+  // Low on the card under review: a session already dealt keeps its order.
+  await rank.getByRole('button', { name: 'Low' }).click();
+  await expect(rank).toHaveAttribute('data-rank', 'low');
+  await expect(rank.getByRole('button', { name: 'Low' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(card).toHaveAttribute('data-card', 'm|GameOne1_7');
+
+  await page.locator('.chip').click();
+  await expect
+    .poll(() => [...w.git.textsOf()].filter(([p]) => p.startsWith('progress/')).map(([, t]) => t).join(''), { timeout: 15_000 })
+    .toContain('"k":"rank","card":"m|GameOne1_7","p":"low"');
+  const log = [...w.git.textsOf()].filter(([p]) => p.startsWith('progress/')).map(([, t]) => t).join('');
+  expect(log).toContain('"k":"rank","card":"m|GameTwo2_7","p":"high"');
+  // Back on the game's page, the mistake shows Low.
+  await page.evaluate(() => (location.hash = '#/games/GameOne1'));
+  await expect(page.getByTestId('game-item').getByRole('combobox', { name: 'Priority' })).toHaveValue('low');
 });
 
 test('the games’ own explorer: moves and results by position, the list filtered, the opening name (§6)', async ({ page }) => {

@@ -2308,3 +2308,17 @@ The technical calls, each with its reason:
   updates check that the address is still the page's). Why: found as a flaky title test; a link
   followed in the instant a chapter opened was lost.
 
+## Revision of 2026-11-12 (a game card's priority; PLAN.md §5.171)
+- **A game card's priority is a new event kind, `rank`** (`p`: `high`, `normal` or `low`, the
+  latest per card deciding; none is Normal). A data format the owner's data is written in: one
+  more kind beside `note` and `drop`, which older code skips. Why an event and not a field of the
+  item: game items come from the Gist and the data repo's `games/` files, which the app never
+  writes; events are what every device already syncs per card.
+- **Priority orders due cards before their due time, and new cards before their drop**; due cards
+  still all come before new ones. Why: the owner asked for due High cards first; ranking new cards
+  the same way makes a High mistake's first review come sooner too, and the daily new-card limit
+  takes High ones first.
+- **A session keeps the order it was dealt.** Why: a card jumping places while the owner changes a
+  priority mid-review would be confusing; the next session uses it.
+- **A sequence made from a mistake starts at that mistake's priority.** Why: it takes the
+  mistake's place in the deck.

@@ -4,6 +4,7 @@
 // the user moves (three lines, the game trainer's depth), then saved as a tactic (`saved`). Made
 // from a mistake card, it replaces that card (`drop`), as mistake-lab's does.
 import { gameCard } from '../core/progress/cards.ts';
+import type { CardRank } from '../core/progress/events.ts';
 import { moverScore, type MoverLine } from '../core/games/grade.ts';
 import { sequenceItem, sequenceLines, sequenceSaved, validateSequence, type SequenceMove, type SequenceNote } from '../core/games/saved.ts';
 import { positionOf } from '../core/storm/walk.ts';
@@ -72,8 +73,11 @@ export function sourceMistake(seq: string | undefined) {
   return c?.item.kind === 'mistake' ? c.item : undefined;
 }
 
-/** Saves the checked sequence; from a mistake, that card is dropped. Returns the new card. */
-export async function saveSequence(check: SequenceCheck, seq: string | undefined): Promise<string | undefined> {
+/**
+ * Saves the checked sequence at the rank chosen (§5.171); from a mistake, that card is dropped.
+ * Returns the new card.
+ */
+export async function saveSequence(check: SequenceCheck, seq: string | undefined, rank: CardRank = 'normal'): Promise<string | undefined> {
   const source = sourceMistake(seq);
   const now = Date.now();
   const item = sequenceItem({ startFen: check.startFen, color: check.color, lines: check.lines, wpDrop: source?.wpDrop ?? 0, now, rand: Math.random().toString(36).slice(2, 7), ...(source ? { from: source.pid } : {}) });
@@ -81,6 +85,7 @@ export async function saveSequence(check: SequenceCheck, seq: string | undefined
   const t = new Date(now).toISOString();
   const card = gameCard(item.pid);
   await recordEvent({ t, k: 'saved', card, item: { ...item } });
+  if (rank !== 'normal') await recordEvent({ t, k: 'rank', card, p: rank });
   if (source) await recordEvent({ t, k: 'drop', card: gameCard(source.pid), on: true });
   return card;
 }

@@ -1,8 +1,10 @@
 // The game cards' deck and the day's queue (PLAN.md §5.53): every item the games give, less the
 // ones dropped (and a tactic whose lines are all dropped), with the saved items and the plan
 // cards; due cards first, then new ones by the size of the drop, as mistake-lab's queue orders
-// them, with a daily limit of new cards. Pure.
+// them, with a daily limit of new cards. A card's rank (§5.171: high, normal, low) comes before
+// both orders. Pure.
 import { gameCard, type CardId } from '../progress/cards.ts';
+import type { CardRank } from '../progress/events.ts';
 import type { CardState, DeviceEvent } from '../progress/replay.ts';
 import { shownItems, type GameItem, type TacticItem } from './extract.ts';
 import type { PlanItem } from './plans.ts';
@@ -68,6 +70,15 @@ export function deckOf(itemsByGame: Iterable<readonly GameItem[]>, saved: readon
   return out;
 }
 
+/** A card's rank: its latest `rank` event, `normal` when it has none. */
+export function rankOf(events: readonly DeviceEvent[]): CardRank {
+  let rank: CardRank = 'normal';
+  for (const { event } of events) if (event?.k === 'rank') rank = event.p;
+  return rank;
+}
+
+const RANK_ORDER: Record<CardRank, number> = { high: 0, normal: 1, low: 2 };
+
 export interface GameQueue {
   due: DeckCard[];
   /** New cards for today, within the limit. */
@@ -86,23 +97,34 @@ export interface QueueDay {
 /** Whether a card has been reviewed (or carried over with a state). */
 const isNew = (s: CardState | undefined) => !s || s.card.state === 0;
 
-export function gameQueue<T extends { card: CardId; item?: { wpDrop?: number } }>(deck: readonly T[], states: ReadonlyMap<string, CardState>, day: QueueDay, newPerDay: number): { due: T[]; fresh: T[]; waiting: number; startedToday: number } {
-  const due: { c: T; at: number }[] = [];
-  const fresh: T[] = [];
+/**
+ * The day's queue: due cards by rank, then by when they fell due; new cards by rank, then by the
+ * drop, the high ones first within the daily limit. `rank` is `normal` for every card when left out.
+ */
+export function gameQueue<T extends { card: CardId; item?: { wpDrop?: number } }>(
+  deck: readonly T[],
+  states: ReadonlyMap<string, CardState>,
+  day: QueueDay,
+  newPerDay: number,
+  rank?: (card: CardId) => CardRank,
+): { due: T[]; fresh: T[]; waiting: number; startedToday: number } {
+  const order = (c: T) => (rank ? RANK_ORDER[rank(c.card)] : 1);
+  const due: { c: T; at: number; r: number }[] = [];
+  const fresh: { c: T; r: number }[] = [];
   let startedToday = 0;
   for (const c of deck) {
     const s = states.get(c.card);
     if (isNew(s)) {
-      fresh.push(c);
+      fresh.push({ c, r: order(c) });
       continue;
     }
     if (s!.firstReview !== undefined && s!.firstReview >= day.start && s!.firstReview < day.end && !s!.snapshot) startedToday++;
     if (s!.suspended) continue;
     const at = s!.card.due ?? 0;
-    if (at < day.end) due.push({ c, at });
+    if (at < day.end) due.push({ c, at, r: order(c) });
   }
-  due.sort((a, b) => a.at - b.at);
-  fresh.sort((a, b) => (b.item?.wpDrop ?? 0) - (a.item?.wpDrop ?? 0));
+  due.sort((a, b) => a.r - b.r || a.at - b.at);
+  fresh.sort((a, b) => a.r - b.r || (b.c.item?.wpDrop ?? 0) - (a.c.item?.wpDrop ?? 0));
   const room = Math.max(0, newPerDay - startedToday);
-  return { due: due.map((d) => d.c), fresh: fresh.slice(0, room), waiting: Math.max(0, fresh.length - room), startedToday };
+  return { due: due.map((d) => d.c), fresh: fresh.slice(0, room).map((f) => f.c), waiting: Math.max(0, fresh.length - room), startedToday };
 }

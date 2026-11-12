@@ -14,7 +14,7 @@ import { formatEvent, parseLog, type KnownEvent } from '../../../../src/core/pro
 import { Replay, toDeviceEvents, type DeviceEvent } from '../../../../src/core/progress/replay.ts';
 import { gameCard, planCard } from '../../../../src/core/progress/cards.ts';
 import type { PositionKey } from '../../../../src/core/chess/positionKey.ts';
-import { deckOf, dropsOf, gameQueue, lineFingerprint, withoutTimeTrouble } from '../../../../src/core/games/deck.ts';
+import { deckOf, dropsOf, gameQueue, lineFingerprint, rankOf, withoutTimeTrouble } from '../../../../src/core/games/deck.ts';
 import { readFileSync } from 'node:fs';
 import { readGamesFile } from '../../../../src/core/games/record.ts';
 import { extractGame } from '../../../../src/core/games/extract.ts';
@@ -150,6 +150,47 @@ test('the queue: due first by time, new by the drop, the daily limit counting ca
   // Plan cards ride the same queue.
   const plan = { card: planCard(KEY) };
   assert.equal(gameQueue([plan], r.states, day, 10).fresh.length, 1);
+});
+
+test('a card’s priority (§5.171): read and written, the latest deciding, normal by default; refused when malformed', () => {
+  const line = '{"v":1,"n":1,"t":"2026-11-12T10:00:00.000Z","k":"rank","card":"m|_seq_1","p":"high"}';
+  const { lines, problems } = parseLog(line);
+  assert.deepEqual(problems, []);
+  assert.equal(formatEvent(lines[0]!.event as KnownEvent), line);
+  const bad = (fields: string) => parseLog('{"v":1,"n":1,"t":"2026-11-12T10:00:00.000Z",' + fields + '}').problems.length;
+  assert.equal(bad('"k":"rank","card":"m|a_1","p":"urgent"'), 1);
+  assert.equal(bad('"k":"rank","card":"m|a_1"'), 1);
+  assert.equal(bad('"k":"rank","card":"r|x|e2e4","p":"low"'), 1);
+  assert.equal(bad('"k":"rank","card":"p|' + KEY + '","p":"low"'), 0);
+  assert.equal(rankOf([]), 'normal');
+  assert.equal(rankOf([ev({ k: 'rank', card: 'm|a_1', p: 'low' })]), 'low');
+  assert.equal(rankOf([ev({ k: 'rank', card: 'm|a_1', p: 'high' }), ev({ k: 'drop', card: 'm|a_1', on: false }), ev({ k: 'rank', card: 'm|a_1', p: 'normal' }, T0 + 1)]), 'normal');
+});
+
+test('the queue by priority: due cards high to low before their due times, new ones before their drops and the limit', () => {
+  const deck = ['b_1', 'b_2', 'b_3', 'b_4', 'b_5', 'b_6', 'b_7'].map((pid, i) => ({ card: gameCard(pid), item: mistake(pid, 10 + i) }));
+  const r = new Replay();
+  r.add([
+    ev({ k: 'review', card: 'm|b_1', g: 3 }, T0 - 30 * DAY), // due long ago, low
+    ev({ k: 'review', card: 'm|b_2', g: 3 }, T0 - 20 * DAY), // normal
+    ev({ k: 'review', card: 'm|b_3', g: 1 }, T0 - 2 * DAY), // due a day ago, high
+    ev({ k: 'review', card: 'm|b_4', g: 1 }, T0 - 3 * DAY), // high, due before b_3
+  ]);
+  const ranks = new Map<string, 'high' | 'normal' | 'low'>([
+    ['m|b_1', 'low'],
+    ['m|b_3', 'high'],
+    ['m|b_4', 'high'],
+    ['m|b_5', 'high'], // new, the smallest drop of the new ones
+    ['m|b_7', 'low'], // new, the largest
+  ]);
+  const day = { start: T0 - 10 * 3600_000, end: T0 + 14 * 3600_000 };
+  const q = gameQueue(deck, r.states, day, 2, (card) => ranks.get(card) ?? 'normal');
+  assert.deepEqual(q.due.map((c) => c.card), ['m|b_4', 'm|b_3', 'm|b_2', 'm|b_1']);
+  assert.deepEqual(q.fresh.map((c) => c.card), ['m|b_5', 'm|b_6']);
+  assert.equal(q.waiting, 1);
+  // Without ranks (or all normal), the order is as before.
+  assert.deepEqual(gameQueue(deck, r.states, day, 2).due.map((c) => c.card), ['m|b_1', 'm|b_2', 'm|b_4', 'm|b_3']);
+  assert.deepEqual(gameQueue(deck, r.states, day, 2).fresh.map((c) => c.card), ['m|b_7', 'm|b_6']);
 });
 
 test('the grades: mistake-lab’s bands, a hint or a failed first try Again; tactics', () => {

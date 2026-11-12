@@ -36,6 +36,7 @@ import { useWakeLock } from './Train.tsx';
 import { endPreview, preview, stepPreview } from '../app/preview.ts';
 import { endPreviewOnBoard, PreviewBar, previewBoard } from './CommentText.tsx';
 import { NoteButton, NoteText, noteArrows } from './CardNote.tsx';
+import { CardRankSelect, RankButtons } from './Rank.tsx';
 import { isoDay } from './day.ts';
 import { graphLabel, graphY, whiteEdge } from './evalGraph.ts';
 import { Back } from './Back.tsx';
@@ -465,6 +466,12 @@ function GameView(props: { id: string; ply?: number }) {
                 <button type="button" class="link" onClick={() => void recordEvent({ t: new Date().toISOString(), k: 'drop', card, on: !dropped })}>
                   {dropped ? 'Put back' : 'Drop'}
                 </button>
+                {!dropped && (
+                  <>
+                    {' '}
+                    <CardRankSelect card={card} />
+                  </>
+                )}
                 {it.kind === 'mistake' && !dropped && (
                   <>
                     {' '}
@@ -660,6 +667,7 @@ function Card(props: { s: GameSession; r: CardRun }) {
               ))}
             </div>
           )}
+          <RankButtons card={r.card.card} />
           <div class="actions train-actions">
             {!r.revealed && (
               <button type="button" class="secondary" onClick={skipCard}>
@@ -687,6 +695,7 @@ function Card(props: { s: GameSession; r: CardRun }) {
           {s.index + 1} of {s.cards.length} · Advantage{game ? ` · ${game.speed} against ${opponentOf(game).name}` : ''} · you were +{(item.peakCp / 100).toFixed(1)} at move {Math.ceil(item.ply / 2)}
         </p>
         <PracticeBoard onNext={continueSession} />
+        <RankButtons card={r.card.card} />
         <div class="actions train-actions">
           {s.phase !== 'right' && !s.results.has(r.card.card) && (
             <button type="button" class="secondary" onClick={skipCard}>
@@ -778,6 +787,7 @@ function Card(props: { s: GameSession; r: CardRun }) {
         )}
         {r.line && !atStart && <LinePanel line={r.line} busy={!!r.lineBusy} wrong={s.phase === 'wrong'} />}
         {graded && <p class="muted">Recorded: {GRADE_WORD[graded]}</p>}
+        <RankButtons card={r.card.card} />
         <div class="actions train-actions">
           {asking && (
             <button type="button" class="secondary" onClick={hint} disabled={r.hint >= 2 || !hm}>

@@ -6,7 +6,7 @@
 // (trainData), so a review recorded here is a progress event like any other.
 import { computed, effect, signal } from '@preact/signals';
 import { readChesscomGame } from '../core/games/chesscom.ts';
-import { deckOf, gameQueue, withoutTimeTrouble, type DeckCard } from '../core/games/deck.ts';
+import { deckOf, gameQueue, rankOf, withoutTimeTrouble, type DeckCard } from '../core/games/deck.ts';
 import { extractGame, type GameItem } from '../core/games/extract.ts';
 import { savedItems, type SavedItem } from '../core/games/saved.ts';
 import { historyOf, type HistoryEntry } from '../core/games/practice.ts';
@@ -16,12 +16,13 @@ import { keyFen } from '../core/chess/positionKey.ts';
 import { replay, type Replayed } from '../core/games/positions.ts';
 import type { PositionKey } from '../core/chess/positionKey.ts';
 import type { CardId } from '../core/progress/cards.ts';
+import type { CardRank } from '../core/progress/events.ts';
 import type { RepertoireIndex } from '../core/repertoire/index.ts';
 import { openGamesStore, type GamesStore, type StoredGame } from '../platform/gamesStore.ts';
 import { gistId, readGist } from '../platform/gist.ts';
 import { classifyPath } from '../core/data/layout.ts';
 import { parseGamesFile } from '../core/games/dataFile.ts';
-import { localStore } from './state.ts';
+import { localStore, recordEvent } from './state.ts';
 import { dataVersion } from './sync.ts';
 import { userGames } from '../platform/lichessGames.ts';
 import { lichessToken } from './lichess.ts';
@@ -282,7 +283,19 @@ export const gameDeck = computed<DeckCard[]>(() => {
 export function gameQueueNow(now: number = decidingNow()) {
   const data = trainData.value;
   const d = dayOf(now);
-  return gameQueue(gameDeck.value, data?.states ?? new Map(), d, gamesPrefs.value.newPerDay);
+  return gameQueue(gameDeck.value, data?.states ?? new Map(), d, gamesPrefs.value.newPerDay, data ? (card) => rankOf(data.eventsOf(card)) : undefined);
+}
+
+/** A game or plan card's rank (§5.171): `normal` until one is set. */
+export function cardRank(card: string): CardRank {
+  const data = trainData.value;
+  return data ? rankOf(data.eventsOf(card)) : 'normal';
+}
+
+/** Ranks a card; nothing is written when it already has that rank. */
+export async function setCardRank(card: string, p: CardRank): Promise<void> {
+  if (cardRank(card) === p) return;
+  await recordEvent({ t: new Date().toISOString(), k: 'rank', card, p });
 }
 
 // The deck's cards kept on the device whenever the games are read (§5.158), so the home counts
