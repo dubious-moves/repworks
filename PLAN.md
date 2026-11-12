@@ -9460,7 +9460,7 @@ Tests:
 
 Live: TESTING.md.
 
-#### 5.167 What is next from §5.164's look (planned 2026-11-11; its first two parts built in §5.168 and §5.169)
+#### 5.167 What is next from §5.164's look (planned 2026-11-11; its three parts built in §5.168 to §5.170)
 
 **To build, in this order** (each a feature's details, decided here; the session that builds one
 writes its "As built"):
@@ -9490,7 +9490,7 @@ writes its "As built"):
    moves started · k mature". Counted with the home's queue (no second replay), a move in two
    studies counted in both, paused and suspended moves left out as the page's Moves leave them.
    Reference studies and idea decks have none.
-3. **What a day's new moves will cost.** Training settings asks for "New moves a day" with nothing
+3. **What a day's new moves will cost.** *Built: §5.170.* Training settings asks for "New moves a day" with nothing
    to judge it by (proposal 4 of the review of 2026-10-17, §5.122). Under the field, as the number
    is typed: "at n a day: about r reviews a day in two weeks, and the m moves left learned by
    <date>", from the FSRS intervals of a move answered right each time (the first review after
@@ -9642,3 +9642,69 @@ until the stored games are (`storedRead` in `src/app/games.ts`). Control run: wi
 by 0.4 s the test fails on both projects without the fix, and passes with it.
 
 Live: TESTING.md.
+
+#### 5.170 Training settings: what a day's new moves will cost (§5.167's third part, built 2026-11-12)
+
+Under "New moves a day" in the training settings, as the number is typed: "At 20 a day: about 85
+reviews a day in two weeks, and the 240 moves left learned by Nov 24."
+
+- **The simulation** (`newMovesForecast`, core, pure):
+  - *New moves*: the number typed each day from today, today's less the moves already taught
+    today, until none is left. Each day's are taught at this time of day and answered right
+    every time: the first review after the learning step (the same day, or the next when the
+    step ends past midnight), then at the scheduler's own intervals for a move answered Good at
+    the retention set (three days, then eleven more, at 0.9).
+  - *The moves already started*: §5.122's forecast, each answered right on its day
+    (`reviewsAhead`, taken out of `progressStats` so both read one rule).
+  - *The moves left*: never taught or reviewed, not suspended, not on paused lines only, and not
+    in a chapter marked known (those skip teaching and the limit).
+- **"A day in two weeks" is the mean of the second week** (days 8 to 14 from today), rounded. One
+  day's count jumps with the days the started moves fall due on; a week's mean doesn't.
+- **"Learned by" is the day the last move left is taught**, by the device's calendar: "today"
+  when today's share holds them all, the year named when it isn't this one.
+- **As typed**: the number in the field, with the retention and the learning step as typed too
+  when they are settings (else the ones saved), so their cost is seen before Save. No line while
+  the field holds no limit (empty, a fraction, over 1000) or there is no repertoire.
+- **Other forms**: "At 0 a day: about r reviews a day in two weeks, and none of the m moves left
+  learned."; "No moves left to learn: about r reviews a day in two weeks."
+- **What it leaves out is said under it**: "The reviews are counted with every answer right:
+  misses add to them." Also left out, and not said: the day's queue takes whole lines, so a day
+  may teach a few moves past the limit; lines picked from the list and "Learn" teach past it too.
+- **A small repertoire learned fast reads low**: sixty moves at 20 a day are taught in three
+  days, their third reviews fall after the fortnight, and the line says "about 0 reviews a day
+  in two weeks". True of the model; on a repertoire with hundreds of moves left the second week
+  holds new moves and their second reviews every day.
+- Cost: one pass over the repertoire's moves each time a field changes (about 2 ms in Node on
+  2,411 moves and 30,000 reviews, the best of nine).
+
+**As built**: `src/core/train/newMoves.ts` (`newMovesForecast`, `movesLeft`),
+`src/core/train/stats.ts` (`reviewsAhead`, `addReviews`), `src/ui/TrainSettings.tsx`
+(`newMovesLine`), `src/ui/app.css` (`.train-forecast`).
+
+Tests:
+- `test/unit/core/train/newMoves.test.ts`, on a repertoire of sixty moves (ten lines of six):
+  the day the last is taught at 20, 7, 1, 60 and 1000 a day; a limit of 0 and nothing left;
+  today's share less the moves taught today; one move's reviews after the step and at FSRS's
+  intervals, with a step past midnight and at a retention of 0.8; twice the moves a day twice
+  the reviews, day for day; added to the forecast of the moves started; suspended, paused and
+  known moves not left. Three controls in its header.
+- `test/unit/core/train/stats.test.ts`: the progress page's forecast as it was, through
+  `reviewsAhead`.
+- `test/e2e/newmoves.spec.ts` (desktop and phone), on the same sixty moves at 10:00 on 1
+  December: the line at 20 (as saved), 4, 8, 60, 1 and 0 a day with its figures and dates, none
+  for an empty field, 2.5 and 2000; the retention and the step as typed; the line inside the
+  dialog; a move taught today off today's share and not left. Two controls in its header.
+- Looked at (headless Chromium, the made-up studies of §5.168): the dialog at 1440×900, the
+  emulated Pixel 7 and 915×412, in Forest and Paper.
+
+**Found by this part's full run, and fixed in the app**: `back.spec.ts`'s title test passed only
+on its second try, once, on the desktop project: after an address was gone to (`#/train/…`), the
+page stayed on the study. A study page writes its place (the move on the board) over its own
+history entry; when that fell between the address changing and its `hashchange`, it wrote the
+study's address over the new entry, and the place gone to was lost. So a link followed, or an
+address typed, in the instant a chapter finished opening could do nothing. `dispatch`
+(`src/app/mode.ts`) now leaves the address alone when it has already left the page.
+`back.spec.ts` has a test that sets the address and clicks a move in one task (desktop and
+phone); control run: without the check it fails on both, the address back at the study's.
+
+Not tested: the figure against a real fortnight (TESTING.md asks for it).

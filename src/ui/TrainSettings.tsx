@@ -3,18 +3,21 @@
 // `settings.json`; then this device's: new moves shown, tried first or shown as a sequence, the
 // repetitions and the mistakes retried (§5.77), a line's end, where a line starts, auto-play, the
 // lines from the comments quizzed in review (§5.98), the pace of moves played for you; and time travel, for this tab. Opened by ⚙ on the home screen's training
-// card and on the training screen.
+// card and on the training screen. Under "New moves a day", what the number typed will cost
+// (§5.170): the reviews a day two weeks on, and the day the moves left are learned.
 import { decidingNow } from '../app/time.ts';
 import { signal } from '@preact/signals';
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { localDays } from '../app/days.ts';
 import { mode } from '../app/mode.ts';
-import { queueOf, trainData } from '../app/train.ts';
+import { queueOf, trainData, type TrainData } from '../app/train.ts';
 import { saveTrainSettings } from '../app/trainSettings.ts';
 import { configureSession } from '../app/train.ts';
 import { DEFAULT_PACE, MAX_PACE_MS, PACE_NAMES, PACES, paceSettings, savePaceSettings, type Pace, type PaceSettings } from '../app/pace.ts';
 import { MIN_PACE_MS } from '../core/train/trainer.ts';
 import { saveTrainPrefs, trainPrefs, type LearnStart, type TrainPrefs } from '../app/trainPrefs.ts';
-import { DEFAULT_TRAIN } from '../core/train/settings.ts';
+import { FORECAST_DAYS, newMovesForecast } from '../core/train/newMoves.ts';
+import { DEFAULT_TRAIN, type TrainSettings } from '../core/train/settings.ts';
 import type { AutoPlay, CommentQuiz, LineStart } from '../core/train/trainer.ts';
 import { TimeControl } from './TimeTravel.tsx';
 
@@ -34,6 +37,25 @@ const COMMENTS: Record<CommentQuiz, string> = {
   pick: 'Only the ones I pick in “Quiz lines”',
   off: 'Off',
 };
+
+const whole = (n: number, one: string) => `${n.toLocaleString('en')} ${one}${n === 1 ? '' : 's'}`;
+
+/**
+ * What the new moves a day typed will cost (§5.170), as the line under the field; undefined while
+ * the number typed is no limit, or with no repertoire to count.
+ */
+export function newMovesLine(data: TrainData | undefined, settings: TrainSettings, taughtToday: number, now: number): string | undefined {
+  if (!data || data.index.cards.size === 0) return undefined;
+  if (!Number.isInteger(settings.newPerDay) || settings.newPerDay < 0 || settings.newPerDay > 1000) return undefined;
+  const f = newMovesForecast(data.index, data.states, settings, { now, ahead: localDays(now, 0, FORECAST_DAYS), taughtToday });
+  const reviews = `about ${whole(Math.round(f.perDay), 'review')} a day in two weeks`;
+  if (f.left === 0) return `No moves left to learn: ${reviews}.`;
+  const at = `At ${settings.newPerDay.toLocaleString('en')} a day: ${reviews}`;
+  if (f.doneIn === undefined) return `${at}, and none of the ${whole(f.left, 'move')} left learned.`;
+  const day = new Date(localDays(now, f.doneIn, 1)[0]!.start);
+  const date = day.toLocaleDateString([], { day: 'numeric', month: 'short', ...(day.getFullYear() === new Date(now).getFullYear() ? {} : { year: 'numeric' }) });
+  return `${at}, and the ${whole(f.left, 'move')} left learned ${f.doneIn === 0 ? 'today' : `by ${date}`}.`;
+}
 
 const shown = signal(false);
 export const openTrainSettings = () => (shown.value = true);
@@ -66,7 +88,27 @@ function Dialog() {
   useEffect(() => {
     if (!ref.current!.open) ref.current!.showModal();
   }, []);
-  const taught = data ? queueOf(data, decidingNow()).taughtToday : 0;
+  const deciding = decidingNow();
+  const taught = data ? queueOf(data, deciding).taughtToday : 0;
+  // The forecast under "New moves a day", from the numbers as typed (a retention or a step that
+  // is no setting yet counts as the one saved).
+  const typedRetention = Number(retention);
+  const typedStep = Number(step);
+  const forecast = useMemo(
+    () =>
+      newMovesLine(
+        data,
+        {
+          ...now,
+          newPerDay: newPerDay.trim() === '' ? NaN : Number(newPerDay),
+          retention: typedRetention >= 0.7 && typedRetention <= 0.99 ? typedRetention : now.retention,
+          learnStepHours: step.trim() !== '' && typedStep >= 0 && typedStep <= 48 ? typedStep : now.learnStepHours,
+        },
+        taught,
+        deciding,
+      ),
+    [data, newPerDay, retention, step, taught, Math.floor(deciding / 60_000)],
+  );
   const save = async () => {
     const values = { newPerDay: Number(newPerDay), retention: Number(retention), learnStepHours: Number(step), newIdeasPerDay: Number(ideas) };
     if (!Number.isInteger(values.newPerDay) || values.newPerDay < 0 || values.newPerDay > 1000) return setError('New moves a day: a whole number from 0 to 1000.');
@@ -106,8 +148,14 @@ function Dialog() {
           New moves a day
           <input type="number" name="new-per-day" min={0} max={1000} step={1} inputMode="numeric" value={newPerDay} onInput={(e) => setNewPerDay(e.currentTarget.value)} />
         </label>
+        {forecast && (
+          <p class="train-forecast" data-testid="new-moves-forecast" aria-live="polite">
+            {forecast}
+          </p>
+        )}
         <p class="muted">
           {taught} taught today. The limit only paces the day's queue: a line you pick from the list is learned whatever it says.
+          {forecast && ' The reviews are counted with every answer right: misses add to them.'}
         </p>
         <label>
           Retention <span class="muted">(how sure a review should be, 0.7–0.99)</span>

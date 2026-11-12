@@ -3615,6 +3615,12 @@ a.button.primary {
   }
 }
 
+/* What the new moves a day typed will cost (§5.170): the line under the field. */
+.train-forecast {
+  margin: 4px 0 2px;
+  font-variant-numeric: tabular-nums;
+}
+
 /* The explorer's settings: chips for the filter, checkboxes in a row. */
 .explorer-settings fieldset,
 .train-settings fieldset {

@@ -217,6 +217,48 @@ export function shadeOf(work: number, busiest: number): number {
 /** The most work a shade holds when the busiest day's is `busiest`: `shadeOf`'s bounds, for a legend. */
 export const shadeTop = (shade: number, busiest: number): number => (shade <= 0 ? 0 : Math.floor((shade * busiest) / (SHADES - 1)));
 
+export interface AheadOptions {
+  now: number;
+  /** The days ahead, today first. */
+  ahead: readonly Span[];
+  params: FsrsParams;
+}
+
+/**
+ * One move's reviews in the days ahead, added to `forecast`: due at `at` in state `card`, answered
+ * right on its day (a day late counts on the first day), and again each time it comes back.
+ */
+export function addReviews(forecast: (Span & { due: number })[], card: FsrsCard, at: number | undefined, now: number, params: FsrsParams, weight = 1): void {
+  const last = forecast.length ? forecast[forecast.length - 1]!.end : now;
+  let c = card;
+  while (at !== undefined && at < last) {
+    const i = Math.max(
+      0,
+      forecast.findIndex((d) => at! < d.end),
+    );
+    forecast[i]!.due += weight;
+    const t = Math.max(at, forecast[i]!.start, now);
+    c = review(c, 3, t, params);
+    at = c.due;
+  }
+}
+
+/**
+ * The forecast: the reviews due on each day ahead from the moves started now, each answered right
+ * on its day and counted again when it comes back within them; the first day takes the overdue
+ * ones. Suspended moves and those on paused lines only are left out, and new moves.
+ */
+export function reviewsAhead(index: RepertoireIndex, states: ReadonlyMap<string, CardState>, settings: TrainSettings, options: AheadOptions): (Span & { due: number })[] {
+  const held = heldCards(index);
+  const forecast = options.ahead.map((s) => ({ start: s.start, end: s.end, due: 0 }));
+  for (const card of index.cards.keys()) {
+    const state = states.get(card);
+    if (!state || state.suspended || held.has(card)) continue;
+    addReviews(forecast, state.card, dueAt(state, settings), options.now, options.params);
+  }
+  return forecast;
+}
+
 export function progressStats(
   index: RepertoireIndex,
   states: ReadonlyMap<string, CardState>,
@@ -339,26 +381,7 @@ export function progressStats(
   const order = new Map(chapters.map((c, i) => [c, i]));
   chapters.sort((a, b) => (a.recall === undefined ? 1 : 0) - (b.recall === undefined ? 1 : 0) || (a.recall ?? 0) - (b.recall ?? 0) || order.get(a)! - order.get(b)!);
 
-  // The forecast: each move due in the days ahead, answered right on its day, and again when it
-  // comes back within them.
-  const forecast = ahead.map((s) => ({ start: s.start, end: s.end, due: 0 }));
-  const last = ahead.length ? ahead[ahead.length - 1]!.end : now;
-  for (const card of index.cards.keys()) {
-    const state = states.get(card);
-    if (!state || state.suspended || held.has(card)) continue;
-    let at = dueAt(state, settings);
-    let c = state.card;
-    while (at !== undefined && at < last) {
-      const i = Math.max(
-        0,
-        forecast.findIndex((d) => at! < d.end),
-      );
-      forecast[i]!.due++;
-      const t = Math.max(at, forecast[i]!.start, now);
-      c = review(c, 3, t, params);
-      at = c.due;
-    }
-  }
+  const forecast = reviewsAhead(index, states, settings, { now, ahead, params });
 
   // The minutes: the gaps between answers (and moves taught) under a break, on the later one's day.
   times.sort((a, b) => a.t - b.t);

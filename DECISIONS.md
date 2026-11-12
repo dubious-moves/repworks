@@ -2294,3 +2294,17 @@ The technical calls, each with its reason:
   card says "moves started", and such a move is in the day's queue.
 - No data format changed; nothing new is stored.
 
+## Revision of 2026-11-12 (what a day's new moves will cost; PLAN.md §5.170)
+- **§5.167's third part is built as planned**: a line under "New moves a day", from a pure
+  simulation in core added to the progress page's forecast.
+- **"A day in two weeks" is the second week's mean**, not the fourteenth day's count. Why: one
+  day's count jumps with the days the started moves happen to fall due on.
+- **The retention and the learning step count as typed too.** Why: their cost is the same
+  question, asked in the same dialog before Save.
+- **Moves in chapters marked known are not "left to learn".** Why: they skip teaching and the
+  daily limit, so the limit says nothing of when they are met.
+- No data format changed; nothing new is stored.
+- **A page never writes its place over an address already gone to** (`dispatch`'s in-place
+  updates check that the address is still the page's). Why: found as a flaky title test; a link
+  followed in the instant a chapter opened was lost.
+

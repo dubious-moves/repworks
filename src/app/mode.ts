@@ -72,6 +72,10 @@ export function dispatch(event: ModeEvent): void {
   if (next === current) return;
   const hash = modeHash(next);
   if (event.type === 'at' || event.type === 'missing') {
+    // The address has already left this page (a link followed, an address typed) and its
+    // hashchange is still to come: the page's own place must not be written over the new entry,
+    // or the place gone to is lost and the page stays.
+    if (modeHash(parseHash(location.hash)) !== modeHash(current)) return;
     history.replaceState(here, '', location.pathname + location.search + hash);
     mark(here.rw, next, false);
   } else if (location.hash !== hash) {

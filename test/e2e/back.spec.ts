@@ -88,6 +88,28 @@ test('a line gone from the repertoire keeps ← and Home; Home is on every page 
   await expect(page.locator('.study-card').first()).toBeVisible();
 });
 
+// Found by a full run (PLAN.md §5.170): the title test below once stayed on the study after an
+// address was gone to. A study page writes its place over its own history entry (the move on the
+// board); done between an address changing and its hashchange, that wrote the study's address
+// over the new entry, and the page stayed. Control run on 2026-11-12: without the check in
+// `dispatch` (src/app/mode.ts) this fails on both projects, the address back at the study's.
+test('an address gone to while the study writes its place is not written over', async ({ page }) => {
+  await setUp(page);
+  await page.getByRole('link', { name: 'Test repertoire', exact: true }).click();
+  await expect(page.locator('.notation .move[data-path="e4"]')).toBeVisible();
+  // In one task: the address changes (its hashchange comes after), then a move is clicked.
+  await page.evaluate(() => {
+    location.hash = '#/progress';
+    document.querySelector<HTMLElement>('.notation .move[data-path="e4"]')!.click();
+  });
+  await expect(page).toHaveURL(/#\/progress$/);
+  await expect(page).toHaveTitle('Progress · Repworks');
+  await expect(page.getByTestId('progress-moves')).toBeVisible();
+  // ← goes back to the study, where it was.
+  await back(page).click();
+  await expect(page).toHaveURL(/#\/study\/Rep0Najd\/Ch1Najdf/);
+});
+
 // The tab's title names the screen (PLAN.md §5.164), so the browser's history and the installed
 // app's window say where each entry is. Control run on 2026-11-11: without `keepTitle()` in
 // main.ts the first title after the home's fails ("Main line · Test repertoire · Repworks",

@@ -1237,6 +1237,16 @@ Export PGN and Copy branch are under 2, Studies.)
 
 ## 12. Settings and sync
 
+### What a day's new moves will cost (§5.170, 2026-11-12)
+- Training settings (⚙ on the training card): under "New moves a day" a line says the reviews a
+  day in two weeks and the day the moves left are learned. Type other numbers: does it change as
+  you type, and is the date the one you'd work out (moves left ÷ moves a day)?
+- Is "about r reviews a day in two weeks" believable against what your days hold now? Note the
+  figure, keep the limit for two weeks, and compare: it counts every answer as right, so the
+  real days should run somewhat over it.
+- **Checked**: unit tests on a made-up repertoire of sixty moves; Playwright on a desktop and an
+  emulated phone; headless screenshots in Forest and Paper. Not against real training.
+
 ### Sounds, Settings apart from Debug, the dark themes (§5.159, 2026-11-10)
 - **Sounds**: Settings → Sounds (off until ticked). Then:
   - a move and a capture each make a short knock, the capture lower;
