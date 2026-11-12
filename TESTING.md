@@ -1180,6 +1180,18 @@ later change replaced are folded into the later item; items already reported wor
 
 ## 10. Progress
 
+### The days trained over 26 weeks (§5.168, 2026-11-12)
+- On Progress, under "Last 14 days": does the calendar show your real habit (the weeks you know
+  you missed, the busy days darkest)? Are "days in a row" and "the longest run" what you'd count
+  yourself? Before training on a day it should say "up to yesterday".
+- On the phone: do the 26 columns fit with no sideways scroll, and is a square easy enough to
+  tap (the day is then said under the calendar)? On a desktop, hover a square for the same.
+- Is an empty day too faint or too strong in your theme, and can the three shades of a day
+  trained be told apart?
+- **Checked**: unit tests (the runs, the shades, local midnights and the days the clocks change);
+  Playwright on a desktop and an emulated phone, at 360px too, and with the device in Stockholm;
+  headless screenshots in Forest and Paper at four sizes. Nothing on a real device.
+
 ### Empty charts, and the weekday (§5.158, 2026-11-10)
 - Progress's charts say "nothing due" or "no training" in a line instead of empty bars, and each
   day carries its weekday's letter.

@@ -11,6 +11,8 @@
 // - Workload: the reviews due on each of the coming days, the moves known now answered right each
 //   time (new moves left out); and the minutes trained on each past day, from the gaps between
 //   answers (a gap of more than five minutes is a break).
+// - The habit (§5.167): the same days over half a year and more, as runs of days in a row and a
+//   calendar's shades.
 // Core has no clock or calendar: the app passes in now, the window's start and the days.
 import type { CardId } from '../progress/cards.ts';
 import { DEFAULT_PARAMS, newCard, retrievability, review, type FsrsCard, type FsrsParams } from '../progress/fsrs.ts';
@@ -158,7 +160,62 @@ function count(t: Tally, a: Answer): void {
   if (a.right) t.right++;
   t.expected += a.predicted ?? 0;
 }
-const spanOf = (spans: readonly Span[], t: number) => spans.findIndex((s) => t >= s.start && t < s.end);
+/** The span `t` falls in, of spans in time order that don't overlap; -1 when in none. */
+export function spanOf(spans: readonly Span[], t: number): number {
+  let lo = 0;
+  let hi = spans.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (spans[mid]!.start <= t) lo = mid;
+    else hi = mid - 1;
+  }
+  const s = spans[lo];
+  return s && t >= s.start && t < s.end ? lo : -1;
+}
+
+/** A day's work: its answers and the new moves taught. A day with any is a day trained. */
+export const workOf = (d: DayWork): number => d.answers + d.taught;
+
+export interface Runs {
+  /**
+   * The days trained in a row up to today. Today counts once it has work; with none yet, the run
+   * up to yesterday still stands.
+   */
+  current: number;
+  /** The longest run of the days given. */
+  longest: number;
+  /** Whether today (the last day) has work. */
+  today: boolean;
+}
+
+/** The runs of days trained in `days`, consecutive days in time order with today last (§5.167). */
+export function runsOf(days: readonly DayWork[]): Runs {
+  let longest = 0;
+  let run = 0;
+  for (const d of days) {
+    run = workOf(d) > 0 ? run + 1 : 0;
+    if (run > longest) longest = run;
+  }
+  const today = days.length > 0 && workOf(days[days.length - 1]!) > 0;
+  let current = run;
+  if (!today) {
+    current = 0;
+    for (let i = days.length - 2; i >= 0 && workOf(days[i]!) > 0; i--) current++;
+  }
+  return { current, longest, today };
+}
+
+/** The steps a calendar's day is shaded in: 0 for no work, then the thirds of the busiest day's. */
+export const SHADES = 4;
+
+/** A day's shade: 0 with no work; 1 to 3 by the third of the busiest day's work it falls in. */
+export function shadeOf(work: number, busiest: number): number {
+  if (!(work > 0)) return 0;
+  return Math.min(SHADES - 1, Math.max(1, Math.ceil(((SHADES - 1) * work) / Math.max(work, busiest))));
+}
+
+/** The most work a shade holds when the busiest day's is `busiest`: `shadeOf`'s bounds, for a legend. */
+export const shadeTop = (shade: number, busiest: number): number => (shade <= 0 ? 0 : Math.floor((shade * busiest) / (SHADES - 1)));
 
 export function progressStats(
   index: RepertoireIndex,

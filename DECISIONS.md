@@ -2272,3 +2272,16 @@ The technical calls, each with its reason:
 - **Read with nothing to set up**, after every sync, as an analyzer record a page's export never
   replaces. The Gist stays a source (and the migration's).
 - Data format: `games/<YYYY-MM>.jsonl` (above).
+
+## Revision of 2026-11-12 (the days trained on the progress page; PLAN.md §5.168)
+- **§5.167's first part is built, with three of its details changed**:
+  - *An empty day in the calendar is under WCAG's 3:1, on purpose*; the three shades of a day
+    trained keep it. Why: at 3:1 the empty days read as days trained, and a week missed, the
+    thing the calendar is for, did not stand out (looked at in Forest and Paper).
+  - *The squares take the card's width* (16px at most) rather than a fixed 12px. Why: 26 columns
+    of 12px are wider than a 360px phone.
+  - *The runs of days are counted since the first answer*, not over the calendar's 26 weeks.
+    Why: a run past half a year would stop at 182. It costs nothing measurable (§5.168).
+- **A day trained is a day with an answer or a new move taught.** Why: a day of new moves alone
+  has no answer yet, and "Last 14 days" already counts it.
+- No data format changed; nothing new is stored.

@@ -6267,6 +6267,111 @@ a.button.disabled {
   border-radius: 4px 4px 0 0;
 }
 
+/* The days trained (§5.167): a column a week, a square a day. The squares take the card's width
+   up to 16px each, so the 26 columns fit a 360px phone (about 9px there) with no sideways scroll.
+   A day is shaded in four steps, the theme's link colour over the card at the four opacities
+   below. The three thirds of a day trained are each 3:1 or more against the card in every theme
+   (themes.test.ts reads them from here); a day with nothing is the faintest, under that line on
+   purpose: it is the ground the days trained are seen against. */
+.cal-card {
+  --cal-0: 14%;
+  --cal-1: 70%;
+  --cal-2: 85%;
+  --cal-3: 100%;
+}
+
+.cal {
+  /* The columns: Progress.tsx sets its own count over this. */
+  --cal-weeks: 26;
+  display: grid;
+  grid-template-columns: max-content repeat(var(--cal-weeks), minmax(0, 16px));
+  gap: 2px;
+  margin: 8px 0 4px;
+  align-items: center;
+}
+
+.cal-month,
+.cal-weekday {
+  font-size: 0.7rem;
+  line-height: 1.2;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.cal-month {
+  grid-row: 1;
+  min-width: 0;
+}
+
+/* A month that starts in the last column is named leftwards, inside the card. */
+.cal-month.last {
+  justify-self: end;
+}
+
+.cal-weekday {
+  grid-column: 1;
+  padding-right: 4px;
+}
+
+.cal-day {
+  aspect-ratio: 1;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--link) var(--cal-0), var(--surface));
+}
+
+.cal-day.s1 {
+  background: color-mix(in srgb, var(--link) var(--cal-1), var(--surface));
+}
+
+.cal-day.s2 {
+  background: color-mix(in srgb, var(--link) var(--cal-2), var(--surface));
+}
+
+.cal-day.s3 {
+  background: color-mix(in srgb, var(--link) var(--cal-3), var(--surface));
+}
+
+.cal-day.today {
+  outline: 2px solid var(--text);
+  outline-offset: 1px;
+}
+
+.cal-day.picked:not(.today) {
+  outline: 1px solid var(--text);
+  outline-offset: 1px;
+}
+
+.cal-told {
+  margin: 4px 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.cal-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 12px;
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+}
+
+.cal-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.cal-key .cal-day {
+  width: 12px;
+}
+
+@media (min-width: 600px) {
+  .cal {
+    gap: 3px;
+  }
+}
+
 /* Lc0 on the engine panel (§5.143): its share beside each line's first move, its pick among the
    close lines marked, and its own row under them. */
 .lc0-switch {

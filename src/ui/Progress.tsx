@@ -1,14 +1,16 @@
 // The progress page (PLAN.md §5.122): what the log says about the training. Recall measured
 // against what the scheduler expected, the moves by stage, the reviews due in the next two
 // weeks, the minutes trained in the last two, the chapters weakest first and the moves missed
-// again and again. Read from the training data (src/core/train/stats.ts); nothing is stored.
+// again and again; and the days trained over 26 weeks, as a calendar and the runs of days in a row
+// (§5.167). Read from the training data (src/core/train/stats.ts); nothing is stored.
 import { useMemo, useState } from 'preact/hooks';
 import { makeSan } from 'chessops/san';
+import { calendarDays, daysSince, localDays, weekdayOf } from '../app/days.ts';
 import { decidingNow } from '../app/time.ts';
 import { trainData, type TrainData } from '../app/train.ts';
 import { parseUciMove } from '../core/chess/uci.ts';
 import { header } from '../core/study/model.ts';
-import { progressStats, type ProgressStats, type Span, type Tally } from '../core/train/stats.ts';
+import { progressStats, runsOf, shadeOf, shadeTop, SHADES, workOf, type DayWork, type ProgressStats, type Span, type Tally } from '../core/train/stats.ts';
 import { Back } from './Back.tsx';
 import { PinButton, where } from './Mistakes.tsx';
 
@@ -16,17 +18,24 @@ const DAY_MS = 86_400_000;
 /** The window recall, chapters and misses are counted over. */
 const WINDOW_DAYS = 30;
 const SPAN_DAYS = 14;
+/** The calendar's columns, a week each. */
+const WEEKS = 26;
 /** Chapters shown before "Show all". */
 const CHAPTERS_SHOWN = 8;
 const MISSED_SHOWN = 20;
 
-/** `count` local days from the day `offset` days from now's, by the device's calendar. */
-function localDays(now: number, offset: number, count: number): Span[] {
-  const d = new Date(now);
-  return Array.from({ length: count }, (_, i) => ({
-    start: new Date(d.getFullYear(), d.getMonth(), d.getDate() + offset + i).getTime(),
-    end: new Date(d.getFullYear(), d.getMonth(), d.getDate() + offset + i + 1).getTime(),
-  }));
+/** The first answer or move taught in the repertoire's log: the runs of days are counted from its day. */
+function firstWork(data: TrainData): number | undefined {
+  let first: number | undefined;
+  for (const card of data.index.cards.keys()) for (const { event, t } of data.eventsOf(card)) if ((event?.k === 'review' || event?.k === 'taught') && (first === undefined || t < first)) first = t;
+  return first;
+}
+
+/** The days counted: the calendar's, or every day since the first answer when that is longer, today last. */
+function pastDays(data: TrainData, now: number): Span[] {
+  const first = firstWork(data);
+  const count = Math.max(calendarDays(now, WEEKS), first === undefined ? 0 : daysSince(now, first));
+  return localDays(now, 1 - count, count);
 }
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
@@ -47,7 +56,7 @@ export function ProgressView() {
         now,
         since: now - WINDOW_DAYS * DAY_MS,
         ahead: localDays(now, 0, SPAN_DAYS),
-        past: localDays(now, 1 - SPAN_DAYS, SPAN_DAYS),
+        past: pastDays(data, now),
       }),
     // The time travelled to changes `now` by hours at a time; a minute's drift isn't worth a recount.
     [data, Math.floor(now / 60_000)],
@@ -70,6 +79,7 @@ export function ProgressView() {
           <MovesCard stats={stats} />
           <Forecast stats={stats} />
           <Minutes stats={stats} />
+          <Habit stats={stats} now={now} />
           <Chapters stats={stats} data={data} />
           <MissedCard stats={stats} data={data} />
         </>
@@ -230,8 +240,8 @@ function Forecast(props: { stats: ProgressStats }) {
 }
 
 function Minutes(props: { stats: ProgressStats }) {
-  const days = props.stats.days;
-  const trained = days.filter((d) => d.answers + d.taught > 0);
+  const days = props.stats.days.slice(-SPAN_DAYS);
+  const trained = days.filter((d) => workOf(d) > 0);
   const minutes = days.reduce((s, d) => s + d.minutes, 0);
   const answers = days.reduce((s, d) => s + d.answers, 0);
   const taught = days.reduce((s, d) => s + d.taught, 0);
@@ -245,6 +255,101 @@ function Minutes(props: { stats: ProgressStats }) {
       <p class="muted">
         {answers.toLocaleString('en')} review{answers === 1 ? '' : 's'} and {taught.toLocaleString('en')} new move{taught === 1 ? '' : 's'}
         {trained.length > 0 && <>, {Math.round(minutes / trained.length)} min a day on the days trained</>}. Minutes are the time between answers, a pause of over five minutes left out.
+      </p>
+    </section>
+  );
+}
+
+const plural = (n: number, one: string) => `${n.toLocaleString('en')} ${one}${n === 1 ? '' : 's'}`;
+const dayTitle = (d: DayWork) => `${dayName(d.start)}: ${workOf(d) > 0 ? `${plural(d.answers, 'answer')}, ${plural(d.taught, 'new move')}, ${Math.round(d.minutes)} min` : 'no training'}`;
+const monthName = (ms: number) => new Date(ms).toLocaleDateString([], { month: 'short' });
+/** The weekdays named beside the calendar's rows: Monday, Wednesday and Friday. */
+const NAMED_ROWS = [0, 2, 4];
+
+/**
+ * The days trained (§5.167): the run of days in a row, the longest, the days of the last 30; and
+ * a calendar of the last 26 weeks, a column a week from Monday, a square a day shaded by its
+ * answers and new moves. A square's title is its day; a tap shows it under the calendar.
+ */
+function Habit(props: { stats: ProgressStats; now: number }) {
+  const all = props.stats.days;
+  const [picked, setPicked] = useState<number | undefined>(undefined);
+  const runs = useMemo(() => runsOf(all), [all]);
+  const shown = all.slice(-calendarDays(props.now, WEEKS));
+  const today = shown[shown.length - 1];
+  if (!today) return null;
+  const busiest = Math.max(0, ...shown.map(workOf));
+  const trained = shown.filter((d) => workOf(d) > 0).length;
+  const month = all.slice(-WINDOW_DAYS);
+  // The first column's days before the calendar's first (none: it starts on a Monday).
+  const lead = weekdayOf(shown[0]!.start);
+  const column = (i: number) => Math.floor((i + lead) / 7);
+  // A month is named over the column its first day is in; the first column's, when the next is far enough.
+  const months: { col: number; name: string }[] = [];
+  shown.forEach((d, i) => {
+    if (new Date(d.start).getDate() === 1 && column(i) > 0) months.push({ col: column(i), name: monthName(d.start) });
+  });
+  if (!months.length || months[0]!.col >= 3) months.unshift({ col: 0, name: monthName(shown[0]!.start) });
+  const shades = Array.from({ length: SHADES - 1 }, (_, i) => ({ shade: i + 1, from: shadeTop(i, busiest) + 1, to: shadeTop(i + 1, busiest) })).filter((s) => s.from <= s.to);
+  const told = shown.find((d) => d.start === picked) ?? today;
+  return (
+    <section class="card cal-card" aria-label="Days trained" data-testid="progress-days">
+      <h2>
+        Last {WEEKS} weeks: {plural(trained, 'day')} trained
+      </h2>
+      <div class="stat-row">
+        <Stat value={String(runs.current)} label={`day${runs.current === 1 ? '' : 's'} in a row${!runs.today && runs.current > 0 ? ' up to yesterday' : ''}`} />
+        <Stat value={String(runs.longest)} label={`day${runs.longest === 1 ? '' : 's'}, the longest run`} />
+        <Stat value={String(month.filter((d) => workOf(d) > 0).length)} label={`of the last ${month.length} days`} />
+      </div>
+      <div
+        class="cal"
+        role="list"
+        aria-label={`Days trained, the last ${WEEKS} weeks`}
+        style={{ '--cal-weeks': WEEKS }}
+        onClick={(e) => {
+          const day = (e.target as HTMLElement).closest<HTMLElement>('[data-day]')?.dataset['day'];
+          if (day !== undefined) setPicked(Number(day));
+        }}
+      >
+        {months.map((m, i) => (
+          <span key={`m${m.col}`} class={`cal-month${m.col >= WEEKS - 1 ? ' last' : ''}`} aria-hidden="true" style={{ gridColumn: `${m.col + 2} / ${(months[i + 1]?.col ?? WEEKS) + 2}` }}>
+            {m.name}
+          </span>
+        ))}
+        {NAMED_ROWS.map((row) => (
+          <span key={`w${row}`} class="cal-weekday" aria-hidden="true" style={{ gridRow: row + 2 }}>
+            {weekday(shown[(row - lead + 7) % 7]!.start)}
+          </span>
+        ))}
+        {shown.map((d, i) => {
+          const title = dayTitle(d);
+          return (
+            <span
+              key={d.start}
+              role="listitem"
+              class={`cal-day s${shadeOf(workOf(d), busiest)}${d === today ? ' today' : ''}${d === told && picked !== undefined ? ' picked' : ''}`}
+              style={{ gridColumn: column(i) + 2, gridRow: ((i + lead) % 7) + 2 }}
+              data-day={d.start}
+              title={title}
+              aria-label={title}
+            />
+          );
+        })}
+      </div>
+      <p class="cal-told" data-testid="cal-told" aria-live="polite">
+        {dayTitle(told)}
+      </p>
+      <p class="muted cal-legend">
+        Answers and new moves a day:{' '}
+        <span class="cal-key">
+          <span class="cal-day s0" /> none
+        </span>
+        {shades.map((s) => (
+          <span key={s.shade} class="cal-key">
+            <span class={`cal-day s${s.shade}`} /> {s.from === s.to ? s.to : `${s.from}–${s.to}`}
+          </span>
+        ))}
       </p>
     </section>
   );

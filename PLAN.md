@@ -9460,12 +9460,14 @@ Tests:
 
 Live: TESTING.md.
 
-#### 5.167 What is next from §5.164's look (planned 2026-11-11, not built)
+#### 5.167 What is next from §5.164's look (planned 2026-11-11; its first part built in §5.168)
 
 **To build, in this order** (each a feature's details, decided here; the session that builds one
 writes its "As built"):
 
-1. **Progress: the days trained, over half a year.** The page shows the last 14 days' minutes and
+1. **Progress: the days trained, over half a year.** *Built: §5.168, which changes three of
+   these details (the empty day's shade, the squares' size, the days the runs are counted over).*
+   The page shows the last 14 days' minutes and
    nothing longer, so whether the habit holds can't be seen.
    - A calendar of the last 26 weeks under "Last 14 days": a column a week (Monday first), a
      square a day, shaded by the answers that day in four steps (none; then thirds of the busiest
@@ -9526,3 +9528,68 @@ browser's own is one tap, and the app is installed); the home and the pages of l
 side (they scroll as they are); a game card's note dialog on a phone's side (it scrolls inside the
 dialog).
 
+#### 5.168 Progress: the days trained over 26 weeks (§5.167's first part, built 2026-11-12)
+
+A card "Last 26 weeks: n days trained" under "Last 14 days" on the progress page.
+
+- **Three figures**: the days in a row ("up to yesterday" while today has nothing yet: the run
+  stands for the day, and is over the day after), the longest run, and the days trained of the
+  last 30.
+- **The calendar**: a column a week from Monday, a square a day, the last column this week's and
+  its last square today's, outlined (176 to 182 squares). The months are named over the column
+  their first day is in, Monday, Wednesday and Friday beside their rows.
+- **A day is trained by its answers and its new moves together**, as "Last 14 days" already
+  counts its days: a first day of new moves alone has no answer (a move's first review comes
+  after the learning step), and is a day trained. The shade is by that sum: none, then the
+  thirds of the busiest day's of the 26 weeks. The legend names the thirds' counts ("1–16",
+  "17–32", "33–48"), not "less" and "more".
+- **A day's title** is its date, answers, new moves and minutes ("no training" for none). A phone
+  has no hover, so **a tap on a square says the same in a line under the calendar**, which reads
+  today's until then.
+- **The runs are counted over every day since the first answer**, not the calendar's 26 weeks: a
+  run longer than half a year would otherwise stop at 182, and "longest" would forget last
+  year's. The page passes `progressStats` the days from the first answer or move taught (26
+  weeks at least); the fortnight's chart reads the last 14 of them, the calendar the last 26
+  weeks.
+- **Cost**: a day's span is now found by halving (`spanOf`), not by walking the list. Measured in
+  Node on 2,411 moves and 30,000 reviews over 180 days, the best of nine: 35 to 55 ms the whole
+  count with 14, 182 or 1,100 days passed, the differences inside the runs' own spread (walking
+  the list, 1,100 days cost 30 to 45 ms more). So the days are not counted apart.
+- **Changed from §5.167's details**:
+  - *The empty day is under 3:1, on purpose.* Built first as §5.167 says (every step 3:1 against
+    the card, the empty day a ring of that strength), it was looked at in Forest and Paper: 180
+    rings read as a full grid, and a week missed did not stand out, which is what the calendar is
+    for. The three steps of a day trained are the link colour over the card at 70%, 85% and 100%:
+    3.3:1 or more in every theme, each 1.15 times the last or more. The empty day is the same
+    colour at 14% (about 1.2:1): seen, and nothing like a day trained.
+  - *The squares are sized by the card*, 16px at most: 26 of 12px with 2px gaps are 362px, wider
+    than a 360px phone before the card's own edges. At 360px they are 9px, on a Pixel 7 11px.
+  - *The colour is `--link`*, the theme's accent as it is read on a card; `--accent` itself is
+    the buttons' ground (1.1 to 1.6:1 against the card in the dark themes).
+
+**As built**: `src/core/train/stats.ts` (`runsOf`, `shadeOf`, `shadeTop`, `workOf`, `spanOf`),
+`src/app/days.ts` (`localDays`, `weekdayOf`, `calendarDays`, `daysSince`), `src/ui/Progress.tsx`
+(`Habit`, `pastDays`), `src/ui/app.css` (`.cal-card`, `.cal`).
+
+Tests:
+- `test/unit/core/train/habit.test.ts`: the run with today answered, with nothing yet today, and
+  over; a gap and the longest; a day of new moves alone; the shades' thirds and the legend's
+  bounds for busiest days of 1 to 101; a time found in its span; a day across midnight on a
+  device two hours ahead; half a year of days counted as the fortnight was. Three controls in
+  its header.
+- `test/unit/app/days.test.ts`, run on Stockholm's clock: local midnights, the 25-hour and
+  23-hour days, the calendar's frame from a Monday, the days since the first answer. Three
+  controls in its header.
+- `test/unit/ui/themes.test.ts`: the four opacities read from `app.css`; the three steps of a day
+  trained 3:1 or more against the card and each stronger than the last, the empty day far
+  fainter and still seen, in the eight themes. Three controls in its comment.
+- `test/e2e/progress.spec.ts` (desktop and phone): the three figures; 179 squares from Monday 13
+  April to Thursday 8 October, each in its column and row; the months; the shades of days with
+  one, two and three answers, the same four colours in the legend; a day told by a tap; the
+  columns inside the card and no sideways scroll, there and at 360px; the next day ("up to
+  yesterday") and the one after (0); and on a device in Stockholm, answers at 23:59 and 00:01 on
+  two days. Three controls in its header. 90 repeats pass.
+- Looked at (headless Chromium, made-up studies and 150 days of reviews on two devices): 1440×900,
+  the emulated Pixel 7, 360×740 and 915×412, in Forest and Paper.
+
+Not tested: a real phone (whether a 9 to 11px square is easy enough to tap). Live: TESTING.md.
