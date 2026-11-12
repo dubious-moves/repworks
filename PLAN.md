@@ -9460,7 +9460,7 @@ Tests:
 
 Live: TESTING.md.
 
-#### 5.167 What is next from §5.164's look (planned 2026-11-11; its first part built in §5.168)
+#### 5.167 What is next from §5.164's look (planned 2026-11-11; its first two parts built in §5.168 and §5.169)
 
 **To build, in this order** (each a feature's details, decided here; the session that builds one
 writes its "As built"):
@@ -9483,7 +9483,8 @@ writes its "As built"):
    - On a phone the 26 columns fit 360px (12px squares, 2px gaps); no sideways scroll.
    - Tests: the runs (today empty, a gap, the longest), the shades' steps, a day across midnight
      local time; Playwright on both projects.
-2. **A study's card on the home: how far it is learned.** The card says what is due and new
+2. **A study's card on the home: how far it is learned.** *Built: §5.169, with the words shown
+   under the bar, not in its title.* The card says what is due and new
    today, not how much of the study is known. Under its counts, a thin bar: mature, young and not
    started moves as three shades (§5.122's `moves`, counted for the study), its title "n of m
    moves started · k mature". Counted with the home's queue (no second replay), a move in two
@@ -9593,3 +9594,51 @@ Tests:
   the emulated Pixel 7, 360×740 and 915×412, in Forest and Paper.
 
 Not tested: a real phone (whether a 9 to 11px square is easy enough to tap). Live: TESTING.md.
+
+#### 5.169 A study's card on the home: how far it is learned (§5.167's second part, built 2026-11-12)
+
+Under a repertoire study's counts on its card: a thin bar of its moves in three shares, mature,
+young and not started, and under it "34 of 120 moves started · 12 mature".
+
+- **The shares** are §5.122's stages, counted for the study: mature (stability of 21 days or
+  more), young (reviewed and not yet mature, and the moves taught and waiting for their first
+  review: they are started), not started. A share's width is its count's; one too small to see
+  keeps 3px. A share of none is not drawn.
+- **Left out**, as the progress page's Moves leave them: suspended moves, and moves on paused
+  lines only. A move played in two studies counts in both. A study with no move to count has no
+  bar; reference studies and idea decks have none.
+- **Counted once for the data read**, from the states already replayed: one pass over the index
+  for every study together (`studyMoves`), kept with the training data (`studyMovesOf`), so the
+  cards ask for a number each and nothing is replayed again.
+- **Changed from §5.167's detail: the words are shown, not a title.** The card's link lies over
+  the whole card (a click anywhere opens the study), so the bar is never hovered, and a phone
+  has no hover. The bar carries the same words, and each share's count, for a screen reader.
+- **Colours**: the link colour for mature, the same at 55% for young, the faint track every
+  card's border uses for not started, with 2px of the card between the shares so two are told
+  apart by more than their shade.
+
+**As built**: `src/core/train/stats.ts` (`studyMoves`), `src/app/train.ts` (`studyMovesOf`),
+`src/ui/App.tsx` (`Learned`, on `StudyCard`), `src/ui/app.css` (`.study-learned`, `.study-bar`).
+
+Tests:
+- `test/unit/core/train/stats.test.ts`: two studies sharing 1. e4; mature, young (a move
+  reviewed once, a move taught only) and not started; a suspended move and a paused line's move
+  in neither; nothing trained; a study not in the index. Three controls in its comment.
+- `test/e2e/studies.spec.ts` (desktop and phone): the fixture's study at "2 of 4 moves started ·
+  1 mature", its three shares in order, their widths one, one and two of four, three colours,
+  the bar inside the card; a second study sharing 1... c5 at "1 of 2", with no young share; a
+  reference study with none; no sideways scroll; a click on the bar opens the study. Two
+  controls in its header. The study cards' own test now scrolls the card into view before its
+  click at the card's foot (on the emulated phone the foot is under the fold with the bar added).
+- Looked at (headless Chromium, the made-up studies of §5.168): the home at 1440×900, the
+  emulated Pixel 7 and 915×412, in Forest and Paper.
+
+**Found by this part's full run, and fixed in the app**: `games.spec.ts`'s "the home counts
+today's game cards" passed only on its second try, once, on the phone project. The cards' review,
+opened straight after a start (§5.158), waits for the games' rows; but the rows were published
+empty as soon as the repertoire was known, before the device's games were read, so a redraw that
+came between the two dealt from an empty deck ("Nothing to review"). The rows now stay unread
+until the stored games are (`storedRead` in `src/app/games.ts`). Control run: with the read slowed
+by 0.4 s the test fails on both projects without the fix, and passes with it.
+
+Live: TESTING.md.

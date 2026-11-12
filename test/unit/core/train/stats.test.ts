@@ -14,7 +14,7 @@ import { Replay, type DeviceEvent } from '../../../../src/core/progress/replay.t
 import { parseChapterFile } from '../../../../src/core/pgn/parse.ts';
 import { indexStudies } from '../../../../src/core/repertoire/index.ts';
 import { DEFAULT_TRAIN } from '../../../../src/core/train/settings.ts';
-import { answersOf, progressStats, type Span } from '../../../../src/core/train/stats.ts';
+import { answersOf, progressStats, studyMoves, type Span } from '../../../../src/core/train/stats.ts';
 import type { Chapter } from '../../../../src/core/study/model.ts';
 import { asDevice, DAY, iso } from '../../../support/reviewHistory.ts';
 
@@ -185,4 +185,49 @@ test('a paused line’s moves count as paused, and are never forecast', () => {
     stats.forecast.reduce((s, d) => s + d.due, 0),
     0,
   );
+});
+
+// A study's moves by stage (PLAN.md §5.169), for its card on the home.
+// Controls run (2026-11-12), each failing this test and no other:
+// - a move counted once, for its first study alone (`places[0]!.sid` for every study it is in):
+//   the Sicilian study's total is 2 for 3;
+// - suspended moves counted (the `suspended` check dropped): the Sicilian study's total is 4,
+//   one more young;
+// - a move taught and not yet reviewed counted as not started (`status === 'fresh' || status ===
+//   'learning'`): the open games' young is 1 for 2.
+test('a study’s moves by stage: mature, young (taught ones too) and not started; a move in two studies counted in both, suspended and paused-only moves in neither', () => {
+  const two = indexStudies([
+    { sid: 'Rep0Open', kind: 'repertoire', chapters: [chapter('Ch1Ruyxx', '1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4')] },
+    { sid: 'Rep1Sici', kind: 'repertoire', chapters: [chapter('Ch2Sicil', '1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4'), chapter('Ch3Alapn', '1. e4 c5 2. c3')] },
+  ]);
+  const BA4 = card('e4 e5 Nf3 Nc6 Bb5 a6 Ba4');
+  const NXD4 = card('e4 c5 Nf3 d6 d4 cxd4 Nxd4');
+  const C3 = card('e4 c5 c3');
+  const replay = new Replay();
+  replay.add([
+    // e4, in both studies: reviewed at its due times, mature by day 12.
+    ev(start, { k: 'review', card: E4, g: 3 }),
+    ev(start + 3 * DAY, { k: 'review', card: E4, g: 3 }),
+    ev(start + 12 * DAY, { k: 'review', card: E4, g: 3 }),
+    // The open games: Nf3 reviewed once (young), Bb5 taught only (young), Ba4 never.
+    ev(start + 12 * DAY, { k: 'review', card: NF3, g: 3 }),
+    ev(start + 12 * DAY, { k: 'taught', card: BB5 }),
+    // The Sicilian: Nf3 reviewed once, d4 suspended after a review, Nxd4 and c3 never.
+    ev(start + 12 * DAY, { k: 'review', card: NF3C5, g: 3 }),
+    ev(start + 12 * DAY, { k: 'review', card: D4, g: 3 }),
+    ev(start + 13 * DAY, { k: 'suspend', card: D4 }),
+  ]);
+  assert.ok(replay.states.get(E4)!.card.stability >= 21, 'e4 is mature');
+  // The Alapin's line is paused: c3 lies on it alone, e4 on active lines too.
+  const paused = { ...two, lines: two.lines.map((l) => (l.cid === 'Ch3Alapn' ? { ...l, paused: true as const } : l)) };
+  const moves = studyMoves(paused, replay.states);
+  assert.deepEqual([...moves.keys()], ['Rep0Open', 'Rep1Sici']);
+  assert.deepEqual(moves.get('Rep0Open'), { total: 4, mature: 1, young: 2, fresh: 1 });
+  assert.deepEqual(moves.get('Rep1Sici'), { total: 3, mature: 1, young: 1, fresh: 1 });
+  assert.ok(two.cards.has(BA4) && two.cards.has(NXD4) && two.cards.has(C3));
+  // Unpaused, c3 is one more not started.
+  assert.deepEqual(studyMoves(two, replay.states).get('Rep1Sici'), { total: 4, mature: 1, young: 1, fresh: 2 });
+  // Nothing trained: every move not started. No study, no entry.
+  assert.deepEqual(studyMoves(two, new Map()).get('Rep0Open'), { total: 4, mature: 0, young: 0, fresh: 4 });
+  assert.equal(studyMoves(two, replay.states).get('Other000'), undefined);
 });

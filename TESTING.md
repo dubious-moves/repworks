@@ -31,6 +31,14 @@ later change replaced are folded into the later item; items already reported wor
 
 ## 1. Home and Today
 
+### A study's card: how far it is learned (§5.169, 2026-11-12)
+- On the home, each repertoire study's card has a thin bar and "n of m moves started · k
+  mature" under its counts. Do the numbers fit what you know of each study (the ones you have
+  finished, the ones barely begun)? Reference studies and idea decks should have none.
+- Is the bar worth its place on the card, on the phone too, or is the line of words enough?
+- **Checked**: unit tests; Playwright on a desktop and an emulated phone; headless screenshots in
+  Forest and Paper. Nothing on the real repertoire.
+
 ### Search (§5.166, 2026-11-11)
 - **Search**, after Import on the home: one box over every study on the device.
   - A chapter by a word of its name, or one of its study's and one of its own ("najdorf bg5").

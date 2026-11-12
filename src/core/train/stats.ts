@@ -390,3 +390,37 @@ export function progressStats(
     days,
   };
 }
+
+/** How far a study is learned (§5.167): its moves by stage, suspended and paused-only ones left out. */
+export interface StudyMoves {
+  /** The moves counted: mature, young and not started. */
+  total: number;
+  /** Stability of `MATURE_DAYS` or more. */
+  mature: number;
+  /** Started and not yet mature: reviewed, or taught and waiting for the first review. */
+  young: number;
+  fresh: number;
+}
+
+/**
+ * Each repertoire study's moves by stage, from the states already replayed: one pass over the
+ * index. A move played in two studies counts in both; a suspended move, and one on paused lines
+ * only, in neither, as the progress page's Moves leave them out.
+ */
+export function studyMoves(index: RepertoireIndex, states: ReadonlyMap<string, CardState>): Map<string, StudyMoves> {
+  const held = heldCards(index);
+  const out = new Map<string, StudyMoves>();
+  for (const [card, places] of index.cards) {
+    const state = states.get(card);
+    if (state?.suspended || held.has(card)) continue;
+    const status = statusOf(state);
+    const stage = status === 'fresh' ? 'fresh' : status === 'review' && state!.card.stability >= MATURE_DAYS ? 'mature' : 'young';
+    for (const sid of new Set(places.map((p) => p.sid))) {
+      let m = out.get(sid);
+      if (!m) out.set(sid, (m = { total: 0, mature: 0, young: 0, fresh: 0 }));
+      m.total++;
+      m[stage]++;
+    }
+  }
+  return out;
+}

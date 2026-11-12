@@ -26,6 +26,7 @@ import { interactivePlan, planSession, withoutAnswered, type SessionPlan } from 
 import { ShowGrade, type Press, type ShowGradeEffect } from '../core/train/showGrade.ts';
 import { todaysQueue, type DailyQueue, type Day } from '../core/train/queue.ts';
 import { SETTINGS_FILE, trainSettings, type TrainSettings } from '../core/train/settings.ts';
+import { studyMoves, type StudyMoves } from '../core/train/stats.ts';
 import { quizLinesOf, type QuizLine } from '../core/train/commentQuiz.ts';
 import { Trainer, type Note, type Summary, type TrainerCommand, type TrainerEffect, type TrainerOptions, type TrainerView } from '../core/train/trainer.ts';
 import type { IdbStore } from '../platform/idbStore.ts';
@@ -144,6 +145,14 @@ export function difficultOf(data: TrainData, now: number): SessionPlan {
 
 export function queueOf(data: TrainData, now: number, scope?: string): DailyQueue {
   return todaysQueue(data.index, data.states, data.settings, dayOf(now), scope === undefined ? {} : { scope });
+}
+
+/** Each study's moves by stage (§5.169), counted once for the data read: the home's cards ask for one each. */
+const studyMovesBy = new WeakMap<TrainData, Map<string, StudyMoves>>();
+export function studyMovesOf(data: TrainData, sid: string): StudyMoves | undefined {
+  let all = studyMovesBy.get(data);
+  if (!all) studyMovesBy.set(data, (all = studyMoves(data.index, data.states)));
+  return all.get(sid);
 }
 
 /** A pace chosen in the session's menu; the settings dialog sets the speed of "custom" and the pauses. */

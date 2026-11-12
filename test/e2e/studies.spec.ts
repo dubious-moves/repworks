@@ -4,9 +4,17 @@
 // Qchess's switch between training and the study: a session left for the study at the move on
 // the board, the line edited there, and the session taken up again with the edit in its plan and
 // nothing asked twice.
+//
+// How far a study is learned (PLAN.md §5.169): the bar and its words on a repertoire study's card.
+// Controls run (2026-11-12), each failing "a study's card says how far it is learned":
+// - every card given the whole repertoire's moves (`studyMoves` keyed by one name for all): the
+//   test repertoire reads "2 of 5 moves started" for "2 of 4";
+// - the bar raised over the card's link (`position: relative; z-index: 1`): a click on the bar
+//   no longer opens the study.
 import { test, expect, type Page } from '@playwright/test';
-import type { FakeGit } from '../support/fakeGit.ts';
-import { REPO, TOKEN } from '../support/syncWorld.ts';
+import { FakeGit } from '../support/fakeGit.ts';
+import { FakeGithub } from '../support/fakeGithub.ts';
+import { fixtureFiles, REPO, TOKEN } from '../support/syncWorld.ts';
 import { chapterSettings, clickSquare, newChapter, studyMenu } from './board.ts';
 import { serveGithub, world } from './github.ts';
 import { serveSite, type SiteServer } from './server.ts';
@@ -61,11 +69,62 @@ test('the study cards: their panel by kind, chapters, side and today’s moves; 
   await expect(page.getByRole('region', { name: /^Repertoire/ })).toContainText('Test repertoire');
   await expect(rep.locator('.study-card-meta')).toHaveText('2 chaptersBlack1 due · 3 new');
   await expect(rep.getByRole('link', { name: 'Train Test repertoire' })).toHaveAttribute('href', '#/train/Rep0Najd');
-  // Anywhere on the card opens the study, but its buttons.
+  // Anywhere on the card opens the study, but its buttons. (Its foot, with the bar of §5.169, is
+  // under the fold on the phone: a click outside the window lands nowhere.)
+  await rep.scrollIntoViewIfNeeded();
   const box = (await rep.boundingBox())!;
   await page.mouse.click(box.x + box.width / 2, box.y + box.height - 8);
   await expect(page).toHaveURL(/#\/study\/Rep0Najd/);
   await expect(page.locator('.notation')).toContainText('1. e4');
+});
+
+test('a study’s card says how far it is learned: a bar of its mature, young and not started moves, and the same in words', async ({ page }) => {
+  const files = fixtureFiles();
+  // 1... c5, answered on 30 September and 5 October in the fixture, again on 25 October: mature
+  // by December. 3... cxd4 taught yesterday: young. 2... d6 is suspended: left out.
+  const log = 'progress/Desktop1/2026-10-05.jsonl';
+  files.set(log, `${files.get(log)!}{"v":1,"n":9,"t":"2026-10-25T10:00:00.000Z","k":"review","card":"${C5}","g":3}\n{"v":1,"n":10,"t":"2026-11-30T10:00:00.000Z","k":"taught","card":"${CXD4}"}\n`);
+  // A second repertoire study that plays 1... c5 too, and a reference study.
+  const study = (id: string, name: string, kind: string) => `${JSON.stringify({ format: 1, id, name, kind, chapters: ['Ch1Onlyx'] }, null, 2)}\n`;
+  files.set('studies/Rep1Kanx/study.json', study('Rep1Kanx', 'Kan', 'repertoire'));
+  files.set('studies/Rep1Kanx/Ch1Onlyx.pgn', '[ChapterName "Kan"]\n[Orientation "black"]\n\n1. e4 c5 2. Nf3 e6 *\n');
+  files.set('studies/Ref0Book/study.json', study('Ref0Book', 'A book', 'reference'));
+  files.set('studies/Ref0Book/Ch1Onlyx.pgn', '[ChapterName "One"]\n[Orientation "black"]\n\n1. e4 c5 *\n');
+  await page.clock.install({ time: DAY });
+  await serveGithub(page, new FakeGithub(new FakeGit(files), { repo: REPO, branch: 'main', token: TOKEN }));
+  await page.goto(`${site.url}#setup?repo=${encodeURIComponent(REPO)}&token=${TOKEN}&name=desktop`);
+  await expect(page.locator('.chip')).toHaveText(/^synced/);
+
+  // The fixture's study: c5 mature, cxd4 young, Nc6 and Nf6 not started; d6 not counted.
+  const rep = card(page, 'Test repertoire');
+  await expect(rep.getByTestId('study-learned')).toHaveText('2 of 4 moves started · 1 mature');
+  const bar = rep.getByRole('img', { name: '2 of 4 moves started · 1 mature: 1 mature, 1 young, 2 not started' });
+  await expect(bar.locator('span')).toHaveCount(3);
+  const widths = await bar.locator('span').evaluateAll((els) => els.map((el) => ({ of: el.className, width: el.getBoundingClientRect().width, colour: getComputedStyle(el).backgroundColor })));
+  expect(widths.map((w) => w.of)).toEqual(['mature', 'young', 'fresh']);
+  // A share's width is its count's: one, one and two of four.
+  expect(Math.abs(widths[0]!.width - widths[1]!.width)).toBeLessThan(1);
+  expect(widths[2]!.width / widths[0]!.width).toBeGreaterThan(1.9);
+  expect(widths[2]!.width / widths[0]!.width).toBeLessThan(2.1);
+  expect(new Set(widths.map((w) => w.colour)).size).toBe(3);
+  // The bar inside the card, the card's counts as they were.
+  const [cardBox, barBox] = [(await rep.boundingBox())!, (await bar.boundingBox())!];
+  expect(barBox.x).toBeGreaterThanOrEqual(cardBox.x);
+  expect(barBox.x + barBox.width).toBeLessThanOrEqual(cardBox.x + cardBox.width);
+  await expect(rep.locator('.study-card-meta')).toHaveText(/^2 chaptersBlack\d+ due · \d+ new$/);
+
+  // A move in two studies counts in both: the Kan's c5 is mature, its e6 not started (no young share).
+  const kan = card(page, 'Kan');
+  await expect(kan.getByTestId('study-learned')).toHaveText('1 of 2 moves started · 1 mature');
+  await expect(kan.locator('.study-bar span')).toHaveCount(2);
+  // A reference study has none.
+  await expect(card(page, 'A book')).toBeVisible();
+  await expect(card(page, 'A book').getByTestId('study-learned')).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
+
+  // The bar is part of the card: a click on it opens the study.
+  await bar.click({ force: true });
+  await expect(page).toHaveURL(/#\/study\/Rep0Najd/);
 });
 
 test('a study made with no import, managed where Qchess has it, and deleted from its card', async ({ page }) => {

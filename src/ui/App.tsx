@@ -6,7 +6,8 @@ import { modeHash } from '../core/app/fsm.ts';
 import { findConflicts } from '../app/overview.ts';
 import { online, shellVersion, updateReady } from '../app/shell.ts';
 import { device, fatal, localStore, ready, starting, studies, type StudyRow } from '../app/state.ts';
-import { queueOf, trainData } from '../app/train.ts';
+import { queueOf, studyMovesOf, trainData } from '../app/train.ts';
+import type { StudyMoves } from '../core/train/stats.ts';
 import { dataVersion } from '../app/sync.ts';
 import { ChapterView } from './ChapterView.tsx';
 import { ConflictsView } from './Conflicts.tsx';
@@ -345,6 +346,26 @@ function StudyGroup(props: { kind: StudyRow['kind']; title: string; empty: strin
 const SIDES = { white: 'White', black: 'Black', both: 'Both' } as const;
 
 /**
+ * How far a study is learned (§5.169): a thin bar of its mature, young and not started moves,
+ * and the same in words under it (a phone has no hover, and the card's link lies over the bar).
+ */
+function Learned(props: { moves: StudyMoves }) {
+  const { total, mature, young } = props.moves;
+  const n = (x: number) => x.toLocaleString('en');
+  const words = `${n(mature + young)} of ${n(total)} moves started · ${n(mature)} mature`;
+  return (
+    <div class="study-learned" data-testid="study-learned">
+      <div class="study-bar" role="img" aria-label={`${words}: ${n(mature)} mature, ${n(young)} young, ${n(total - mature - young)} not started`}>
+        {mature > 0 && <span class="mature" style={{ flexGrow: mature }} />}
+        {young > 0 && <span class="young" style={{ flexGrow: young }} />}
+        {total - mature - young > 0 && <span class="fresh" style={{ flexGrow: total - mature - young }} />}
+      </div>
+      <span class="study-learned-words">{words}</span>
+    </div>
+  );
+}
+
+/**
  * A study as a card, after Qchess's /studies (read live, 2026-10-06): the name, the chapters, and
  * the side as Qchess's colour tag; here also today's due and new moves. Its kind is the panel it
  * sits in. The card opens the study; ⚙ and 🗑 in its corner, as Qchess's tag and delete buttons,
@@ -356,6 +377,8 @@ function StudyCard(props: { study: StudyRow }) {
   const queue = s.kind === 'repertoire' && data ? queueOf(data, decidingNow(), s.id) : undefined;
   // An idea deck's cards (§5.128): their counts and their Train button.
   const ideas = !queue && enrolledIn(ideaEnrolled.value, s.id).length ? ideaQueueNow(s.id) : undefined;
+  // How far it is learned (§5.169): a repertoire study with a move to learn.
+  const moves = queue && data ? studyMovesOf(data, s.id) : undefined;
   const ref = { sid: s.id, name: s.name, kind: s.kind, chapters: s.chapters };
   return (
     <li class="study-card">
@@ -391,6 +414,7 @@ function StudyCard(props: { study: StudyRow }) {
           Train
         </a>
       )}
+      {moves && moves.total > 0 && <Learned moves={moves} />}
       {ideas && (
         <a class="button primary study-card-train" href={`#/ideas/${s.id}`} aria-label={`Train ${s.name}`}>
           Train

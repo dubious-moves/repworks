@@ -2285,3 +2285,12 @@ The technical calls, each with its reason:
 - **A day trained is a day with an answer or a new move taught.** Why: a day of new moves alone
   has no answer yet, and "Last 14 days" already counts it.
 - No data format changed; nothing new is stored.
+
+## Revision of 2026-11-12 (a study's card says how far it is learned; PLAN.md §5.169)
+- **§5.167's second part is built, with one detail changed: the bar's words are shown under
+  it**, not kept in a title. Why: the card's link covers the whole card, so the bar is never
+  hovered, and a phone has no hover.
+- **A move taught and not yet reviewed counts as started** (the bar's young share). Why: the
+  card says "moves started", and such a move is in the day's queue.
+- No data format changed; nothing new is stored.
+

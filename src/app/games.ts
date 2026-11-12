@@ -105,12 +105,19 @@ export function repertoireMoves(index: RepertoireIndex | undefined): (key: Posit
 }
 
 let stored: StoredGame[] = [];
+/**
+ * Whether the device's games have been read. Until then there are no rows, not an empty list: a
+ * screen that deals from the rows (the cards' review, opened straight after a start) waits for
+ * them, and one drawn between the start and the read would deal from no game at all.
+ */
+let storedRead = false;
 async function readStored(): Promise<void> {
   try {
     stored = await gamesStore().games();
   } catch {
     stored = [];
   }
+  storedRead = true;
   rebuild();
 }
 
@@ -135,6 +142,7 @@ export const playedOf = (g: GameRecord): Replayed | undefined => {
 };
 
 function rebuild(): void {
+  if (!storedRead) return;
   const cutoff = sinceCutoff(gamesPrefs.peek().since, Date.now());
   const isRep = repertoireMoves(trainData.peek()?.index);
   gameRows.value = stored

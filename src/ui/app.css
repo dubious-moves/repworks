@@ -486,6 +486,44 @@ label.check input {
   align-self: end;
 }
 
+/* How far a study is learned (§5.169): mature, young and not started, the link colour at full
+   and at 55% on a faint track; a hair of the card between them, so two shares are told apart
+   by more than their shade. The words under it say the same. */
+.study-learned {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.study-bar {
+  display: flex;
+  gap: 2px;
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.study-bar span {
+  flex: 0 0 0;
+  /* A share too small to see is still shown. */
+  min-width: 3px;
+}
+
+.study-bar .mature {
+  background: var(--link);
+}
+
+.study-bar .young {
+  background: color-mix(in srgb, var(--link) 55%, transparent);
+}
+
+.study-bar .fresh {
+  background: rgb(var(--ink) / 14%);
+}
+
 .study-card-counts .some.due {
   color: var(--due);
 }
