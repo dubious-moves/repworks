@@ -18,7 +18,7 @@ import { lineTail } from '../core/storm/sources.ts';
 import { positionOf } from '../core/storm/walk.ts';
 import { Back } from './Back.tsx';
 import { MiniBoard } from './CommentOffer.tsx';
-import { MoveBoard, MoveList } from './Practice.tsx';
+import { gamePremove, MoveBoard, MoveList } from './Practice.tsx';
 import { useWakeLock } from './Train.tsx';
 
 const DAY = 86_400_000;
@@ -421,8 +421,8 @@ function EndgameGame(props: { game: PracticeGame; endgame: Endgame; rep?: Repert
     startEndgame(e);
   };
   return (
-    <div class="train-grid practice-game endgame-game" data-phase={over ? 'over' : slip ? 'slip' : p.ending ? 'ending' : p.phase} data-moves={p.moves.length} data-testid="endgame-game">
-      <MoveBoard fen={fen} orientation={p.setup.color} movable={p.phase === 'user' && !slip && !p.ending} lastUci={last?.uci} arrows={arrows} onMove={(u) => void practiceMove(u)} />
+    <div class="train-grid practice-game endgame-game" data-phase={over ? 'over' : slip ? 'slip' : p.ending ? 'ending' : p.phase} data-moves={p.moves.length} data-premove={p.premove ? p.premove.from + p.premove.to : ''} data-testid="endgame-game">
+      <MoveBoard fen={fen} orientation={p.setup.color} movable={p.phase === 'user' && !slip && !p.ending} lastUci={last?.uci} arrows={arrows} onMove={(u) => void practiceMove(u)} premove={gamePremove(p)} />
       <div class="train-panel">
         <p class="train-counters">
           {taskOf(e)}

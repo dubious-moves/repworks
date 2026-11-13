@@ -128,6 +128,8 @@ export function Board(p: BoardProps) {
   const api = useRef<Api | undefined>(undefined);
   const props = useRef(p);
   props.current = p;
+  // The premove the last render was given (`premove.current`).
+  const premoveShown = useRef<[Key, Key] | undefined>(undefined);
   // The sketch (`sketchKey`): what was drawn on this key, dropped when the key changes.
   const sketch = useRef<{ key: string | undefined; shapes: Shape[] }>({ key: p.sketchKey, shapes: [] });
   if (sketch.current.key !== p.sketchKey) sketch.current = { key: p.sketchKey, shapes: [] };
@@ -227,8 +229,12 @@ export function Board(p: BoardProps) {
       c.movable = { color: undefined };
     }
     api.current?.set(c);
-    // A premove played or dropped by the game is taken off the board too.
-    if (api.current?.state.premovable.current && !p.premove?.current) api.current.cancelPremove();
+    // A premove played or dropped by the game is taken off the board too, and one left on a board
+    // whose side is to move or that takes none. One just made is told of a moment later
+    // (chessground's events wait a tick): a render meanwhile leaves it be.
+    const had = premoveShown.current;
+    premoveShown.current = p.premove?.current;
+    if (api.current?.state.premovable.current && !p.premove?.current && (had || !p.premove || p.dests.size)) api.current.cancelPremove();
   });
 
   // Sounds (§5.159): a move or a capture as the position goes one ply on, whoever made it; stepping

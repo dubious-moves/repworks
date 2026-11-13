@@ -19,7 +19,7 @@ import { analyseFrom, entryKey, open } from '../app/mode.ts';
 import { chapterNameAt, checklistMaia, checklistViews, excludeLine, generating, makeChecklist, MAIA_MAX, MAIA_MIN, restoreExcluded, setChecklistMaia, stopChecklist, touch, unpickLine, type ChecklistView } from '../app/checklist.ts';
 import { openingNameOf } from '../app/games.ts';
 import { lichessToken } from '../app/lichess.ts';
-import { leavePractice, parkPractice, practice, startPractice, takeUpPractice } from '../app/practice.ts';
+import { leavePractice, parkPractice, practice, practiceMove, premoveUci, startPractice, takeUpPractice } from '../app/practice.ts';
 import { practiceResults } from '../app/repertoireCheck.ts';
 import { trainData } from '../app/train.ts';
 import { completedPresets, linesOf, PRESET_ORDER, PRESETS, presetOpen, presetStats, RANK_SPEEDS, type ChecklistGap, type Preset, type ShownLine } from '../core/games/checklist.ts';
@@ -27,6 +27,7 @@ import type { Color } from '../core/games/record.ts';
 import { parseUciMove } from '../core/chess/uci.ts';
 import { keyFen, positionKeyOf } from '../core/chess/positionKey.ts';
 import { positionOf } from '../core/storm/walk.ts';
+import type { BoardProps } from './Board.tsx';
 import { MiniBoard } from './CommentOffer.tsx';
 import { MoveBoard, PracticeBoard } from './Practice.tsx';
 import { winRateColor } from './RepertoireCheck.tsx';
@@ -440,6 +441,13 @@ export function ChecklistDrill(props: { sid: string; side: Color; line: string[]
   const inLeadUp = !!v && k < v.lineUci.length;
   const fen = v ? fenAt(Math.min(k, v.lineUci.length)) : START;
   const turn = positionOf(fen)?.turn;
+  // A premove while the lead-up's opponent move waits, played once it is on the board (into the
+  // game when the line ends there). The user's move as this render has it, for the effect and the
+  // board's events.
+  const [pre, setPre] = useState<{ from: string; to: string } | undefined>(undefined);
+  const userMove = useRef<(uci: string) => void>(() => undefined);
+  const now = useRef({ fen, turn });
+  now.current = { fen, turn };
   // The opponent's moves of the lead-up, played after 0.4 s; at the end, the game starts.
   useEffect(() => {
     if (!v) return;
@@ -447,12 +455,18 @@ export function ChecklistDrill(props: { sid: string; side: Color; line: string[]
       if (resumed && practice.peek()) return;
       const p = PRESETS[props.preset];
       startPractice({ kind: 'checklist', fen: v.leafFen, color, silent: true, title: lineText(v.lineSan), opponent: { ratings: [...p.ratings], speeds: [...RANK_SPEEDS], maiaElo, precision: p.precision }, preset: props.preset, leaf: v.leafKey, before: v.lineUci.map((_, n) => keyFen(fenAt(n))!.key) });
+      const uci = pre && premoveUci(v.leafFen, pre);
+      setPre(undefined);
+      if (uci) void practiceMove(uci);
       return;
     }
     if (turn !== color) {
       const t = setTimeout(() => setK(k + 1), 400);
       return () => clearTimeout(t);
     }
+    const uci = pre && premoveUci(fen, pre);
+    setPre(undefined);
+    if (uci) userMove.current(uci);
     return undefined;
   }, [k, v]);
   const leading = useRef({ on: inLeadUp, k });
@@ -493,12 +507,24 @@ export function ChecklistDrill(props: { sid: string; side: Color; line: string[]
     setNote(undefined);
     setK(k + 1);
   };
+  userMove.current = onMove;
+  const premove: BoardProps['premove'] = {
+    color,
+    current: pre ? [pre.from as Key, pre.to as Key] : undefined,
+    onSet: (from, to) => {
+      // Told of after the opponent's move has come: played now, as it would have been.
+      if (now.current.turn !== color) return setPre({ from, to });
+      const uci = premoveUci(now.current.fen, { from, to });
+      if (uci) userMove.current(uci);
+    },
+    onUnset: () => setPre(undefined),
+  };
   const p = PRESETS[props.preset];
   return (
     <div class="games">
       {back}
-      <div class="train-grid checklist-drill" data-step={k} data-testid="checklist-drill">
-        <MoveBoard fen={fen} orientation={color} movable={turn === color} lastUci={k ? v.lineUci[k - 1] : undefined} onMove={onMove} />
+      <div class="train-grid checklist-drill" data-step={k} data-premove={pre ? pre.from + pre.to : ''} data-testid="checklist-drill">
+        <MoveBoard fen={fen} orientation={color} movable={turn === color} lastUci={k ? v.lineUci[k - 1] : undefined} onMove={onMove} premove={premove} />
         <div class="train-panel">
           <p class="train-counters">{lineText(v.lineSan)}</p>
           <p class="feedback train-feedback" role="status" data-testid="checklist-feedback">

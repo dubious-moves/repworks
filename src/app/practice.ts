@@ -724,23 +724,21 @@ async function opponentTurn(g: number): Promise<void> {
   const after = played(fen, m.uci);
   if (!after) return void finish(g, 'interrupted');
   const note = m.dbFailed && !q.note && !q.setup.silent ? 'The database is unavailable (a Lichess login is needed): Maia or Stockfish answers.' : q.note;
-  const now = patch(g, (r) => ({ moves: [...r.moves, { san: after.san, uci: m.uci, isUser: false, fenBefore: fen, fen: after.fen, source: m.source }], source: m.source, phase: 'user', ...(note ? { note } : {}) }));
+  // The premove is taken off with the answer: played next when it is legal here, else dropped.
+  const pre = q.premove;
+  const now = replace(g, (r) => {
+    const { premove: _p, ...rest } = r;
+    return { ...rest, moves: [...r.moves, { san: after.san, uci: m.uci, isUser: false, fenBefore: fen, fen: after.fen, source: m.source }], source: m.source, phase: 'user', ...(note ? { note } : {}) };
+  });
   const end = now && endOf(now, false);
   if (end) return now.setup.kind === 'endgame' ? conclude(g, end) : finish(g, end);
   if (now) ponder(now);
-  // The premove, played now when it is legal here (mistake-lab's: always a queen; dropped when illegal).
-  const pre = practice.peek()?.premove;
-  if (pre) {
-    replace(g, (r) => {
-      const { premove: _p, ...rest } = r;
-      return rest;
-    });
-    const uci = premoveUci(after.fen, pre);
-    if (uci) void practiceMove(uci);
-  }
+  const uci = pre && premoveUci(after.fen, pre);
+  if (uci) void practiceMove(uci);
 }
 
-function premoveUci(fen: string, pre: { from: string; to: string }): string | undefined {
+/** A premove as a move at `fen` (standard UCI), when it is legal there: a pawn reaching the last rank queens (mistake-lab's, and Lichess's by default). */
+export function premoveUci(fen: string, pre: { from: string; to: string }): string | undefined {
   const pos = positionOf(fen);
   const from = parseSquare(pre.from);
   const to = parseSquare(pre.to);
@@ -749,13 +747,23 @@ function premoveUci(fen: string, pre: { from: string; to: string }): string | un
   const promotion = piece?.role === 'pawn' && (pre.to[1] === '8' || pre.to[1] === '1') ? ('queen' as const) : undefined;
   const move = normalizeMove(pos, { from, to, ...(promotion ? { promotion } : {}) });
   if (!isNormal(move) || !pos.isLegal(move)) return undefined;
-  return standardUci(pos, move) + (promotion ? 'q' : '');
+  // The promotion is in the move: standard UCI writes it (c7c8q).
+  return standardUci(pos, move);
 }
 
-/** A premove set or changed during the opponent's turn. */
+/**
+ * A premove set or changed during the opponent's turn. The board tells of it a moment after the
+ * hand made it: when the opponent has answered meanwhile, it is played at once (legal), as it would
+ * have been.
+ */
 export function setPremove(from: string, to: string): void {
   const p = practice.peek();
-  if (p && p.phase === 'opponent') patch(p.gen, () => ({ premove: { from, to } }));
+  if (!p || p.slip || p.ending) return;
+  if (p.phase === 'opponent') patch(p.gen, () => ({ premove: { from, to } }));
+  else if (p.phase === 'user') {
+    const uci = premoveUci(fenAfter(p), { from, to });
+    if (uci) void practiceMove(uci);
+  }
 }
 
 export function clearPremove(): void {

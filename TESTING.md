@@ -1044,6 +1044,16 @@ later change replaced are folded into the later item; items already reported wor
 
 ## 8. Endgames
 
+### Premoves in every kind of practice (§5.173, 2026-11-13)
+- Phone, then desktop: an endgame (Breakthrough is a good one): while Stockfish thinks, premove your
+  next move (tap the piece, tap the square: both marked); tap an empty square and it is gone; set it
+  again and it is played the moment the answer lands. One the answer makes illegal (a pawn it
+  captures) just disappears. A pawn premoved to the last rank becomes a queen.
+- The same in a practice game from a position, an advantage drill and a checklist drill (its lead-up
+  too: premove your next prep move while the opponent's line move comes). Does a premove ever get
+  lost or played when you didn't expect it?
+- **Checked**: the endgame and checklist e2e (desktop and emulated phone), the practice e2e's premove.
+
 ### More endgames (§5.150, 2026-11-02)
 - Home → Endgames: 23 positions in six groups, two of them new (Rook against a pawn or a minor
   piece; Minor pieces). On the phone the page is long now: is it still easy to find one, or would

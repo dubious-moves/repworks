@@ -7,7 +7,7 @@
 // its lead-up (a move off the prep refused), then a game from its end against the explorer's
 // moves, judged by the fake engine at +12 three times running, won by Claim victory: the line
 // checked off at Easy, the block's progress 17%; then Medium stopped in its game, counted a loss
-// (Medium 0/1). The list and the win synced; a second device
+// (Medium 0/1), its lead-up's 2...d6 premoved while 2.Nf3 waits. The list and the win synced; a second device
 // shows the same list after its sync, with no explorer call. Then a list kept on a device before
 // §5.130 carried into the log after the first sync; a line taken out (asked first) and restored;
 // the Alapin line paused on another device, hidden here after a sync; a drill's old address.
@@ -25,7 +25,7 @@ import { parseSan } from 'chessops/san';
 import { makeUci } from 'chessops/util';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
 import type { FakeGit } from '../support/fakeGit.ts';
-import { clickSquare, studyMenu } from './board.ts';
+import { clickSquare, square, studyMenu } from './board.ts';
 import { fakeEngine, SLOW } from './engine.ts';
 import { fakeExplorer, lichessLogin, serveExplorer, type FakeExplorer } from './explorer.ts';
 import { serveGithub, world } from './github.ts';
@@ -179,11 +179,18 @@ test('a checklist made on its page, a line drilled at Easy through its lead-up a
   await again.getByTestId('checklist-line').nth(0).getByRole('button', { name: /Medium/ }).click();
   await expect(page).toHaveURL(/&preset=medium$/);
   await expect(drill).toHaveAttribute('data-step', '1');
-  for (const [from, to, step] of [['c7', 'c5', '3'], ['d7', 'd6', '5']] as const) {
-    await clickSquare(page, from, 'black');
-    await clickSquare(page, to, 'black');
-    await expect(drill).toHaveAttribute('data-step', step);
-  }
+  // A premove in the lead-up: 2...d6 set while 2.Nf3 waits its 0.4 s (the clicks one after another,
+  // the squares measured first), played once it lands. The premove's mark is caught as it comes and goes.
+  const at = Object.fromEntries(await Promise.all(['c7', 'c5', 'd7', 'd6'].map(async (n) => [n, await square(page, n, 'black')] as const)));
+  await drill.evaluate((el) => {
+    const seen: (string | null)[] = [];
+    (window as unknown as { premoves: typeof seen }).premoves = seen;
+    new MutationObserver(() => seen.push(el.getAttribute('data-premove'))).observe(el, { attributes: true, attributeFilter: ['data-premove'] });
+  });
+  for (const n of ['c7', 'c5', 'd7', 'd6']) await page.mouse.click(at[n]!.x, at[n]!.y);
+  await expect(drill).toHaveAttribute('data-step', '5');
+  expect(await page.evaluate(() => (window as unknown as { premoves: string[] }).premoves)).toEqual(['d7d6', '']);
+  await expect(page.getByTestId('checklist-feedback')).toHaveText('Your move: play your prep');
   await clickSquare(page, 'c5', 'black');
   await clickSquare(page, 'd4', 'black');
   await expect(game).toHaveAttribute('data-moves', '1');

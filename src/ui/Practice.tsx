@@ -129,6 +129,16 @@ export function MoveBoard(props: { fen: string; orientation: 'white' | 'black'; 
 
 /* ------------------------------------------------------------------ the game */
 
+/**
+ * A game's premoves (any kind: from a position, an advantage drill, a checklist's, an endgame): set
+ * while the opponent thinks, played once it has answered. None while an endgame waits on a slip or
+ * on its judges, nor once the game is over.
+ */
+export function gamePremove(p: PracticeGame): BoardProps['premove'] | undefined {
+  if (p.phase === 'over' || p.slip || p.ending) return undefined;
+  return { color: p.setup.color, current: p.premove ? [p.premove.from as Key, p.premove.to as Key] : undefined, onSet: (o, d) => setPremove(o, d), onUnset: clearPremove };
+}
+
 export const END_WORD = {
   mate: 'Checkmate: you won.',
   mated: 'Checkmated.',
@@ -171,10 +181,9 @@ export function PracticeBoard(props: { onNext?: () => void }) {
   const hint = p.hint?.fen === fen && p.hint.uci ? p.hint : undefined;
   const arrows = hint ? [{ orig: hint.uci!.slice(0, 2), ...(hint.level === 2 ? { dest: hint.uci!.slice(2, 4) } : {}), brush: 'blue' }] : [];
   const canHint = s.kind === 'practice' && p.phase === 'user';
-  const premove: BoardProps['premove'] = { color: s.color, current: p.premove ? [p.premove.from as Key, p.premove.to as Key] : undefined, onSet: (o, d) => setPremove(o, d), onUnset: clearPremove };
   return (
     <div class="train-grid practice-game" data-phase={p.phase} data-moves={p.moves.length} data-premove={p.premove ? p.premove.from + p.premove.to : ''}>
-      <MoveBoard fen={fen} orientation={s.color} movable={p.phase === 'user'} lastUci={last?.uci} arrows={arrows} onMove={(u) => void practiceMove(u)} premove={premove} />
+      <MoveBoard fen={fen} orientation={s.color} movable={p.phase === 'user'} lastUci={last?.uci} arrows={arrows} onMove={(u) => void practiceMove(u)} premove={gamePremove(p)} />
       <div class="train-panel">
         <p class="train-counters">
           {s.kind === 'advantage' ? 'Convert the advantage' : s.kind === 'checklist' ? `Checklist · ${s.preset}` : 'Practice'} · {s.title}

@@ -15,7 +15,9 @@
 // reload, filtered, and one removed. And the endgames added in §5.150: the list's new groups; the
 // bishop and knight's own goal line (+0.50: Stockfish scores the whole mate about +1.6), a hung
 // bishop stopped as a slip where +2's line would stop nothing; the rook against a pawn played to its
-// end, the king first, the pawn won.
+// end, the king first, the pawn won. And premoves (the owner's request, 2026-11-13): set while the
+// defence thinks, taken off, dropped when its answer makes one illegal, a pawn premoved to the last
+// rank queening.
 import { test, expect, type Page } from '@playwright/test';
 import type { FakeGit } from '../support/fakeGit.ts';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
@@ -51,6 +53,9 @@ const BREAKTHROUGH: [string, string, string[]?][] = [
   ['8/p1P4k/p7/1p6/8/8/8/7K b - -', 'b5b4'],
   ['8/p1P4k/p7/8/1p6/8/8/7K w - -', 'c7c8q', ['c7c8r', 'h1g2']],
 ];
+
+/** The breakthrough's defence's search, ms (its premoves' test). */
+const DEFENCE_MS = 2500;
 
 /** King in front of the pawn, and after Kd5: Stockfish's first line Kf7, Maia 2600's likeliest move Ke7. */
 const KING_IN_FRONT = '5k2/8/8/8/3KP3/8/8/8 w - -';
@@ -200,7 +205,9 @@ test.beforeAll(async () => {
   };
   for (const [key, lines] of ROOK_PAWN) extra[key] = lines;
   for (const [key, uci, others] of BREAKTHROUGH) extra[key] = [[1, key.includes(' w ') ? 700 : -700, uci], ...(others ?? []).map((m, i): [number, number, string] => [i + 2, 0, m])];
-  site = await serveSite({ engine: fakeEngine(ENGINE_MS, extra) });
+  // The breakthrough's defence thinks a while: time for premoves to be set, taken off and set again.
+  const slowAt = Object.fromEntries(BREAKTHROUGH.filter(([key]) => key.includes(' b ')).map(([key]) => [key, DEFENCE_MS]));
+  site = await serveSite({ engine: fakeEngine(ENGINE_MS, extra, false, undefined, slowAt) });
 });
 test.afterAll(async () => {
   await site.close();
@@ -319,6 +326,7 @@ test('an endgame: a move that lets the win slip, found after playing on, taken b
 });
 
 test('an endgame solved first time: the breakthrough along Stockfish’s line, the pawn queened, back tomorrow', async ({ page }) => {
+  test.setTimeout(60_000);
   const git = await setUp(page);
   await page.evaluate(() => (location.hash = '#/endgames/breakthrough'));
   const game = page.getByTestId('endgame-game');
@@ -344,6 +352,53 @@ test('an endgame solved first time: the breakthrough along Stockfish’s line, t
   expect(endgameEvents(git)[0]).toMatchObject({ card: `x|${BREAKTHROUGH[0]![0]}`, res: 'win', preset: 'endgame', mv: 5 });
   await page.evaluate(() => (location.hash = '#/endgames'));
   await expect(page.locator('[data-endgame="breakthrough"] [data-testid="endgame-standing"]')).toHaveText('Solved once · back tomorrow ✓');
+});
+
+test('an endgame on premoves: one taken off, one dropped when the answer makes it illegal, then played one after another to the pawn queened', async ({ page }) => {
+  test.setTimeout(60_000);
+  await setUp(page);
+  await page.evaluate(() => (location.hash = '#/endgames/breakthrough'));
+  const game = page.getByTestId('endgame-game');
+  const moves = page.getByTestId('practice-moves');
+  // The premove's squares on the board (chessground hides the squares it no longer uses).
+  const marks = game.locator('cg-board square.current-premove').filter({ visible: true });
+  const play = async (uci: string) => {
+    await clickSquare(page, sq(uci, 0), 'white');
+    await clickSquare(page, sq(uci, 2), 'white');
+  };
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  await play('b5b6');
+  await expect(game).toHaveAttribute('data-phase', 'opponent');
+  // bxc7 premoved while Stockfish thinks, taken off by a click on an empty square, set again.
+  await play('b6c7');
+  await expect(game).toHaveAttribute('data-premove', 'b6c7');
+  await expect(marks).toHaveCount(2);
+  await clickSquare(page, 'e4', 'white');
+  await expect(game).toHaveAttribute('data-premove', '');
+  await expect(marks).toHaveCount(0);
+  await play('b6c7');
+  await expect(game).toHaveAttribute('data-premove', 'b6c7');
+  // 1...cxb6 takes the pawn it would have moved: dropped, the user to move, the board clear of it.
+  await expect(game).toHaveAttribute('data-moves', '2', { timeout: DEFENCE_MS * 4 });
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  await expect(game).toHaveAttribute('data-premove', '');
+  await expect(marks).toHaveCount(0);
+  await expect(moves).toHaveText('1. b6 cxb6');
+
+  // Then each move premoved while the answer comes, played as it lands: c6, c7, and c8 a queen.
+  await play('a5a6');
+  await expect(game).toHaveAttribute('data-phase', 'opponent');
+  for (const [uci, after] of [['c5c6', 5], ['c6c7', 7], ['c7c8', 9]] as const) {
+    await play(uci);
+    await expect(game).toHaveAttribute('data-premove', uci);
+    if (after === 9) break;
+    await expect(game).toHaveAttribute('data-moves', String(after), { timeout: DEFENCE_MS * 4 });
+    await expect(game).toHaveAttribute('data-premove', '');
+    await expect(game).toHaveAttribute('data-phase', 'opponent');
+  }
+  await expect(game).toHaveAttribute('data-phase', 'over', { timeout: DEFENCE_MS * 8 });
+  await expect(moves).toHaveText('1. b6 cxb6 2. a6 bxa6 3. c6 b5 4. c7 b4 5. c8=Q');
+  await expect(page.getByTestId('endgame-feedback')).toHaveText('The pawn queens: the win is yours.');
 });
 
 test('bishop and knight: its own goal line, a hung bishop stopped though every move scores under +2', async ({ page }) => {
