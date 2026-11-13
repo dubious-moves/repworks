@@ -832,6 +832,9 @@ later change replaced are folded into the later item; items already reported wor
   due. Does the row (Priority High · Normal · Low) sit well on the phone, before and after an
   answer?
 - Make a sequence from a High mistake: does the dialog start at High, and the saved sequence keep it?
+- Saving with a priority (§5.172): in a practice game's review, pick High beside "💾 Save as a
+  mistake" and save; the select stays beside "✓ Saved". The same for a tactic found in a practice
+  game, and for a storm card's "Save as a mistake". Is the saved card asked first in Review?
 - After a sync, does the other device show the same priorities?
 - **Checked**: unit tests and Playwright (desktop and emulated phone, fake data repo); not on your
   devices.

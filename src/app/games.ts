@@ -292,6 +292,13 @@ export function cardRank(card: string): CardRank {
   return data ? rankOf(data.eventsOf(card)) : 'normal';
 }
 
+/** An item saved into the game cards (a practice or storm mistake, a tactic, a sequence) at the priority chosen (§5.172). */
+export async function recordSaved(card: string, item: Record<string, unknown>, rank: CardRank): Promise<void> {
+  const t = new Date().toISOString();
+  await recordEvent({ t, k: 'saved', card, item });
+  if (rank !== 'normal') await recordEvent({ t, k: 'rank', card, p: rank });
+}
+
 /** Ranks a card; nothing is written when it already has that rank. */
 export async function setCardRank(card: string, p: CardRank): Promise<void> {
   if (cardRank(card) === p) return;

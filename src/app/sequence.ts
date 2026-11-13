@@ -12,7 +12,7 @@ import { makeFen } from 'chessops/fen';
 import { startPosition } from '../core/study/tree.ts';
 import { header, type Chapter, type MoveNode } from '../core/study/model.ts';
 import { parseSan } from 'chessops/san';
-import { gameDeck, savedDeck } from './games.ts';
+import { gameDeck, recordSaved, savedDeck } from './games.ts';
 import { recordEvent } from './state.ts';
 import { analyseForStorm } from './stormEngine.ts';
 import { smallDevice } from './device.ts';
@@ -84,8 +84,7 @@ export async function saveSequence(check: SequenceCheck, seq: string | undefined
   if (!item || sequenceSaved(savedDeck.value, check.startFen, check.lines[0]!)) return undefined;
   const t = new Date(now).toISOString();
   const card = gameCard(item.pid);
-  await recordEvent({ t, k: 'saved', card, item: { ...item } });
-  if (rank !== 'normal') await recordEvent({ t, k: 'rank', card, p: rank });
+  await recordSaved(card, { ...item }, rank);
   if (source) await recordEvent({ t, k: 'drop', card: gameCard(source.pid), on: true });
   return card;
 }

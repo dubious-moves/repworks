@@ -20,7 +20,8 @@ import { selfBand, showable, showPress, type ShowState } from '../core/storm/sho
 import { continuedCard, followUps, maiaReply, rootCard, type FollowUp } from '../core/storm/after.ts';
 import { gameCard } from '../core/progress/cards.ts';
 import { practiceMistakeOf, practiceMistakeSaved, stormMistakeItem } from '../core/games/saved.ts';
-import { savedDeck } from './games.ts';
+import { recordSaved, savedDeck } from './games.ts';
+import type { CardRank } from '../core/progress/events.ts';
 import { fenAfterUci, positionOf, uciToSan } from '../core/storm/walk.ts';
 import type { Chapter } from '../core/study/model.ts';
 import { positionAt } from '../core/study/tree.ts';
@@ -1579,11 +1580,11 @@ export function stormMistakeCard(item: StormItem): { card: string; fen: string; 
   return saved ? { card: gameCard(saved.pid), fen: m.fen, color: m.color } : undefined;
 }
 
-/** Saves a storm card as a mistake in the game cards, answered well or not; nothing is scored. */
-export async function saveStormMistake(item: StormItem): Promise<boolean> {
+/** Saves a storm card as a mistake in the game cards at the priority chosen (§5.172), answered well or not; nothing is scored. */
+export async function saveStormMistake(item: StormItem, rank: CardRank = 'normal'): Promise<boolean> {
   const m = stormMistake(item);
   if (!m.item || practiceMistakeSaved(savedDeck.value, m.fen, m.item.san)) return false;
-  await recordEvent({ t: new Date().toISOString(), k: 'saved', card: gameCard(m.item.pid), item: { ...m.item } });
+  await recordSaved(gameCard(m.item.pid), { ...m.item }, rank);
   return true;
 }
 

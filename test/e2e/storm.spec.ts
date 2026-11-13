@@ -308,11 +308,18 @@ test('the storm: positions gathered, a great move and a mistake scored, the revi
   await page.getByRole('button', { name: '← Back to the storm' }).click();
 
   // Save as a mistake (§5.74): the mistake with its move, the great answer with none.
+  // Saved at the priority chosen beside it (§5.172); once saved, the select changes the card's.
   await expect(page.locator('.storm-row.current')).toContainText('Mistake');
+  const rank = page.getByRole('combobox', { name: 'Priority' });
+  await rank.selectOption('high');
   await page.getByTestId('storm-save-mistake').click();
   await expect(page.getByTestId('storm-save-mistake')).toHaveText('Saved as a mistake');
+  await expect(rank).toHaveValue('high');
+  await rank.selectOption('low');
+  await expect(rank).toHaveValue('low');
   await rows.nth(0).click();
   await expect(page.getByTestId('storm-save-mistake')).toHaveText('Save as a mistake');
+  await expect(rank).toHaveValue('normal');
   await page.getByTestId('storm-save-mistake').click();
   await expect(page.getByTestId('storm-save-mistake')).toBeDisabled();
   // Its note (§5.91), written as it is saved.
@@ -337,6 +344,8 @@ test('the storm: positions gathered, a great move and a mistake scored, the revi
   expect(log).toContain('"b":"bad"');
   expect(log).toContain(`"san":"${mine}"`);
   expect((log.match(/"k":"saved","card":"m\|_storm_\d+_\d+","item":\{"kind":"mistake"/g) ?? []).length).toBe(2);
+  // High as saved, then Low; the other one Normal, with no event.
+  expect((log.match(/"k":"rank","card":"m\|_storm_\d+_\d+","p":"\w+"/g) ?? []).map((l) => l.replace(/.*"p":/, ''))).toEqual(['"high"', '"low"']);
   expect(log).toContain('"san":"","uci":""');
   expect(log).toMatch(/"k":"note","card":"m\|_storm_\d+_\d+","text":"A note on the storm position"/);
   // The record on the home.

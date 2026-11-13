@@ -13,7 +13,9 @@ import { isNormal, type Role, type SquareName } from 'chessops/types';
 import type { Key } from '@lichess-org/chessground/types';
 import { analyseFrom, entryKey, open } from '../app/mode.ts';
 import { recordEvent } from '../app/state.ts';
-import { openingNameOf, practiceHistory, savedDeck } from '../app/games.ts';
+import { openingNameOf, practiceHistory, recordSaved, savedDeck } from '../app/games.ts';
+import type { CardRank } from '../core/progress/events.ts';
+import { SaveRankSelect } from './Rank.tsx';
 import { analyse, canOfferDraw, canTakeBack, claimVictory, offerDraw, clearPremove, detection, setFoundState, type FoundTactic, discardSaved, gameOfHistory, ignoreRepertoire, loadOpponent, practiceFeedback, practiceHint, resumePractice, setPracticeFeedback, showsFeedback, savedPractice, saveOpponent, judge, parkPractice, practice, practiceMove, takeUpPractice, practiceReview, setPremove, startPractice, stopPractice, takeBack, type Opponent, type PracticeGame, type PracticeMove } from '../app/practice.ts';
 import { parseUciMove, standardUci } from '../core/chess/uci.ts';
 import { makeFen } from 'chessops/fen';
@@ -26,7 +28,7 @@ import { closeReviewLine, reviewLine, reviewLineMove, reviewLineStep, reviewLine
 import { EngineLinePanel, formatCp } from './EngineLinePanel.tsx';
 import { practiceMistakeItem, practiceMistakeOf, practiceMistakeSaved } from '../core/games/saved.ts';
 import { NoteButton } from './CardNote.tsx';
-import { practiceTacticItem, tacticSaved, type DetectedTactic } from '../core/games/detect.ts';
+import { practiceTacticItem, savedTacticOf, tacticSaved, type DetectedTactic } from '../core/games/detect.ts';
 import { nextLine, playReply, playUser, repliesDue, startTactic, type TacticRun } from '../core/games/tactic.ts';
 import { gameCard } from '../core/progress/cards.ts';
 import { positionOf } from '../core/storm/walk.ts';
@@ -76,6 +78,12 @@ function OpponentSettings(props: { value: Opponent; onChange(o: Opponent): void 
 
 /* ------------------------------------------------------------------ a board that takes moves */
 
+
+/** The game card a found tactic was saved as (§5.172), or undefined. */
+function savedCardOf(f: FoundTactic): string | undefined {
+  const s = savedTacticOf(savedDeck.value, f.t);
+  return s ? gameCard(s.pid) : undefined;
+}
 export function MoveBoard(props: { fen: string; orientation: 'white' | 'black'; movable: boolean; lastUci?: string | undefined; arrows?: { orig: string; dest?: string; brush: string }[]; badge?: BoardProps['badge']; celebrate?: BoardProps['celebrate']; onMove(uci: string): void; premove?: BoardProps['premove'] }) {
   const pos = useMemo(() => positionOf(props.fen), [props.fen]);
   const [promotion, setPromotion] = useState<{ orig: Key; dest: Key } | undefined>(undefined);
@@ -482,6 +490,9 @@ export function PracticeReview(props: { game: PracticeGame; onNext?: (() => void
   const [retry, setRetry] = useState<Retry | undefined>(undefined);
   const [best, setBest] = useState(false);
   const [savedNote, setSavedNote] = useState<string | undefined>(undefined);
+  // The priority a mistake (at its ply) or a found tactic (by its index) will be saved with (§5.172).
+  const [saveRank, setSaveRank] = useState<{ at: number; r: CardRank } | undefined>(undefined);
+  const [tacticRanks, setTacticRanks] = useState<ReadonlyMap<number, CardRank>>(new Map());
   const [solving, setSolving] = useState<DetectedTactic | undefined>(undefined);
   // Scores Stockfish gave the board's positions no judge covered (White's, by FEN).
   const [searched, setSearched] = useState<ReadonlyMap<string, number>>(new Map());
@@ -603,14 +614,14 @@ export function PracticeReview(props: { game: PracticeGame; onNext?: (() => void
     if (practiceMistakeSaved(savedDeck.value, m.fenBefore, m.san)) return setSavedNote('Already saved.');
     const item = practiceMistakeItem({ move: { fenBefore: m.fenBefore, san: m.san, uci: m.uci, wpDrop: m.wpDrop, cpLoss: m.cpLoss, bestCp: m.bestCp }, color: s.color, now: Date.now(), ...(g.historyId ? { from: `h|${g.historyId}` } : {}) });
     if (!item) return setSavedNote(`Only a move that gives up more than 2% is saved.`);
-    void recordEvent({ t: new Date().toISOString(), k: 'saved', card: gameCard(item.pid), item: { ...item } });
+    void recordSaved(gameCard(item.pid), { ...item }, saveRank?.at === i ? saveRank.r : 'normal');
     setSavedNote('Saved: it is in your game cards.');
   };
   const saveTactic = (i: number, f: FoundTactic) => {
     if (tacticSaved(savedDeck.value, f.t)) return setFoundState(i, 'saved');
     const item = practiceTacticItem(f.t, { now: Date.now(), rand: Math.random().toString(36).slice(2, 7), ...(g.historyId ? { from: `h|${g.historyId}` } : {}) });
     if (!item) return;
-    void recordEvent({ t: new Date().toISOString(), k: 'saved', card: gameCard(item.pid), item: { ...item } });
+    void recordSaved(gameCard(item.pid), { ...item }, tacticRanks.get(i) ?? 'normal');
     setFoundState(i, 'saved');
   };
   if (solving) return <TacticSolver t={solving} onClose={() => setSolving(undefined)} />;
@@ -779,12 +790,16 @@ export function PracticeReview(props: { game: PracticeGame; onNext?: (() => void
                 <button type="button" class="secondary" disabled>
                   ✓ Saved
                 </button>
+                <SaveRankSelect card={gameCard(saved.pid)} value="normal" onPick={() => undefined} />
                 <NoteButton card={gameCard(saved.pid)} fen={mv.fenBefore} color={s.color} />
               </>
             ) : (
-              <button type="button" class="secondary" title="A practice mistake in your game cards" onClick={() => saveMistake(at)}>
-                💾 Save as a mistake
-              </button>
+              <>
+                <button type="button" class="secondary" title="A practice mistake in your game cards" onClick={() => saveMistake(at)}>
+                  💾 Save as a mistake
+                </button>
+                <SaveRankSelect value={saveRank?.at === at ? saveRank.r : 'normal'} onPick={(r) => setSaveRank({ at, r })} />
+              </>
             )}
             <button type="button" class="secondary" title="Build the lines that refute it on the analysis board, and drill them as a sequence" onClick={() => analyseFrom({ fen: mv.fenBefore, seq: '*', side: s.color })}>
               🔍 Make a sequence
@@ -919,6 +934,11 @@ export function PracticeReview(props: { game: PracticeGame; onNext?: (() => void
                               Save
                             </button>
                           )}
+                          <SaveRankSelect
+                            card={f.state === 'saved' ? savedCardOf(f) : undefined}
+                            value={tacticRanks.get(i) ?? 'normal'}
+                            onPick={(r) => setTacticRanks(new Map(tacticRanks).set(i, r))}
+                          />
                           {f.state !== 'saved' && (
                             <button type="button" class="secondary" onClick={() => setFoundState(i, 'discarded')}>
                               Discard

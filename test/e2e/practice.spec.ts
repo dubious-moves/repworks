@@ -253,9 +253,13 @@ test('a practice game: played against the explorer, stopped, reviewed, kept in t
   await expect(review.getByTestId('practice-retry')).toHaveText('★ Best move!');
   await expect(review.getByTestId('board-badge')).toHaveAttribute('title', 'Best move');
   await review.getByRole('button', { name: 'Done' }).click();
+  // Saved at the priority chosen beside it (§5.172), which stays beside "✓ Saved".
+  await expect(card.getByRole('combobox', { name: 'Priority' })).toHaveValue('normal');
+  await card.getByRole('combobox', { name: 'Priority' }).selectOption('high');
   await card.getByRole('button', { name: '💾 Save as a mistake' }).click();
   await expect(review).toContainText('Saved: it is in your game cards.');
   await expect(card.getByRole('button', { name: '✓ Saved' })).toBeDisabled();
+  await expect(card.getByRole('combobox', { name: 'Priority' })).toHaveValue('high');
   await expect(review).toContainText('Kept in the history.');
 
   // After a reload: the game in the list, its review reopened.
@@ -273,6 +277,7 @@ test('a practice game: played against the explorer, stopped, reviewed, kept in t
   const log = progressLog(git);
   expect(log).toContain('"k":"practice","card":"x|rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -","res":"loss"');
   expect(log).toMatch(/"k":"saved","card":"m\|_practice_\d+_4","item":\{"kind":"mistake"/);
+  expect(log).toMatch(/"k":"rank","card":"m\|_practice_\d+_4","p":"high"/);
 });
 
 test('an advantage card drilled in the game cards’ session: a collapse, graded Again', async ({ page }) => {
@@ -494,10 +499,13 @@ test('tactics detected after a practice game: found by the scan, tried, discarde
 
   await found.getByRole('button', { name: 'Discard' }).click();
   await found.getByRole('button', { name: 'Undo discard' }).click();
+  await found.getByRole('combobox', { name: 'Priority' }).selectOption('low');
   await found.getByRole('button', { name: 'Save' }).click();
   await expect(found).toContainText('✓ Saved');
+  await expect(found.getByRole('combobox', { name: 'Priority' })).toHaveValue('low');
 
   await page.locator('button.chip').click();
   await expect.poll(() => progressLog(git), { timeout: 15_000 }).toMatch(/"k":"saved","card":"m\|_practice_tactic_\d+_[a-z0-9]+_t6","item":\{"kind":"tactic"/);
   expect(progressLog(git)).toContain('"lines":[[{"uci":"c4f7","san":"Bxf7+","user":true},{"uci":"e8f7","san":"Kxf7","user":false},{"uci":"f3g5","san":"Ng5+","user":true}]]');
+  expect(progressLog(git)).toMatch(/"k":"rank","card":"m\|_practice_tactic_\d+_[a-z0-9]+_t6","p":"low"/);
 });

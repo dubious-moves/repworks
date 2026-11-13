@@ -38,3 +38,11 @@ export function RankSelect(props: { value: CardRank; onPick(r: CardRank): void; 
 export function CardRankSelect(props: { card: string }) {
   return <RankSelect value={cardRank(props.card)} onPick={(r) => void setCardRank(props.card, r)} />;
 }
+
+/**
+ * The select beside a Save (§5.172): before the item is saved, the priority it will be saved with
+ * (`value`, `onPick`); once saved (`card`), the card's own, changed as on a card under review.
+ */
+export function SaveRankSelect(props: { card?: string | undefined; value: CardRank; onPick(r: CardRank): void }) {
+  return props.card ? <CardRankSelect card={props.card} /> : <RankSelect value={props.value} onPick={props.onPick} />;
+}

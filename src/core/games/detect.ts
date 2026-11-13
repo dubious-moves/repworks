@@ -289,5 +289,7 @@ export function practiceTacticItem(t: DetectedTactic, a: { now: number; rand: st
 }
 
 /** Whether the same tactic (its start and main line) is saved already (`_chainSig`). */
-export const tacticSaved = (saved: readonly { kind: string; fenBefore: string; lines?: readonly (readonly { uci: string }[])[] }[], t: DetectedTactic): boolean =>
-  saved.some((s) => s.kind === 'tactic' && s.fenBefore === t.cand.preFen && s.lines?.[0]?.map((m) => m.uci).join(',') === t.lines[0]!.map((m) => m.uci).join(','));
+export const tacticSaved = (saved: readonly { kind: string; fenBefore: string; lines?: readonly (readonly { uci: string }[])[] }[], t: DetectedTactic): boolean => !!savedTacticOf(saved, t);
+/** The saved item standing for the same tactic, if one does (its card for its priority, §5.172). */
+export const savedTacticOf = <S extends { kind: string; fenBefore: string; lines?: readonly (readonly { uci: string }[])[] }>(saved: readonly S[], t: DetectedTactic): S | undefined =>
+  saved.find((s) => s.kind === 'tactic' && s.fenBefore === t.cand.preFen && s.lines?.[0]?.map((m) => m.uci).join(',') === t.lines[0]!.map((m) => m.uci).join(','));

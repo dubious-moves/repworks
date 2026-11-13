@@ -4,6 +4,8 @@
 // the explorer is on this screen: during a card they would name the answer. Analyse opens the
 // analysis board with the session kept, and "Back to the storm" comes back to it (§18.4).
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import type { CardRank } from '../core/progress/events.ts';
+import { SaveRankSelect } from './Rank.tsx';
 import { chessgroundDests } from 'chessops/compat';
 import { normalizeMove } from 'chessops/chess';
 import { makeUci, parseSquare } from 'chessops/util';
@@ -1344,6 +1346,9 @@ function MaiaNote(props: { p: StoredPosition; elo: number }) {
 function SaveMistake(props: { item: StormItem }) {
   const saved = stormMistakeSaved(props.item);
   const card = saved ? stormMistakeCard(props.item) : undefined;
+  // The priority it will be saved with (§5.172), for this card only.
+  const [pick, setPick] = useState<{ item: StormItem; r: CardRank } | undefined>(undefined);
+  const rank = pick?.item === props.item ? pick.r : 'normal';
   return (
     <>
     <button
@@ -1352,10 +1357,11 @@ function SaveMistake(props: { item: StormItem }) {
       disabled={saved}
       data-testid="storm-save-mistake"
       title={saved ? 'In your game cards' : 'Into the game cards, to find the move again on another day (with the move you played when it went wrong); nothing is scored'}
-      onClick={() => void saveStormMistake(props.item)}
+      onClick={() => void saveStormMistake(props.item, rank)}
     >
       {saved ? 'Saved as a mistake' : 'Save as a mistake'}
     </button>
+    <SaveRankSelect card={card?.card} value={rank} onPick={(r) => setPick({ item: props.item, r })} />
     {card && <NoteButton {...card} onOpen={pauseVerdict} />}
     </>
   );

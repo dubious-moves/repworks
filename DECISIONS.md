@@ -2322,3 +2322,9 @@ The technical calls, each with its reason:
   priority mid-review would be confusing; the next session uses it.
 - **A sequence made from a mistake starts at that mistake's priority.** Why: it takes the
   mistake's place in the deck.
+
+## Revision of 2026-11-13 (the priority chosen when saving; PLAN.md §5.172)
+- **Every Save into the game cards offers the priority, beside the button**, and keeps it there
+  once saved, where it changes the card's own. Why: the owner asked to set it when saving; a
+  select that stays after saving needs no second place to change it from. No data format changed:
+  the `rank` event of §5.171, written with the `saved` one.
