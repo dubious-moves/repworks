@@ -1448,6 +1448,15 @@ function SaveMistake(props: { item: StormItem }) {
 /** The review list's lines shown (a per-device convenience). */
 const LINES_KEY = 'repworks-storm-review-lines';
 
+/** The review's board on the Chessnut Move: shown only, driven once a row is stayed on (CHESSNUT.md §6 part (f)). */
+const REVIEW_MIRROR: CardMirror = { delayMs: 1000 };
+/** A retry's move once graded, in its band's brush (a puzzle's wrong move too; its right moves go on). */
+function retryPlayed(retry: StormItem): CardMirror['played'] {
+  const v = retry.answer;
+  const brush = v && retry.played ? playedBrush(v, !!retry.puzzle) : undefined;
+  return brush ? { uci: retry.played!, brush } : undefined;
+}
+
 function Review(props: { s: StormSession; scope: StormScopeData }) {
   const s = props.s;
   const items = s.history;
@@ -1586,10 +1595,19 @@ function Review(props: { s: StormSession; scope: StormScopeData }) {
       </section>
       {item && (
         <div class="train-grid storm-review-grid">
+          {/* The Chessnut Move (CHESSNUT.md §5.2, part (f)): the retry set up at once, its move read and lit
+              in its band's colour once graded; the review's row driven once it has been stayed on
+              a second (stepping through never sends the robot to and fro), its arrows lit. */}
           {retry ? (
-            <CardBoard item={retry} asking={!retry.answer && !retry.played} onMove={(u) => void answerMove(u)} sketch={`retry|${retry.card.card}`} />
+            <CardBoard
+              item={retry}
+              asking={!retry.answer && !retry.played}
+              onMove={(u, board) => void answerMove(u, { board: !!board })}
+              sketch={`retry|${retry.card.card}`}
+              mirror={{ played: retryPlayed(retry) }}
+            />
           ) : (
-            <CardBoard item={{ ...item, played: undefined, step: 0 }} asking={false} onMove={() => undefined} arrows={arrows} sketch={`review|${at}`} />
+            <CardBoard item={{ ...item, played: undefined, step: 0 }} asking={false} onMove={() => undefined} arrows={arrows} sketch={`review|${at}`} mirror={REVIEW_MIRROR} />
           )}
           <div class="train-panel storm-panel">
             <div class="storm-nav">

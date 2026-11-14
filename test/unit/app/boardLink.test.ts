@@ -11,6 +11,8 @@
 //   board mirrored wins …";
 // - a pending delay neither cancelled by the next position nor checked against the position shown
 //   when it ends: "the review's stepping: only the position stayed on is driven";
+// - the lights shown from the waiting position's marks during its delay (part (f), `!cancelDelay`
+//   gone from `showLights`): the same test;
 // - `resendOnReport` never set: "a drop: reconnecting …, the position set again if the board
 //   changed while off";
 // - `parkedAt` never set by Reset the pieces: "Reset the pieces: the start driven, the screen's
@@ -289,11 +291,15 @@ test("the review's stepping: only the position stayed on is driven", async () =>
   await time.advance(400);
   link.setMirror(o, spec(full(E4E5, 'w'), { movable: false, delayMs: 1000 }));
   await time.advance(400);
-  link.setMirror(o, spec(full(D4, 'b'), { movable: false, delayMs: 1000 }));
+  link.setMirror(o, spec(full(D4, 'b'), { movable: false, delayMs: 1000, marks: { lastUci: 'd2d4', arrows: [{ orig: 'g8', dest: 'f6', brush: 'green' }] } }));
   await time.advance(900);
   assert.deepEqual(board.drives, []);
+  // Meanwhile no lights: the row's marks wait for its position (part (f)).
+  assert.equal(board.lit.at(-1)!.filter((l) => l !== LIGHT.off).length, 0);
   await time.advance(200);
   assert.deepEqual(board.drives, [D4]);
+  const lit = board.lit.at(-1)!;
+  assert.deepEqual([lit[11], lit[27], lit[62], lit[45]], [LIGHT.blue, LIGHT.blue, LIGHT.green, LIGHT.green]);
 });
 
 test('a drop: reconnecting after 1, 2, 4 … s, the position set again if the board changed while off', async () => {

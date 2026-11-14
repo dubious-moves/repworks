@@ -1560,5 +1560,20 @@ does. Start with the spike: its log decides what the later parts change (CHESSNU
   said and written, the next card by itself; a held card taken back by the robot, by hand, and
   shown; show and grade's lights and a move named on the board; castling by hand graded and lit; a
   third queen not dealt; the arrival played; Play on the screen; a puzzle's reply driven). The
-  timed storm deals through the same setup, but its clock and the review are part (f)'s. Nothing on
-  a real board.
+  timed storm and the review are part (f)'s, below. Nothing on a real board.
+
+### The timed storm and the review on the Chessnut Move (CHESSNUT.md part (f), 2026-11-14)
+- Connect from the ♞ chip, then a timed storm (Start storm): the clock stands still while the board
+  sets up each card ("Setting up the board…", the clock greyed) and runs only once the card is
+  asked; a puzzle's reply is set up the same way. Then the review after End: the board follows the
+  row you stop on, a second after you stop (stepping quickly through the rows doesn't send the robot
+  to and fro); the move you played lit red, the best green once shown (`B`). Try again (`T`) on a
+  row: the move made on the board is graded, lit in its band's colour and said.
+- Worth noting as you go: whether the second's wait in the review feels right; the lights go off
+  while a row waits for the board, then come with its position; how long a whole timed storm takes
+  on the board compared with the screen (setup never costs clock time, but it costs your time).
+- **Checked**: unit tests (the review's stepping: no lights until the row stayed on is driven);
+  Playwright on a desktop and an emulated phone with the simulated board (a timed storm: the clock
+  unchanged through two 2 s setups and running between them; a puzzle not asked while its reply is
+  driven; the review stepped quickly driving only the row stopped on, the played move lit red and
+  the best green; a retry by hand graded, lit and said). Nothing on a real board.

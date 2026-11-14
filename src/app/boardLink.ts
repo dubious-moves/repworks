@@ -197,7 +197,9 @@ export function createBoardLink(deps: BoardLinkDeps): BoardLink {
   function showLights(force = false): void {
     if (!board || status.peek().state !== 'on') return;
     const p = deps.prefs();
-    const spec = applied && !parkedAt ? applied.spec : undefined;
+    // While a position waits out its delay (the review's stepping) the board still shows the one
+    // before: no lights, rather than the next row's marks on the last row's pieces.
+    const spec = applied && !parkedAt && !cancelDelay ? applied.spec : undefined;
     const turn = turnedFor(spec);
     const l: Light[] = !p.lights || !spec ? new Array<Light>(64).fill(LIGHT.off) : lightsFor({ ...spec.marks, wrong: wrongSquares() }, { turned: turn, basicOnly: p.basicColours });
     const key = l.join('');

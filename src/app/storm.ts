@@ -1148,7 +1148,12 @@ export async function answerMove(given: string, o: { board?: boolean } = {}): Pr
   void lookAhead();
   const now = stormSession.value;
   if (!now || seq !== gradeSeq) return;
-  if (retry) return update({ retry: { ...played, answer: v } });
+  if (retry) {
+    // The review's retry: nothing scored, the verdict said all the same.
+    update({ retry: { ...played, answer: v } });
+    if (o.board) sayVerdict(v);
+    return;
+  }
   // The card as graded: deepened when the look-ahead's search was kept (its list names the rank's "of").
   settle({ ...played, card }, uci, v);
   if (o.board) sayVerdict(v);
@@ -1244,8 +1249,8 @@ async function answerPuzzle(item: StormItem, uci: string, retry: boolean, seq: n
     const v: StormAnswer = { verdict: band, band, userSan, userUci: uci, puzzle: true };
     // A wrong move stays on the board, as a position's does.
     const next: StormItem = right ? { ...item, step: step + 1, answer: v } : { ...item, played: uci, answer: v };
-    if (retry) return update({ retry: next });
-    settle(next, uci, v);
+    if (retry) update({ retry: next });
+    else settle(next, uci, v);
     if (board) sayVerdict(v);
   };
   if (!right) return solved('blunder');
@@ -1260,15 +1265,20 @@ async function answerPuzzle(item: StormItem, uci: string, retry: boolean, seq: n
     // The line ends on the opponent's move: solved.
     put(replied);
     const v: StormAnswer = { verdict: 'great', band: 'great', userSan, userUci: uci, puzzle: true };
-    if (retry) return update({ retry: { ...replied, answer: v } });
-    settle({ ...replied, answer: v }, uci, v);
+    if (retry) update({ retry: { ...replied, answer: v } });
+    else settle({ ...replied, answer: v }, uci, v);
     if (board) sayVerdict(v);
     return;
   }
   if (retry) return update({ retry: replied });
   const now = stormSession.value;
   if (now) update({ item: replied, history: now.history.map((h) => (h === item ? replied : h)) });
-  setPhase('solving');
+  // On the board the reply is driven as a card is set up (CHESSNUT.md part (f)): the next move is
+  // asked once the board shows it, so a timed storm's clock never runs while the robot drives.
+  if (boardLinked()) {
+    setPhase('setup');
+    void setUpBoard(replied, ++dealSeq);
+  } else setPhase('solving');
 }
 
 /** A puzzle as the session's card: the solver's position, the opponent's move that made it. */

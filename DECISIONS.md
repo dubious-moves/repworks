@@ -2395,3 +2395,17 @@ The technical calls, each with its reason:
   as any phase but `solving` does); part (f) tests it.
 - No data format changed; nothing new is written or synced (answers from the board are ordinary
   `storm` events); the board's settings stay on the device.
+
+## Revision of 2026-11-14 (the timed storm and the review on the Chessnut Move: CHESSNUT.md part (f))
+- **The plan's build is complete** (parts (a) to (f)); `CHESSNUT.md` §7's live checks and
+  `TESTING.md` §14 wait for the board.
+- **A puzzle's reply is set up as a card is**: with the board linked, the card waits in `setup`
+  until the board shows the reply, then asks for the next move. Why: otherwise a timed storm's
+  clock ran while the robot drove the reply, against the plan's "setup never costs time", and the
+  screen asked for a move the board couldn't take yet.
+- **No lights while the review's row waits out its second**. Why: the board still shows the row
+  before, so the next row's marks would light squares of the wrong position.
+- **A retry's verdict is said** after a move made on the board (with `speak`), as a card's is.
+  Why: the retry is played on the board too, and nothing else tells a user looking at the board.
+- No data format changed; nothing new is written or synced; the board's settings stay on the
+  device.

@@ -1,7 +1,8 @@
 # Repworks: the Chessnut Move (a robotic board)
 
-Status: planned 2026-11-06 at the owner's request; **being built since 2026-11-14** at the owner's
-word ("Go ahead and build it"), before the board arrives. Built: parts (a) to (e) (2026-11-14). What each
+Status: planned 2026-11-06 at the owner's request; **built 2026-11-14**, parts (a) to (f), the whole
+plan, at the owner's word ("Go ahead and build it"), before the board arrives. What waits is §7's live
+checks and `TESTING.md` §14's entries, once the board is bought. What each
 part changed from this plan is in `PLAN.md` §5.153's "As built" notes. Everything here can be built
 and tested before the board arrives (a simulated board in the tests), and part (a)'s spike page
 checks on the first day what only the real board can show. Read with
