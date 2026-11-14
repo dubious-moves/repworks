@@ -10131,6 +10131,12 @@ chapters, not Silman's.
   comments along the chapter's main line, each with its move (`1.Kd3`, `1…Kc5`, "Start" for the
   chapter's own), a comment repeated straight after itself once. Folded during the try (the text
   gives the method away), open once the try is over.
+- **Remove from inside the practice** (the owner's request of 2026-11-14, built): "Remove from the
+  list" among the drill's buttons, during the try and after it. It takes the drill off as the list's
+  Remove does (tries stay counted), lets an unfinished try go (nothing counted) and opens the next
+  drill (the course drill's Next rule: due, else new, in its group, else anywhere); with none left, the
+  Endgames page. The next drill says "Removed “…” from the list. Undo" (gone when that drill is left);
+  "Put the n removed back" under the list still restores them all. Nothing new is stored.
 - **Not built** (Claude's calls, nothing the plan needed): the comments' shapes drawn on the board;
   clickable lines in the drill's text (open the chapter for them: the chapter view, the Read view);
   a per-study include/exclude (Remove per drill does); scoring a chosen group first; any use of the

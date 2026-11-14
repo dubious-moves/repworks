@@ -1067,6 +1067,10 @@ later change replaced are folded into the later item; items already reported wor
   and "(The quicker …)" lines clickable now, and do they start from the right position? A remark that
   just names a move ("Black resigns after 5.Nf3") must stay text. Say where either goes wrong.
 - A plan card (game cards): Show plan → the comment's lines clickable, the board previewing them.
+- Playing through the course and deciding which are too easy: "Remove from the list" under the board
+  (during the try or after it) takes the drill off and opens the next one, with an Undo note. Does
+  it feel right to remove one mid-try (the try isn't counted), and is the next drill the one you
+  expect? Back after a removal lands on the list.
 - **Checked**: the rules, the scoring, the flipped chapter, the groups and the text by unit tests;
   the page and a drill by Playwright on desktop and the emulated phone, with a small synthetic
   course and the fake Stockfish. Not the real export, not Stockfish at depth 16/18 on real chapters,

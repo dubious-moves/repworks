@@ -67,6 +67,15 @@ export async function removeCourseDrill(id: string): Promise<void> {
   await stormStore().put('meta', REMOVED_KEY, [...courseRemoved.value]);
 }
 
+/** The drill just taken off from inside its practice, for the Undo on the next one (cleared by Undo or the next removal). */
+export const courseJustRemoved = signal<{ id: string; title: string } | undefined>(undefined);
+
+/** Puts one removed drill back (the Undo after a removal from the practice). */
+export async function restoreCourseDrill(id: string): Promise<void> {
+  courseRemoved.value = new Set([...courseRemoved.value].filter((x) => x !== id));
+  await stormStore().put('meta', REMOVED_KEY, [...courseRemoved.value]);
+}
+
 /** Puts every removed drill back. */
 export async function restoreCourseDrills(): Promise<void> {
   courseRemoved.value = new Set();

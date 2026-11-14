@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { checkEndgameMaia, endgameMaiaHere, endgameStandings, startEndgame } from '../app/endgames.ts';
 import { endgameMaiaAlone, setEndgameMaiaAlone } from '../app/endgameVariety.ts';
-import { courseById, courseCandidates, courseNow, courseScores, courseScoring, courseStandings, loadCourse, removeCourseDrill, restoreCourseDrills, scoreCourse, stopCourseScoring } from '../app/courseEndgames.ts';
+import { courseById, courseCandidates, courseJustRemoved, courseNow, courseScores, courseScoring, courseStandings, loadCourse, removeCourseDrill, restoreCourseDrill, restoreCourseDrills, scoreCourse, stopCourseScoring } from '../app/courseEndgames.ts';
 import { readSearchChapters, searchChapters } from '../app/search.ts';
 import { dataVersion } from '../app/sync.ts';
 import { gatherRepEndgames, loadRepEndgames, removeRepEndgame, repById, repEndgames, repGather, repStandings, stopRepGather } from '../app/repertoireEndgames.ts';
@@ -564,12 +564,17 @@ function CourseText(props: { course: CourseDrill; over: boolean }) {
   );
 }
 
-function CourseNextButton(props: { after: string; primary: boolean }) {
+/** The course drill to play after `after`: the next due, else new, in its group, else in the whole list. */
+function nextCourseDrill(after: string): CourseDrill | undefined {
   const list = courseNow.value.drills;
-  const d = list.find((x) => x.id === props.after);
+  const d = list.find((x) => x.id === after);
   const among = d ? list.filter((x) => x.cand.group === d.cand.group) : list;
   const standings = courseStandings(decidingNow());
-  const next = nextEndgame(standings, props.after, among) ?? nextEndgame(standings, props.after, list);
+  return nextEndgame(standings, after, among) ?? nextEndgame(standings, after, list);
+}
+
+function CourseNextButton(props: { after: string; primary: boolean }) {
+  const next = nextCourseDrill(props.after);
   if (!next)
     return (
       <a class="button secondary" href="#/endgames">
@@ -580,6 +585,54 @@ function CourseNextButton(props: { after: string; primary: boolean }) {
     <button type="button" class={props.primary ? 'primary' : 'secondary'} onClick={() => (leavePractice(), open({ name: 'endgames', id: next.id }))}>
       Next: {next.cand.title}
     </button>
+  );
+}
+
+/**
+ * Takes the drill off the list from inside its practice (too easy, say) and goes on to the next one;
+ * a try not finished is let go, nothing counted. Undo, shown on the next drill, puts it back.
+ */
+function CourseRemoveButton(props: { course: CourseDrill }) {
+  const d = props.course;
+  const remove = () => {
+    const next = nextCourseDrill(d.id);
+    leavePractice();
+    courseJustRemoved.value = { id: d.id, title: d.cand.title };
+    open(next ? { name: 'endgames', id: next.id } : { name: 'endgames' });
+    void removeCourseDrill(d.id);
+  };
+  return (
+    <button type="button" class="secondary endgame-remove-now" data-testid="course-remove" title="Take this one off the list (too easy, say) and go on to the next; it can be put back from the list or with Undo" onClick={remove}>
+      Remove from the list
+    </button>
+  );
+}
+
+/** After a removal from the practice: what went, with Undo. */
+function CourseRemovedNote() {
+  const r = courseJustRemoved.value;
+  // Shown on the one drill after the removal: leaving that drill lets the note go (not a later removal's).
+  useEffect(() => {
+    if (!r) return;
+    return () => {
+      if (courseJustRemoved.peek() === r) courseJustRemoved.value = undefined;
+    };
+  }, [r]);
+  if (!r) return null;
+  return (
+    <p class="muted" role="status" data-testid="course-removed-note">
+      Removed “{r.title}” from the list.{' '}
+      <button
+        type="button"
+        class="link"
+        onClick={() => {
+          courseJustRemoved.value = undefined;
+          void restoreCourseDrill(r.id);
+        }}
+      >
+        Undo
+      </button>
+    </p>
   );
 }
 
@@ -684,6 +737,7 @@ function EndgameGame(props: { game: PracticeGame; endgame: Endgame; rep?: Repert
           </p>
         )}
         <BoardNote />
+        {props.course && <CourseRemovedNote />}
         {over && <p class="muted" data-testid="endgame-counted">{countedText(p, e)}</p>}
         {!over && p.failed && !slip && <p class="muted">This try counts as missed: play it out, or start again.</p>}
         <MoveList moves={p.moves} baseFen={e.fen} marks={false} slipAt={slip?.at} />
@@ -724,6 +778,7 @@ function EndgameGame(props: { game: PracticeGame; endgame: Endgame; rep?: Repert
               </button>
             </>
           )}
+          {props.course && <CourseRemoveButton course={props.course} />}
           <button type="button" class="secondary" title="The analysis board at this position; ← comes back here" onClick={() => analyseFrom({ fen: e.fen, ...(p.moves.length ? { line: p.moves.slice(0, slip ? slip.at + 1 : undefined).map((m) => m.san) } : {}), side: p.setup.color })}>
             Analyse
           </button>

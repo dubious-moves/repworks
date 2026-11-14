@@ -749,6 +749,33 @@ test('the courses’ endgames: a reference study scored on the device, listed by
   await section.getByRole('button', { name: 'Put the 1 removed back' }).click();
   await expect(items).toHaveCount(4);
 
+  const toEndgames = () => page.evaluate(() => { location.hash = '#/endgames'; });
+  // Removed from inside its practice: on to the next (the due one), with an Undo that puts it back.
+  await items.getByRole('link', { name: 'The Staircase - 1', exact: true }).click();
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  await expect(page.locator('.study-title')).toHaveText('Part 1: Endgames for Beginners (Unrated-999) · The Staircase - 1');
+  await page.getByTestId('course-remove').click();
+  await expect(page.locator('.study-title')).toHaveText('Part 3: Endgames for Class D (1000-1199) · Win the Race - 2');
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  await expect(page.getByTestId('course-removed-note')).toContainText('Removed “The Staircase - 1” from the list.');
+  await toEndgames();
+  await expect(items).toHaveCount(3);
+  await expect(section.getByTestId('course-counts')).toHaveText('3 drills · 1 due · 2 new · 1 with no goal');
+  await items.getByRole('link', { name: 'Win the Race - 2', exact: true }).click();
+  await expect(page.getByTestId('course-removed-note')).toHaveCount(0);
+  await toEndgames();
+  await section.locator('.endgame-left summary').click();
+  await section.getByRole('button', { name: 'Put the 1 removed back' }).click();
+  await expect(items).toHaveCount(4);
+  // And Undo on the next drill.
+  await items.getByRole('link', { name: 'Test 1', exact: true }).click();
+  await page.getByTestId('course-remove').click();
+  await expect(page.getByTestId('course-removed-note')).toContainText('Removed “Test 1” from the list.');
+  await page.getByTestId('course-removed-note').getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByTestId('course-removed-note')).toHaveCount(0);
+  await toEndgames();
+  await expect(items).toHaveCount(4);
+
   // Kept on the device: after a reload nothing is scored again, and the missed drill is still due.
   await page.reload();
   await expect(section.getByTestId('course-counts')).toHaveText('4 drills · 1 due · 3 new · 1 with no goal');
