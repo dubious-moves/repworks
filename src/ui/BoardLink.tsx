@@ -222,7 +222,7 @@ const SWITCHES: readonly [keyof BoardPrefs, string][] = [
   ['lights', 'Lights on the squares'],
   ['basicColours', 'Only red, green and blue lights'],
   ['turnForBlack', 'Playing Black, Black nearest you (the board turned)'],
-  ['autoNext', 'A set’s next card by itself after a verdict'],
+  ['autoNext', 'The next card by itself after a verdict (a set, show and grade)'],
   ['autoRetry', 'A held card’s move taken back by itself'],
   ['playArrival', 'A card set up one move early, then that move played'],
   ['speak', 'Say verdicts and the opponent’s moves'],

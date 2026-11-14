@@ -38,3 +38,30 @@ export function spokenFor(heard: Heard, g: SpokenGame | undefined): [string[], H
   if (g.deviation && g.deviation !== heard.deviation) out.push(`Not your repertoire. The study move is ${moveToSpeech(g.deviation.repSan)}.`);
   return [out, now];
 }
+
+/** A storm verdict's parts the words come from (CHESSNUT.md §5.2). */
+export interface SpokenVerdict {
+  /** The band ('great' … 'blunder', 'unknown'). */
+  band: string;
+  /** The top move was played. */
+  top: boolean;
+  /** A puzzle: solved or not, nothing more. */
+  puzzle?: boolean | undefined;
+  /** The best move (SAN), said when it wasn't played and the screen shows it. */
+  bestSan?: string | undefined;
+}
+
+const BAND_SAID: Record<string, string> = { great: 'Great', good: 'Good', ok: 'Inaccuracy', bad: 'Mistake', blunder: 'Blunder', unknown: 'No verdict' };
+
+/**
+ * What a storm card says after a move read from the board: the band's word, and the best move when
+ * another was played and the screen names it (a held set card keeps it hidden, so its caller leaves
+ * `bestSan` out). A puzzle says only whether it was solved.
+ */
+export function verdictSpeech(v: SpokenVerdict): string {
+  if (v.puzzle) return v.band === 'great' ? 'Solved.' : 'Not the solution.';
+  if (v.top) return 'Best move.';
+  const word = BAND_SAID[v.band];
+  if (!word) return '';
+  return v.bestSan ? `${word}. The best move was ${moveToSpeech(v.bestSan)}.` : `${word}.`;
+}

@@ -34,6 +34,7 @@ import {
   leaveStorm,
   nextCard,
   pauseVerdict,
+  playOnScreen,
   recordOf,
   refreshHome,
   retryFromReview,
@@ -95,6 +96,7 @@ import { Board } from './Board.tsx';
 import { CLASSIFICATION } from '../core/games/grade.ts';
 import { useWakeLock } from './wakeLock.ts';
 import { useBoardMirror } from './boardMirror.ts';
+import { BoardNote } from './BoardLink.tsx';
 import { collect, fillBodies, puzzlePrefs, puzzleState, refreshPuzzles, setPuzzlePrefs, SHARD_MB, SHARES, SHARDS_PER_COLLECT, stopPuzzles, WORKING_SET } from '../app/puzzles.ts';
 import { Back, Stuck } from './Back.tsx';
 import { NoteButton } from './CardNote.tsx';
@@ -866,9 +868,15 @@ interface CardMirror {
   delayMs?: number | undefined;
   /** The position to set up instead of the one shown (the setup's earlier position, `playArrival`). */
   fen?: string | undefined;
+  /** With `fen`: the move lit as the last one there (none for the setup's earlier position). */
+  lastUci?: string | undefined;
 }
 
-function CardBoard(props: { item: StormItem; asking: boolean; onMove(uci: string): void; arrows?: Arrow[]; sketch: string; draw?: boolean; burst?: string | undefined; view?: BoardView | undefined; mirror?: CardMirror | undefined }) {
+/** The board's brush for a verdict's move (CHESSNUT.md §4.7): the top move bright green, else its band's. */
+const PLAYED_BRUSH: Record<string, string> = { great: 'bandGreat', good: 'bandGood', ok: 'bandOk', bad: 'bandBad', blunder: 'bandBlunder' };
+const playedBrush = (v: StormAnswer, puzzle: boolean): string | undefined => (topFound(v, puzzle) ? 'bandBest' : PLAYED_BRUSH[v.band]);
+
+function CardBoard(props: { item: StormItem; asking: boolean; onMove(uci: string, board?: boolean): void; arrows?: Arrow[]; sketch: string; draw?: boolean; burst?: string | undefined; view?: BoardView | undefined; mirror?: CardMirror | undefined }) {
   const p = props.item.card;
   const puzzle = props.item.puzzle;
   const step = props.item.step ?? 0;
@@ -897,10 +905,13 @@ function CardBoard(props: { item: StormItem; asking: boolean; onMove(uci: string
           fen: mirrorFen,
           movable: mirrorFen === fen && dests.size > 0,
           orientation: p.side,
-          marks: { lastUci, arrows: props.arrows, played: m.played },
+          // A line shown has its own last move; the user's move is lit only on the card's position.
+          marks: { lastUci: m.fen !== undefined ? m.lastUci : lastUci, arrows: props.arrows, played: view ? undefined : m.played },
           onMove: (uci) => {
             const move = parseUci(uci);
-            send(move && mirrorFen === fen ? makeUci(normalizeMove(pos, move)) : uci);
+            const u = move && mirrorFen === fen ? makeUci(normalizeMove(pos, move)) : uci;
+            if (view) view.onMove(u);
+            else props.onMove(u, true);
           },
           undo: m.undo,
           delayMs: m.delayMs,
@@ -1071,7 +1082,8 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
       }
       if (e.key === 'Escape') endStorm('stop');
       else if ((e.key === ' ' || e.key === 'Enter') && now.phase === 'verdict') nextCard();
-      else if (e.key === 'p' && now.phase === 'verdict' && now.nextAt !== undefined) pauseVerdict();
+      else if ((e.key === ' ' || e.key === 'Enter') && now.phase === 'setup') playOnScreen();
+      else if (e.key === 'p' && (now.phase === 'verdict' || now.phase === 'held') && now.nextAt !== undefined) pauseVerdict();
       else if (e.key === 't' && canTryAgain(now)) tryAgain();
       else if (e.key === 's' && (now.phase === 'held' || triesGoOn(now))) showMove();
       else if (e.key === 'r' && follow.includes('refutation')) showStormLine('refutation');
@@ -1129,8 +1141,11 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
   const replying = !!s.replying;
   const continued = !!item.by;
   const band = replying ? 'checking' : (v?.band ?? (phase === 'grading' ? 'checking' : 'none'));
+  const settingUp = phase === 'setup';
   const title = replying
     ? 'Opponent to move…'
+    : settingUp
+    ? 'Setting up the board…'
     : v
     ? v.self
       ? SELF_WORD[v.self]!
@@ -1160,10 +1175,25 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
       ? 'Found if it was a green arrow, Missed if not; or play it to have it graded'
       : continued && arrived
         ? `${item.by} answered ${numbered(arrived.before, arrived.san)} · ${turn === 'white' ? 'White' : 'Black'} to play · not counted`
-        : `${turn === 'white' ? 'White' : 'Black'} to play${showing ? ', then show the moves' : ''}`;
+        : settingUp
+          ? `${turn === 'white' ? 'White' : 'Black'} to play · asked once the board shows the position`
+          : `${turn === 'white' ? 'White' : 'Black'} to play${showing ? ', then show the moves' : ''}`;
+  // The Chessnut Move (CHESSNUT.md §5.2): the position shown, set up first (with `playArrival` the
+  // one before the arrival), the move once graded in its band's colour, a held card's take-back by
+  // hand as Try again, and once the move is shown, the card's own position with the best lit.
+  const base = item.puzzle ? puzzleFen(item) : item.card.fen;
+  const baseLast = item.puzzle && item.step ? item.puzzle.plies[item.step - 1]!.uci : item.card.arrived?.uci;
+  const brush = v && !v.self && item.played ? playedBrush(v, !!item.puzzle) : undefined;
+  const shownBack = s.revealed && !!item.played && !showing;
+  const mirror: CardMirror = {
+    played: brush && !shownBack ? { uci: item.played!, brush } : undefined,
+    undo: held && again ? { fen: base, run: tryAgain } : undefined,
+    ...(s.setupAt === 'before' && item.card.arrived ? { fen: item.card.arrived.before, lastUci: undefined } : shownBack ? { fen: base, lastUci: baseLast } : {}),
+  };
+  const timed = (phase === 'verdict' || held) && s.nextAt !== undefined;
   return (
     <div class="train-grid storm-card" data-mode={s.mode} data-phase={phase} data-fen={item.card.fen} data-side={item.card.side} data-card={item.card.card} data-step={item.step ?? 0} data-line={item.puzzle ? '' : positionLineKey(item.card)}>
-      <CardBoard item={boardItem} asking={asking} onMove={(u) => void answerMove(u)} arrows={view ? [] : arrows} sketch={sketch} draw={draw} burst={burst} view={view} />
+      <CardBoard item={boardItem} asking={asking} onMove={(u, board) => void answerMove(u, { board: !!board })} arrows={view ? [] : arrows} sketch={sketch} draw={draw} burst={burst} view={view} mirror={mirror} />
       <div class="train-panel storm-panel">
         <Hud s={s} />
         <Strip s={s} />
@@ -1177,6 +1207,7 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
           </p>
           <p class="storm-line">{line}</p>
         </div>
+        <BoardNote />
         {counted && counted !== v && !counted.unanswered && (
           <p class={`storm-counted band-${counted.band}`} data-testid="storm-counted">
             Counted: the first answer, <span>{answerWords(counted, !!item.puzzle)}</span>
@@ -1204,12 +1235,17 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
             Solution: {solution(item.puzzle)} · {puzzleFacts(item.puzzle)}
           </p>
         )}
-        {phase === 'verdict' && s.mode === 'storm' && s.nextAt !== undefined && s.nextIn !== undefined && (
+        {timed && s.nextIn !== undefined && (
           <div class="storm-next" aria-hidden="true">
             <span key={s.nextAt} style={{ animationDuration: `${s.nextIn}ms` }} />
           </div>
         )}
         <div class="actions train-actions">
+          {settingUp && (
+            <button type="button" class="primary" title="Answer on the screen now; the board finishes setting up by itself" onClick={playOnScreen}>
+              Play on the screen <kbd>Space</kbd>
+            </button>
+          )}
           {showing && asking && (
             <>
               {s.movesShown ? (
@@ -1261,8 +1297,13 @@ function Card(props: { s: StormSession; scope: StormScopeData }) {
               {s.mode === 'storm' ? 'Next' : 'Next position'} <kbd>{showing ? '2' : 'Space'}</kbd>
             </button>
           )}
-          {phase === 'verdict' && s.mode === 'storm' && s.nextAt !== undefined && (
-            <button type="button" class="secondary" title="Keep this position on the board; the clock is stopped" onClick={pauseVerdict}>
+          {timed && (
+            <button
+              type="button"
+              class="secondary"
+              title={held ? 'Keep the move on the board: Try again waits for you' : s.mode === 'storm' ? 'Keep this position on the board; the clock is stopped' : 'Keep this position on the board: the next waits for you'}
+              onClick={pauseVerdict}
+            >
               Pause <kbd>P</kbd>
             </button>
           )}

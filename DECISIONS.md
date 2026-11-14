@@ -2370,3 +2370,28 @@ The technical calls, each with its reason:
 - **"Castle with the king first" is said once a page load**, until the next move read from the board.
 - No data format changed; nothing new is written or synced (answers from the board are ordinary
   `practice` events); the board's settings stay on the device.
+
+## Revision of 2026-11-14 (the storm's untimed sessions on the Chessnut Move: CHESSNUT.md part (e))
+- **A storm card's move is kept, graded and written in standard UCI** (castling as the king's two
+  squares, `e1g1`), whichever spelling the board hands over. Why: the card's board on the screen gave
+  castling as the king onto the rook (`e1h1`), so a castled answer was never found in its list (the
+  lists are standard UCI): it was graded by a search, its rank lost, and written as `e1h1`, against
+  `src/core/chess/uci.ts`'s rule that everything the site writes is standard UCI. The format is the
+  one the events already had; nothing reads a storm event's move back, and old `e1h1` answers stay
+  as written.
+- **Show the move sets the board to the card's position** (the best lit green), while the screen
+  keeps the move played on its own board as before. Why: the plan had the screen dropping the move;
+  it doesn't, and the board shows the best move better from the position it is played in.
+- **A held card's take-back by itself (`autoRetry`) has the storm's bar and Pause**, and Show the
+  move or Analyse cancel it. Why: without a way to stop it, a user who wanted the move shown had only
+  the put-back time to press it.
+- **Show and grade's named move brings the next card by itself too** (`autoNext`), as the plan's
+  part (e) says; the dialog's words now say so.
+- **The link forgets the report it acted on once the board shows the position wanted.** Why: a
+  held card's wrong move, taken back by the robot and then played again by hand, gave the same
+  report as before and was never read (found by the part's browser test). Appendix A's reducer is
+  changed in this one place; its other guards are as they were.
+- **The timed storm's cards go through the same setup** (`deal` is shared; `setup` stops its clock
+  as any phase but `solving` does); part (f) tests it.
+- No data format changed; nothing new is written or synced (answers from the board are ordinary
+  `storm` events); the board's settings stay on the device.

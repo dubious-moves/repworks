@@ -14,6 +14,8 @@
 // - the acted-on guard gone (`if (s.handed || same(s.seen, s.actedOn))`): "a move by hand read
 //   after the window, once", "a move the site turns down is put back at once" and "a move read,
 //   then the site's new position 300 ms later".
+// - `actedOn` kept once the board shows the position again (part (e), 2026-11-14): "the same move
+//   made again after the robot set the position back is read again".
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Squares } from '../../../../src/core/board/chessnut.ts';
@@ -232,4 +234,22 @@ test('nothing wanted: the link idle, reports kept, nothing done', () => {
   assert.deepEqual(kinds(actions), ['phase:idle']);
   assert.equal(state.phase, 'idle');
   assert.deepEqual(state.seen, sq(FEN1));
+});
+
+test('the same move made again after the robot set the position back is read again', () => {
+  // A held storm card: the move read and kept on the screen, then taken back (Try again) by the robot.
+  const { state, actions } = run([
+    { t: 'report', squares: sq(FEN0), now: 0 },
+    { t: 'want', want: { fen: FEN0, movable: true, turned: false }, now: 0 },
+    { t: 'report', squares: sq(FEN1), now: 1000 },
+    { t: 'tick', now: 1700 },
+    { t: 'want', want: { fen: FEN1, movable: false, turned: false, undoFen: FEN0 }, now: 1800 },
+    { t: 'want', want: { fen: FEN0, movable: true, turned: false }, now: 4000 },
+    { t: 'report', squares: sq(FEN0), now: 5000 },
+    // The same move by hand again.
+    { t: 'report', squares: sq(FEN1), now: 6000 },
+    { t: 'tick', now: 6700 },
+  ]);
+  assert.deepEqual(kinds(actions), ['phase:synced', 'move:e2e4', 'drive', 'phase:driving', 'phase:synced', 'move:e2e4']);
+  assert.equal(state.handed?.uci, 'e2e4');
 });

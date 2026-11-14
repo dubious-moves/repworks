@@ -1539,3 +1539,26 @@ does. Start with the spike: its log decides what the later parts change (CHESSNU
   Take back; a game as Black: turned, a refused move put back within a second and the study move
   said, the hint's lights; a third queen the set can't make; an endgame driven and played). The
   checklist's lead-up has no browser test of its own on the board. Nothing on a real board.
+
+### The storm's untimed sessions on the Chessnut Move (CHESSNUT.md part (e), 2026-11-14)
+- Connect from the ♞ chip, then a Set of 6 with the board: how long each card takes to set up (the
+  card says "Setting up the board…" until the board shows it; "Play on the screen" answers at
+  once); the move that reached it lit blue; the verdict's colours (the top move bright green, Great
+  green, Good dark green, Inaccuracy yellow, Mistake orange, Blunder red); a held card taken back by
+  the robot after 2 s and tried again, or taken back by hand (Try again at once); Show the move's
+  light (the move taken back, the best lit green); the next card by itself after a verdict (Pause,
+  `P`, keeps it). A Show and grade: the top move lit once the moves are shown; a move played on the
+  board graded. A puzzle: the reply played by the robot. Ten minutes with the screen untouched:
+  still connected?
+- Worth noting as you go: with "Say verdicts…" on, the verdict said after a move made on the board
+  (the best move too, unless the card is held); castling by hand graded as castling; "A card set up
+  one move early, then that move played" in the dialog: does it help, or only slow things down? A card the set can't make (a third queen) is never dealt while
+  the board is connected.
+- **Checked**: unit tests (the verdict's words; the link reading the same wrong move again after
+  the robot set the position back); Playwright on a desktop and an emulated phone with the
+  simulated board (a set: setup before each card, the arrival lit, the top move by hand graded, lit,
+  said and written, the next card by itself; a held card taken back by the robot, by hand, and
+  shown; show and grade's lights and a move named on the board; castling by hand graded and lit; a
+  third queen not dealt; the arrival played; Play on the screen; a puzzle's reply driven). The
+  timed storm deals through the same setup, but its clock and the review are part (f)'s. Nothing on
+  a real board.

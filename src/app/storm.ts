@@ -40,6 +40,12 @@ import { cleanFocus, cleanLevelUp, easyAt, FOCUSES, LEVEL_DEFAULT, tooEasyAt, ma
 import { maiaElo, maiaPolicies, maiaStored } from './maia.ts';
 import type { ReadyPuzzle } from '../core/puzzles/puzzles.ts';
 import { smallDevice } from './device.ts';
+import { boardLink, boardLinked } from './boardLink.ts';
+import { boardPrefs } from './boardPrefs.ts';
+import { missingPieces, squaresOfFen } from '../core/board/read.ts';
+import { verdictSpeech } from '../core/board/speech.ts';
+import { parseUciMove, standardUci } from '../core/chess/uci.ts';
+import { say } from '../platform/speech.ts';
 
 /* ------------------------------------------------------------------ settings (per device) */
 
@@ -773,7 +779,8 @@ function swapIn(d: StoredPosition, afterOnly = false): void {
 
 /** The timed storm, the set of six, and show and grade (§5.152: untimed, every move shown). */
 export type SessionMode = 'storm' | 'set' | 'show';
-type Phase = 'solving' | 'grading' | 'verdict' | 'held' | 'done';
+/** `setup`: the Chessnut Move sets the card up (CHESSNUT.md §5.2); shown, not yet asked, the clock stopped. */
+type Phase = 'setup' | 'solving' | 'grading' | 'verdict' | 'held' | 'done';
 
 export interface StormAnswer extends Verdict {
   band: Band | 'unanswered';
@@ -850,6 +857,8 @@ export interface StormSession {
   replying?: boolean;
   /** What became of a Continue that found no position to ask (no reply, or a reply that ends the game). */
   followNote?: string;
+  /** The board's setup with `playArrival` (CHESSNUT.md §5.2): the position before the arrival first. */
+  setupAt?: 'before';
 }
 
 export const stormSession = signal<StormSession | undefined>(undefined);
@@ -953,6 +962,12 @@ export async function startStorm(s: StormScopeData, mode: SessionMode, o: { focu
   const data = trainData.value;
   const ready = share > 0 ? await readyPuzzles(s) : [];
   puzzleQueue = data ? drawOrder(ready.map((p) => ({ card: 'z|' + p.id, p })), histories(data), Math.random, STORM.reachTop).map((x) => x.p) : [];
+  // While the board is linked, positions its pieces can't make are left out (CHESSNUT.md §4.8), so
+  // a set is six it can set up; `deal` skips one met later (the board linked mid-session).
+  if (boardLinked()) {
+    queue = queue.filter((p) => !unmakeable({ card: p }));
+    puzzleQueue = puzzleQueue.filter((p) => !unmakeable({ card: puzzleAsCard(p), puzzle: p, step: 0 }));
+  }
   let total = queue.length + puzzleQueue.length;
   if (mode === 'set') {
     // A set of six, the puzzles' share of it decided once (more if positions run short).
@@ -991,13 +1006,28 @@ function setPhase(phase: Phase): void {
 
 export const clockLeft = (s: StormSession): number => (s.endsAt !== undefined ? Math.max(0, s.endsAt - Date.now()) : s.left);
 
+/** A card's position as asked: a puzzle's at its step, else the card's. */
+export const fenOfItem = (item: StormItem): string => (item.puzzle ? puzzleFen(item) : item.card.fen);
+
+/** A position the Chessnut Move's pieces can't make (a third queen, CHESSNUT.md §4.8). */
+function unmakeable(item: StormItem): boolean {
+  const squares = squaresOfFen(fenOfItem(item));
+  return !!squares && missingPieces(squares).length > 0;
+}
+
+/** Bumped by each deal: a setup still under way for an earlier card gives up. */
+let dealSeq = 0;
+
 function deal(): void {
   const s = stormSession.value;
   if (!s) return;
   let card: StoredPosition | undefined;
   let item: StormItem | undefined;
+  // While the board is linked, a card its pieces can't make isn't dealt (CHESSNUT.md §4.8).
+  const onBoard = boardLinked();
   if (s.pass === 2) {
     item = secondPass.shift();
+    while (item && onBoard && unmakeable(item)) item = secondPass.shift();
   } else {
     // A puzzle at the share chosen, or whatever is left (§5.48).
     // In a set the puzzles drawn are spread among the positions; in a storm, each card is one at the share.
@@ -1005,11 +1035,13 @@ function deal(): void {
     const puzzle = puzzleQueue.length && (!queue.length || Math.random() * 100 < odds) ? takeSpread(puzzleQueue, puzzleLineKey, dealtLines, recentAtStart) : undefined;
     if (puzzle) {
       item = { card: puzzleAsCard(puzzle), puzzle, step: 0, attempts: 0 };
+      if (onBoard && unmakeable(item)) return deal();
       noteDealt(puzzleLineKey(puzzle));
     } else {
       card = takeSpread(queue, positionLineKey, dealtLines, recentAtStart);
       if (card) {
         item = { card, attempts: 0 };
+        if (onBoard && unmakeable(item)) return deal();
         noteDealt(positionLineKey(card));
       }
     }
@@ -1020,20 +1052,87 @@ function deal(): void {
   }
   if (!item) return endStorm(s.history.length ? 'out' : 'empty');
   cardLine.close();
-  const { nextAt: _a, nextIn: _b, practice: _c, movesShown: _d, replying: _e, followNote: _f, ...rest } = stormSession.value!;
+  const { nextAt: _a, nextIn: _b, practice: _c, movesShown: _d, replying: _e, followNote: _f, setupAt: _g, ...rest } = stormSession.value!;
   stormSession.value = { ...rest, item, revealed: false, history: s.pass === 1 ? [...s.history, item] : s.history };
-  setPhase('solving');
+  const seq = ++dealSeq;
+  if (onBoard) {
+    setPhase('setup');
+    void setUpBoard(item, seq);
+  } else setPhase('solving');
   void lookAhead();
 }
 
-/** The user's move on the card (standard UCI). */
-export async function answerMove(uci: string): Promise<void> {
+/**
+ * The Chessnut Move sets the card up before it is asked (CHESSNUT.md §5.2): with `playArrival`,
+ * the position before the move that reached it first, then that move driven; the card asked once
+ * the board shows it. `boardLink.reached` answers false at once when the board isn't linked or
+ * can't make the position, so the session never waits on a missing board; a board stuck waits for
+ * Set up again, a hand, or "Play on the screen".
+ */
+async function setUpBoard(item: StormItem, seq: number): Promise<void> {
+  const still = () => seq === dealSeq && stormSession.peek()?.phase === 'setup';
+  const before = item.card.arrived?.before;
+  if (boardPrefs.peek().playArrival && before && (item.step ?? 0) === 0) {
+    update({ setupAt: 'before' });
+    await boardLink.reached(before);
+    if (!still()) return;
+    const { setupAt: _gone, ...rest } = stormSession.peek()!;
+    stormSession.value = rest;
+  }
+  await boardLink.reached(fenOfItem(item));
+  if (still()) setPhase('solving');
+}
+
+/** "Play on the screen": the card asked now, the board's setup left to finish by itself. */
+export function playOnScreen(): void {
+  const s = stormSession.peek();
+  if (s?.phase !== 'setup') return;
+  dealSeq++;
+  const { setupAt: _gone, ...rest } = s;
+  stormSession.value = rest;
+  setPhase('solving');
+}
+
+/** A move in standard UCI (castling as the king's two squares, as the lists and the events have it). */
+function standard(fen: string, uci: string): string {
+  const pos = positionOf(fen);
+  const move = pos && parseUciMove(pos, uci);
+  return pos && move ? standardUci(pos, move) : uci;
+}
+
+/** Whether the board's settings want the next card by itself now (a board linked, `autoNext`). */
+const autoNextOn = (): boolean => boardLinked() && boardPrefs.peek().autoNext;
+
+/** The next card after `wait` ms, with the bar that shows it; Pause keeps the card. */
+function nextAfter(wait: number): void {
+  clearTimeout(verdictTimer);
+  update({ nextAt: Date.now() + wait, nextIn: wait });
+  verdictTimer = setTimeout(() => deal(), wait);
+}
+
+/** Says a verdict reached by a move read from the board (CHESSNUT.md §5.2), with `speak` on. */
+function sayVerdict(v: StormAnswer): void {
+  const s = stormSession.peek();
+  if (!s || !boardPrefs.peek().speak || !boardLinked()) return;
+  // The best move only where the screen names it: a held set card, or one whose tries go on, keeps it hidden.
+  const hidden = s.phase === 'held' || triesGoOn(s);
+  const words = verdictSpeech({ band: v.band, top: isTopMove(v), puzzle: !!v.puzzle, bestSan: hidden ? undefined : v.bestSan });
+  if (words) say(words);
+}
+
+/**
+ * The user's move on the card, in either castling spelling (the screen's board gives the king onto
+ * the rook, e1h1): kept and graded in standard UCI, as the lists and the events have it. `board`:
+ * read from the Chessnut Move, so the verdict is said (CHESSNUT.md §5.2).
+ */
+export async function answerMove(given: string, o: { board?: boolean } = {}): Promise<void> {
   const s = stormSession.value;
   const item = s?.retry ?? s?.item;
   if (!s || !item || (s.phase !== 'solving' && !s.retry)) return;
+  const uci = standard(fenOfItem(item), given);
   const seq = ++gradeSeq;
   const retry = !!s.retry;
-  if (item.puzzle) return answerPuzzle(item, uci, retry, seq);
+  if (item.puzzle) return answerPuzzle(item, uci, retry, seq, !!o.board);
   // The move stays on the board while it is graded and while the verdict is read.
   const played: StormItem = { ...item, played: uci };
   if (retry) update({ retry: played });
@@ -1052,6 +1151,7 @@ export async function answerMove(uci: string): Promise<void> {
   if (retry) return update({ retry: { ...played, answer: v } });
   // The card as graded: deepened when the look-ahead's search was kept (its list names the rank's "of").
   settle({ ...played, card }, uci, v);
+  if (o.board) sayVerdict(v);
 }
 
 /** A verdict reached: scored and written (the storm), or resolved or held (the set). */
@@ -1089,6 +1189,8 @@ function settle(item: StormItem, uci: string, v: StormAnswer): void {
     const done: StormItem = { ...item, answer: v, attempts };
     update({ item: done, history: now.history.map((h) => (h.card.card === item.card.card ? done : h)), movesShown: true });
     setPhase('verdict');
+    // On the board (CHESSNUT.md §5.2): the next card by itself, as a set's.
+    if (autoNextOn()) nextAfter(band === 'great' || band === 'good' ? STORM.verdictFastMs : STORM.verdictMs);
     return;
   }
   // The set (§17): a clean answer resolves, a worse one holds the card.
@@ -1102,6 +1204,14 @@ function settle(item: StormItem, uci: string, v: StormAnswer): void {
   update({ item: next, history: now.history.map((h) => (h.card.card === item.card.card ? kept(h) : h)) });
   setPhase(held ? 'held' : 'verdict');
   if (!held && now.pass === 1 && outcome && outcome !== 'first' && outcome !== 'unknown') secondPass.push(again(item));
+  // On the board (CHESSNUT.md §5.2): the next card by itself after a verdict (sooner after a clean
+  // answer), and a held card's move taken back after `putBackMs`, each with the bar and Pause.
+  if (!held && autoNextOn()) nextAfter(band === 'great' || band === 'good' ? STORM.verdictFastMs : STORM.verdictMs);
+  else if (held && boardLinked() && boardPrefs.peek().autoRetry && canTryAgain(stormSession.peek())) {
+    const wait = boardPrefs.peek().putBackMs;
+    update({ nextAt: Date.now() + wait, nextIn: wait });
+    verdictTimer = setTimeout(() => tryAgain(), wait);
+  }
 }
 
 /** A position (or puzzle) set back for another go. */
@@ -1119,7 +1229,7 @@ export function puzzleFen(item: StormItem): string {
  * the opponent's reply played after a moment; any other move ends it. Solved is `great`, a miss
  * `blunder`; nothing is graded.
  */
-async function answerPuzzle(item: StormItem, uci: string, retry: boolean, seq: number): Promise<void> {
+async function answerPuzzle(item: StormItem, uci: string, retry: boolean, seq: number, board = false): Promise<void> {
   const p = item.puzzle!;
   const step = item.step ?? 0;
   const fen = puzzleFen(item);
@@ -1136,6 +1246,7 @@ async function answerPuzzle(item: StormItem, uci: string, retry: boolean, seq: n
     const next: StormItem = right ? { ...item, step: step + 1, answer: v } : { ...item, played: uci, answer: v };
     if (retry) return update({ retry: next });
     settle(next, uci, v);
+    if (board) sayVerdict(v);
   };
   if (!right) return solved('blunder');
   if (mates || step + 1 >= p.plies.length) return solved('great');
@@ -1150,7 +1261,9 @@ async function answerPuzzle(item: StormItem, uci: string, retry: boolean, seq: n
     put(replied);
     const v: StormAnswer = { verdict: 'great', band: 'great', userSan, userUci: uci, puzzle: true };
     if (retry) return update({ retry: { ...replied, answer: v } });
-    return settle({ ...replied, answer: v }, uci, v);
+    settle({ ...replied, answer: v }, uci, v);
+    if (board) sayVerdict(v);
+    return;
   }
   if (retry) return update({ retry: replied });
   const now = stormSession.value;
@@ -1230,7 +1343,11 @@ export function showMove(): void {
   const s = stormSession.value;
   if (!s?.item) return;
   // Found already, kept for more tries: the move shown, the outcome as it was.
-  if (triesGoOn(s)) return update({ revealed: true });
+  if (triesGoOn(s)) {
+    // The next card by itself (the board's `autoNext`) waits: the move is to be looked at.
+    pauseVerdict();
+    return update({ revealed: true });
+  }
   if (s.phase !== 'held') return;
   reveal({ ...s, item: s.item });
 }
@@ -1240,6 +1357,10 @@ function reveal(s: StormSession & { item: StormItem }): void {
   const outcome: SetOutcome = 'shown';
   const item: StormItem = { ...s.item, ...(s.pass === 1 ? { outcome } : { secondOutcome: outcome }) };
   if (s.pass === 1) secondPass.push(again(s.item));
+  // A held card's take-back by itself (the board's `autoRetry`) is off: the move is shown instead.
+  clearTimeout(verdictTimer);
+  const { nextAt: _a, nextIn: _b, ...rest } = stormSession.peek()!;
+  stormSession.value = rest;
   update({ item, revealed: true, history: s.history.map((h) => (h.card.card === item.card.card ? { ...h, ...item, answer: h.answer ?? item.answer, later: h.later } : h)) });
   setPhase('verdict');
 }
@@ -1307,7 +1428,8 @@ export function showGradePress(press: 'next' | 'wrong'): void {
 /** A storm's verdict kept on the board: the next card waits for Next. */
 export function pauseVerdict(): void {
   const s = stormSession.value;
-  if (!s || s.phase !== 'verdict' || s.nextAt === undefined) return;
+  // A held card's take-back by itself (the board's `autoRetry`) pauses the same way.
+  if (!s || (s.phase !== 'verdict' && s.phase !== 'held') || s.nextAt === undefined) return;
   clearTimeout(verdictTimer);
   const { nextAt: _a, nextIn: _b, ...rest } = s;
   stormSession.value = rest;
@@ -1406,7 +1528,7 @@ export function analyse(item: StormItem, back: StormMode, reviewAt?: number): vo
   const s = stormSession.value;
   if (s?.phase === 'held' && s.item === item) showMove();
   // A practice try left as it is: its answer counted already.
-  else if (s?.phase === 'solving' && s.item === item && !s.practice) giveUp({ ...s, item });
+  else if ((s?.phase === 'solving' || s?.phase === 'setup') && s.item === item && !s.practice) giveUp({ ...s, item });
   if (reviewAt !== undefined) update({ reviewAt });
   open(analysisFor(item, back));
 }

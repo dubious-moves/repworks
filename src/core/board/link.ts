@@ -101,8 +101,11 @@ export function step(state: LinkState, e: Event, o: LinkSettings = LINK_DEFAULTS
         setPhase('unmakeable', missing);
         return [s, out];
       }
-      if (same(s.seen, target)) setPhase('synced');
-      else drive(e.now);
+      if (same(s.seen, target)) {
+        // The board shows it already: whatever was acted on before is gone from it.
+        delete s.actedOn;
+        setPhase('synced');
+      } else drive(e.now);
     }
     return [s, out];
   }
@@ -117,8 +120,13 @@ export function step(state: LinkState, e: Event, o: LinkSettings = LINK_DEFAULTS
       s.seen = e.squares;
       s.seenAt = e.now;
     }
-    // A drive is done when the board shows its position; reports on the way are only watched.
-    if ((s.phase === 'driving' || s.phase === 'stuck') && same(s.seen, s.target)) setPhase('synced');
+    // A drive is done when the board shows its position; reports on the way are only watched. Once
+    // it shows it, the report acted on before is history: the same move made again is new (a held
+    // storm card's wrong move played again after the robot took it back).
+    if (same(s.seen, s.target)) {
+      delete s.actedOn;
+      if (s.phase === 'driving' || s.phase === 'stuck') setPhase('synced');
+    }
     return [s, out];
   }
 
