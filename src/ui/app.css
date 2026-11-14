@@ -5049,6 +5049,30 @@ a.button.primary {
     min-height: 0;
     overflow-y: auto;
   }
+
+  /* The actions in three even columns, always two rows (the board's keys, then Save as a mistake and
+     its priority): left to wrap, a wider font (DejaVu Sans) or a longer label ("Hide best move")
+     made three rows and pushed the list past the board's foot. A long label wraps in its button. */
+  .storm-review-grid .storm-panel > .actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .storm-review-grid .storm-panel > .actions > * {
+    min-width: 0;
+    padding-inline: 8px;
+    line-height: 1.15;
+  }
+
+  /* The priority's words in full: two columns while no note button follows it. */
+  .storm-review-grid .storm-panel > .actions > .rank-select {
+    font-size: 0.875rem;
+  }
+
+  .storm-review-grid .storm-panel > .actions > .rank-select:last-child {
+    grid-column: span 2;
+  }
 }
 
 .storm-row {

@@ -292,6 +292,9 @@ test('a held card on the board: taken back by the robot and tried again; taken b
   await expect(stormCard(page)).toHaveAttribute('data-phase', 'held');
   await b.hand(boardOf(QGD.fen));
   await expect(stormCard(page)).toHaveAttribute('data-phase', 'solving', { timeout: 2000 });
+  // The link has the card's position once the held move's lights are off: a move made before that
+  // (a moment after the screen says "solving") is a wrong position to it, driven back, not read.
+  await expect.poll(() => litOn(page, worst)).not.toEqual([LIGHT.orange, LIGHT.orange]);
 
   // A third time: no attempts left, so no take-back by itself. Show the move: the move driven back,
   // the best lit green, the move's own lights gone.

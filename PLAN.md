@@ -9940,6 +9940,13 @@ select still High beside "✓ Saved", its `rank` synced; the found tactic saved 
 select back at Normal, saved without a `rank`; the two `rank` events synced in that order. Looked
 at: the practice review's card before and after saving, at 1280×720 and on the emulated phone.
 
+Found 2026-11-14 (§5.174's session): on a wide screen the storm review's actions, now with the
+select, took three rows in a wider system font (DejaVu Sans, as on CI's runners; Inter, in the cloud
+containers, fitted in two), pushing the list past the board's foot; `test/e2e/storm.spec.ts`'s
+layout check failed on CI from this change on, so nothing was deployed after it. The review's actions
+are three even columns now, always two rows (a long label wraps in its button, the select takes two
+columns while no note button follows it), checked in both fonts.
+
 #### 5.173 Premoves in every kind of practice (the owner's request of 2026-11-13, built)
 
 The owner: "Make sure that pre-moving is implemented in all kinds of practice (endgame too) and that
