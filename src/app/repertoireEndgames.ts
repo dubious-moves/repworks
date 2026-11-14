@@ -93,7 +93,7 @@ class GatherEnd extends Error {}
 const narrow = smallDevice;
 
 /** Stockfish's score for the side to move at the judges' depth (the drill's), or undefined. */
-async function scoreOf(fen: string): Promise<{ cp: number; depth: number } | undefined> {
+export async function scoreOf(fen: string): Promise<{ cp: number; depth: number } | undefined> {
   const pos = positionOf(fen);
   const a = await analyseForStorm(fen, 1, narrow() ? 16 : 18, 10_000);
   const cp = pos && a?.lines[0] ? moverCp(a.lines[0].score, pos.turn, STORM) : null;

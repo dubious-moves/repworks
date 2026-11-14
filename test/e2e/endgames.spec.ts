@@ -18,7 +18,12 @@
 // bishop stopped as a slip where +2's line would stop nothing; the rook against a pawn played to its
 // end, the king first, the pawn won. And premoves (the owner's request, 2026-11-13): set while the
 // defence thinks, taken off, dropped when its answer makes one illegal, a pawn premoved to the last
-// rank queening.
+// rank queening. And the courses' endgames (§5.175): a small reference study in the shape of a
+// course export (chapters from a [FEN], one main line, prose in the comments), scored on the
+// device (a win to mate, a win converted, a draw held, a weaker side's chapter played from the
+// course's first move, one chapter with no goal; a chapter with no position not offered), listed
+// by the course's groups, one played, its hint synced as an ordinary endgame try, the course's text
+// under the board, one removed and put back, and the scores kept over a reload.
 import { test, expect, type Page } from '@playwright/test';
 import type { FakeGit } from '../support/fakeGit.ts';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
@@ -106,6 +111,15 @@ const ROOK_PAWN: [string, [number, number, string][], string?][] = [
   ['R7/8/8/8/8/1pK5/k7/8 b - -', [[1, -6000, 'a2b1 c3b3']]],
   ['R7/8/8/8/8/1pK5/8/1k6 w - -', [[1, 7000, 'c3b3 b1c1'], [2, 6500, 'a8b8 b1c1'], [3, 6000, 'a8a3 b1b2']], 'c3b3'],
 ];
+/** The course's chapters (§5.175), as the fake engine scores them. */
+const COURSE_MATE = '8/8/8/4k3/8/8/8/R2QK3 w - -';
+const COURSE_WIN = '8/p7/8/3k4/8/2K5/3P4/8 w - -';
+const COURSE_AFTER_KD3 = '8/p7/8/3k4/8/3K4/3P4/8 b - -';
+const COURSE_AFTER_KD3_KC5 = '8/p7/8/2k5/8/3K4/3P4/8 w - -';
+const COURSE_HOLD = '8/3k4/8/3K4/3P4/8/8/8 b - -';
+const COURSE_WORSE = '8/8/8/3k4/8/2K5/3P4/8 b - -';
+const COURSE_AFTER_KC5 = '8/8/8/2k5/8/2K5/3P4/8 w - -';
+const COURSE_DEAD = '8/pp6/8/8/8/8/PP6/K6k w - -';
 const REP_DRAW = 'r7/4n1kp/8/R7/4K2P/2N5/5P2/8 b - -';
 const REP_WIN = '2k4r/pp5p/3r1p1p/8/8/4K3/PPP3PP/1R3R2 b - -';
 
@@ -113,6 +127,20 @@ let site: SiteServer;
 test.beforeAll(async () => {
   const extra: Record<string, [number, number, string][]> = {
     [REP_DRAW]: [[1, -40, 'a8a5 c3a4']],
+    // The courses' chapters: the queens' mate far ahead on material, a win, its reply, a draw, the
+    // weaker side to move (and the position after the course's Kc5), and a position with no goal.
+    [COURSE_MATE]: [[1, 4000, 'a1a8 e5f4']],
+    [COURSE_WIN]: [
+      [1, 900, 'c3d3 d5c5'],
+      [2, 0, 'c3b3 d5c5'],
+      [3, 0, 'c3c2 d5c4'],
+    ],
+    [COURSE_AFTER_KD3]: [[1, -900, 'd5c5 d3c3']],
+    [COURSE_AFTER_KD3_KC5]: [[1, 900, 'd3c3 c5d5']],
+    [COURSE_HOLD]: [[1, -20, 'd7e7 d5e5']],
+    [COURSE_WORSE]: [[1, -700, 'd5c5 c3d3']],
+    [COURSE_AFTER_KC5]: [[1, 700, 'c3d3 c5d5']],
+    [COURSE_DEAD]: [[1, 220, 'a1b1 h1g2']],
     [REP_WIN]: [[1, 450, 'd6d2 b1d1']],
     // The user's moves hold (0.00), the others lose; the attacker's first line is Kd5 where the
     // board is A1 (twice: Kd5 a repetition the second time, Kf5 then), Ke5 at A2, Kg5 at A3 with
@@ -613,4 +641,116 @@ test('the repertoire’s endgames: gathered from the games at the line ends, by 
   await expect(page.getByTestId('rep-endgame-gather')).toContainText('Every line end walked (games up to ', { timeout: ENGINE_MS * 10 });
   expect(requests.filter((r) => r.startsWith('explorer until='))).toHaveLength(3);
   expect(requests.filter((r) => r.startsWith('export'))).toHaveLength(3);
+});
+
+/** A reference study in the shape of a course export: one main line a chapter, prose in the comments. */
+const COURSE_CHAPTERS: [string, string, string | undefined, string][] = [
+  ['Ch01Mate', 'Part 1: Endgames for Beginners (Unrated-999): The Staircase - 1', '8/8/8/4k3/8/8/8/R2QK3 w - - 0 1', '{ Mate with the heavy pieces: keep the king boxed in. } 1. Ra8 { The staircase begins. } Kf4 2. Qd4+ Kg3'],
+  ['Ch02Race', 'Part 3: Endgames for Class D (1000-1199): Win the Race - 2', '8/p7/8/3k4/8/2K5/3P4/8 w - - 0 1', '{ Method: take the opposition. } 1. Kd3 { Opposition. (Or 1.Kc2 Kc4 2.Kd2) } Kc5'],
+  ['Ch03Test', 'Part 3: Endgames for Class D (1000-1199): Test 1', '8/3k4/8/3K4/3P4/8/8/8 b - - 0 1', ''],
+  ['Ch04Wrse', 'Part 3: Endgames for Class D (1000-1199): The Worse Side - 4', '8/8/8/3k4/8/2K5/3P4/8 b - - 0 1', '{ Black is lost: why? } 1... Kc5 { The king steps aside and White takes the opposition. (Not 1...Ke5 2.Kd3 Kf5 3.Ke3) } 2. Kd3'],
+  ['Ch05Lock', 'Part 4: Endgames for Class C (1400-1599): Locked - 5', '8/pp6/8/8/8/8/PP6/K6k w - - 0 1', '{ Nothing to win here. } 1. Kb1'],
+  ['Ch06Text', 'Part 4: Endgames for Class C (1400-1599): Words Only - 6', undefined, '{ Only words: the course explains the ideas. }'],
+];
+
+async function setUpCourse(page: Page): Promise<FakeGit> {
+  const { git, github } = world();
+  const files = new Map<string, string>([['studies/Crs0Silm/study.json', JSON.stringify({ format: 1, id: 'Crs0Silm', name: 'Synthetic Endgame Course', kind: 'reference', chapters: COURSE_CHAPTERS.map(([cid]) => cid) }, null, 2) + '\n']]);
+  for (const [cid, name, fen, text] of COURSE_CHAPTERS) {
+    files.set(`studies/Crs0Silm/${cid}.pgn`, `[Event "Synthetic Endgame Course"]\n[White "Nobody"]\n[Black "${name}"]\n[Result "*"]\n[ChapterName "${name}"]\n${fen ? `[FEN "${fen}"]\n[SetUp "1"]\n` : ''}\n${text} *\n`);
+  }
+  git.commitIfHead(git.head, 'a course', files, []);
+  await serveGithub(page, github);
+  await page.goto(`${site.url}#setup?repo=${encodeURIComponent(REPO)}&token=${TOKEN}&name=desktop`);
+  await expect(page.locator('.chip')).toHaveText(/^synced/);
+  return git;
+}
+
+test('the courses’ endgames: a reference study scored on the device, listed by its groups, one played with the course’s text, removed and put back, kept over a reload', async ({ page }) => {
+  test.setTimeout(120_000);
+  const git = await setUpCourse(page);
+  await page.getByRole('navigation', { name: 'Pages' }).getByRole('link', { name: /^Endgames/ }).click();
+  const section = page.getByTestId('endgame-courses');
+  await expect(section.getByRole('heading', { name: 'From your courses' })).toBeVisible();
+  // Five chapters start from a position (the one with no position is not one); none scored yet.
+  await expect(section.getByTestId('course-counts')).toHaveText('0 drills · 0 due · 0 new · 5 to score');
+  await section.getByRole('button', { name: 'Score the course (5)' }).click();
+  await expect(page.getByTestId('course-scoring')).toHaveText('Every chapter scored: 4 drills from 5.', { timeout: ENGINE_MS * 20 });
+  await expect(section.getByTestId('course-counts')).toHaveText('4 drills · 0 due · 4 new · 1 with no goal');
+  await expect(section.getByRole('button', { name: /^Score/ })).toHaveCount(0);
+
+  // The course's groups as chips, the drills in the course's order, each with its task.
+  await expect(section.getByRole('button', { name: /^Part 1: Endgames for Beginners \(Unrated-999\)/ })).toContainText('1');
+  await expect(section.getByRole('button', { name: /^Part 3: Endgames for Class D \(1000-1199\)/ })).toContainText('3');
+  const items = section.locator('.endgame-item');
+  await expect(items.locator('.endgame-title')).toHaveText(['The Staircase - 1', 'Win the Race - 2', 'Test 1', 'The Worse Side - 4']);
+  await expect(items.nth(0)).toContainText('White to play and win (mate)');
+  await expect(items.nth(1)).toContainText('White to play and win (queen a pawn or go 5 points up)');
+  await expect(items.nth(2)).toContainText('Black to play and draw (hold 15 moves)');
+  // The weaker side's chapter: White is the user's, after the course's Kc5, against a bare king: a pawn to queen.
+  await expect(items.nth(3)).toContainText('White to play and win (queen a pawn)');
+  await expect(items.nth(3).locator('.endgame-source')).toHaveText('Part 3: Endgames for Class D (1000-1199) · after the course’s Kc5');
+  await expect(section.getByTestId('course-next')).toHaveText('Next new: The Staircase - 1');
+  // The one with no goal is listed with why.
+  await section.locator('.endgame-left summary').click();
+  await expect(section.locator('.endgame-left-list')).toHaveText('Locked - 5 · better, but not clearly winning');
+
+  // One played: the drill as the others, the course's text folded under the board.
+  await items.nth(1).getByRole('link', { name: 'Win the Race - 2', exact: true }).click();
+  await expect(page).toHaveURL(/#\/endgames\/c-[0-9a-f]{8}$/);
+  const game = page.getByTestId('endgame-game');
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  await expect(page.locator('.study-title')).toHaveText('Part 3: Endgames for Class D (1000-1199) · Win the Race - 2');
+  await expect(game.locator('.train-counters')).toHaveText('White to play and win (queen a pawn or go 5 points up)');
+  await expect(page.getByTestId('endgame-source')).toContainText('From Synthetic Endgame Course, Part 3: Endgames for Class D (1000-1199): Win the Race - 2. Stockfish at the start: +9.00.');
+  await expect(page.getByTestId('endgame-source').getByRole('link', { name: 'Open the chapter' })).toHaveAttribute('href', '#/study/Crs0Silm/Ch02Race');
+  const text = page.getByTestId('course-text');
+  await expect(text).not.toHaveAttribute('open', '');
+  await text.locator('summary').click();
+  await expect(text.locator('.course-move')).toHaveText(['Start', '1.Kd3']);
+  await expect(text).toContainText('Method: take the opposition.');
+  await expect(text).toContainText('Opposition. (Or 1.Kc2 Kc4 2.Kd2)');
+  // A hint counts the try missed: an ordinary endgame try, synced at the chapter's position.
+  await game.getByRole('button', { name: 'Hint' }).click();
+  await expect(game).toContainText('This try counts as missed: play it out, or start again.');
+  await expect(page.locator('.chip')).toHaveText('1 change waiting');
+  await page.locator('.chip').click();
+  await expect.poll(() => endgameEvents(git).length, { timeout: 15_000 }).toBe(1);
+  expect(endgameEvents(git)[0]).toMatchObject({ card: `x|${COURSE_WIN}`, res: 'loss', preset: 'endgame', mv: 0 });
+  // Any move that keeps the goal is allowed: Kd3 (the course's) and Stockfish's answer.
+  await clickSquare(page, 'c3', 'white');
+  await clickSquare(page, 'd3', 'white');
+  await expect(game).toHaveAttribute('data-moves', '2', { timeout: ENGINE_MS * 4 });
+
+  // Back on the list: due, missed. The weaker side's chapter opens with the course's first move said.
+  await page.locator('.chapter-head .back').click();
+  await expect(section.getByTestId('course-counts')).toHaveText('4 drills · 1 due · 3 new · 1 with no goal');
+  await expect(items.nth(0).locator('[data-testid="endgame-standing"]')).toHaveText('Due · missed last time ✗');
+  await expect(section.getByTestId('course-next')).toHaveText('Next due: Win the Race - 2');
+  await items.nth(3).getByRole('link', { name: 'The Worse Side - 4', exact: true }).click();
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  await expect(page.getByTestId('endgame-source')).toContainText('The side to move there is the worse one: the course’s first move, Kc5, is played for you, and you have the other side.');
+  await expect(game.locator('.cg-wrap')).toHaveClass(/orientation-white/);
+  await page.getByTestId('course-text').locator('summary').click();
+  await expect(page.getByTestId('course-text').locator('.course-move')).toHaveText(['Start', '1…Kc5']);
+  await expect(page.getByTestId('course-text')).toContainText('(Not 1...Ke5 2.Kd3 Kf5 3.Ke3)');
+  await page.locator('.chapter-head .back').click();
+
+  // A group chosen; one drill removed and put back.
+  await section.getByRole('button', { name: /^Part 1: Endgames for Beginners/ }).click();
+  await expect(items).toHaveCount(1);
+  await expect(section.getByTestId('course-counts')).toHaveText('1 drill · 0 due · 1 new · 1 with no goal');
+  await section.getByRole('button', { name: /^All/ }).click();
+  await expect(items).toHaveCount(4);
+  await items.nth(2).getByRole('button', { name: 'Remove' }).click();
+  await expect(items).toHaveCount(3);
+  await expect(section.locator('.endgame-left summary')).toHaveText('1 without a goal · 1 removed');
+  await section.locator('.endgame-left summary').click();
+  await section.getByRole('button', { name: 'Put the 1 removed back' }).click();
+  await expect(items).toHaveCount(4);
+
+  // Kept on the device: after a reload nothing is scored again, and the missed drill is still due.
+  await page.reload();
+  await expect(section.getByTestId('course-counts')).toHaveText('4 drills · 1 due · 3 new · 1 with no goal');
+  await expect(section.getByRole('button', { name: /^Score/ })).toHaveCount(0);
 });

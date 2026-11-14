@@ -26,8 +26,8 @@ export type Group = 'mates' | 'pawns' | 'rooks' | 'rook-vs' | 'minors' | 'queen'
 
 export interface Endgame {
   id: string;
-  /** A theoretical endgame's group, or a repertoire endgame's category (§5.149). */
-  group: Group | Category;
+  /** A theoretical endgame's group, a repertoire endgame's category (§5.149), or `course` (§5.175). */
+  group: Group | Category | 'course';
   title: string;
   fen: string;
   goal: Goal;

@@ -1045,6 +1045,33 @@ later change replaced are folded into the later item; items already reported wor
 
 ## 8. Endgames
 
+### From your courses (§5.175, 2026-11-14)
+- Import the Silman PGN as a reference study (Import, kind "reference"), then Endgames → "From your
+  courses" → "Score the course (326)": watch the progress ("Scoring: n of 326 chapters · m drills").
+  How long does it take on the desktop, and on the phone? Stop it part way and press it again: it
+  should take up where it left off. Roughly: 230 drills from the chapters as they are, about 25
+  more as mates, some more where the course's first move is played for you, the rest "without a goal".
+- Play a few from different parts: a Part 1 mate (win by mate), a king-and-pawn ending (a pawn
+  queened), a Class C or D rook ending (hold, or win), and one whose chapter starts with the weaker
+  side's move (the source line says "the course's first move, …, is played for you": do you have
+  the stronger side, and is the position one worth playing?). Do the goals feel right: a win that
+  ends too soon or never, a draw that is really lost, a position where the stronger side's goal is
+  mate in 40 moves? Say which chapters, so the bands can be tuned.
+- Part 8 (master-game fragments) and Part 9 (tactics): are they sensible as drills, or would you rather
+  they were left out? (Remove takes one off; a study-level exclude isn't built.)
+- Under the board, "The course's text": folded during the try, open when it is over. Is it the right
+  text in the right order? The chapter's own link opens the study at the chapter.
+- The groups: do the chips (Part n: …) read well, and is "Next due / Next new" within a group what you
+  want?
+- The informational variations: in the chapter view and the Read view, are the "(Or …)", "(Not …)"
+  and "(The quicker …)" lines clickable now, and do they start from the right position? A remark that
+  just names a move ("Black resigns after 5.Nf3") must stay text. Say where either goes wrong.
+- A plan card (game cards): Show plan → the comment's lines clickable, the board previewing them.
+- **Checked**: the rules, the scoring, the flipped chapter, the groups and the text by unit tests;
+  the page and a drill by Playwright on desktop and the emulated phone, with a small synthetic
+  course and the fake Stockfish. Not the real export, not Stockfish at depth 16/18 on real chapters,
+  not Maia in these positions, not on your devices.
+
 ### A varied defence, and Maia alone (§5.174, 2026-11-14)
 - Any endgame with Maia on the device (King in front of the pawn is quick): solve it, then Again:
   where Maia has a second likely reply (15% or more), the defence now tries the one you haven't met

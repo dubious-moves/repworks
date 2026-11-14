@@ -19,6 +19,8 @@ import { HistoryScreen, PracticeScreen } from './Practice.tsx';
 import { RepertoireCheckScreen } from './RepertoireCheck.tsx';
 import { ChecklistDrill, ChecklistScreen } from './Checklist.tsx';
 import { EndgamesScreen } from './Endgames.tsx';
+import { courseScores, loadCourse } from '../app/courseEndgames.ts';
+import { readSearchChapters } from '../app/search.ts';
 import { loadRepEndgames } from '../app/repertoireEndgames.ts';
 import { gameCountsNow } from '../app/games.ts';
 import { endgamesDue, TodayCard, useStormReady } from './Today.tsx';
@@ -322,8 +324,10 @@ function GamesLink() {
 
 /** Endgames (§5.145), with how many are due: none tried yet says nothing more. */
 function EndgamesLink() {
-  // The repertoire's endgames (§5.149) count once read.
+  // The repertoire's endgames (§5.149) count once read; the courses' (§5.175) once scored, which reads the chapters.
   useEffect(() => void loadRepEndgames(), []);
+  const version = dataVersion.value;
+  useEffect(() => void loadCourse().then(() => (courseScores.peek()?.size ? readSearchChapters() : undefined)), [version]);
   const due = endgamesDue(decidingNow()).due;
   return (
     <a class="button secondary" href="#/endgames" title="The theoretical endgames and your repertoire's, each played for its goal">

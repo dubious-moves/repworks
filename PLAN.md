@@ -5276,7 +5276,7 @@ copies whenever the data or the enrolments change), the move menu's "Make a plan
 or start with a comment or a shape) and "Remove the plan card", and the card in the game cards'
 session: the board turned to the card's side, Show plan (the comments, the shapes on the board),
 then Again/Hard/Good/Easy; Skip is Again, as mistake-lab's; Open the chapter; Remove the card. The
-comments are shown as text (their lines not clickable here). Plan cards are new cards like the
+comments are shown as text (their lines not clickable here; since §5.175 they are, as in the Read view). Plan cards are new cards like the
 others, so the daily limit of new game cards counts them; mistake-lab had no limit for them. "N plan
 cards need content" on the Games screen counts those whose position has no comment. Tests:
 `test/unit/core/games/plans.test.ts` (two controls), `test/e2e/plans.spec.ts` (desktop and phone:
@@ -10027,3 +10027,125 @@ its replay, the store read back and trimmed, hanging from the board, Maia alone'
 the pawn, 1.Kd5 Ke7 again after Restart, Ke8 (19%) after a try left unfinished, the memory's counts,
 and Maia alone kept over a reload, Ke8 with no search of Maia's moves. Live: waits for the owner's
 devices (`TESTING.md` §8).
+
+#### 5.175 Endgames from your courses; lead-in lines and plan cards (the owner's request of 2026-11-14, built)
+
+(Numbered §5.175: §5.165 was taken when the request was written.) The owner bought Silman's
+*Complete Endgame Course* on Chessable and exported it with their own script (D14) to PGN, to be
+imported as a **reference study** kept in the private data repo (326 chapters, 443 KB; the file is
+not in this repo and never goes in it). The owner asked for: (1) a separate section "From your
+courses" on the Endgames page; (2) its positions practised repworks' own way, played out against
+Maia 3 (checked by Stockfish, §5.147), judged move by move by Stockfish for a goal, all alternative
+moves allowed, **not the course's one line as an answer key**; (3) a sensible place for the course's
+many informational "variations"; (4) a better way to show a "plan" now that comments and specific
+lines carry the ideas. Three parts, built in this order, the first two as their own commits.
+
+**The export's shape** (measured by the previous session with this repo's own `parseGames` and
+Stockfish 18 lite at depth 14; taken from its hand-over, not re-measured: the file isn't here).
+326 games, each a `[ChapterName "Part 1: Endgames for Beginners (Unrated-999): The Staircase - 3"]`,
+a `[FEN]` set-up (all 326 parse, no import notes), one main line of about 7–18 moves and **no PGN
+variations at all**. Parts: 1 Beginners 16, 2 Class E 10, 3 Class D 22, 4 Class C 40, 5 Class B 31,
+6 Class A 42, 7 Experts 51, 8 Masters 29 (master-game fragments: queens, bishops and knights, nine
+pawns), 9 "Pure Pleasure" 85 (tactics, game fragments), with "Test n" chapters in Parts 1–7. The
+variations are prose in the comments, in parentheses: "(Or 1...Ke4 2.Qaa4+ Ke3 3.Qbb3+ ...)", "(Not
+3.Rge8 since then ...)", "(Stopping 7.Ra7+ due to 7...Kxa7.)", "(The quicker 2.Qae5+ Kf3 3.Qbe2 mate
+doesn't follow the method ...)": about 1,243 parenthesised groups in 1,620 comments, of which
+§5.12's rule made 178 clickable lines and about 500 more held moves behind a lead-in word or ended
+in prose. Through the goal bands below, Stockfish at depth 14 gave: 86 a win (+3 or better), 144 a
+draw (−1 to +1.5), 25 already won on material (mostly Part 1's mates), 21 in the dead band
+(+1.5 to +3), 50 where the side to move is clearly worse: chapters whose main line starts with the
+**weaker** side's move, to show why it loses.
+
+**1. Lead-in lines** (`parseCommentLines`, `src/core/repertoire/lines.ts`): a parenthesised group
+that opens with up to four words before its first move number is a line if every opening word is on
+a closed list (`LEAD_IN`: or, not, and, but, instead, better, also, even, the, quicker, stopping,
+possible, …): `(Or 1...Ke4 2.Qaa4+ …)`, `(Not 3.Rge8 since then …)`, `(Stopping 7.Ra7+ due to
+7...Kxa7.)`, `(The quicker 2.Qae5+ …)`, `(And not 4.Kf2? Kd3)`. Any other opening word keeps the
+group a remark, so "(see 5. Nf3)", "(this is not 5. Nf3)", "(Black resigns after 5.Nf3)" stay text,
+as does a group whose number fits neither the commented move's position nor the one before it
+(§5.12's placing is unchanged). A full stop after a move is text (`7...Kxa7.`). Training's quiz reads
+the number-first groups only (`parseCommentLines(text, false)`): an "Or …" is an alternative, not the
+line to be quizzed. The informational variations live where lines already preview: the chapter view
+(Notation) and the Read view, and now plan cards. The drill's text (below) shows them as plain
+text. Not built: a Chessable-style "variation" list per chapter, a toggle for "informational"
+lines, shapes on a previewed line.
+
+**2. Plan cards with clickable lines** (`planNotes`, `src/core/games/plans.ts`; `Card`,
+`src/ui/Games.tsx`): each comment of a plan keeps the positions of the node it was found at
+(`contexts`: the position and the one before it), so its lines are placed as they are in the
+chapter even when the position was reached at another move number; Show plan draws the comments
+with `CommentText` (owner `games`, the preview and its ◀ ▶ Back bar the other game cards use). The
+shapes still show on the board with the plan.
+
+**3. From your courses.** Where: the Endgames page, a section under "From your repertoire", shown
+when a reference study has chapters that start from a position. Generic: any reference study's
+chapters, not Silman's.
+- **Candidates** (`candidatesOf`, `src/core/endgames/courses.ts`): the chapters of reference studies
+  with a legal `[FEN]` start that isn't over, the first chapter of each position (by key); a chapter
+  without a position (words only) isn't one; a "Test" chapter is like any other. No `isEndgame`
+  filter: the owner chose the course (Parts 8 and 9 have rooks and minor pieces).
+- **Groups**: a chapter name cut at its second ": ": "Part 4: Endgames for Class C (1400-1599): Rook
+  vs. Lone Pawn - 3" is in the group "Part 4: Endgames for Class C (1400-1599)", titled "Rook vs. Lone
+  Pawn - 3"; one ": " gives the text before it as the group; none, the study's name. Chips per group
+  (the choice kept per device), "Next due / Next new" within the chosen group, the list due first,
+  then new, then the rest, 12 shown until "Show all", each with its board, task, group, where it
+  stands, and Remove (the drill is taken off this device's list; its tries stay counted; "Put the n
+  removed back" under "n without a goal").
+- **The goal** (`courseGoal`, `scoreCandidate`): Stockfish's score for the side to move at the judges'
+  depth (18, 16 on a phone: `scoreOf`, shared with the repertoire gather), by §5.149's bands
+  (`goalFor`): **+3 or better a win**, until a pawn queens, a bare king, `CONVERT_LEAD` points
+  of material up (`convert`); a win **already 5 points up on material is played to mate**; **−1 to
+  +1.5 a draw held 15 moves**. Found while building: a win against a bare king (a course's king and
+  pawn endings, its mates) can't be `convert`, whose bare king is there at the start (the first
+  e2e game ended on its first move, "5 points of material ahead"): against a bare king the win is a
+  pawn queened when the user has pawns and nothing else (`promote`), else mate. Between +1.5 and
+  +3: no goal, listed under "n without a goal" with the reason.
+- **The weaker side to move**: where the score is below −1 and the main line has a legal first move,
+  the course's first move is played for the side to move, the other side is the user's, and the
+  resulting position is scored again; it is a drill (kept with `flipped`, the move) when it then has a
+  goal, else left out with the reason. The lesson shows why the weaker side loses; the user plays
+  the stronger side. The source line says so ("the course's first move, Kc5, is played for you").
+- **Scored on the device, in the background** (`src/app/courseEndgames.ts`): "Score the course (n)"
+  scores every candidate not scored yet, in the course's order, with progress ("Scoring: 12 of 326
+  chapters · 9 drills") and Stop; stopped, or closed, the next press takes up where it left off;
+  three silent Stockfish searches in a row stop it with a note. The scores are kept in the storm
+  store's `meta` (D5's cache tier: `courseScores`, `courseRemoved`), **nothing new in the data repo
+  and no new data format**; the candidates themselves are read live from the chapters (`searchChapters`).
+  About 330 searches at the judges' depth: minutes, not hours, on a desktop.
+- **Tries** are the §5.145 `practice` events with `preset: "endgame"` at the drill's start position
+  (after the first move for a flipped chapter), so they sync as they are; the standings, the spacing
+  (1, 3, 7, 14, 30, 60 days) and the home's "Endgames · n due" count them
+  (`courseStandings`). Drill ids `c-<hash>` (the chapter start's key), the address
+  `#/endgames/c-xxxxxxxx`.
+- **The drill** is the endgame drill (`EndgameDrill`: Maia's defence checked by Stockfish, hold or
+  convert, the first slip stopped, take back, hint, Analyse, premoves, the varied defence of §5.174).
+  Under the board, "From <study>, <group>: <title>" with the flipped move and Stockfish's score and
+  "Open the chapter" (to the chapter in the study); and **the course's own text** (`courseText`): the
+  comments along the chapter's main line, each with its move (`1.Kd3`, `1…Kc5`, "Start" for the
+  chapter's own), a comment repeated straight after itself once. Folded during the try (the text
+  gives the method away), open once the try is over.
+- **Not built** (Claude's calls, nothing the plan needed): the comments' shapes drawn on the board;
+  clickable lines in the drill's text (open the chapter for them: the chapter view, the Read view);
+  a per-study include/exclude (Remove per drill does); scoring a chosen group first; any use of the
+  course's line as an answer key.
+
+**Checked**: `test/unit/core/endgames/courses.test.ts` (the group of a name, the candidates, the
+goal bands and the bare king's, the scoring with a stub Stockfish: a win, a win on material to mate,
+a draw, no goal, no answer; the weaker side's chapter flipped and left out when it still has no goal
+or the chapter has no move; the drills joined with their scores, removed, grouped; the stored score
+read back; the text along the main line with a repeated comment once), `test/unit/core/repertoire/
+lines.test.ts` (the examples above, the remarks that stay text, the number placing),
+`test/unit/core/games/plans.test.ts` (each comment's positions, a transposition's other move
+number); `test/e2e/endgames.spec.ts` on desktop and the emulated phone with a small synthetic
+reference study in a course export's shape (a mate, a win with pawns, a draw in a "Test" chapter,
+a weaker side's chapter, one with no goal, one with no position) scored by the fake Stockfish, the
+groups, one played with a hint synced as one endgame try at the chapter's position, the text under
+the board, the flipped chapter's source and board side, a group chosen, one removed and put back,
+the scores kept over a reload; `test/e2e/views.spec.ts` and `test/e2e/plans.spec.ts` for the lines.
+**Not checked live**: the real export (not in this container), Stockfish at the judges' depth on
+the real chapters, Maia as the defence in these positions. `TESTING.md` §8.
+
+**As built** (2026-11-14): `src/core/endgames/courses.ts`, `src/app/courseEndgames.ts`, the section,
+drill and next button in `src/ui/Endgames.tsx`, the home's count in `src/ui/Today.tsx`, loading in
+`src/ui/App.tsx`; `Endgame.group` may be `course`; `hash` exported from `repertoire.ts`.
+

@@ -6739,6 +6739,37 @@ a.button.disabled {
   font-size: 0.85rem;
 }
 
+/* The courses' endgames (Endgames.tsx, PLAN.md §5.175): the course's own text under the board. */
+.course-note {
+  margin-top: 8px;
+}
+
+.course-note p {
+  margin: 2px 0 0;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.course-move {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.endgame-left {
+  margin-top: 10px;
+}
+
+.endgame-left summary {
+  cursor: pointer;
+}
+
+.endgame-left-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 0.9rem;
+}
+
 /* "?" lists the screen's keys (§5.158). */
 .keys-help {
   max-width: min(520px, calc(100vw - 32px));

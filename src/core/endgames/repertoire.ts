@@ -236,7 +236,7 @@ export interface RepertoireEndgame {
 }
 
 /** FNV-1a over a string, as 8 hex digits. */
-function hash(s: string): string {
+export function hash(s: string): string {
   let h = 0x811c9dc5;
   for (let i = 0; i < s.length; i++) {
     h ^= s.charCodeAt(i);

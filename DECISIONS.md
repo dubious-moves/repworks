@@ -2424,3 +2424,27 @@ The technical calls, each with its reason:
   checks (no stalemate, no repetition for a draw's attacker, nothing hanging). Why: the owner's
   request to cut the wait and trust Maia, as an option; off by default, so §5.147's checked
   defence stays the default.
+
+## Revision of 2026-11-14 (endgames from the user's courses, lead-in lines, plan cards: PLAN.md §5.175)
+- **A course's chapters are drills the repworks way, not an answer key.** A chapter of a reference
+  study with a `[FEN]` start is a candidate; Stockfish gives it a goal by the repertoire endgames'
+  bands (§5.149), and it is played against Maia's defence with every move judged, any move that keeps
+  the goal allowed. Why: the owner's request; the course's one line is a lesson, not the only right
+  play. Where the side to move is the worse one, the course's first move is played for it and the
+  user has the other side (the main line of 50 of Silman's 326 chapters starts with the weaker
+  side's move).
+- **Nothing new in the data repo.** The candidates are read live from the study's chapters, the scores
+  are kept on the device (the storm store's `meta`, D5's cache tier), the tries are the §5.145
+  `practice` events with the preset `endgame`. Why: no data format of the owner's changed; the
+  course stays in the owner's private data repo (D14), never in this one.
+- **A win against a bare king is a pawn queened or mate, not "converted"** (found by the first e2e
+  game ending on its first move). `convert`'s bare king is reached at once there.
+- **A comment's group may open with a few lead-in words** (`Or`, `Not`, `The quicker`…, a closed
+  list), and is then a clickable line, placed by its number as before. Why: the course writes its
+  variations as such prose (about 500 more groups); the chapter and Read views already preview lines,
+  so the informational variations live there. The training quiz still reads number-first groups
+  only. This loosens §5.12's "starts with a move number", which was q_extension's rule.
+- **Plan cards show their comments with clickable lines**, each placed at its own node's positions
+  (§5.61 said "their lines not clickable here").
+- The plan's section number is §5.175 (the request named §5.165, which was taken).
+
