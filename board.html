@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#22412e" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Repworks: board spike</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
+    <style>
+      :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #161a17; color: #d6dbd5; line-height: 1.45; }
+      body { margin: 0 auto; max-width: 760px; padding: 12px 12px 48px; }
+      h1 { font-size: 1.25rem; margin: 4px 0; }
+      h2 { font-size: 1.05rem; margin: 22px 0 6px; border-top: 1px solid #2c362e; padding-top: 14px; }
+      p, li { font-size: 0.95rem; }
+      .muted { color: #8d978e; font-size: 0.85rem; }
+      input, button, textarea { font: inherit; }
+      input { width: 100%; min-height: 44px; padding: 6px 10px; margin: 4px 0; box-sizing: border-box; background: #202621; color: inherit; border: 1px solid #3a463c; border-radius: 6px; }
+      button { min-height: 44px; padding: 0 14px; margin: 4px 6px 4px 0; border-radius: 6px; border: 1px solid #3f6b4f; background: #22412e; color: #e8efe9; }
+      button.small { min-height: 36px; padding: 0 10px; font-size: 0.85rem; background: #202621; border-color: #3a463c; }
+      button:disabled { opacity: 0.45; }
+      #log { white-space: pre-wrap; word-break: break-all; background: #101311; border: 1px solid #2c362e; border-radius: 6px; padding: 8px; max-height: 360px; overflow: auto; font-size: 0.8rem; }
+      #grid { font-family: ui-monospace, monospace; font-size: 1.05rem; line-height: 1.3; background: #101311; border: 1px solid #2c362e; border-radius: 6px; padding: 8px 12px; display: inline-block; margin: 4px 0; }
+      #fen-now { font-family: ui-monospace, monospace; font-size: 0.85rem; word-break: break-all; }
+      table { border-collapse: collapse; font-size: 0.85rem; }
+      td, th { padding: 2px 10px 2px 0; text-align: left; }
+      textarea { width: 100%; height: 160px; box-sizing: border-box; }
+      .ok { color: #9fd3a8; } .bad { color: #e0a070; }
+    </style>
+  </head>
+  <body>
+    <h1>Repworks: board spike</h1>
+    <p class="muted">A test page for the Chessnut Move (CHESSNUT.md part (a), §7). Close Chessnut's own app first: the board talks to one app at a time. Build <span id="build"></span>.</p>
+
+    <h2>1. Can this browser?</h2>
+    <p id="can">Checking…</p>
+
+    <h2>2. Connect</h2>
+    <button id="connect" type="button">Connect</button>
+    <button id="reconnect" type="button" hidden>Reconnect</button>
+    <button id="disconnect" type="button" disabled>Disconnect</button>
+    <p id="link" class="muted">Not connected.</p>
+
+    <h2>3. The board now</h2>
+    <p id="fen-now" class="muted">No report yet.</p>
+    <pre id="grid"></pre>
+
+    <h2>4. Drive</h2>
+    <label>Position (a FEN; its first field is taken)<input id="fen" autocomplete="off" spellcheck="false" /></label>
+    <div id="samples"></div>
+    <button id="drive-force" type="button" disabled>Drive (force)</button>
+    <button id="drive-hand" type="button" disabled>Drive (a hand stops it)</button>
+    <button id="stop" type="button" disabled>Stop</button>
+    <p class="muted">Logs the time from the write to the first report showing the position, and every report on the way. Try a hand on a piece during a drive, in each mode.</p>
+
+    <h2>5. Five storm-like setups</h2>
+    <button id="setups" type="button" disabled>Run the five setups</button>
+    <p class="muted">The start, then five middlegame positions one after another, each timed: what a storm card will cost.</p>
+
+    <h2>6. Lights</h2>
+    <button id="lights-each" type="button" disabled>Each code</button>
+    <button id="lights-off" type="button" disabled>Off</button>
+    <p class="muted">"Each code": rank 1 off, rank 2 code 1 (red), rank 3 code 2 (green), rank 4 code 3 (blue), rank 5 code 4 (dark green?), rank 6 code 5 (bright green?), rank 7 code 6 (yellow?), rank 8 code 7 (orange?). Note in the box below which ranks light, and in what colour.</p>
+    <label>What the lights showed<input id="lights-note" autocomplete="off" placeholder="e.g. ranks 2–8 lit; 5 and 6 the same green; 7 yellow; 8 orange" /></label>
+
+    <h2>7. Battery and pieces</h2>
+    <button id="battery" type="button" disabled>Battery</button>
+    <button id="pieces" type="button" disabled>Pieces</button>
+    <p id="battery-now" class="muted"></p>
+    <table id="pieces-table"></table>
+
+    <h2>8. The log</h2>
+    <button id="log-copy" type="button">Copy log</button>
+    <button id="log-clear" type="button" class="small">Clear</button>
+    <textarea id="log-text" hidden readonly></textarea>
+    <pre id="log"></pre>
+
+    <script type="module" src="/src/spike/board.ts"></script>
+  </body>
+</html>

@@ -92,7 +92,8 @@ export function App() {
       <footer class="footer">
         <span>
           build {__BUILD_ID__}
-          {shellVersion.value && <> · shell {shellVersion.value.slice(0, 8)}</>} · <a href={`${import.meta.env.BASE_URL}spike.html`}>remote spike</a>
+          {shellVersion.value && <> · shell {shellVersion.value.slice(0, 8)}</>} · <a href={`${import.meta.env.BASE_URL}spike.html`}>remote spike</a> ·{' '}
+          <a href={`${import.meta.env.BASE_URL}board.html`}>board spike</a>
         </span>
         {wide.value && <SyncStatus />}
       </footer>

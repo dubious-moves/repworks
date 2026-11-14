@@ -1,8 +1,10 @@
 # Repworks: the Chessnut Move (a robotic board)
 
-Status: planned 2026-11-06 at the owner's request, not built. The owner hasn't bought the board
-yet; everything here can be built and tested before it arrives (a simulated board in the tests),
-and part (a)'s spike page checks on the first day what only the real board can show. Read with
+Status: planned 2026-11-06 at the owner's request; **being built since 2026-11-14** at the owner's
+word ("Go ahead and build it"), before the board arrives. Built: parts (a) and (b) (2026-11-14). What each
+part changed from this plan is in `PLAN.md` §5.153's "As built" notes. Everything here can be built
+and tested before the board arrives (a simulated board in the tests), and part (a)'s spike page
+checks on the first day what only the real board can show. Read with
 `CLAUDE.md`, `PLAN.md` (§5.153 points here) and `DECISIONS.md` (its revision log of 2026-11-06).
 
 The owner's words: "I'm planning on buying the 'Chessnut Move' board and I want to be able to use

@@ -21,6 +21,7 @@ per screen, in this order:
 11. Import and share
 12. Settings and sync
 13. The spike and installation (the installed app, the start, the frame around every page)
+14. The Chessnut Move (when the board arrives: CHESSNUT.md)
 
 Within a screen the newest items come first. Each item names its section and date. Its bullets
 are what waits for the owner's devices; its last line, **Checked**, says what tests, headless
@@ -1483,3 +1484,23 @@ q_extension (or give it to a session with q_extension attached), then run
    });
  }
 ```
+
+## 14. The Chessnut Move
+
+Built before the board arrives (CHESSNUT.md, PLAN.md §5.153): nothing here can be checked until it
+does. Start with the spike: its log decides what the later parts change (CHESSNUT.md §7).
+
+### The Chessnut Move's spike page (CHESSNUT.md part (a), 2026-11-14)
+- Nothing live yet; the simulated board only. When the board arrives: on the device that will drive
+  it (Chrome, or Brave with brave://flags/#brave-web-bluetooth-api enabled), close Chessnut's app,
+  open the footer's "board spike", and go through its steps 1–8. Copy the log and give it to any
+  session: CHESSNUT.md §7 says what each answer changes.
+- Worth noting as you go: whether Chrome on the phone asks for Location in the chooser; what the
+  robot does with a hand on a piece in each Drive mode; where "Kings and pawns" puts the pieces it
+  takes off; which ranks "Each code" lights, in what colour (the box under it goes into the log);
+  and, with the page open, the link after the screen locks and after the board's own sleep.
+- **Checked**: unit tests (the codec against Chessnut's byte vectors; the Bluetooth module against
+  a simulated board in Node); Playwright on a desktop and an emulated phone with the simulated
+  board (connect, a drive timed with a report on its way, the five setups, the lights' pattern, the
+  pieces, a drop and Reconnect, Copy log; without Web Bluetooth, and Brave's flag). Nothing on a
+  real board.

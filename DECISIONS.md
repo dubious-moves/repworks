@@ -2328,3 +2328,13 @@ The technical calls, each with its reason:
   once saved, where it changes the card's own. Why: the owner asked to set it when saving; a
   select that stays after saving needs no second place to change it from. No data format changed:
   the `rank` event of §5.171, written with the `saved` one.
+
+## Revision of 2026-11-14 (the Chessnut Move built before it arrives; CHESSNUT.md parts (a) and (b))
+- **The Chessnut Move is being built now, before the board is bought.** Why: the owner, 2026-11-14:
+  "Read CHESSNUT.md. Go ahead and build it." (on 2026-11-10 the owner had said to leave it until
+  it was bought). The parts go in `CHESSNUT.md`'s order, (a) to (f), each pushed when the checks
+  pass; the live checks wait for the board, in `TESTING.md` §14.
+- **`openBoard` takes an options object** (`sleep`, `onFrame`, `onWrite`) in place of Appendix A's
+  `sleep` argument. Why: the spike logs every frame raw and which write kind went through (§7's
+  "does a 35-byte write work, and which kind?"), and three optional values read better named.
+- No data format changed; nothing in the app uses the board yet.
