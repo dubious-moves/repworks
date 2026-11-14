@@ -1662,6 +1662,10 @@ does. Start with the spike: its log decides what the later parts change (CHESSNU
   move it rates a little worse: the margin is 0.10 of the expected score).
 - **Checked**: the veto on the real position with the real networks under Node (Kb6 0.11 against 0.49),
   the rule in unit tests, the page's existing e2e; **not** the app with Lc0 stored, nor any phone.
+- **Fixed 2026-11-14** (the owner's Réti, 8.Qxc7+ Kb5): a move that ends the game is now valued by its
+  result. Replay Réti with Maia alone and Lc0 to 8.Qxc7+: Black should take on c7 (king against king,
+  a draw), never Kb5 or Ka6. Checked under Node with the real network (Kxc7 0.5, Kb5 and Ka6 0.000);
+  not in the app.
 
 ### An endgame's end not waiting long (PLAN.md §5.177, 2026-11-14)
 - Play a course drill (or a built-in king and pawn win) quickly with "Maia alone" on, to its end

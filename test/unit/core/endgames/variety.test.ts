@@ -121,7 +121,10 @@ test('hanging, from the board alone: taken by a cheaper piece, or with nothing t
 
 test('Maia alone: nothing ended, nothing hanging, no repetition for a draw’s attacker; a forced give-up still played', () => {
   const check = (fen: string, repeated: string[] = []) => ({
-    over: (u: string) => after(fen, u).isEnd(),
+    ends: (u: string) => {
+      const p = after(fen, u);
+      return !p.isEnd() ? undefined : p.isCheckmate() ? ('mate' as const) : ('draw' as const);
+    },
     repeats: (u: string) => repeated.includes(u),
     hangs: (u: string) => hangs(after(fen, u)),
   });
@@ -151,6 +154,33 @@ test('Maia alone: nothing ended, nothing hanging, no repetition for a draw’s a
   assert.deepEqual(trustPick('draw', ['e3d4'], policy('e3d4', 'e4e5'), ['e4e5'], check(loose)), { uci: 'e3d4' });
   // Nothing at all to play: Stockfish then.
   assert.equal(trustPick('win', [], [], [], check(kp)), undefined);
+  // A defence's draw on the board is its best: Kxe7 (king against king) played, not passed over.
+  const bare = '4k3/4P3/8/4K3/8/8/8/8 b - - 0 1';
+  assert.deepEqual(trustPick('win', ['e8e7', 'e8d7'], policy('e8e7', 'e8d7'), [], check(bare)), { uci: 'e8e7' });
+  // A mate is played though the board checks call every move here hanging.
+  const mate = '6k1/5ppp/8/8/8/8/r4PPP/6K1 b - - 0 1';
+  assert.deepEqual(trustPick('draw', ['a2b2', 'a2a1'], policy('a2b2', 'a2a1'), [], { ...check(mate), hangs: () => true }), { uci: 'a2a1' });
+});
+
+test('The owner’s report (2026-11-14, Réti): after 8.Qxc7+ the attacker takes the queen when the rest lose', () => {
+  const fen = '8/2Q1K3/1k6/8/8/8/8/8 b - - 0 8';
+  const check = {
+    ends: (u: string) => (after(fen, u).isEnd() ? ('draw' as const) : undefined),
+    repeats: () => false,
+    hangs: (u: string) => hangs(after(fen, u)),
+  };
+  const maia = [{ uci: 'b6c7', prob: 0.92 }, { uci: 'b6b5', prob: 0.07 }, { uci: 'b6a6', prob: 0.013 }];
+  // Kxc7 ends the game, king against king: a draw.
+  assert.equal(check.ends('b6c7'), 'draw');
+  // Without Lc0, the board-only rule passes an attacker's draw over (§5.147's stalemates): Kb5.
+  assert.deepEqual(trustPick('draw', ['b6c7', 'b6b5', 'b6a6'], maia, [], check), { uci: 'b6b5' });
+  // Lc0 rates Kxc7 by its result (0.5) and the king moves as lost: they're vetoed, and the draw played.
+  const vetoed = lc0Vetoed({ b6c7: 0.5, b6b5: 0.004, b6a6: 0.003 });
+  assert.deepEqual([...vetoed].sort(), ['b6a6', 'b6b5']);
+  const left = ['b6c7', 'b6b5', 'b6a6'].filter((u) => !vetoed.has(u));
+  assert.deepEqual(trustPick('draw', left, maia, [], check, true), { uci: 'b6c7' });
+  // Not vetted (no Lc0), a draw that is all that's left goes to Stockfish.
+  assert.equal(trustPick('draw', left, maia, [], check), undefined);
 });
 
 test('Lc0’s veto: the moves rated clearly below the best, nothing when they are alike', () => {

@@ -10274,6 +10274,26 @@ Stockfish but stronger than Maia".
 of `endgameReply` (`src/app/practice.ts`); `startEndgame` warms it (`src/app/endgames.ts`); the
 sentence under the switch (`src/ui/Endgames.tsx`).
 
+**Fixed 2026-11-14 (the owner's report, Réti):** "In this position black played Kb5, turning a draw
+into a loss. This shouldn't be possible with Lc0 veto." After 5…h1=Q 6.c8=Q Qh2+ 7.Ke7 Qc7+
+8.Qxc7+ (`8/2Q1K3/1k6/8/8/8/8/8 b`), the attacker's only move that doesn't lose is Kxc7, king against
+king, which ends the game. A move that ends the game was left out twice: before Lc0 was asked (it
+values positions, and that game is over), and by `trustPick`, which passes over any game-ending move
+(§5.147's stalemates). Lc0 saw only Kb5 and Ka6, both lost (0.000 each), and vetoed neither; Maia's
+7% Kb5 was played. Now:
+- A move that ends the game is valued by its result in the veto, no network run: a mate 1, a draw
+  (stalemate, a dead position) 0.5 (`endgameLc0`). Here Kb5 and Ka6 are vetoed against Kxc7's 0.5.
+- `trustPick` takes how a move ends (`ends`: mate or draw) instead of whether it does. A mate is
+  played like any sound move, whether or not its piece hangs; so is a defence's draw (the drill's user
+  plays for a win, so the drawing move is the defence's best). An attacker's draw is still passed over,
+  unless Lc0 has rated the candidates (`vetted`) and it is all that's left: every other move lost.
+  Without Lc0, an attacker's draw that is all that's left goes to Stockfish as before.
+- Not changed: `opponentPick` (with Stockfish): Stockfish's own line, which is the draw here, stands in
+  when Maia's moves aren't sound.
+- **Checked**: the real network under Node on this position (Kxc7 0.5, Kb5 0.000, Ka6 0.000: both
+  vetoed); `variety.test.ts` (this position with and without the veto, a defence's king-against-king
+  capture, a mate whose piece hangs); the e2e endgames spec. **Not checked live** in the app. `TESTING.md`.
+
 #### 5.177 Endgames: the end doesn't wait long on the judges (the owner's report of 2026-11-14, built)
 
 The owner, on a course drill (White Ka7, Pb7 against Kd7, 10.b8=Q played): "With the Lc0 veto and all, I

@@ -89,7 +89,7 @@ export function warmEndgameLc0(): void {
 export interface EndgameLc0 {
   /** Lc0's own likeliest move here. */
   top?: string;
-  /** For each of `ucis` that doesn't end the game, and `top`: the mover's expected score after it. */
+  /** For each of `ucis` and `top`: the mover's expected score after it (a move that ends the game: its result). */
   values: Record<string, number>;
 }
 
@@ -108,8 +108,8 @@ export async function endgameLc0(fen: string, ucis: readonly string[]): Promise<
       if (!move) continue;
       const child = pos.clone();
       child.play(move);
-      if (child.isEnd()) continue;
-      values[uci] = 1 - expected((await ask([fen, makeFen(child.toSetup())])).wdl);
+      // A move that ends the game is worth its result, no network run: a mate 1, a draw 0.5.
+      values[uci] = child.isEnd() ? (child.isCheckmate() ? 1 : 0.5) : 1 - expected((await ask([fen, makeFen(child.toSetup())])).wdl);
     }
     return { ...(top ? { top } : {}), values };
   } catch {

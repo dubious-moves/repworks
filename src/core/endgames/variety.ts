@@ -158,14 +158,21 @@ export function lc0Vetoed(values: Readonly<Record<string, number>>, margin = LC0
 
 /**
  * "Maia alone"'s reply: no Stockfish, so only checks that need no search. A draw's attacker's pawn
- * push first when asked for (§5.148), Maia's likeliest that ends nothing, repeats nothing and hangs
- * nothing; then the moves in `ordered` (the last try's reply first after a miss, then
+ * push first when asked for (§5.148), Maia's likeliest that throws nothing away, repeats nothing and
+ * hangs nothing; then the moves in `ordered` (the last try's reply first after a miss, then
  * `replyOrder`'s), the first passing those checks. Only moves of `ordered` are ever played: a
  * move Maia gives 0.3% is not an alternative (the owner's report of 2026-11-14: a 99% move that
  * repeated the position was passed over for Kd3). Failing the checks, the first of `ordered` that
- * ends nothing and hangs nothing though it repeats a position (a draw's attacker with no other
- * decent move: the repetition is the honest reply), else the first that ends and repeats nothing
- * (a lost defence may have to give something up); undefined when none does (Stockfish then).
+ * throws nothing away and hangs nothing though it repeats a position (a draw's attacker with no other
+ * decent move: the repetition is the honest reply), else the first that throws nothing away and
+ * repeats nothing (a lost defence may have to give something up); undefined when none does
+ * (Stockfish then).
+ * A move that ends the game (`check.ends`) is taken as its result: a mate, or a defence's draw
+ * (stalemate, a dead position), is the mover's best and played like any sound move, hanging or not;
+ * an attacker's draw throws its win away (§5.147's stalemates) and is passed over, unless `vetted`
+ * (Lc0 has rated what's left, §5.176) and it is all that is left: then every other move lost
+ * (the owner's report of 2026-11-14, Réti: 8…Kxc7, king against king, passed over for Kb5, which
+ * loses the queen ending).
  * `policy` is Maia's whole answer (the pushes' likelihoods), `pushes` the pawn pushes to try;
  * repetitions count only for a draw's attacker.
  */
@@ -174,17 +181,24 @@ export function trustPick(
   ordered: readonly string[],
   policy: readonly { uci: string; prob: number }[],
   pushes: readonly string[],
-  check: { over(uci: string): boolean; repeats(uci: string): boolean; hangs(uci: string): boolean },
+  check: { ends(uci: string): 'mate' | 'draw' | undefined; repeats(uci: string): boolean; hangs(uci: string): boolean },
+  vetted = false,
 ): { uci: string; push?: boolean } | undefined {
   const repeats = (uci: string) => goal === 'draw' && check.repeats(uci);
-  const quiet = (uci: string) => !check.over(uci) && !repeats(uci);
+  // The user holding a draw makes the opponent the attacker: a draw on the board is its win given away.
+  const throws = (uci: string) => goal === 'draw' && check.ends(uci) === 'draw';
+  const ends = (uci: string) => check.ends(uci) !== undefined;
+  const quiet = (uci: string) => !throws(uci) && !repeats(uci);
+  const firm = (uci: string) => ends(uci) || !check.hangs(uci);
   const prob = (uci: string) => policy.find((m) => m.uci === uci)?.prob ?? 0;
-  const push = pushes.filter((u) => quiet(u) && !check.hangs(u)).sort((a, b) => prob(b) - prob(a))[0];
+  const push = pushes.filter((u) => quiet(u) && firm(u)).sort((a, b) => prob(b) - prob(a))[0];
   if (push) return { uci: push, push: true };
-  const safe = ordered.find((u) => quiet(u) && !check.hangs(u));
+  const safe = ordered.find((u) => quiet(u) && firm(u));
   if (safe) return { uci: safe };
-  const repeating = ordered.find((u) => !check.over(u) && !check.hangs(u));
+  const repeating = ordered.find((u) => !throws(u) && firm(u));
   if (repeating) return { uci: repeating };
   const any = ordered.find(quiet);
-  return any ? { uci: any } : undefined;
+  if (any) return { uci: any };
+  const drawn = vetted ? ordered.find(throws) : undefined;
+  return drawn ? { uci: drawn } : undefined;
 }

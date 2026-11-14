@@ -2457,6 +2457,14 @@ The technical calls, each with its reason:
   and pawn win with three lines, 7.5 s with one. The recheck of a likely slip searches the best move
   and the one played. Other practice, the storm and the review are unchanged.
 
+## Revision of 2026-11-14 (a move that ends the game, in Maia alone and Lc0's veto: PLAN.md §5.176)
+- **A move that ends the game counts by its result**: in Lc0's veto a mate is 1 and a draw 0.5, no
+  network run; in Maia alone a mate, or a defence's draw, is played like any sound move, and an
+  attacker's draw only when Lc0 has rated the candidates and every other one is vetoed. This changes
+  §5.174's "the game not ended by the move", which passed over every such move. Why: the owner's
+  report, Réti after 8.Qxc7+: Kxc7 (king against king) was left out of the veto and passed over, so
+  Lc0 compared only Kb5 and Ka6 (both lost), vetoed neither, and Maia's 7% Kb5 lost the game.
+
 ## Revision of 2026-11-14 (Lc0 vetoes a Maia-alone move, PLAN.md §5.176)
 - **With "Maia alone", Lc0 vetoes a move it rates clearly worse, when its files are on the device.**
   One network run on the position after each candidate; more than 0.10 below the best candidate's

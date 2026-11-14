@@ -263,6 +263,11 @@ async function endgameReply(fen: string, e: Endgame, userMoves: number, seen: Re
     return p;
   };
   const over = (uci: string) => after(uci)?.isEnd() ?? true;
+  /** How a move ends the game, if it does: a mate (the mover wins) or a draw (stalemate, a dead position). */
+  const ends = (uci: string): 'mate' | 'draw' | undefined => {
+    const p = after(uci);
+    return !p?.isEnd() ? undefined : p.isCheckmate() ? 'mate' : 'draw';
+  };
   const repeats = (uci: string) => {
     const p = after(uci);
     const k = p && keyFen(makeFen(p.toSetup()))?.key;
@@ -274,11 +279,13 @@ async function endgameReply(fen: string, e: Endgame, userMoves: number, seen: Re
       let ordered = [...new Set([...(replay ? [replay] : []), ...replyOrder(maiaCandidates(policy), hints.seen).map((m) => m.uci)])];
       let pushed = pushes;
       // Lc0, when it is on this device, vetoes a move it rates clearly worse than the best (§5.176): a king
-      // step that loses the opposition looks sound to the board-only checks. With every candidate vetoed,
-      // its own likeliest move; with none of them, no veto.
-      const lc0 = await endgameLc0(fen, [...ordered, ...pushes].filter((u) => !over(u)));
+      // step that loses the opposition looks sound to the board-only checks. A move that ends the game is
+      // rated by its result (a draw 0.5), so the others are measured against it. With every candidate
+      // vetoed, its own likeliest move; with none of them, no veto.
+      const lc0 = await endgameLc0(fen, [...ordered, ...pushes]);
       let lc0Own = false;
-      if (lc0 && Object.keys(lc0.values).length) {
+      const vetted = !!lc0 && Object.keys(lc0.values).length > 0;
+      if (lc0 && vetted) {
         const vetoed = lc0Vetoed(lc0.values);
         ordered = ordered.filter((u) => !vetoed.has(u));
         pushed = pushes.filter((u) => !vetoed.has(u));
@@ -291,7 +298,7 @@ async function endgameReply(fen: string, e: Endgame, userMoves: number, seen: Re
         const p = after(uci);
         return !p || hangs(p);
       };
-      const pick = trustPick(goal, ordered, policy, pushed, { over, repeats, hangs: hung });
+      const pick = trustPick(goal, ordered, policy, pushed, { ends, repeats, hangs: hung }, vetted);
       if (pick) return { uci: pick.uci, source: lc0Own ? 'Lc0' : `Maia ${MAIA_ELO}`, dbFailed: false };
     }
   }
