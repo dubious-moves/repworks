@@ -33,6 +33,8 @@ interface Job {
   startedAt?: number;
   /** Waited on now (an endgame's reply): ahead of the queue, and ahead of a search under way that isn't. */
   urgent?: boolean;
+  /** Ahead of the background searches, behind the urgent ones, and no search under way is stopped for it (an endgame's judges). */
+  ahead?: boolean;
   resolve(a: EngineAnswer | null): void;
 }
 
@@ -184,11 +186,14 @@ export function stormEngineProgress(): (LaneProgress | null)[] {
 }
 
 /** Stockfish's MultiPV lines for a position, to `depth` or `movetime` ms, of `moves` only when given; null when it can't. */
-export function analyseForStorm(fen: string, lines: number, depth: number, movetime: number, moves?: readonly string[], urgent = false): Promise<EngineAnswer | null> {
+export function analyseForStorm(fen: string, lines: number, depth: number, movetime: number, moves?: readonly string[], urgent: boolean | 'ahead' = false): Promise<EngineAnswer | null> {
   return new Promise((resolve) => {
-    const job: Job = { fen, lines, depth, movetime, ...(moves?.length ? { moves } : {}), ...(urgent ? { urgent } : {}), resolve };
+    const job: Job = { fen, lines, depth, movetime, ...(moves?.length ? { moves } : {}), ...(urgent === true ? { urgent } : urgent === 'ahead' ? { ahead: true } : {}), resolve };
     if (!urgent) queue.push(job);
-    else {
+    else if (urgent === 'ahead') {
+      const at = queue.findIndex((j) => !j.urgent && !j.ahead);
+      queue.splice(at < 0 ? queue.length : at, 0, job);
+    } else {
       // Behind the other urgent ones, ahead of the rest; the one worker's background search is put
       // back at the front, to start again (over its warm hash) once this one is answered.
       const at = queue.findIndex((j) => !j.urgent);

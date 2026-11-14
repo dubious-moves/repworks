@@ -2449,6 +2449,14 @@ The technical calls, each with its reason:
 - The plan's section number is §5.175 (the request named §5.165, which was taken).
 
 
+## Revision of 2026-11-14 (an endgame's judges: one line, 3 s, ahead of background searches: PLAN.md §5.177)
+- **In endgame drilling, a move's judge, the ponder and the hint search one line for at most 3 s,
+  ahead of the background searches, instead of three lines for up to 8 s.** The slip rule reads
+  only the best move's score and the played move's. Why: the owner's report, 2026-11-14: "Checking
+  your moves…" took long after a quick Maia-alone drill; measured 24 s of judges over a ten-move king
+  and pawn win with three lines, 7.5 s with one. The recheck of a likely slip searches the best move
+  and the one played. Other practice, the storm and the review are unchanged.
+
 ## Revision of 2026-11-14 (Lc0 vetoes a Maia-alone move, PLAN.md §5.176)
 - **With "Maia alone", Lc0 vetoes a move it rates clearly worse, when its files are on the device.**
   One network run on the position after each candidate; more than 0.10 below the best candidate's

@@ -222,7 +222,7 @@ test.beforeAll(async () => {
     ],
     [AFTER_KD2_KE3]: [[1, 0, 'd5e5 e3d3']],
     // Every move of the bishop and knight's mate about +1.6; Bc4 hangs the bishop (0.00), confirmed
-    // by the deeper search of the lines' moves and it.
+    // by the deeper search of the best move and it.
     [BN.u0]: [
       [1, 165, 'e1d2 e5d4'],
       [2, 164, 'e1f2 e5e4'],
@@ -235,11 +235,10 @@ test.beforeAll(async () => {
       [3, 157, 'd2e2 d4e4'],
     ],
     [BN.bc4]: [[1, 0, 'd4c4 d2e3']],
-    [`${BN.u1}|f1d3 b1c3 d2e2 f1c4`]: [
+    // A judge searches the best move alone (one line), so its deeper search is of the best move and the one played.
+    [`${BN.u1}|f1d3 f1c4`]: [
       [1, 160, 'f1d3 d4c5'],
-      [2, 158, 'b1c3 d4c4'],
-      [3, 157, 'd2e2 d4e4'],
-      [4, 0, 'f1c4 d4c4'],
+      [2, 0, 'f1c4 d4c4'],
     ],
   };
   for (const [key, lines] of ROOK_PAWN) extra[key] = lines;
@@ -311,8 +310,11 @@ test('an endgame: a move that lets the win slip, found after playing on, taken b
   await expect(page.locator('.game-move.endgame-slip-move')).toHaveText('1. Kd2');
   await expect(page.locator('.game-move.endgame-after-slip')).toHaveCount(3);
   const cmds = commands(site.requests);
-  const recheck = cmds.findIndex((c) => /^go depth \d+ movetime 15000 searchmoves d3e3 d3c3 d3d2$/.test(c));
+  const recheck = cmds.findIndex((c) => /^go depth \d+ movetime 15000 searchmoves d3e3 d3d2$/.test(c));
   expect(recheck).toBeGreaterThan(-1);
+  // The judge's first searches are of one line and at most 3 s (the end doesn't wait long on them).
+  expect(cmds.filter((c) => /^go depth \d+ movetime 3000$/.test(c)).length).toBeGreaterThan(0);
+  expect(cmds.some((c) => /^go depth \d+ movetime 8000/.test(c))).toBe(false);
   // Stockfish's answer to Kd2 was searched before the judge's deeper search.
   expect(cmds.slice(0, recheck).some((c) => c.startsWith(`position fen ${AFTER_KD2} `))).toBe(true);
   // Nothing answers it while it waits.
@@ -801,6 +803,9 @@ test('the courses’ endgames: a reference study scored on the device, listed by
   await expect(items).toHaveCount(4);
 
   // Kept on the device: after a reload nothing is scored again, and the missed drill is still due.
+  // The Undo's event is written to the device's log a moment after the page shows it: the reload waits
+  // for it (a person can't reload within milliseconds of a click).
+  await page.waitForTimeout(1500);
   await page.reload();
   await expect(section.getByTestId('course-counts')).toHaveText('4 drills · 1 due · 3 new · 1 with no goal');
   await expect(section.getByRole('button', { name: /^Score/ })).toHaveCount(0);

@@ -362,11 +362,19 @@ function played(fen: string, uci: string): { san: string; fen: string } | undefi
 
 const searches = new Map<string, Promise<Awaited<ReturnType<typeof analyseForStorm>>>>();
 /** A position's lines at the judges' depth, kept for the review (its lines and its eval bar ask again). */
-export function analyse(fen: string, lines: number) {
-  return search(fen, lines, narrow() ? 16 : 18, 8000);
+export function analyse(fen: string, lines: number, quick = false) {
+  return quick ? search(fen, 1, narrow() ? 16 : 18, ENDGAME_JUDGE_MS, undefined, 'ahead') : search(fen, lines, narrow() ? 16 : 18, 8000);
 }
 
-function search(fen: string, lines: number, depth: number, movetime: number, moves?: readonly string[], urgent = false) {
+/**
+ * An endgame's judges and its hint (the owner's request, 2026-11-14: "Checking your moves…" took
+ * long with the defence needing no Stockfish): the best move's score and the played move's, one
+ * line each, at most this long, ahead of the background searches. The slip rule needs no more
+ * (`slips`); three lines at depth 18 took 4 to 10 s a king and pawn position, 24 s over a drill.
+ */
+const ENDGAME_JUDGE_MS = 3000;
+
+function search(fen: string, lines: number, depth: number, movetime: number, moves?: readonly string[], urgent: boolean | 'ahead' = false) {
   const key = `${fen}|${lines}|${depth}|${moves?.join(' ') ?? ''}`;
   let p = searches.get(key);
   if (!p) {
@@ -395,11 +403,11 @@ function sanLine(fen: string, pv: readonly string[]): string[] {
  * judged by that search (§5.136); only when `recheckIf` says so, given it (an endgame's move, only
  * when it looks like a slip: nothing else about it is shown).
  */
-export async function judge(fenBefore: string, uci: string, fenAfter: string, recheckIf?: (bestCp: number, afterCp: number) => boolean): Promise<Partial<PracticeMove> | undefined> {
+export async function judge(fenBefore: string, uci: string, fenAfter: string, recheckIf?: (bestCp: number, afterCp: number) => boolean, quick = false): Promise<Partial<PracticeMove> | undefined> {
   const pos = positionOf(fenBefore);
   if (!pos) return undefined;
   const moverLines = (a: Awaited<ReturnType<typeof analyse>>): MoverLine[] => (a?.lines ?? []).filter((l) => l.pv.length).map((l) => ({ move: l.pv[0]!, cp: moverScore(l.score, pos.turn) }));
-  let a = await analyse(fenBefore, 3);
+  let a = await analyse(fenBefore, 3, quick);
   let lines = moverLines(a);
   const matched = lines.find((l) => l.move === uci);
   let afterCp = matched?.cp;
@@ -407,7 +415,7 @@ export async function judge(fenBefore: string, uci: string, fenAfter: string, re
   const ended = !!after?.isEnd();
   if (ended) afterCp = after!.isCheckmate() ? 10000 : 0;
   else if (!matched && after) {
-    const l = (await analyse(fenAfter, 1))?.lines[0];
+    const l = (await analyse(fenAfter, 1, quick))?.lines[0];
     if (l?.pv.length) afterCp = -moverScore(l.score, after.turn);
   }
   let j = judgeMove(lines, uci, afterCp);
@@ -438,7 +446,7 @@ function judgeAt(g: number, i: number): Promise<void> {
   if (!p || !mv) return Promise.resolve();
   pendingBy.set(g, (pendingBy.get(g) ?? 0) + 1);
   const e = p.setup.endgame;
-  const job = judge(mv.fenBefore, mv.uci, mv.fen, e && ((best, after) => slips(e.goal, best, after, lineOf(e)))).then((j) => {
+  const job = judge(mv.fenBefore, mv.uci, mv.fen, e && ((best, after) => slips(e.goal, best, after, lineOf(e))), !!e).then((j) => {
     patch(g, (q) => {
       const moves = [...q.moves];
       const { judging: _j, ...rest } = moves[i]!;
@@ -852,7 +860,7 @@ export async function practiceHint(): Promise<void> {
   const rep = key ? repertoireEntries(key)?.[0]?.uci : undefined;
   patch(g, () => ({ hint: { fen, level: 1, ...(rep ? { uci: rep } : {}) } }));
   if (rep) return;
-  const best = (await analyse(fen, 3))?.lines[0]?.pv[0];
+  const best = (await analyse(fen, 3, p.setup.kind === 'endgame'))?.lines[0]?.pv[0];
   const q = practice.peek();
   if (best && q?.gen === g && q.hint?.fen === fen) patch(g, () => ({ hint: { ...q.hint!, uci: best } }));
 }
@@ -955,7 +963,7 @@ async function writeHistory(g: number, reason: EndReason, result: 'win' | 'draw'
  * starts from these lines, so it is mostly in by the time Stockfish has answered.
  */
 function ponder(p: PracticeGame): void {
-  if (p.setup.kind === 'endgame' && p.phase === 'user') void analyse(fenAfter(p), 3);
+  if (p.setup.kind === 'endgame' && p.phase === 'user') void analyse(fenAfter(p), 1, true);
 }
 
 /**

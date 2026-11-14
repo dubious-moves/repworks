@@ -1662,3 +1662,12 @@ does. Start with the spike: its log decides what the later parts change (CHESSNU
   move it rates a little worse: the margin is 0.10 of the expected score).
 - **Checked**: the veto on the real position with the real networks under Node (Kb6 0.11 against 0.49),
   the rule in unit tests, the page's existing e2e; **not** the app with Lc0 stored, nor any phone.
+
+### An endgame's end not waiting long (PLAN.md §5.177, 2026-11-14)
+- Play a course drill (or a built-in king and pawn win) quickly with "Maia alone" on, to its end
+  (the pawn queening, say): how long is "Checking your moves…" on the desktop and on the phone? Before:
+  tens of seconds in the owner's case. Also: a move that really throws the win away still stops the game
+  and is taken back (the judge now searches one line, 3 s, then the deeper recheck of the best move and
+  the one played), and nothing wins that shouldn't (a drawn position played to a "win").
+- **Checked**: Stockfish under Node over a guessed king and pawn line (24.4 s of judges with three
+  lines, 7.5 s with one) and Playwright's endgames spec; **not** the app on a device.

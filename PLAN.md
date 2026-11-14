@@ -10273,3 +10273,32 @@ Stockfish but stronger than Maia".
 `src/app/endgameLc0.ts` (a worker of its own, `endgameLc0`, `warmEndgameLc0`); the Maia-alone branch
 of `endgameReply` (`src/app/practice.ts`); `startEndgame` warms it (`src/app/endgames.ts`); the
 sentence under the switch (`src/ui/Endgames.tsx`).
+
+#### 5.177 Endgames: the end doesn't wait long on the judges (the owner's report of 2026-11-14, built)
+
+The owner, on a course drill (White Ka7, Pb7 against Kd7, 10.b8=Q played): "With the Lc0 veto and all, I
+shouldn't have to wait long for 'Checking your moves…' in this situation." "Maia alone" answers in
+about 0.3 s, so the user plays ahead of Stockfish's judges (§5.146), and the end waits for every one
+(§5.146's "the end waits for the judges"). In endgame drilling only.
+
+- **Measured** (2026-11-14, cloud container, Node, the vendored Stockfish 18 lite, depth 18, the
+  line 1.b3 … 10.b8=Q from a guessed start, a king and pawn win): a judge asked three lines of the
+  position before the move (and one of the position after, when the move wasn't among them), as
+  §5.146 built it: 11 searches, **24.4 s** in all, single searches of 4.3, 6.5 and 9.9 s (a MultiPV
+  search proves the weak second and third lines too). The same with one line: 13 searches, **7.5 s**,
+  the longest 4.2 s (a mate in 12 at depth 18); two lines 6.9 s.
+- **Decided** (Claude's calls): an endgame's judge, its ponder and its hint ask for **one line**
+  and at most **3 s** (`ENDGAME_JUDGE_MS`; the search is taken at the depth it reached), the best move's
+  score and the played move's, which is all the slip rule reads (`slips`: kept before, not after,
+  §5.145). The move played is searched in the position after it when it isn't Stockfish's best, as
+  before. The deeper recheck of a likely slip (§5.136, §5.146) searches the best move and the one
+  played, not the three lines' moves. These searches go **ahead of the background searches** (a
+  course's scoring, a gather) in the engine's queue, behind the defence's own (`urgent`), and stop
+  nothing under way (`analyseForStorm`'s `'ahead'`). Other practice, the storm and the review ask as before.
+- **Checked**: Playwright's endgames spec on a desktop and an emulated phone (the judge's search is
+  `go depth 18 movetime 3000`, none at 8 s; the recheck of Kd2 and of Bc4 searches the best move and
+  the played one). The timings are Node's, on a guessed start; **not checked** live in the app on a
+  device (its Stockfish, a phone's speed). `TESTING.md`.
+
+**As built** (2026-11-14): `analyse(fen, lines, quick)`, `ENDGAME_JUDGE_MS`, `judge(…, quick)`,
+`ponder`, `practiceHint` in `src/app/practice.ts`; the `ahead` job in `src/app/stormEngine.ts`.
