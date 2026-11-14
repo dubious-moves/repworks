@@ -1076,6 +1076,15 @@ later change replaced are folded into the later item; items already reported wor
   devices on a fake GitHub (scores, a removal, a missed try and a restore across them; a device's
   older local scores carried into the log); **not** on a real course or your devices.
 
+- **Whose side, second look (2026-11-14, after your report: the side of the move that ends the line)**:
+  press "Score the course" again (every older score is dropped). Then check: "Bishop and Two Pawns 2"
+  (White starts, Black ends, "Black draws by giving up his Bishop") should be Black's drill, after
+  1.Bg6, with "The course ends on Black's move, so it teaches Black"; "Bishop and Wrong Colored
+  Rook-Pawn vs. Lone King 3" also Black's. Look through the list for any drill whose side is still wrong
+  (say which chapter and what the text says), and for chapters now "without a goal" that you wanted: the
+  reasons name the side the line ends on (about ten: the saving tricks Stockfish rates as lost at depth
+  14, and winners' lines that end on the lone king's move). A mark on the first move (`?` `??` `!` `!!`)
+  decides before the last move does.
 - Part 8 (master-game fragments) and Part 9 (tactics): are they sensible as drills, or would you rather
   they were left out? (Remove takes one off; a study-level exclude isn't built.)
 - Under the board, "The course's text": folded during the try, open when it is over. Is it the right

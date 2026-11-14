@@ -186,8 +186,8 @@ let stopAsked = false;
 
 /**
  * Scores every candidate not scored yet, in the course's order, on this device: Stockfish at the
- * judges' depth for the side to move, and, where that side is the worse one, for the other side
- * after the course's first move (`scoreCandidate`). Kept as it goes, so a stopped scoring is
+ * judges' depth for the side to move, and, where the course's first move is the opponent's
+ * (`flipOf`), for the other side after it (`scoreCandidate`). Kept as it goes, so a stopped scoring is
  * resumed by the next.
  */
 export async function scoreCourse(): Promise<void> {

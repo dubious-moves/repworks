@@ -2488,3 +2488,17 @@ The technical calls, each with its reason:
   stopped them following the owner was that a second device had no drills, since it had no scores.
 - **Carried over once**: what a device kept before is written to the log for chapters the log has
   no score for, then cleared.
+
+## Revision of 2026-11-14 (later: the side of a course's drill is the side that ends the line: PLAN.md §5.175)
+- **A course chapter is practised from the side that makes the main line's last move**, not from
+  Stockfish's score. This replaces the earlier revision's rules (a 150 cp swing, the side to move being
+  worse), which still gave 49 drawn chapters the wrong side on the owner's real course: the owner's
+  report, with the reasoning that a lesson does not end on the opponent's move. The author's mark on
+  the first move overrides: `?`/`??` the opponent's (as before), `!`/`!!` the teacher's (a line may end on
+  the other side's forced reply). Why: checked against the 322 chapters of the real course (Stockfish
+  depth 14 and the text of the chapters read): every chapter read where the two disagreed was taught
+  from the side that ends the line, apart from lines ending on a forced reply, which the `!` covers.
+  A chapter whose line ends on the side Stockfish rates lost by the bands is left out, not drilled for the
+  other side (the earlier rule: the user never gets the side the author is against).
+- **Stored course scores are versioned `v: 3`, the old (`v: 1`, `v: 2`) scored again.** Why: the rule
+  changed which side drills have. Cheaper than before: only a flipped chapter needs a second search.

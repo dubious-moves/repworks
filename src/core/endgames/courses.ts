@@ -3,11 +3,13 @@
 // drill; Stockfish's score for the side to move gives it a goal by the repertoire endgames' bands
 // (`goalFor`, §5.149), and it is played as every endgame is (§5.145–§5.148): against Maia's
 // defence, every move judged for the goal, every alternative move allowed. The course's one main
-// line is not an answer key: it is its text (the comments, in order) kept under the board. Its first
-// move is played for the *opponent* where the author means it as the opponent's: it is marked `?` or
-// `??` (a blunder to punish), it throws away `BLUNDER_SWING` or more by Stockfish, or the side to
-// move is the worse one (the lesson shows why it loses); the user then has the other side, the one
-// the author is teaching. Pure: Stockfish's score comes in as a function.
+// line is not an answer key: it is its text (the comments, in order) kept under the board. The user
+// practises the side the author teaches, which is the side that makes the course's last move (a
+// lesson ends on its point, not on the reply to it): when that is not the side to move, the
+// course's first move is played for the opponent and the drill starts after it. The author's mark
+// on the first move overrides: `?`/`??` is the opponent's move (a blunder to punish), `!`/`!!` the
+// teacher's (a line may end on the other side's forced reply: a stalemate, a draw agreed). The user
+// never gets the side the author is against. Pure: Stockfish's score comes in as a function.
 import type { Position } from 'chessops/chess';
 import { parseSan, makeSan } from 'chessops/san';
 import type { Color } from 'chessops/types';
@@ -48,6 +50,10 @@ export interface Candidate {
   first?: string;
   /** The author's mark on the first move when it is a mistake: `?` or `??`. */
   mark?: '?' | '??';
+  /** The author calls the first move good: `!` or `!!`. */
+  praised?: true;
+  /** The side that makes the main line's last move (when every move of the line is legal). */
+  last?: Color;
 }
 
 export const courseId = (key: string): string => `c-${hash(key)}`;
@@ -81,8 +87,10 @@ export function candidatesOf(chapters: readonly CourseChapter[]): Candidate[] {
     seen.add(key);
     const { group, title } = nameParts(c.name, c.study);
     const first = firstMove(c.chapter, start);
-    const mark = first ? markOf(c.chapter.root.children[0]!.nags) : undefined;
-    out.push({ id: courseId(key), key, fen: fenOf(start), sid: c.sid, cid: c.cid, study: c.study, name: c.name, group, title, ...(first ? { first: first.san } : {}), ...(mark ? { mark } : {}) });
+    const nags = first ? c.chapter.root.children[0]!.nags : [];
+    const mark = markOf(nags);
+    const last = lastMover(c.chapter, start);
+    out.push({ id: courseId(key), key, fen: fenOf(start), sid: c.sid, cid: c.cid, study: c.study, name: c.name, group, title, ...(first ? { first: first.san } : {}), ...(mark ? { mark } : {}), ...(!mark && praisedOf(nags) ? { praised: true as const } : {}), ...(last ? { last } : {}) });
   }
   return out;
 }
@@ -90,6 +98,25 @@ export function candidatesOf(chapters: readonly CourseChapter[]): Candidate[] {
 /** `??` or `?` when the glyphs say so (NAG 4, 2): a move the author calls a mistake. */
 function markOf(nags: readonly number[]): '?' | '??' | undefined {
   return nags.includes(4) ? '??' : nags.includes(2) ? '?' : undefined;
+}
+
+/** `!` or `!!` (NAG 1, 3): a move the author calls good. */
+const praisedOf = (nags: readonly number[]): boolean => nags.includes(1) || nags.includes(3);
+
+/**
+ * The side that makes the main line's last move, when the line has a move and every move of it is
+ * legal (a line cut short by a move that doesn't parse says nothing about who ends it).
+ */
+export function lastMover(chapter: Chapter, start: Position): Color | undefined {
+  const pos = start.clone();
+  let last: Color | undefined;
+  for (let node: MoveNode | undefined = chapter.root.children[0]; node; node = node.children[0]) {
+    const move = parseSan(pos, node.san);
+    if (!move) return undefined;
+    last = pos.turn;
+    pos.play(move);
+  }
+  return last;
 }
 
 /** The main line's first move, legal at the start, and the position after it. */
@@ -138,7 +165,7 @@ export function courseGoal(cp: number, lead: number, pos?: Position, side?: Colo
 
 /** A scored candidate, as this device keeps it: its drill, or why it has none. */
 export interface CourseScore {
-  v: 2;
+  v: 3;
   /** The candidate's key (the chapter start's). */
   key: PositionKey;
   /** Stockfish's score for the side to move at the chapter's start, and its depth. */
@@ -147,8 +174,7 @@ export interface CourseScore {
   /**
    * The drill: its start (the chapter's, or after the course's first move), the user's side, the
    * goal. `flipped` is the course's first move as written (with its mark), played for the opponent,
-   * and `by` why: the author marked it a mistake, Stockfish scores it as one, or the side to move
-   * there was the worse one.
+   * and `by` why: the author marked it a mistake, or the course ends on the other side's move.
    */
   drill?: { fen: string; side: 'white' | 'black'; goal: Goal; until?: Until; cp: number; flipped?: string; by?: FlipBy };
   /** When there is no drill, why. */
@@ -157,45 +183,56 @@ export interface CourseScore {
   at: number;
 }
 
-export type FlipBy = 'marked' | 'swing' | 'worse';
-
-/** What the course's first move may lose, by Stockfish, before it is read as a blunder to punish, cp. */
-export const BLUNDER_SWING = 150;
+/** Why the course's first move is the opponent's: the author marked it a mistake, or the course ends on the other side's move. */
+export type FlipBy = 'marked' | 'last';
 
 export type Scorer = (fen: string) => Promise<{ cp: number; depth: number } | undefined>;
 
 const sideOfFen = (fen: string): 'white' | 'black' => (fen.split(' ')[1] === 'b' ? 'black' : 'white');
+const sideName = (c: Color): string => (c === 'white' ? 'White' : 'Black');
 
 /**
- * Scores a candidate: the side to move at the chapter's start has the goal its score gives it,
- * unless the author's first move is meant as the opponent's: marked `?`/`??`, losing `BLUNDER_SWING`
- * or more for the side that plays it, or played by the worse side. Then the move is played for that
- * side, the other side is the user's, and the position after it gives the goal. Left out, with the
- * reason, when that position has none: the side the author is teaching is never swapped for the
- * other. Undefined when Stockfish didn't answer (nothing kept: asked again later).
+ * Whether the course's first move is the opponent's, and why. The author's mark decides first: `?`
+ * or `??` is a blunder to punish, `!` or `!!` the teacher's own move (a line that goes on to end on
+ * the other side's forced reply, a stalemate or a draw agreed, still teaches the side that started
+ * it). Unmarked, the side that makes the line's last move is the side being taught, so a line that
+ * ends on the other side's move starts with the opponent's. Stockfish's score is no part of it: it
+ * misjudges the very positions a course is about (a fortress, a sacrifice).
+ */
+export function flipOf(c: Candidate, start: Position): FlipBy | undefined {
+  if (!c.first) return undefined;
+  if (c.mark) return 'marked';
+  if (c.praised) return undefined;
+  return c.last && c.last !== start.turn ? 'last' : undefined;
+}
+
+/**
+ * Scores a candidate: the side the author teaches has the goal its score gives it. That is the side
+ * to move at the chapter's start, unless the first move is the opponent's (`flipOf`): then it is
+ * played for the opponent, the other side is the user's, and the position after it gives the goal.
+ * Left out, with the reason, when that side has none: the side the author is teaching is never
+ * swapped for the other. Undefined when Stockfish didn't answer (nothing kept: asked again later).
  */
 export async function scoreCandidate(c: Candidate, start: Position, score: Scorer, now: number): Promise<CourseScore | undefined> {
   const a = await score(c.fen);
   if (!a) return undefined;
   const side = start.turn;
-  const goal = courseGoal(a.cp, materialFor(start, side), start, side);
-  const base = { v: 2 as const, key: c.key, cp: Math.round(a.cp), depth: a.depth, at: now };
-  const move = c.first ? playMove(start, c.first) : undefined;
-  const live = move && !move.pos.isEnd() ? move : undefined;
-  // Stockfish for the side to move after the first move, the other side's: the first move's swing is
-  // what the side that played it lost by it.
-  const b = live ? await score(live.fen) : undefined;
-  if (live && !b) return undefined;
-  const by: FlipBy | undefined = c.mark ? 'marked' : b && a.cp + b.cp >= BLUNDER_SWING ? 'swing' : goal === 'you are worse' ? 'worse' : undefined;
+  const base = { v: 3 as const, key: c.key, cp: Math.round(a.cp), depth: a.depth, at: now };
+  const by = flipOf(c, start);
   if (!by) {
+    const goal = courseGoal(a.cp, materialFor(start, side), start, side);
     if (typeof goal === 'string') return { ...base, why: goal };
     return { ...base, drill: { fen: c.fen, side, ...goal, cp: Math.round(a.cp) } };
   }
   const shown = `${c.first}${c.mark ?? ''}`;
-  if (!live || !b) return { ...base, why: by === 'worse' ? 'worse, and the course has no move to play for the weaker side' : `the course’s first move, ${shown}, is a mistake, and it has no position after it to play` };
+  const reason = by === 'marked' ? 'the course’s first move is a mistake' : `the course ends on ${sideName(c.last!)}’s move, so it teaches ${sideName(c.last!)}`;
+  const move = playMove(start, c.first!);
+  const live = move && !move.pos.isEnd() ? move : undefined;
+  if (!live) return { ...base, why: `${reason}, and its first move, ${shown}, has no position after it to play` };
+  const b = await score(live.fen);
+  if (!b) return undefined;
   const other = live.pos.turn;
   const again = courseGoal(b.cp, materialFor(live.pos, other), live.pos, other);
-  const reason = by === 'worse' ? 'worse' : 'the course’s first move is a mistake';
   if (typeof again === 'string') return { ...base, why: `${reason}, and still no goal after the course’s ${shown}: ${again}` };
   return { ...base, drill: { fen: live.fen, side: other, ...again, cp: Math.round(b.cp), flipped: shown, by } };
 }
@@ -251,7 +288,7 @@ export function groupsOf(drills: readonly CourseDrill[]): { group: string; n: nu
 /** Whether a stored value is a score this version reads. */
 export function readCourseScore(x: unknown): CourseScore | undefined {
   const s = x as Partial<CourseScore> | null;
-  if (!s || s.v !== 2 || typeof s.key !== 'string' || typeof s.cp !== 'number') return undefined;
+  if (!s || s.v !== 3 || typeof s.key !== 'string' || typeof s.cp !== 'number') return undefined;
   const d = s.drill;
   if (d && (typeof d.fen !== 'string' || (d.goal !== 'win' && d.goal !== 'draw') || (d.side !== 'white' && d.side !== 'black') || sideOfFen(d.fen) !== d.side)) return undefined;
   return s as CourseScore;

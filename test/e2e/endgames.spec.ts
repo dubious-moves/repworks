@@ -20,8 +20,8 @@
 // defence thinks, taken off, dropped when its answer makes one illegal, a pawn premoved to the last
 // rank queening. And the courses' endgames (§5.175): a small reference study in the shape of a
 // course export (chapters from a [FEN], one main line, prose in the comments), scored on the
-// device (a win to mate, a win converted, a draw held, a weaker side's chapter played from the
-// course's first move, one chapter with no goal; a chapter with no position not offered), listed
+// device (a win to mate, a win converted, a draw held, a chapter whose line ends on the other side's
+// move played from the course's first move, one chapter with no goal; a chapter with no position not offered), listed
 // by the course's groups, one played, its hint synced as an ordinary endgame try, the course's text
 // under the board, one removed and put back, and the scores kept over a reload.
 import { test, expect, type Page } from '@playwright/test';
@@ -120,7 +120,7 @@ const COURSE_HOLD = '8/3k4/8/3K4/3P4/8/8/8 b - -';
 const COURSE_WORSE = '8/8/8/3k4/8/2K5/3P4/8 b - -';
 const COURSE_AFTER_KC5 = '8/8/8/2k5/8/2K5/3P4/8 w - -';
 const COURSE_DEAD = '8/pp6/8/8/8/8/PP6/K6k w - -';
-/** The positions after each chapter's first move (the other side's score: no swing), and the chapter whose first move is a marked blunder. */
+/** The positions after each chapter's first move and the chapter whose first move is a marked blunder. */
 const COURSE_AFTER_RA8 = 'R7/8/8/4k3/8/8/8/3QK3 b - -';
 const COURSE_AFTER_KB1 = '8/pp6/8/8/8/8/PP6/1K5k b - -';
 const COURSE_BLUNDER = '7k/8/5K2/8/8/8/7P/8 w - -';
@@ -655,8 +655,8 @@ test('the repertoire’s endgames: gathered from the games at the line ends, by 
 
 /** A reference study in the shape of a course export: one main line a chapter, prose in the comments. */
 const COURSE_CHAPTERS: [string, string, string | undefined, string][] = [
-  ['Ch01Mate', 'Part 1: Endgames for Beginners (Unrated-999): The Staircase - 1', '8/8/8/4k3/8/8/8/R2QK3 w - - 0 1', '{ Mate with the heavy pieces: keep the king boxed in. } 1. Ra8 { The staircase begins. } Kf4 2. Qd4+ Kg3'],
-  ['Ch02Race', 'Part 3: Endgames for Class D (1000-1199): Win the Race - 2', '8/p7/8/3k4/8/2K5/3P4/8 w - - 0 1', '{ Method: take the opposition. } 1. Kd3 { Opposition. (Or 1.Kc2 Kc4 2.Kd2) } Kc5'],
+  ['Ch01Mate', 'Part 1: Endgames for Beginners (Unrated-999): The Staircase - 1', '8/8/8/4k3/8/8/8/R2QK3 w - - 0 1', '{ Mate with the heavy pieces: keep the king boxed in. } 1. Ra8 { The staircase begins. } Kf4 2. Qd4+'],
+  ['Ch02Race', 'Part 3: Endgames for Class D (1000-1199): Win the Race - 2', '8/p7/8/3k4/8/2K5/3P4/8 w - - 0 1', '{ Method: take the opposition. } 1. Kd3 { Opposition. (Or 1.Kc2 Kc4 2.Kd2) } Kc5 2. Ke3'],
   ['Ch03Test', 'Part 3: Endgames for Class D (1000-1199): Test 1', '8/3k4/8/3K4/3P4/8/8/8 b - - 0 1', ''],
   ['Ch04Wrse', 'Part 3: Endgames for Class D (1000-1199): The Worse Side - 4', '8/8/8/3k4/8/2K5/3P4/8 b - - 0 1', '{ Black is lost: why? } 1... Kc5 { The king steps aside and White takes the opposition. (Not 1...Ke5 2.Kd3 Kf5 3.Ke3) } 2. Kd3'],
   ['Ch05Lock', 'Part 4: Endgames for Class C (1400-1599): Locked - 5', '8/pp6/8/8/8/8/PP6/K6k w - - 0 1', '{ Nothing to win here. } 1. Kb1'],
@@ -753,7 +753,7 @@ test('the courses’ endgames: a reference study scored on the device, listed by
   await expect(section.getByTestId('course-next')).toHaveText('Next due: Win the Race - 2');
   await items.nth(3).getByRole('link', { name: 'The Worse Side - 4', exact: true }).click();
   await expect(game).toHaveAttribute('data-phase', 'user');
-  await expect(page.getByTestId('endgame-source')).toContainText('The side to move there is the worse one: the course’s first move, Kc5, is played for your opponent, and you have the other side (White).');
+  await expect(page.getByTestId('endgame-source')).toContainText('The course ends on White’s move, so it teaches White: its first move, Kc5, is played for your opponent, and you have White.');
   await expect(game.locator('.cg-wrap')).toHaveClass(/orientation-white/);
   await page.getByTestId('course-text').locator('summary').click();
   await expect(page.getByTestId('course-text').locator('.course-move')).toHaveText(['Start', '1…Kc5']);

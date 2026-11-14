@@ -10117,25 +10117,43 @@ chapters, not Silman's.
   e2e game ended on its first move, "5 points of material ahead"): against a bare king the win is a
   pawn queened when the user has pawns and nothing else (`promote`), else mate. Between +1.5 and
   +3: no goal, listed under "n without a goal" with the reason.
-- **Whose first move it is** (the owner's report of 2026-11-14, built): a chapter's main line may start
-  with the *opponent's* move, which the user is to answer: a blunder to punish ("1.g4??", Part 3's
-  "The Deep") or the weaker side's move that shows why it loses. The user practises **the side the author
-  is teaching**, so the course's first move is played for the other side, and the position after it is
-  the drill (kept with `flipped`, the move with its mark, and `by`) when it has a goal for the user, else
-  the chapter is left out with the reason: **the user never gets the side the author is against**. The
-  first move is the opponent's when (`scoreCandidate`, in this order of trust): (1) **`marked`**: the
-  author marks it `?` or `??` (NAG 2 or 4; `Candidate.mark`), whatever Stockfish says; (2) **`swing`**: it
-  loses `BLUNDER_SWING` (150 cp) or more for the side that plays it (its score at the start plus the other
-  side's score after the move); (3) **`worse`**: the side to move is below −1 at the start (the rule of the
-  first build). Before the report only (3) existed, so a draw with White to move whose first move was the
-  author's blunder was drilled as White. Costs a second search for every chapter with a first move (the
-  position after it), about twice the scoring time. The source line says which: "The course's first move,
-  Kf7??, is a mistake and is played for your opponent: you punish it as Black." / "The side to move there
-  is the worse one: the course's first move, Kc5, is played for your opponent, and you have the other side
-  (White)." Scores kept before this change (`v: 1`) are not read: "Score the course" scores them again, and
-  a drill whose side changed starts without its old tries (they were at another position). Not built: the
+- **Whose first move it is** (the owner's reports of 2026-11-14, built twice): a chapter's main line may
+  start with the *opponent's* move, which the user is to answer: a blunder to punish ("1.g4??", Part 3's
+  "The Deep"), or the move of the side the author is teaching, which the lesson then answers. The user
+  practises **the side the author is teaching**, so the course's first move is played for the other
+  side when it is not that side's, and the position after it is the drill (kept with `flipped`, the move
+  with its mark, and `by`) when it has a goal for the user, else the chapter is left out with the reason:
+  **the user never gets the side the author is against**. Decided by `flipOf` (`courses.ts`), in this
+  order, and **Stockfish's score is no part of it** (it misjudges the positions a course is about: a
+  fortress, a sacrifice, a draw by a trick): (1) **`marked`**: the author marks the first move `?` or
+  `??` (NAG 2 or 4): the opponent's; (2) the author marks it `!` or `!!` (NAG 1 or 3, `Candidate.praised`):
+  the teacher's, whoever ends the line (a line can end on the other side's forced reply: a stalemate, "draw
+  agreed"); (3) **`last`** (the owner's second report: "check which side makes the last move in the pgn"):
+  the side that makes the main line's last move is the side being taught, so a line that ends on the
+  other side's move starts with the opponent's. `lastMover` walks the line and gives nothing when a move
+  of it is illegal or the line has none (then the side to move keeps the position). **Measured on the
+  owner's real course** (the data repo's 322 chapters with a position, Stockfish 18 lite at depth 14; the
+  numbers are from this session's check): the last mover is not the side to move in 114 chapters, and the
+  first build's rules (the mark, a 150 cp swing, the side to move being worse) drilled 49 drawn chapters
+  as the side that does not end the line: 0NLLtS5A, "Black draws by giving up his Bishop", was White's
+  drill; 9Jbd9wpB, "now Black draws easily", White's; EYBDmRjI, "how does White make optimal use…", Black's.
+  The swing rule also flipped a first move the author marked `!!` (Bh3!! in s2OhqIPi: depth 14 does not see
+  the idea), so it is gone, and so is the worse-side rule (a drill for the weaker side is the
+  mirror of the fault when the lesson is the weaker side's saving trick). With the new rule, 257 of 263
+  drills are the last mover's (the six others are `!`-first lines ending on a forced reply, or `?`-marked),
+  211 drills keep their side, 49 change it, 10 chapters that had a drill have none now (the side the line
+  ends on has no goal by the bands: a trick Stockfish rates −1.2 to −3 for the saving side (CcPOc31j,
+  VqTH4f2h, bjEJgsLh), a winner's line that ends on the lone king's reply (cOmGV270, r2X2NSDP), …) and 3
+  gained one. **Known cost**: a chapter that teaches the winner but ends on the loser's reply and
+  is not marked `!` (a few) is left out, not drilled for the loser. It no longer costs a second search for
+  every chapter: only a chapter whose first move is the opponent's is searched after it (about 90 of the
+  322). The source line says why: "The course ends on White's move, so it teaches White: its first move,
+  Kc5, is played for your opponent, and you have White." / "The course's first move, Kf7??, is a mistake
+  and is played for your opponent: you punish it as Black." Scores kept before this change (`v: 1`, and now
+  `v: 2`) are not read: "Score the course" scores them again (a minute or two on a desktop), and a drill
+  whose side changed starts without its old tries (they were at another position). Not built: the
   opponent's move shown on the board before the user's turn (the drill opens after it, the move is named in
-  the source line); a first move the author marks `?!`.
+  the source line); a first move the author marks `?!` or `!?` (no meaning taken from them).
 - **Scored on the device, in the background** (`src/app/courseEndgames.ts`): "Score the course (n)"
   scores every candidate not scored yet, in the course's order, with progress ("Scoring: 12 of 326
   chapters · 9 drills") and Stop; stopped, or closed, the next press takes up where it left off;
@@ -10184,14 +10202,15 @@ chapters, not Silman's.
 
 **Checked**: `test/unit/core/endgames/courses.test.ts` (the group of a name, the candidates, the
 goal bands and the bare king's, the scoring with a stub Stockfish: a win, a win on material to mate,
-a draw, no goal, no answer; the weaker side's chapter flipped and left out when it still has no goal
-or the chapter has no move; the drills joined with their scores, removed, grouped; the stored score
+a draw, no goal, no answer; a line that ends on the other side's move flipped and left out when the
+side that ends it has no goal, `!` and `?` first moves deciding before the last move, `lastMover` with
+no moves and with an illegal one; the drills joined with their scores, removed, grouped; the stored score
 read back; the text along the main line with a repeated comment once), `test/unit/core/repertoire/
 lines.test.ts` (the examples above, the remarks that stay text, the number placing),
 `test/unit/core/games/plans.test.ts` (each comment's positions, a transposition's other move
 number); `test/e2e/endgames.spec.ts` on desktop and the emulated phone with a small synthetic
 reference study in a course export's shape (a mate, a win with pawns, a draw in a "Test" chapter,
-a weaker side's chapter, one with no goal, one with no position) scored by the fake Stockfish, the
+a chapter ending on the other side's move, one with no goal, one with no position) scored by the fake Stockfish, the
 groups, one played with a hint synced as one endgame try at the chapter's position, the text under
 the board, the flipped chapter's source and board side, a group chosen, one removed and put back,
 the scores kept over a reload; `test/e2e/views.spec.ts` and `test/e2e/plans.spec.ts` for the lines.

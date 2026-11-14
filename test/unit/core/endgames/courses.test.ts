@@ -118,28 +118,28 @@ test('scoring: a win, a win on material to mate, a draw, no goal, and no answer'
   assert.equal(await scoreCandidate(cand(CH.worse), at(KP_WORSE), scorer({}), 7), undefined);
 });
 
-test('the weaker side to move: the course’s first move is played for them and the other side is the user’s', async () => {
+test('a line that ends on the other side’s move: the course’s first move is played for the opponent and the side that ends it is the user’s', async () => {
   const asked: string[] = [];
   // Black to move is lost at −640; after 1...Kf5 White, to move, is +640.
   const s = scorer({ '8/8/8/4k3/8/3K4/4P3/8 b': -640, '8/8/8/5k2/8/3K4/4P3/8 w': 640 }, asked);
   const sc = (await scoreCandidate(cand(CH.worse), at(KP_WORSE), s, 1))!;
-  assert.deepEqual(sc.drill, { fen: '8/8/8/5k2/8/3K4/4P3/8 w - - 1 2', side: 'white', goal: 'win', until: 'promote', cp: 640, flipped: 'Kf5', by: 'worse' });
+  assert.deepEqual(sc.drill, { fen: '8/8/8/5k2/8/3K4/4P3/8 w - - 1 2', side: 'white', goal: 'win', until: 'promote', cp: 640, flipped: 'Kf5', by: 'last' });
   assert.equal(sc.cp, -640, 'the chapter start’s own score is kept');
   assert.equal(asked.length, 2, 'the start, then the position after the first move');
   // After the move, still no goal for the other side (a dead position): left out, with the reason.
   const none = (await scoreCandidate(cand(CH.worse), at(KP_WORSE), scorer({ '8/8/8/4k3/8/3K4/4P3/8 b': -640, '8/8/8/5k2/8/3K4/4P3/8 w': 240 }), 1))!;
   assert.equal(none.drill, undefined);
-  assert.match(none.why!, /still no goal after the course’s Kf5/);
-  // No first move in the chapter: no flip.
+  assert.match(none.why!, /the course ends on White’s move, so it teaches White, and still no goal after the course’s Kf5/);
+  // No first move in the chapter: nothing to flip, the side to move is the user's (and has no goal here).
   const moveless = candidatesOf([chapter('Part 3: Class D: Bare - 9', KP_WORSE, '')])[0]!;
   const bare = (await scoreCandidate(moveless, at(KP_WORSE), scorer({ '8/8/8/4k3/8/3K4/4P3/8 b': -640 }), 1))!;
   assert.equal(bare.drill, undefined);
-  assert.match(bare.why!, /no move to play/);
+  assert.equal(bare.why, 'you are worse');
   // Stockfish silent on the second search: asked again later.
   assert.equal(await scoreCandidate(cand(CH.worse), at(KP_WORSE), scorer({ '8/8/8/4k3/8/3K4/4P3/8 b': -640 }), 1), undefined);
 });
 
-test('a first move the author marks as a mistake, or that throws the position away, is the opponent’s: the user punishes it from the other side', async () => {
+test('a first move the author marks as a mistake is the opponent’s: the user punishes it from the other side (the score is no part of it)', async () => {
   // White, to move, holds a draw; 1.Kf7?? is the blunder the chapter is about. The user is Black.
   const START = '7k/8/5K2/8/8/8/7P/8 w - - 0 1';
   const AFTER = '7k/5K2/8/8/8/8/7P/8 b - - 1 1';
@@ -160,18 +160,55 @@ test('a first move the author marks as a mistake, or that throws the position aw
   // The author's mark decides, not the score: the move that costs nothing by Stockfish is still the opponent's.
   const kept = (await scoreCandidate(marked, at(START), scorer({ ...start, '7k/5K2/8/8/8/8/7P/8 b': 0 }), 1))!;
   assert.deepEqual([kept.drill!.side, kept.drill!.goal, kept.drill!.by], ['black', 'draw', 'marked']);
-  // Not marked, but it throws a draw away (Stockfish: 8 points swing): the same.
-  const swing = (await scoreCandidate(cand(plain), at(plain.chapter.headers.find(([k]) => k === 'FEN')![1]), scorer({ '7k/8/5K2/8/8/8/6P1/8 w': 0, '7k/5K2/8/8/8/8/6P1/8 b': 800 }), 1))!;
-  assert.deepEqual([swing.drill!.side, swing.drill!.flipped, swing.drill!.by], ['black', 'Kf7', 'swing']);
-  // Not marked and it keeps the score (a small drop is no blunder): the drill is the side to move's, from the start.
-  const fine = (await scoreCandidate(cand(plain), at(plain.chapter.headers.find(([k]) => k === 'FEN')![1]), scorer({ '7k/8/5K2/8/8/8/6P1/8 w': 0, '7k/5K2/8/8/8/8/6P1/8 b': 100 }), 1))!;
+  // Not marked, and Stockfish scores the move as a blunder (8 points swing), but the line ends on White's move: Stockfish
+  // is no part of it, the side to move is the side taught.
+  const fen6 = plain.chapter.headers.find(([k]) => k === 'FEN')![1];
+  const asked: string[] = [];
+  const fine = (await scoreCandidate(cand(plain), at(fen6), scorer({ '7k/8/5K2/8/8/8/6P1/8 w': 0, '7k/5K2/8/8/8/8/6P1/8 b': 800 }, asked), 1))!;
   assert.deepEqual(fine.drill, { fen: '7k/8/5K2/8/8/8/6P1/8 w - - 0 1', side: 'white', goal: 'draw', cp: 0 });
+  assert.equal(asked.length, 1, 'no second search when nothing is flipped');
   // Marked, but the position after it has no goal for the other side: left out, with the reason: never the wrong side.
   const none = (await scoreCandidate(marked, at(START), scorer({ ...start, '7k/5K2/8/8/8/8/7P/8 b': 220 }), 1))!;
   assert.equal(none.drill, undefined);
   assert.match(none.why!, /the course’s first move is a mistake, and still no goal after the course’s Kf7\?\?/);
   // The first move is the first thing asked after the start: Stockfish silent on it, asked again later.
   assert.equal(await scoreCandidate(marked, at(START), scorer(start), 1), undefined);
+});
+
+test('who ends the line: the side the author teaches, unless the first move is marked', async () => {
+  // Bishop and wrong rook-pawn: White starts, Black ends (1.Bf5 Kg8 2.h7+ Kh8): Black holds the draw, so the user is Black,
+  // from the position after 1.Bf5, whatever Stockfish thinks of the side to move.
+  const WRONG = '7k/8/6KP/8/4B3/8/8/8 w - - 0 1';
+  const wrong = cand(chapter('Part 4: Class C: Wrong Rook-Pawn - 3', WRONG, '1. Bf5 Kg8 2. h7+ Kh8'));
+  assert.equal(wrong.last, 'black');
+  const dl = (await scoreCandidate(wrong, at(WRONG), scorer({ '7k/8/6KP/8/4B3/8/8/8 w': 90, '7k/8/6KP/5B2/8/8/8/8 b': -90 }), 1))!;
+  assert.deepEqual(dl.drill, { fen: '7k/8/6KP/5B2/8/8/8/8 b - - 1 1', side: 'black', goal: 'draw', cp: -90, flipped: 'Bf5', by: 'last' });
+  // The same chapter ending on White's move: White's, from the start.
+  const white = cand(chapter('Part 4: Class C: Wrong Rook-Pawn - 4', WRONG, '1. Bf5 Kg8 2. h7+'));
+  assert.equal(white.last, 'white');
+  assert.deepEqual((await scoreCandidate(white, at(WRONG), scorer({ '7k/8/6KP/8/4B3/8/8/8 w': 0 }), 1))!.drill, { fen: WRONG, side: 'white', goal: 'draw', cp: 0 });
+  // The author calls the first move good: the teacher's, whoever ends the line (a stalemate, a draw agreed).
+  const praised = cand(chapter('Part 4: Class C: Wrong Rook-Pawn - 5', WRONG, '1. Bf5! Kg8'));
+  assert.equal(praised.praised, true);
+  assert.equal(praised.last, 'black');
+  assert.equal((await scoreCandidate(praised, at(WRONG), scorer({ '7k/8/6KP/8/4B3/8/8/8 w': 0 }), 1))!.drill!.side, 'white');
+  // `!!` too, and `?!` / `!?` say nothing.
+  assert.equal(cand(chapter('Part 4: Class C: Wrong Rook-Pawn - 6', WRONG, '1. Bf5!! Kg8')).praised, true);
+  assert.equal(cand(chapter('Part 4: Class C: Wrong Rook-Pawn - 7', WRONG, '1. Bf5?! Kg8')).praised, undefined);
+  // Marked a mistake, the first move is the opponent's even when its side ends the line.
+  const blunder = cand(chapter('Part 4: Class C: Wrong Rook-Pawn - 8', WRONG, '1. Bf5?? Kg8 2. h7+'));
+  assert.deepEqual([blunder.mark, blunder.praised, blunder.last], ['??', undefined, 'white']);
+  const db = (await scoreCandidate(blunder, at(WRONG), scorer({ '7k/8/6KP/8/4B3/8/8/8 w': 0, '7k/8/6KP/5B2/8/8/8/8 b': 0 }), 1))!;
+  assert.deepEqual([db.drill!.side, db.drill!.by], ['black', 'marked']);
+  // No moves, or a move that isn't legal: nobody is known to end it, so the side to move keeps the position.
+  assert.equal(cand(chapter('Part 4: Class C: Wrong Rook-Pawn - 9', WRONG, '')).last, undefined);
+  const broken = chapter('Part 4: Class C: Wrong Rook-Pawn - 10', WRONG, '1. Bf5 Kg8 2. h7+');
+  (broken.chapter.root.children[0]!.children[0]!.children[0] as { san: string }).san = 'Qh7';
+  assert.equal(candidatesOf([broken])[0]!.last, undefined, 'a line with a move that isn’t legal says nothing about who ends it');
+  // The side that ends the line has no goal (here, worse): left out, never the other side.
+  const lost = (await scoreCandidate(wrong, at(WRONG), scorer({ '7k/8/6KP/8/4B3/8/8/8 w': 900, '7k/8/6KP/5B2/8/8/8/8 b': -900 }), 1))!;
+  assert.equal(lost.drill, undefined);
+  assert.match(lost.why!, /the course ends on Black’s move, so it teaches Black, and still no goal after the course’s Bf5: you are worse/);
 });
 
 test('the drills joined with their scores: the ones with a goal, those without, those still to score, those removed', async () => {
@@ -216,7 +253,8 @@ test('stored scores: read back, and refused when the drill does not match its si
   assert.deepEqual(readCourseScore(JSON.parse(JSON.stringify(sc))), sc);
   assert.equal(readCourseScore({ ...sc, drill: { ...sc.drill!, side: 'black' } }), undefined);
   assert.equal(readCourseScore({ ...sc, v: 1 }), undefined, 'a score from before the first move was read as the author’s is scored again');
-  assert.equal(readCourseScore({ ...sc, v: 3 }), undefined);
+  assert.equal(readCourseScore({ ...sc, v: 2 }), undefined, 'a score from before the last move decided the side is scored again');
+  assert.equal(readCourseScore({ ...sc, v: 4 }), undefined);
   assert.equal(readCourseScore(null), undefined);
 });
 
@@ -237,7 +275,7 @@ test('the course’s text: the comments along the main line with their moves, a 
 
 test('scores and removals in the progress log (§5.175, synced): written, read back, the latest of each card deciding, across devices', () => {
   const key = positionKeyOf(at(KP_WIN));
-  const score = (cp: number, at: number): CourseScore => ({ v: 2, key, cp, depth: 18, drill: { fen: KP_WIN, side: 'white', goal: 'win', until: 'convert', cp }, at });
+  const score = (cp: number, at: number): CourseScore => ({ v: 3, key, cp, depth: 18, drill: { fen: KP_WIN, side: 'white', goal: 'win', until: 'convert', cp }, at });
   const ev = (n: number, t: string, rest: Record<string, unknown>): KnownEvent => ({ v: 1, n, t, card: courseCard(key), ...rest }) as unknown as KnownEvent;
   const first = ev(1, '2026-11-14T10:00:00.000Z', { k: 'cscore', sc: score(900, 1) });
   assert.equal(formatEvent(first), `{"v":1,"n":1,"t":"2026-11-14T10:00:00.000Z","k":"cscore","card":"e|${key}","sc":${JSON.stringify(score(900, 1))}}`);

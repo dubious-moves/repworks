@@ -239,7 +239,7 @@ export interface RankEvent extends Base {
 }
 /**
  * A course endgame's score (PLAN.md §5.175, synced): Stockfish's verdict on one chapter, kept as the
- * `CourseScore` it is (`sc`, `v: 2`), on the card `e|<chapter start's key>`. The latest of a card decides.
+ * `CourseScore` it is (`sc`, `v: 3`), on the card `e|<chapter start's key>`. The latest of a card decides.
  */
 export interface CourseScoreEvent extends Base {
   k: 'cscore';

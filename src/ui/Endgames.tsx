@@ -422,8 +422,8 @@ function CourseEndgames(props: { now: number }) {
       <p class="muted">
         The chapters of your reference studies that start from a position ({cands.length} here), played the way endgames are played here: against Maia’s defence, every move judged by
         Stockfish for a goal, any move that keeps it allowed, not the course’s one line. Where Stockfish has the side to move +3 or better, win it ({CONVERT_LEAD} points up, a pawn
-        queened or mate); about level (−1 to +1.5), hold it for {REP.hold} moves. Where that side is the worse one, the course’s first move is played for you and you have the other. The
-        course’s own text for the chapter is under the board.
+        queened or mate); about level (−1 to +1.5), hold it for {REP.hold} moves. You have the side the course teaches, the one that makes its last move: when that isn’t the side to move, the course’s first move is played for your
+        opponent (and one marked ?? is always the opponent’s). The course’s own text for the chapter is under the board.
       </p>
       <div class="actions">
         {scoring?.running ? (
@@ -533,7 +533,7 @@ function CourseItem(props: { drill: CourseDrill; standing: Standing; now: number
 /** Why the course's first move was played for the opponent, and which side that leaves the user. */
 function flippedWhy(d: CourseDrill): string {
   const side = d.side === 'white' ? 'White' : 'Black';
-  if (d.by === 'worse') return `The side to move there is the worse one: the course’s first move, ${d.flipped}, is played for your opponent, and you have the other side (${side}).`;
+  if (d.by === 'last') return `The course ends on ${side}’s move, so it teaches ${side}: its first move, ${d.flipped}, is played for your opponent, and you have ${side}.`;
   return `The course’s first move, ${d.flipped}, is a mistake and is played for your opponent: you punish it as ${side}.`;
 }
 
