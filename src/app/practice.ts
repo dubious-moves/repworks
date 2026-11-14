@@ -31,7 +31,9 @@ import { readSaved, resumable, type Saved } from '../core/games/resume.ts';
 import { covered, scanCandidate, tacticCandidates, TACTIC, type DetectedTactic, type Pv } from '../core/games/detect.ts';
 import type { Color } from '../core/games/record.ts';
 import { historyCard, practiceCard } from '../core/progress/cards.ts';
-import { ENDGAME_PRESET, firstSlip, GOAL_CP, held, keepsGoal, lineOf, MAIA_ELO, MAIA_MIN, MAIA_TOP, materialFor, opponentPick, pawnPushes, pushNow, slips, wonAfter, type Endgame, type OpponentLine } from '../core/endgames/endgames.ts';
+import { ENDGAME_PRESET, firstSlip, GOAL_CP, held, keepsGoal, lineOf, MAIA_ELO, maiaCandidates, materialFor, opponentPick, pawnPushes, pushNow, slips, solvedBy, wonAfter, type Endgame, type OpponentLine } from '../core/endgames/endgames.ts';
+import { hangs, replyOrder, trustPick } from '../core/endgames/variety.ts';
+import { endgameMaiaAlone, hintsAt, replyPlayed, tryBegun, tryEnded } from './endgameVariety.ts';
 import type { Grade } from '../core/progress/events.ts';
 import { positionOf } from '../core/storm/walk.ts';
 import { onWorker, postToWorker } from './explorer.ts';
@@ -239,14 +241,44 @@ export async function endgameMaia(fen: string): Promise<MaiaMove[] | null> {
  * An endgame's opponent (§5.147, the owner's request): Maia's likeliest move that Stockfish finds
  * sound (`opponentPick`), its moves searched alone at the judges' depth; Stockfish's own (its best
  * in a defence, `pressingMove` against a draw) when Maia isn't on this device or none of its moves
- * is sound. The user waits on it, so its searches go ahead of the judges in the background.
+ * is sound. The user waits on it, so its searches go ahead of the judges in the background. Varied
+ * over tries (§5.174): the replies met here before tried last, the last try's again after a miss.
+ * With "Maia alone" on, Maia's reply is played without waiting on Stockfish (`trustPick`).
  */
 async function endgameReply(fen: string, e: Endgame, userMoves: number, seen: ReadonlySet<string> = new Set()): Promise<{ uci: string; source: string; dbFailed: boolean } | undefined> {
   const pos = positionOf(fen);
   if (!pos) return undefined;
   const goal = e.goal;
+  const key = keyFen(fen)?.key;
+  const hints = key ? hintsAt(e.id, key) : { seen: {} };
+  const replay = hints.replay && parseUciMove(pos, hints.replay) ? hints.replay : undefined;
   // A draw's attacker pushes on once a third of the drill is held (§5.148).
   const pushes = pushNow(e, userMoves) ? pawnPushes(pos) : [];
+  const after = (uci: string) => {
+    const p = pos.clone();
+    const m = parseUciMove(p, uci);
+    if (!m) return undefined;
+    p.play(m);
+    return p;
+  };
+  const over = (uci: string) => after(uci)?.isEnd() ?? true;
+  const repeats = (uci: string) => {
+    const p = after(uci);
+    const k = p && keyFen(makeFen(p.toSetup()))?.key;
+    return !!k && seen.has(k);
+  };
+  if (endgameMaiaAlone.peek()) {
+    const policy = await endgameMaia(fen);
+    if (policy?.length) {
+      const ordered = [...new Set([...(replay ? [replay] : []), ...replyOrder(maiaCandidates(policy), hints.seen).map((m) => m.uci)])];
+      const hung = (uci: string) => {
+        const p = after(uci);
+        return !p || hangs(p);
+      };
+      const pick = trustPick(goal, ordered, policy, pushes, { over, repeats, hangs: hung });
+      if (pick) return { uci: pick.uci, source: `Maia ${MAIA_ELO}`, dbFailed: false };
+    }
+  }
   const depth = narrow() ? 16 : 18;
   const [a, maia] = await Promise.all([search(fen, goal === 'draw' ? DRAW_LINES : 1, depth, 6000, undefined, true), endgameMaia(fen)]);
   const scored = (r: typeof a): OpponentLine[] => (r?.lines ?? []).filter((l) => l.pv.length).map((l) => ({ cp: moverScore(l.score, pos.turn), pv: l.pv }));
@@ -260,29 +292,19 @@ async function endgameReply(fen: string, e: Endgame, userMoves: number, seen: Re
     }
     return materialFor(p, pos.turn);
   };
-  // Maia's moves Stockfish's lines don't cover, searched alone: only up to the first that is
-  // Stockfish's own move (no search needed after it, unless it repeats); and the pawn pushes when
-  // asked for.
+  // Maia's moves Stockfish's lines don't cover, searched alone: those tried before Stockfish's own
+  // move (no search needed after it, unless it repeats), the last try's reply after a miss, and the
+  // pawn pushes when asked for; in Maia's order, so a search asked before is asked alike.
   const base = goal === 'draw' ? undefined : lines[0]?.pv[0];
-  const candidates = (maia ?? []).slice(0, MAIA_TOP).filter((m) => m.prob >= MAIA_MIN);
-  const upTo = candidates.findIndex((m) => m.uci === base);
-  const rest = [...new Set([...pushes, ...(upTo < 0 ? candidates : candidates.slice(0, upTo)).map((m) => m.uci)])].filter((u) => !lines.some((l) => l.pv[0] === u));
+  const candidates = maiaCandidates(maia ?? []);
+  const order = replyOrder(candidates, hints.seen).map((m) => m.uci);
+  const upTo = base ? order.indexOf(base) : -1;
+  const needed = new Set([...(upTo < 0 ? order : order.slice(0, upTo)), ...(replay && replay !== base ? [replay] : [])]);
+  const byMaia = [...candidates.map((m) => m.uci).filter((u) => needed.has(u)), ...[...needed].filter((u) => !candidates.some((m) => m.uci === u))];
+  const rest = [...new Set([...pushes, ...byMaia])].filter((u) => !lines.some((l) => l.pv[0] === u));
   const more = rest.length ? scored(await search(fen, rest.length, depth, 6000, rest, true)) : [];
   const lineFor = (uci: string) => [...lines, ...more].find((l) => l.pv[0] === uci);
-  const after = (uci: string) => {
-    const p = pos.clone();
-    const m = parseUciMove(p, uci);
-    if (!m) return undefined;
-    p.play(m);
-    return p;
-  };
-  const over = (uci: string) => after(uci)?.isEnd() ?? true;
-  const repeats = (uci: string) => {
-    const p = after(uci);
-    const key = p && keyFen(makeFen(p.toSetup()))?.key;
-    return !!key && seen.has(key);
-  };
-  const pick = opponentPick(goal, lines, candidates, lineFor, material, over, { pushes, repeats, line: lineOf(e) });
+  const pick = opponentPick(goal, lines, candidates, lineFor, material, over, { pushes, repeats, line: lineOf(e), seen: hints.seen, ...(replay ? { replay } : {}) });
   return pick ? { uci: pick.uci, source: pick.maia ? `Maia ${MAIA_ELO}` : 'Stockfish', dbFailed: false } : undefined;
 }
 
@@ -432,6 +454,7 @@ export function startPractice(setup: PracticeSetup): void {
   const pos = positionOf(setup.fen);
   if (!pos) return;
   gen++;
+  if (setup.kind === 'endgame' && setup.endgame) tryBegun(setup.endgame.id);
   practice.value = { gen, setup, moves: [], phase: pos.turn === setup.color ? 'user' : 'opponent', track: startTrack(setup.peakCp ?? null), claim: false, judged: true };
   if (pos.turn !== setup.color) void opponentTurn(gen);
   else ponder(practice.peek()!);
@@ -730,6 +753,9 @@ async function opponentTurn(g: number): Promise<void> {
     const { premove: _p, ...rest } = r;
     return { ...rest, moves: [...r.moves, { san: after.san, uci: m.uci, isUser: false, fenBefore: fen, fen: after.fen, source: m.source }], source: m.source, phase: 'user', ...(note ? { note } : {}) };
   });
+  // The defence's reply remembered for the tries to come (§5.174).
+  const replyKey = now?.setup.endgame && keyFen(fen)?.key;
+  if (now?.setup.endgame && replyKey) replyPlayed(now.setup.endgame.id, replyKey, m.uci);
   const end = now && endOf(now, false);
   if (end) return now.setup.kind === 'endgame' ? conclude(g, end) : finish(g, end);
   if (now) ponder(now);
@@ -995,6 +1021,7 @@ function endgameMiss(g: number, res: 'draw' | 'loss', upTo?: number): void {
   const p = practice.peek();
   if (!p || p.gen !== g || p.setup.kind !== 'endgame' || p.failed) return;
   patch(g, () => ({ failed: true }));
+  tryEnded(p.setup.endgame!.id, 'missed');
   recordEndgame(p, res, upTo);
 }
 
@@ -1014,7 +1041,10 @@ function finishEndgame(p: PracticeGame, reason: EndReason): void {
   const { slip: _s, ending: _e, ...rest } = p;
   practice.value = { ...rest, phase: 'over', end: { reason, result }, claim: false };
   const userMoves = p.moves.filter((m) => m.isUser).length;
-  if (!p.failed && reason !== 'interrupted' && userMoves > 0) recordEndgame(p, result);
+  if (!p.failed && reason !== 'interrupted' && userMoves > 0) {
+    recordEndgame(p, result);
+    tryEnded(e.id, solvedBy(e.goal, result) ? 'solved' : 'missed');
+  }
 }
 
 /**

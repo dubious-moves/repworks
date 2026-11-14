@@ -308,6 +308,14 @@ test('the opponent: Maia’s likeliest move that Stockfish finds sound, else Sto
     { uci: 'f8e7', maia: false },
   );
 
+  // Varied over tries (§5.174): Kf7 met here before, so Ke7 (Stockfish's own) this time; Kf7 played
+  // again after a miss though Ke7 is likelier; a replay without a sound line passed over.
+  assert.deepEqual(opponentPick('win', [ke7], [{ uci: 'f8f7', prob: 0.6 }, { uci: 'f8e7', prob: 0.3 }], lines(ke7, kf7), material(kp), over(kp), { seen: { f8f7: 1 } }), { uci: 'f8e7', maia: true });
+  assert.deepEqual(opponentPick('win', [ke7], [{ uci: 'f8e7', prob: 0.6 }, { uci: 'f8f7', prob: 0.3 }], lines(ke7, kf7), material(kp), over(kp), { replay: 'f8f7' }), { uci: 'f8f7', maia: true });
+  assert.deepEqual(opponentPick('win', [ke7], [{ uci: 'f8e7', prob: 0.6 }], lines(ke7), material(kp), over(kp), { replay: 'f8g8' }), { uci: 'f8e7', maia: true });
+  // Met least, but under VARY_MIN: the likely move first all the same.
+  assert.deepEqual(opponentPick('win', [ke7], [{ uci: 'f8f7', prob: 0.85 }, { uci: 'f8e7', prob: 0.1 }], lines(ke7, kf7), material(kp), over(kp), { seen: { f8f7: 3 } }), { uci: 'f8f7', maia: true });
+
   // A defence: Maia's Ra8+ hangs the rook (Kxa8), Stockfish's Rb2 doesn't: Maia's next, Rc2, kept.
   const rook = '1K6/1P2k3/8/8/8/8/r7/3R4 b - - 0 1';
   const rb2 = { cp: -900, pv: ['a2b2', 'd1d4'] };

@@ -13,6 +13,7 @@ import type { Position } from 'chessops/chess';
 import { makeSquare as squareName } from 'chessops/util';
 import type { PositionKey } from '../chess/positionKey.ts';
 import type { Category } from './repertoire.ts';
+import { replyOrder } from './variety.ts';
 
 export type Goal = 'win' | 'draw';
 /**
@@ -406,6 +407,13 @@ export const MAIA_ELO = 2600;
 export const MAIA_TOP = 3;
 export const MAIA_MIN = 0.05;
 
+/** Maia's moves the opponent may play: its likeliest `MAIA_TOP`, each `MAIA_MIN` or more likely. */
+export const maiaCandidates = <M extends { prob: number }>(maia: readonly M[]): M[] =>
+  [...maia]
+    .sort((a, b) => b.prob - a.prob)
+    .slice(0, MAIA_TOP)
+    .filter((m) => m.prob >= MAIA_MIN);
+
 /** A line of the opponent's: its score for the opponent (a mate ±10000, as `moverScore`) and its moves. */
 export interface OpponentLine {
   cp: number;
@@ -427,6 +435,9 @@ export interface OpponentLine {
  * scored taken (a draw's attacker making progress, `pushNow`); `extra.repeats` whether a move goes
  * back to a position of the game's (a draw's attacker plays none while it has a sound other);
  * `extra.line` the endgame's goal line (`lineOf`), below which the opponent counts as lost.
+ * Varied over tries (§5.174): `extra.replay`, the last try's reply here after a miss, comes first
+ * when sound; Maia's moves are tried in `replyOrder` by `extra.seen` (the replies met here before),
+ * the least met of its likely ones first.
  */
 export function opponentPick(
   goal: Goal,
@@ -435,7 +446,7 @@ export function opponentPick(
   lineOf: (uci: string) => OpponentLine | undefined,
   material: (pv: readonly string[]) => number | undefined,
   over: (uci: string) => boolean,
-  extra: { pushes?: readonly string[]; repeats?: (uci: string) => boolean; line?: number } = {},
+  extra: { pushes?: readonly string[]; repeats?: (uci: string) => boolean; line?: number; seen?: Readonly<Record<string, number>>; replay?: string } = {},
 ): { uci: string; maia: boolean; push?: boolean } | undefined {
   const top = best[0];
   if (!top) return undefined;
@@ -456,11 +467,13 @@ export function opponentPick(
     const after = material(l.pv.slice(0, 2));
     return after === undefined || floor === undefined || after < floor ? undefined : l;
   };
+  // After a miss, the same defence again (§5.174), when it is still sound.
+  const replay = extra.replay;
+  if (replay && (replay === base || sound(replay))) return { uci: replay, maia: maia.some((m) => m.uci === replay) };
   // Progress first (§5.148): the soundest pawn push, when asked for.
   const pushed = (extra.pushes ?? []).map(sound).filter((l): l is OpponentLine => !!l).sort((a, b) => b.cp - a.cp)[0];
   if (pushed) return { uci: pushed.pv[0]!, maia: maia.some((m) => m.uci === pushed.pv[0]), push: true };
-  for (const m of maia.slice(0, MAIA_TOP)) {
-    if (m.prob < MAIA_MIN) break;
+  for (const m of replyOrder(maiaCandidates(maia), extra.seen)) {
     if (m.uci === base) return { uci: base, maia: true };
     if (sound(m.uci)) return { uci: m.uci, maia: true };
   }

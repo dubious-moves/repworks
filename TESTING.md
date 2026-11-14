@@ -1045,6 +1045,21 @@ later change replaced are folded into the later item; items already reported wor
 
 ## 8. Endgames
 
+### A varied defence, and Maia alone (§5.174, 2026-11-14)
+- Any endgame with Maia on the device (King in front of the pawn is quick): solve it, then Again:
+  where Maia has a second likely reply (15% or more), the defence now tries the one you haven't met
+  (King in front: 1.Kd5 Ke7 the first time, Ke8 the next). Over a few tries, do you meet new
+  defences, and are they still moves a strong player would play?
+- Miss one (a slip, a hint, or Restart): the next try plays the same defence again, so you can put
+  it right. Is that what you want after a miss, or would you rather it varied then too?
+- Endgames list → "Maia alone": the reply comes at once (no Stockfish search for it). Is the wait
+  between moves now short enough on the phone? Does the defence ever let you off cheaply (a piece
+  hung, a stalemate, the pawn given away)? Say where, with the position.
+- **Checked**: the order, the memory and the board-only checks by unit tests; the page by
+  Playwright on desktop and the emulated phone with the real Maia and a fake Stockfish (Ke7 again
+  after Restart, Ke8 after an unfinished try, Maia alone with no search of its moves after a
+  reload). Not on your devices.
+
 ### Premoves in every kind of practice (§5.173, 2026-11-13)
 - Phone, then desktop: an endgame (Breakthrough is a good one): while Stockfish thinks, premove your
   next move (tap the piece, tap the square: both marked); tap an empty square and it is gone; set it

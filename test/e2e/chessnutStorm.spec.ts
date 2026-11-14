@@ -472,13 +472,19 @@ test('a puzzle on the board: the right move by hand, the reply driven before the
 /** The clock's text and whether it runs, sampled every 200 ms while the card is set up. */
 async function clockThroughSetup(page: Page): Promise<{ text: string; running: boolean }[]> {
   await expect(stormCard(page)).toHaveAttribute('data-phase', 'setup');
-  const clock = page.getByTestId('storm-clock');
   const out: { text: string; running: boolean }[] = [];
-  while ((await stormCard(page).getAttribute('data-phase')) === 'setup') {
-    out.push({ text: (await clock.textContent())!, running: !(await clock.getAttribute('class'))!.includes('stopped') });
+  // The phase and the clock read together: read apart, the clock could be read just after the setup
+  // ended and the clock started (a flaky test).
+  for (;;) {
+    const r = await page.evaluate(() => {
+      const card = document.querySelector('.storm-card');
+      const clock = document.querySelector('[data-testid="storm-clock"]');
+      return { phase: card?.getAttribute('data-phase'), text: clock?.textContent ?? '', running: !clock?.classList.contains('stopped') };
+    });
+    if (r.phase !== 'setup') return out;
+    out.push({ text: r.text, running: r.running });
     await page.waitForTimeout(200);
   }
-  return out;
 }
 
 test('a timed storm on the board: the clock stands still through each setup, runs while the card is asked', async ({ page }) => {

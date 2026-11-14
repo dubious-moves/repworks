@@ -2409,3 +2409,18 @@ The technical calls, each with its reason:
   Why: the retry is played on the board too, and nothing else tells a user looking at the board.
 - No data format changed; nothing new is written or synced; the board's settings stay on the
   device.
+
+## Revision of 2026-11-14 (an endgame's defence varied over tries, and Maia alone: PLAN.md §5.174)
+- **The endgames' opponent varies over tries**: of Maia's likely moves (15% or more) that pass
+  Stockfish's check, the one met least at the position comes first; after a missed try the same
+  defence is played again. Why: the owner's request ("more likely that they'll choose a new path
+  when retrying… still a move with decent maia likelihood"), the owner's choice of B, D and the
+  device's memory among the alternatives offered; §5.147's pick was deterministic, so a retry met
+  the same defence every time.
+- **The memory stays on the device** (localStorage), not in the data repo. Why: the owner's choice;
+  no data format of the owner's changes.
+- **"Maia alone" as an option, not a higher rating**: Maia 3 goes no higher than 2600, which the
+  endgames use already; the switch plays Maia's reply without Stockfish's search, with board-only
+  checks (no stalemate, no repetition for a draw's attacker, nothing hanging). Why: the owner's
+  request to cut the wait and trust Maia, as an option; off by default, so §5.147's checked
+  defence stays the default.

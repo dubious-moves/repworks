@@ -7,6 +7,7 @@
 // played the same way.
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { checkEndgameMaia, endgameMaiaHere, endgameStandings, startEndgame } from '../app/endgames.ts';
+import { endgameMaiaAlone, setEndgameMaiaAlone } from '../app/endgameVariety.ts';
 import { gatherRepEndgames, loadRepEndgames, removeRepEndgame, repById, repEndgames, repGather, repStandings, stopRepGather } from '../app/repertoireEndgames.ts';
 import { maiaDialog } from '../app/maia.ts';
 import { analyseFrom, entryKey, open } from '../app/mode.ts';
@@ -87,7 +88,8 @@ function EndgameList() {
       <section class="card endgames-intro">
         <p>
           The endgames every player needs, each played against a defence that sets the traps a strong player sets. A move that throws the goal away stops the game: take it
-          back and find a better one. A try counts once, whatever happens after a take-back or a hint; a solved endgame comes back after 1, 3, 7, 14, 30 and 60 days.
+          back and find a better one. A try counts once, whatever happens after a take-back or a hint; a solved endgame comes back after 1, 3, 7, 14, 30 and 60 days. After a
+          miss the defence plays as it did, so you can put it right; otherwise it tries the likely replies you have met least.
         </p>
         <OpponentNote />
         <div class="actions">
@@ -118,24 +120,37 @@ function EndgameList() {
   );
 }
 
-/** Who the opponent is: Maia checked by Stockfish, or Stockfish alone with the offer of Maia. */
+/** Who the opponent is: Maia checked by Stockfish or Maia alone (the switch), or Stockfish alone with the offer of Maia. */
 function OpponentNote() {
   const here = endgameMaiaHere.value;
   if (here === undefined) return null;
+  const alone = endgameMaiaAlone.value;
   return (
-    <p class="muted endgame-opponent" data-testid="endgame-opponent">
-      {here ? (
-        <>The opponent: Maia {MAIA_ELO} plays the move a strong player would try, among the moves Stockfish finds sound.</>
-      ) : (
-        <>
-          The opponent: Stockfish alone. It knows a lost position is lost whichever move it plays, so it often plays one that sets no problem; Maia plays the testing move a strong
-          player would try.{' '}
-          <button type="button" class="link" onClick={() => (maiaDialog.value = true)}>
-            Get Maia…
-          </button>
-        </>
+    <>
+      <p class="muted endgame-opponent" data-testid="endgame-opponent">
+        {here ? (
+          alone ? (
+            <>The opponent: Maia {MAIA_ELO} plays the move a strong player would try, at once: Stockfish doesn’t check it, so now and then it may let you off.</>
+          ) : (
+            <>The opponent: Maia {MAIA_ELO} plays the move a strong player would try, among the moves Stockfish finds sound.</>
+          )
+        ) : (
+          <>
+            The opponent: Stockfish alone. It knows a lost position is lost whichever move it plays, so it often plays one that sets no problem; Maia plays the testing move a
+            strong player would try.{' '}
+            <button type="button" class="link" onClick={() => (maiaDialog.value = true)}>
+              Get Maia…
+            </button>
+          </>
+        )}
+      </p>
+      {here && (
+        <label class="check endgame-alone">
+          <input type="checkbox" checked={alone} onChange={(ev) => setEndgameMaiaAlone(ev.currentTarget.checked)} /> Maia alone: answers at once, without waiting on Stockfish’s
+          check
+        </label>
       )}
-    </p>
+    </>
   );
 }
 

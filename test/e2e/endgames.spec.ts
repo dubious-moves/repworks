@@ -7,7 +7,8 @@
 // `practice` event, synced, at Kd2), the list saying so. Then the breakthrough solved first time
 // along Stockfish's own line (b6 cxb6 a6 bxa6 c6 b5 c7 b4 c8=Q), the list saying when it comes back.
 // And the opponent (§5.147): Stockfish alone without Maia, then, Maia downloaded from the list, Maia
-// 2600's move (the real network) once Stockfish, searching it alone, finds it sound. And a draw's
+// 2600's move (the real network) once Stockfish, searching it alone, finds it sound; the same reply
+// after a miss, one not met yet after an unfinished try, and "Maia alone" (§5.174). And a draw's
 // attacker (§5.148) not going back to a position seen, and pushing its pawn once a third is held.
 // And the repertoire's endgames (§5.149): gathered from two games the fake explorer names at every
 // line end (each walked to its first quiet endgame position past 3...cxd4, scored by the fake
@@ -471,6 +472,40 @@ test('the opponent: Stockfish alone without Maia; with Maia, its move once Stock
   await clickSquare(page, 'd5', 'white');
   await expect(moves).toHaveText('1. Kd5 Ke7', { timeout: 30_000 });
   expect(commands(site.requests).some((c) => / searchmoves f8e7 f8e8$/.test(c))).toBe(true);
+
+  // Varied over tries (§5.174). Restarted, the try counts as missed: the same defence, Ke7, again.
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  await page.getByRole('button', { name: 'Restart' }).click();
+  await expect(moves).toHaveText('');
+  await clickSquare(page, 'd4', 'white');
+  await clickSquare(page, 'd5', 'white');
+  await expect(moves).toHaveText('1. Kd5 Ke7', { timeout: 30_000 });
+  // Left unfinished, then begun afresh: Maia's likely reply not met yet, Ke8 (19%).
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  await page.evaluate(() => (location.hash = '#/endgames'));
+  await page.evaluate(() => (location.hash = '#/endgames/king-in-front'));
+  await expect(moves).toHaveText('');
+  await clickSquare(page, 'd4', 'white');
+  await clickSquare(page, 'd5', 'white');
+  await expect(moves).toHaveText('1. Kd5 Ke8', { timeout: 30_000 });
+  const kept = await page.evaluate(() => JSON.parse(localStorage.getItem('repworks-endgame-replies') ?? '{}') as Record<string, { seen: Record<string, Record<string, number>> }>);
+  expect(Object.values(kept['king-in-front']!.seen)).toContainEqual({ f8f7: 1, f8e7: 2, f8e8: 1 });
+
+  // Maia alone: switched on from the list, kept over a reload (the engine's searches forgotten),
+  // Maia's reply played with no search of its moves; Ke8 again, Ke7 met twice.
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  await page.evaluate(() => (location.hash = '#/endgames'));
+  await page.getByRole('checkbox', { name: /^Maia alone/ }).check();
+  await expect(note).toContainText('at once: Stockfish doesn’t check it');
+  await page.reload();
+  await expect(page.getByRole('checkbox', { name: /^Maia alone/ })).toBeChecked();
+  const searched = commands(site.requests).filter((c) => / searchmoves f8e7/.test(c)).length;
+  await page.evaluate(() => (location.hash = '#/endgames/king-in-front'));
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  await clickSquare(page, 'd4', 'white');
+  await clickSquare(page, 'd5', 'white');
+  await expect(moves).toHaveText('1. Kd5 Ke8', { timeout: 30_000 });
+  expect(commands(site.requests).filter((c) => / searchmoves f8e7/.test(c)).length).toBe(searched);
 });
 
 test('a draw’s attacker: no going back to a position seen, and the pawn pushed once a third is held', async ({ page }) => {
