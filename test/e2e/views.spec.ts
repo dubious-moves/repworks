@@ -416,6 +416,24 @@ test('clickable lines: preview a comment’s line, step through its lines, and b
   await expect(bar).toHaveCount(0);
 });
 
+test('clickable lines: a group opening with Or or Not is a line, and a remark naming a move is not (§5.175)', async ({ page, isMobile }) => {
+  await setUp(page);
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf?at=e4,c5,Nf3,d6`);
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 d6');
+  await comment(page, '(Or 2...e6 3.d4 cxd4 4.Nxd4.) (Not 3.d3 since then 3...Nf6 is easy) (this is not 2...e6 at all)');
+  const written = page.locator('.notation .comment', { hasText: 'at all' });
+  // The first line replaces 2...d6; the second starts at 3.d4's ply, after the commented move, and one is no line.
+  await expect(written.locator('.line-move')).toHaveText(['e6', 'd4', 'cxd4', 'Nxd4', 'd3', 'Nf6']);
+  const bar = page.getByRole('group', { name: 'Line from the comment' });
+  await written.locator('.line-move', { hasText: 'e6' }).click();
+  await expect(bar).toContainText('From the comment: e6');
+  await written.locator('.line-move', { hasText: 'Nf6' }).click();
+  await expect(bar).toContainText('From the comment: d3 Nf6');
+  if (isMobile) await bar.getByRole('button', { name: 'Back' }).click();
+  else await page.keyboard.press('Escape');
+  await expect(bar).toHaveCount(0);
+});
+
 test('a line with words and null moves; ↓ enters a move’s lines, ↑ ↓ between them, ← → along', async ({ page, isMobile }) => {
   test.skip(isMobile, 'arrow keys: the desktop');
   await setUp(page);

@@ -5,6 +5,13 @@
 //   `(6... Nbd7 7. Bc4)`. Any other group is a remark, `(with braces typed as parens)`, and stays
 //   text. Glyphs standing alone (`!?`, `$14`) are allowed; q_extension would read such a group as
 //   a remark.
+// - **Lead-in words** (PLAN.md §5.175, the owner's courses): a group may open with a few words before
+//   its first move number, `(Or 1...Ke4 2.Qaa4+)`, `(Not 3.Rge8 since then …)`, `(The quicker
+//   2.Qae5+ …)`: up to four, each one of `LEAD_IN`'s (or, not, and, instead, better, also, the,
+//   stopping …). Any other opening word makes the group a remark as before, so `(see 5. Nf3)` and
+//   `(this is not 5. Nf3)` stay text. The line is still placed by its number and side alone, so a
+//   remark that names a move of another ply is text too. Training's quiz reads groups without
+//   lead-ins only (`parseCommentLines(text, false)`): an "Or …" is an alternative, not the line.
 // - Words may follow a move, `(12. Ng5 Ndf6 taking e6 under control 13. Nxe6 Bxe6)`: they are
 //   text, and the line goes on at the next move number, so a square or a move named in the words
 //   is never read as a move. A comma, colon or semicolon after a move is text too.
@@ -59,10 +66,26 @@ const GLYPH = /^(?:[!?]{1,2}|\$\d{1,3})$/;
 /** The move glyphs a NAG stands for (`$1`–`$6`); the others (`$14`, ±) say nothing about the move. */
 const NAG_GLYPHS: Record<string, string> = { $1: '!', $2: '?', $3: '!!', $4: '??', $5: '!?', $6: '?!' };
 
+/**
+ * The words a line may open with before its first move number (lowercase, without punctuation):
+ * the connectives and comparatives that introduce an alternative or an aside in a course's
+ * comments. A closed list on purpose: a remark that merely contains a move stays text.
+ */
+export const LEAD_IN = new Set([
+  'or', 'nor', 'and', 'but', 'not', 'no', 'instead', 'rather', 'than', 'of', 'better', 'worse', 'best', 'also', 'even', 'only', 'just', 'simply', 'too', 'still', 'then', 'if',
+  'the', 'a', 'an', 'quicker', 'quickest', 'faster', 'simpler', 'stronger', 'weaker', 'easier', 'safer', 'slower', 'longer', 'shorter', 'cleaner', 'neater', 'prettier',
+  'possible', 'good', 'fine', 'enough', 'wins', 'win', 'draws', 'is', 'are', 'was', 'also', 'alternatively', 'perhaps', 'maybe', 'sometimes', 'normally', 'usually', 'either',
+  'similarly', 'likewise', 'equally', 'otherwise', 'now', 'here', 'with', 'by', 'to', 'for', 'after', 'before',
+  'stopping', 'preventing', 'avoiding', 'allowing', 'threatening', 'preparing', 'trying', 'playing',
+]);
+/** Most lead-in words a line may open with. */
+export const LEAD_IN_MAX = 4;
+
 const clean = (token: string) => token.replace(/[!?]+$/, '').replace(/[+#]$/, '').replace(/^0-0-0$/, 'O-O-O').replace(/^0-0$/, 'O-O');
 
 /** One group's moves, or undefined when it is a remark. `at` is the group's inner text offset. */
-function parseGroup(inner: string, at: number): Omit<CommentLine, 'from' | 'to'> | undefined {
+function parseGroup(inner: string, at: number, leadIns: boolean): Omit<CommentLine, 'from' | 'to'> | undefined {
+  let lead = 0;
   const moves: CommentMove[] = [];
   const words: { from: number; to: number }[] = [];
   let first: { number: number; turn: Color } | undefined;
@@ -88,9 +111,13 @@ function parseGroup(inner: string, at: number): Omit<CommentLine, 'from' | 'to'>
       token = numbered[3]!;
       offset += numbered[1]!.length + numbered[2]!.length;
       if (token === '') continue;
-    } else if (!first) return undefined;
-    // A comma, colon or semicolon after a move is text.
-    const move = prose ? '' : token.replace(/[,;:]+$/, '');
+    } else if (!first) {
+      // Before the first number: only the lead-in words, a few of them.
+      if (!leadIns || ++lead > LEAD_IN_MAX || !LEAD_IN.has(token.replace(/[,:;]+$/, '').toLowerCase())) return undefined;
+      continue;
+    }
+    // A comma, colon, semicolon or full stop after a move is text.
+    const move = prose ? '' : token.replace(/[,;:.]+$/, '');
     if (move && GLYPH.test(move)) {
       // A glyph standing after a move is the move's, unless it has one written on it.
       const last = moves.at(-1);
@@ -116,10 +143,10 @@ function parseGroup(inner: string, at: number): Omit<CommentLine, 'from' | 'to'>
 }
 
 /** Every line written in a comment, in order. */
-export function parseCommentLines(text: string): CommentLine[] {
+export function parseCommentLines(text: string, leadIns = true): CommentLine[] {
   const out: CommentLine[] = [];
   for (const m of text.matchAll(/\(([^()]*)\)/g)) {
-    const group = parseGroup(m[1]!, m.index + 1);
+    const group = parseGroup(m[1]!, m.index + 1, leadIns);
     if (group) out.push({ from: m.index, to: m.index + m[0].length, ...group });
   }
   return out;
@@ -178,8 +205,8 @@ export function playLine(line: CommentLine, start: Position | undefined): Played
 }
 
 /** Every line of a comment, played from where each starts. */
-export function playedLines(text: string, after: Position, before: Position | undefined): PlayedLine[] {
-  return parseCommentLines(text).map((line) => playLine(line, lineStart(line, after, before)));
+export function playedLines(text: string, after: Position, before: Position | undefined, leadIns = true): PlayedLine[] {
+  return parseCommentLines(text, leadIns).map((line) => playLine(line, lineStart(line, after, before)));
 }
 
 /** A move of a comment's lines: the line's index and how many of its moves are played (1 or more). */

@@ -74,7 +74,7 @@ export function CommentText(props: {
   // Played once per comment, so a line that fits neither position is text and the moves past
   // the legal ones are struck through (q_extension's rules). Only for a comment with a group.
   const played = useMemo(() => {
-    if (!/\(\s*\d/.test(props.text) || !parseCommentLines(props.text).length) return undefined;
+    if (!props.text.includes('(') || !parseCommentLines(props.text).length) return undefined;
     const at = props.positions();
     return at ? playedLines(props.text, at.after, at.before) : undefined;
   }, [props.text, props.id]);

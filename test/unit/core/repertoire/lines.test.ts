@@ -247,3 +247,61 @@ test('a move keeps its glyph, written on it or standing after it, and the number
   const [b] = parseCommentLines(text);
   assert.deepEqual(b!.moves.map((m) => [text.slice(m.from, m.to), m.glyph ?? '']), [['Bb5+', '!'], ['Bd7', '!!']]);
 });
+
+test('lead-in words: a group opening with Or, Not, The quicker… before its first number is a line (§5.175)', () => {
+  const text = [
+    '(Or 1...Ke4 2.Qaa4+ Ke3 3.Qbb3+ ...)',
+    '(Not 3.Rge8 since then 3...Kxe8 wins.)',
+    '(Stopping 7.Ra7+ due to 7...Kxa7.)',
+    '(The quicker 2.Qae5+ Kf3 3.Qbe2 mate doesn’t follow the method ...)',
+    '(And not 4.Kf2? Kd3)',
+    '(Instead 5.a4 is a mistake)',
+    '(Better, 6.Bb5)',
+    '(Also possible is 2.Kd2 Kd7)',
+  ].join(' ');
+  const lines = parseCommentLines(text);
+  assert.deepEqual(
+    lines.map((l) => [l.number, l.turn, l.moves.map((m) => m.san)]),
+    [
+      [1, 'black', ['Ke4', 'Qaa4', 'Ke3', 'Qbb3']],
+      [3, 'white', ['Rge8', 'Kxe8']],
+      [7, 'white', ['Ra7', 'Kxa7']],
+      [2, 'white', ['Qae5', 'Kf3', 'Qbe2']],
+      [4, 'white', ['Kf2', 'Kd3']],
+      [5, 'white', ['a4']],
+      [6, 'white', ['Bb5']],
+      [2, 'white', ['Kd2', 'Kd7']],
+    ],
+  );
+  // The moves are where they are written, with no lead-in and no full stop.
+  assert.deepEqual(lines[2]!.moves.map((m) => text.slice(m.from, m.to)), ['Ra7+', 'Kxa7']);
+  assert.deepEqual(lines[2]!.words.map((w) => text.slice(w.from, w.to)), ['due to', '.']);
+  // The group is the whole parenthesis, so it is drawn as one line with its lead-in as text.
+  assert.equal(text.slice(lines[0]!.from, lines[0]!.to), '(Or 1...Ke4 2.Qaa4+ Ke3 3.Qbb3+ ...)');
+});
+
+test('lead-in words: a remark that merely contains a move stays text', () => {
+  for (const text of [
+    '(this is not 5. Nf3)',
+    '(see 5. Nf3)',
+    '(the idea is 5. Nf3)',
+    '(Black resigns after 5.Nf3)',
+    '(Not a bad idea: 5.Nf3 e5 6.Nc3 Nc6 7.d3)', // "a bad" is not a lead-in
+    '(Or maybe the best way is 5.Nf3)', // five lead-in words and "way"
+    '(Or something 5.Nf3)',
+    '(Or)',
+    '(Not 5)',
+  ]) assert.deepEqual(parseCommentLines(text), [], text);
+  // Without lead-ins (training's quiz) a group opens with its number only, as q_extension reads it.
+  assert.deepEqual(parseCommentLines('(Or 1...Ke4 2.Qaa4+) (3.Rg2 Kf3)', false).map((l) => l.moves.map((m) => m.san)), [['Rg2', 'Kf3']]);
+});
+
+test('lead-in words: placed by number and side alone, so a remark naming a move of another ply stays text', () => {
+  // 2...d6 commented: "Or 2...Nc6" replaces it (before the move's own position is 2...), "Not 5.Bb5" fits neither.
+  const c = chapter('1. e4 e5 2. Nf3 d6 { Black could play (Or 2...Nc6 3.Bb5 a6) but (not 5.Bb5) is nonsense. }');
+  const lines = linesAt(c, ['e4', 'e5', 'Nf3', 'd6']);
+  assert.equal(lines.length, 2);
+  assert.equal(lines[0]!.placed, true);
+  assert.deepEqual(lines[0]!.sans, ['Nc6', 'Bb5', 'a6']);
+  assert.equal(lines[1]!.placed, false);
+});

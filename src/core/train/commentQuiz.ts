@@ -113,7 +113,7 @@ export function quizLinesOf(chapter: Chapter, path: readonly string[], side: Col
     const after = positions[d]!;
     const before = d > 0 ? positions[d - 1] : undefined;
     for (const text of [...node.startingComments, ...node.comments]) {
-      for (const line of parseCommentLines(text)) {
+      for (const line of parseCommentLines(text, false)) {
         const at = fits(line, after) ? d : before && fits(line, before) ? d - 1 : undefined;
         if (at === undefined) continue;
         const q = quizLine(line, positions[at]!, at, side, index);
