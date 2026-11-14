@@ -19,7 +19,7 @@ import { positionOf } from '../core/storm/walk.ts';
 import { Back } from './Back.tsx';
 import { MiniBoard } from './CommentOffer.tsx';
 import { gamePremove, MoveBoard, MoveList } from './Practice.tsx';
-import { useWakeLock } from './Train.tsx';
+import { useWakeLock } from './wakeLock.ts';
 
 const DAY = 86_400_000;
 

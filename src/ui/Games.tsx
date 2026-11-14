@@ -32,7 +32,7 @@ import { expectedCell, expectedTitle, explorerRows, openingNameAt, reaches } fro
 import { keyFen } from '../core/chess/positionKey.ts';
 import { fenAfterUci, START_FEN, uciToSan } from '../core/storm/walk.ts';
 import { discardSaved, resumePractice, savedPractice } from '../app/practice.ts';
-import { useWakeLock } from './Train.tsx';
+import { useWakeLock } from './wakeLock.ts';
 import { endPreview, preview, stepPreview } from '../app/preview.ts';
 import { endPreviewOnBoard, PreviewBar, previewBoard } from './CommentText.tsx';
 import { NoteButton, NoteText, noteArrows } from './CardNote.tsx';

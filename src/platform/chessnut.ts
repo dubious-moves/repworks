@@ -67,6 +67,8 @@ export interface OpenOptions {
 export async function openBoard(device: BtDevice, o: OpenOptions = {}): Promise<PhysicalBoard> {
   const sleep = o.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const reportFns: ((s: Squares) => void)[] = [];
+  /** The latest report, handed at once to a subscriber that comes after it (the board reports on start, then only on a change). */
+  let lastReport: Squares | undefined;
   const goneFns: (() => void)[] = [];
   const answerFns = new Set<(b: Uint8Array) => void>();
   let write: BtCharacteristic | undefined;
@@ -82,7 +84,9 @@ export async function openBoard(device: BtDevice, o: OpenOptions = {}): Promise<
     const b = bytesOf(e);
     if (b) o.onFrame?.('report', b);
     const squares = b && readReport(b);
-    if (squares) for (const f of reportFns) f(squares);
+    if (!squares) return;
+    lastReport = squares;
+    for (const f of reportFns) f(squares);
   };
   const onAnswer = (e: Event) => {
     const b = bytesOf(e);
@@ -158,7 +162,10 @@ export async function openBoard(device: BtDevice, o: OpenOptions = {}): Promise<
 
   return {
     name: device.name ?? MOVE_NAME,
-    onReport: (f) => void reportFns.push(f),
+    onReport: (f) => {
+      reportFns.push(f);
+      if (lastReport) f(lastReport);
+    },
     onGone: (f) => void goneFns.push(f),
     async reconnect() {
       try {

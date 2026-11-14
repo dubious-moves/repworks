@@ -8,7 +8,7 @@ import type { CardRank } from '../core/progress/events.ts';
 import { SaveRankSelect } from './Rank.tsx';
 import { chessgroundDests } from 'chessops/compat';
 import { normalizeMove } from 'chessops/chess';
-import { makeUci, parseSquare } from 'chessops/util';
+import { makeUci, parseSquare, parseUci } from 'chessops/util';
 import type { Key } from '@lichess-org/chessground/types';
 import type { Role, SquareName } from 'chessops/types';
 import { entryKey, goBack, open } from '../app/mode.ts';
@@ -93,7 +93,8 @@ import { focusAbout, focusTitle, FOCUS_GROUPS, FOCUS_LABEL, LEVEL_MAX, LEVEL_MIN
 import { maiaDialog, maiaElo, maiaState } from '../app/maia.ts';
 import { Board } from './Board.tsx';
 import { CLASSIFICATION } from '../core/games/grade.ts';
-import { useWakeLock } from './Train.tsx';
+import { useWakeLock } from './wakeLock.ts';
+import { useBoardMirror } from './boardMirror.ts';
 import { collect, fillBodies, puzzlePrefs, puzzleState, refreshPuzzles, setPuzzlePrefs, SHARD_MB, SHARES, SHARDS_PER_COLLECT, stopPuzzles, WORKING_SET } from '../app/puzzles.ts';
 import { Back, Stuck } from './Back.tsx';
 import { NoteButton } from './CardNote.tsx';
@@ -855,7 +856,19 @@ interface BoardView {
  * while it is graded and the verdict is read); arrows drawn on it stay until the next card. With a
  * line shown (`view`), the line's position instead, one board throughout.
  */
-function CardBoard(props: { item: StormItem; asking: boolean; onMove(uci: string): void; arrows?: Arrow[]; sketch: string; draw?: boolean; burst?: string | undefined; view?: BoardView | undefined }) {
+/** What the Chessnut Move is handed with a card (CHESSNUT.md §6 part (c); the storm passes it from part (e)). */
+interface CardMirror {
+  /** The user's move once graded, lit in its band's brush. */
+  played?: { uci: string; brush: string } | undefined;
+  /** A held card: the position a take-back by hand returns to, and Try again. */
+  undo?: { fen: string; run(): void } | undefined;
+  /** Wait this long before driving a new position (the review's stepping). */
+  delayMs?: number | undefined;
+  /** The position to set up instead of the one shown (the setup's earlier position, `playArrival`). */
+  fen?: string | undefined;
+}
+
+function CardBoard(props: { item: StormItem; asking: boolean; onMove(uci: string): void; arrows?: Arrow[]; sketch: string; draw?: boolean; burst?: string | undefined; view?: BoardView | undefined; mirror?: CardMirror | undefined }) {
   const p = props.item.card;
   const puzzle = props.item.puzzle;
   const step = props.item.step ?? 0;
@@ -872,6 +885,28 @@ function CardBoard(props: { item: StormItem; asking: boolean; onMove(uci: string
   const last = lastUci ? ([sq(lastUci, 0), sq(lastUci, 2)] as [Key, Key]) : undefined;
   const send = view ? view.onMove : props.onMove;
   const burst = view ? undefined : props.burst;
+  // The board's position is the one shown (after the move played: the link puts back a move whose
+  // position the site leaves as it was, PLAN.md §5.153's part (b) note). A move read there comes as
+  // standard UCI (castling e1g1) and goes on in this board's own form (castling e1h1, as
+  // `normalizeMove` gives it), so it enters exactly as a move on the screen does.
+  const m = props.mirror;
+  const mirrorFen = m?.fen ?? fen;
+  useBoardMirror(
+    m
+      ? {
+          fen: mirrorFen,
+          movable: mirrorFen === fen && dests.size > 0,
+          orientation: p.side,
+          marks: { lastUci, arrows: props.arrows, played: m.played },
+          onMove: (uci) => {
+            const move = parseUci(uci);
+            send(move && mirrorFen === fen ? makeUci(normalizeMove(pos, move)) : uci);
+          },
+          undo: m.undo,
+          delayMs: m.delayMs,
+        }
+      : undefined,
+  );
   const onMove = (orig: Key, dest: Key) => {
     const piece = pos.board.get(parseSquare(orig)!);
     if (piece?.role === 'pawn' && (dest[1] === '8' || dest[1] === '1')) return setPromotion({ orig, dest });

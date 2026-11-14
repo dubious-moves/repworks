@@ -34,7 +34,8 @@ import { gameCard } from '../core/progress/cards.ts';
 import { positionOf } from '../core/storm/walk.ts';
 import { Board, type BoardProps } from './Board.tsx';
 import { answerPending, repeatOpponent, setVoiceConfirm, voice, voiceConfirm, voiceOff, voiceOn } from '../app/voice.ts';
-import { useWakeLock } from './Train.tsx';
+import { useWakeLock } from './wakeLock.ts';
+import { useBoardMirror } from './boardMirror.ts';
 import { isoDay } from './day.ts';
 import { graphLabel, graphY, whiteEdge } from './evalGraph.ts';
 import { Back } from './Back.tsx';
@@ -84,9 +85,34 @@ function savedCardOf(f: FoundTactic): string | undefined {
   const s = savedTacticOf(savedDeck.value, f.t);
   return s ? gameCard(s.pid) : undefined;
 }
-export function MoveBoard(props: { fen: string; orientation: 'white' | 'black'; movable: boolean; lastUci?: string | undefined; arrows?: { orig: string; dest?: string; brush: string }[]; badge?: BoardProps['badge']; celebrate?: BoardProps['celebrate']; onMove(uci: string): void; premove?: BoardProps['premove'] }) {
+export function MoveBoard(props: {
+  fen: string;
+  orientation: 'white' | 'black';
+  movable: boolean;
+  lastUci?: string | undefined;
+  arrows?: { orig: string; dest?: string; brush: string }[];
+  badge?: BoardProps['badge'];
+  celebrate?: BoardProps['celebrate'];
+  onMove(uci: string): void;
+  premove?: BoardProps['premove'];
+  /** The Chessnut Move follows this board (CHESSNUT.md §4.2), with the user's move lit in its brush once judged. */
+  mirror?: boolean | { played?: { uci: string; brush: string } | undefined } | undefined;
+}) {
   const pos = useMemo(() => positionOf(props.fen), [props.fen]);
   const [promotion, setPromotion] = useState<{ orig: Key; dest: Key } | undefined>(undefined);
+  // Before the early return: a hook runs on every render. A move read on the board is standard
+  // UCI already, as this board hands its own moves over.
+  useBoardMirror(
+    props.mirror && pos
+      ? {
+          fen: props.fen,
+          movable: props.movable,
+          orientation: props.orientation,
+          onMove: props.onMove,
+          marks: { lastUci: props.lastUci, arrows: props.arrows, ...(typeof props.mirror === 'object' ? { played: props.mirror.played } : {}) },
+        }
+      : undefined,
+  );
   if (!pos) return null;
   const dests = props.movable ? (chessgroundDests(pos) as Map<Key, Key[]>) : new Map<Key, Key[]>();
   const last = props.lastUci ? ([sq(props.lastUci, 0), sq(props.lastUci, 2)] as [Key, Key]) : undefined;

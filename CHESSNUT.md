@@ -1,7 +1,7 @@
 # Repworks: the Chessnut Move (a robotic board)
 
 Status: planned 2026-11-06 at the owner's request; **being built since 2026-11-14** at the owner's
-word ("Go ahead and build it"), before the board arrives. Built: parts (a) and (b) (2026-11-14). What each
+word ("Go ahead and build it"), before the board arrives. Built: parts (a), (b) and (c) (2026-11-14). What each
 part changed from this plan is in `PLAN.md` §5.153's "As built" notes. Everything here can be built
 and tested before the board arrives (a simulated board in the tests), and part (a)'s spike page
 checks on the first day what only the real board can show. Read with
@@ -312,8 +312,8 @@ and every screen that doesn't opt in.
 
 ### 5.1 The chip and the dialog
 
-- **The chip** sits in the header beside the sync status (`src/ui/App.tsx`'s `topbar`), on every
-  page, when `navigator.bluetooth` exists or the browser is Brave (`navigator.brave`), to say how
+- **The chip** sits beside the sync status on every page (`src/ui/App.tsx`: in the `topbar` on a
+  phone, in the footer on a desktop and a phone held sideways, as built in part (c)), when `navigator.bluetooth` exists or the browser is Brave (`navigator.brave`), to say how
   to turn it on. Its states: "♞ Board" (not connected: a click connects), "Connecting…", "♞ 87%"
   with a dot (green in sync, amber setting up, red stuck or differing), "♞ Reconnecting". A click
   when connected opens the dialog.
@@ -688,9 +688,9 @@ Changes in `src/app/storm.ts`:
 - `deal()`: when `boardLinked()`, a position whose pieces can't be made (`missingPieces`) is
   skipped (dealt again from the queue); else `setPhase('setup')` and then
   `void setUp(item)`: with `playArrival` and `item.card.arrived`, `update({ setupAt: 'before' })`,
-  `await boardReached(arrived.before)`, then `update({ setupAt: 'card' })`; then
-  `await boardReached(fenOfItem(item))`; then, if the session still holds this card in `setup`,
-  `setPhase('solving')`. `boardReached` resolves `false` at once when the board isn't linked or
+  `await boardLink.reached(arrived.before)`, then `update({ setupAt: 'card' })`; then
+  `await boardLink.reached(fenOfItem(item))`; then, if the session still holds this card in `setup`,
+  `setPhase('solving')`. `boardLink.reached` resolves `false` at once when the board isn't linked or
   the position is unmakeable, so the session never waits on a missing board. Without the board:
   `setPhase('solving')` as today.
 - `settle()`, the set's branch: when `boardLinked()` and not held and `autoNext`, schedule
@@ -701,7 +701,7 @@ Changes in `src/app/storm.ts`:
 - Show and grade's named move: the same `autoNext` after the verdict.
 - Speech (`speak` setting): after a move read from the board, the band's word and, when it wasn't
   the top move, the best move (`v.bestSan`, through `moveToSpeech` from `src/core/games/voice.ts`).
-- `boardReached(fen)` (in `boardLink.ts`): resolves `true` when the link reports `synced` with that
+- `boardLink.reached(fen)` (built in part (c)): resolves `true` when the link reports `synced` with that
   position wanted, `false` when the link isn't `on` or the position is `unmakeable` or the link
   goes off; no timeout (a `stuck` board waits for Send again, a fix by hand, or "Play on the
   screen").

@@ -5,7 +5,8 @@
 //
 // Controls (each run once, 2026-11-14, and each failed this test): `GAP_MS` at 0 (the writes'
 // gap); `onReport` not subscribed before START_REPORTS (the first report lost); the reconnect
-// without `connect()` (the drive after it refused).
+// without `connect()` (the drive after it refused); `onReport` without the latest report handed to
+// a late subscriber (the start report not seen; part (c), 2026-11-14).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { installFakeMove } from '../../e2e/chessnut.ts';
@@ -36,6 +37,9 @@ test('the platform module against the simulated board', async () => {
   assert.equal(fake().writes()[0], '21 01 00');
   assert.deepEqual(writes[0], { bytes: 3, kind: 'with response' });
   assert.equal(frames[0], 'report 1 38');
+  // That first report, sent before anyone subscribed, handed to the subscriber at once: the board
+  // reports only on a change, so the app's link (subscribed after the chooser) would not see it.
+  assert.equal(seen[0], START);
   // A hand: read at once.
   fake().hand('rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR');
   assert.equal(seen.at(-1), 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR');

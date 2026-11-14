@@ -30,6 +30,7 @@ import { enrolledIn } from '../core/ideas/cards.ts';
 import { ImportScreen } from './Import.tsx';
 import { SetupForm } from './Setup.tsx';
 import { SyncBanners, SyncChip } from './Sync.tsx';
+import { BoardChip, BoardDialog } from './BoardLink.tsx';
 import { HomeLink } from './Back.tsx';
 import { SIDEWAYS } from './phone.ts';
 import { MistakesView } from './Mistakes.tsx';
@@ -54,6 +55,7 @@ export function App() {
       <header class="topbar">
         <img class="topbar-icon" src={`${import.meta.env.BASE_URL}icons/icon.svg`} alt="" width={28} height={28} />
         <h1>Repworks</h1>
+        {!wide.value && <BoardStatus />}
         {!wide.value && <SyncStatus />}
         {mode.value.name !== 'list' && <HomeLink class="topbar-home" />}
       </header>
@@ -88,6 +90,7 @@ export function App() {
         <Lc0Dialog />
         <KeysHelp />
         <PriorityDialog />
+        <BoardDialog />
       </Guard>
       <footer class="footer">
         <span>
@@ -95,7 +98,12 @@ export function App() {
           {shellVersion.value && <> · shell {shellVersion.value.slice(0, 8)}</>} · <a href={`${import.meta.env.BASE_URL}spike.html`}>remote spike</a> ·{' '}
           <a href={`${import.meta.env.BASE_URL}board.html`}>board spike</a>
         </span>
-        {wide.value && <SyncStatus />}
+        {wide.value && (
+          <span class="footer-status">
+            <BoardStatus />
+            <SyncStatus />
+          </span>
+        )}
       </footer>
     </div>
   );
@@ -120,6 +128,15 @@ function SyncStatus() {
     </Guard>
   ) : (
     !online.value && <span class="status status-offline">offline</span>
+  );
+}
+
+/** The Chessnut Move's chip (CHESSNUT.md §5.1), beside the sync status wherever that is. */
+function BoardStatus() {
+  return (
+    <Guard name="The board's chip">
+      <BoardChip />
+    </Guard>
   );
 }
 

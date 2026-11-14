@@ -1504,3 +1504,19 @@ does. Start with the spike: its log decides what the later parts change (CHESSNU
   board (connect, a drive timed with a report on its way, the five setups, the lights' pattern, the
   pieces, a drop and Reconnect, Copy log; without Web Bluetooth, and Brave's flag). Nothing on a
   real board.
+
+### The board's chip and dialog (CHESSNUT.md part (c), 2026-11-14)
+- Connect from the ♞ chip (in the head on the phone, in the footer beside the sync status on a
+  desktop); the battery; the dialog's small board follows the real board as you move pieces; Check
+  the pieces. Turn the board off and on: "Reconnecting", then back.
+- Worth noting as you go: whether the battery's percentage matches Chessnut's app; whether the
+  small board shows the position at once on connecting (the board reports once when its reports
+  start, then only on a change); Reset the pieces and Lights off; Disconnect, then Connect again
+  without a reload; on a phone held sideways the board pages have no head, so the chip is in the
+  footer there.
+- **Checked**: unit tests (the link in the app against a fake board and clock: the mirror, the
+  latest board mirrored winning, the review's delay, the lights, a drop and the reconnects, Reset
+  the pieces, a stuck drive, a position the set can't make, Check the pieces, the settings);
+  Playwright on a desktop and an emulated phone with the simulated board (the chip, the dialog, the
+  settings kept after a reload, a drop and back, Disconnect, nothing picked, no chip without Web
+  Bluetooth, Brave's flag). No screen uses the board yet. Nothing on a real board.

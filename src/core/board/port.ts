@@ -5,7 +5,7 @@ import type { Battery, Light, PieceState, Squares } from './chessnut.ts';
 export interface PhysicalBoard {
   /** The device's name as the chooser showed it. */
   readonly name: string;
-  /** Every position report, read (unreadable ones are dropped). */
+  /** Every position report, read (unreadable ones are dropped); the latest one at once, if any came before. */
   onReport(f: (squares: Squares) => void): void;
   /** The link dropped (the board off, out of range, the page hidden). */
   onGone(f: () => void): void;

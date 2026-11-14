@@ -175,6 +175,93 @@ h2 {
   background: var(--bg);
 }
 
+/* The Chessnut Move's chip (CHESSNUT.md §5.1), beside the sync status: in the head on a phone, in
+   the footer on a desktop. Its dot is the link: green in step, amber setting up, red needs a hand. */
+.footer-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.board-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.topbar .board-chip:not(.chip-warn) {
+  min-height: 32px;
+  padding: 0 10px;
+  border-color: color-mix(in srgb, currentColor 45%, transparent);
+}
+
+.footer .board-chip {
+  min-height: 24px;
+  padding: 0 8px;
+  font-size: 0.8rem;
+}
+
+.footer .board-chip:not(.chip-warn) {
+  color: var(--muted);
+}
+
+.board-dot {
+  display: inline-block;
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: 1px;
+  box-shadow: 0 0 0 1px rgb(var(--ink) / 30%);
+}
+
+.board-chip .board-dot {
+  margin-right: 0;
+}
+
+.board-dot-ok {
+  background: var(--win);
+}
+
+.board-dot-busy {
+  background: var(--warn);
+}
+
+.board-dot-bad {
+  background: var(--loss);
+}
+
+.board-dialog .board-seen {
+  margin: 8px 0;
+}
+
+.board-dialog .board-seen figcaption {
+  margin-top: 4px;
+  font-size: 0.85rem;
+}
+
+.board-dialog .board-pieces p {
+  margin: 6px 0;
+}
+
+.board-dialog .board-settings {
+  margin: 12px 0 0;
+  padding: 4px 12px 10px;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius);
+}
+
+.board-dialog .board-settings > label:not(.check) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin-top: 8px;
+}
+
 .banner-warn {
   border-left: 4px solid var(--warn);
 }

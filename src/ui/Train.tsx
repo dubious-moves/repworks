@@ -2,6 +2,7 @@
 // name and the comments of the move reached; one primary action per state, and the day's
 // counters. The screen stays on while a session runs (Screen Wake Lock).
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { useWakeLock } from './wakeLock.ts';
 import { makeFen } from 'chessops/fen';
 import { parseSan } from 'chessops/san';
 import { chessgroundDests, chessgroundMove } from 'chessops/compat';
@@ -117,33 +118,6 @@ export function numbered(start: Position, path: readonly string[]): string {
     turn = turn === 'white' ? 'black' : 'white';
   });
   return out.join(' ');
-}
-
-export function useWakeLock(active: boolean) {
-  useEffect(() => {
-    if (!active || !('wakeLock' in navigator)) return;
-    let lock: WakeLockSentinel | undefined;
-    let stopped = false;
-    const take = () => {
-      if (document.visibilityState !== 'visible' || lock) return;
-      navigator.wakeLock.request('screen').then(
-        (l) => {
-          if (stopped) return void l.release();
-          lock = l;
-          l.addEventListener('release', () => (lock = undefined));
-        },
-        () => undefined,
-      );
-    };
-    take();
-    // The browser releases the lock when the page is hidden; it is taken again on return.
-    document.addEventListener('visibilitychange', take);
-    return () => {
-      stopped = true;
-      document.removeEventListener('visibilitychange', take);
-      void lock?.release();
-    };
-  }, [active]);
 }
 
 /** Analyse: the analysis board at the session's position, the session kept for this entry. */

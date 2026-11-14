@@ -27,7 +27,7 @@ import { Back } from './Back.tsx';
 import { Board } from './Board.tsx';
 import { CommentText, endPreviewOnBoard, PreviewBar, previewBoard } from './CommentText.tsx';
 import { LineReader } from './Read.tsx';
-import { useWakeLock } from './Train.tsx';
+import { useWakeLock } from './wakeLock.ts';
 
 const GRADE_WORD = { 1: 'Again', 2: 'Hard', 3: 'Good', 4: 'Easy' } as const;
 

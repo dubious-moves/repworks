@@ -2338,3 +2338,23 @@ The technical calls, each with its reason:
   `sleep` argument. Why: the spike logs every frame raw and which write kind went through (§7's
   "does a 35-byte write work, and which kind?"), and three optional values read better named.
 - No data format changed; nothing in the app uses the board yet.
+
+## Revision of 2026-11-14 (the Chessnut Move in the app: CHESSNUT.md part (c))
+- **The board's chip sits beside the sync status wherever that is**: in the head on a phone, in the
+  footer on a desktop and on a phone held sideways (the plan had it in the head). Why: the
+  installed app on a desktop shows no head at all, and a sideways phone's board pages none; the sync
+  status already moved for the same reasons.
+- **A new subscriber to the board's reports gets the latest at once** (`src/platform/chessnut.ts`).
+  Why: the board reports once when its reports start, then only on a change; the app subscribes
+  after the chooser, so it would not have known the position until a piece moved.
+- **Reset the pieces with a board mirrored parks the mirror** until the screen's position changes
+  or Set up again. Why: the link would otherwise put the game's position straight back (a wrong
+  position held 2 s), so Reset the pieces at a game's end, as CHESSNUT.md §5.4 has it, would undo
+  itself.
+- **A review's `delayMs` covers its first position too.** Why: a review opened and stepped at once
+  would otherwise send the robot to the first row and then on.
+- **A move read on the board reaches `CardBoard`'s handler in its own form** (castling `e1h1`, as
+  `normalizeMove` gives it), not the link's `e1g1`. Why: it then enters exactly as a move on the
+  screen does, whatever `answerMove` does with either.
+- No data format changed; the settings stay on the device (`repworks-board`); no screen mirrors a
+  board yet.
