@@ -141,6 +141,21 @@ export function hangs(pos: Position): boolean {
   return false;
 }
 
+/** How much worse than the best (the mover's expected score, 0 to 1) Lc0 may rate a move before it is vetoed. */
+export const LC0_MARGIN = 0.1;
+
+/**
+ * "Maia alone"'s veto, from Lc0's value of each move (the mover's expected score after it, one
+ * network run on the position it leads to): the moves rated more than `margin` below the best of
+ * them. Lc0 has no search here, so it can't tell a move from its near equals (the 0.30 to 1.00 slips
+ * Maia now and then makes, which it rates alike), but it sees the ones that lose or draw away a game
+ * (a king step that loses the opposition: 0.11 against 0.49, PLAN.md §5.176). Pure.
+ */
+export function lc0Vetoed(values: Readonly<Record<string, number>>, margin = LC0_MARGIN): Set<string> {
+  const best = Math.max(...Object.values(values));
+  return new Set(Object.keys(values).filter((u) => best - values[u]! > margin));
+}
+
 /**
  * "Maia alone"'s reply: no Stockfish, so only checks that need no search. A draw's attacker's pawn
  * push first when asked for (§5.148), Maia's likeliest that ends nothing, repeats nothing and hangs

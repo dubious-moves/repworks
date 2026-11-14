@@ -2448,3 +2448,15 @@ The technical calls, each with its reason:
   (§5.61 said "their lines not clickable here").
 - The plan's section number is §5.175 (the request named §5.165, which was taken).
 
+
+## Revision of 2026-11-14 (Lc0 vetoes a Maia-alone move, PLAN.md §5.176)
+- **With "Maia alone", Lc0 vetoes a move it rates clearly worse, when its files are on the device.**
+  One network run on the position after each candidate; more than 0.10 below the best candidate's
+  expected score (W + D/2) is vetoed; with every candidate vetoed, Lc0's own likeliest move; with no
+  Lc0, §5.174 unchanged. Maia still plays. Why: the owner's report, 2026-11-14: in a drawn king and
+  pawn ending Maia alone played 1…Kb6 (51%), which loses, and the drill's attacker gave the draw
+  drill away; Lc0 saw only drawing moves. Measured: Lc0's value doesn't tell Maia's 0.30 slips from
+  the best, but separates a losing move (0.11 against 0.49); Lc0 as the opponent was more often
+  0.30 off than Maia (8.9% against 2.2%) and less testing (§5.147), so it vetoes, it doesn't play.
+- **Nothing is downloaded for it, and Lc0 doesn't judge the user's moves** (Lc0 stays out of grading,
+  §5.143). The end of a try still waits for Stockfish's judges (§5.145, as before).

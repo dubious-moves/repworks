@@ -10172,3 +10172,55 @@ the real chapters, Maia as the defence in these positions. `TESTING.md` §8.
 drill and next button in `src/ui/Endgames.tsx`, the home's count in `src/ui/Today.tsx`, loading in
 `src/ui/App.tsx`; `Endgame.group` may be `course`; `hash` exported from `repertoire.ts`.
 
+
+#### 5.176 Lc0 vetoes a Maia-alone move (the owner's request of 2026-11-14, built)
+
+The owner, in "Hold the draw" (a king and pawn ending, Black Kc6 b5 g6 against Kb4 g3 h4): "Maia
+plays a losing move. Lc0 only shows drawing moves. I was supposed to hold the draw but managed to win
+instead." Maia 3 at 2600 gave 1…Kb6 51% (it loses the opposition: Stockfish d22 mate in 16), Kd5 44%
+and Kd6 4% (both hold); Lc0's policy gave Kd5 57%, Kd6 24%, Kd7 11% and its value 0 / 100 / 0. "Maia
+alone" (§5.174) has only board checks (nothing ended, no repetition, nothing hanging), blind to this.
+The owner's suggestion: Lc0, when it is on the device, as the soundness check, "much faster than
+Stockfish but stronger than Maia".
+
+- **Measured** (2026-11-14, cloud container, Node, one thread, `scripts`-style throwaway; Stockfish
+  d12 as the truth, 726 Maia-alone replies over the 23 built-in endgames, three games each, the user
+  side Stockfish's best or now and then its second; 418 not lost anyway):
+
+  | Opponent | More than 0.30 below the best | More than 1.00 | Mean loss |
+  | --- | --- | --- | --- |
+  | Maia alone | 9 (2.2%) | 2 (0.5%) | 5.8 cp |
+  | Lc0's policy, its top move | 37 (8.9%) | 0 | 9.1 cp |
+
+  Lc0's value after each of Maia's three moves (one network run each, 63 ms) did **not** separate
+  those 0.30 to 1.00 slips (its gap on the nine: 0.00 to 0.01), so as a check of every move it adds
+  nothing there: the slips are near equals. What it does catch is a move that loses or draws away the
+  game: after Kb6 its value for the mover is 0.106 against 0.493 for Kd5 and Kd6 (g5 0.038), a gap of
+  0.39; with a search, 200 nodes (8.7 s) 1…Kb6 got 1 visit and Q −0.79. The 726 replies held no such
+  move (two replies lost 1.00 to 2.00 pawns, none more), so the sample can't say how often Maia plays one;
+  the owner's position is one case, in a king-and-pawn ending, where Maia is weakest (it needs
+  calculation). Lc0 as the opponent (policy) is worse than Maia at the 0.30 slips, and §5.147 found it
+  the less testing defence; so Maia stays the one who plays, Lc0 only vetoes.
+- **Decided** (Claude's calls):
+  - **The veto**: with "Maia alone" and Lc0's files on the device (the study page's switch needn't be
+    on, as for Maia; nothing is downloaded for it), Lc0 values each candidate (Maia's moves in their
+    order, the draw attacker's pushes) by one run on the position after it: the mover's expected score
+    W + D/2 of the child's W/D/L, flipped. A move more than 0.10 below the best of them, Lc0's own
+    likeliest move included, is vetoed (`lc0Vetoed`, `LC0_MARGIN` in `core/endgames/variety.ts`; at 0.10
+    the sample flagged 10 of 418 replies, and playing the best-rated candidate instead cost nothing
+    against Stockfish). With every candidate vetoed, Lc0's own likeliest move; with no answer
+    (files missing, 6 s), no veto and §5.174 as it was. Stockfish still judges the user's moves.
+  - **Cost**: up to five network runs a reply, about 0.3 s on a desktop (Maia's own is about as
+    much), the worker started with the try.
+  - **Not done**: Lc0 judging the user's moves (the goal's bands are Stockfish's centipawns, §5.145,
+    and the owner left Lc0 out of grading, §5.143), and the end of a try without waiting for the
+    judges, waiting on the owner's answer.
+- **Checked**: `lc0Vetoed` in `test/unit/core/endgames/variety.test.ts` (this position's values: Kb6
+  and g5 vetoed, Kd5 and Kd6 kept; near equals and a lost position's values left alone); the e2e
+  endgames spec unchanged (Lc0 isn't on the device there: no veto). **Not checked live**: the
+  veto in the app with Lc0 downloaded, its speed on a phone. `TESTING.md`.
+
+**As built** (2026-11-14): `lc0Vetoed`, `LC0_MARGIN` (`src/core/endgames/variety.ts`);
+`src/app/endgameLc0.ts` (a worker of its own, `endgameLc0`, `warmEndgameLc0`); the Maia-alone branch
+of `endgameReply` (`src/app/practice.ts`); `startEndgame` warms it (`src/app/endgames.ts`); the
+sentence under the switch (`src/ui/Endgames.tsx`).

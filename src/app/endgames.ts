@@ -4,6 +4,8 @@
 import { computed, signal } from '@preact/signals';
 import { keyFen } from '../core/chess/positionKey.ts';
 import { attemptsByEndgame, ENDGAMES, sideOf, standingOf, type Endgame, type Standing } from '../core/endgames/endgames.ts';
+import { warmEndgameLc0 } from './endgameLc0.ts';
+import { endgameMaiaAlone } from './endgameVariety.ts';
 import { maiaState, maiaStored } from './maia.ts';
 import { DEFAULT_OPPONENT, endgameMaia, startPractice } from './practice.ts';
 import { practiceResults } from './repertoireCheck.ts';
@@ -31,6 +33,7 @@ export function checkEndgameMaia(): void {
 export function startEndgame(e: Endgame): void {
   checkEndgameMaia();
   void endgameMaia(e.fen);
+  if (endgameMaiaAlone.peek()) warmEndgameLc0();
   startPractice({ kind: 'endgame', fen: e.fen, color: sideOf(e), silent: true, title: e.title, opponent: DEFAULT_OPPONENT, endgame: e });
 }
 

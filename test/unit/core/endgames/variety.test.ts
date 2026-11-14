@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { Chess } from 'chessops/chess';
 import { parseFen } from 'chessops/fen';
 import { parseUci } from 'chessops/util';
-import { beginTry, hangs, KEEP_ENDGAMES, KEEP_POSITIONS, noteEnd, noteReply, readMemories, replyHints, replyOrder, trustPick, VARY_MIN, type Memories } from '../../../../src/core/endgames/variety.ts';
+import { beginTry, hangs, lc0Vetoed, KEEP_ENDGAMES, KEEP_POSITIONS, noteEnd, noteReply, readMemories, replyHints, replyOrder, trustPick, VARY_MIN, type Memories } from '../../../../src/core/endgames/variety.ts';
 
 const pos = (fen: string) => Chess.fromSetup(parseFen(fen).unwrap()).unwrap();
 const after = (fen: string, uci: string) => {
@@ -151,4 +151,13 @@ test('Maia alone: nothing ended, nothing hanging, no repetition for a draw’s a
   assert.deepEqual(trustPick('draw', ['e3d4'], policy('e3d4', 'e4e5'), ['e4e5'], check(loose)), { uci: 'e3d4' });
   // Nothing at all to play: Stockfish then.
   assert.equal(trustPick('win', [], [], [], check(kp)), undefined);
+});
+
+test('Lc0’s veto: the moves rated clearly below the best, nothing when they are alike', () => {
+  // The real case (2026-11-14): 1…Kb6 loses the opposition, Kd5 and Kd6 hold; Lc0's values after each move.
+  assert.deepEqual([...lc0Vetoed({ b6: 0.106, d5: 0.493, d6: 0.493, g5: 0.038 })].sort(), ['b6', 'g5']);
+  // Near equals (the 0.30 slips Lc0 can't tell apart) and a lost position's values are left alone.
+  assert.equal(lc0Vetoed({ a: 0.5, b: 0.45, c: 0.41 }).size, 0);
+  assert.equal(lc0Vetoed({ a: 0.02, b: 0.01 }).size, 0);
+  assert.deepEqual([...lc0Vetoed({ a: 0.5, b: 0.39 }, 0.2)], []);
 });

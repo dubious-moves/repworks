@@ -32,7 +32,8 @@ import { covered, scanCandidate, tacticCandidates, TACTIC, type DetectedTactic, 
 import type { Color } from '../core/games/record.ts';
 import { historyCard, practiceCard } from '../core/progress/cards.ts';
 import { ENDGAME_PRESET, firstSlip, GOAL_CP, held, keepsGoal, lineOf, MAIA_ELO, maiaCandidates, materialFor, opponentPick, pawnPushes, pushNow, slips, solvedBy, wonAfter, type Endgame, type OpponentLine } from '../core/endgames/endgames.ts';
-import { hangs, replyOrder, trustPick } from '../core/endgames/variety.ts';
+import { hangs, lc0Vetoed, replyOrder, trustPick } from '../core/endgames/variety.ts';
+import { endgameLc0 } from './endgameLc0.ts';
 import { endgameMaiaAlone, hintsAt, replyPlayed, tryBegun, tryEnded } from './endgameVariety.ts';
 import type { Grade } from '../core/progress/events.ts';
 import { positionOf } from '../core/storm/walk.ts';
@@ -270,13 +271,28 @@ async function endgameReply(fen: string, e: Endgame, userMoves: number, seen: Re
   if (endgameMaiaAlone.peek()) {
     const policy = await endgameMaia(fen);
     if (policy?.length) {
-      const ordered = [...new Set([...(replay ? [replay] : []), ...replyOrder(maiaCandidates(policy), hints.seen).map((m) => m.uci)])];
+      let ordered = [...new Set([...(replay ? [replay] : []), ...replyOrder(maiaCandidates(policy), hints.seen).map((m) => m.uci)])];
+      let pushed = pushes;
+      // Lc0, when it is on this device, vetoes a move it rates clearly worse than the best (§5.176): a king
+      // step that loses the opposition looks sound to the board-only checks. With every candidate vetoed,
+      // its own likeliest move; with none of them, no veto.
+      const lc0 = await endgameLc0(fen, [...ordered, ...pushes].filter((u) => !over(u)));
+      let lc0Own = false;
+      if (lc0 && Object.keys(lc0.values).length) {
+        const vetoed = lc0Vetoed(lc0.values);
+        ordered = ordered.filter((u) => !vetoed.has(u));
+        pushed = pushes.filter((u) => !vetoed.has(u));
+        if (!ordered.length && lc0.top && !vetoed.has(lc0.top)) {
+          ordered = [lc0.top];
+          lc0Own = true;
+        }
+      }
       const hung = (uci: string) => {
         const p = after(uci);
         return !p || hangs(p);
       };
-      const pick = trustPick(goal, ordered, policy, pushes, { over, repeats, hangs: hung });
-      if (pick) return { uci: pick.uci, source: `Maia ${MAIA_ELO}`, dbFailed: false };
+      const pick = trustPick(goal, ordered, policy, pushed, { over, repeats, hangs: hung });
+      if (pick) return { uci: pick.uci, source: lc0Own ? 'Lc0' : `Maia ${MAIA_ELO}`, dbFailed: false };
     }
   }
   const depth = narrow() ? 16 : 18;

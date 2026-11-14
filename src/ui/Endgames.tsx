@@ -167,7 +167,7 @@ function OpponentNote() {
       {here && (
         <label class="check endgame-alone">
           <input type="checkbox" checked={alone} onChange={(ev) => setEndgameMaiaAlone(ev.currentTarget.checked)} /> Maia alone: answers at once, without waiting on Stockfish’s
-          check
+          check (Lc0, if it’s on this device, vetoes a move it rates clearly worse)
         </label>
       )}
     </>

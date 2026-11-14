@@ -1623,3 +1623,14 @@ does. Start with the spike: its log decides what the later parts change (CHESSNU
   unchanged through two 2 s setups and running between them; a puzzle not asked while its reply is
   driven; the review stepped quickly driving only the row stopped on, the played move lit red and
   the best green; a retry by hand graded, lit and said). Nothing on a real board.
+
+### Lc0 vetoes a Maia-alone move (PLAN.md §5.176, 2026-11-14)
+- With Lc0 downloaded (the study page's engine bar), switch "Maia alone" on in the Endgames list and
+  play a draw drill in a king and pawn ending ("Hold with the opposition", the breakthrough and the
+  like) a few times: does the attacker still ever play a move that loses the position it should
+  only draw (the owner's Kb6)? And how long does its reply take compared with before, on the phone
+  too (up to five network runs on top of Maia's)?
+- Worth noting: whether a vetoed move ever makes the defence too easy (Lc0 steering Maia off a testing
+  move it rates a little worse: the margin is 0.10 of the expected score).
+- **Checked**: the veto on the real position with the real networks under Node (Kb6 0.11 against 0.49),
+  the rule in unit tests, the page's existing e2e; **not** the app with Lc0 stored, nor any phone.
