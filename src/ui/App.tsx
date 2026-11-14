@@ -327,7 +327,10 @@ function EndgamesLink() {
   // The repertoire's endgames (§5.149) count once read; the courses' (§5.175) once scored, which reads the chapters.
   useEffect(() => void loadRepEndgames(), []);
   const version = dataVersion.value;
-  useEffect(() => void loadCourse().then(() => (courseScores.peek()?.size ? readSearchChapters() : undefined)), [version]);
+  useEffect(() => void loadCourse(), [version]);
+  // The scores come from the synced log, so they may arrive after the start, or from another device.
+  const scored = !!courseScores.value?.size;
+  useEffect(() => void (scored ? readSearchChapters() : undefined), [scored, version]);
   const due = endgamesDue(decidingNow()).due;
   return (
     <a class="button secondary" href="#/endgames" title="The theoretical endgames and your repertoire's, each played for its goal">

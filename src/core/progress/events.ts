@@ -237,6 +237,21 @@ export interface RankEvent extends Base {
   card: string;
   p: CardRank;
 }
+/**
+ * A course endgame's score (PLAN.md §5.175, synced): Stockfish's verdict on one chapter, kept as the
+ * `CourseScore` it is (`sc`, `v: 2`), on the card `e|<chapter start's key>`. The latest of a card decides.
+ */
+export interface CourseScoreEvent extends Base {
+  k: 'cscore';
+  card: string;
+  sc: Record<string, unknown>;
+}
+/** A course drill taken off the list (`on`, the card `e|<key>`) or put back; the latest decides. */
+export interface CourseDrillEvent extends Base {
+  k: 'cdrill';
+  card: string;
+  on: boolean;
+}
 export type KnownEvent =
   | ReviewEvent
   | SuspendEvent
@@ -261,8 +276,10 @@ export type KnownEvent =
   | NoteEvent
   | ChecklistEvent
   | PickEvent
-  | RankEvent;
-export const KNOWN_KINDS = ['review', 'suspend', 'unsuspend', 'forget', 'taught', 'pin', 'unpin', 'drill', 'alt', 'storm', 'snapshot', 'drop', 'relapse', 'plan', 'idea', 'dismiss', 'saved', 'played', 'practice', 'line', 'note', 'checklist', 'pick', 'rank'] as const;
+  | RankEvent
+  | CourseScoreEvent
+  | CourseDrillEvent;
+export const KNOWN_KINDS = ['review', 'suspend', 'unsuspend', 'forget', 'taught', 'pin', 'unpin', 'drill', 'alt', 'storm', 'snapshot', 'drop', 'relapse', 'plan', 'idea', 'dismiss', 'saved', 'played', 'practice', 'line', 'note', 'checklist', 'pick', 'rank', 'cscore', 'cdrill'] as const;
 
 /** A line as read. `event` is set for the kinds this code knows; `raw` is always the line itself. */
 export interface LogLine {
@@ -529,6 +546,19 @@ function knownEvent(o: Record<string, unknown>): KnownEvent | string {
       if (typeof p !== 'string' || !(CARD_RANKS as readonly string[]).includes(p)) return 'p must be high, normal or low';
       return { ...base, k: 'rank', p: p as CardRank };
     }
+    case 'cscore': {
+      if (!card.startsWith('e|') || card.length < 3) return 'card must be a course endgame (e|<position>)';
+      const sc = o['sc'];
+      if (typeof sc !== 'object' || sc === null || Array.isArray(sc)) return 'sc must be an object';
+      if ((sc as Record<string, unknown>)['key'] !== card.slice(2)) return 'sc.key must be the card’s position';
+      return { ...base, k: 'cscore', sc: sc as Record<string, unknown> };
+    }
+    case 'cdrill': {
+      if (!card.startsWith('e|') || card.length < 3) return 'card must be a course endgame (e|<position>)';
+      const on = o['on'];
+      if (typeof on !== 'boolean') return 'on must be true or false';
+      return { ...base, k: 'cdrill', on };
+    }
     default:
       return { ...base, k: 'forget' };
   }
@@ -565,6 +595,8 @@ export function formatEvent(event: KnownEvent): string {
   }
   if (event.k === 'pick') Object.assign(o, { color: event.color, m: event.m, on: event.on });
   if (event.k === 'rank') o['p'] = event.p;
+  if (event.k === 'cscore') o['sc'] = event.sc;
+  if (event.k === 'cdrill') o['on'] = event.on;
   if (event.k === 'saved') o['item'] = event.item;
   if (event.k === 'played') o['game'] = event.game;
   if (event.k === 'practice') {

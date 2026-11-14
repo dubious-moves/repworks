@@ -10139,12 +10139,28 @@ chapters, not Silman's.
 - **Scored on the device, in the background** (`src/app/courseEndgames.ts`): "Score the course (n)"
   scores every candidate not scored yet, in the course's order, with progress ("Scoring: 12 of 326
   chapters · 9 drills") and Stop; stopped, or closed, the next press takes up where it left off;
-  three silent Stockfish searches in a row stop it with a note. The scores are kept in the storm
-  store's `meta` (D5's cache tier: `courseScores`, `courseRemoved`), **nothing new in the data repo
-  and no new data format**; the candidates themselves are read live from the chapters (`searchChapters`).
-  About 330 searches at the judges' depth: minutes, not hours, on a desktop.
+  three silent Stockfish searches in a row stop it with a note. The candidates themselves are read
+  live from the chapters (`searchChapters`). About 330 searches at the judges' depth: minutes, not
+  hours, on a desktop.
+- **Synced** (the owner's request of 2026-11-14, built; first build kept them on the device in the
+  storm store's `meta`): the scores and the drills taken off the list are **events in the device's
+  progress log**, no new file or layout. `cscore` (`{"k":"cscore","card":"e|<chapter start's
+  key>","sc":{…the `CourseScore`, v 2…}}`) is a chapter's score; `cdrill` (`{"k":"cdrill","card":
+  "e|<key>","on":true}`) takes a drill off the list, `on: false` puts it back. The latest of each
+  card decides (replay order: time, device, n; `courseFromLog`), so the removal is by chapter and
+  holds for a score made on another device, and a chapter scored on one device is not scored again
+  on another: "Score the course (n)" counts only what no device has scored. A chapter scored twice
+  (two devices at once) keeps the later score. "Put the n removed back" writes one `on: false` a
+  chapter. Scores are written in batches of ten and when the scoring ends (a stopped scoring has
+  its scores in the log); about 330 events of 300–400 bytes, once. What this device did a moment
+  ago shows at once and gives way to the log as soon as it holds something newer for that chapter
+  (so another device's later restore is not hidden). **Carried over**: scores and removals the
+  first build kept in `meta` are written to the log once, as soon as it is read, for the chapters
+  the log has no answer for, and then cleared (`migrateLegacy`). Unknown to older builds, the two
+  kinds are skipped by their readers and kept by compaction (D4), so an old tab is not harmed.
 - **Tries** are the §5.145 `practice` events with `preset: "endgame"` at the drill's start position
-  (after the first move for a flipped chapter), so they sync as they are; the standings, the spacing
+  (after the first move for a flipped chapter), so they sync as they are, and with the scores synced
+  too, a drill has the same standing on every device; the standings, the spacing
   (1, 3, 7, 14, 30, 60 days) and the home's "Endgames · n due" count them
   (`courseStandings`). Drill ids `c-<hash>` (the chapter start's key), the address
   `#/endgames/c-xxxxxxxx`.

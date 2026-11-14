@@ -7,10 +7,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseChapterFile } from '../../../../src/core/pgn/parse.ts';
 import { positionOf } from '../../../../src/core/storm/walk.ts';
-import { positionKey } from '../../../../src/core/chess/positionKey.ts';
+import { positionKey, positionKeyOf } from '../../../../src/core/chess/positionKey.ts';
 import { asCourseEndgame, candidatesOf, courseGoal, courseId, courseState, courseText, groupsOf, isCourseId, nameParts, readCourseScore, scoreCandidate, type Candidate, type CourseChapter, type CourseScore } from '../../../../src/core/endgames/courses.ts';
 import { attemptsByEndgame, taskOf, wonAfter } from '../../../../src/core/endgames/endgames.ts';
 import { REP } from '../../../../src/core/endgames/repertoire.ts';
+import { courseFromLog } from '../../../../src/core/endgames/courses.ts';
+import { courseCard } from '../../../../src/core/progress/cards.ts';
+import { formatEvent, parseLog, type KnownEvent } from '../../../../src/core/progress/events.ts';
+import { Replay, toDeviceEvents } from '../../../../src/core/progress/replay.ts';
 
 const at = (fen: string) => positionOf(fen)!;
 const QR = '8/8/8/4k3/8/8/8/R2QK3 w - - 0 1';
@@ -229,4 +233,35 @@ test('the course’s text: the comments along the main line with their moves, a 
   // A chapter with no comment says nothing; a chapter from a set-up position keeps its move numbers.
   assert.deepEqual(courseText(CH.test1.chapter), []);
   assert.deepEqual(courseText(CH.worse.chapter).map((x) => x.label), ['1…Kf5']);
+});
+
+test('scores and removals in the progress log (§5.175, synced): written, read back, the latest of each card deciding, across devices', () => {
+  const key = positionKeyOf(at(KP_WIN));
+  const score = (cp: number, at: number): CourseScore => ({ v: 2, key, cp, depth: 18, drill: { fen: KP_WIN, side: 'white', goal: 'win', until: 'convert', cp }, at });
+  const ev = (n: number, t: string, rest: Record<string, unknown>): KnownEvent => ({ v: 1, n, t, card: courseCard(key), ...rest }) as unknown as KnownEvent;
+  const first = ev(1, '2026-11-14T10:00:00.000Z', { k: 'cscore', sc: score(900, 1) });
+  assert.equal(formatEvent(first), `{"v":1,"n":1,"t":"2026-11-14T10:00:00.000Z","k":"cscore","card":"e|${key}","sc":${JSON.stringify(score(900, 1))}}`);
+  const lines = (...events: KnownEvent[]) => events.map(formatEvent).join('\n');
+  // Device A scores, removes it, and puts it back later; device B scores again, later.
+  const a = parseLog(lines(first, ev(2, '2026-11-14T10:01:00.000Z', { k: 'cdrill', on: true }), ev(3, '2026-11-14T10:05:00.000Z', { k: 'cdrill', on: false })));
+  const b = parseLog(lines(ev(1, '2026-11-14T10:02:00.000Z', { k: 'cscore', sc: score(950, 2) }), ev(2, '2026-11-14T10:03:00.000Z', { k: 'cdrill', on: true })));
+  assert.deepEqual(a.problems, []);
+  assert.deepEqual(b.problems, []);
+  const replay = new Replay();
+  replay.add([...toDeviceEvents('devA0001', a.lines), ...toDeviceEvents('devB0001', b.lines)]);
+  const { scores, removed } = courseFromLog(replay.states.keys(), (c) => replay.eventsOf(c));
+  assert.equal(scores.get(key)?.cp, 950, 'the later score decides');
+  assert.equal(removed.has(key), false, 'A put it back after B removed it');
+  // Refused: a score whose key isn't its card's, a card of another kind, a flag that isn't one.
+  const bad = [
+    `{"v":1,"n":4,"t":"2026-11-14T10:00:00.000Z","k":"cscore","card":"e|${key}","sc":{"v":2,"key":"other"}}`,
+    `{"v":1,"n":5,"t":"2026-11-14T10:00:00.000Z","k":"cdrill","card":"x|${key}","on":true}`,
+    `{"v":1,"n":6,"t":"2026-11-14T10:00:00.000Z","k":"cdrill","card":"e|${key}","on":1}`,
+  ];
+  assert.deepEqual(parseLog(bad.join('\n')).problems.map((p) => p.reason), ['sc.key must be the card’s position', 'card must be a course endgame (e|<position>)', 'on must be true or false']);
+  // A score this version can't read is skipped, not fatal.
+  const odd = parseLog(`{"v":1,"n":1,"t":"2026-11-14T10:00:00.000Z","k":"cscore","card":"e|${key}","sc":{"v":1,"key":"${key}"}}`);
+  const r2 = new Replay();
+  r2.add(toDeviceEvents('devA0001', odd.lines));
+  assert.equal(courseFromLog(r2.states.keys(), (c) => r2.eventsOf(c)).scores.size, 0);
 });

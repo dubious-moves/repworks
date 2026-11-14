@@ -1064,6 +1064,18 @@ later change replaced are folded into the later item; items already reported wor
   wrong the other way (a chapter where you teach the side to move but get the other), and any chapter
   now "without a goal" that you expected (its reason names the first move). Say which, so the 150 cp
   swing can be tuned. The opponent's move is not shown on the board before your turn; say if you want it.
+- **Synced across devices (2026-11-14, after your request)**: on the device where you have already
+  scored the course, open the app once: its scores are carried into the data repo (the sync chip
+  shows a batch of changes, ~330). On a second device (after it syncs) Endgames → "From your
+  courses" should show the same drills, with **no** "Score the course" button (only for chapters
+  no device has scored). Then check: a drill removed on one device is gone on the other after a sync
+  (and "Put the n removed back" restores it on both); a drill missed or passed on one is due or
+  spaced on the other (a try is a `practice` event: it was synced already); and the old per-device
+  "Score the course" is not offered again on the first device. Two devices removing and restoring at
+  nearly the same time: the later one wins. **Checked**: unit tests, and e2e with two emulated
+  devices on a fake GitHub (scores, a removal, a missed try and a restore across them; a device's
+  older local scores carried into the log); **not** on a real course or your devices.
+
 - Part 8 (master-game fragments) and Part 9 (tactics): are they sensible as drills, or would you rather
   they were left out? (Remove takes one off; a study-level exclude isn't built.)
 - Under the board, "The course's text": folded during the try, open when it is over. Is it the right

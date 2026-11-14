@@ -663,17 +663,31 @@ const COURSE_CHAPTERS: [string, string, string | undefined, string][] = [
   ['Ch06Text', 'Part 4: Endgames for Class C (1400-1599): Words Only - 6', undefined, '{ Only words: the course explains the ideas. }'],
 ];
 
-async function setUpCourse(page: Page, chapters = COURSE_CHAPTERS): Promise<FakeGit> {
-  const { git, github } = world();
+/** A data repo holding the synthetic course. */
+function courseWorld(chapters = COURSE_CHAPTERS) {
+  const w = world();
   const files = new Map<string, string>([['studies/Crs0Silm/study.json', JSON.stringify({ format: 1, id: 'Crs0Silm', name: 'Synthetic Endgame Course', kind: 'reference', chapters: chapters.map(([cid]) => cid) }, null, 2) + '\n']]);
   for (const [cid, name, fen, text] of chapters) {
     files.set(`studies/Crs0Silm/${cid}.pgn`, `[Event "Synthetic Endgame Course"]\n[White "Nobody"]\n[Black "${name}"]\n[Result "*"]\n[ChapterName "${name}"]\n${fen ? `[FEN "${fen}"]\n[SetUp "1"]\n` : ''}\n${text} *\n`);
   }
-  git.commitIfHead(git.head, 'a course', files, []);
-  await serveGithub(page, github);
-  await page.goto(`${site.url}#setup?repo=${encodeURIComponent(REPO)}&token=${TOKEN}&name=desktop`);
+  w.git.commitIfHead(w.git.head, 'a course', files, []);
+  return w;
+}
+
+async function setUpCourse(page: Page, chapters = COURSE_CHAPTERS, w = courseWorld(chapters), name = 'desktop'): Promise<FakeGit> {
+  await serveGithub(page, w.github);
+  await page.goto(`${site.url}#setup?repo=${encodeURIComponent(REPO)}&token=${TOKEN}&name=${name}`);
   await expect(page.locator('.chip')).toHaveText(/^synced/);
-  return git;
+  return w.git;
+}
+
+/** The course's synced scores and removals (`cscore`, `cdrill` events), as written to the data repo. */
+function courseEvents(git: FakeGit): Record<string, unknown>[] {
+  return [...git.textsOf()]
+    .filter(([p]) => p.startsWith('progress/'))
+    .flatMap(([, t]) => t.split('\n').filter(Boolean))
+    .map((l) => JSON.parse(l) as Record<string, unknown>)
+    .filter((e) => e['k'] === 'cscore' || e['k'] === 'cdrill');
 }
 
 test('the courses’ endgames: a reference study scored on the device, listed by its groups, one played with the course’s text, removed and put back, kept over a reload', async ({ page }) => {
@@ -723,7 +737,7 @@ test('the courses’ endgames: a reference study scored on the device, listed by
   // A hint counts the try missed: an ordinary endgame try, synced at the chapter's position.
   await game.getByRole('button', { name: 'Hint' }).click();
   await expect(game).toContainText('This try counts as missed: play it out, or start again.');
-  await expect(page.locator('.chip')).toHaveText('1 change waiting');
+  await expect(page.locator('.chip')).toHaveText('6 changes waiting');
   await page.locator('.chip').click();
   await expect.poll(() => endgameEvents(git).length, { timeout: 15_000 }).toBe(1);
   expect(endgameEvents(git)[0]).toMatchObject({ card: `x|${COURSE_WIN}`, res: 'loss', preset: 'endgame', mv: 0 });
@@ -810,4 +824,97 @@ test('a course chapter whose first move is the author’s marked mistake is play
   await expect(game.locator('.cg-wrap')).toHaveClass(/orientation-black/);
   await page.getByTestId('course-text').locator('summary').click();
   await expect(page.getByTestId('course-text').locator('.course-move')).toHaveText(['Start', '1.Kf7']);
+});
+
+test('the courses’ scores, removals and tries follow the user to a second device, which scores nothing', async ({ page, browser }) => {
+  test.setTimeout(120_000);
+  const w = courseWorld();
+  const git = await setUpCourse(page, COURSE_CHAPTERS, w);
+  await page.getByRole('navigation', { name: 'Pages' }).getByRole('link', { name: /^Endgames/ }).click();
+  const section = page.getByTestId('endgame-courses');
+  await section.getByRole('button', { name: 'Score the course (5)' }).click();
+  await expect(page.getByTestId('course-scoring')).toHaveText('Every chapter scored: 4 drills from 5.', { timeout: ENGINE_MS * 20 });
+  const items = section.locator('.endgame-item');
+  // One removed from the list, one tried and missed (a hint).
+  await items.nth(2).getByRole('button', { name: 'Remove' }).click();
+  await expect(items).toHaveCount(3);
+  await items.getByRole('link', { name: 'Win the Race - 2', exact: true }).click();
+  const game = page.getByTestId('endgame-game');
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  await game.getByRole('button', { name: 'Hint' }).click();
+  await expect(game).toContainText('This try counts as missed');
+  await page.evaluate(() => (location.hash = '#/endgames'));
+  await expect(section.getByTestId('course-counts')).toHaveText('3 drills · 1 due · 2 new · 1 with no goal');
+  // Five scores, the removal and the try wait to be synced.
+  await expect(page.locator('.chip')).toHaveText('7 changes waiting');
+  await page.locator('.chip').click();
+  // Every chapter's score, and the one removal, are in the data repo as events: nothing but the log.
+  await expect.poll(() => courseEvents(git).length, { timeout: 15_000 }).toBe(6);
+  expect(courseEvents(git).map((e) => e['k']).sort()).toEqual(['cdrill', 'cscore', 'cscore', 'cscore', 'cscore', 'cscore']);
+
+  // The second device: the same drills, the removal, the due one; no button to score, no search asked.
+  const context = await browser.newContext({ viewport: page.viewportSize()! });
+  const second = await context.newPage();
+  await setUpCourse(second, COURSE_CHAPTERS, w, 'laptop');
+  await second.getByRole('navigation', { name: 'Pages' }).getByRole('link', { name: /^Endgames/ }).click();
+  const there = second.getByTestId('endgame-courses');
+  await expect(there.getByTestId('course-counts')).toHaveText('3 drills · 1 due · 2 new · 1 with no goal');
+  await expect(there.getByRole('button', { name: /^Score/ })).toHaveCount(0);
+  await expect(there.locator('.endgame-item .endgame-title')).toHaveText(['Win the Race - 2', 'The Staircase - 1', 'The Worse Side - 4']);
+  await expect(there.getByTestId('course-next')).toHaveText('Next due: Win the Race - 2');
+
+  // A removal made there is put back here: the removal and its undo are one log.
+  await there.locator('.endgame-left summary').click();
+  await there.getByRole('button', { name: 'Put the 1 removed back' }).click();
+  await expect(there.locator('.endgame-item')).toHaveCount(4);
+  await second.locator('.chip').click();
+  await expect(second.locator('.chip')).toHaveText(/^synced/);
+  await page.locator('.chip').click();
+  await expect(items).toHaveCount(4, { timeout: 30_000 });
+  await context.close();
+});
+
+test('a course scored on a device before the scores were synced is carried into the log once, then cleared', async ({ page, browser }) => {
+  test.setTimeout(120_000);
+  // Device one scores, only to give real scores; its log is not shared with the world below.
+  const first = await setUpCourse(page);
+  await page.getByRole('navigation', { name: 'Pages' }).getByRole('link', { name: /^Endgames/ }).click();
+  await page.getByTestId('endgame-courses').getByRole('button', { name: 'Score the course (5)' }).click();
+  await expect(page.getByTestId('course-scoring')).toHaveText('Every chapter scored: 4 drills from 5.', { timeout: ENGINE_MS * 20 });
+  await page.locator('.chip').click();
+  await expect.poll(() => courseEvents(first).length, { timeout: 15_000 }).toBe(5);
+  const scores = courseEvents(first).map((e) => e['sc']);
+
+  // Another repo, one device: what the older version kept (`meta`), as it kept it.
+  const w = courseWorld();
+  const context = await browser.newContext({ viewport: page.viewportSize()! });
+  const old = await context.newPage();
+  await setUpCourse(old, COURSE_CHAPTERS, w, 'old');
+  await old.evaluate(
+    ([kept, removed]) =>
+      new Promise<void>((resolve, reject) => {
+        const req = indexedDB.open('repworks-storm', 1);
+        req.onerror = () => reject(req.error);
+        req.onsuccess = () => {
+          const tx = req.result.transaction('meta', 'readwrite');
+          tx.objectStore('meta').put(kept, 'courseScores');
+          tx.objectStore('meta').put(removed, 'courseRemoved');
+          tx.oncomplete = () => resolve();
+        };
+      }),
+    [scores, [] as string[]] as const,
+  );
+  await old.reload();
+  await expect(old.locator('.chip')).toHaveText(/^synced|change/);
+  await old.getByRole('navigation', { name: 'Pages' }).getByRole('link', { name: /^Endgames/ }).click();
+  const section = old.getByTestId('endgame-courses');
+  await expect(section.getByTestId('course-counts')).toHaveText('4 drills · 0 due · 4 new · 1 with no goal');
+  await expect(section.getByRole('button', { name: /^Score/ })).toHaveCount(0);
+  await old.locator('.chip').click();
+  await expect.poll(() => courseEvents(w.git).length, { timeout: 15_000 }).toBe(5);
+  // Cleared: a second reload writes nothing more.
+  await old.reload();
+  await expect(section.getByTestId('course-counts')).toHaveText('4 drills · 0 due · 4 new · 1 with no goal');
+  expect(courseEvents(w.git).length).toBe(5);
+  await context.close();
 });

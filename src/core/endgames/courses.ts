@@ -16,6 +16,7 @@ import { fenOf } from '../storm/walk.ts';
 import { header, type Chapter, type MoveNode } from '../study/model.ts';
 import { startPosition } from '../study/tree.ts';
 import { materialFor, type Endgame, type Goal, type Until } from './endgames.ts';
+import type { DeviceEvent } from '../progress/replay.ts';
 import { goalFor, hash, REP } from './repertoire.ts';
 
 /** A chapter of any study, as the app reads them (`searchChapters`). */
@@ -254,6 +255,34 @@ export function readCourseScore(x: unknown): CourseScore | undefined {
   const d = s.drill;
   if (d && (typeof d.fen !== 'string' || (d.goal !== 'win' && d.goal !== 'draw') || (d.side !== 'white' && d.side !== 'black') || sideOfFen(d.fen) !== d.side)) return undefined;
   return s as CourseScore;
+}
+
+/**
+ * The scores and the drills taken off, as the progress log says (every device's, §5.175): the latest
+ * `cscore` of each card `e|<key>` is its score, the latest `cdrill` says whether it is removed.
+ * Removals are by chapter key, so they hold for a score made on another device.
+ */
+export function courseFromLog(cards: Iterable<string>, eventsOf: (card: string) => readonly DeviceEvent[]): { scores: Map<string, CourseScore>; removed: Set<string>; removedAt: Map<string, number> } {
+  const scores = new Map<string, CourseScore>();
+  const removed = new Set<string>();
+  /** When the latest `cdrill` of each card was written (ms), so a change made here and not read back yet can be told from an older one. */
+  const removedAt = new Map<string, number>();
+  for (const card of cards) {
+    if (!card.startsWith('e|')) continue;
+    const key = card.slice(2);
+    let off = false;
+    for (const e of eventsOf(card)) {
+      if (e.event?.k === 'cscore') {
+        const s = readCourseScore(e.event.sc);
+        if (s && s.key === key) scores.set(key, s);
+      } else if (e.event?.k === 'cdrill') {
+        off = e.event.on;
+        removedAt.set(key, e.t);
+      }
+    }
+    if (off) removed.add(key);
+  }
+  return { scores, removed, removedAt };
 }
 
 /* ------------------------------------------------------------------ the course's text */

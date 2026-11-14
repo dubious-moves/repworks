@@ -2473,3 +2473,18 @@ The technical calls, each with its reason:
 - **Stored course scores are versioned (`v: 2`), and the old are scored again**, one more Stockfish
   search a chapter. Why: the rule changed which side many drills have; no data format of the owner's
   changed (the scores are the device's cache, D5).
+
+## Revision of 2026-11-14 (course endgames' scores and removals sync: PLAN.md §5.175)
+- **The course endgames' scores and removed drills are synced, as progress events** (`cscore`,
+  `cdrill`, cards `e|<chapter start's key>`), the latest of each card deciding. The first build
+  kept them on the device (D5's cache tier) because they are derived; the owner asked for them to
+  sync, since scoring ~330 chapters on each device is minutes of Stockfish a time (longer on a
+  phone), and a removal made on one device was undone on the next. Why the log and not a file: D4's
+  rule for state that more than one device changes, an append-only per-device log, needs no merge and
+  no new layout, and the practice tries it spaces from are already in it. The data repo's layout is
+  unchanged (`repworks.json` format 1); two new event kinds, which readers that don't know them skip
+  and compaction keeps (D4).
+- **The tries and the spacing needed nothing**: they were already synced (`practice` events); what
+  stopped them following the owner was that a second device had no drills, since it had no scores.
+- **Carried over once**: what a device kept before is written to the log for chapters the log has
+  no score for, then cleared.
