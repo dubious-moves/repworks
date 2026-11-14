@@ -10117,11 +10117,25 @@ chapters, not Silman's.
   e2e game ended on its first move, "5 points of material ahead"): against a bare king the win is a
   pawn queened when the user has pawns and nothing else (`promote`), else mate. Between +1.5 and
   +3: no goal, listed under "n without a goal" with the reason.
-- **The weaker side to move**: where the score is below −1 and the main line has a legal first move,
-  the course's first move is played for the side to move, the other side is the user's, and the
-  resulting position is scored again; it is a drill (kept with `flipped`, the move) when it then has a
-  goal, else left out with the reason. The lesson shows why the weaker side loses; the user plays
-  the stronger side. The source line says so ("the course's first move, Kc5, is played for you").
+- **Whose first move it is** (the owner's report of 2026-11-14, built): a chapter's main line may start
+  with the *opponent's* move, which the user is to answer: a blunder to punish ("1.g4??", Part 3's
+  "The Deep") or the weaker side's move that shows why it loses. The user practises **the side the author
+  is teaching**, so the course's first move is played for the other side, and the position after it is
+  the drill (kept with `flipped`, the move with its mark, and `by`) when it has a goal for the user, else
+  the chapter is left out with the reason: **the user never gets the side the author is against**. The
+  first move is the opponent's when (`scoreCandidate`, in this order of trust): (1) **`marked`**: the
+  author marks it `?` or `??` (NAG 2 or 4; `Candidate.mark`), whatever Stockfish says; (2) **`swing`**: it
+  loses `BLUNDER_SWING` (150 cp) or more for the side that plays it (its score at the start plus the other
+  side's score after the move); (3) **`worse`**: the side to move is below −1 at the start (the rule of the
+  first build). Before the report only (3) existed, so a draw with White to move whose first move was the
+  author's blunder was drilled as White. Costs a second search for every chapter with a first move (the
+  position after it), about twice the scoring time. The source line says which: "The course's first move,
+  Kf7??, is a mistake and is played for your opponent: you punish it as Black." / "The side to move there
+  is the worse one: the course's first move, Kc5, is played for your opponent, and you have the other side
+  (White)." Scores kept before this change (`v: 1`) are not read: "Score the course" scores them again, and
+  a drill whose side changed starts without its old tries (they were at another position). Not built: the
+  opponent's move shown on the board before the user's turn (the drill opens after it, the move is named in
+  the source line); a first move the author marks `?!`.
 - **Scored on the device, in the background** (`src/app/courseEndgames.ts`): "Score the course (n)"
   scores every candidate not scored yet, in the course's order, with progress ("Scoring: 12 of 326
   chapters · 9 drills") and Stop; stopped, or closed, the next press takes up where it left off;

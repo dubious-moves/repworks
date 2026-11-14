@@ -1057,6 +1057,13 @@ later change replaced are folded into the later item; items already reported wor
   the stronger side, and is the position one worth playing?). Do the goals feel right: a win that
   ends too soon or never, a draw that is really lost, a position where the stronger side's goal is
   mate in 40 moves? Say which chapters, so the bands can be tuned.
+- **Whose first move (2026-11-14, after your report)**: press "Score the course" again (the old
+  scores are dropped; about twice the time, a second search a chapter). Then "The Deep" chapter with
+  1.g4??: is it Black's drill, after the move, with "The course's first move, g4??, is a mistake and is
+  played for your opponent: you punish it as Black"? Look through the list for any drill whose side is
+  wrong the other way (a chapter where you teach the side to move but get the other), and any chapter
+  now "without a goal" that you expected (its reason names the first move). Say which, so the 150 cp
+  swing can be tuned. The opponent's move is not shown on the board before your turn; say if you want it.
 - Part 8 (master-game fragments) and Part 9 (tactics): are they sensible as drills, or would you rather
   they were left out? (Remove takes one off; a study-level exclude isn't built.)
 - Under the board, "The course's text": folded during the try, open when it is over. Is it the right

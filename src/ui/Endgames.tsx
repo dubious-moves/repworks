@@ -530,7 +530,14 @@ function CourseItem(props: { drill: CourseDrill; standing: Standing; now: number
   );
 }
 
-/** A course drill's source: the chapter, the first move played for the user, the score, and the chapter itself. */
+/** Why the course's first move was played for the opponent, and which side that leaves the user. */
+function flippedWhy(d: CourseDrill): string {
+  const side = d.side === 'white' ? 'White' : 'Black';
+  if (d.by === 'worse') return `The side to move there is the worse one: the course’s first move, ${d.flipped}, is played for your opponent, and you have the other side (${side}).`;
+  return `The course’s first move, ${d.flipped}, is a mistake and is played for your opponent: you punish it as ${side}.`;
+}
+
+/** A course drill's source: the chapter, the first move played for the opponent, the score, and the chapter itself. */
 function CourseSource(props: { course: CourseDrill }) {
   const d = props.course;
   const cp = d.score.drill?.cp ?? d.score.cp;
@@ -538,7 +545,7 @@ function CourseSource(props: { course: CourseDrill }) {
   return (
     <p class="muted endgame-source" data-testid="endgame-source">
       From {d.cand.study}, {d.cand.group}: {d.cand.title}.
-      {d.flipped ? ` The side to move there is the worse one: the course’s first move, ${d.flipped}, is played for you, and you have the other side.` : ''} Stockfish at the start: {score}.{' '}
+      {d.flipped ? ` ${flippedWhy(d)}` : ''} Stockfish at the start: {score}.{' '}
       <a href={`#/study/${d.cand.sid}/${d.cand.cid}`}>Open the chapter</a>
     </p>
   );

@@ -120,6 +120,11 @@ const COURSE_HOLD = '8/3k4/8/3K4/3P4/8/8/8 b - -';
 const COURSE_WORSE = '8/8/8/3k4/8/2K5/3P4/8 b - -';
 const COURSE_AFTER_KC5 = '8/8/8/2k5/8/2K5/3P4/8 w - -';
 const COURSE_DEAD = '8/pp6/8/8/8/8/PP6/K6k w - -';
+/** The positions after each chapter's first move (the other side's score: no swing), and the chapter whose first move is a marked blunder. */
+const COURSE_AFTER_RA8 = 'R7/8/8/4k3/8/8/8/3QK3 b - -';
+const COURSE_AFTER_KB1 = '8/pp6/8/8/8/8/PP6/1K5k b - -';
+const COURSE_BLUNDER = '7k/8/5K2/8/8/8/7P/8 w - -';
+const COURSE_AFTER_KF7 = '7k/5K2/8/8/8/8/7P/8 b - -';
 const REP_DRAW = 'r7/4n1kp/8/R7/4K2P/2N5/5P2/8 b - -';
 const REP_WIN = '2k4r/pp5p/3r1p1p/8/8/4K3/PPP3PP/1R3R2 b - -';
 
@@ -141,6 +146,11 @@ test.beforeAll(async () => {
     [COURSE_WORSE]: [[1, -700, 'd5c5 c3d3']],
     [COURSE_AFTER_KC5]: [[1, 700, 'c3d3 c5d5']],
     [COURSE_DEAD]: [[1, 220, 'a1b1 h1g2']],
+    [COURSE_AFTER_RA8]: [[1, -4000, 'e5f4 d1d4']],
+    [COURSE_AFTER_KB1]: [[1, -220, 'h1g2 b1a1']],
+    // White holds the draw, 1.Kf7?? is the author's mistake and Black wins after it.
+    [COURSE_BLUNDER]: [[1, 0, 'f6g6 h8g8']],
+    [COURSE_AFTER_KF7]: [[1, 800, 'h8h7 f7f6']],
     [REP_WIN]: [[1, 450, 'd6d2 b1d1']],
     // The user's moves hold (0.00), the others lose; the attacker's first line is Kd5 where the
     // board is A1 (twice: Kd5 a repetition the second time, Kf5 then), Ke5 at A2, Kg5 at A3 with
@@ -653,10 +663,10 @@ const COURSE_CHAPTERS: [string, string, string | undefined, string][] = [
   ['Ch06Text', 'Part 4: Endgames for Class C (1400-1599): Words Only - 6', undefined, '{ Only words: the course explains the ideas. }'],
 ];
 
-async function setUpCourse(page: Page): Promise<FakeGit> {
+async function setUpCourse(page: Page, chapters = COURSE_CHAPTERS): Promise<FakeGit> {
   const { git, github } = world();
-  const files = new Map<string, string>([['studies/Crs0Silm/study.json', JSON.stringify({ format: 1, id: 'Crs0Silm', name: 'Synthetic Endgame Course', kind: 'reference', chapters: COURSE_CHAPTERS.map(([cid]) => cid) }, null, 2) + '\n']]);
-  for (const [cid, name, fen, text] of COURSE_CHAPTERS) {
+  const files = new Map<string, string>([['studies/Crs0Silm/study.json', JSON.stringify({ format: 1, id: 'Crs0Silm', name: 'Synthetic Endgame Course', kind: 'reference', chapters: chapters.map(([cid]) => cid) }, null, 2) + '\n']]);
+  for (const [cid, name, fen, text] of chapters) {
     files.set(`studies/Crs0Silm/${cid}.pgn`, `[Event "Synthetic Endgame Course"]\n[White "Nobody"]\n[Black "${name}"]\n[Result "*"]\n[ChapterName "${name}"]\n${fen ? `[FEN "${fen}"]\n[SetUp "1"]\n` : ''}\n${text} *\n`);
   }
   git.commitIfHead(git.head, 'a course', files, []);
@@ -729,7 +739,7 @@ test('the courses’ endgames: a reference study scored on the device, listed by
   await expect(section.getByTestId('course-next')).toHaveText('Next due: Win the Race - 2');
   await items.nth(3).getByRole('link', { name: 'The Worse Side - 4', exact: true }).click();
   await expect(game).toHaveAttribute('data-phase', 'user');
-  await expect(page.getByTestId('endgame-source')).toContainText('The side to move there is the worse one: the course’s first move, Kc5, is played for you, and you have the other side.');
+  await expect(page.getByTestId('endgame-source')).toContainText('The side to move there is the worse one: the course’s first move, Kc5, is played for your opponent, and you have the other side (White).');
   await expect(game.locator('.cg-wrap')).toHaveClass(/orientation-white/);
   await page.getByTestId('course-text').locator('summary').click();
   await expect(page.getByTestId('course-text').locator('.course-move')).toHaveText(['Start', '1…Kc5']);
@@ -780,4 +790,24 @@ test('the courses’ endgames: a reference study scored on the device, listed by
   await page.reload();
   await expect(section.getByTestId('course-counts')).toHaveText('4 drills · 1 due · 3 new · 1 with no goal');
   await expect(section.getByRole('button', { name: /^Score/ })).toHaveCount(0);
+});
+
+test('a course chapter whose first move is the author’s marked mistake is played from the side that punishes it', async ({ page }) => {
+  test.setTimeout(60_000);
+  await setUpCourse(page, [['Ch07Blun', 'Part 3: Endgames for Class D (1200-1399): The Deep - 7', '7k/8/5K2/8/8/8/7P/8 w - - 0 1', '{ White holds the draw, but disaster struck: } 1. Kf7?? { Suddenly Black is winning. } Kh7 2. Kf6']]);
+  await page.getByRole('navigation', { name: 'Pages' }).getByRole('link', { name: /^Endgames/ }).click();
+  const section = page.getByTestId('endgame-courses');
+  await section.getByRole('button', { name: 'Score the course (1)' }).click();
+  await expect(page.getByTestId('course-scoring')).toHaveText('Every chapter scored: 1 drills from 1.', { timeout: ENGINE_MS * 10 });
+  // Stockfish scores the start a draw for White to move: the drill is still Black's, after the mistake.
+  const item = section.locator('.endgame-item');
+  await expect(item).toContainText('Black to play and win');
+  await expect(item.locator('.endgame-source')).toHaveText('Part 3: Endgames for Class D (1200-1399) · after the course’s Kf7??');
+  await item.getByRole('link', { name: 'The Deep - 7', exact: true }).click();
+  const game = page.getByTestId('endgame-game');
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  await expect(page.getByTestId('endgame-source')).toContainText('The course’s first move, Kf7??, is a mistake and is played for your opponent: you punish it as Black. Stockfish at the start: +8.00.');
+  await expect(game.locator('.cg-wrap')).toHaveClass(/orientation-black/);
+  await page.getByTestId('course-text').locator('summary').click();
+  await expect(page.getByTestId('course-text').locator('.course-move')).toHaveText(['Start', '1.Kf7']);
 });

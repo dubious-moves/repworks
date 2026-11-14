@@ -2460,3 +2460,16 @@ The technical calls, each with its reason:
   0.30 off than Maia (8.9% against 2.2%) and less testing (§5.147), so it vetoes, it doesn't play.
 - **Nothing is downloaded for it, and Lc0 doesn't judge the user's moves** (Lc0 stays out of grading,
   §5.143). The end of a try still waits for Stockfish's judges (§5.145, as before).
+
+## Revision of 2026-11-14 (the side of a course's drill follows the author's first move: PLAN.md §5.175)
+- **A course chapter is practised from the side the author teaches, found from the first move, not
+  from Stockfish's score for the side to move.** The first move is the opponent's, played for it
+  before the drill, when the author marks it `?`/`??`, when it loses 150 cp or more by Stockfish, or
+  when the side to move is the worse one; the user has the other side, and the chapter is left out
+  (with the reason) when the position after it has no goal. This changes the first build's rule ("where
+  the side to move is the worse one…"), which missed a drawn position whose first move is the author's
+  blunder: it was drilled as the side that blunders. Why: the owner's report, with the Silman chapter
+  where White's 1.g4?? is to be punished as Black.
+- **Stored course scores are versioned (`v: 2`), and the old are scored again**, one more Stockfish
+  search a chapter. Why: the rule changed which side many drills have; no data format of the owner's
+  changed (the scores are the device's cache, D5).
