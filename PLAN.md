@@ -10035,6 +10035,16 @@ the pawn, 1.Kd5 Ke7 again after Restart, Ke8 (19%) after a try left unfinished, 
 and Maia alone kept over a reload, Ke8 with no search of Maia's moves. Live: waits for the owner's
 devices (`TESTING.md` §8).
 
+**Fixed 2026-11-14 (the owner's report)**: with Maia alone on, a draw's attacker played Kd3, which
+Maia gave 0.3%, because its 99% move (Kd4) repeated a position and `trustPick`'s last resort
+walked Maia's whole answer for a move that ended and repeated nothing. Now only the candidates
+(`ordered`: the likeliest three, 5% or more, and the replayed reply) are ever played: failing the
+checks, one that only repeats a position (and ends nothing, hangs nothing) comes before one that
+hangs something; with none, Stockfish's reply, as when Maia doesn't answer. A draw's attacker with
+a single decent move now repeats it, so such a drill can end as the rules' repetition draw instead of
+wandering. Not changed: with Maia alone off, Stockfish's own move (labelled Stockfish) still stands
+in when none of Maia's moves is sound, a repetition included. Test: `variety.test.ts`.
+
 #### 5.175 Endgames from your courses; lead-in lines and plan cards (the owner's request of 2026-11-14, built)
 
 (Numbered §5.175: §5.165 was taken when the request was written.) The owner bought Silman's

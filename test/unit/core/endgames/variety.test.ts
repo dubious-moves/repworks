@@ -138,6 +138,13 @@ test('Maia alone: nothing ended, nothing hanging, no repetition for a draw’s a
   const kp = '8/8/4k3/8/3KP3/8/8/8 w - - 0 1';
   assert.deepEqual(trustPick('draw', ['d4c4', 'd4d3'], policy('d4c4', 'd4d3'), [], check(kp, ['d4c4'])), { uci: 'd4d3' });
   assert.deepEqual(trustPick('win', ['d4c4', 'd4d3'], policy('d4c4', 'd4d3'), [], check(kp, ['d4c4'])), { uci: 'd4c4' });
+  // The owner's report (2026-11-14): Kd4 at 99% repeats the position, and Kd3 at 0.3% was played
+  // instead. Only a likely move is ever played: the repetition, here; a long shot never.
+  const king = '8/8/3k4/3P4/4K3/8/8/8 w - - 0 1';
+  const shots = [{ uci: 'e4d4', prob: 0.99 }, { uci: 'e4d3', prob: 0.003 }, { uci: 'e4f5', prob: 0.003 }];
+  assert.deepEqual(trustPick('draw', ['e4d4'], shots, [], check(king, ['e4d4'])), { uci: 'e4d4' });
+  // Nothing decent that ends nothing: Stockfish, not a long shot.
+  assert.equal(trustPick('win', [], shots, [], check(king)), undefined);
   // The pawn pushed when asked for, its king behind it; not when the push hangs it.
   assert.deepEqual(trustPick('draw', ['d4c4'], policy('d4c4', 'e4e5'), ['e4e5'], check(kp)), { uci: 'e4e5', push: true });
   const loose = '8/8/4k3/8/4P3/4K3/8/8 w - - 0 1';

@@ -145,9 +145,13 @@ export function hangs(pos: Position): boolean {
  * "Maia alone"'s reply: no Stockfish, so only checks that need no search. A draw's attacker's pawn
  * push first when asked for (§5.148), Maia's likeliest that ends nothing, repeats nothing and hangs
  * nothing; then the moves in `ordered` (the last try's reply first after a miss, then
- * `replyOrder`'s), the first passing those checks; else the first of them, then of Maia's, that at
- * least ends and repeats nothing (a lost defence may have to give something up); undefined when
- * none does (Stockfish then). `policy` is Maia's whole answer, `pushes` the pawn pushes to try;
+ * `replyOrder`'s), the first passing those checks. Only moves of `ordered` are ever played: a
+ * move Maia gives 0.3% is not an alternative (the owner's report of 2026-11-14: a 99% move that
+ * repeated the position was passed over for Kd3). Failing the checks, the first of `ordered` that
+ * ends nothing and hangs nothing though it repeats a position (a draw's attacker with no other
+ * decent move: the repetition is the honest reply), else the first that ends and repeats nothing
+ * (a lost defence may have to give something up); undefined when none does (Stockfish then).
+ * `policy` is Maia's whole answer (the pushes' likelihoods), `pushes` the pawn pushes to try;
  * repetitions count only for a draw's attacker.
  */
 export function trustPick(
@@ -164,6 +168,8 @@ export function trustPick(
   if (push) return { uci: push, push: true };
   const safe = ordered.find((u) => quiet(u) && !check.hangs(u));
   if (safe) return { uci: safe };
-  const any = [...ordered, ...policy.map((m) => m.uci)].find(quiet);
+  const repeating = ordered.find((u) => !check.over(u) && !check.hangs(u));
+  if (repeating) return { uci: repeating };
+  const any = ordered.find(quiet);
   return any ? { uci: any } : undefined;
 }
