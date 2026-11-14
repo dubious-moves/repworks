@@ -19,6 +19,7 @@ import { positionOf } from '../core/storm/walk.ts';
 import { Back } from './Back.tsx';
 import { MiniBoard } from './CommentOffer.tsx';
 import { gamePremove, MoveBoard, MoveList } from './Practice.tsx';
+import { BoardNote } from './BoardLink.tsx';
 import { useWakeLock } from './wakeLock.ts';
 
 const DAY = 86_400_000;
@@ -422,7 +423,7 @@ function EndgameGame(props: { game: PracticeGame; endgame: Endgame; rep?: Repert
   };
   return (
     <div class="train-grid practice-game endgame-game" data-phase={over ? 'over' : slip ? 'slip' : p.ending ? 'ending' : p.phase} data-moves={p.moves.length} data-premove={p.premove ? p.premove.from + p.premove.to : ''} data-testid="endgame-game">
-      <MoveBoard fen={fen} orientation={p.setup.color} movable={p.phase === 'user' && !slip && !p.ending} lastUci={last?.uci} arrows={arrows} onMove={(u) => void practiceMove(u)} premove={gamePremove(p)} />
+      <MoveBoard fen={fen} orientation={p.setup.color} movable={p.phase === 'user' && !slip && !p.ending} lastUci={last?.uci} arrows={arrows} onMove={(u) => void practiceMove(u)} premove={gamePremove(p)} mirror />
       <div class="train-panel">
         <p class="train-counters">
           {taskOf(e)}
@@ -437,6 +438,7 @@ function EndgameGame(props: { game: PracticeGame; endgame: Endgame; rep?: Repert
             Found after you had played on: the board is back on that move, and Take back takes the moves after it too.
           </p>
         )}
+        <BoardNote />
         {over && <p class="muted" data-testid="endgame-counted">{countedText(p, e)}</p>}
         {!over && p.failed && !slip && <p class="muted">This try counts as missed: play it out, or start again.</p>}
         <MoveList moves={p.moves} baseFen={e.fen} marks={false} slipAt={slip?.at} />

@@ -2358,3 +2358,15 @@ The technical calls, each with its reason:
   screen does, whatever `answerMove` does with either.
 - No data format changed; the settings stay on the device (`repworks-board`); no screen mirrors a
   board yet.
+
+## Revision of 2026-11-14 (practice on the Chessnut Move: CHESSNUT.md part (d))
+- **A move the repertoire check takes back stays lit red while the screen names the study move**
+  (until the next move, or Take back), not "briefly". Why: the board then says what the screen says,
+  for as long as it says it, with no timer of its own.
+- **A note under the game's panel when the board needs the user**: a position the set can't make,
+  a drive that didn't arrive (with Set up again), "Castle with the king first". Not in the plan,
+  which had them in the chip's status only. Why: on a phone a chip's title is never read, and the
+  eyes are on the board and the panel.
+- **"Castle with the king first" is said once a page load**, until the next move read from the board.
+- No data format changed; nothing new is written or synced (answers from the board are ordinary
+  `practice` events); the board's settings stay on the device.

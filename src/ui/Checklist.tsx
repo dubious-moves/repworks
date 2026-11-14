@@ -30,6 +30,7 @@ import { positionOf } from '../core/storm/walk.ts';
 import type { BoardProps } from './Board.tsx';
 import { MiniBoard } from './CommentOffer.tsx';
 import { MoveBoard, PracticeBoard } from './Practice.tsx';
+import { BoardNote } from './BoardLink.tsx';
 import { winRateColor } from './RepertoireCheck.tsx';
 import { isoDay } from './day.ts';
 import { Back, Stuck } from './Back.tsx';
@@ -524,12 +525,13 @@ export function ChecklistDrill(props: { sid: string; side: Color; line: string[]
     <div class="games">
       {back}
       <div class="train-grid checklist-drill" data-step={k} data-premove={pre ? pre.from + pre.to : ''} data-testid="checklist-drill">
-        <MoveBoard fen={fen} orientation={color} movable={turn === color} lastUci={k ? v.lineUci[k - 1] : undefined} onMove={onMove} premove={premove} />
+        <MoveBoard fen={fen} orientation={color} movable={turn === color} lastUci={k ? v.lineUci[k - 1] : undefined} onMove={onMove} premove={premove} mirror />
         <div class="train-panel">
           <p class="train-counters">{lineText(v.lineSan)}</p>
           <p class="feedback train-feedback" role="status" data-testid="checklist-feedback">
             {note ?? (turn === color ? 'Your move: play your prep' : 'The opponent plays the line…')}
           </p>
+          <BoardNote />
           <p class="muted" data-testid="checklist-opponent">
             Then a game from the line’s end: the explorer’s games at {p.ratings[0]}–{p.ratings[p.ratings.length - 1]}, then Maia {maiaElo}.
           </p>

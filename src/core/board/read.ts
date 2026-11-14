@@ -2,7 +2,7 @@
 // board reports, whether the pieces can make a position, and what differs. Pure, on chessops.
 import { Chess, type Position } from 'chessops/chess';
 import { makeBoardFen, parseFen } from 'chessops/fen';
-import { makeSquare, makeUci } from 'chessops/util';
+import { makeSquare, makeUci, parseSquare } from 'chessops/util';
 import type { NormalMove, Role } from 'chessops/types';
 import { castlingSide } from 'chessops/chess';
 import { kingCastlesTo } from 'chessops/util';
@@ -95,3 +95,32 @@ export function differences(want: Squares, has: Squares): Difference[] {
 
 /** Only pieces lifted (squares emptied), nothing put down wrong: a hand still moving, never put back. */
 export const onlyLifted = (want: Squares, has: Squares): boolean => has.every((c, s) => c === want[s] || c === '');
+
+/** The rook's step of each castling, a wing at a time: the rook's corner and the square it lands on. */
+const ROOK_FIRST: readonly { rook: string; to: string; king: string }[] = [
+  { rook: 'h1', to: 'f1', king: 'e1' },
+  { rook: 'a1', to: 'd1', king: 'e1' },
+  { rook: 'h8', to: 'f8', king: 'e8' },
+  { rook: 'a8', to: 'd8', king: 'e8' },
+];
+
+/**
+ * Whether `uci`, read from the board in `fen`, is a rook's step that castling on that wing would
+ * have made, castling being legal there: a rook moved first and left, read as a rook move (§4.3),
+ * the screen then saying "Castle with the king first".
+ */
+export function rookMovedFirst(fen: string, uci: string): boolean {
+  const step = ROOK_FIRST.find((r) => uci === r.rook + r.to);
+  if (!step) return false;
+  const setup = parseFen(fen);
+  if (setup.isErr) return false;
+  const pos = Chess.fromSetup(setup.value);
+  if (pos.isErr) return false;
+  const p = pos.value;
+  const king = parseSquare(step.king)!;
+  const rook = parseSquare(step.rook)!;
+  const piece = p.board.get(rook);
+  if (piece?.role !== 'rook' || piece.color !== p.turn || p.board.get(king)?.role !== 'king') return false;
+  // chessops writes castling as the king onto its rook.
+  return p.isLegal({ from: king, to: rook });
+}

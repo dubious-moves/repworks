@@ -14,7 +14,8 @@
 // - `resendOnReport` never set: "a drop: reconnecting …, the position set again if the board
 //   changed while off";
 // - `parkedAt` never set by Reset the pieces: "Reset the pieces: the start driven, the screen's
-//   position waits …".
+//   position waits …";
+// - `castleSaid` never set (part (d)): "a rook moved first when castling was legal: …".
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { boardFenOf, LIGHT, squaresOf, type Battery, type Light, type PieceState, type Squares } from '../../../src/core/board/chessnut.ts';
@@ -397,6 +398,38 @@ test("a position the set can't make: unmakeable, the pieces named, never waited 
   assert.deepEqual(s.missing, ['Q']);
   assert.deepEqual(board.drives, []);
   assert.equal(await link.reached(three), false);
+});
+
+test('a rook moved first when castling was legal: read as a rook move, "Castle with the king first" said once, until the next move read', async () => {
+  const CASTLE = 'r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R';
+  const RF1 = 'r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3KR2';
+  const { link, board, time } = setUp({ board: new FakeBoard(CASTLE) });
+  await link.connect();
+  const owner = {};
+  const s = spec(`${CASTLE} w KQkq - 0 1`);
+  link.setMirror(owner, s);
+  board.report(RF1);
+  await time.advance(700);
+  assert.deepEqual(s.moves, ['h1f1']);
+  const castle = () => (link.status.peek() as { castle?: true }).castle;
+  assert.equal(castle(), true);
+  // The screen plays it and the opponent answers: the note stays until the user's next move is read.
+  const RF1A6 = 'r3k2r/1ppppppp/p7/8/8/8/PPPPPPPP/R3KR2';
+  link.setMirror(owner, spec(`${RF1} b Qkq - 1 1`, { movable: false }));
+  link.setMirror(owner, spec(`${RF1A6} w Qkq - 0 2`, { onMove: (u) => s.moves.push(u) }));
+  board.arrive();
+  assert.equal(castle(), true);
+  board.report('r3k2r/1ppppppp/p7/8/8/8/PPPPPPPP/R3K1R1');
+  await time.advance(700);
+  assert.deepEqual(s.moves, ['h1f1', 'f1g1']);
+  assert.equal(castle(), undefined);
+  // Once a page load: the same again later is not said.
+  link.setMirror(owner, spec(`${CASTLE} w KQkq - 0 1`, { onMove: (u) => s.moves.push(u) }));
+  board.arrive();
+  board.report(RF1);
+  await time.advance(700);
+  assert.deepEqual(s.moves.at(-1), 'h1f1');
+  assert.equal(castle(), undefined);
 });
 
 test('the lights off, or only the basic colours, as set', async () => {

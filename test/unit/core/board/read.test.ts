@@ -8,11 +8,13 @@
 // - `readMove` handing castling over as chessops's king-takes-rook (`e1h1`), not `uciOf`:
 //   "castling, both wings, both sides" fails;
 // - `turned` as the identity: "the board turned half round" fails;
-// - `onlyLifted` always false: "differences and lifted pieces" fails.
+// - `onlyLifted` always false: "differences and lifted pieces" fails;
+// - `rookMovedFirst` without its castling check (`isLegal`): "a rook moved first when castling
+//   was legal" fails (part (d), 2026-11-14).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Squares } from '../../../../src/core/board/chessnut.ts';
-import { differences, missingPieces, onlyLifted, readMove, squaresOfFen, turned, turnSquare } from '../../../../src/core/board/read.ts';
+import { differences, missingPieces, onlyLifted, readMove, rookMovedFirst, squaresOfFen, turned, turnSquare } from '../../../../src/core/board/read.ts';
 
 const S = (fen: string): Squares => squaresOfFen(fen)!;
 const after = (fen: string) => S(fen);
@@ -106,4 +108,20 @@ test('differences and lifted pieces', () => {
   assert.deepEqual(differences(want, want), []);
   assert.equal(onlyLifted(want, lifted), true);
   assert.equal(onlyLifted(want, S('rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR w - - 0 1')), false);
+});
+
+test('a rook moved first when castling was legal: told; a rook move with no castling there is not', () => {
+  const castle = 'r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1';
+  assert.equal(rookMovedFirst(castle, 'h1f1'), true);
+  assert.equal(rookMovedFirst(castle, 'a1d1'), true);
+  const black = 'r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R b KQkq - 0 1';
+  assert.equal(rookMovedFirst(black, 'h8f8'), true);
+  assert.equal(rookMovedFirst(black, 'a8d8'), true);
+  // Another rook step, the other side's rook, or no right to castle that wing: nothing to say.
+  assert.equal(rookMovedFirst(castle, 'h1g1'), false);
+  assert.equal(rookMovedFirst(castle, 'h8f8'), false);
+  assert.equal(rookMovedFirst('r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w Qkq - 0 1', 'h1f1'), false);
+  // Castling through check isn't legal: a rook move it is.
+  assert.equal(rookMovedFirst('r3k2r/pppppppp/8/8/2b5/8/PPPP1PPP/R3K2R w KQkq - 0 1', 'h1f1'), false);
+  assert.equal(rookMovedFirst('not a fen', 'h1f1'), false);
 });

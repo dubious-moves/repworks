@@ -27,8 +27,16 @@ const list = (xs: readonly string[]) => (xs.length < 2 ? xs.join('') : `${xs.sli
 const PIECE_NAME: Record<string, string> = { p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: 'king' };
 const pieceName = (letter: string) => `${letter === letter.toUpperCase() ? 'White' : 'Black'} ${PIECE_NAME[letter.toLowerCase()] ?? letter}`;
 
-/** The link's state in words (the dialog, the chip's title). */
+/** Said once a page load when a rook moved first is read as a rook move (CHESSNUT.md §4.3). */
+export const CASTLE_WORDS = 'Castle with the king first: a rook moved first is read as a rook move.';
+
+/** The link's state in words (the dialog, the chip's title), "Castle with the king first" ahead when it is said. */
 export function linkWords(s: BoardStatus): string {
+  const words = phaseWords(s);
+  return s.state === 'on' && s.castle ? `${CASTLE_WORDS} ${words}` : words;
+}
+
+function phaseWords(s: BoardStatus): string {
   switch (s.state) {
     case 'off':
       return s.error ?? 'Not connected.';
@@ -74,6 +82,33 @@ export function BoardChip() {
       {text}
       {dot && <span class={`board-dot board-dot-${dot}`} data-dot={dot} aria-label={dot === 'ok' ? 'in step' : dot === 'busy' ? 'setting up' : 'needs a hand'} role="img" />}
     </button>
+  );
+}
+
+/**
+ * The board's word under a game's panel (practice, an endgame, a checklist's lead-up) while the
+ * screen's board is mirrored, when the board needs the user: a position the set can't make (the
+ * game goes on on the screen), a drive that didn't arrive (Set up again), or a rook moved first.
+ * The chip says the same in its title; on a phone that's not read, so the panel says it too.
+ */
+export function BoardNote() {
+  const s = boardLink.status.value;
+  if (!boardLink.mirrored.value || s.state !== 'on') return null;
+  const stuck = s.phase === 'stuck';
+  if (!stuck && s.phase !== 'unmakeable' && !s.castle) return null;
+  return (
+    <p class="board-note" role="status" data-testid="board-note">
+      <span aria-hidden="true">♞ </span>
+      {s.phase === 'unmakeable' || stuck ? phaseWords(s) : CASTLE_WORDS}
+      {stuck && (
+        <>
+          {' '}
+          <button type="button" class="secondary" onClick={() => boardLink.resend()}>
+            Set up again
+          </button>
+        </>
+      )}
+    </p>
   );
 }
 

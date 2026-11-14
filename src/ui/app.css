@@ -233,6 +233,18 @@ h2 {
   background: var(--loss);
 }
 
+.board-note {
+  margin: 6px 0;
+  padding: 6px 10px;
+  border-left: 3px solid var(--warn);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+}
+
+.board-note button {
+  margin-left: 6px;
+}
+
 .board-dialog .board-seen {
   margin: 8px 0;
 }

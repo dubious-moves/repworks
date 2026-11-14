@@ -36,6 +36,7 @@ import { Board, type BoardProps } from './Board.tsx';
 import { answerPending, repeatOpponent, setVoiceConfirm, voice, voiceConfirm, voiceOff, voiceOn } from '../app/voice.ts';
 import { useWakeLock } from './wakeLock.ts';
 import { useBoardMirror } from './boardMirror.ts';
+import { BoardNote } from './BoardLink.tsx';
 import { isoDay } from './day.ts';
 import { graphLabel, graphY, whiteEdge } from './evalGraph.ts';
 import { Back } from './Back.tsx';
@@ -182,6 +183,22 @@ export const END_WORD = {
 const RESULT_WORD = { win: 'a win', draw: 'a draw', loss: 'a loss' } as const;
 const GRADE_WORD = { 1: 'Again', 2: 'Hard', 3: 'Good', 4: 'Easy' } as const;
 
+/**
+ * A move's classification as the Chessnut Move lights it (CHESSNUT.md §4.7, §6 part (d)): the
+ * storm's band brushes, which `lightsFor` maps to the board's colours.
+ */
+export const FEEDBACK_BRUSH: Record<Classification, string> = {
+  best: 'bandBest',
+  great: 'bandGreat',
+  excellent: 'bandGood',
+  good: 'bandGood',
+  book: 'green',
+  inaccuracy: 'bandOk',
+  mistake: 'bandBad',
+  miss: 'bandBlunder',
+  blunder: 'bandBlunder',
+};
+
 /** The game being played (any kind), then its review. */
 export function PracticeBoard(props: { onNext?: () => void }) {
   const p = practice.value;
@@ -207,9 +224,13 @@ export function PracticeBoard(props: { onNext?: () => void }) {
   const hint = p.hint?.fen === fen && p.hint.uci ? p.hint : undefined;
   const arrows = hint ? [{ orig: hint.uci!.slice(0, 2), ...(hint.level === 2 ? { dest: hint.uci!.slice(2, 4) } : {}), brush: 'blue' }] : [];
   const canHint = s.kind === 'practice' && p.phase === 'user';
+  // On the Chessnut Move: the user's move in its classification's colour while it is the last move
+  // (once the opponent answers, the last move is the opponent's); a move the repertoire check took
+  // back red on its two squares while the screen names the study move.
+  const boardPlayed = cls && lastUser && last === lastUser ? { uci: lastUser.uci, brush: FEEDBACK_BRUSH[lastUser.classification!] } : p.deviation ? { uci: p.deviation.uci, brush: 'red' } : undefined;
   return (
     <div class="train-grid practice-game" data-phase={p.phase} data-moves={p.moves.length} data-premove={p.premove ? p.premove.from + p.premove.to : ''}>
-      <MoveBoard fen={fen} orientation={s.color} movable={p.phase === 'user'} lastUci={last?.uci} arrows={arrows} onMove={(u) => void practiceMove(u)} premove={gamePremove(p)} />
+      <MoveBoard fen={fen} orientation={s.color} movable={p.phase === 'user'} lastUci={last?.uci} arrows={arrows} onMove={(u) => void practiceMove(u)} premove={gamePremove(p)} mirror={{ played: boardPlayed }} />
       <div class="train-panel">
         <p class="train-counters">
           {s.kind === 'advantage' ? 'Convert the advantage' : s.kind === 'checklist' ? `Checklist · ${s.preset}` : 'Practice'} · {s.title}
@@ -240,6 +261,7 @@ export function PracticeBoard(props: { onNext?: () => void }) {
             {p.drawOffer.state === 'pending' ? 'Draw offered: the opponent is thinking…' : 'The opponent declines the draw.'}
           </p>
         )}
+        <BoardNote />
         <MoveList moves={p.moves} baseFen={s.fen} marks={feedback} />
         {s.kind === 'practice' && (
           <label class="check" title="Each move’s classification as you play (the review at the end has them either way)">

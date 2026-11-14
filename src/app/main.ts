@@ -4,6 +4,7 @@ import '../ui/themes.css';
 import '../ui/app.css';
 import { App } from '../ui/App.tsx';
 import { registerServiceWorker } from '../platform/serviceWorker.ts';
+import { startBoardSpeech } from './boardSpeech.ts';
 import { carryOverLocalLists } from './checklist.ts';
 import { closeDialogsOnBackdrop } from './lightDismiss.ts';
 import { takeLichessCallback } from './lichess.ts';
@@ -33,6 +34,8 @@ void startApp(link, lichessCallback, !new URLSearchParams(location.search).has('
 carryOverLocalLists();
 // A .pgn opened with the installed app (§5.159).
 startFileLaunch();
+// The opponent's moves said on the Chessnut Move, when asked (CHESSNUT.md §4.10).
+startBoardSpeech();
 
 if (import.meta.env.PROD) {
   registerServiceWorker(import.meta.env.BASE_URL, {

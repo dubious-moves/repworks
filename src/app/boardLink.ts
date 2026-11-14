@@ -5,7 +5,7 @@
 // tests drive it with a fake board; the app uses `boardLink`, made with the browser's.
 import { signal, type ReadonlySignal } from '@preact/signals';
 import { boardFenOf, LIGHT, type Battery, type Light, type PieceState, type Squares } from '../core/board/chessnut.ts';
-import { differences, missingPieces, onlyLifted, squaresOfFen, turned } from '../core/board/read.ts';
+import { differences, missingPieces, onlyLifted, rookMovedFirst, squaresOfFen, turned } from '../core/board/read.ts';
 import { lightsFor, type Marks } from '../core/board/lights.ts';
 import { initialLink, step, type Action, type Event, type LinkState, type Phase, type Want } from '../core/board/link.ts';
 import type { PhysicalBoard } from '../core/board/port.ts';
@@ -15,7 +15,8 @@ import { boardPrefs, type BoardPrefs } from './boardPrefs.ts';
 export type BoardStatus =
   | { state: 'off'; error?: string }
   | { state: 'connecting' }
-  | { state: 'on'; name: string; battery?: Battery; phase: Phase; missing?: string[]; wrong?: string[] }
+  /** `castle`: a rook moved first when castling was legal was read as a rook move (said once a page load, until the next move read). */
+  | { state: 'on'; name: string; battery?: Battery; phase: Phase; missing?: string[]; wrong?: string[]; castle?: true }
   /** The link dropped: `trying` while the reconnects after 1, 2, 4, 8 and 16 s are under way. */
   | { state: 'lost'; name: string; trying: boolean };
 
@@ -133,6 +134,9 @@ export function createBoardLink(deps: BoardLinkDeps): BoardLink {
   /** After a reconnect, the first report sends the position again (the board may have changed while off). */
   let resendOnReport = false;
   const waiters = new Set<() => void>();
+  /** "Castle with the king first": said once a page load (CHESSNUT.md §4.3), shown until the next move read. */
+  let castleSaid = false;
+  let castleShown = false;
 
   const current = (): { owner: object; spec: MirrorSpec } | undefined => {
     let last: { owner: object; spec: MirrorSpec } | undefined;
@@ -159,7 +163,12 @@ export function createBoardLink(deps: BoardLinkDeps): BoardLink {
 
   function act(a: Action): void {
     if (a.t === 'drive') void board?.drive(a.squares);
-    else if (a.t === 'move') applied?.spec.onMove(a.uci);
+    else if (a.t === 'move') {
+      const spec = applied?.spec;
+      castleShown = !castleSaid && !!spec && rookMovedFirst(spec.fen, a.uci);
+      if (castleShown) castleSaid = true;
+      spec?.onMove(a.uci);
+    }
     else if (a.t === 'undo') applied?.spec.undo?.run();
   }
 
@@ -181,7 +190,7 @@ export function createBoardLink(deps: BoardLinkDeps): BoardLink {
     if (s.state !== 'on') return;
     const missing = link.phase === 'unmakeable' && link.target ? missingPieces(link.target) : undefined;
     const wrong = wrongSquares();
-    const next: BoardStatus = { state: 'on', name: s.name, ...(s.battery ? { battery: s.battery } : {}), phase: link.phase, ...(missing ? { missing } : {}), ...(wrong.length ? { wrong } : {}) };
+    const next: BoardStatus = { state: 'on', name: s.name, ...(s.battery ? { battery: s.battery } : {}), phase: link.phase, ...(missing ? { missing } : {}), ...(wrong.length ? { wrong } : {}), ...(castleShown ? { castle: true as const } : {}) };
     if (JSON.stringify(next) !== JSON.stringify(s)) status.value = next;
   }
 
@@ -375,6 +384,7 @@ export function createBoardLink(deps: BoardLinkDeps): BoardLink {
     const b = board;
     board = undefined;
     link = initialLink();
+    castleShown = false;
     seen.value = undefined;
     setStatus({ state: 'off' });
     if (b) {

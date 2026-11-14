@@ -1520,3 +1520,22 @@ does. Start with the spike: its log decides what the later parts change (CHESSNU
   Playwright on a desktop and an emulated phone with the simulated board (the chip, the dialog, the
   settings kept after a reload, a drop and back, Disconnect, nothing picked, no chip without Web
   Bluetooth, Brave's flag). No screen uses the board yet. Nothing on a real board.
+
+### Practice on the Chessnut Move (CHESSNUT.md part (d), 2026-11-14)
+- Connect from the ♞ chip, then a practice game from a position, as White and as Black (the board
+  turned to you): your moves by hand, the opponent's driven and lit blue; a move outside the
+  repertoire put back and lit red; Take back; the hint's lights; Move feedback's colours. Does 0.6 s
+  before a move is read feel right? Does 2 s before a wrong position is put back? (Both are in the
+  dialog's settings.) Castle with the king first (moving the rook first says so once, under the
+  game). An endgame and a checklist drill on the board too.
+- Worth noting as you go: with "Say verdicts and the opponent's moves" on (the dialog) and voice
+  input off, the opponent's moves are said, and the study move after one put back; a hand on the
+  board during the opponent's turn is put back after 2 s; a capture made by hand (the captured piece
+  off first, then yours on its square) is read as one move; a promotion with the spare queen; the
+  board at the game's end stays as it is (Reset the pieces in the dialog sets up the start).
+- **Checked**: unit tests (castling with the rook first told once a page load; what a game says);
+  Playwright on a desktop and an emulated phone with the simulated board (a game as White: the
+  start driven, moves read, the answers driven, lit and said, a blunder lit red, a hand put back,
+  Take back; a game as Black: turned, a refused move put back within a second and the study move
+  said, the hint's lights; a third queen the set can't make; an endgame driven and played). The
+  checklist's lead-up has no browser test of its own on the board. Nothing on a real board.
