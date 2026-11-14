@@ -3,7 +3,7 @@
 // cards' session (the mistake trainer). mistake-lab's Games and Review tabs, on the site's SRS.
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { chessgroundDests } from 'chessops/compat';
-import { normalizeMove } from 'chessops/chess';
+import { normalizeMove, type Position } from 'chessops/chess';
 import { makeUci, parseSquare } from 'chessops/util';
 import type { Key } from '@lichess-org/chessground/types';
 import { isNormal, type Role, type SquareName } from 'chessops/types';
@@ -33,8 +33,8 @@ import { keyFen } from '../core/chess/positionKey.ts';
 import { fenAfterUci, START_FEN, uciToSan } from '../core/storm/walk.ts';
 import { discardSaved, resumePractice, savedPractice } from '../app/practice.ts';
 import { useWakeLock } from './wakeLock.ts';
-import { endPreview, preview, stepPreview } from '../app/preview.ts';
-import { endPreviewOnBoard, PreviewBar, previewBoard } from './CommentText.tsx';
+import { commentId, endPreview, preview, stepPreview } from '../app/preview.ts';
+import { CommentText, endPreviewOnBoard, PreviewBar, previewBoard } from './CommentText.tsx';
 import { NoteButton, NoteText, noteArrows } from './CardNote.tsx';
 import { CardRankSelect, RankButtons } from './Rank.tsx';
 import { isoDay } from './day.ts';
@@ -625,6 +625,12 @@ function Done(props: { s: GameSession }) {
   );
 }
 
+/** A plan comment's positions for its lines (the commented move's, and the one before it); the card's own when unknown. */
+function commentPositions(ctx: { after: string; before?: string } | undefined, fen: string): { after: Position; before: Position | undefined } | undefined {
+  const after = positionOf(ctx?.after ?? fen);
+  return after ? { after, before: ctx?.before ? positionOf(ctx.before) : undefined } : undefined;
+}
+
 function Card(props: { s: GameSession; r: CardRun }) {
   const { s, r } = props;
   const item = r.card.item;
@@ -648,7 +654,9 @@ function Card(props: { s: GameSession; r: CardRun }) {
           {r.revealed ? (
             <div class="plan-notes" data-testid="plan-notes">
               {n.comments.map((c, i) => (
-                <p key={i}>{c}</p>
+                <p key={i}>
+                  <CommentText text={c} owner="games" id={commentId(`${r.card.card}#${i}`, c)} positions={() => commentPositions(n.contexts[i], n.fen)} />
+                </p>
               ))}
             </div>
           ) : (

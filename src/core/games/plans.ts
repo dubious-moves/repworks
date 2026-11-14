@@ -34,10 +34,18 @@ export interface NotePlace {
   path: string[];
 }
 
+/** Where a comment's lines start (§5.12): the commented move's position, and the one before it. */
+export interface CommentContext {
+  after: string;
+  before?: string;
+}
+
 export interface PlanNote {
   /** A FEN of the position, with a move number from where it was found. */
   fen: string;
   comments: string[];
+  /** For each comment, its node's positions, so its lines are placed as they are in the chapter (§5.175). */
+  contexts: CommentContext[];
   shapes: Shape[];
   places: NotePlace[];
 }
@@ -50,18 +58,22 @@ export interface PlanNote {
 export function planNotes(chapters: Iterable<{ sid: string; cid: string; chapter: Chapter }>, keys: ReadonlySet<PositionKey>): Map<PositionKey, PlanNote> {
   const out = new Map<PositionKey, PlanNote>();
   if (!keys.size) return out;
-  const take = (key: PositionKey, pos: Position, node: { comments: string[]; shapes: Shape[] }, place: NotePlace) => {
+  const take = (key: PositionKey, pos: Position, before: Position | undefined, node: { comments: string[]; shapes: Shape[] }, place: NotePlace) => {
     let n = out.get(key);
-    if (!n) out.set(key, (n = { fen: makeFen(pos.toSetup()), comments: [], shapes: [], places: [] }));
+    if (!n) out.set(key, (n = { fen: makeFen(pos.toSetup()), comments: [], contexts: [], shapes: [], places: [] }));
     n.places.push(place);
-    for (const c of node.comments) if (c.trim() && !n.comments.includes(c.trim())) n.comments.push(c.trim());
+    for (const c of node.comments) {
+      if (!c.trim() || n.comments.includes(c.trim())) continue;
+      n.comments.push(c.trim());
+      n.contexts.push({ after: makeFen(pos.toSetup()), ...(before ? { before: makeFen(before.toSetup()) } : {}) });
+    }
     for (const s of node.shapes) if (!n.shapes.some((x) => x.orig === s.orig && x.dest === s.dest && x.brush === s.brush)) n.shapes.push(s);
   };
   for (const { sid, cid, chapter } of chapters) {
     const start = startPosition(chapter);
     if (!start) continue;
     const k0 = positionKeyOf(start);
-    if (keys.has(k0)) take(k0, start, chapter.root, { sid, cid, path: [] });
+    if (keys.has(k0)) take(k0, start, undefined, chapter.root, { sid, cid, path: [] });
     const walk = (pos: Position, children: readonly MoveNode[], path: string[]) => {
       for (const node of children) {
         const move = parseSan(pos, node.san);
@@ -70,7 +82,7 @@ export function planNotes(chapters: Iterable<{ sid: string; cid: string; chapter
         next.play(move);
         const here = [...path, node.san];
         const key = positionKeyOf(next);
-        if (keys.has(key)) take(key, next, node, { sid, cid, path: here });
+        if (keys.has(key)) take(key, next, pos, node, { sid, cid, path: here });
         walk(next, node.children, here);
       }
     };

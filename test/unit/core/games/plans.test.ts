@@ -10,6 +10,8 @@ import assert from 'node:assert/strict';
 import { parseChapterFile } from '../../../../src/core/pgn/parse.ts';
 import { parseLog } from '../../../../src/core/progress/events.ts';
 import { toDeviceEvents, type DeviceEvent } from '../../../../src/core/progress/replay.ts';
+import { playedLines } from '../../../../src/core/repertoire/lines.ts';
+import { positionOf } from '../../../../src/core/storm/walk.ts';
 import { planDeck, planEnrolments, planNotes } from '../../../../src/core/games/plans.ts';
 import type { PositionKey } from '../../../../src/core/chess/positionKey.ts';
 
@@ -74,4 +76,30 @@ test('the enrolments, and the deck: a position without content left out and coun
   assert.equal(deck.needContent, 1);
   assert.equal(deck.cards[0]!.item.color, 'black');
   assert.equal(deck.cards[0]!.item.ply, 5);
+});
+
+test('each comment keeps its node’s positions, so its lines are placed as in the chapter (§5.175)', () => {
+  // 2...d6's comment replaces the move with "Or 2...e6" (before) and goes on with "3.d4" (after); the
+  // transposed chapter reaches the position at another move number, and its comment keeps that one.
+  const D = chapter('ChapterD', '[Orientation "black"]\n\n1. e4 c5 2. Nf3 d6 { Play it, (Or 2...e6 3.d4 cxd4) or (3.d4 cxd4 4.Nxd4). } *');
+  const E = chapter('ChapterE', '[Orientation "black"]\n\n1. Nf3 c5 2. e4 d6 { Same: (3.d4 cxd4). } *');
+  const n = planNotes(
+    [
+      { sid: 'StudyAAA', cid: 'ChapterD', chapter: D },
+      { sid: 'StudyAAA', cid: 'ChapterE', chapter: E },
+    ],
+    new Set([KEY]),
+  ).get(KEY)!;
+  assert.equal(n.contexts.length, n.comments.length);
+  const at = (i: number) => ({ after: positionOf(n.contexts[i]!.after)!, before: n.contexts[i]!.before ? positionOf(n.contexts[i]!.before!) : undefined });
+  const lines = playedLines(n.comments[0]!, at(0).after, at(0).before);
+  assert.deepEqual(lines.map((l) => [l.placed, l.sans]), [
+    [true, ['e6', 'd4', 'cxd4']],
+    [true, ['d4', 'cxd4', 'Nxd4']],
+  ]);
+  // The second chapter's comment: the same position by another route; the position before it is after 2.e4.
+  assert.equal(n.contexts[1]!.before, 'rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 0 2');
+  assert.deepEqual(playedLines(n.comments[1]!, at(1).after, at(1).before).map((l) => l.sans), [['d4', 'cxd4']]);
+  // The chapter's own start has no position before it.
+  assert.equal(planNotes([{ sid: 'NotesAAA', cid: 'ChapterN', chapter: NOTES }], new Set([KEY])).get(KEY)!.contexts[0]!.before, undefined);
 });
