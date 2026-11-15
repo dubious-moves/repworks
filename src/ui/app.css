@@ -6789,6 +6789,70 @@ a.button.disabled {
   font-variant-numeric: tabular-nums;
 }
 
+/* The course's groups (§5.179): each a row to choose, its name and size, a bar of solved, due and new, and the counts. */
+.course-how {
+  margin-bottom: 10px;
+}
+
+.course-how summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.course-how p {
+  margin: 6px 0 0;
+}
+
+.course-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
+  gap: 8px;
+  margin: 4px 0 14px;
+}
+
+button.course-group {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 8px;
+  align-items: baseline;
+  min-height: 44px;
+  padding: 8px 10px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid rgb(var(--ink) / 16%);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+button.course-group.on {
+  border-color: var(--link);
+  background: color-mix(in srgb, var(--link) 10%, transparent);
+}
+
+.course-group-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.course-group-n,
+.course-group-counts {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.course-group .study-bar,
+.course-group-counts {
+  grid-column: 1 / -1;
+}
+
+.course-group .study-bar .due {
+  background: var(--due);
+}
+
 .endgame-left {
   margin-top: 10px;
 }

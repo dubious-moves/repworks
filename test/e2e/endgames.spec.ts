@@ -851,6 +851,64 @@ test('a course chapter whose first move is the author’s marked mistake is play
   await expect(page.getByTestId('course-text').locator('.course-move')).toHaveText(['Start', '1.Kf7']);
 });
 
+test('course only: the built-in endgames and the repertoire’s are put aside on the page and in what’s due, on this device, until switched back', async ({ page }) => {
+  test.setTimeout(120_000);
+  await setUpCourse(page);
+  const homeLink = page.getByRole('navigation', { name: 'Pages' }).getByRole('link', { name: /^Endgames/ });
+  await homeLink.click();
+  const section = page.getByTestId('endgame-courses');
+  // Nothing scored: no switch yet.
+  await expect(section.getByTestId('course-only')).toHaveCount(0);
+  await section.getByRole('button', { name: 'Score the course (5)' }).click();
+  await expect(page.getByTestId('course-scoring')).toHaveText('Every chapter scored: 4 drills from 5.', { timeout: ENGINE_MS * 20 });
+  // The groups as rows, each with what is in it; the explanation folded once there are drills.
+  await expect(section.getByRole('button', { name: /^All/ })).toContainText('4 new');
+  await expect(section.getByRole('button', { name: /^Part 3: Endgames for Class D \(1000-1199\)/ })).toContainText('3 new');
+  await expect(section.locator('.course-how')).not.toHaveAttribute('open', '');
+
+  // One built-in endgame and one of the course's missed (a hint): two due.
+  const game = page.getByTestId('endgame-game');
+  await page.getByTestId('endgame-next').click();
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  await game.getByRole('button', { name: 'Hint' }).click();
+  await expect(game).toContainText('This try counts as missed');
+  await page.locator('.chapter-head .back').click();
+  await section.locator('.endgame-item').getByRole('link', { name: 'Win the Race - 2', exact: true }).click();
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  await game.getByRole('button', { name: 'Hint' }).click();
+  await expect(game).toContainText('This try counts as missed');
+  await page.locator('.chapter-head .back').click();
+  await expect(section.getByRole('button', { name: /^All/ })).toContainText('1 due · 3 new');
+  await page.locator('.chapter-head .back').click();
+  await expect(homeLink).toHaveText('Endgames · 2 due');
+
+  // Switched on: the course's section alone, and its due alone on the home.
+  await homeLink.click();
+  await expect(page.getByRole('heading', { name: 'From your repertoire' })).toBeVisible();
+  await expect(page.locator('.endgame-group')).not.toHaveCount(1);
+  await section.getByTestId('course-only').check();
+  await expect(page.getByTestId('course-only-note')).toContainText('Course only');
+  await expect(page.locator('.endgame-group')).toHaveCount(1);
+  await expect(page.getByTestId('endgame-next')).toHaveCount(0);
+  await expect(page.getByTestId('endgame-repertoire')).toHaveCount(0);
+  await expect(section.getByTestId('course-next')).toHaveText('Next due: Win the Race - 2');
+  await page.locator('.chapter-head .back').click();
+  await expect(homeLink).toHaveText('Endgames · 1 due');
+
+  // Kept on the device over a reload; "Show everything" brings the rest back.
+  await page.reload();
+  await expect(homeLink).toHaveText('Endgames · 1 due');
+  await homeLink.click();
+  await expect(page.locator('.endgame-group')).toHaveCount(1);
+  await expect(section.getByTestId('course-only')).toBeChecked();
+  await page.getByTestId('course-only-note').getByRole('button', { name: 'Show everything' }).click();
+  await expect(page.getByRole('heading', { name: 'From your repertoire' })).toBeVisible();
+  await expect(page.getByTestId('endgame-next')).toBeVisible();
+  await expect(section.getByTestId('course-only')).not.toBeChecked();
+  await page.locator('.chapter-head .back').click();
+  await expect(homeLink).toHaveText('Endgames · 2 due');
+});
+
 test('the courses’ scores, removals and tries follow the user to a second device, which scores nothing', async ({ page, browser }) => {
   test.setTimeout(120_000);
   const w = courseWorld();

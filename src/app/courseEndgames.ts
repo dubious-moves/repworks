@@ -108,6 +108,43 @@ export const courseNow = computed(() => courseState(courseCandidates.value, cour
 
 export const courseById = (id: string): CourseDrill | undefined => courseNow.value.drills.find((d) => d.id === id);
 
+/* ------------------------------------------------------------------ the course alone (§5.179) */
+
+const ONLY_KEY = 'repworks-endgames-course-only';
+function readOnly(): boolean {
+  try {
+    return localStorage.getItem(ONLY_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+/** "Course only" as switched on this device: the built-in endgames and the repertoire's put aside. */
+export const courseOnlyAsked = signal(readOnly());
+
+export function setCourseOnly(on: boolean): void {
+  courseOnlyAsked.value = on;
+  try {
+    localStorage.setItem(ONLY_KEY, on ? '1' : '0');
+  } catch {
+    // Kept for this visit.
+  }
+}
+
+/** In force on the Endgames page: asked for, and the course has drills (with none, nothing would be left to play). */
+export const courseOnly = computed(() => courseOnlyAsked.value && courseNow.value.drills.length > 0);
+
+/**
+ * In force for what is due (the home, Today): as `courseOnly`, and also while the scores or the
+ * chapters are still being read, so the count doesn't show the other endgames for a moment first.
+ */
+export const courseOnlyDue = computed(() => {
+  if (!courseOnlyAsked.value) return false;
+  const scores = courseScores.value;
+  if (!scores || (scores.size > 0 && !searchChapters.value)) return true;
+  return courseNow.value.drills.length > 0;
+});
+
 /** Each drill's tries, from every device's log. */
 const courseAttempts = computed(() =>
   attemptsByEndgame(

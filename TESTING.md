@@ -1045,6 +1045,15 @@ later change replaced are folded into the later item; items already reported wor
 
 ## 8. Endgames
 
+### Course only, and the course's groups as rows (§5.179, 2026-11-15)
+- Endgames → "From your courses": the groups are rows now (name, size, a bar of solved, due and
+  new, the counts). With Silman's nine long group names, do they read well on the phone and the
+  desktop? Is the bar worth its place?
+- Tick "Course only": the built-in groups and "From your repertoire" go, the top card says so. Home:
+  "Endgames · n due" and Today count the course's drills alone, and Next opens a course drill.
+- "Show everything" (or untick): all back, the built-in ones that came due meanwhile due.
+- It is kept per device: is that right, or should the phone follow the desktop?
+
 ### From your courses (§5.175, 2026-11-14)
 - Import the Silman PGN as a reference study (Import, kind "reference"), then Endgames → "From your
   courses" → "Score the course (326)": watch the progress ("Scoring: n of 326 chapters · m drills").

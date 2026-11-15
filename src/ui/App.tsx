@@ -19,7 +19,7 @@ import { HistoryScreen, PracticeScreen } from './Practice.tsx';
 import { RepertoireCheckScreen } from './RepertoireCheck.tsx';
 import { ChecklistDrill, ChecklistScreen } from './Checklist.tsx';
 import { EndgamesScreen } from './Endgames.tsx';
-import { courseScores, loadCourse } from '../app/courseEndgames.ts';
+import { courseOnlyDue, courseScores, loadCourse } from '../app/courseEndgames.ts';
 import { readSearchChapters } from '../app/search.ts';
 import { loadRepEndgames } from '../app/repertoireEndgames.ts';
 import { gameCountsNow } from '../app/games.ts';
@@ -333,7 +333,7 @@ function EndgamesLink() {
   useEffect(() => void (scored ? readSearchChapters() : undefined), [scored, version]);
   const due = endgamesDue(decidingNow()).due;
   return (
-    <a class="button secondary" href="#/endgames" title="The theoretical endgames and your repertoire's, each played for its goal">
+    <a class="button secondary" href="#/endgames" title={courseOnlyDue.value ? "Your course's endgames, each played for its goal (Course only is on)" : "The theoretical endgames and your repertoire's, each played for its goal"}>
       Endgames{due > 0 && <span class="home-tool-count"> · {due} due</span>}
     </a>
   );

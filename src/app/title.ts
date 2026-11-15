@@ -6,6 +6,7 @@ import { ENDGAMES } from '../core/endgames/endgames.ts';
 import { header } from '../core/study/model.ts';
 import { study } from './editor.ts';
 import { mode } from './mode.ts';
+import { courseById } from './courseEndgames.ts';
 import { repById } from './repertoireEndgames.ts';
 import { studies } from './state.ts';
 import { trainData } from './train.ts';
@@ -19,7 +20,7 @@ const names: TitleNames = {
     const c = trainData.value?.chapters.get(`${sid}/${cid}`);
     return c ? header(c, 'ChapterName') : undefined;
   },
-  endgame: (id) => ENDGAMES.find((e) => e.id === id)?.title ?? repById(id)?.title,
+  endgame: (id) => ENDGAMES.find((e) => e.id === id)?.title ?? repById(id)?.title ?? courseById(id)?.cand.title,
 };
 
 /** Starts keeping `document.title` to the screen shown; the names arriving later rename it. */

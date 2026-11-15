@@ -7,7 +7,7 @@ import { checklistViews, chapterNameAt } from '../app/checklist.ts';
 import { endgameStandings } from '../app/endgames.ts';
 import { gameCountsNow } from '../app/games.ts';
 import { ideaEnrolled, ideaQueueNow } from '../app/ideas.ts';
-import { courseStandings } from '../app/courseEndgames.ts';
+import { courseOnlyDue, courseStandings } from '../app/courseEndgames.ts';
 import { repStandings } from '../app/repertoireEndgames.ts';
 import { practiceResults } from '../app/repertoireCheck.ts';
 import { refreshStormReady, stormReadyAll } from '../app/storm.ts';
@@ -31,9 +31,10 @@ export function useStormReady(): number | undefined {
   return stormReadyAll.value;
 }
 
-/** The endgames due, theoretical, the repertoire's and the courses', and the first of them. */
+/** The endgames due, theoretical, the repertoire's and the courses' (the courses' alone with "Course only", §5.179), and the first of them. */
 export function endgamesDue(now: number): { due: number; first?: string } {
-  const due = [...endgameStandings(now), ...repStandings(now), ...courseStandings(now)].filter(([, s]) => s.state === 'due');
+  const all = courseOnlyDue.value ? [...courseStandings(now)] : [...endgameStandings(now), ...repStandings(now), ...courseStandings(now)];
+  const due = all.filter(([, s]) => s.state === 'due');
   return due.length ? { due: due.length, first: `#/endgames/${due[0]![0]}` } : { due: 0 };
 }
 

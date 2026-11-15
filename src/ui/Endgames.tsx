@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { attemptsAt, checkEndgameMaia, endgameMaiaHere, endgameStandings, startEndgame } from '../app/endgames.ts';
 import { endgameMaiaAlone, setEndgameMaiaAlone } from '../app/endgameVariety.ts';
-import { courseById, courseCandidates, courseJustRemoved, courseNow, courseScores, courseScoring, courseStandings, loadCourse, removeCourseDrill, restoreCourseDrill, restoreCourseDrills, scoreCourse, stopCourseScoring } from '../app/courseEndgames.ts';
+import { courseById, courseCandidates, courseJustRemoved, courseNow, courseOnly, courseOnlyAsked, setCourseOnly, courseScores, courseScoring, courseStandings, loadCourse, removeCourseDrill, restoreCourseDrill, restoreCourseDrills, scoreCourse, stopCourseScoring } from '../app/courseEndgames.ts';
 import { readSearchChapters, searchChapters } from '../app/search.ts';
 import { dataVersion } from '../app/sync.ts';
 import { gatherRepEndgames, loadRepEndgames, removeRepEndgame, repById, repEndgames, repGather, repStandings, stopRepGather } from '../app/repertoireEndgames.ts';
@@ -95,9 +95,11 @@ function EndgameList() {
   const due = ENDGAMES.filter((e) => standings.get(e.id)?.state === 'due').length;
   const fresh = ENDGAMES.filter((e) => standings.get(e.id)?.state === 'new').length;
   const soonest = Math.min(...ENDGAMES.map((e) => standings.get(e.id)?.next ?? Infinity));
+  // Course only (§5.179): the course's section alone, the built-in endgames and the repertoire's put aside.
+  const only = courseOnly.value;
   useEffect(checkEndgameMaia, []);
   return (
-    <div class="games endgames">
+    <div class="games endgames" data-course-only={only ? '1' : undefined}>
       <div class="chapter-head">
         <Back parent={{ name: 'list' }} />
         <div class="titles">
@@ -105,37 +107,49 @@ function EndgameList() {
         </div>
       </div>
       <section class="card endgames-intro">
-        <p>
-          The endgames every player needs, each played against a defence that sets the traps a strong player sets. A move that throws the goal away stops the game: take it
-          back and find a better one. A try counts once, whatever happens after a take-back or a hint; a solved endgame comes back after 1, 3, 7, 14, 30 and 60 days. After a
-          miss the defence plays as it did, so you can put it right; otherwise it tries the likely replies you have met least.
-        </p>
+        {only ? (
+          <p data-testid="course-only-note">
+            Course only: your course’s endgames alone, here and in what’s due on the home. The built-in endgames and your repertoire’s are put aside, their tries kept.{' '}
+            <button type="button" class="link" onClick={() => setCourseOnly(false)}>
+              Show everything
+            </button>
+          </p>
+        ) : (
+          <p>
+            The endgames every player needs, each played against a defence that sets the traps a strong player sets. A move that throws the goal away stops the game: take it
+            back and find a better one. A try counts once, whatever happens after a take-back or a hint; a solved endgame comes back after 1, 3, 7, 14, 30 and 60 days. After a
+            miss the defence plays as it did, so you can put it right; otherwise it tries the likely replies you have met least.
+          </p>
+        )}
         <OpponentNote />
-        <div class="actions">
-          {next ? (
-            <a class="button primary" href={`#/endgames/${next.id}`} data-testid="endgame-next">
-              {standings.get(next.id)?.state === 'due' ? 'Next due' : 'Next new'}: {next.title}
-            </a>
-          ) : (
-            <span class="muted">All solved for now{Number.isFinite(soonest) ? `: the next comes back ${inDays(soonest, now)}` : ''}.</span>
-          )}
-          <span class="muted" data-testid="endgame-counts">
-            {due} due · {fresh} new
-          </span>
-        </div>
+        {!only && (
+          <div class="actions">
+            {next ? (
+              <a class="button primary" href={`#/endgames/${next.id}`} data-testid="endgame-next">
+                {standings.get(next.id)?.state === 'due' ? 'Next due' : 'Next new'}: {next.title}
+              </a>
+            ) : (
+              <span class="muted">All solved for now{Number.isFinite(soonest) ? `: the next comes back ${inDays(soonest, now)}` : ''}.</span>
+            )}
+            <span class="muted" data-testid="endgame-counts">
+              {due} due · {fresh} new
+            </span>
+          </div>
+        )}
       </section>
-      <RepertoireEndgames now={now} />
+      {!only && <RepertoireEndgames now={now} />}
       <CourseEndgames now={now} />
-      {GROUPS.map((g) => (
-        <section key={g.id} class="card endgame-group" aria-labelledby={`endgame-group-${g.id}`}>
-          <h2 id={`endgame-group-${g.id}`}>{g.title}</h2>
-          <ul class="endgame-list">
-            {ENDGAMES.filter((e) => e.group === g.id).map((e) => (
-              <EndgameItem key={e.id} endgame={e} standing={standings.get(e.id)!} now={now} />
-            ))}
-          </ul>
-        </section>
-      ))}
+      {!only &&
+        GROUPS.map((g) => (
+          <section key={g.id} class="card endgame-group" aria-labelledby={`endgame-group-${g.id}`}>
+            <h2 id={`endgame-group-${g.id}`}>{g.title}</h2>
+            <ul class="endgame-list">
+              {ENDGAMES.filter((e) => e.group === g.id).map((e) => (
+                <EndgameItem key={e.id} endgame={e} standing={standings.get(e.id)!} now={now} />
+              ))}
+            </ul>
+          </section>
+        ))}
     </div>
   );
 }
@@ -419,12 +433,15 @@ function CourseEndgames(props: { now: number }) {
   return (
     <section class="card endgame-group endgame-courses" aria-labelledby="endgame-group-courses" data-testid="endgame-courses">
       <h2 id="endgame-group-courses">From your courses</h2>
-      <p class="muted">
-        The chapters of your reference studies that start from a position ({cands.length} here), played the way endgames are played here: against Maia’s defence, every move judged by
-        Stockfish for a goal, any move that keeps it allowed, not the course’s one line. Where Stockfish has the side to move +3 or better, win it ({CONVERT_LEAD} points up, a pawn
-        queened or mate); about level (−1 to +1.5), hold it for {REP.hold} moves. You have the side the course teaches, the one that makes its last move: when that isn’t the side to move, the course’s first move is played for your
-        opponent (and one marked ?? is always the opponent’s). The course’s own text for the chapter is under the board.
-      </p>
+      <details class="course-how" open={!state.drills.length}>
+        <summary>How these are played</summary>
+        <p class="muted">
+          The chapters of your reference studies that start from a position ({cands.length} here), played the way endgames are played here: against Maia’s defence, every move judged
+          by Stockfish for a goal, any move that keeps it allowed, not the course’s one line. Where Stockfish has the side to move +3 or better, win it ({CONVERT_LEAD} points up, a
+          pawn queened or mate); about level (−1 to +1.5), hold it for {REP.hold} moves. You have the side the course teaches, the one that makes its last move: when that isn’t the
+          side to move, the course’s first move is played for your opponent (and one marked ?? is always the opponent’s). The course’s own text for the chapter is under the board.
+        </p>
+      </details>
       <div class="actions">
         {scoring?.running ? (
           <button type="button" class="secondary" onClick={stopCourseScoring}>
@@ -453,15 +470,17 @@ function CourseEndgames(props: { now: number }) {
           {scoring.running ? `Scoring: ${scoring.done} of ${scoring.of} chapters · ${scoring.kept} drills` : scoring.note}
         </p>
       )}
+      {(state.drills.length > 0 || courseOnlyAsked.value) && (
+        <label class="check course-only" title="For a stretch on the course alone: nothing is deleted, and the others’ tries and due dates are kept">
+          <input type="checkbox" checked={courseOnlyAsked.value} onChange={(ev) => setCourseOnly(ev.currentTarget.checked)} data-testid="course-only" /> Course only: put the built-in
+          endgames and your repertoire’s aside, here and in what’s due
+        </label>
+      )}
       {groups.length > 0 && (
-        <div class="chips endgame-cats" role="group" aria-label="Course group">
-          <button type="button" class={`chip-toggle${group === '' ? ' on' : ''}`} aria-pressed={group === ''} onClick={() => choose('')}>
-            All <span class="storm-focus-n">{state.drills.length}</span>
-          </button>
+        <div class="course-groups" role="group" aria-label="Course group">
+          <GroupRow name="All" drills={state.drills} stateOf={stateOf} on={group === ''} onChoose={() => choose('')} />
           {groups.map((g) => (
-            <button type="button" key={g.group} class={`chip-toggle${group === g.group ? ' on' : ''}`} aria-pressed={group === g.group} onClick={() => choose(g.group)}>
-              {g.group} <span class="storm-focus-n">{g.n}</span>
-            </button>
+            <GroupRow key={g.group} name={g.group} drills={state.drills.filter((d) => d.cand.group === g.group)} stateOf={stateOf} on={group === g.group} onChoose={() => choose(g.group)} />
           ))}
         </div>
       )}
@@ -497,6 +516,25 @@ function CourseEndgames(props: { now: number }) {
         </details>
       )}
     </section>
+  );
+}
+
+/** A group of the course (or all of it) to choose: its name, how far it is solved as a bar, and what is due and new in it. */
+function GroupRow(props: { name: string; drills: readonly CourseDrill[]; stateOf(d: CourseDrill): Standing['state']; on: boolean; onChoose(): void }) {
+  const n = { later: 0, due: 0, new: 0 };
+  for (const d of props.drills) n[props.stateOf(d)]++;
+  const words = [n.due ? `${n.due} due` : '', n.new ? `${n.new} new` : '', n.later ? `${n.later} solved` : ''].filter(Boolean).join(' · ');
+  return (
+    <button type="button" class={`course-group${props.on ? ' on' : ''}`} aria-pressed={props.on} onClick={props.onChoose}>
+      <span class="course-group-name">{props.name}</span>
+      <span class="course-group-n">{props.drills.length}</span>
+      <span class="study-bar" aria-hidden="true">
+        {n.later > 0 && <span class="mature" style={{ flexGrow: n.later }} />}
+        {n.due > 0 && <span class="due" style={{ flexGrow: n.due }} />}
+        {n.new > 0 && <span class="fresh" style={{ flexGrow: n.new }} />}
+      </span>
+      <span class="course-group-counts">{words}</span>
+    </button>
   );
 }
 
