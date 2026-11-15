@@ -17,8 +17,7 @@ lists the files to create or change, the steps in order, the tests to write (nam
 "done" means. The core code in Appendix A is written and tested already (scratch, 2026-11-06,
 against this repo's chessops 0.15.1 and its strict TypeScript settings): copy it into place, copy
 its tests from Appendix B, and run them before writing anything new. §8 has the prompt for each
-part's session. Follow `CLAUDE.md` as always (push to `main` when `npm run check`, `npm test` and
-`npm run e2e` pass; start the next part's session when a part is pushed, until the owner's live
+part's session. Follow `CLAUDE.md` as always (its rule for pushing to `main`; start the next part's session when a part is pushed, until the owner's live
 checks are all that's left).
 
 Contents:
@@ -369,8 +368,7 @@ only in `solving` (`setPhase`, `src/app/storm.ts`), so setting up never costs ti
 
 ## 6. Build plan, part by part
 
-Each part is one session (§8 has the prompts), pushed to `main` when `npm run check`, `npm test`
-and `npm run e2e` pass, with a `PLAN.md` §5.153 "As built" note, a `DECISIONS.md` revision entry
+Each part is one session (§8 has the prompts), pushed to `main` by `CLAUDE.md`'s rule, with a `PLAN.md` §5.153 "As built" note, a `DECISIONS.md` revision entry
 where something changed, and its `TESTING.md` entry from Appendix D.
 
 ### Part (a): the codec, the platform, the simulated board and the spike page

@@ -2530,3 +2530,14 @@ The technical calls, each with its reason:
   try's end. Stored on the `practice` event (`g`, `ms`), and a changed grade as a new event kind
   `grade` on the same card; readers that don't know them skip them (D4). Tries from before count Good.
 
+## Revision of 2026-11-15 (how work reaches main: CLAUDE.md, "How we work")
+- **A push to `main` needs `npm run check`, `npm test` and the e2e specs the change touches; the
+  full e2e run is CI's, and the session waits for CI on its commit and fixes a red run before
+  anything else.** Was: all three, the full `npm run e2e` included, pass locally before any push.
+  Why (the owner's question of 2026-11-15, answered from CI's records): the local rule didn't keep
+  `main` green (16 of its last 100 CI runs failed), and its worst case was one a local run can't
+  catch, a layout test failing only in the CI runners' font, nine pushes in a row with nothing
+  deployed for 22 hours because no session looked at CI. The deploy already needs CI green. And the
+  full local run is most of a small session: §5.179's was built and tested in 3.5 minutes, then
+  waited 9.5 for a run that found nothing and that CI repeats in five. Given up: `main` can be red
+  for the minutes a fix takes, and a session starting then builds on it.

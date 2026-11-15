@@ -17,11 +17,21 @@ for a robotic board (the Chessnut Move), built only when the owner asks.
 - Say plainly what was checked live (and on which device), what by tests, and what was taken
   from documentation.
 - Work that is ready goes straight to `main`: commit and push there, not to a feature branch or a
-  pull request, whatever branch the session was started on. Ready means `npm run check`,
-  `npm test` and `npm run e2e` pass; never push to `main` otherwise. Playwright runs a failed
-  test once more and reports one that passes then as flaky: that is a race to fix (in the test,
-  or in the app if the app has it), not to leave. CI deploys `main` to GitHub
-  Pages.
+  pull request, whatever branch the session was started on. Ready means `npm run check` and
+  `npm test` pass, and so do the e2e specs the change touches (`npm run build`, then
+  `npx playwright test <spec files>`; a new feature brings its own). The full `npm run e2e` is
+  CI's: it runs there on every push, in about five minutes, and only a green run deploys `main`
+  to GitHub Pages.
+- A push isn't done until CI is green on it. After pushing, wait for the CI run on that commit
+  (GitHub tools: `actions_list`, then `get_job_logs` for a failed job) and read its result before
+  the closing reply or the next session. Red: fix it first, ahead of anything else, and push
+  again; never start the next session, or end the turn as done, on a red `main`. If `main` was
+  already red when the session began, fixing it is the first task. Run the full `npm run e2e`
+  locally only to reproduce a CI failure, or for a change wide enough to touch most pages
+  (shared layout, the router, the store).
+- Playwright runs a failed test once more and reports one that passes then as flaky, and CI stays
+  green on it: read the e2e jobs' summaries for "flaky", not only the tick. A flaky test is a race
+  to fix (in the test, or in the app if the app has it), not to leave.
 - Working through the plan: when a task or phase is done and pushed, start the next cloud session
   (`create_session`, claude-code-remote tools) with a prompt naming the next part of `PLAN.md`
   and anything it needs that isn't in the repo, then end with a short reply: what was built, what
