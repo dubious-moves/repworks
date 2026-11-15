@@ -122,8 +122,26 @@ test('nothing runs in training; the panel fits the phone', async ({ page }) => {
   const panel = page.getByRole('region', { name: 'Engine' });
   await panel.getByRole('switch', { name: 'Engine' }).check();
   await expect(panel.locator('.engine-line')).toHaveCount(3);
-  const widths = await page.evaluate(() => [...document.querySelectorAll('.engine, .engine *, .eval-bar')].map((e) => e.getBoundingClientRect().right));
-  expect(Math.max(...widths)).toBeLessThanOrEqual(page.viewportSize()!.width + 0.5);
+  const rightmost = () => page.evaluate(() => Math.max(...[...document.querySelectorAll('.engine, .engine *, .eval-bar')].map((e) => e.getBoundingClientRect().right)));
+  expect(await rightmost()).toBeLessThanOrEqual(page.viewportSize()!.width + 0.5);
+  // And once the search is done and + (Go deeper) has come: the bar's fullest state. CI's run of
+  // 2026-11-15 failed above when the measure happened to be taken after + came (416.7 of 412 in
+  // the runners' font); this asks it every run, on the desktop's side column too, where ⚙ went
+  // past the bar's own edge: nothing past the bar, the depth whole, the bar's height unchanged.
+  const bar = () =>
+    page.evaluate(() => {
+      const b = document.querySelector('.engine-bar')!.getBoundingClientRect();
+      const d = document.querySelector('.engine-depth') as HTMLElement;
+      return { over: Math.max(...[...document.querySelectorAll('.engine-bar > *')].map((e) => e.getBoundingClientRect().right)) - b.right, height: b.height, cut: d.scrollWidth - d.clientWidth, text: d.textContent };
+    });
+  const before = await bar();
+  await expect(panel.getByRole('button', { name: 'Go deeper' })).toBeVisible();
+  expect(await rightmost()).toBeLessThanOrEqual(page.viewportSize()!.width + 0.5);
+  const done = await bar();
+  expect(done.over, '⚙ and + inside the bar').toBeLessThanOrEqual(0.5);
+  expect(done.text).toBe('Depth 20');
+  expect(done.cut, 'the depth isn’t cut short').toBeLessThanOrEqual(0);
+  expect(done.height, '+ doesn’t move what is under the bar').toBe(before.height);
   await page.getByRole('button', { name: 'Train', exact: true }).click();
   await expect(page.locator('.train-grid')).toBeVisible();
   const n = commands(site.requests).length;

@@ -4030,6 +4030,44 @@ a.button.primary {
   flex: 1;
 }
 
+/* A narrow bar (a phone's, the desktop's side column): its rigid parts (three switches, their
+   names and ⚙) take nearly the whole row. The status had what was left ("Depth 2…"), and once a
+   search was done and + came it was squeezed to nothing and ⚙ pushed past the bar's edge: past
+   the screen's in a font a little wider (CI's runners, 2026-11-15). So there the status and +
+   have a row of their own under the switches, from the moment the engine is on, at a height +
+   doesn't change. */
+.engine {
+  container-type: inline-size;
+}
+
+@container (max-width: 470px) {
+  .engine-bar {
+    flex-wrap: wrap;
+    row-gap: 0;
+  }
+
+  .engine-bar .engine-depth {
+    order: 2;
+    flex: 1 1 calc(100% - 60px);
+    display: flex;
+    align-items: center;
+    min-height: 32px;
+  }
+
+  .engine-bar .engine-depth:empty {
+    display: none;
+  }
+
+  .engine-bar > .link,
+  .engine-bar .engine-deeper {
+    order: 3;
+  }
+
+  .engine-bar .engine-deeper {
+    min-height: 32px;
+  }
+}
+
 .engine-name {
   color: var(--engine);
   font-weight: 600;

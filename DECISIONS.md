@@ -2560,3 +2560,10 @@ The technical calls, each with its reason:
   checked. Given up: a data file in every install that isn't code or an engine. A position is
   named by D10's key, a line by its last named position (Lichess's rule). No data format of the
   owner's changed.
+
+## Revision of 2026-11-15 (the engine bar on a narrow panel: PLAN.md §5.182)
+- **On an engine bar of 470px or less the status and + (Go deeper) have a row of their own under
+  the switches.** Was: one row, where the status was cut ("Depth 2…") and, once + came, squeezed
+  to nothing with ⚙ pushed past the bar's edge. Why: CI failed on it (past the screen's edge in the
+  runners' font), and the fault was the app's on a phone and in the desktop's side column alike.
+  Given up: 32px of a phone's height while the engine is on.

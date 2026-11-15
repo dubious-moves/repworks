@@ -102,6 +102,13 @@ later change replaced are folded into the later item; items already reported wor
 
 ## 2. Studies and the study page
 
+### The engine bar: the status on its own row (§5.182, 2026-11-15)
+- On the phone, and on the desktop's study page, switch Stockfish on: under the three switches
+  a row with "Depth 20" whole and, once the search is done, + at its right; ⚙ stays inside the
+  panel. Does anything under the bar move when + comes? Is the extra row acceptable on the phone?
+- **Checked**: Playwright (desktop and emulated phone), headless screenshots. Not your phone's
+  font, which is where it went past the screen's edge.
+
 ### The opening's name under the analysis board (§5.181, 2026-11-15)
 - On the analysis board, play a few moves: under the board, "B90 · Sicilian Defense: Najdorf
   Variation" for the move shown, by any move order, kept past the list's last name; nothing at
