@@ -2567,3 +2567,12 @@ The technical calls, each with its reason:
   to nothing with ⚙ pushed past the bar's edge. Why: CI failed on it (past the screen's edge in the
   runners' font), and the fault was the app's on a phone and in the desktop's side column alike.
   Given up: 32px of a phone's height while the engine is on.
+
+## Revision of 2026-11-15 (FSRS fitted to the log, as a report: PLAN.md §5.183)
+- **A script answers whether fitted FSRS weights would predict the owner's answers better than
+  the defaults; the app is unchanged.** `scripts/fsrs-fit.ts` fits FSRS-6's long-term weights and
+  decay with the FSRS project's optimizer (`@open-spaced-repetition/binding`, a dev dependency)
+  and judges both sets with the app's own scheduler, on cards the fit has not seen and on later
+  answers. Why: the owner's word of 2026-11-15, to look before §5.167's waiting idea is decided.
+  Run on the real log that day: no gain beyond chance yet, so the defaults stay. Switching fitted
+  weights on (a data format, every interval changed) still waits for the owner's word.

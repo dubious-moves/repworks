@@ -72,6 +72,10 @@ tests at it: `REPWORKS_CHROMIUM=/opt/pw-browsers/chromium npm run e2e`.
 The analyzer's games into a data repo checkout (PLAN.md §5.163): `node scripts/games-to-data.mjs
 <analyzed_games.json> <data-repo checkout> [--dry-run] [--commit]`.
 
+Whether FSRS fitted to the progress log would beat the default weights (PLAN.md §5.183), a report
+that writes nothing: `node scripts/fsrs-fit.ts ../repworks-data --offset-minutes 60` (`--kinds r,m`
+adds the game cards; `--json`).
+
 The storm's "Gather positions" from a cloud session, as a device named `cloud` (PLAN.md §5.155),
 with the data repo checked out on `main`:
 `node scripts/storm-gather.ts ../repworks-data --minutes 60 --score-minutes 40 --push`; only
