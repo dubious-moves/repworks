@@ -10877,3 +10877,35 @@ test covers the path).
 `src/app/practice.ts` (`positionsBefore`), `src/app/continuation.ts` (`continuationFiles`),
 `src/ui/EngineSettings.tsx`, `src/ui/MaiaDialog.tsx`, `src/ui/Engines.tsx`, `vite.config.ts`
 (`maia23Model`).
+
+#### 5.189 The tablebase on the analysis board (the owner's word of 2026-11-15, built)
+
+The tablebase (§5.187) judged an endgame's moves and showed nowhere else. On the analysis board
+it is now a row under the engine's lines, wherever the board's position is in it.
+
+- **When**: the board's position has seven pieces or fewer, no castling right, and the game isn't
+  over (`inTablebase`, the endgame judge's own test). Otherwise no row, and nothing is asked.
+  Independent of the engine's switch: Stockfish may be off. The position is the board's, not a
+  previewed line's, as the engine's lines are.
+- **What it says**: the verdict for the position ("White wins, mate in 9", "Black wins", "Draw",
+  the fifty-move rule's cursed win and blessed loss said as draws, "maybe" as "unless the
+  fifty-move rule comes first"), the mate distance in moves where the tablebase has it (it gives
+  plies; seven-piece positions often have none), DTZ in the verdict's tooltip; then every move
+  as a chip, best first as Lichess orders them: its SAN, its outcome for the mover, and "M9"
+  (moves to mate, the move itself counted) where known. A chip plays the move on the board, as
+  an engine line's move or the explorer's row does.
+- **Where**: the analysis board only (`EnginePanel`'s `tablebase`), not the study page: the owner
+  asked for the analysis page; the study's engine panel is one prop away if it is wanted there.
+- **Same fetch as the judge** (`src/platform/tablebase.ts`): the position (a FEN) to
+  `tablebase.lichess.ovh`, no token; kept for the session; after a failure nothing is asked for a
+  minute, and the row says "No answer (offline, or Lichess's tablebase is busy)".
+- `readTablebase` keeps the distances and the fifty-move note now (`TablebasePosition.dtm`, `dtz`,
+  `fifty`; the move's too, and `mate`); the judge reads only the outcomes, as before.
+
+**Checked**: unit tests of the reader and the mate arithmetic; Playwright (`analysis.spec.ts`,
+desktop and emulated phone) with a fake tablebase: no row and no request at the start position,
+the row for a three-piece FEN with the engine off, the verdict and chips, a chip played, the
+answer kept on stepping back. A real answer for a four-piece position (white pawn on the seventh
+against a black pawn on the second) laid out in headless Chromium, desktop and phone width
+(2026-11-15), and the real API's mate distances checked by hand against the arithmetic. **Not
+checked**: a seven-piece position (whether Lichess gives any mate distance there), a device.

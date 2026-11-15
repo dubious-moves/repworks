@@ -250,7 +250,7 @@ export function ChapterView() {
             {/* The stage's left (option B): the engine and the explorer, the notation having the right to itself. */}
             {wide && (
               <div class="cv-side">
-                <EnginePanel board={board.pos} />
+                <EnginePanel board={board.pos} tablebase={scratch} />
                 <Explorer chapter={c} path={path} />
               </div>
             )}
@@ -281,7 +281,7 @@ export function ChapterView() {
               {wide && <CommentPanel />}
             </div>
             <div class="cv-panel">
-              {!wide && <EnginePanel board={board.pos} />}
+              {!wide && <EnginePanel board={board.pos} tablebase={scratch} />}
               <Notation chapter={c} />
               {!scratch && (
                 <div class="cv-tools">

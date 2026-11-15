@@ -24,6 +24,7 @@ import { side } from '../app/editor.ts';
 import { lc0Answer, lc0Prefs, lc0State, setLc0On, type Lc0Answer } from '../app/lc0.ts';
 import { lc0Centipawns } from '../core/lc0/encode.ts';
 import { lc0Pick, shareOf } from '../core/lc0/pick.ts';
+import { TablebaseRow } from './Tablebase.tsx';
 
 /** Moves shown in a row (the row is cut to its width on a narrow screen). */
 const SHOWN_MOVES = 16;
@@ -66,7 +67,8 @@ function statusText(board: Position | undefined, shown: { a: Analysis } | undefi
   return `Depth ${shown.a.depth}`;
 }
 
-export function EnginePanel(props: { board: Position | undefined }) {
+/** `tablebase`: the analysis board's, which shows Lichess's tablebase under the lines (§5.189). */
+export function EnginePanel(props: { board: Position | undefined; tablebase?: boolean }) {
   const prefs = enginePrefs.value;
   const shown = useShown();
   const on = prefs.on;
@@ -126,6 +128,7 @@ export function EnginePanel(props: { board: Position | undefined }) {
         </ol>
       )}
       {lc0Prefs.value.on && <Lc0Row answer={lc0} board={props.board} />}
+      {props.tablebase && <TablebaseRow board={props.board} />}
     </section>
   );
 }

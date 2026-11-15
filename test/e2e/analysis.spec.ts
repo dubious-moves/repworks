@@ -6,6 +6,7 @@ import { REPO, TOKEN } from '../support/syncWorld.ts';
 import type { FakeGit } from '../support/fakeGit.ts';
 import { clickSquare, studyMenu } from './board.ts';
 import { commands, fakeEngine } from './engine.ts';
+import { serveTablebase, type FakeTablebase } from './explorer.ts';
 import { serveGithub, world } from './github.ts';
 import { serveSite, type SiteServer } from './server.ts';
 
@@ -18,6 +19,8 @@ test.afterEach(async () => {
 });
 
 async function setUp(page: Page): Promise<FakeGit> {
+  // Lichess's tablebase answers "unknown" unless a spec routes its own (§5.189): an ending set up here never reaches the network.
+  await serveTablebase(page);
   const w = world();
   await serveGithub(page, w.github);
   await page.goto(`${site.url}#setup?repo=${encodeURIComponent(REPO)}&token=${TOKEN}&name=desktop`);
@@ -88,6 +91,39 @@ test('from the home screen: moves kept on this device, never synced; a FEN set u
   await page.getByRole('region', { name: 'Engine' }).getByRole('switch', { name: 'Engine' }).check();
   await expect(page.getByRole('region', { name: 'Engine' }).locator('.engine-line')).toHaveCount(3);
   expect(commands(site.requests)).toContain('position fen rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
+});
+
+test('the tablebase shown where the position is in it: the verdict, each move with its outcome, a move played from the list (§5.189)', async ({ page }) => {
+  const OPPOSITION = '8/8/8/4k3/8/3K4/4P3/8 w - -';
+  const table: FakeTablebase = {
+    positions: new Map([[OPPOSITION, { category: 'win', dtm: 21, dtz: 3, moves: [['d3d2', 'loss', 20], ['d3e3', 'draw'], ['d3c3', 'draw']] }]]),
+    requests: [],
+  };
+  await setUp(page);
+  await serveTablebase(page, table);
+  await page.getByRole('link', { name: 'Analysis board' }).click();
+  const row = page.getByRole('region', { name: 'Engine' }).getByTestId('tablebase');
+  // The start position has too many pieces: no row, and nothing asked.
+  await expect(row).toHaveCount(0);
+  expect(table.requests).toEqual([]);
+  // A FEN with three pieces, the engine off: the tablebase answers all the same.
+  await page.getByLabel('FEN').fill(`${OPPOSITION} 0 1`);
+  await page.getByRole('button', { name: 'Set up' }).click();
+  await expect(row.getByTestId('tablebase-verdict')).toHaveText('White wins, mate in 11');
+  expect(table.requests).toEqual([`${OPPOSITION.replace(/ /g, '_')}_0_1`]);
+  const moves = row.getByRole('button');
+  await expect(moves).toHaveText(['Kd2 win · M11', 'Ke3 draw', 'Kc3 draw']);
+  // A move in the list is played on the board, into the line; its position isn't the fake's: no answer.
+  await row.getByRole('button', { name: /^Kd2/ }).click();
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'Kd2');
+  await expect(row).toHaveAttribute('data-state', 'none');
+  // Back, the answer is kept: shown again with no new request.
+  await page.keyboard.press('ArrowLeft');
+  await expect(row.getByTestId('tablebase-verdict')).toHaveText('White wins, mate in 11');
+  expect(table.requests.filter((f) => f.startsWith(OPPOSITION.replace(/ /g, '_')))).toHaveLength(1);
+  // A new board: the full set of pieces again, the row gone.
+  await page.getByRole('button', { name: 'New' }).click();
+  await expect(row).toHaveCount(0);
 });
 
 test('from a chapter’s move: a line played there and added back to the chapter, synced', async ({ page }) => {

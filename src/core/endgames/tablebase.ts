@@ -2,7 +2,8 @@
 // (tablebase.lichess.ovh, Syzygy with 7 pieces) says of a position with at most seven pieces
 // whether it is won, drawn or lost, and the same of every move from it, exactly; an endgame's
 // move is judged by that where it answers, in place of Stockfish's score against a line
-// (`GOAL_CP`). Pure: the URL, the answer read, the rule. The fetch is the platform's.
+// (`GOAL_CP`), and the analysis board shows it (§5.189). Pure: the URL, the answer read, the
+// rule. The fetch is the platform's.
 
 import type { Goal } from './endgames.ts';
 
@@ -14,10 +15,33 @@ export const TABLEBASE_URL = 'https://tablebase.lichess.ovh/standard';
 /** How the game ends with best play, for the side the verdict is about, the fifty-move rule counted. */
 export type Outcome = 'win' | 'draw' | 'loss';
 
+/**
+ * What the fifty-move rule does to an outcome, for the side it is about: a win it takes away
+ * (cursed), a loss it takes away (blessed), or an outcome it may or may not (maybe).
+ */
+export type Fifty = 'cursed-win' | 'blessed-loss' | 'maybe';
+
 /** A position as the tablebase has it: for the side to move, and each move's outcome for that same side, best first. */
 export interface TablebasePosition {
   outcome: Outcome;
-  moves: { uci: string; outcome: Outcome }[];
+  fifty?: Fifty;
+  /** Plies to mate with best play (the side to move's win or loss); absent when the tablebase has none. */
+  dtm?: number;
+  /** Plies to the next capture or pawn move (Syzygy's), likewise. */
+  dtz?: number;
+  moves: TablebaseMove[];
+}
+
+/** A move from a position: its outcome for the mover, and the distances after it, the mover's turn counted as one ply. */
+export interface TablebaseMove {
+  uci: string;
+  outcome: Outcome;
+  fifty?: Fifty;
+  /** Plies from the position after the move; the mate itself is 0. */
+  dtm?: number;
+  dtz?: number;
+  /** The move mates. */
+  mate?: boolean;
 }
 
 /** The tablebase's verdict on a move: the best outcome there was, and the move's; both for the mover. */
@@ -66,8 +90,32 @@ export function outcomeOf(category: unknown): Outcome | undefined {
   }
 }
 
-const FLIP: Record<Outcome, Outcome> = { win: 'loss', draw: 'draw', loss: 'win' };
+/** The fifty-move rule's part in a category, if any. */
+export function fiftyOf(category: unknown): Fifty | undefined {
+  switch (category) {
+    case 'cursed-win':
+      return 'cursed-win';
+    case 'blessed-loss':
+      return 'blessed-loss';
+    case 'maybe-win':
+    case 'maybe-loss':
+      return 'maybe';
+    default:
+      return undefined;
+  }
+}
 
+const FLIP: Record<Outcome, Outcome> = { win: 'loss', draw: 'draw', loss: 'win' };
+const FLIP_FIFTY: Record<Fifty, Fifty> = { 'cursed-win': 'blessed-loss', 'blessed-loss': 'cursed-win', maybe: 'maybe' };
+
+/** A distance as a whole number, or none. */
+const distance = (n: unknown): number | undefined => (typeof n === 'number' && Number.isFinite(n) ? Math.abs(n) : undefined);
+
+/** Moves to mate from the position, from its plies: the side to move's own count (a win or a loss), rounded up. */
+export const mateIn = (plies: number): number => Math.ceil(plies / 2);
+
+/** Moves to mate from the position a move is played in, from the plies after the move: the move itself counts. */
+export const mateAfter = (plies: number): number => Math.ceil((plies + 1) / 2);
 /**
  * The tablebase's JSON read: undefined when it isn't an answer, or says "unknown" of the
  * position. A move's category there is the other side's (the one to move after it), turned here
@@ -75,15 +123,29 @@ const FLIP: Record<Outcome, Outcome> = { win: 'loss', draw: 'draw', loss: 'win' 
  */
 export function readTablebase(json: unknown): TablebasePosition | undefined {
   if (!json || typeof json !== 'object') return undefined;
-  const j = json as { category?: unknown; moves?: unknown };
+  const j = json as { category?: unknown; moves?: unknown; dtm?: unknown; dtz?: unknown };
   const outcome = outcomeOf(j.category);
   if (!outcome || !Array.isArray(j.moves)) return undefined;
-  const moves: TablebasePosition['moves'] = [];
-  for (const m of j.moves as { uci?: unknown; category?: unknown }[]) {
+  const moves: TablebaseMove[] = [];
+  for (const m of j.moves as { uci?: unknown; category?: unknown; dtm?: unknown; dtz?: unknown; checkmate?: unknown }[]) {
     const o = outcomeOf(m?.category);
-    if (typeof m?.uci === 'string' && o) moves.push({ uci: m.uci, outcome: FLIP[o] });
+    if (typeof m?.uci !== 'string' || !o) continue;
+    const f = fiftyOf(m.category);
+    const dtm = distance(m.dtm);
+    const dtz = distance(m.dtz);
+    moves.push({
+      uci: m.uci,
+      outcome: FLIP[o],
+      ...(f && { fifty: FLIP_FIFTY[f] }),
+      ...(dtm !== undefined && o !== 'draw' && { dtm }),
+      ...(dtz !== undefined && o !== 'draw' && { dtz }),
+      ...(m.checkmate === true && { mate: true }),
+    });
   }
-  return { outcome, moves };
+  const fifty = fiftyOf(j.category);
+  const dtm = distance(j.dtm);
+  const dtz = distance(j.dtz);
+  return { outcome, ...(fifty && { fifty }), ...(dtm !== undefined && outcome !== 'draw' && { dtm }), ...(dtz !== undefined && outcome !== 'draw' && { dtz }), moves };
 }
 
 /** The verdict on `uci` played from the position; undefined when the tablebase doesn't know the move. */

@@ -2627,3 +2627,9 @@ The technical calls, each with its reason:
 - **Found**: the first model is as large (22.7 million parameters); the look of 2026-11-15 was
   wrong to call the 23M larger. The 79M model is not built (316 MB).
 
+## Revision of 2026-11-15 (the tablebase on the analysis board: PLAN.md §5.189)
+- **The analysis board shows Lichess's tablebase wherever its position has seven pieces or fewer,
+  with the engine on or off; the study page doesn't.** Why: the owner's word of 2026-11-15 (it
+  was only the endgame judge's). Given up: one more request to Lichess (the position alone, no
+  token) per such position viewed on the analysis board, kept for the session. No data format
+  changed.

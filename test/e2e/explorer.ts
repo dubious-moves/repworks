@@ -38,7 +38,7 @@ const key = (fen: string) => fen.split(' ').slice(0, 4).join(' ');
 /** A position as Lichess's tablebase answers it: its category for the side to move, each move's for the side to move after it. */
 export interface FakeTablebase {
   /** By the FEN's first four fields. */
-  positions: Map<string, { category: string; moves: [uci: string, category: string][] }>;
+  positions: Map<string, { category: string; dtm?: number; dtz?: number; moves: [uci: string, category: string, dtm?: number][] }>;
   /** Every request's FEN, as asked (spaces as underscores). */
   requests: string[];
 }
@@ -53,7 +53,7 @@ export async function serveTablebase(page: Page, fake: FakeTablebase = { positio
     const fen = new URL(route.request().url()).searchParams.get('fen') ?? '';
     fake.requests.push(fen);
     const known = fake.positions.get(key(fen.replace(/_/g, ' ')));
-    const body = known ? { category: known.category, moves: known.moves.map(([uci, category]) => ({ uci, category })) } : { category: 'unknown', moves: [] };
+    const body = known ? { category: known.category, dtm: known.dtm ?? null, dtz: known.dtz ?? null, moves: known.moves.map(([uci, category, dtm]) => ({ uci, category, dtm: dtm ?? null })) } : { category: 'unknown', moves: [] };
     await route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*', 'content-type': 'application/json' }, body: JSON.stringify(body) });
   });
   return fake;

@@ -6628,6 +6628,82 @@ a.button.disabled {
   margin-left: 8px;
 }
 
+/* Lichess's tablebase on the analysis board (§5.189): the verdict, then each move with its outcome. */
+.tb-row {
+  padding: 2px 8px 6px;
+  font-size: 0.9rem;
+  line-height: 1.7;
+  border-top: 1px solid rgb(var(--ink) / 8%);
+}
+
+.tb-tag {
+  margin-right: 6px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.tb-verdict {
+  font-weight: 600;
+}
+
+.tb-verdict.white {
+  color: var(--eval-white);
+}
+
+.tb-verdict.black {
+  color: var(--eval-black);
+}
+
+.tb-verdict.even {
+  color: var(--muted);
+}
+
+.tb-moves {
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 4px;
+  max-height: 9.5em;
+  overflow-y: auto;
+}
+
+.tb-move {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 30px;
+  padding: 0 8px;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  background: none;
+  border: 1px solid rgb(var(--ink) / 18%);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.tb-move:hover,
+.tb-move:focus-visible {
+  background: rgb(var(--ink) / 8%);
+}
+
+.tb-san {
+  font-weight: 600;
+}
+
+.tb-move.win .tb-result {
+  color: var(--good-text);
+}
+
+.tb-move.loss .tb-result {
+  color: var(--due);
+}
+
+.tb-move.draw .tb-result {
+  color: var(--muted);
+}
+
 /* Lc0 vs Maia from a move (§5.144): the settings in a row, the line with each move's source. */
 .continuation-options {
   display: flex;

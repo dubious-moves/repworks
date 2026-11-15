@@ -1806,3 +1806,15 @@ does. Start with the spike: its log decides what the later parts change (CHESSNU
 - The list's "back in …" for endgames you had solved before: now FSRS's from those tries, so some
   dates moved (a run of solves in one sitting no longer counts as a long run).
 - **Checked**: unit tests and Playwright's endgames spec (desktop, emulated phone); **not** on a device.
+
+### The tablebase on the analysis board (PLAN.md §5.189, 2026-11-15)
+- Online, on the analysis board: set up "Take the opposition" (`8/8/8/4k3/8/3K4/4P3/8 w - - 0 1`).
+  A "Tablebase" row should appear under the engine's switches, with or without Stockfish on: the
+  verdict, and a chip a move, Kd2 the win. Tap a chip: the move is played on the board.
+- Add a seventh piece, then an eighth: the row stays for seven (does it give mate distances there,
+  or only the verdict and wins/draws/losses?) and goes at eight. On the phone, is the row's size
+  right between the lines and the explorer, and the chips easy to tap?
+- Offline: "No answer", and nothing else changes.
+- **Checked**: unit tests, Playwright (desktop, emulated phone) with a fake tablebase, and a real
+  answer's layout in headless Chromium; **not** on a device.
+

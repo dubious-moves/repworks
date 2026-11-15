@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { firstSlip, goalKept } from '../../../../src/core/endgames/endgames.ts';
-import { inTablebase, keepingMoves, outcomeOf, pieceCount, readTablebase, tablebaseSlips, tablebaseUrl, tablebaseVerdict } from '../../../../src/core/endgames/tablebase.ts';
+import { fiftyOf, inTablebase, keepingMoves, mateAfter, mateIn, outcomeOf, pieceCount, readTablebase, tablebaseSlips, tablebaseUrl, tablebaseVerdict } from '../../../../src/core/endgames/tablebase.ts';
 
 /** https://tablebase.lichess.ovh/standard?fen=4k3/6KP/8/8/8/8/7p/8_w_-_-_0_1, its first moves and two others. */
 const LIVE = {
@@ -38,7 +38,16 @@ test('the categories as outcomes under the fifty-move rule', () => {
 
 test('an answer read: the moves’ outcomes turned to the mover’s, an unknown move left out', () => {
   const pos = readTablebase(LIVE)!;
-  assert.deepEqual(pos, { outcome: 'win', moves: [{ uci: 'h7h8q', outcome: 'win' }, { uci: 'g7g8', outcome: 'draw' }, { uci: 'g7f6', outcome: 'loss' }] });
+  assert.deepEqual(pos, {
+    outcome: 'win',
+    dtm: 17,
+    dtz: 1,
+    moves: [
+      { uci: 'h7h8q', outcome: 'win', dtm: 16, dtz: 2 },
+      { uci: 'g7g8', outcome: 'draw' },
+      { uci: 'g7f6', outcome: 'loss', dtm: 21, dtz: 1 },
+    ],
+  });
   assert.equal(readTablebase({ category: 'unknown', moves: [] }), undefined);
   assert.equal(readTablebase({ category: 'win' }), undefined);
   assert.equal(readTablebase('nope'), undefined);
@@ -76,4 +85,35 @@ test('a move with a verdict is judged by it, whatever its scores say; one withou
   assert.equal(goalKept('draw', { tb: { best: 'draw', after: 'draw' } }), true);
   assert.equal(goalKept('win', { afterCp: 900 }), true);
   assert.equal(goalKept('win', {}), false);
+});
+
+test('the distances and the fifty-move rule kept for the analysis board (§5.189)', () => {
+  // The mate's distance is in plies: the position's 17 is mate on White's ninth move, the winning move's 16 after it the same ninth.
+  assert.equal(mateIn(17), 9);
+  assert.equal(mateIn(16), 8);
+  assert.equal(mateAfter(16), 9);
+  assert.equal(mateAfter(0), 1);
+  assert.equal(fiftyOf('cursed-win'), 'cursed-win');
+  assert.equal(fiftyOf('blessed-loss'), 'blessed-loss');
+  assert.equal(fiftyOf('maybe-loss'), 'maybe');
+  assert.equal(fiftyOf('win'), undefined);
+  // A cursed win for the side to move is a draw; the move into it is, for the mover, a blessed loss turned: the other side's blessed loss is the mover's cursed win.
+  const pos = readTablebase({
+    category: 'cursed-win',
+    dtz: 120,
+    moves: [
+      { uci: 'a1a2', category: 'blessed-loss', dtz: -2, dtm: null },
+      { uci: 'a1b1', category: 'win', dtz: -3, dtm: -4 },
+      { uci: 'a1b2', category: 'loss', dtz: 0, dtm: 0, checkmate: true },
+    ],
+  })!;
+  assert.deepEqual(pos, {
+    outcome: 'draw',
+    fifty: 'cursed-win',
+    moves: [
+      { uci: 'a1a2', outcome: 'draw', fifty: 'cursed-win' },
+      { uci: 'a1b1', outcome: 'loss', dtm: 4, dtz: 3 },
+      { uci: 'a1b2', outcome: 'win', dtm: 0, dtz: 0, mate: true },
+    ],
+  });
 });
