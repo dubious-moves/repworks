@@ -8,9 +8,9 @@
 // that start from a position, scored on the device, by the course's own groups, with the course's
 // text for the chapter kept under the board. "Focus on mistakes" (§5.180) holds the page and its
 // Next to the endgames missed in one of their last five tries, due or not.
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'preact/hooks';
 import { attemptsAt, checkEndgameMaia, endgameMaiaHere, endgameStandings, mistakesOnly, setMistakesOnly, startEndgame } from '../app/endgames.ts';
-import { endgameMaiaAlone, setEndgameMaiaAlone } from '../app/endgameVariety.ts';
+import { authorFirst, endgameMaiaAlone, setEndgameMaiaAlone } from '../app/endgameVariety.ts';
 import { courseById, courseCandidates, courseJustRemoved, courseNow, courseOnly, courseOnlyAsked, setCourseOnly, courseScores, courseScoring, courseStandings, loadCourse, removeCourseDrill, restoreCourseDrill, restoreCourseDrills, scoreCourse, stopCourseScoring } from '../app/courseEndgames.ts';
 import { readSearchChapters, searchChapters } from '../app/search.ts';
 import { dataVersion } from '../app/sync.ts';
@@ -86,7 +86,9 @@ function CourseDrillScreen(props: { id: string }) {
   }, [version]);
   if (!courseScores.value || !searchChapters.value) return <p class="muted">Setting up…</p>;
   const d = courseById(props.id);
-  return d ? <EndgameDrill key={d.id} endgame={asCourseEndgame(d)} course={d} /> : <EndgameList />;
+  // With its chapter: the course author's replies are the defence until a try against them is solved.
+  const chapter = d && searchChapters.value.find((c) => c.sid === d.cand.sid && c.cid === d.cand.cid)?.chapter;
+  return d ? <EndgameDrill key={d.id} endgame={asCourseEndgame(d, chapter)} course={d} /> : <EndgameList />;
 }
 
 function EndgameList() {
@@ -684,7 +686,9 @@ function CourseRemoveButton(props: { course: CourseDrill }) {
 function CourseRemovedNote() {
   const r = courseJustRemoved.value;
   // Shown on the one drill after the removal: leaving that drill lets the note go (not a later removal's).
-  useEffect(() => {
+  // A layout effect, set up as the note renders: an effect waits for the paint, and a drill left before
+  // then (a busy device) kept the note for the next one (CI's flaky run of 2026-11-15).
+  useLayoutEffect(() => {
     if (!r) return;
     return () => {
       if (courseJustRemoved.peek() === r) courseJustRemoved.value = undefined;
@@ -810,6 +814,11 @@ function EndgameGame(props: { game: PracticeGame; endgame: Endgame; rep?: Repert
         )}
         <BoardNote />
         {props.course && <CourseRemovedNote />}
+        {e.author && !over && authorFirst(e.id) && (
+          <p class="muted" data-testid="course-author">
+            Your opponent plays the course’s own replies while it has them, until you solve a try against them; then Maia’s, varied.
+          </p>
+        )}
         {over && <p class="muted" data-testid="endgame-counted">{countedText(p, e)}</p>}
         {over && <GradeChoice game={p} endgame={e} />}
         {!over && p.failed && !slip && <p class="muted">This try counts as missed: play it out, or start again.</p>}

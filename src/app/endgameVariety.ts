@@ -3,7 +3,7 @@
 // device in localStorage (a convenience: lost with the browser's data, never synced); and the
 // switch for Maia's reply played without Stockfish's check.
 import { signal } from '@preact/signals';
-import { beginTry, noteEnd, noteReply, readMemories, replyHints, type Memories } from '../core/endgames/variety.ts';
+import { authorFirst as authorFirstIn, beginTry, noteEnd, noteReply, readMemories, replyHints, type Memories } from '../core/endgames/variety.ts';
 
 const MEMORY_KEY = 'repworks-endgame-replies';
 const ALONE_KEY = 'repworks-endgame-maia-alone';
@@ -32,10 +32,12 @@ function save(next: Memories): void {
 
 /** A try at endgame `id` begun. */
 export const tryBegun = (id: string): void => save(beginTry(load(), id));
-/** The defence's reply `uci` at the position `key` of endgame `id`. */
-export const replyPlayed = (id: string, key: string, uci: string): void => save(noteReply(load(), id, key, uci));
+/** The defence's reply `uci` at the position `key` of endgame `id`; `byAuthor` when it was the course's. */
+export const replyPlayed = (id: string, key: string, uci: string, byAuthor = false): void => save(noteReply(load(), id, key, uci, byAuthor));
 /** The try in play ended, solved or missed. */
 export const tryEnded = (id: string, end: 'solved' | 'missed'): void => save(noteEnd(load(), id, end));
+/** Whether a course drill's defence is still the author's: no try that met it solved yet (on this device). */
+export const authorFirst = (id: string): boolean => authorFirstIn(load(), id);
 /** The replies met at `key`, and the reply to play again after a miss. */
 export const hintsAt = (id: string, key: string) => replyHints(load(), id, key);
 

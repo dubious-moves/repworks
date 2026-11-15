@@ -195,7 +195,7 @@ for (const e of ENDGAMES.filter((x) => !ids.length || ids.includes(x.id))) {
         pos = after;
         seen.set(keyOf(pos), (seen.get(keyOf(pos)) ?? 0) + 1);
         if (after.isCheckmate()) end = 'mate';
-        else if ((wonAfter(e, after, uci.length === 5) || held(e, userMoves)) && keepsGoal(e.goal, j.afterCp, line)) end = 'goal';
+        else if ((wonAfter(e, after, uci) || held(e, userMoves)) && keepsGoal(e.goal, j.afterCp, line)) end = 'goal';
         continue;
       }
       const uci = await opponent(e, pos, userMoves, new Set(seen.keys()));

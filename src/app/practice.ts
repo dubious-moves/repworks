@@ -34,7 +34,7 @@ import { historyCard, practiceCard } from '../core/progress/cards.ts';
 import { ENDGAME_PRESET, firstSlip, GOAL_CP, GRADE_SECONDS, gradeOfTime, meanSeconds, type SolveGrade, held, keepsGoal, lineOf, MAIA_ELO, maiaCandidates, materialFor, opponentPick, pawnPushes, pushNow, slips, solvedBy, wonAfter, type Endgame, type OpponentLine } from '../core/endgames/endgames.ts';
 import { hangs, lc0Vetoed, replyOrder, trustPick } from '../core/endgames/variety.ts';
 import { endgameLc0 } from './endgameLc0.ts';
-import { endgameMaiaAlone, hintsAt, replyPlayed, tryBegun, tryEnded } from './endgameVariety.ts';
+import { authorFirst, endgameMaiaAlone, hintsAt, replyPlayed, tryBegun, tryEnded } from './endgameVariety.ts';
 import type { Grade } from '../core/progress/events.ts';
 import { positionOf } from '../core/storm/walk.ts';
 import { onWorker, postToWorker } from './explorer.ts';
@@ -245,6 +245,9 @@ function explorerGames(fen: string, o: Opponent): Promise<PracticeReply | null> 
   });
 }
 
+/** The source shown for a course author's reply in an endgame drill. */
+export const COURSE_SOURCE = 'the course';
+
 /** Stockfish's lines for a draw's attacker: room for a line that doesn't repeat (§5.148). */
 const DRAW_LINES = 5;
 
@@ -293,6 +296,10 @@ async function endgameReply(fen: string, e: Endgame, userMoves: number, seen: Re
     const k = p && keyFen(makeFen(p.toSetup()))?.key;
     return !!k && seen.has(k);
   };
+  // A course drill's author's reply, until a try that met the author's line is solved (the owner's
+  // request of 2026-11-15): the course's defence, which proves its point, ahead of Maia's.
+  const authored = key ? e.author?.[key] : undefined;
+  if (authored && authorFirst(e.id) && parseUciMove(pos, authored)) return { uci: authored, source: COURSE_SOURCE, dbFailed: false };
   if (endgameMaiaAlone.peek()) {
     const policy = await endgameMaia(fen);
     if (policy?.length) {
@@ -302,11 +309,16 @@ async function endgameReply(fen: string, e: Endgame, userMoves: number, seen: Re
       // step that loses the opposition looks sound to the board-only checks. A move that ends the game is
       // rated by its result (a draw 0.5), so the others are measured against it. With every candidate
       // vetoed, its own likeliest move; with none of them, no veto.
+      const hung = (uci: string) => {
+        const p = after(uci);
+        return !p || hangs(p, materialFor(p, pos.turn) - materialFor(pos, pos.turn));
+      };
       const lc0 = await endgameLc0(fen, [...ordered, ...pushes]);
       let lc0Own = false;
       const vetted = !!lc0 && Object.keys(lc0.values).length > 0;
       if (lc0 && vetted) {
-        const vetoed = lc0Vetoed(lc0.values);
+        // Measured against the best that gives nothing away: one run overrates a move that drops a pawn.
+        const vetoed = lc0Vetoed(lc0.values, undefined, (u) => ends(u) !== undefined || !hung(u));
         ordered = ordered.filter((u) => !vetoed.has(u));
         pushed = pushes.filter((u) => !vetoed.has(u));
         if (!ordered.length && lc0.top && !vetoed.has(lc0.top)) {
@@ -314,10 +326,6 @@ async function endgameReply(fen: string, e: Endgame, userMoves: number, seen: Re
           lc0Own = true;
         }
       }
-      const hung = (uci: string) => {
-        const p = after(uci);
-        return !p || hangs(p);
-      };
       const pick = trustPick(goal, ordered, policy, pushed, { ends, repeats, hangs: hung }, vetted);
       if (pick) return { uci: pick.uci, source: lc0Own ? 'Lc0' : `Maia ${MAIA_ELO}`, dbFailed: false };
     }
@@ -806,7 +814,7 @@ async function opponentTurn(g: number): Promise<void> {
   });
   // The defence's reply remembered for the tries to come (§5.174).
   const replyKey = now?.setup.endgame && keyFen(fen)?.key;
-  if (now?.setup.endgame && replyKey) replyPlayed(now.setup.endgame.id, replyKey, m.uci);
+  if (now?.setup.endgame && replyKey) replyPlayed(now.setup.endgame.id, replyKey, m.uci, m.source === COURSE_SOURCE);
   const end = now && endOf(now, false);
   if (end) return now.setup.kind === 'endgame' ? conclude(g, end) : finish(g, end);
   if (now) ponder(now);
@@ -1007,7 +1015,7 @@ function endgameAfterUser(g: number): void {
   const mv = q.moves.at(-1)!;
   const after = positionOf(mv.fen);
   const userMoves = q.moves.filter((m) => m.isUser).length;
-  if (after && (wonAfter(e, after, mv.uci.length === 5) || held(e, userMoves))) return conclude(g, 'goal');
+  if (after && (wonAfter(e, after, mv.uci) || held(e, userMoves))) return conclude(g, 'goal');
   void opponentTurn(g);
 }
 

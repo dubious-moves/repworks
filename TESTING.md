@@ -1095,6 +1095,23 @@ later change replaced are folded into the later item; items already reported wor
 
 ## 8. Endgames
 
+### The endgames' defence: the course's replies, and three fixes (§5.185, 2026-11-15)
+- A course drill whose chapter goes on after your first move (the Silman king-and-pawn race,
+  2.g5): the opponent now plays the course's replies (there, 2…Kb6, the author's), a line under the
+  board says so, until you solve a try against them; then Maia's, varied. Does it stay on the
+  author's line through "Again" after a miss, and switch to Maia once solved? A course with
+  variations: does a variation's own reply come when you play its move?
+- Maia alone, without the course: in that race (no course replies, or after solving), is 2…f6 gone
+  (it drops a pawn) in favour of Kd6? Test 2 of Part 4 (hold 15 moves): no more 7.b5+ (0.6%, it
+  lost the draw for White); 7.gxh5 instead, and the drill held to its end.
+- Silman Part 5's "King and Two Healthy Pawns vs. Lone King 8": 4.a8=Q+ no longer ends the drill
+  while Black can take the queen; after 4…Kxa8 you must still find 5.Kc6.
+- **Checked**: the f6 and b5+ positions with the real Maia and Lc0 networks under Node (both now
+  pick Maia's top move, Kd6 and gxh5); unit tests (the exchange count, the veto's best, the push
+  floor, the author's replies and when they stop, the queen that can be taken); Playwright's
+  endgames spec (the course's reply played and the line shown). **Not** the app on a device, and
+  not the owner's real course chapters.
+
 ### Focus on mistakes (§5.180, 2026-11-15)
 - Endgames → tick "Focus on mistakes" in the top card: only the endgames with a ✗ among their last
   five tries are listed, in the built-in groups, "From your repertoire" and "From your courses"

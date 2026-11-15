@@ -16,6 +16,8 @@ export const KEEP_ENDGAMES = 80;
 export interface TryPath {
   replies: Record<string, string>;
   end?: 'solved' | 'missed';
+  /** A course drill's author's reply was played in this try (`noteReply`'s `byAuthor`). */
+  author?: true;
 }
 
 /** One endgame's memory: how often each reply was met at each position, the try in play and the one before. */
@@ -23,6 +25,8 @@ export interface ReplyMemory {
   seen: Record<string, Record<string, number>>;
   cur?: TryPath;
   last?: TryPath;
+  /** A try that met the course author's replies was solved: from then on the defence varies (`authorFirst`). */
+  authorSolved?: true;
 }
 
 /** Every endgame's memory by id, the latest used last. */
@@ -35,7 +39,7 @@ function readPath(o: unknown): TryPath | undefined {
   const replies: Record<string, string> = {};
   for (const [k, v] of Object.entries(o['replies'])) if (typeof v === 'string') replies[k] = v;
   const end = o['end'] === 'solved' || o['end'] === 'missed' ? o['end'] : undefined;
-  return { replies, ...(end ? { end } : {}) };
+  return { replies, ...(end ? { end } : {}), ...(o['author'] === true ? { author: true as const } : {}) };
 }
 
 /** The memories as stored (JSON); anything unreadable is left out, so a bad store starts afresh. */
@@ -59,7 +63,7 @@ export function readMemories(raw: string | null | undefined): Memories {
     }
     const cur = readPath(m['cur']);
     const last = readPath(m['last']);
-    out[id] = { seen, ...(cur ? { cur } : {}), ...(last ? { last } : {}) };
+    out[id] = { seen, ...(cur ? { cur } : {}), ...(last ? { last } : {}), ...(m['authorSolved'] === true ? { authorSolved: true as const } : {}) };
   }
   return out;
 }
@@ -77,23 +81,33 @@ function touch(all: Memories, id: string, f: (m: ReplyMemory) => ReplyMemory): M
 export const beginTry = (all: Memories, id: string): Memories =>
   touch(all, id, (m) => {
     const last = m.cur && Object.keys(m.cur.replies).length ? m.cur : m.last;
-    return { seen: m.seen, cur: { replies: {} }, ...(last ? { last } : {}) };
+    return { ...m, cur: { replies: {} }, ...(last ? { last } : {}) };
   });
 
-/** A reply played at the position `key`: counted, and kept as the try's. */
-export const noteReply = (all: Memories, id: string, key: string, uci: string): Memories =>
+/** A reply played at the position `key`: counted, and kept as the try's; `byAuthor` when it was the course author's. */
+export const noteReply = (all: Memories, id: string, key: string, uci: string, byAuthor = false): Memories =>
   touch(all, id, (m) => {
     const { [key]: counts, ...others } = m.seen;
     const seen = { ...others, [key]: { ...counts, [uci]: (counts?.[uci] ?? 0) + 1 } };
     const keys = Object.keys(seen);
     for (const old of keys.slice(0, Math.max(0, keys.length - KEEP_POSITIONS))) delete seen[old];
     const cur = m.cur ?? { replies: {} };
-    return { ...m, seen, cur: { ...cur, replies: { ...cur.replies, [key]: uci } } };
+    return { ...m, seen, cur: { ...cur, replies: { ...cur.replies, [key]: uci }, ...(byAuthor ? { author: true as const } : {}) } };
   });
 
 /** The try in play ended, solved or missed; the first end counts (a miss stays a miss). */
 export const noteEnd = (all: Memories, id: string, end: 'solved' | 'missed'): Memories =>
-  touch(all, id, (m) => ({ ...m, cur: { ...(m.cur ?? { replies: {} }), end: m.cur?.end ?? end } }));
+  touch(all, id, (m) => {
+    const first = m.cur?.end ?? end;
+    const solved = m.authorSolved || (first === 'solved' && m.cur?.author);
+    return { ...m, cur: { ...(m.cur ?? { replies: {} }), end: first }, ...(solved ? { authorSolved: true as const } : {}) };
+  });
+
+/**
+ * Whether a course drill's defence is still the author's (the owner's request of 2026-11-15): the
+ * course's own replies, where it has one, until a try that met them is solved; then Maia's, varied.
+ */
+export const authorFirst = (all: Memories, id: string): boolean => !all[id]?.authorSolved;
 
 /** What the defence goes by at `key`: the replies met there, and the last try's reply when that try was missed (D). */
 export function replyHints(all: Memories, id: string, key: string): { seen: Record<string, number>; replay?: string } {
@@ -116,30 +130,75 @@ export function replyOrder<M extends { uci: string; prob: number }>(candidates: 
 }
 
 const VALUE = { pawn: 1, knight: 3, bishop: 3, rook: 5, queen: 9, king: 0 } as const;
+/** A king's worth in an exchange: it takes only where nothing takes back, so it is never taken. */
+const KING_SWAP = 100;
+const worth = (role: keyof typeof VALUE): number => (role === 'king' ? KING_SWAP : VALUE[role]);
 
 /**
- * Whether the side not to move has left something hanging, read from the board alone (no search):
- * a piece the side to move can take with a cheaper one, or one taken with nothing to take back (a
- * king alone doesn't take back on a square the taker's side covers again). "Maia alone"'s stand-in
- * for Stockfish's material check (§5.147 found Maia hanging a rook).
+ * What the side to move wins by taking on `to` with the piece on `from` and the exchange that
+ * follows there, each side taking with its cheapest piece and stopping when going on would cost it
+ * (a static exchange evaluation). A king takes only where nothing of the other side covers the
+ * square any more. Pins and checks are not looked at after the first capture. Pure.
  */
-export function hangs(pos: Position): boolean {
+export function exchangeGain(pos: Position, from: number, to: number): number {
+  const victim = pos.board.get(to);
+  const taker = pos.board.get(from);
+  if (!victim || !taker) return 0;
+  const gain: number[] = [VALUE[victim.role]];
+  let occupied = pos.board.occupied.without(from);
+  let onSquare = worth(taker.role);
+  let side: 'white' | 'black' = pos.turn === 'white' ? 'black' : 'white';
+  for (;;) {
+    const attackers = pos.kingAttackers(to, side, occupied).intersect(occupied);
+    if (attackers.isEmpty()) break;
+    let from2: number | undefined;
+    let least = Infinity;
+    for (const sq of attackers) {
+      const w = worth(pos.board.get(sq)!.role);
+      if (w < least) [least, from2] = [w, sq];
+    }
+    const other = side === 'white' ? 'black' : 'white';
+    if (least === KING_SWAP && pos.kingAttackers(to, other, occupied.without(from2!)).intersect(occupied).nonEmpty()) break;
+    gain.push(onSquare - gain[gain.length - 1]!);
+    onSquare = least;
+    occupied = occupied.without(from2!);
+    side = other;
+  }
+  for (let d = gain.length - 1; d > 0; d--) gain[d - 1] = -Math.max(-gain[d - 1]!, gain[d]!);
+  return gain[0]!;
+}
+
+/** The most material the side to move wins by a capture now (its legal captures, each with the exchange after it); 0 when none wins anything. */
+export function captureGain(pos: Position): number {
+  let best = 0;
   for (const [from, dests] of pos.allDests()) {
-    const taker = pos.board.get(from);
-    if (!taker) continue;
     for (const to of dests) {
       const victim = pos.board.get(to);
       if (!victim || victim.color === pos.turn || victim.role === 'king') continue;
-      if (taker.role !== 'king' && VALUE[victim.role] > VALUE[taker.role]) return true;
-      const occupied = pos.board.occupied.without(from);
-      const defenders = pos.kingAttackers(to, victim.color, occupied);
-      if (defenders.isEmpty()) return true;
-      const kingOnly = defenders.size() === 1 && pos.board.king.has(defenders.first()!);
-      if (kingOnly && pos.kingAttackers(to, pos.turn, occupied).without(from).nonEmpty()) return true;
+      best = Math.max(best, exchangeGain(pos, from, to));
     }
   }
-  return false;
+  return best;
 }
+
+/**
+ * Whether the side not to move has left material to be won, read from the board alone (no search):
+ * the side to move wins more by a capture and the exchange after it (`captureGain`) than the move
+ * just made won (`gained`: a capture's worth, a promotion's, so an exchange begun isn't counted as a
+ * piece left hanging). "Maia alone"'s stand-in for Stockfish's material check (§5.147 found Maia
+ * hanging a rook; the owner's report of 2026-11-15: a pawn pushed where two pieces take it and one
+ * defends it, b5+ against a6 and Kc6, given away).
+ */
+export function hangs(pos: Position, gained = 0): boolean {
+  return captureGain(pos) > gained;
+}
+
+/**
+ * The least likely push "Maia alone" plays for a draw's attacker's progress (§5.148): the pushes a
+ * player makes there (Philidor's e6 7%, the king-and-pawn ending's e5 28%) and not a long shot (the
+ * owner's report of 2026-11-15: b5+ at 0.6%, which gave a pawn away and lost a drawn game).
+ */
+export const PUSH_MIN = 0.02;
 
 /** How much worse than the best (the mover's expected score, 0 to 1) Lc0 may rate a move before it is vetoed. */
 export const LC0_MARGIN = 0.1;
@@ -147,18 +206,22 @@ export const LC0_MARGIN = 0.1;
 /**
  * "Maia alone"'s veto, from Lc0's value of each move (the mover's expected score after it, one
  * network run on the position it leads to): the moves rated more than `margin` below the best of
- * them. Lc0 has no search here, so it can't tell a move from its near equals (the 0.30 to 1.00 slips
+ * them that gives nothing away (`firm`; of all of them when none does). Lc0 has no search here, so it can't tell a move from its near equals (the 0.30 to 1.00 slips
  * Maia now and then makes, which it rates alike), but it sees the ones that lose or draw away a game
  * (a king step that loses the opposition: 0.11 against 0.49, PLAN.md §5.176). Pure.
  */
-export function lc0Vetoed(values: Readonly<Record<string, number>>, margin = LC0_MARGIN): Set<string> {
-  const best = Math.max(...Object.values(values));
+export function lc0Vetoed(values: Readonly<Record<string, number>>, margin = LC0_MARGIN, firm: (uci: string) => boolean = () => true): Set<string> {
+  // The best is a move that gives nothing away (`firm`): one run can't see a pawn simply taken, and
+  // rates the move that drops it above the sound ones (the owner's report of 2026-11-15: 2…f6, which
+  // g5 takes, 0.42 against 2…Kd6's 0.31, so Kd6 and Kb6 were vetoed and f6 played every try).
+  const sound = Object.keys(values).filter(firm);
+  const best = Math.max(...(sound.length ? sound : Object.keys(values)).map((u) => values[u]!));
   return new Set(Object.keys(values).filter((u) => best - values[u]! > margin));
 }
 
 /**
  * "Maia alone"'s reply: no Stockfish, so only checks that need no search. A draw's attacker's pawn
- * push first when asked for (§5.148), Maia's likeliest that throws nothing away, repeats nothing and
+ * push first when asked for (§5.148), Maia's likeliest of those `PUSH_MIN` or likelier that throws nothing away, repeats nothing and
  * hangs nothing; then the moves in `ordered` (the last try's reply first after a miss, then
  * `replyOrder`'s), the first passing those checks. Only moves of `ordered` are ever played: a
  * move Maia gives 0.3% is not an alternative (the owner's report of 2026-11-14: a 99% move that
@@ -191,7 +254,7 @@ export function trustPick(
   const quiet = (uci: string) => !throws(uci) && !repeats(uci);
   const firm = (uci: string) => ends(uci) || !check.hangs(uci);
   const prob = (uci: string) => policy.find((m) => m.uci === uci)?.prob ?? 0;
-  const push = pushes.filter((u) => quiet(u) && firm(u)).sort((a, b) => prob(b) - prob(a))[0];
+  const push = pushes.filter((u) => prob(u) >= PUSH_MIN && quiet(u) && firm(u)).sort((a, b) => prob(b) - prob(a))[0];
   if (push) return { uci: push, push: true };
   const safe = ordered.find((u) => quiet(u) && firm(u));
   if (safe) return { uci: safe };

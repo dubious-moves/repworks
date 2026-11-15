@@ -3,7 +3,8 @@
 // drill; Stockfish's score for the side to move gives it a goal by the repertoire endgames' bands
 // (`goalFor`, §5.149), and it is played as every endgame is (§5.145–§5.148): against Maia's
 // defence, every move judged for the goal, every alternative move allowed. The course's one main
-// line is not an answer key: it is its text (the comments, in order) kept under the board. The user
+// line is not an answer key: it is its text (the comments, in order) kept under the board; its
+// replies are the opponent's first defence (`authorReplies`, §5.185). The user
 // practises the side the author teaches, which is the side that makes the course's last move (a
 // lesson ends on its point, not on the reply to it): when that is not the side to move, the
 // course's first move is played for the opponent and the drill starts after it. The author's mark
@@ -14,7 +15,8 @@ import type { Position } from 'chessops/chess';
 import { parseSan, makeSan } from 'chessops/san';
 import type { Color } from 'chessops/types';
 import { positionKeyOf, type PositionKey } from '../chess/positionKey.ts';
-import { fenOf } from '../storm/walk.ts';
+import { standardUci } from '../chess/uci.ts';
+import { fenOf, positionOf } from '../storm/walk.ts';
 import { header, type Chapter, type MoveNode } from '../study/model.ts';
 import { startPosition } from '../study/tree.ts';
 import { materialFor, type Endgame, type Goal, type Until } from './endgames.ts';
@@ -269,9 +271,44 @@ export function courseState(cands: readonly Candidate[], scores: ReadonlyMap<str
   return { drills, left, todo, removed: gone };
 }
 
-/** A drill as the endgame drill plays it: a win converted or mated, or a draw held for `REP.hold` moves. */
-export function asCourseEndgame(d: CourseDrill): Endgame {
-  return { id: d.id, group: 'course', title: d.cand.title, fen: d.fen, goal: d.goal, ...(d.goal === 'win' ? { until: d.until ?? 'convert' } : { hold: REP.hold }), idea: '' };
+/**
+ * A drill as the endgame drill plays it: a win converted or mated, or a draw held for `REP.hold`
+ * moves; with its chapter, the author's replies for the opponent (`authorReplies`).
+ */
+export function asCourseEndgame(d: CourseDrill, chapter?: Chapter): Endgame {
+  const from = positionOf(d.fen);
+  const author = chapter && from ? authorReplies(chapter, d.side === 'white' ? 'black' : 'white', positionKeyOf(from)) : {};
+  return { id: d.id, group: 'course', title: d.cand.title, fen: d.fen, goal: d.goal, ...(d.goal === 'win' ? { until: d.until ?? 'convert' } : { hold: REP.hold }), idea: '', ...(Object.keys(author).length ? { author } : {}) };
+}
+
+/**
+ * The course author's replies for `side` (the drill's opponent), by position key: at every position
+ * of the chapter's tree where `side` is to move, its first move there, the main line's or a
+ * variation's own (the owner's request of 2026-11-15: the author's 2…Kb6, the defence that proves
+ * the lesson's point, where Maia played 2…f6). The first time a position is met in the tree wins: the
+ * main line before its variations. Moves that don't parse end their branch. With `from` (the drill's
+ * start), only the tree from that position on: a flipped drill's first move is not a reply.
+ */
+export function authorReplies(chapter: Chapter, side: Color, from?: PositionKey): Record<string, string> {
+  const start = startPosition(chapter);
+  const out: Record<string, string> = {};
+  if (!start) return out;
+  const walk = (pos: Position, children: readonly MoveNode[], reached: boolean): void => {
+    const key = positionKeyOf(pos);
+    const on = reached || key === from;
+    let first = true;
+    for (const node of children) {
+      const move = parseSan(pos, node.san);
+      if (!move || !('from' in move)) continue;
+      if (first && on && pos.turn === side && !(key in out)) out[key] = standardUci(pos, move);
+      first = false;
+      const next = pos.clone();
+      next.play(move);
+      walk(next, node.children, on);
+    }
+  };
+  walk(start, chapter.root.children, from === undefined);
+  return out;
 }
 
 /** The groups in the order of their first drill, each with its drills' count. */

@@ -147,10 +147,12 @@ test('the kept endgame, its id, and the drill made of it', () => {
 test('a converted win: a promotion, a bare king, or the lead', () => {
   const e = { id: 'r-1', group: 'rook' as const, title: '', fen: '', goal: 'win' as const, until: 'convert' as const, idea: '' };
   // Black has just moved (White to move): Black's lead counts.
-  assert.equal(wonAfter(e, pos('8/5pk1/6p1/8/8/6P1/r4PK1/8 w - - 0 1'), false), true, 'a rook up: 5');
-  assert.equal(wonAfter(e, pos('8/5pk1/6p1/8/8/6P1/r4PK1/R7 w - - 0 1'), false), false, 'level');
-  assert.equal(wonAfter(e, pos('8/5pk1/6p1/8/8/6P1/r4PK1/R7 w - - 0 1'), true), true, 'promoted');
-  assert.equal(wonAfter(e, pos('8/5pk1/8/8/8/8/6K1/8 w - - 0 1'), false), true, 'a bare king');
+  assert.equal(wonAfter(e, pos('8/5pk1/6p1/8/8/6P1/r4PK1/8 w - - 0 1')), true, 'a rook up: 5');
+  assert.equal(wonAfter(e, pos('8/5pk1/6p1/8/8/6P1/r4PK1/R7 w - - 0 1')), false, 'level');
+  assert.equal(wonAfter(e, pos('8/5pk1/6p1/8/8/6P1/r4PK1/4q3 w - - 0 1'), 'e2e1q'), true, 'promoted');
+  assert.equal(wonAfter(e, pos('8/5pk1/6p1/8/8/6P1/r4PK1/R3q3 w - - 0 1'), 'e2e1q'), false, 'promoted where the rook takes it');
+  assert.equal(wonAfter(e, pos('8/5pk1/6p1/8/8/6P1/5PK1/7r w - - 0 1')), false, 'a rook up, but the king takes it: Kxh1');
+  assert.equal(wonAfter(e, pos('8/5pk1/8/8/8/8/6K1/8 w - - 0 1')), true, 'a bare king');
 });
 
 test('the list: new ones added once, the oldest out past the cap, by category', () => {

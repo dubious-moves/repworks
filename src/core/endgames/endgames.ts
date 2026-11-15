@@ -10,11 +10,11 @@
 // `scripts/endgame-check.ts`): the goal is kept by a clear margin on one side of its line
 // (`GOAL_CP`, or the endgame's own) and lost by a clear margin on the other.
 import type { Position } from 'chessops/chess';
-import { makeSquare as squareName } from 'chessops/util';
+import { makeSquare as squareName, parseSquare } from 'chessops/util';
 import type { PositionKey } from '../chess/positionKey.ts';
 import { DEFAULT_PARAMS, Grade, newCard, review, type FsrsCard, type FsrsParams } from '../progress/fsrs.ts';
 import type { Category } from './repertoire.ts';
-import { replyOrder } from './variety.ts';
+import { captureGain, replyOrder } from './variety.ts';
 
 export type Goal = 'win' | 'draw';
 /**
@@ -44,6 +44,11 @@ export interface Endgame {
   line?: number;
   /** The method, in a few sentences: shown before a first try and on request. */
   idea: string;
+  /**
+   * A course drill's author's replies for the opponent, by position key: the course's move where it
+   * has one, played until a try that met them is solved (`authorFirst`, the owner's request of 2026-11-15).
+   */
+  author?: Readonly<Record<string, string>>;
 }
 
 export const GROUPS: readonly { id: Group; title: string }[] = [
@@ -346,17 +351,23 @@ function bare(pos: Position, side: 'white' | 'black'): boolean {
 export const CONVERT_LEAD = 5;
 
 /**
- * Whether a win's goal is reached after the user's move, which kept it (the caller has judged
+ * Whether a win's goal is reached after the user's move `uci`, which kept it (the caller has judged
  * that): mate, a promotion, or the defender with a bare king; converting, also a lead of
- * `CONVERT_LEAD`. A draw's goal is reached by holding
- * (`held`) or by the rules' draws, which the game itself ends on.
+ * `CONVERT_LEAD`. A draw's goal is reached by holding (`held`) or by the rules' draws, which the game
+ * itself ends on. Nothing counts that the defence takes back at once (the owner's report of
+ * 2026-11-15: 4.a8=Q+ Kxa8, and only 5.Kc6 still wins): a new queen it can take, a bare king that
+ * can take something, a lead less what it wins by a capture now (`captureGain`).
  */
-export function wonAfter(e: Endgame, after: Position, promoted: boolean): boolean {
+export function wonAfter(e: Endgame, after: Position, uci?: string): boolean {
   if (e.goal !== 'win') return false;
   if (after.isCheckmate()) return true;
+  const on = uci?.length === 5 ? parseSquare(uci.slice(2, 4)) : undefined;
+  const promoted = on !== undefined && ![...after.allDests().values()].some((d) => d.has(on));
+  const won = after.turn === 'white' ? 'black' : 'white';
+  const bareNow = () => bare(after, after.turn) && captureGain(after) === 0;
   if (e.until === 'promote') return promoted;
-  if (e.until === 'bare') return bare(after, after.turn);
-  if (e.until === 'convert') return promoted || bare(after, after.turn) || materialFor(after, after.turn === 'white' ? 'black' : 'white') >= CONVERT_LEAD;
+  if (e.until === 'bare') return bareNow();
+  if (e.until === 'convert') return promoted || bareNow() || materialFor(after, won) - captureGain(after) >= CONVERT_LEAD;
   return false;
 }
 

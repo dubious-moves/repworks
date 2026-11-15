@@ -763,10 +763,13 @@ test('the courses’ endgames: a reference study scored on the device, listed by
   await page.locator('.chip').click();
   await expect.poll(() => endgameEvents(git).length, { timeout: 15_000 }).toBe(1);
   expect(endgameEvents(git)[0]).toMatchObject({ card: `x|${COURSE_WIN}`, res: 'loss', preset: 'endgame', mv: 0 });
-  // Any move that keeps the goal is allowed: Kd3 (the course's) and Stockfish's answer.
+  // Any move that keeps the goal is allowed: Kd3 (the course's), and the course's own reply, Kc5,
+  // played for the opponent until a try against the course's replies is solved.
+  await expect(page.getByTestId('course-author')).toContainText('Your opponent plays the course’s own replies');
   await clickSquare(page, 'c3', 'white');
   await clickSquare(page, 'd3', 'white');
   await expect(game).toHaveAttribute('data-moves', '2', { timeout: ENGINE_MS * 4 });
+  await expect(game.getByTestId('practice-moves')).toContainText('Kc5');
 
   // Back on the list: due, missed. The weaker side's chapter opens with the course's first move said.
   await page.locator('.chapter-head .back').click();
@@ -777,6 +780,8 @@ test('the courses’ endgames: a reference study scored on the device, listed by
   await expect(game).toHaveAttribute('data-phase', 'user');
   await expect(page.getByTestId('endgame-source')).toContainText('The course ends on White’s move, so it teaches White: its first move, Kc5, is played for your opponent, and you have White.');
   await expect(game.locator('.cg-wrap')).toHaveClass(/orientation-white/);
+  // The course has no reply of Black's after its Kc5: Maia's and Stockfish's defence, nothing said.
+  await expect(page.getByTestId('course-author')).toHaveCount(0);
   await page.getByTestId('course-text').locator('summary').click();
   await expect(page.getByTestId('course-text').locator('.course-move')).toHaveText(['Start', '1…Kc5']);
   await expect(page.getByTestId('course-text')).toContainText('(Not 1...Ke5 2.Kd3 Kf5 3.Ke3)');

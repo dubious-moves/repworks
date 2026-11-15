@@ -2586,3 +2586,15 @@ The technical calls, each with its reason:
   choice is measured on each device instead of assumed. Given up: a second runtime of 16.8 MB on
   a device that switches it on (the plain one stays as the fallback), and a second or two at an
   engine's first start each session. D13's "runs in the browser" stands; no data format changed.
+
+## Revision of 2026-11-15 (the endgames' defence: PLAN.md §5.185)
+- **A course drill's opponent plays the course's own replies** (the main line's, or a variation's
+  once the user follows it) until a try against them is solved; then Maia's, varied. Was: Maia's
+  from the first try, the course's line only its text (§5.175). Why: the owner's idea, after Maia
+  played 2…f6 where the author's 2…Kb6 proves the lesson's point. Kept on the device with the
+  reply memory: a new device starts on the author's line again. No data format of the owner's changed.
+- **"Queen a pawn" (and a bare king, a converting lead) counts only what the defence can't take back
+  at once.** Why: the owner's report, 4.a8=Q+ Kxa8 still needing 5.Kc6.
+- **Maia alone's board checks count exchanges, its pushes need 2% of Maia, and Lc0's veto measures
+  against the best move that gives nothing away.** Why: the owner's reports of 2…f6 and 7.b5+ played
+  on every try.

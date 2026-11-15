@@ -146,21 +146,27 @@ test('a win is reached by mate, by a promotion, or by a bare king, as each endga
   const mate = endgameById('queen-mate')!;
   // A pawn promoted: Lucena's goal, not the queen mate's.
   const promoted = pos('1Q2k3/8/8/8/8/8/8/1K6 b - - 0 1');
-  assert.equal(wonAfter(lucena, promoted, true), true);
-  assert.equal(wonAfter(lucena, promoted, false), false);
-  assert.equal(wonAfter(mate, promoted, true), false);
+  assert.equal(wonAfter(lucena, promoted, 'b7b8q'), true);
+  assert.equal(wonAfter(lucena, promoted), false);
+  assert.equal(wonAfter(mate, promoted, 'b7b8q'), false);
+  // A new queen the king takes at once isn't the pawn queened (the owner's report of 2026-11-15:
+  // 4.a8=Q+ Kxa8, and only 5.Kc6 still wins); one it can't reach is.
+  assert.equal(wonAfter(lucena, pos('Q7/1k6/1P1K4/8/8/8/8/8 b - - 0 1'), 'a7a8q'), false);
+  assert.equal(wonAfter(lucena, pos('Q7/8/1P1K4/8/2k5/8/8/8 b - - 0 1'), 'a7a8q'), true);
   // Mate ends any win.
   const m = pos('4k3/1Q6/4K3/8/8/8/8/8 w - - 0 1');
   m.play(parseUci('b7e7')!);
   assert.equal(m.isCheckmate(), true);
-  assert.equal(wonAfter(mate, m, false), true);
+  assert.equal(wonAfter(mate, m), true);
   // The pawn taken: the defender has a bare king.
-  const bare = pos('8/8/8/8/8/8/4k3/K2Q4 b - - 0 1');
-  assert.equal(wonAfter(qp, bare, false), true);
-  assert.equal(wonAfter(qp, pos(qp.fen.replace(' w ', ' b ')), false), false);
+  const bare = pos('8/8/8/8/8/8/4k3/K6Q b - - 0 1');
+  assert.equal(wonAfter(qp, bare), true);
+  // Not while the bare king can take the queen.
+  assert.equal(wonAfter(qp, pos('8/8/8/8/8/8/4k3/K2Q4 b - - 0 1')), false);
+  assert.equal(wonAfter(qp, pos(qp.fen.replace(' w ', ' b '))), false);
   // A draw's goal is held, never won.
   const philidor = endgameById('philidor')!;
-  assert.equal(wonAfter(philidor, m, false), false);
+  assert.equal(wonAfter(philidor, m), false);
   assert.equal(held(philidor, 14), false);
   assert.equal(held(philidor, 15), true);
   assert.equal(held(lucena, 99), false);

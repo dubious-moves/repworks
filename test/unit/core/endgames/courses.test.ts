@@ -5,10 +5,11 @@
 // course export (a [FEN] set-up, one main line, prose in the comments), not a course's content.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { parseSquare } from 'chessops/util';
 import { parseChapterFile } from '../../../../src/core/pgn/parse.ts';
 import { positionOf } from '../../../../src/core/storm/walk.ts';
 import { positionKey, positionKeyOf } from '../../../../src/core/chess/positionKey.ts';
-import { asCourseEndgame, candidatesOf, courseGoal, courseId, courseState, courseText, groupsOf, isCourseId, nameParts, readCourseScore, scoreCandidate, type Candidate, type CourseChapter, type CourseScore } from '../../../../src/core/endgames/courses.ts';
+import { asCourseEndgame, authorReplies, candidatesOf, courseGoal, courseId, courseState, courseText, groupsOf, isCourseId, nameParts, readCourseScore, scoreCandidate, type Candidate, type CourseChapter, type CourseScore } from '../../../../src/core/endgames/courses.ts';
 import { attemptsByEndgame, taskOf, wonAfter } from '../../../../src/core/endgames/endgames.ts';
 import { REP } from '../../../../src/core/endgames/repertoire.ts';
 import { courseFromLog } from '../../../../src/core/endgames/courses.ts';
@@ -17,6 +18,7 @@ import { formatEvent, parseLog, type KnownEvent } from '../../../../src/core/pro
 import { Replay, toDeviceEvents } from '../../../../src/core/progress/replay.ts';
 
 const at = (fen: string) => positionOf(fen)!;
+const sq = (name: string) => parseSquare(name)!;
 const QR = '8/8/8/4k3/8/8/8/R2QK3 w - - 0 1';
 const KP_WIN = '5k2/8/8/8/3KP3/8/8/8 w - - 0 1';
 const KP_DRAW = '4k3/8/8/4K3/4P3/8/8/8 b - - 0 1';
@@ -238,7 +240,7 @@ test('the drills joined with their scores: the ones with a goal, those without, 
     { group: 'Part 3: Endgames for Class D (1000-1199)', n: 2 },
   ]);
   // A mate's win is home at mate, not at a lead.
-  assert.equal(wonAfter(asCourseEndgame(m), at('R2Q1K2/8/8/8/8/8/8/k7 b - - 0 1'), false), false);
+  assert.equal(wonAfter(asCourseEndgame(m), at('R2Q1K2/8/8/8/8/8/8/k7 b - - 0 1')), false);
 });
 
 test('the tries at a drill are the practice events at its start, found by the position', () => {
@@ -302,4 +304,27 @@ test('scores and removals in the progress log (§5.175, synced): written, read b
   const r2 = new Replay();
   r2.add(toDeviceEvents('devA0001', odd.lines));
   assert.equal(courseFromLog(r2.states.keys(), (c) => r2.eventsOf(c)).scores.size, 0);
+});
+
+test('the course author’s replies for the opponent (the owner’s request of 2026-11-15): the main line’s, then a variation’s own, never the user’s side', () => {
+  const c = chapter('Part 3: Endgames for Class D (1000-1199): King and Pawn - 9', KP_WIN, '1. Kd5 Ke8 (1... Kg7 2. Ke6 Kg6) 2. Ke6 Kd8 3. e5');
+  const keyAfter = (...ucis: string[]) => {
+    const p = at(KP_WIN);
+    for (const u of ucis) p.play({ from: sq(u.slice(0, 2)), to: sq(u.slice(2, 4)) });
+    return positionKeyOf(p);
+  };
+  const r = authorReplies(c.chapter, 'black');
+  // After 1.Kd5 the main line's 1…Ke8, not the variation's Kg7; the variation's own reply after its 2.Ke6.
+  assert.deepEqual(r, { [keyAfter('d4d5')]: 'f8e8', [keyAfter('d4d5', 'f8e8', 'd5e6')]: 'e8d8', [keyAfter('d4d5', 'f8g7', 'd5e6')]: 'g7g6' });
+  assert.deepEqual(Object.values(authorReplies(c.chapter, 'white')).sort(), ['d4d5', 'd5e6', 'd5e6', 'e4e5'].sort());
+  // The drill carries them when its chapter is given, for the side against the user.
+  const d = { id: 'c-00000000', cand: { title: 'King and Pawn - 9' }, fen: KP_WIN, side: 'white', goal: 'win', until: 'promote' } as unknown as Parameters<typeof asCourseEndgame>[0];
+  assert.deepEqual(asCourseEndgame(d, c.chapter).author, r);
+  assert.equal(asCourseEndgame(d).author, undefined);
+  // A flipped drill starts after the course's first move: that move is not one of the opponent's replies.
+  const w = chapter('Part 3: Endgames for Class D (1000-1199): Why it Loses - 9', KP_WORSE, '1... Kf5 2. Kd4 Kf4 3. Kd5');
+  const after = at(KP_WORSE);
+  after.play({ from: sq('e5'), to: sq('f5') });
+  assert.deepEqual(Object.values(authorReplies(w.chapter, 'black', positionKeyOf(after))), ['f5f4']);
+  assert.deepEqual(Object.values(authorReplies(w.chapter, 'black')).sort(), ['e5f5', 'f5f4']);
 });

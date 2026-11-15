@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { Chess } from 'chessops/chess';
 import { parseFen } from 'chessops/fen';
 import { parseUci } from 'chessops/util';
-import { beginTry, hangs, lc0Vetoed, KEEP_ENDGAMES, KEEP_POSITIONS, noteEnd, noteReply, readMemories, replyHints, replyOrder, trustPick, VARY_MIN, type Memories } from '../../../../src/core/endgames/variety.ts';
+import { authorFirst, beginTry, captureGain, hangs, lc0Vetoed, PUSH_MIN, KEEP_ENDGAMES, KEEP_POSITIONS, noteEnd, noteReply, readMemories, replyHints, replyOrder, trustPick, VARY_MIN, type Memories } from '../../../../src/core/endgames/variety.ts';
 
 const pos = (fen: string) => Chess.fromSetup(parseFen(fen).unwrap()).unwrap();
 const after = (fen: string, uci: string) => {
@@ -190,4 +190,79 @@ test('Lc0’s veto: the moves rated clearly below the best, nothing when they ar
   assert.equal(lc0Vetoed({ a: 0.5, b: 0.45, c: 0.41 }).size, 0);
   assert.equal(lc0Vetoed({ a: 0.02, b: 0.01 }).size, 0);
   assert.deepEqual([...lc0Vetoed({ a: 0.5, b: 0.39 }, 0.2)], []);
+});
+
+test('hanging counts the exchange that follows, and what the move itself won (the owner’s report of 2026-11-15)', () => {
+  // Test 2: 7.b5+ is defended by a4 but taken twice (a6, Kc6): it loses a pawn.
+  const t2 = '8/5p2/ppk1p1p1/4P2p/PP1K1PP1/8/7P/8 w - - 0 7';
+  assert.equal(hangs(after(t2, 'b4b5')), true);
+  assert.equal(captureGain(after(t2, 'b4b5')), 1);
+  // 7.gxh5 gxh5 is an exchange: the pawn the move took is counted, nothing is lost.
+  assert.equal(hangs(after(t2, 'g4h5'), 1), false);
+  assert.equal(hangs(after(t2, 'g4h5')), true);
+  // 7.h3 leaves nothing to take.
+  assert.equal(hangs(after(t2, 'h2h3')), false);
+  // The rook ending: 2…f6 drops the pawn to gxf6.
+  assert.equal(hangs(after('8/5p1p/p1k3p1/6P1/1PK5/P7/8/8 b - - 0 2', 'f7f6')), true);
+  assert.equal(hangs(after('8/5p1p/p1k3p1/6P1/1PK5/P7/8/8 b - - 0 2', 'c6d6')), false);
+});
+
+test('Lc0’s veto measured against the best move that gives nothing away (the owner’s report of 2026-11-15)', () => {
+  // 2…f6 drops a pawn yet one run rates it best: Kd6 and Kb6 were vetoed against it, f6 played every try.
+  const values = { c6d6: 0.309, f7f6: 0.423, c6b6: 0.106 };
+  assert.deepEqual([...lc0Vetoed(values)].sort(), ['c6b6', 'c6d6']);
+  const firm = (u: string) => u !== 'f7f6';
+  assert.deepEqual([...lc0Vetoed(values, undefined, firm)], ['c6b6']);
+  // Nothing firm: measured against all of them, as before.
+  assert.deepEqual([...lc0Vetoed(values, undefined, () => false)].sort(), ['c6b6', 'c6d6']);
+});
+
+test('a draw’s attacker’s push is one Maia gives some chance, not a long shot (the owner’s report of 2026-11-15)', () => {
+  const t2 = '8/5p2/ppk1p1p1/4P2p/PP1K1PP1/8/7P/8 w - - 0 7';
+  const check = {
+    ends: () => undefined,
+    repeats: () => false,
+    hangs: (u: string) => {
+      const p = after(t2, u);
+      return hangs(p, u === 'g4h5' ? 1 : 0);
+    },
+  };
+  const maia = [
+    { uci: 'g4h5', prob: 0.633 },
+    { uci: 'h2h3', prob: 0.29 },
+    { uci: 'g4g5', prob: 0.061 },
+    { uci: 'b4b5', prob: 0.006 },
+  ];
+  // b5+ at 0.6%, even were it firm, isn't pushed; nor when it is the only push Lc0 left.
+  assert.ok(0.006 < PUSH_MIN);
+  assert.deepEqual(trustPick('draw', ['g4h5'], maia, ['b4b5'], { ...check, hangs: () => false }), { uci: 'g4h5' });
+  assert.deepEqual(trustPick('draw', ['g4h5'], maia, ['b4b5'], check), { uci: 'g4h5' });
+  // A likely push is still made first.
+  assert.deepEqual(trustPick('draw', ['g4h5'], maia, ['h2h3', 'b4b5'], check), { uci: 'h2h3', push: true });
+});
+
+test('a course drill’s defence is the author’s until a try that met it is solved', () => {
+  let m: Memories = beginTry({}, 'c-1');
+  assert.equal(authorFirst(m, 'c-1'), true);
+  m = noteReply(m, 'c-1', 'k1', 'c6b6', true);
+  m = noteEnd(m, 'c-1', 'missed');
+  // Missed: still the author's, and the stored memory keeps the mark.
+  m = beginTry(m, 'c-1');
+  assert.equal(authorFirst(m, 'c-1'), true);
+  assert.equal(readMemories(JSON.stringify(m))['c-1']!.last!.author, true);
+  // A solved try that met none of the author's replies (the line ran out) doesn't end it.
+  m = noteReply(m, 'c-1', 'k9', 'e8d8');
+  m = noteEnd(m, 'c-1', 'solved');
+  assert.equal(authorFirst(m, 'c-1'), true);
+  m = beginTry(m, 'c-1');
+  m = noteReply(m, 'c-1', 'k1', 'c6b6', true);
+  m = noteEnd(m, 'c-1', 'solved');
+  assert.equal(authorFirst(m, 'c-1'), false);
+  // Kept across tries and in storage; a solve after a miss in the same try doesn't count.
+  m = beginTry(m, 'c-1');
+  assert.equal(authorFirst(readMemories(JSON.stringify(m)), 'c-1'), false);
+  let n: Memories = beginTry({}, 'c-2');
+  n = noteReply(n, 'c-2', 'k1', 'c6b6', true);
+  n = noteEnd(noteEnd(n, 'c-2', 'missed'), 'c-2', 'solved');
+  assert.equal(authorFirst(n, 'c-2'), true);
 });
