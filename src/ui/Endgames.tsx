@@ -6,9 +6,10 @@
 // user's own repertoire (§5.149): gathered from real games through the line ends, by category,
 // played the same way; and those of the user's courses (§5.175): the chapters of a reference study
 // that start from a position, scored on the device, by the course's own groups, with the course's
-// text for the chapter kept under the board.
+// text for the chapter kept under the board. "Focus on mistakes" (§5.180) holds the page and its
+// Next to the endgames missed in one of their last five tries, due or not.
 import { useEffect, useMemo, useState } from 'preact/hooks';
-import { attemptsAt, checkEndgameMaia, endgameMaiaHere, endgameStandings, startEndgame } from '../app/endgames.ts';
+import { attemptsAt, checkEndgameMaia, endgameMaiaHere, endgameStandings, mistakesOnly, setMistakesOnly, startEndgame } from '../app/endgames.ts';
 import { endgameMaiaAlone, setEndgameMaiaAlone } from '../app/endgameVariety.ts';
 import { courseById, courseCandidates, courseJustRemoved, courseNow, courseOnly, courseOnlyAsked, setCourseOnly, courseScores, courseScoring, courseStandings, loadCourse, removeCourseDrill, restoreCourseDrill, restoreCourseDrills, scoreCourse, stopCourseScoring } from '../app/courseEndgames.ts';
 import { readSearchChapters, searchChapters } from '../app/search.ts';
@@ -18,7 +19,7 @@ import { maiaDialog } from '../app/maia.ts';
 import { analyseFrom, entryKey, open } from '../app/mode.ts';
 import { canTakeBack, leavePractice, parkPractice, playOnAfterSlip, practice, practiceHint, practiceMove, regradeEndgame, showSlipMove, stopPractice, takeBack, takeUpPractice, type PracticeGame } from '../app/practice.ts';
 import { decidingNow } from '../app/time.ts';
-import { bareTarget, CONVERT_LEAD, endgameById, ENDGAMES, GRADE_WORD, GROUPS, MAIA_ELO, nextAfter, nextEndgame, sideOf, solvedBy, taskOf, type Endgame, type Standing } from '../core/endgames/endgames.ts';
+import { bareTarget, CONVERT_LEAD, endgameById, ENDGAMES, GRADE_WORD, GROUPS, isMistake, MAIA_ELO, mistakeOrder, nextAfter, nextEndgame, nextMistake, sideOf, solvedBy, taskOf, type Endgame, type Standing } from '../core/endgames/endgames.ts';
 import { asCourseEndgame, courseText, groupsOf, isCourseId, type CourseDrill } from '../core/endgames/courses.ts';
 import { asEndgame, CATEGORIES, categoryById, isRepertoireId, REP, type Category, type RepertoireEndgame } from '../core/endgames/repertoire.ts';
 import { lineTail } from '../core/storm/sources.ts';
@@ -91,7 +92,10 @@ function CourseDrillScreen(props: { id: string }) {
 function EndgameList() {
   const now = decidingNow();
   const standings = endgameStandings(now);
-  const next = nextEndgame(standings);
+  // Focus on mistakes (§5.180): the endgames missed in one of their last five tries alone, due or not.
+  const focus = mistakesOnly.value;
+  const mistakes = mistakeOrder(standings, ENDGAMES);
+  const next = focus ? mistakes[0] : nextEndgame(standings);
   const due = ENDGAMES.filter((e) => standings.get(e.id)?.state === 'due').length;
   const fresh = ENDGAMES.filter((e) => standings.get(e.id)?.state === 'new').length;
   const soonest = Math.min(...ENDGAMES.map((e) => standings.get(e.id)?.next ?? Infinity));
@@ -117,14 +121,26 @@ function EndgameList() {
         ) : (
           <p>
             The endgames every player needs, each played against a defence that sets the traps a strong player sets. A move that throws the goal away stops the game: take it
-            back and find a better one. A try counts once, whatever happens after a take-back or a hint; a solved endgame comes back after 1, 3, 7, 14, 30 and 60 days. After a
+            back and find a better one. A try counts once, whatever happens after a take-back or a hint; a solved endgame comes back after a few days, then at growing gaps. After a
             miss the defence plays as it did, so you can put it right; otherwise it tries the likely replies you have met least.
           </p>
         )}
         <OpponentNote />
+        <label class="check endgame-mistakes" title="Five solves running take an endgame off this list; its tries count and space it as always">
+          <input type="checkbox" checked={focus} onChange={(ev) => setMistakesOnly(ev.currentTarget.checked)} data-testid="endgame-mistakes" /> Focus on mistakes: only the endgames
+          you missed in one of their last five tries, due or not, the ones missed last time first
+        </label>
         {!only && (
           <div class="actions">
-            {next ? (
+            {focus ? (
+              next ? (
+                <a class="button primary" href={`#/endgames/${next.id}`} data-testid="endgame-next">
+                  Next mistake: {next.title}
+                </a>
+              ) : (
+                <span class="muted" data-testid="endgame-no-mistakes">No mistakes among these: none missed in its last five tries.</span>
+              )
+            ) : next ? (
               <a class="button primary" href={`#/endgames/${next.id}`} data-testid="endgame-next">
                 {standings.get(next.id)?.state === 'due' ? 'Next due' : 'Next new'}: {next.title}
               </a>
@@ -132,7 +148,7 @@ function EndgameList() {
               <span class="muted">All solved for now{Number.isFinite(soonest) ? `: the next comes back ${inDays(soonest, now)}` : ''}.</span>
             )}
             <span class="muted" data-testid="endgame-counts">
-              {due} due · {fresh} new
+              {focus ? `${mistakes.length} to review` : `${due} due · ${fresh} new`}
             </span>
           </div>
         )}
@@ -140,16 +156,20 @@ function EndgameList() {
       {!only && <RepertoireEndgames now={now} />}
       <CourseEndgames now={now} />
       {!only &&
-        GROUPS.map((g) => (
-          <section key={g.id} class="card endgame-group" aria-labelledby={`endgame-group-${g.id}`}>
-            <h2 id={`endgame-group-${g.id}`}>{g.title}</h2>
-            <ul class="endgame-list">
-              {ENDGAMES.filter((e) => e.group === g.id).map((e) => (
-                <EndgameItem key={e.id} endgame={e} standing={standings.get(e.id)!} now={now} />
-              ))}
-            </ul>
-          </section>
-        ))}
+        GROUPS.map((g) => {
+          const items = ENDGAMES.filter((e) => e.group === g.id && (!focus || isMistake(standings.get(e.id))));
+          if (!items.length) return null;
+          return (
+            <section key={g.id} class="card endgame-group" aria-labelledby={`endgame-group-${g.id}`}>
+              <h2 id={`endgame-group-${g.id}`}>{g.title}</h2>
+              <ul class="endgame-list">
+                {items.map((e) => (
+                  <EndgameItem key={e.id} endgame={e} standing={standings.get(e.id)!} now={now} />
+                ))}
+              </ul>
+            </section>
+          );
+        })}
     </div>
   );
 }
@@ -234,10 +254,12 @@ function RepertoireEndgames(props: { now: number }) {
   if (!list) return null;
   const standings = repStandings(props.now);
   const stateOf = (r: RepertoireEndgame) => standings.get(r.id)?.state ?? 'new';
-  const shown = cat === 'all' ? list : list.filter((r) => r.category === cat);
-  // What to play first at the top: due, then new, then the rest, each in the list's order.
-  const ordered = [...shown].sort((a, b) => STATE_RANK[stateOf(a)] - STATE_RANK[stateOf(b)]);
-  const next = nextEndgame(standings, undefined, shown);
+  const focus = mistakesOnly.value;
+  const kept = focus ? list.filter((r) => isMistake(standings.get(r.id))) : list;
+  const shown = cat === 'all' ? kept : kept.filter((r) => r.category === cat);
+  // What to play first at the top: due, then new, then the rest, each in the list's order; the mistakes alone in theirs.
+  const ordered = focus ? mistakeOrder(standings, shown) : [...shown].sort((a, b) => STATE_RANK[stateOf(a)] - STATE_RANK[stateOf(b)]);
+  const next = focus ? ordered[0] : nextEndgame(standings, undefined, shown);
   const due = shown.filter((r) => stateOf(r) === 'due').length;
   const fresh = shown.filter((r) => stateOf(r) === 'new').length;
   const choose = (c: Category | 'all') => {
@@ -269,12 +291,12 @@ function RepertoireEndgames(props: { now: number }) {
         )}
         {next && (
           <a class="button primary" href={`#/endgames/${next.id}`} data-testid="rep-endgame-next">
-            {stateOf(next) === 'due' ? 'Next due' : 'Next new'}: {next.title}
+            {focus ? 'Next mistake' : stateOf(next) === 'due' ? 'Next due' : 'Next new'}: {next.title}
           </a>
         )}
         {list.length > 0 && (
           <span class="muted" data-testid="rep-endgame-counts">
-            {shown.length} kept · {due} due · {fresh} new
+            {focus ? `${shown.length} to review of ${list.length} kept` : `${shown.length} kept · ${due} due · ${fresh} new`}
           </span>
         )}
       </div>
@@ -286,10 +308,10 @@ function RepertoireEndgames(props: { now: number }) {
       {list.length > 0 && (
         <div class="chips endgame-cats" role="group" aria-label="Category">
           <button type="button" class={`chip-toggle${cat === 'all' ? ' on' : ''}`} aria-pressed={cat === 'all'} onClick={() => choose('all')}>
-            All <span class="storm-focus-n">{list.length}</span>
+            All <span class="storm-focus-n">{kept.length}</span>
           </button>
           {CATEGORIES.map((c) => {
-            const n = list.filter((r) => r.category === c.id).length;
+            const n = kept.filter((r) => r.category === c.id).length;
             return (
               <button type="button" key={c.id} class={`chip-toggle${cat === c.id ? ' on' : ''}`} aria-pressed={cat === c.id} disabled={!n && cat !== c.id} onClick={() => choose(c.id)}>
                 {c.title} <span class="storm-focus-n">{n}</span>
@@ -373,7 +395,9 @@ function RepNextButton(props: { after: string; primary: boolean }) {
   const list = repEndgames.value ?? [];
   const r = list.find((x) => x.id === props.after);
   const among = r ? list.filter((x) => x.category === r.category) : list;
-  const next = nextEndgame(repStandings(decidingNow()), props.after, among) ?? nextEndgame(repStandings(decidingNow()), props.after, list);
+  const focus = mistakesOnly.value;
+  const standings = repStandings(decidingNow());
+  const next = focus ? nextMistake(standings, props.after, list) : (nextEndgame(standings, props.after, among) ?? nextEndgame(standings, props.after, list));
   if (!next)
     return (
       <a class="button secondary" href="#/endgames">
@@ -381,8 +405,8 @@ function RepNextButton(props: { after: string; primary: boolean }) {
       </a>
     );
   return (
-    <button type="button" class={props.primary ? 'primary' : 'secondary'} onClick={() => (leavePractice(), open({ name: 'endgames', id: next.id }))}>
-      Next: {next.title}
+    <button type="button" class={props.primary ? 'primary' : 'secondary'} data-testid="endgame-next-drill" onClick={() => (leavePractice(), open({ name: 'endgames', id: next.id }))}>
+      {focus ? 'Next mistake' : 'Next'}: {next.title}
     </button>
   );
 }
@@ -415,9 +439,11 @@ function CourseEndgames(props: { now: number }) {
   const group = groups.some((g) => g.group === chosen) ? chosen : '';
   const standings = courseStandings(props.now);
   const stateOf = (d: CourseDrill) => standings.get(d.id)?.state ?? 'new';
-  const shown = group ? state.drills.filter((d) => d.cand.group === group) : state.drills;
-  const ordered = [...shown].sort((a, b) => STATE_RANK[stateOf(a)] - STATE_RANK[stateOf(b)]);
-  const next = nextEndgame(standings, undefined, shown);
+  const focus = mistakesOnly.value;
+  const drills = focus ? state.drills.filter((d) => isMistake(standings.get(d.id))) : state.drills;
+  const shown = group ? drills.filter((d) => d.cand.group === group) : drills;
+  const ordered = focus ? mistakeOrder(standings, shown) : [...shown].sort((a, b) => STATE_RANK[stateOf(a)] - STATE_RANK[stateOf(b)]);
+  const next = focus ? ordered[0] : nextEndgame(standings, undefined, shown);
   const due = shown.filter((d) => stateOf(d) === 'due').length;
   const fresh = shown.filter((d) => stateOf(d) === 'new').length;
   const choose = (g: string) => {
@@ -456,11 +482,11 @@ function CourseEndgames(props: { now: number }) {
         )}
         {next && (
           <a class="button primary" href={`#/endgames/${next.id}`} data-testid="course-next">
-            {stateOf(next) === 'due' ? 'Next due' : 'Next new'}: {next.cand.title}
+            {focus ? 'Next mistake' : stateOf(next) === 'due' ? 'Next due' : 'Next new'}: {next.cand.title}
           </a>
         )}
         <span class="muted" data-testid="course-counts">
-          {shown.length} drill{shown.length === 1 ? '' : 's'} · {due} due · {fresh} new
+          {focus ? `${shown.length} to review` : `${shown.length} drill${shown.length === 1 ? '' : 's'} · ${due} due · ${fresh} new`}
           {left.length > 0 && ` · ${left.length} with no goal`}
           {state.todo.length > 0 && ` · ${state.todo.length} to score`}
         </span>
@@ -478,9 +504,9 @@ function CourseEndgames(props: { now: number }) {
       )}
       {groups.length > 0 && (
         <div class="course-groups" role="group" aria-label="Course group">
-          <GroupRow name="All" drills={state.drills} stateOf={stateOf} on={group === ''} onChoose={() => choose('')} />
+          <GroupRow name="All" drills={drills} stateOf={stateOf} on={group === ''} onChoose={() => choose('')} />
           {groups.map((g) => (
-            <GroupRow key={g.group} name={g.group} drills={state.drills.filter((d) => d.cand.group === g.group)} stateOf={stateOf} on={group === g.group} onChoose={() => choose(g.group)} />
+            <GroupRow key={g.group} name={g.group} drills={drills.filter((d) => d.cand.group === g.group)} stateOf={stateOf} on={group === g.group} onChoose={() => choose(g.group)} />
           ))}
         </div>
       )}
@@ -615,6 +641,7 @@ function nextCourseDrill(after: string): CourseDrill | undefined {
   const d = list.find((x) => x.id === after);
   const among = d ? list.filter((x) => x.cand.group === d.cand.group) : list;
   const standings = courseStandings(decidingNow());
+  if (mistakesOnly.value) return nextMistake(standings, after, list);
   return nextEndgame(standings, after, among) ?? nextEndgame(standings, after, list);
 }
 
@@ -627,8 +654,8 @@ function CourseNextButton(props: { after: string; primary: boolean }) {
       </a>
     );
   return (
-    <button type="button" class={props.primary ? 'primary' : 'secondary'} onClick={() => (leavePractice(), open({ name: 'endgames', id: next.id }))}>
-      Next: {next.cand.title}
+    <button type="button" class={props.primary ? 'primary' : 'secondary'} data-testid="endgame-next-drill" onClick={() => (leavePractice(), open({ name: 'endgames', id: next.id }))}>
+      {mistakesOnly.value ? 'Next mistake' : 'Next'}: {next.cand.title}
     </button>
   );
 }
@@ -845,7 +872,9 @@ function EndgameGame(props: { game: PracticeGame; endgame: Endgame; rep?: Repert
 }
 
 function NextButton(props: { after: string; primary: boolean }) {
-  const next = nextEndgame(endgameStandings(decidingNow()), props.after);
+  const focus = mistakesOnly.value;
+  const standings = endgameStandings(decidingNow());
+  const next = focus ? nextMistake(standings, props.after, ENDGAMES) : nextEndgame(standings, props.after);
   if (!next)
     return (
       <a class="button secondary" href="#/endgames">
@@ -853,8 +882,8 @@ function NextButton(props: { after: string; primary: boolean }) {
       </a>
     );
   return (
-    <button type="button" class={props.primary ? 'primary' : 'secondary'} onClick={() => (leavePractice(), open({ name: 'endgames', id: next.id }))}>
-      Next: {next.title}
+    <button type="button" class={props.primary ? 'primary' : 'secondary'} data-testid="endgame-next-drill" onClick={() => (leavePractice(), open({ name: 'endgames', id: next.id }))}>
+      {focus ? 'Next mistake' : 'Next'}: {next.title}
     </button>
   );
 }

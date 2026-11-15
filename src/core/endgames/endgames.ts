@@ -554,6 +554,8 @@ export interface Standing {
   last: boolean[];
   /** The last try's grade, when it was solved. */
   grade?: SolveGrade;
+  /** When it was last tried. */
+  at?: number;
 }
 
 /** Where an endgame stands from its attempts (any order) at `now`. */
@@ -562,8 +564,8 @@ export function standingOf(goal: Goal, attempts: readonly Attempt[], now: number
   const marks = sorted.map((a) => solvedBy(goal, a.res));
   let streak = 0;
   for (let i = marks.length - 1; i >= 0 && marks[i]; i--) streak++;
-  const base = { tries: marks.length, solves: marks.filter(Boolean).length, streak, last: marks.slice(-5) };
-  if (!sorted.length) return { state: 'new', ...base };
+  if (!sorted.length) return { state: 'new', tries: 0, solves: 0, streak: 0, last: [] };
+  const base = { tries: marks.length, solves: marks.filter(Boolean).length, streak, last: marks.slice(-5), at: sorted[sorted.length - 1]!.t };
   // A missed endgame is due at once (FSRS's Again would wait a day): practised until solved.
   if (!streak) return { state: 'due', ...base };
   const card = fsrsOf(goal, sorted, params);
@@ -610,3 +612,26 @@ export function nextEndgame<E extends { id: string } = Endgame>(standings: Reado
   const pick = (state: Standing['state']) => order.find((e) => e.id !== after && (standings.get(e.id)?.state ?? 'new') === state);
   return pick('due') ?? pick('new');
 }
+
+/* ------------------------------------------------------------------ the mistakes alone (§5.180) */
+
+/** An endgame the user got wrong: missed in one of its last five tries (the ✓ and ✗ of its row). Five solves running clear it. */
+export const isMistake = (s: Standing | undefined): boolean => !!s && s.last.includes(false);
+
+/**
+ * The mistakes of `list` in the order to play them, due or not: those missed last time first, then
+ * the rest; in each, the one tried longest ago first (the list's order between equals). One just
+ * played goes to the back of its part, so "Next" walks round them all, and one missed again comes
+ * back as soon as another has been played.
+ */
+export function mistakeOrder<E extends { id: string }>(standings: ReadonlyMap<string, Standing>, list: readonly E[]): E[] {
+  return list
+    .filter((e) => isMistake(standings.get(e.id)))
+    .map((e, i) => ({ e, i, s: standings.get(e.id)! }))
+    .sort((a, b) => Number(a.s.streak > 0) - Number(b.s.streak > 0) || (a.s.at ?? 0) - (b.s.at ?? 0) || a.i - b.i)
+    .map((x) => x.e);
+}
+
+/** The next mistake of `list` to play, not `after` (the one just played). */
+export const nextMistake = <E extends { id: string }>(standings: ReadonlyMap<string, Standing>, after: string | undefined, list: readonly E[]): E | undefined =>
+  mistakeOrder(standings, list).find((e) => e.id !== after);

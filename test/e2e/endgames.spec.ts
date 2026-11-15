@@ -909,6 +909,69 @@ test('course only: the built-in endgames and the repertoire’s are put aside on
   await expect(homeLink).toHaveText('Endgames · 2 due');
 });
 
+test('focus on mistakes: only the endgames missed in their last five tries, due or not, those missed last first; Next walks them; kept on this device', async ({ page }) => {
+  test.setTimeout(90_000);
+  await setUp(page);
+  await page.getByRole('navigation', { name: 'Pages' }).getByRole('link', { name: /^Endgames/ }).click();
+  const focus = page.getByTestId('endgame-mistakes');
+  const game = page.getByTestId('endgame-game');
+  // Nothing missed yet: nothing to review.
+  await focus.check();
+  await expect(page.getByTestId('endgame-counts')).toHaveText('0 to review');
+  await expect(page.getByTestId('endgame-no-mistakes')).toBeVisible();
+  await expect(page.locator('.endgame-item')).toHaveCount(0);
+  await focus.uncheck();
+  await expect(page.locator('.endgame-item')).toHaveCount(23);
+  // Two missed (a hint each): the breakthrough first, then the opposition.
+  for (const title of ['The breakthrough', 'Take the opposition']) {
+    await page.getByRole('link', { name: title, exact: true }).click();
+    await expect(game).toHaveAttribute('data-phase', 'user');
+    await game.getByRole('button', { name: 'Hint' }).click();
+    await expect(game).toContainText('This try counts as missed');
+    await game.getByRole('button', { name: 'Restart' }).click();
+    await expect(game).toHaveAttribute('data-moves', '0');
+    await page.locator('.chapter-head .back').click();
+  }
+  await expect(page.getByTestId('endgame-counts')).toHaveText('2 due · 21 new');
+  await focus.check();
+  await expect(page.getByTestId('endgame-counts')).toHaveText('2 to review');
+  await expect(page.locator('.endgame-item')).toHaveCount(2);
+  await expect(page.locator('.endgame-group h2')).toHaveText(['From your repertoire', 'King and pawns']);
+  await expect(page.getByTestId('endgame-next')).toHaveText('Next mistake: The breakthrough');
+  // Kept over a reload.
+  await page.reload();
+  await expect(focus).toBeChecked();
+  await expect(page.locator('.endgame-item')).toHaveCount(2);
+  // The breakthrough solved: still among the mistakes, and Next is the other one, not the next new endgame.
+  await page.getByTestId('endgame-next').click();
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  for (let i = 0; i < BREAKTHROUGH.length; i += 2) {
+    const uci = BREAKTHROUGH[i]![1];
+    await clickSquare(page, sq(uci, 0), 'white');
+    await clickSquare(page, sq(uci, 2), 'white');
+    if (uci.length === 5) {
+      await page.getByRole('dialog', { name: 'Promote to' }).getByRole('button', { name: 'queen', exact: true }).click();
+      break;
+    }
+    await expect(game).toHaveAttribute('data-moves', String(i + 2));
+    await expect(game).toHaveAttribute('data-phase', 'user');
+  }
+  await expect(game).toHaveAttribute('data-phase', 'over', { timeout: ENGINE_MS * 8 });
+  await expect(page.getByTestId('endgame-counted')).toHaveText(/^Solved first time/);
+  await expect(page.getByTestId('endgame-next-drill')).toHaveText('Next mistake: Take the opposition');
+  await page.getByTestId('endgame-next-drill').click();
+  await expect(page).toHaveURL(/#\/endgames\/opposition$/);
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  await page.evaluate(() => (location.hash = '#/endgames'));
+  await expect(page.getByTestId('endgame-counts')).toHaveText('2 to review');
+  await expect(page.locator('[data-endgame="breakthrough"] [data-testid="endgame-standing"]')).toHaveText(/^Solved once · back .* ✗✓$/);
+  await expect(page.getByTestId('endgame-next')).toHaveText('Next mistake: Take the opposition');
+  // Off: everything back, by what is due.
+  await focus.uncheck();
+  await expect(page.locator('.endgame-item')).toHaveCount(23);
+  await expect(page.getByTestId('endgame-counts')).toHaveText('1 due · 21 new');
+});
+
 test('the courses’ scores, removals and tries follow the user to a second device, which scores nothing', async ({ page, browser }) => {
   test.setTimeout(120_000);
   const w = courseWorld();

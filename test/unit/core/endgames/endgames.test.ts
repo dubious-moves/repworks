@@ -34,6 +34,9 @@ import {
   slips,
   solvedBy,
   standingOf,
+  isMistake,
+  mistakeOrder,
+  nextMistake,
   taskOf,
   wonAfter,
   type Standing,
@@ -265,6 +268,37 @@ test('the next endgame: the first due in order, else the first new; after one, t
   n.set('lucena', st('due'));
   assert.equal(nextEndgame(n, 'opposition')?.id, 'lucena');
   assert.equal(nextEndgame(n, 'lucena')?.id, 'queen-mate');
+});
+
+test('the mistakes alone: missed in one of the last five tries; those missed last first, then the longest ago; five solves running clear one', () => {
+  const DAY = 86_400_000;
+  const tries = (...marks: [number, boolean][]) => standingOf('win', marks.map(([t, ok]) => ({ t, res: ok ? ('win' as const) : ('draw' as const) })), 100 * DAY);
+  assert.equal(isMistake(undefined), false);
+  assert.equal(isMistake(tries()), false);
+  assert.equal(isMistake(tries([1, true])), false);
+  assert.equal(isMistake(tries([1, false])), true);
+  // Solved since, and not due: still one of the mistakes, until five solves running.
+  const solvedSince = standingOf('win', [{ t: 1, res: 'draw' }, { t: 2, res: 'win' }], 3);
+  assert.equal(solvedSince.state, 'later');
+  assert.equal(solvedSince.at, 2);
+  assert.equal(isMistake(solvedSince), true);
+  assert.equal(isMistake(tries([1, false], [2, true], [3, true], [4, true], [5, true])), true);
+  assert.equal(isMistake(tries([1, false], [2, true], [3, true], [4, true], [5, true], [6, true])), false);
+  const list = ['a', 'b', 'c', 'd', 'e'].map((id) => ({ id }));
+  const m = new Map<string, Standing>([
+    ['a', tries([1, false], [9, true])], // solved since, tried last
+    ['b', tries([5, true])], // never missed
+    ['c', tries([2, true], [7, false])], // missed last
+    ['d', tries([3, false])], // missed last, longer ago
+    // e: never tried
+  ]);
+  assert.deepEqual(mistakeOrder(m, list).map((e) => e.id), ['d', 'c', 'a']);
+  assert.equal(nextMistake(m, undefined, list)?.id, 'd');
+  assert.equal(nextMistake(m, 'd', list)?.id, 'c');
+  // d solved now: c (missed last) before a, and d at the back; with one mistake alone, nothing after it.
+  m.set('d', tries([3, false], [10, true]));
+  assert.deepEqual(mistakeOrder(m, list).map((e) => e.id), ['c', 'a', 'd']);
+  assert.equal(nextMistake(new Map([['d', m.get('d')!]]), 'd', list), undefined);
 });
 
 test('material for a side, and the attacker pressing rather than handing a drawn position over', () => {

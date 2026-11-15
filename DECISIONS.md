@@ -2541,3 +2541,12 @@ The technical calls, each with its reason:
   full local run is most of a small session: §5.179's was built and tested in 3.5 minutes, then
   waited 9.5 for a run that found nothing and that CI repeats in five. Given up: `main` can be red
   for the minutes a fix takes, and a session starting then builds on it.
+
+## Revision of 2026-11-15 (endgames, focus on mistakes: PLAN.md §5.180)
+- **"Focus on mistakes" on the Endgames page**: a switch that holds the page and its Next to the
+  endgames missed in one of their last five tries, due or not, those missed last time first, then
+  the one tried longest ago. Why: the owner's request of 2026-11-15 ("only reviews positions that
+  the user has gotten wrong"). The five-try window is Claude's call: it is what each row's ✓ and ✗
+  show, and five solves running clear an endgame, where "ever missed" would only grow. Kept on the
+  device; the tries count and are spaced as always; what is due on the home is unchanged. No data
+  format changed.

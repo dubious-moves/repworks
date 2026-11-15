@@ -1045,6 +1045,17 @@ later change replaced are folded into the later item; items already reported wor
 
 ## 8. Endgames
 
+### Focus on mistakes (§5.180, 2026-11-15)
+- Endgames → tick "Focus on mistakes" in the top card: only the endgames with a ✗ among their last
+  five tries are listed, in the built-in groups, "From your repertoire" and "From your courses"
+  (with the real course: do the group rows and their counts read right?). Does the checkbox's long
+  line read well on the phone?
+- "Next mistake: …", play it, then "Next mistake" at the end: it should walk round the mistakes, the
+  ones missed last time first, whether or not they are due.
+- Is "missed in one of the last five tries" the right rule (five solves running take one off), or
+  should it be every endgame ever missed, or only those missed last time?
+- The home's "Endgames · n due" doesn't change with it: is that right?
+
 ### Course only, and the course's groups as rows (§5.179, 2026-11-15)
 - Endgames → "From your courses": the groups are rows now (name, size, a bar of solved, due and
   new, the counts). With Silman's nine long group names, do they read well on the phone and the

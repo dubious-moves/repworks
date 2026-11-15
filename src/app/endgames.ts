@@ -25,6 +25,29 @@ export function endgameStandings(now: number): Map<string, Standing> {
   return new Map(ENDGAMES.map((e) => [e.id, standingOf(e.goal, attempts.get(e.id) ?? [], now)]));
 }
 
+/**
+ * Focus on mistakes (§5.180): the page and its Next hold to the endgames missed in one of their
+ * last five tries, due or not. Kept on the device, as "Course only" is.
+ */
+const MISTAKES_KEY = 'repworks-endgames-mistakes';
+function readMistakes(): boolean {
+  try {
+    return localStorage.getItem(MISTAKES_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+export const mistakesOnly = signal(readMistakes());
+export function setMistakesOnly(on: boolean): void {
+  mistakesOnly.value = on;
+  try {
+    if (on) localStorage.setItem(MISTAKES_KEY, '1');
+    else localStorage.removeItem(MISTAKES_KEY);
+  } catch {
+    // Not kept: the choice is a convenience.
+  }
+}
+
 /** Whether Maia's files are on this device, so Maia defends (§5.147); undefined until known. */
 export const endgameMaiaHere = signal<boolean | undefined>(undefined);
 
