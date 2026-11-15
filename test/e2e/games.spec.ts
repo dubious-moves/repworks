@@ -449,6 +449,16 @@ test('the games’ own explorer: moves and results by position, the list filtere
   await expect(rows.locator('tbody tr')).toHaveCount(2);
   await ex.getByRole('button', { name: 'Back' }).click();
   await expect(page.getByTestId('games-count')).toHaveText('3 of 4 reaching the explorer’s position');
+  // The one game through 1... d6 carries no opening name: the bundled list's (§5.181).
+  await rows.getByRole('button', { name: 'd6' }).click();
+  await expect(page.getByTestId('games-count')).toHaveText('1 of 4 reaching the explorer’s position');
+  await expect(ex.getByTestId('explorer-name')).toHaveText('Pirc Defense');
+  // That game's own head names it by its moves.
+  await page.getByTestId('game-row').click();
+  await expect(page.getByTestId('game-opening')).toHaveText('Pirc Defense: Kholmov System');
+  await page.locator('.back').click();
+  await ex.getByRole('button', { name: 'Back' }).click();
+  await expect(page.getByTestId('games-count')).toHaveText('3 of 4 reaching the explorer’s position');
   await rows.getByRole('button', { name: 'e5' }).click();
   await ex.getByRole('button', { name: 'Practise from here' }).click();
   await expect(page.locator('.practice-game .train-counters')).toContainText('Practice · Blackburne Shilling Gambit');

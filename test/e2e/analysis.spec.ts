@@ -36,6 +36,15 @@ test('from the home screen: moves kept on this device, never synced; a FEN set u
   await clickSquare(page, 'e7', 'white');
   await clickSquare(page, 'e5', 'white');
   await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 e5');
+  // The opening's name under the board (§5.181), from the bundled list; a move back, the name there.
+  await expect(page.getByTestId('opening-name')).toHaveText('C20 · King\'s Pawn Game');
+  await page.keyboard.press('ArrowLeft');
+  await expect(page.getByTestId('opening-name')).toHaveText('B00 · King\'s Pawn Game');
+  await page.keyboard.press('ArrowLeft');
+  await expect(page.getByTestId('opening-name')).toHaveCount(0);
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 e5');
   // Kept after a reload, on this device only: a sync sends nothing.
   await page.reload();
   await expect(page.locator('.notation')).toContainText('e4');
@@ -58,6 +67,8 @@ test('from the home screen: moves kept on this device, never synced; a FEN set u
   await expect(page.locator('.cg-wrap')).toHaveClass(/orientation-black/);
   await expect(page.locator('.notation')).not.toContainText('e5');
   await expect(page.getByLabel('FEN')).toHaveAttribute('placeholder', '4k3/8/8/8/8/8/4P3/4K3 b - - 0 1');
+  // An ending has no opening's name.
+  await expect(page.getByTestId('opening-name')).toHaveCount(0);
   // White a pawn up, at the top of the turned board: the board's own pawn above it, and +1.
   await expect(top).toHaveAttribute('aria-label', 'White material +1');
   await expect(top.locator('piece.pawn.white')).toHaveCount(1);

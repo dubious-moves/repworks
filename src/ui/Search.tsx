@@ -1,9 +1,11 @@
 // The search page (PLAN.md §5.166): one box over every study on the device. A study or a chapter
 // by its name, a comment by its words, and a position by moves from the start or a FEN, wherever
 // a chapter reaches it. The hits come as the words are typed; the address follows them, so a hit
-// opened and ← comes back to the same search.
+// opened and ← comes back to the same search. An opening is found by its name too (§5.181): its
+// hit searches for its position, so the chapters that reach it come next.
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { keepHere } from '../app/mode.ts';
+import { loadOpenings, openingBook } from '../app/openings.ts';
 import { reachOf, readSearchChapters, searchChapters } from '../app/search.ts';
 import { dataVersion } from '../app/sync.ts';
 import { modeHash } from '../core/app/fsm.ts';
@@ -27,12 +29,15 @@ const GROUPS: { kind: SearchHit['kind']; title: string }[] = [
   { kind: 'position', title: 'Position' },
   { kind: 'study', title: 'Studies' },
   { kind: 'chapter', title: 'Chapters' },
+  { kind: 'opening', title: 'Openings' },
   { kind: 'comment', title: 'Comments' },
 ];
 
 export function SearchScreen(props: { q: string }) {
   const version = dataVersion.value;
   useEffect(() => void readSearchChapters(), [version]);
+  useEffect(loadOpenings, []);
+  const book = openingBook.value;
   const [text, setText] = useState(props.q);
   /** The address's words as this box knows them: those it started with, then those it wrote. */
   const known = useRef(props.q);
@@ -59,7 +64,7 @@ export function SearchScreen(props: { q: string }) {
 
   const chapters = searchChapters.value;
   const query = text.trim();
-  const result = useMemo(() => (chapters && query.length >= LEAST ? search(chapters, query, SEARCH_LIMITS, reachOf) : undefined), [chapters, query]);
+  const result = useMemo(() => (chapters && query.length >= LEAST ? search(chapters, query, SEARCH_LIMITS, reachOf, book) : undefined), [chapters, query, book]);
   const asked = result?.position;
   const board = asked ? modeHash(asked.fen ? { name: 'analysis', fen: asked.fen } : { name: 'analysis', line: asked.sans ?? [] }) : undefined;
 
@@ -93,7 +98,7 @@ export function SearchScreen(props: { q: string }) {
           <p class="muted">No studies on this device yet.</p>
         ) : !result ? (
           <p class="muted" data-testid="search-hint">
-            Two letters or more. A study’s or a chapter’s name; words from a comment (all of them, in one move’s comment); moves from the start, in any order that reaches the position (1.e4 c5 2.Nf3, or e4 c5 Nf3); or a FEN.
+            Two letters or more. A study’s or a chapter’s name; an opening’s name; words from a comment (all of them, in one move’s comment); moves from the start, in any order that reaches the position (1.e4 c5 2.Nf3, or e4 c5 Nf3); or a FEN.
           </p>
         ) : (
           // A hit followed before the address has caught up with the typing: the words first, so ← finds them.
@@ -101,6 +106,7 @@ export function SearchScreen(props: { q: string }) {
             {asked && (
               <p class="search-position" data-testid="search-position">
                 {asked.fen ? 'The position of the FEN' : <>The position after <strong>{asked.line}</strong></>}
+                {asked.opening ? ` (${asked.opening})` : ''}
                 {result.hits.some((h) => h.kind === 'position') ? '' : ': no chapter reaches it'}
                 {' · '}
                 <a href={board}>Analysis board</a>
@@ -138,6 +144,19 @@ export function SearchScreen(props: { q: string }) {
 
 function Hit(props: { hit: SearchHit; words: readonly string[] }) {
   const h = props.hit;
+  if (h.kind === 'opening') {
+    // Its position searched for: the chapters that reach it, by any move order, and the analysis board's link.
+    return (
+      <li class="search-hit">
+        <a href={modeHash({ name: 'search', q: h.line })}>
+          <Marked text={h.name} words={props.words} />
+        </a>{' '}
+        <span class="muted">
+          {h.eco} · {h.line} · {h.chapters ? `${h.chapters} chapter${h.chapters === 1 ? '' : 's'}` : 'no chapter'}
+        </span>
+      </li>
+    );
+  }
   if (h.kind === 'study') {
     return (
       <li class="search-hit">

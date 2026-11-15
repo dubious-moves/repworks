@@ -1,7 +1,7 @@
 // The analysis board's head (PLAN.md §5.35), and the FEN to start from under its board, and "Add to a chapter…": the
 // line from the board's start to the move shown, into a chapter that reaches that start (the one
 // the board was opened from first, then the repertoire's), as a variation, synced like any edit.
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { makeFen } from 'chessops/fen';
 import { addToChapter, targetsFor, type Target } from '../app/analysis.ts';
 import { at, chapter, feedback, goTo, openScratch, side } from '../app/editor.ts';
@@ -9,7 +9,9 @@ import { checkSequence, saveSequence, sourceMistake, type CheckResult } from '..
 import type { Chapter } from '../core/study/model.ts';
 import { goBack, mode, open } from '../app/mode.ts';
 import type { BackMode, Mode } from '../core/app/fsm.ts';
-import { positionAt } from '../core/study/tree.ts';
+import { positionAt, startPosition } from '../core/study/tree.ts';
+import { loadOpenings, openingBook } from '../app/openings.ts';
+import { openingLabel, openingOfLine } from '../core/openings/names.ts';
 import { Back } from './Back.tsx';
 import { RankSelect } from './Rank.tsx';
 import { cardRank } from '../app/games.ts';
@@ -57,6 +59,24 @@ export function backTo(m: BackMode): string {
     default:
       return 'Back';
   }
+}
+
+/**
+ * The opening's name under the board (§5.181): the last named position on the line shown, from
+ * the bundled list, whatever the move order. Nothing where the line has no name.
+ */
+export function AnalysisOpening() {
+  const c = chapter.value;
+  const line = at.value;
+  const book = openingBook.value;
+  useEffect(loadOpenings, []);
+  const named = useMemo(() => (c && book ? openingOfLine(book, startPosition(c), line) : undefined), [c, book, line]);
+  if (!named) return null;
+  return (
+    <p class="opening-name muted" data-testid="opening-name">
+      {openingLabel(named.opening)}
+    </p>
+  );
 }
 
 /** The FEN to start from, under the board: a long line of text has no place in the head. The position shown's is copied from the ☰ menu (§5.87), as on a study. */

@@ -1,10 +1,12 @@
 // Search across the studies (PLAN.md §5.166): a study or a chapter by its name, a comment by its
 // words, and a position by a FEN or a line of moves from the start, wherever a chapter reaches it
-// (D10's key, so by any move order). Pure: the chapters as read, a query, the hits in order.
+// (D10's key, so by any move order); and an opening by its name (§5.181), from the bundled list,
+// with the chapters that reach it. Pure: the chapters as read, a query, the hits in order.
 import { Chess, type Position } from 'chessops/chess';
 import { parseFen } from 'chessops/fen';
 import { parseSan } from 'chessops/san';
 import { positionKeyOf, type PositionKey } from '../chess/positionKey.ts';
+import { foldText, openingLabel, openingOfLine, openingsNamed, type OpeningBook } from '../openings/names.ts';
 import type { Chapter, MoveNode, RootNode, StudyKind } from './model.ts';
 import { transpositions } from './transpositions.ts';
 import { startPosition, type Path } from './tree.ts';
@@ -31,15 +33,21 @@ export type SearchHit =
   | ({ kind: 'chapter' } & Where)
   /** A position the chapter reaches: its first place in tree order, and by how many move orders. */
   | ({ kind: 'position'; path: Path; line: string; orders: number } & Where)
+  /** An opening by its name (§5.181): its line from the start, and how many chapters reach its position. */
+  | { kind: 'opening'; eco: string; name: string; sans: readonly string[]; line: string; chapters: number }
   /** A comment: the move it is on ("Start" for the chapter's own), and the words around the match. */
   | ({ kind: 'comment'; path: Path; move: string; text: string } & Where);
 
 export interface SearchResult {
   hits: SearchHit[];
   /** Hits left out by the limits, by kind. */
-  more: { chapter: number; comment: number; position: number };
-  /** The position asked for, when the query reads as a FEN (`fen`) or as moves from the start (`sans`, and `line` as movetext). */
-  position?: { fen?: string; sans?: string[]; line: string };
+  more: { chapter: number; comment: number; position: number; opening: number };
+  /**
+   * The position asked for, when the query reads as a FEN (`fen`) or as moves from the start
+   * (`sans`, and `line` as movetext), with its opening's name when the list has one (a FEN's own
+   * position's; a line's last named position's).
+   */
+  position?: { fen?: string; sans?: string[]; line: string; opening?: string };
   /** The query's words, lower-cased, for marking them in a hit. */
   words: string[];
 }
@@ -48,11 +56,12 @@ export interface SearchLimits {
   chapter: number;
   comment: number;
   position: number;
+  opening: number;
 }
-export const SEARCH_LIMITS: SearchLimits = { chapter: 40, comment: 60, position: 40 };
+export const SEARCH_LIMITS: SearchLimits = { chapter: 40, comment: 60, position: 40, opening: 8 };
 
 /** Lower case, accents off: "grunfeld" finds "Grünfeld". */
-const fold = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const fold = foldText;
 
 /** The query's words: every one must be found. */
 export const searchWords = (query: string): string[] => fold(query).split(/\s+/).filter(Boolean);
@@ -130,14 +139,25 @@ export type ReachOf = (chapter: Chapter) => ReadonlyMap<PositionKey, readonly Pa
  * own): the position's places first (when the query reads as one), then the studies and the
  * chapters by name, then the comments. Every word must be found: in a study's name; in a
  * chapter's with its study's (one at least in the chapter's own, so a study's name alone doesn't
- * list all its chapters); within one move's comments.
+ * list all its chapters); within one move's comments. With a `book` (§5.181), the openings whose
+ * name holds every word come after the studies and the chapters by name: those a chapter reaches first (the
+ * most chapters first), then the shortest lines.
  */
-export function search(chapters: readonly SearchChapter[], query: string, limits: SearchLimits = SEARCH_LIMITS, reachOf: ReachOf = (c) => transpositions(c).reach): SearchResult {
+export function search(
+  chapters: readonly SearchChapter[],
+  query: string,
+  limits: SearchLimits = SEARCH_LIMITS,
+  reachOf: ReachOf = (c) => transpositions(c).reach,
+  book?: OpeningBook,
+): SearchResult {
   const words = searchWords(query);
-  const result: SearchResult = { hits: [], more: { chapter: 0, comment: 0, position: 0 }, words };
+  const result: SearchResult = { hits: [], more: { chapter: 0, comment: 0, position: 0, opening: 0 }, words };
   if (!words.length) return result;
   const asked = queryPosition(query);
-  if (asked) result.position = { line: asked.line, ...(asked.fen ? { fen: asked.fen } : {}), ...(asked.sans ? { sans: asked.sans } : {}) };
+  if (asked) {
+    const named = !book ? undefined : asked.sans ? openingOfLine(book, Chess.default(), asked.sans)?.opening : book.byKey.get(asked.key);
+    result.position = { line: asked.line, ...(asked.fen ? { fen: asked.fen } : {}), ...(asked.sans ? { sans: asked.sans } : {}), ...(named ? { opening: openingLabel(named) } : {}) };
+  }
 
   const positions: SearchHit[] = [];
   const studies: SearchHit[] = [];
@@ -189,6 +209,29 @@ export function search(chapters: readonly SearchChapter[], query: string, limits
     };
     walk(c.chapter.root, []);
   }
-  result.hits = [...positions, ...studies, ...named, ...comments];
+  const openings: SearchHit[] = [];
+  if (book) {
+    const starts = new Map<SearchChapter, PositionKey | undefined>();
+    const reached = (key: PositionKey) => {
+      let n = 0;
+      for (const c of chapters) {
+        if (!starts.has(c)) {
+          const start = startPosition(c.chapter);
+          starts.set(c, start && positionKeyOf(start));
+        }
+        if (starts.get(c) === key || reachOf(c.chapter).has(key)) n++;
+      }
+      return n;
+    };
+    const found = openingsNamed(book, words).map((o) => ({ o, chapters: reached(o.key) }));
+    // The repertoire's own openings first; the sort is stable, so the shortest lines stay first within a count.
+    found.sort((a, b) => b.chapters - a.chapters);
+    for (const { o, chapters: n } of found.slice(0, limits.opening)) {
+      openings.push({ kind: 'opening', eco: o.eco, name: o.name, sans: o.sans, line: lineText(Chess.default(), o.sans), chapters: n });
+    }
+    result.more.opening = Math.max(0, found.length - limits.opening);
+  }
+  // The user's own names before the list's: eight openings would push a chapter of that name down a phone's screen.
+  result.hits = [...positions, ...studies, ...named, ...openings, ...comments];
   return result;
 }

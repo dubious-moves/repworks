@@ -49,5 +49,7 @@ any later version; see [`LICENSE`](LICENSE).
 
 It builds on [chessground](https://github.com/lichess-org/chessground) and
 [chessops](https://github.com/niklasf/chessops) by the Lichess developers (GPL-3.0-or-later),
-the cburnett pieces by Colin M.L. Burnett (GPLv2+, embedded in chessground), and
-[Preact](https://preactjs.com) (MIT).
+the cburnett pieces by Colin M.L. Burnett (GPLv2+, embedded in chessground),
+[Preact](https://preactjs.com) (MIT), and Lichess's
+[chess-openings](https://github.com/lichess-org/chess-openings) list of opening names (CC0).
+The engines and models it vendors are credited in `vendor/*/README.md`.

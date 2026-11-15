@@ -17,7 +17,7 @@ import { normalizeMove } from 'chessops/chess';
 import type { Key } from '@lichess-org/chessground/types';
 import type { Move, Role } from 'chessops/types';
 import { afterEdits, at, chapter, conflictsHere, doc, edit, feedback, flipBoard, move, play, problem, redoEdit, resolve, SCRATCH, side, study, undoEdit } from '../app/editor.ts';
-import { AnalysisFen, AnalysisHead } from './Analysis.tsx';
+import { AnalysisFen, AnalysisHead, AnalysisOpening } from './Analysis.tsx';
 import { open } from '../app/mode.ts';
 import { left, trainingFrom } from '../app/train.ts';
 import { endPreview, enterCommentLines, preview, stepPreview, switchPreviewLine } from '../app/preview.ts';
@@ -276,6 +276,7 @@ export function ChapterView() {
                 {feedback.value ?? ''}
               </p>
               <AltAdding />
+              {scratch && <AnalysisOpening />}
               {scratch && <AnalysisFen />}
               {wide && <CommentPanel />}
             </div>

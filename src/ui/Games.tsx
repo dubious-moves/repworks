@@ -40,6 +40,8 @@ import { CardRankSelect, RankButtons } from './Rank.tsx';
 import { isoDay } from './day.ts';
 import { graphLabel, graphY, whiteEdge } from './evalGraph.ts';
 import { Back } from './Back.tsx';
+import { loadOpenings, openingBook } from '../app/openings.ts';
+import { openingOfLine } from '../core/openings/names.ts';
 
 const sq = (u: string, i: number) => u.slice(i, i + 2) as SquareName;
 const KIND_WORD: Record<GameItem['kind'] | 'plan', string> = { mistake: 'Mistake', tactic: 'Tactic', advantage: 'Advantage', plan: 'Plan' };
@@ -432,7 +434,7 @@ function GameView(props: { id: string; ply?: number }) {
             · {RESULT_WORD[resultFor(g)]} · {g.speed} · {isoDay(g.createdAt)} · against {opp.name}
           </span>
         </p>
-        {g.opening && <p class="muted">{g.opening}</p>}
+        <GameOpening game={g} />
         <EvalGraph game={g} ply={ply} items={row.items} onPly={setPly} />
         <div class="game-moves" data-testid="game-moves">
           {played.plies.map((p) => {
@@ -874,6 +876,25 @@ function LinePanel(props: { line: EngineLine; busy: boolean; wrong: boolean }) {
 }
 
 /**
+ * A game's opening under its head (§5.181): the name its source gave it, else the bundled list's
+ * for its moves (a chess.com game without one, a game from a file).
+ */
+function GameOpening(props: { game: GameRecord }) {
+  const g = props.game;
+  const given = g.opening && g.opening !== 'Unknown' ? g.opening : undefined;
+  const book = openingBook.value;
+  useEffect(() => {
+    if (!given) loadOpenings();
+  }, [given]);
+  const name = useMemo(() => given ?? (book ? openingOfLine(book, positionOf(g.initialFen ?? START_FEN), g.moves)?.opening.name : undefined), [given, book, g]);
+  return name ? (
+    <p class="muted" data-testid="game-opening">
+      {name}
+    </p>
+  ) : null;
+}
+
+/**
  * The games' own explorer (§6, item 4; mistake-lab's OPENING EXPLORER): a board whose position
  * filters the games list (transpositions included), each move's games and results there (White's
  * wins first, of the colour chosen in the filters), and the opening name most of them carry.
@@ -888,7 +909,10 @@ function GamesExplorer() {
   const idx = show ? openings.value : undefined;
   const key = keyFen(fen)!.key;
   const rows = idx ? explorerRows(idx, key, f.color || undefined) : [];
-  const name = idx ? openingNameAt(idx, key) : '';
+  const book = openingBook.value;
+  useEffect(() => {
+    if (show) loadOpenings();
+  }, [show]);
   const go = (list: string[]) => {
     let p = START_FEN;
     for (const u of list) p = fenAfterUci(p, u) ?? p;
@@ -900,6 +924,8 @@ function GamesExplorer() {
     sans.push(uciToSan(positionOf(p)!, u));
     p = fenAfterUci(p, u) ?? p;
   }
+  // The name most of the games here carry; where they carry none, the bundled list's for the moves played (§5.181).
+  const name = (idx ? openingNameAt(idx, key) : '') || (book && at ? (openingOfLine(book, positionOf(START_FEN), sans)?.opening.name ?? '') : '');
   return (
     <details class="card games-explorer" data-testid="games-explorer" open={show} onToggle={(e) => setShow((e.currentTarget as HTMLDetailsElement).open)}>
       <summary>

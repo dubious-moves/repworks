@@ -6,10 +6,17 @@
 //   text searched) → "comments";
 // - positions looked up by the path's moves instead of the position reached (no transpositions)
 //   → "a position by its moves, in any order".
+//
+// Openings by name (§5.181), controls run on 2026-11-15, each failing "openings by their name":
+// - an opening counted only where a chapter starts at it (the positions a chapter reaches left
+//   out) → every opening is in 0 chapters;
+// - the openings left shortest first (no chapters-first sort) → with one shown, "sicilian"
+//   gives the Sicilian Defense (2 chapters), not the Modern Variations all three reach.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseChapterFile } from '../../../../src/core/pgn/parse.ts';
-import { queryPosition, search, searchWords, type SearchChapter, type SearchHit } from '../../../../src/core/study/search.ts';
+import { parseOpenings } from '../../../../src/core/openings/names.ts';
+import { queryPosition, search, searchWords, SEARCH_LIMITS, type SearchChapter, type SearchHit } from '../../../../src/core/study/search.ts';
 
 function chapter(sid: string, study: string, cid: string, name: string, movetext: string, fen?: string, kind: 'repertoire' | 'reference' = 'repertoire'): SearchChapter {
   const parsed = parseChapterFile(`[Event "Test"]\n[ChapterName "${name}"]\n${fen ? `[FEN "${fen}"]\n[SetUp "1"]\n` : ''}\n${movetext} *\n`, cid);
@@ -25,7 +32,7 @@ const CHAPTERS: SearchChapter[] = [
   chapter('Ends', 'Rook endings', 'Luc', 'Lucena', '1. Rd1+ Ke7 2. Rd4 { Building the bridge. }', '1K1k4/1P6/8/8/8/8/r7/2R5 w - - 0 1', 'reference'),
 ];
 
-const brief = (h: SearchHit) => (h.kind === 'study' ? `study ${h.study}` : `${h.kind} ${h.study} · ${h.chapter}${h.kind === 'comment' ? ` @ ${h.move}` : h.kind === 'position' ? ` @ ${h.line || 'start'}${h.orders > 1 ? ` ×${h.orders}` : ''}` : ''}`);
+const brief = (h: SearchHit) => (h.kind === 'study' ? `study ${h.study}` : h.kind === 'opening' ? `opening ${h.eco} ${h.name} @ ${h.line} in ${h.chapters}` : `${h.kind} ${h.study} · ${h.chapter}${h.kind === 'comment' ? ` @ ${h.move}` : h.kind === 'position' ? ` @ ${h.line || 'start'}${h.orders > 1 ? ` ×${h.orders}` : ''}` : ''}`);
 const hits = (q: string) => search(CHAPTERS, q).hits.map(brief);
 
 test('names: a study, a chapter by its own words or with its study’s, and no chapter for the study’s name alone', () => {
@@ -101,13 +108,59 @@ test('the query’s forms, the order of the hits and the limits', () => {
   assert.deepEqual(hits('d4'), ['position Grünfeld Defence · Exchange @ 1. d4']);
   assert.deepEqual(hits('e5').map((h) => h.split(' ')[0]), ['comment']);
   // The limits: what is left out is counted, never dropped silently.
-  const few = search(CHAPTERS, 'the', { chapter: 0, comment: 2, position: 1 });
+  const few = search(CHAPTERS, 'the', { chapter: 0, comment: 2, position: 1, opening: 0 });
   assert.equal(few.hits.filter((h) => h.kind === 'comment').length, 2);
   assert.ok(few.more.comment >= 2, String(few.more.comment));
   // Words are found inside words: "the" in "the English Attack" and in "another".
   assert.equal(few.more.chapter, 2);
-  const places = search(CHAPTERS, 'e4 c5', { chapter: 9, comment: 9, position: 1 });
+  const places = search(CHAPTERS, 'e4 c5', { chapter: 9, comment: 9, position: 1, opening: 9 });
   assert.equal(places.hits.filter((h) => h.kind === 'position').length, 1);
   // Two chapters reach 1. e4 c5 (the third comes to the Sicilian by 1. Nf3): one shown, one counted.
   assert.equal(places.more.position, 1);
+});
+
+// A few rows as the bundled list has them (vendor/openings/openings.tsv).
+const BOOK = parseOpenings(
+  [
+    'B20\tSicilian Defense\te4 c5',
+    'B50\tSicilian Defense: Modern Variations\te4 c5 Nf3 d6',
+    'B90\tSicilian Defense: Najdorf Variation\te4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6',
+    'B90\tSicilian Defense: Najdorf Variation, English Attack\te4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6 Be3',
+    'B90\tSicilian Defense: Najdorf Variation, Adams Attack\te4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6 h3',
+    'D85\tGrünfeld Defense: Exchange Variation\td4 Nf6 c4 g6 Nc3 d5 cxd5 Nxd5',
+    'C00\tFrench Defense\te4 e6',
+  ].join('\n') + '\n',
+);
+const withBook = (q: string, limits = SEARCH_LIMITS) => search(CHAPTERS, q, limits, undefined, BOOK);
+
+test('openings by their name: the ones the chapters reach first, by any move order, then the shortest lines', () => {
+  const najdorf = withBook('najdorf').hits.map(brief);
+  assert.deepEqual(najdorf, [
+    // The user's own names first.
+    'study Najdorf Sicilian',
+    // Two chapters play it; the third comes to the Sicilian by 1. Nf3 and stops at 3. d4.
+    'opening B90 Sicilian Defense: Najdorf Variation @ 1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 in 2',
+    'opening B90 Sicilian Defense: Najdorf Variation, English Attack @ 1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 6. Be3 in 1',
+    // No chapter plays 6. h3: after the repertoire's own.
+    'opening B90 Sicilian Defense: Najdorf Variation, Adams Attack @ 1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 6. h3 in 0',
+  ]);
+  // 1. Nf3 c5 2. e4 d6 is the Modern Variations' position by another order: all three chapters reach it.
+  assert.equal(withBook('modern variations').hits.map(brief)[0], 'opening B50 Sicilian Defense: Modern Variations @ 1. e4 c5 2. Nf3 d6 in 3');
+  // Accents folded, words in any order; an opening no chapter plays is found too.
+  assert.deepEqual(withBook('exchange grunfeld').hits.map(brief).filter((h) => h.startsWith('opening')), ['opening D85 Grünfeld Defense: Exchange Variation @ 1. d4 Nf6 2. c4 g6 3. Nc3 d5 4. cxd5 Nxd5 in 1']);
+  assert.deepEqual(withBook('french').hits.map(brief), ['opening C00 French Defense @ 1. e4 e6 in 0']);
+  // The limit: what is left out is counted.
+  const one = withBook('sicilian', { ...SEARCH_LIMITS, opening: 1 });
+  assert.deepEqual(one.hits.filter((h) => h.kind === 'opening').map(brief), ['opening B50 Sicilian Defense: Modern Variations @ 1. e4 c5 2. Nf3 d6 in 3']);
+  assert.equal(one.more.opening, 4);
+  // Without the book (it is read after the page opens) the search is as it was.
+  assert.deepEqual(hits('najdorf'), ['study Najdorf Sicilian']);
+});
+
+test('a position asked for is named: a line by its last named position, a FEN by its own', () => {
+  assert.equal(withBook('e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6 Be2').position?.opening, 'B90 · Sicilian Defense: Najdorf Variation');
+  assert.equal(withBook('1. Nf3 c5 2. e4 d6').position?.opening, 'B50 · Sicilian Defense: Modern Variations');
+  assert.equal(withBook('rnbqkbnr/pppp1ppp/4p3/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2').position?.opening, 'C00 · French Defense');
+  assert.equal(withBook('d4 d5').position?.opening, undefined);
+  assert.equal(search(CHAPTERS, 'e4 e6').position?.opening, undefined);
 });

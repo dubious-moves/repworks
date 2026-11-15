@@ -14,6 +14,10 @@
 // the box reading "comment MADE-up" again. A step of the page's start (its effect that takes
 // another entry's words) ran after the first keys under load and put the address's words back.
 // The box now only takes words it neither started with nor wrote; 80 runs of 80 pass since.
+//
+// Openings by name (§5.181), control run on 2026-11-15: with the openings' chunk never read
+// (`loadOpenings` a no-op), both tests fail: the second at its first step (no Openings group),
+// the first where 1. d4 d5 is named.
 import { test, expect, type Page } from '@playwright/test';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
 import { serveGithub, world } from './github.ts';
@@ -84,7 +88,8 @@ test('search: a chapter by its name, a comment by its words, a position by its m
   await box(page).fill('1.e4 c5');
   await expect(group(page, 'Position').getByRole('link')).toHaveText(['Test repertoire · Main line', 'Test repertoire · Alapin']);
   await box(page).fill('1.d4 d5');
-  await expect(page.getByTestId('search-position')).toContainText('The position after 1. d4 d5: no chapter reaches it');
+  // The position is named from the bundled openings (§5.181).
+  await expect(page.getByTestId('search-position')).toContainText('The position after 1. d4 d5 (D00 · Queen\'s Pawn Game): no chapter reaches it');
   await expect(page.getByTestId('search-results').locator('.search-hit')).toHaveCount(0);
 
   // Words that find nothing, and one letter.
@@ -102,4 +107,44 @@ test('search: a chapter by its name, a comment by its words, a position by its m
   await expect(study).toContainText('2 chapters');
   await study.getByRole('link').click();
   await expect(page).toHaveURL(/#\/study\/Rep0Najd/);
+});
+
+test('search: an opening by its name, the repertoire’s own first; its hit searches for its position (§5.181)', async ({ page }) => {
+  await setUp(page);
+  await page.goto(`${site.url}#/search`);
+  await box(page).fill('alapin');
+  const openings = group(page, 'Openings');
+  // 31 names hold the word: the one a chapter plays first, eight shown, the rest counted.
+  await expect(openings.locator('.search-hit')).toHaveCount(8);
+  await expect(openings.locator('h2')).toHaveText('Openings 31');
+  await expect(openings).toContainText('23 more not shown');
+  const first = openings.locator('.search-hit').first();
+  await expect(first.getByRole('link')).toHaveText('Sicilian Defense: Alapin Variation');
+  await expect(first.locator('mark')).toHaveText('Alapin');
+  await expect(first).toContainText('B22 · 1. e4 c5 2. c3 · 1 chapter');
+  // One no chapter plays says so.
+  await expect(openings.locator('.search-hit').nth(1)).toContainText('no chapter');
+  // The chapter of that name comes before the list's openings.
+  await expect(group(page, 'Chapters').getByRole('link')).toHaveText(['Test repertoire · Alapin']);
+  await expect(page.getByTestId('search-results').locator('section h2')).toHaveText(['Chapters 1', 'Openings 31']);
+
+  // The hit: a search for its moves, so the chapter that reaches the position and the analysis board.
+  await first.getByRole('link').click();
+  await expect(page).toHaveURL(/#\/search\?q=1\.%20e4%20c5%202\.%20c3$/);
+  await expect(box(page)).toHaveValue('1. e4 c5 2. c3');
+  await expect(page.getByTestId('search-position')).toContainText('The position after 1. e4 c5 2. c3 (B22 · Sicilian Defense: Alapin Variation)');
+  await expect(group(page, 'Position').getByRole('link')).toHaveText(['Test repertoire · Alapin']);
+  // ← comes back to the name and its hits.
+  await page.goBack();
+  await expect(box(page)).toHaveValue('alapin');
+  await expect(openings.locator('.search-hit')).toHaveCount(8);
+
+  // A line past its last name keeps it; the repertoire's Sicilians are both counted at 1. e4 c5.
+  await box(page).fill('e4 c5 c3 Nf6 e5');
+  await expect(page.getByTestId('search-position')).toContainText('(B22 · Sicilian Defense: Alapin Variation)');
+  await box(page).fill('sicilian defense');
+  await expect(openings.locator('.search-hit').first()).toContainText('B20 · 1. e4 c5 · 2 chapters');
+  // Nothing wider than the phone.
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
 });

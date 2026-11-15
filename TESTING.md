@@ -40,6 +40,19 @@ later change replaced are folded into the later item; items already reported wor
 - **Checked**: unit tests; Playwright on a desktop and an emulated phone; headless screenshots in
   Forest and Paper. Nothing on the real repertoire.
 
+### Openings found by name in search (§5.181, 2026-11-15)
+- In **Search**, type an opening's name ("najdorf", "grunfeld exchange"): a group **Openings**
+  after Studies and Chapters, the openings your chapters reach first with "n chapters". A tap on
+  one searches for its moves: the chapters that reach that position, by any move order, and the
+  analysis board's link; ← comes back to the name.
+- With your real repertoire: do the counts fit (a position reached by another move order
+  counted)? Are eight openings the right number before "add a word to narrow them", and is the
+  group in the right place (after your own studies and chapters, before comments)?
+- The first search on the phone reads the list (3,865 lines): is there a wait you notice?
+  (60 ms in Node; not measured on a phone.)
+- **Checked**: unit tests, Playwright (desktop and emulated phone), a headless screenshot at the
+  phone's size. Nothing on the real repertoire.
+
 ### Search (§5.166, 2026-11-11)
 - **Search**, after Import on the home: one box over every study on the device.
   - A chapter by a word of its name, or one of its study's and one of its own ("najdorf bg5").
@@ -88,6 +101,14 @@ later change replaced are folded into the later item; items already reported wor
   studies; what stands is the real repertoire.)
 
 ## 2. Studies and the study page
+
+### The opening's name under the analysis board (§5.181, 2026-11-15)
+- On the analysis board, play a few moves: under the board, "B90 · Sicilian Defense: Najdorf
+  Variation" for the move shown, by any move order, kept past the list's last name; nothing at
+  the start or in an ending. Is it in the right place on the phone (between the board and the
+  FEN box), and is the ECO code wanted?
+- **Checked**: unit tests, Playwright (desktop and emulated phone), a headless screenshot at the
+  phone's size.
 
 ### The repertoire's moves on the analysis board (§5.165, 2026-11-11)
 - On the **analysis board** the explorer's third tab is **Repertoire** (it was "Study", and read
@@ -826,6 +847,12 @@ later change replaced are folded into the later item; items already reported wor
 - §5.49: Phase 4's acceptance test (desktop and Android phone), then a week of daily storms.
 
 ## 6. Game cards and Games
+
+### A game's opening where it came without one (§5.181, 2026-11-15)
+- Games → a game that has no opening name (a chess.com game without one, a game from a file):
+  its head names it from its moves, from Lichess's list. In the games' explorer, a position your
+  games carry no name for says the list's name, not "No opening name here".
+- **Checked**: Playwright (desktop and emulated phone) on a made-up game. No real game.
 
 ### A game card's priority (§5.171, 2026-11-12)
 - Games → a game: set a mistake's select to High priority; Review: is it asked first among the

@@ -2550,3 +2550,13 @@ The technical calls, each with its reason:
   show, and five solves running clear an endgame, where "ever missed" would only grow. Kept on the
   device; the tries count and are spaced as always; what is due on the home is unchanged. No data
   format changed.
+
+## Revision of 2026-11-15 (opening names: PLAN.md §5.181)
+- **Lichess's `chess-openings` list is bundled with the site** (CC0; 3,865 named lines; 335 KB,
+  49 KB gzipped, a chunk of the shell read when a name is first asked for): the opening's name
+  under the analysis board, in the head of a game that came without one, and found by its name in
+  search, where a hit leads to the chapters that reach its position. Why: the owner's word of
+  2026-11-15 on §5.167's waiting idea, after the licence and the size it had left unread were
+  checked. Given up: a data file in every install that isn't code or an engine. A position is
+  named by D10's key, a line by its last named position (Lichess's rule). No data format of the
+  owner's changed.
