@@ -13,6 +13,7 @@ import { addLine } from '../core/study/ops.ts';
 import { nodeAt, positionsTo, type Path } from '../core/study/tree.ts';
 import { ENGINES, ensure, stored } from '../platform/blobs.ts';
 import { chapter, doc, edit, feedback, goTo } from './editor.ts';
+import { gpuInit, noteGpu } from './gpu.ts';
 import { onWorker, postToWorker, prefs as explorerPrefs } from './explorer.ts';
 import { LC0_FILES } from './lc0.ts';
 import { maiaElo, maiaPolicies } from './maia.ts';
@@ -156,7 +157,11 @@ function startWorker(): Promise<void> {
     worker = w;
     w.onmessage = (e: MessageEvent<FromLc0>) => {
       const m = e.data;
-      if (m.type === 'status') return m.status === 'ready' ? resolve() : reject(new Error('Lc0’s files are not on this device'));
+      if (m.type === 'status') {
+        if (m.status !== 'ready') return reject(new Error('Lc0’s files are not on this device'));
+        noteGpu('lc0', m.gpu);
+        return resolve();
+      }
       if (m.type === 'failed') return reject(new Error(m.reason));
       if (!('id' in m)) return;
       const job = waiting.get(m.id);
@@ -173,7 +178,9 @@ function startWorker(): Promise<void> {
       waiting.clear();
       endWorker();
     };
-    w.postMessage({ type: 'init' } satisfies ToLc0);
+    // The graphics processor too, where it serves (§5.184).
+    const gpu = gpuInit('lc0');
+    w.postMessage({ type: 'init', ...(gpu ? { gpu } : {}) } satisfies ToLc0);
   });
   ready.catch(() => endWorker());
   return ready;

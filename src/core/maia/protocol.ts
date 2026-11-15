@@ -1,5 +1,6 @@
 // The messages of Maia's worker (PLAN.md §5.32, §5.34): the page's and, over a port, the explorer
 // worker's. Types only.
+import type { GpuInit, GpuNote } from '../engine/gpu.ts';
 import type { MaiaMove } from './encode.ts';
 
 /** A MessagePort, as far as the worker uses one (core has no DOM types). */
@@ -9,8 +10,8 @@ export interface MaiaPort {
 }
 
 export type ToMaia =
-  /** Load the model (stored already: the page downloads it). */
-  | { type: 'init' }
+  /** Load the model (stored already: the page downloads it); with `gpu`, on the graphics processor where it serves (§5.184). */
+  | { type: 'init'; gpu?: GpuInit }
   /** Maia's policy and score in a position. */
   | { type: 'ask'; id: number; fen: string; elo: number }
   /** The mover's expected score after each of `sans` (Qchess's Ms). */
@@ -19,7 +20,8 @@ export type ToMaia =
   | { type: 'port'; port: MaiaPort };
 
 export type FromMaia =
-  | { type: 'status'; status: 'ready' | 'missing' }
+  /** Ready, with what became of the graphics processor when it was asked for. */
+  | { type: 'status'; status: 'ready' | 'missing'; gpu?: GpuNote }
   /** Asked through a port: the page keeps the worker alive while the explorer worker uses it. */
   | { type: 'busy' }
   | { type: 'failed'; reason: string }

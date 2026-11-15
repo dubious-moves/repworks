@@ -10,6 +10,9 @@ import { EngineFiles } from './Engines.tsx';
 import { maiaEloFor } from '../core/maia/encode.ts';
 import { maiaPrefs, setMaiaPrefs } from '../app/maia.ts';
 import { prefs as explorerPrefs } from '../app/explorer.ts';
+import { GPU_FILES, gpuNotes, gpuPrefs, gpuState, gpuSupport, setGpuOn } from '../app/gpu.ts';
+import { gpuNoteText } from '../core/engine/gpu.ts';
+import { megabytes } from './Engines.tsx';
 
 const shown = signal(false);
 /** Qchess's thread choices, as far as this device has cores. */
@@ -34,6 +37,45 @@ function Choice<T extends number>(props: { label: string; values: readonly T[]; 
           </button>
         ))}
       </div>
+    </fieldset>
+  );
+}
+
+/**
+ * Maia and Lc0 on the graphics processor (§5.184): a switch of its own, taken at once (not with
+ * Save: it downloads). Each engine times itself on both when it next starts and keeps the
+ * faster; what it found is said under the switch.
+ */
+function GpuChoice() {
+  const [support, setSupport] = useState<string | undefined | null>(null);
+  useEffect(() => void gpuSupport().then(setSupport), []);
+  const on = gpuPrefs.value.on;
+  const state = gpuState.value;
+  const notes = gpuNotes.value;
+  const bytes = GPU_FILES.reduce((n, f) => n + f.bytes, 0);
+  return (
+    <fieldset class="gpu-choice" data-testid="gpu-choice">
+      <legend>Maia and Lc0</legend>
+      <label class="check">
+        <input type="checkbox" checked={on || state.kind === 'downloading'} disabled={support !== undefined || state.kind === 'downloading'} onChange={(e) => void setGpuOn(e.currentTarget.checked)} /> On the graphics processor, where it is faster (WebGPU)
+      </label>
+      <p class="muted" role="status" data-testid="gpu-note">
+        {support === null ? (
+          '…'
+        ) : support ? (
+          `${support} They run on the processor.`
+        ) : state.kind === 'downloading' ? (
+          `Downloading its runtime… ${Math.floor((100 * state.received) / state.total)}%`
+        ) : state.kind === 'refused' ? (
+          state.reason
+        ) : on ? (
+          <>
+            {gpuNoteText('Maia', notes.maia)} {gpuNoteText('Lc0', notes.lc0)}
+          </>
+        ) : (
+          `Off: both run on the processor. On downloads a runtime of ${megabytes(bytes)} once; each engine then times itself on both when it starts, checks the answers are the same, and keeps the faster.`
+        )}
+      </p>
     </fieldset>
   );
 }
@@ -95,6 +137,7 @@ function Dialog() {
             ))}
           </select>
         </label>
+        <GpuChoice />
         <EngineFiles />
         <div class="dialog-buttons">
           <button type="button" class="secondary" onClick={() => setDraft({ ...DEFAULT_ENGINE_PREFS, on: draft.on })}>

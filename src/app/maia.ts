@@ -8,6 +8,7 @@ import { maiaEloFor, type MaiaMove } from '../core/maia/encode.ts';
 import type { FromMaia, ToMaia } from '../core/maia/protocol.ts';
 import { ENGINES, ensure, remove, stored } from '../platform/blobs.ts';
 import { linkMaia, prefs as explorerPrefs, setPrefs as setExplorerPrefs } from './explorer.ts';
+import { gpuInit, gpuPrefs, noteGpu } from './gpu.ts';
 import { effect } from '@preact/signals';
 
 export interface MaiaPrefs {
@@ -114,7 +115,10 @@ function startWorker(): void {
       if (m.status === 'missing') {
         maiaState.value = { kind: 'missing' };
         if (maiaPrefs.peek().on) maiaDialog.value = true;
-      } else maiaState.value = { kind: 'ready' };
+      } else {
+        noteGpu('maia', m.gpu);
+        maiaState.value = { kind: 'ready' };
+      }
       return;
     }
     if (m.type === 'failed') {
@@ -132,7 +136,8 @@ function startWorker(): void {
     maiaState.value = { kind: 'failed', reason: e.message || 'Maia stopped working' };
     worker = undefined;
   };
-  post({ type: 'init' });
+  const gpu = gpuInit('maia');
+  post({ type: 'init', ...(gpu ? { gpu } : {}) });
 }
 
 /** Qchess's Maia switch. On also opens the explorer, where Maia's columns are. */
@@ -273,6 +278,20 @@ effect(() => {
         }
       : undefined,
   );
+});
+
+// The graphics processor switched on or off (§5.184): a running worker starts again, to take it up or leave it.
+let gpuWas = gpuPrefs.peek().on;
+effect(() => {
+  const on = gpuPrefs.value.on;
+  if (on === gpuWas) return;
+  gpuWas = on;
+  if (!worker) return;
+  worker.terminate();
+  worker = undefined;
+  for (const w of waiting.values()) w({ type: 'error', id: 0, reason: 'Maia was started again' });
+  waiting.clear();
+  startWorker();
 });
 
 // Maia comes back on with the page when it was left on (its files stored: no dialog then).

@@ -8,6 +8,7 @@ import { makeFen, parseFen } from 'chessops/fen';
 import { parseUci } from 'chessops/util';
 import { expected, type Lc0Move, type Wdl } from '../core/lc0/encode.ts';
 import type { FromLc0, ToLc0 } from '../core/lc0/protocol.ts';
+import { gpuInit, noteGpu } from './gpu.ts';
 
 const IDLE_MS = 90_000;
 /** The worker's start (the network read and compiled) and the whole of one ask, at most. */
@@ -46,7 +47,10 @@ function start(): Promise<void> {
     w.onmessage = (e: MessageEvent<FromLc0>) => {
       const m = e.data;
       if (m.type === 'status') {
-        if (m.status === 'ready') return resolve();
+        if (m.status === 'ready') {
+          noteGpu('lc0', m.gpu);
+          return resolve();
+        }
         missingAt = Date.now();
         return reject(new Error('Lc0’s files are not on this device'));
       }
@@ -59,7 +63,9 @@ function start(): Promise<void> {
       else if (m.type === 'error') job.reject(new Error(m.reason));
     };
     w.onerror = (e) => reject(new Error(e.message || 'Lc0 stopped working'));
-    w.postMessage({ type: 'init' } satisfies ToLc0);
+    // The graphics processor too, where it serves (§5.184).
+    const gpu = gpuInit('lc0');
+    w.postMessage({ type: 'init', ...(gpu ? { gpu } : {}) } satisfies ToLc0);
   });
   ready.catch(end);
   return ready;

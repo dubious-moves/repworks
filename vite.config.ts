@@ -34,7 +34,12 @@ export default defineConfig({
     // onnxruntime-web's build that loads its wasm and glue from `env.wasm.wasmPaths` (§5.32): the
     // default one points at its wasm with `new URL(…, import.meta.url)`, which the build would
     // copy into assets/ and the shell would precache.
-    alias: { 'onnxruntime-web/wasm': resolve('node_modules/onnxruntime-web/dist/ort.wasm.min.mjs') },
+    // The same for its build with the WebGPU backend (§5.184): the one that waits on the graphics
+    // processor through JSPI, whose wasm is 16.8 MB (the asyncify one is 26.8 MB).
+    alias: {
+      'onnxruntime-web/wasm': resolve('node_modules/onnxruntime-web/dist/ort.wasm.min.mjs'),
+      'onnxruntime-web/jspi': resolve('node_modules/onnxruntime-web/dist/ort.jspi.min.mjs'),
+    },
   },
   plugins: [engines(), serviceWorker()],
   // Maia's and Lc0's workers read the engines' URLs too (§5.32, §5.143).
@@ -61,6 +66,8 @@ const ENGINE_FILES: Record<string, string> = {
   lc0Model: 'vendor/lc0/791556.onnx',
   ortWasm: 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm',
   ortMjs: 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.mjs',
+  ortGpuWasm: 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jspi.wasm',
+  ortGpuMjs: 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jspi.mjs',
 };
 const ENGINES_DIR = 'engines/';
 const ENGINES_ID = 'virtual:repworks-engines';

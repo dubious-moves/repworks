@@ -2576,3 +2576,13 @@ The technical calls, each with its reason:
   answers. Why: the owner's word of 2026-11-15, to look before §5.167's waiting idea is decided.
   Run on the real log that day: no gain beyond chance yet, so the defaults stay. Switching fitted
   weights on (a data format, every interval changed) still waits for the owner's word.
+
+## Revision of 2026-11-15 (Maia and Lc0 on the graphics processor: PLAN.md §5.184)
+- **Maia and Lc0 may run on WebGPU: a switch per device, off unless chosen.** On, each engine's
+  worker loads its model on both backends when it starts, runs real positions on both, and keeps
+  the graphics processor only when its outputs are the processor's (within 0.05) and it is
+  faster; otherwise the processor, with the reason shown under the switch. Why: the owner's word
+  of 2026-11-15; and since no real graphics processor can be reached from a cloud container, the
+  choice is measured on each device instead of assumed. Given up: a second runtime of 16.8 MB on
+  a device that switches it on (the plain one stays as the fallback), and a second or two at an
+  engine's first start each session. D13's "runs in the browser" stands; no data format changed.

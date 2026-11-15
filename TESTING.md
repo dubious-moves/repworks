@@ -102,6 +102,22 @@ later change replaced are folded into the later item; items already reported wor
 
 ## 2. Studies and the study page
 
+### Maia and Lc0 on the graphics processor (§5.184, 2026-11-15)
+- On the desktop and on the phone, each: ⚙ (engine settings) → "Maia and Lc0: on the graphics
+  processor, where it is faster (WebGPU)". It downloads 16.8 MB once. With Maia and Lc0 on, open
+  ⚙ again after a few seconds: what does each line say? ("Lc0: on the graphics processor, n ms a
+  run against m on the processor", or "on the processor (…)" with a reason.) **Those numbers are
+  the point**: no real graphics processor has run this, only Chromium's software one.
+- Maia has never run on a graphics processor at all (its model needs 16-bit floats in shaders,
+  which the software adapter lacks). If it says "on the graphics processor": do its explorer
+  columns show the same percentages as with the switch off, at a few positions?
+- If the box is greyed out, the line under it says why (no WebGPU, or no JSPI before Chrome 137).
+- With it on, is anything slower to start (Maia's columns, Lc0's row, the storm's Maia, an
+  endgame's defence)? Each engine checks itself once a session, a second or two.
+- **Checked**: unit tests; Playwright with the software adapter and the real Lc0 network (kept,
+  the reference's numbers from the graphics processor; Maia's fallback by a real failure; no
+  gain; no WebGPU). No real adapter, no Android.
+
 ### The engine bar: the status on its own row (§5.182, 2026-11-15)
 - On the phone, and on the desktop's study page, switch Stockfish on: under the three switches
   a row with "Depth 20" whole and, once the search is done, + at its right; ⚙ stays inside the

@@ -1,25 +1,26 @@
-// Maia's worker (PLAN.md §5.32): onnxruntime-web (wasm, one thread) on the vendored model, its
-// files from the engines' cache (the page downloads them first, src/platform/blobs.ts). Runs are
-// batched (core/maia/batch.ts). Asked by the page and, over a port, by the explorer worker.
-import * as ort from 'onnxruntime-web/wasm';
+// Maia's worker (PLAN.md §5.32): onnxruntime-web (wasm, one thread; or WebGPU where the page
+// asks for it and it serves, §5.184) on the vendored model, its files from the engines' cache
+// (the page downloads them first, src/platform/blobs.ts). Runs are batched (core/maia/batch.ts).
+// Asked by the page and, over a port, by the explorer worker.
 import { Chess } from 'chessops/chess';
 import { parseFen } from 'chessops/fen';
 import { parseSan } from 'chessops/san';
+import type { GpuInit } from '../core/engine/gpu.ts';
 import { createMaiaBatch } from '../core/maia/batch.ts';
+import { maiaTokens } from '../core/maia/encode.ts';
 import type { FromMaia, ToMaia } from '../core/maia/protocol.ts';
 import { ENGINES, stored } from './blobs.ts';
+import { openSession, type Opened } from './ortSession.ts';
 
 const scope = self as unknown as { postMessage(m: FromMaia): void; onmessage: ((e: MessageEvent<ToMaia>) => void) | null };
 
-ort.env.wasm.numThreads = 1;
-ort.env.wasm.wasmPaths = { wasm: new URL(ENGINES.ortWasm.url, location.href).href, mjs: new URL(ENGINES.ortMjs.url, location.href).href };
-
-let session: ort.InferenceSession | undefined;
+let opened: Opened | undefined;
 let loading: Promise<void> | undefined;
 
 const batch = createMaiaBatch({
   run: async (tokens, elos, n) => {
-    if (!session) throw new Error('Maia is not loaded');
+    if (!opened) throw new Error('Maia is not loaded');
+    const { ort, session } = opened;
     const out = await session.run({
       tokens: new ort.Tensor('float32', tokens, [n, 64, 12]),
       elo_self: new ort.Tensor('float32', elos, [n]),
@@ -30,11 +31,26 @@ const batch = createMaiaBatch({
   defer: (fn) => setTimeout(fn, 0),
 });
 
-function load(): Promise<void> {
+/** The positions the graphics processor is checked on (§5.184): an opening, a middlegame, an ending, at three ratings, as one batch. */
+const PROBE: readonly [fen: string, elo: number][] = [
+  ['rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', 1100],
+  ['rnbqkb1r/1p2pppp/p2p1n2/8/3NP3/2N5/PPP2PPP/R1BQKB1R w KQkq - 0 6', 1500],
+  ['r1bq1rk1/pp2ppbp/2np1np1/8/3NP3/2N1BP2/PPPQ2PP/R3KB1R w KQ - 3 9', 1900],
+  ['8/5pk1/6p1/8/3R4/6P1/r4PK1/8 b - - 0 40', 2300],
+];
+
+function load(gpu?: GpuInit): Promise<void> {
   loading ??= (async () => {
-    const response = await fetch(ENGINES.maiaModel.url);
-    if (!response.ok) throw new Error(`the model: HTTP ${response.status}`);
-    session = await ort.InferenceSession.create(new Uint8Array(await response.arrayBuffer()));
+    opened = await openSession(ENGINES.maiaModel.url, 'the model', gpu, {
+      outputs: ['logits_move', 'logits_value'],
+      feeds: (ort) => {
+        const n = PROBE.length;
+        const tokens = new Float32Array(n * 64 * 12);
+        PROBE.forEach(([fen], i) => tokens.set(maiaTokens(fen), i * 64 * 12));
+        const elos = Float32Array.from(PROBE, ([, elo]) => elo);
+        return { tokens: new ort.Tensor('float32', tokens, [n, 64, 12]), elo_self: new ort.Tensor('float32', elos, [n]), elo_oppo: new ort.Tensor('float32', Float32Array.from(elos), [n]) };
+      },
+    });
   })();
   return loading;
 }
@@ -49,8 +65,8 @@ async function handle(m: ToMaia, reply: (r: FromMaia) => void): Promise<void> {
   if (m.type === 'init') {
     try {
       if (!(await stored([ENGINES.maiaModel, ENGINES.ortWasm, ENGINES.ortMjs]))) return reply({ type: 'status', status: 'missing' });
-      await load();
-      reply({ type: 'status', status: 'ready' });
+      await load(m.gpu);
+      reply({ type: 'status', status: 'ready', ...(opened?.gpu ? { gpu: opened.gpu } : {}) });
     } catch (e) {
       loading = undefined;
       reply({ type: 'failed', reason: e instanceof Error ? e.message : String(e) });

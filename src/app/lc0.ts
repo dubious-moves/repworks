@@ -4,12 +4,13 @@
 // Lc0's policy and W/D/L there, from the line that led to it. One ask at a time: stepping through
 // a line asks for the position the board stops at, not every one on the way. Answers are kept for
 // the session.
-import { computed, signal } from '@preact/signals';
+import { computed, effect, signal } from '@preact/signals';
 import { makeFen } from 'chessops/fen';
 import type { Position } from 'chessops/chess';
 import type { Lc0Move, Wdl } from '../core/lc0/encode.ts';
 import type { FromLc0, ToLc0 } from '../core/lc0/protocol.ts';
 import { ENGINES, ensure, remove } from '../platform/blobs.ts';
+import { gpuInit, gpuPrefs, noteGpu } from './gpu.ts';
 
 export interface Lc0Prefs {
   on: boolean;
@@ -106,6 +107,7 @@ function startWorker(): void {
         lc0State.value = { kind: 'missing' };
         if (lc0Prefs.peek().on) lc0Dialog.value = true;
       } else {
+        noteGpu('lc0', m.gpu);
         lc0State.value = { kind: 'ready' };
         pump();
       }
@@ -130,7 +132,8 @@ function startWorker(): void {
     asking = undefined;
   };
   touch();
-  worker.postMessage({ type: 'init' } satisfies ToLc0);
+  const gpu = gpuInit('lc0');
+  worker.postMessage({ type: 'init', ...(gpu ? { gpu } : {}) } satisfies ToLc0);
 }
 
 /** Asks for the board's position when nothing is asked and it has no answer yet. */
@@ -195,6 +198,19 @@ export async function deleteLc0(): Promise<void> {
   setLc0On(false);
   await remove([ENGINES.lc0Model]);
 }
+
+// The graphics processor switched on or off (§5.184): a running worker starts again, to take it up or leave it.
+let gpuWas = gpuPrefs.peek().on;
+effect(() => {
+  const on = gpuPrefs.value.on;
+  if (on === gpuWas) return;
+  gpuWas = on;
+  if (!worker) return;
+  worker.terminate();
+  worker = undefined;
+  asking = undefined;
+  startWorker();
+});
 
 // Lc0 comes back on with the page when it was left on (its files stored: no dialog then).
 if (lc0Prefs.peek().on) startWorker();

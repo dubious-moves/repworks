@@ -20,5 +20,7 @@ declare module 'virtual:repworks-engines' {
     lc0Model: EngineFile;
     ortWasm: EngineFile;
     ortMjs: EngineFile;
+    ortGpuWasm: EngineFile;
+    ortGpuMjs: EngineFile;
   };
 }
