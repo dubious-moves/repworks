@@ -1,7 +1,7 @@
 // The Stockfish worker from the build, in the browser (PLAN.md §5.30): it starts from its
 // hashed URLs, finds mate in one, and ends a search on `stop` (mistake-lab never sends one, for
 // fear of a crash; Qchess does), then searches again. Checked in the container's Chromium, for
-// both vendored versions (18, and 19 since §5.75).
+// both vendored versions (18, and 19 since §5.75) and 19's full net (§5.186).
 import { test, expect } from '@playwright/test';
 import { serveSite, type SiteServer } from './server.ts';
 
@@ -13,14 +13,21 @@ test.afterAll(async () => {
   await site.close();
 });
 
-for (const version of [18, 19]) {
+// The lite builds of 18 and 19, and 19's full net (§5.186).
+const BUILDS = [
+  { version: '18', id: 'Stockfish 18 Lite WASM', file: 'stockfish-18-lite-single' },
+  { version: '19', id: 'Stockfish 19 Lite WASM', file: 'stockfish-19-lite-single' },
+  { version: '19 with its full net', id: 'Stockfish 19 WASM', file: 'stockfish-19-single' },
+];
+
+for (const { version, id, file: build } of BUILDS) {
   test(`Stockfish ${version}: the built worker answers mate in one, and a stop ends a search that a new one follows`, async ({ page, isMobile }) => {
     test.skip(isMobile, 'the same Chromium as the desktop project');
     await page.goto(site.url);
-    const result = await page.evaluate(async (version) => {
+    const result = await page.evaluate(async (build) => {
       const sw = await (await fetch('sw.js')).text();
       const engines = JSON.parse(/const __ENGINES__ = (\[.*?\]);/.exec(sw)![1]!) as string[];
-      const file = (ext: string) => new URL(engines.find((u) => u.includes(`/stockfish-${version}-lite-single.`) && u.endsWith(ext))!, location.href).href;
+      const file = (ext: string) => new URL(engines.find((u) => u.includes(`/${build}.`) && u.endsWith(ext))!, location.href).href;
       const js = file('.js');
       const wasm = file('.wasm');
       const worker = new Worker(`${js}#${encodeURIComponent(wasm)}`);
@@ -38,7 +45,7 @@ for (const version of [18, 19]) {
         });
       worker.addEventListener('message', (e: MessageEvent<string>) => seen.push(e.data));
       worker.postMessage('uci');
-      await waitFor((l) => l === 'uciok', 15000);
+      await waitFor((l) => l === 'uciok', 60000);
       worker.postMessage('isready');
       await waitFor((l) => l === 'readyok', 5000);
       worker.postMessage('position fen r1bqkbnr/pppp1ppp/2n5/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4');
@@ -57,8 +64,8 @@ for (const version of [18, 19]) {
       const deep = seen.filter((l) => l.startsWith('info depth')).length;
       worker.terminate();
       return { mate, stopped, stopMs, after, deep, name: seen.find((l) => l.startsWith('id name')) };
-    }, version);
-    expect(result.name).toBe(`id name Stockfish ${version} Lite WASM`);
+    }, build);
+    expect(result.name).toBe(`id name ${id}`);
     expect(result.mate).toBe('bestmove h5f7');
     expect(result.stopped).toMatch(/^bestmove \w{4}/);
     expect(result.stopMs).toBeLessThan(1000);

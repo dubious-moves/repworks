@@ -5,7 +5,7 @@
 // flight is run once. The model's run, and how to wait for the turn's end, are passed in. Pure.
 import type { Position } from 'chessops/chess';
 import { positionKeyOf } from '../chess/positionKey.ts';
-import { expectedScore, MAIA_MOVES, MAIA_TOKENS, maiaTokens, policyFrom, type MaiaMove } from './encode.ts';
+import { expectedScore, MAIA_HISTORY, MAIA_MOVES, MAIA_TOKENS, maiaHistoryTokens, maiaTokens, policyFrom, type MaiaMove } from './encode.ts';
 import { makeFen } from 'chessops/fen';
 
 export interface MaiaOutput {
@@ -29,10 +29,13 @@ export interface MaiaBatchOptions {
   maxBatch?: number;
   /** Answers kept (q_extension's 20,000). */
   memo?: number;
+  /** The model reads the positions before too (the 23M model, §5.188): `run`'s tokens are `[B, 64, 96]`. */
+  history?: boolean;
 }
 
 export interface MaiaBatch {
-  ask(pos: Position, elo: number): Promise<MaiaAnswer>;
+  /** `before`: the positions that led here, oldest first (FENs), for a model with history; without, the position stands for them. */
+  ask(pos: Position, elo: number, before?: readonly string[]): Promise<MaiaAnswer>;
   counts(): { positions: number; batches: number };
 }
 
@@ -47,6 +50,7 @@ interface Queued {
 
 export function createMaiaBatch(o: MaiaBatchOptions): MaiaBatch {
   const maxBatch = o.maxBatch ?? 32;
+  const width = o.history ? MAIA_TOKENS * MAIA_HISTORY : MAIA_TOKENS;
   const memoMax = o.memo ?? 20000;
   const memo = new Map<string, MaiaAnswer>();
   const inflight = new Map<string, Promise<MaiaAnswer>>();
@@ -63,10 +67,10 @@ export function createMaiaBatch(o: MaiaBatchOptions): MaiaBatch {
     if (running || !queue.length) return;
     running = true;
     const batch = queue.splice(0, maxBatch);
-    const tokens = new Float32Array(batch.length * MAIA_TOKENS);
+    const tokens = new Float32Array(batch.length * width);
     const elos = new Float32Array(batch.length);
     batch.forEach((q, i) => {
-      tokens.set(q.tokens, i * MAIA_TOKENS);
+      tokens.set(q.tokens, i * width);
       elos[i] = q.elo;
     });
     c.batches++;
@@ -95,14 +99,17 @@ export function createMaiaBatch(o: MaiaBatchOptions): MaiaBatch {
   };
 
   return {
-    ask(pos, elo) {
-      const key = `${positionKeyOf(pos)}|${elo}`;
+    ask(pos, elo, before) {
+      const fen = makeFen(pos.toSetup());
+      // The positions before, as the model sees them: their boards and sides to move.
+      const led = o.history && before?.length ? before.slice(-(MAIA_HISTORY - 1)) : [];
+      const key = `${positionKeyOf(pos)}|${elo}${led.length ? `|${led.map((f) => f.split(' ').slice(0, 2).join(' ')).join('|')}` : ''}`;
       const known = memo.get(key);
       if (known) return Promise.resolve(known);
       const flying = inflight.get(key);
       if (flying) return flying;
       const p = new Promise<MaiaAnswer>((resolve, reject) => {
-        queue.push({ pos: pos.clone(), elo, key, tokens: maiaTokens(makeFen(pos.toSetup())), resolve, reject });
+        queue.push({ pos: pos.clone(), elo, key, tokens: o.history ? maiaHistoryTokens([...led, fen]) : maiaTokens(fen), resolve, reject });
       });
       inflight.set(key, p);
       const done = () => void inflight.delete(key);

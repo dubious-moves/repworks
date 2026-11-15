@@ -7,7 +7,7 @@ where the build differed). What remains is live: the spike's re-run (§4.2), the
 Lichess imports (§4.10), and the acceptance test (§4.11), on the owner's devices. Phase 1 starts
 alongside them (the owner's decision of 2026-10-06), and is planned in depth in §5 (2026-10-06),
 with the owner's answers (§5.13); it is built through §5.17 (the owner's second notes), its acceptance test (§5.14) waiting
-for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) is built as the explorer's Study tab (§5.162, the owner's yes of 2026-11-10), §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; the analyzer's output lives in the data repo through a converter (§5.66, the owner's choice of 2026-11-10, built in §5.163), its acceptance test (§5.65) waits for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Storm positions shared between devices through the data repo, and an overnight gather (§5.102), are built (2026-10-12). Lc0 on the study page, its pick among close moves (§5.143), is built (2026-10-31). Endgames, the theoretical endgames each played for its goal against Stockfish (§5.145), are built (2026-10-31), their moves judged in the background since (§5.146, the owner's request of 2026-11-01), defended by Maia checked by Stockfish (§5.147, the owner's request), and a draw's attacker pushing on so the whole method comes up (§5.148, the owner's note). The endgames of the user's own repertoire (§5.149) are built (2026-11-01), and thirteen more theoretical endgames in two more groups (§5.150, the owner's request of 2026-11-02). A game card's move judged without waiting on the engine line's searches or the storm's workers (§5.151, the owner's request of 2026-11-04). Show and grade in the storm, every move of a deepened position shown by its band (§5.152, the owner's request of 2026-11-06), is built. A robotic board, the Chessnut Move, in the storm's untimed sessions and in practice is planned in its own document, `CHESSNUT.md` (§5.153 points there; the owner's request of 2026-11-06), and being built since 2026-11-14 at the owner's word, before the board arrives: parts (a) to (c), the codec, the Web Bluetooth module, a simulated board, the spike page, reading moves, the link and the lights (pure), and the link in the app with its chip and dialog, are built, and so are part (d), practice on the board (the drills and the endgames too), part (e), the storm's set, show and grade and puzzles on the board, and part (f), the timed storm (its clock stopped while the board sets up), the review and its retry: the plan's build is complete, and its live checks wait for the board. After a storm verdict, Show refutation (a mistake or a blunder), Show line (a great move or the top move) and Continue against Maia's reply (a good move or better) are built (§5.154, the owner's request of 2026-11-06). A polish pass (§5.156, the owner's request of 2026-11-07) made the light theme readable and the folded settings panel free, and lists ideas waiting for the owner's word. The positions after Maia's likely moves (20% or more) outside a storm card's list are searched while the user thinks (§5.157, the owner's request of 2026-11-10). Of §5.156's ideas the owner said to build all but the faster start (2026-11-10): Today on the home, the icon's shortcuts, the wrong move shown, "?" for the keys and the empty pages are built (§5.158). Share to Repworks and .pgn files opened with it, sounds, Settings apart from Debug and the dark themes' contrasts are built (§5.159). TESTING.md is one walk through the app, by screen (§5.160). The home's deepening searches Maia's likely moves too, and those searches are kept with the position (§5.161). The explorer has a Study tab: the open study's moves at the board's position, across its chapters and move orders (§5.162, §5.27). The analyzer's games are converted into the data repo's `games/` files, which every device reads beside the Gist (§5.163, §5.66). A second look (§5.164, the owner's request of 2026-11-11): a phone held sideways has the board whole at the left of every board page, long names no longer make a phone's page scroll sideways, and the page's title names the screen. On the analysis board the explorer's third tab is the whole repertoire's moves at the position (§5.165), and a search page finds a study or a chapter by name, a comment by its words and a position by its moves or FEN (§5.166). What is next from that look is planned in §5.167: three parts to build, and five ideas waiting for the owner's word. A game card's priority, High, Normal or Low, its due cards asked high first (§5.171, the owner's request of 2026-11-12), is built, and chosen wherever a mistake or a tactic is saved (§5.172). Premoves are in every kind of practice, the endgames and a checklist's lead-up too (§5.173, the owner's request of 2026-11-13). An endgame's defence varies over tries, Maia's likely replies not met yet first and the same defence after a miss, and "Maia alone" answers without waiting on Stockfish (§5.174, the owner's request of 2026-11-14). "Course only" on the Endgames page puts the built-in endgames and the repertoire's aside, on the page and in what is due, and the course's groups are rows with their progress (§5.179, the owner's request of 2026-11-15). "Focus on mistakes" on the Endgames page holds it and its Next to the endgames missed in one of their last five tries, due or not (§5.180, the owner's request of 2026-11-15). Opening names from Lichess's list, bundled (§5.181, §5.167's first waiting idea, the owner's word of 2026-11-15): under the analysis board, in a game's head, and found by name in search. On a narrow engine bar the status and + have a row of their own (§5.182, a CI failure of 2026-11-15 that was the app's). Whether FSRS fitted to the owner's own answers would predict them better than the default weights is a script's report (§5.183, the owner's word of 2026-11-15 on §5.167's third waiting idea): run on the real log, it says not yet; the app's scheduler is unchanged. Maia and Lc0 can run on the graphics processor (WebGPU), a switch in the engine's settings, off unless chosen, each engine checked against the processor's answers and timed when it starts (§5.184, the owner's word of 2026-11-15); whether it is faster waits for the owner's devices. A course drill's opponent plays the course's own replies until a try against them is solved, and Maia alone's defence counts exchanges, needs 2% of Maia for a push and is vetoed by Lc0 only against a sound best; a queen the defence can take at once isn't "queened" (§5.185, the owner's reports of 2026-11-15). Read with `DECISIONS.md`, which this plan updates (its
+for the owner. Phase 2 is planned in depth in §5 too (§5.20–§5.28, 2026-10-06), and built through §5.26; §5.18 (alternative moves) is built, §5.27 (the course tree) is built as the explorer's Study tab (§5.162, the owner's yes of 2026-11-10), §5.28 for the owner's devices. The owner's third notes are built (§5.38). Phase 3 is planned in depth (§5.29–§5.37, 2026-10-06) and built through §5.36 (threads opt-in); its acceptance test (§5.37) waits for the owner's devices. Phase 4 (the storm and puzzles) is planned in depth (§5.39–§5.49, 2026-10-06) and built through §5.48 (2026-10-07); its acceptance test (§5.49) waits for the owner's devices. Phase 5 (mistake review and the migration from mistake-lab) is planned in depth (§5.50–§5.66, 2026-10-07) and built through §5.64; the analyzer's output lives in the data repo through a converter (§5.66, the owner's choice of 2026-11-10, built in §5.163), its acceptance test (§5.65) waits for the owner's devices. What was left of mistake-lab after it (§6's list of five) is built too (2026-10-07). Prioritizing a study and paused lines (§5.70, the owner's request) are built (2026-10-07); the live check waits for the owner's devices. The storm reworked after the owner's first test (§5.71, 2026-10-08): the deal spread over line ends, the move and arrows kept on the board, Analyse keeping the session, new screens. Clearing the gathered positions (§5.72) is built. A set's first answer kept through Try again, and the review's list beside the board (§5.73), are built, and so are saving a sequence from any analysis board and a storm position as a mistake (§5.74). Stockfish 19 is an option beside 18 (§5.75, the owner's request). A new chapter from a FEN or PGN (§5.76) is built. The owner's notes of 2026-10-08 (§5.77) are built: repetitions, mistakes asked again at a line's end and in drills, Copy FEN, the explorer without games, Maia's columns kept, the analysis board's side, and ← back to where a page was opened from. The owner's notes of 2026-10-09 on training (§5.78) are built: "From the start, asked" asks every own move on every pass, the study's arrows at a line's end, and Read within a session. A storm move is judged by Stockfish alone, the deepening at depth 24 (22 on a phone) while the user thinks (§5.84). The study page's option B (§5.94, the owner's choice) and the owner's notes on it (§5.95) are built (2026-10-11). Storm positions shared between devices through the data repo, and an overnight gather (§5.102), are built (2026-10-12). Lc0 on the study page, its pick among close moves (§5.143), is built (2026-10-31). Endgames, the theoretical endgames each played for its goal against Stockfish (§5.145), are built (2026-10-31), their moves judged in the background since (§5.146, the owner's request of 2026-11-01), defended by Maia checked by Stockfish (§5.147, the owner's request), and a draw's attacker pushing on so the whole method comes up (§5.148, the owner's note). The endgames of the user's own repertoire (§5.149) are built (2026-11-01), and thirteen more theoretical endgames in two more groups (§5.150, the owner's request of 2026-11-02). A game card's move judged without waiting on the engine line's searches or the storm's workers (§5.151, the owner's request of 2026-11-04). Show and grade in the storm, every move of a deepened position shown by its band (§5.152, the owner's request of 2026-11-06), is built. A robotic board, the Chessnut Move, in the storm's untimed sessions and in practice is planned in its own document, `CHESSNUT.md` (§5.153 points there; the owner's request of 2026-11-06), and being built since 2026-11-14 at the owner's word, before the board arrives: parts (a) to (c), the codec, the Web Bluetooth module, a simulated board, the spike page, reading moves, the link and the lights (pure), and the link in the app with its chip and dialog, are built, and so are part (d), practice on the board (the drills and the endgames too), part (e), the storm's set, show and grade and puzzles on the board, and part (f), the timed storm (its clock stopped while the board sets up), the review and its retry: the plan's build is complete, and its live checks wait for the board. After a storm verdict, Show refutation (a mistake or a blunder), Show line (a great move or the top move) and Continue against Maia's reply (a good move or better) are built (§5.154, the owner's request of 2026-11-06). A polish pass (§5.156, the owner's request of 2026-11-07) made the light theme readable and the folded settings panel free, and lists ideas waiting for the owner's word. The positions after Maia's likely moves (20% or more) outside a storm card's list are searched while the user thinks (§5.157, the owner's request of 2026-11-10). Of §5.156's ideas the owner said to build all but the faster start (2026-11-10): Today on the home, the icon's shortcuts, the wrong move shown, "?" for the keys and the empty pages are built (§5.158). Share to Repworks and .pgn files opened with it, sounds, Settings apart from Debug and the dark themes' contrasts are built (§5.159). TESTING.md is one walk through the app, by screen (§5.160). The home's deepening searches Maia's likely moves too, and those searches are kept with the position (§5.161). The explorer has a Study tab: the open study's moves at the board's position, across its chapters and move orders (§5.162, §5.27). The analyzer's games are converted into the data repo's `games/` files, which every device reads beside the Gist (§5.163, §5.66). A second look (§5.164, the owner's request of 2026-11-11): a phone held sideways has the board whole at the left of every board page, long names no longer make a phone's page scroll sideways, and the page's title names the screen. On the analysis board the explorer's third tab is the whole repertoire's moves at the position (§5.165), and a search page finds a study or a chapter by name, a comment by its words and a position by its moves or FEN (§5.166). What is next from that look is planned in §5.167: three parts to build, and five ideas waiting for the owner's word. A game card's priority, High, Normal or Low, its due cards asked high first (§5.171, the owner's request of 2026-11-12), is built, and chosen wherever a mistake or a tactic is saved (§5.172). Premoves are in every kind of practice, the endgames and a checklist's lead-up too (§5.173, the owner's request of 2026-11-13). An endgame's defence varies over tries, Maia's likely replies not met yet first and the same defence after a miss, and "Maia alone" answers without waiting on Stockfish (§5.174, the owner's request of 2026-11-14). "Course only" on the Endgames page puts the built-in endgames and the repertoire's aside, on the page and in what is due, and the course's groups are rows with their progress (§5.179, the owner's request of 2026-11-15). "Focus on mistakes" on the Endgames page holds it and its Next to the endgames missed in one of their last five tries, due or not (§5.180, the owner's request of 2026-11-15). Opening names from Lichess's list, bundled (§5.181, §5.167's first waiting idea, the owner's word of 2026-11-15): under the analysis board, in a game's head, and found by name in search. On a narrow engine bar the status and + have a row of their own (§5.182, a CI failure of 2026-11-15 that was the app's). Whether FSRS fitted to the owner's own answers would predict them better than the default weights is a script's report (§5.183, the owner's word of 2026-11-15 on §5.167's third waiting idea): run on the real log, it says not yet; the app's scheduler is unchanged. Maia and Lc0 can run on the graphics processor (WebGPU), a switch in the engine's settings, off unless chosen, each engine checked against the processor's answers and timed when it starts (§5.184, the owner's word of 2026-11-15); whether it is faster waits for the owner's devices. A course drill's opponent plays the course's own replies until a try against them is solved, and Maia alone's defence counts exchanges, needs 2% of Maia for a push and is vetoed by Lc0 only against a sound best; a queen the defence can take at once isn't "queened" (§5.185, the owner's reports of 2026-11-15). Stockfish 19 with its full net is a third Version in the engine's settings, a 99 MB download taken from the npm package at build time (§5.186, the owner's word of 2026-11-15). An endgame's move with seven pieces or fewer is judged by Lichess's tablebase where it answers, exactly, with Stockfish beside it and alone when it doesn't (§5.187, the same word). The official 23M Maia 3, which reads the seven positions before too, is a second model to choose in the engine's settings, exported from the official checkpoint and checked against the official code (§5.188, the same word); the 79M one is not built. Read with `DECISIONS.md`, which this plan updates (its
 revision log lists every change and why).
 
 Contents:
@@ -10646,7 +10646,7 @@ switch that can't make things wrong or slower, and that measures.
     numbers explode on garbage): the check must be on real positions.
   - The software adapter is 15 times slower than wasm. Nothing here says anything of a real one.
 - **Not built**: several threads for the wasm backend (the page is cross-origin isolated only
-  when Stockfish's threads are on); Maia's larger models (found in the look of 2026-11-15 that led here: they
+  when Stockfish's threads are on); Maia's larger models (the official 23M since built, §5.188; found in the look of 2026-11-15 that led here: they
   wait for the owner's word, and for this to show that a graphics processor serves); the choice synced
   between devices (a phone and a desktop differ).
 
@@ -10728,3 +10728,152 @@ Four reports from the owner's endgame drilling, with "Maia alone" on (§5.174) a
 `COURSE_SOURCE` (`src/app/practice.ts`); `authorFirst` (`src/app/endgameVariety.ts`); the line under
 the board and the chapter passed in (`src/ui/Endgames.tsx`). Tests: `variety.test.ts`,
 `courses.test.ts`, `endgames.test.ts`, `repertoire.test.ts`, the endgames e2e spec.
+
+#### 5.186 Stockfish 19 with its full net (the owner's word of 2026-11-15, built)
+
+The app shipped the lite builds only (18: 7 MB; 19: 1.8 MB). Stockfish.js 19 also has builds with
+the full net (`nn-1a298aa575a0`), 99 MB each: stronger at the same depth, which matters where a
+search is short (the storm's and the endgames' judges, a phone's depth).
+
+- **A third Version** in the engine's settings: Stockfish 18, Stockfish 19, **Stockfish 19, full
+  net**. Chosen, the dialog says what it costs ("a download of 99.2 MB, once"); the engine bar
+  reads `SF19F`. Everything that starts Stockfish by the settings' version takes it: the analysis
+  engine and the background searches (the storm, practice, the endgames' judges). With threads
+  on, the threaded full build (99.1 MB, a second download).
+- **From the npm package, not vendored**: `stockfish@19.0.1` is a devDependency (pinned exactly),
+  and `vite.config.ts` emits `node_modules/stockfish/bin/stockfish-19-single.{js,wasm}` and
+  `stockfish-19.{js,wasm}` among the engines. Why: git refuses a file over 100 MB and warns over
+  50; two of 99 MB don't belong in the history. The lite builds stay vendored (from 19.0.0, as
+  before). The built site grows from 110 MB to 352 MB (with §5.188's model), under GitHub Pages'
+  1 GB; nothing is downloaded by a device that doesn't choose it.
+- **A longer handshake**: 60 s for the full build instead of 10 (99 MB of wasm to compile and a
+  net to read; under Node `uciok` comes in about a second).
+- **Not built**: the full net as the default, or on a phone by a rule (the owner chooses);
+  Stockfish 18's full net.
+
+**Checked**: under Node, the full build from the package answers mate in one and searches the
+start position (`test/unit/engine/stockfish.test.ts`, each of the three builds); in headless
+Chromium, the built worker of each build answers `uciok` with its own name, mate in one, and
+stops (`test/e2e/stockfish.spec.ts`), and the choice (`test/e2e/version.spec.ts`): the size said,
+the full build's wasm downloaded and no lite one, `SF19F` searching, kept over a reload.
+**Not checked**: any real device (the download's time, a phone's memory with 99 MB of wasm:
+`TESTING.md` §2); how much stronger it judges at the app's depths (taken from Stockfish's own
+notes on the nets, not measured here).
+
+**As built** (2026-11-15): `package.json` (`stockfish` 19.0.1), `vite.config.ts` (`stockfish19Full*`),
+`src/platform/stockfish.ts` (`STOCKFISH_VERSIONS`, `stockfishName`, `stockfishShort`,
+`stockfishFiles`, `HANDSHAKE_FULL_MS`), `src/ui/EngineSettings.tsx`, `src/ui/Engine.tsx`,
+`src/ui/Engines.tsx`, `vendor/stockfish/README.md`.
+
+#### 5.187 An endgame's moves judged by the tablebase (the owner's word of 2026-11-15, built)
+
+An endgame's move was a slip when Stockfish's score fell under a line (+2 for a win, −2 for a
+draw, or the endgame's own: §5.145, §5.150). That is a guess with a threshold: the bishops' mates
+score under +2 though won, a fortress scores +3 though drawn. Lichess's tablebase
+(`tablebase.lichess.ovh`, Syzygy, up to seven pieces) knows the truth of such positions.
+
+- **Where it answers, it decides.** A move's judge asks the tablebase for the position before
+  the move, beside Stockfish's search (which is mostly in already: §5.177). The answer has the
+  position's outcome and every move's. The move slipped when the goal was there to keep and is
+  gone after it: for a win, won before and not won after; for a draw, not lost before and lost
+  after. Stockfish's scores for that move are then not looked at, and its deeper second search
+  (§5.146) is not run. The fifty-move rule counts as the tablebase counts it: a cursed win is a
+  draw.
+- **Where it doesn't, nothing changes**: more than seven pieces, castling rights left, offline,
+  no answer in 2.5 s, "unknown". After a failure nothing is asked for a minute, so a judge waits
+  on it once at most. With Stockfish gone and the tablebase there, the tablebase's verdict alone
+  judges.
+- **The move that keeps it** (the slip's arrow): Stockfish's best move if the tablebase agrees it
+  keeps the goal, else the tablebase's first keeping move.
+- **Said on the slip**: "The tablebase's verdict, with best play: a win before the move, a draw
+  after it."
+- **Asked while the user thinks** (with the judge's search, `ponder`), kept for the session by
+  position and halfmove clock.
+- **What is sent**: the position (a FEN) to Lichess, with no token and nothing about the user.
+  The app already asks Lichess's explorer; this needs no login.
+- **Not built**: the tablebase as the defence (the opponent's moves stay Stockfish's, Maia's and
+  Lc0's: §5.147, §5.174), distance to mate shown, a switch to turn it off (nothing in the judge is
+  worse with it: say if one is wanted), the hint from the tablebase.
+
+**Checked**: the real tablebase from a page in headless Chromium, read by the core module
+(2026-11-15): it answers any origin, in 0.2 to 0.7 s; "Take the opposition" is a win kept only
+by Ke3, Kd2 a draw; the bishop and knight's start is won by 14 moves; the hold's only drawing
+move is Ke7. Unit tests (`test/unit/core/endgames/tablebase.test.ts`: the URL, the categories,
+a live answer read, the rule both ways, a verdict overriding the scores in `firstSlip` and
+`goalKept`). Playwright with a fake tablebase and the fake Stockfish at odds
+(`test/e2e/endgames.spec.ts`): a move Stockfish scores as a slip kept and not searched again;
+the move Stockfish likes stopped, with the verdict said and the tablebase's keeping move as the
+arrow; the try recorded as a draw. Every other endgame test runs with a tablebase that knows
+nothing (`serveTablebase`, through `serveExplorer`), so they stay Stockfish's alone and never
+reach the network. **Not checked**: on the owner's devices, with real Stockfish and the real
+tablebase together (`TESTING.md` §8); Lichess's rate limit under a long session (one request a
+move; a 429 backs off for a minute).
+
+**As built** (2026-11-15): `src/core/endgames/tablebase.ts` (`inTablebase`, `tablebaseUrl`,
+`readTablebase`, `tablebaseVerdict`, `tablebaseSlips`, `outcomeKeeps`, `keepingMoves`),
+`src/core/endgames/endgames.ts` (`JudgedMove.tb`, `firstSlip`, `goalKept`),
+`src/platform/tablebase.ts` (`tablebase`), `src/app/practice.ts` (`judge`'s `goal`, `ponder`,
+`endgameJudged`, `slipAt`, `PracticeMove.tb`), `src/ui/Endgames.tsx` (the verdict's line),
+`test/e2e/explorer.ts` (`serveTablebase`).
+
+#### 5.188 The official 23M Maia 3, with the positions before (the owner's word of 2026-11-15, built)
+
+The look of 2026-11-15 called the official Maia-3 models "larger". **That was half wrong, found
+while building**: the vendored `maia3_simplified.onnx` (the Maia platform's) already has 22.7
+million parameters, the size of the official 23M. What the official release (CSSLab/maia3,
+Hugging Face `UofTCSSLab/Maia3-23M`) adds is the **history**: its input is the last eight
+positions, not one. Only the 79M model is larger.
+
+- **A second model to choose**, in the engine's settings: "Maia's model": Maia 3 (as before, the
+  default) or **Maia 3, 23M**. Per device (`repworks-maia`'s `model`). One model runs at a time;
+  everything that asks Maia on the device asks the chosen one (the explorer's columns and
+  search, practice's opponent, the storm, the endgames' defence, the continuation). The other's
+  file is a download of its own, 45.8 MB, asked for by the usual dialog when it isn't there.
+- **The history where a game gives it**: a practice game's opponent sends the game's positions
+  before (up to seven). Everywhere else the position stands for them, repeated eight times: the
+  official engine's own default (`--use_uci_history` off).
+- **Exported here** from the official PyTorch checkpoint with the official model code
+  (`scripts/maia3-export.py`): the same input names as the first model, `tokens [B, 64, 96]`,
+  ratings as float32. `RMSNorm` written out in plain arithmetic (the exporter has no rule for
+  it; the outputs are identical, 0.0 apart). The weights stored at half precision with a cast
+  after each, the arithmetic in float32: 45.8 MB instead of 91 MB (git warns over 50 MB), the
+  largest move probability 0.00015 from PyTorch's on 64 positions. So, unlike the first model, it
+  needs no 16-bit floats in shaders (§5.184).
+- **The encoding** (`maiaHistoryTokens`): the eight positions oldest first, each from its own
+  side to move's view (the board turns from one to the next), the earliest repeated in front
+  when there are fewer: the official `tokenize_board` and `get_historical_tokens`.
+- **Licence**: the official repository is AGPL-3.0, and so the export. This repository is
+  GPL-3.0-or-later, which allows the combination (GPLv3 §13); the file stays under the AGPL,
+  whose one added duty, the source offered to those who use it over a network, a public
+  repository already meets. `vendor/maia/README.md`; D11's revision in `DECISIONS.md`.
+- **The same speed**: 124 ms a position against the first model's 138 (onnxruntime-web, one
+  thread, under Node in the cloud container).
+- **Not built**: the 79M model (a 316 MB checkpoint, 158 MB at half precision: over git's 100 MB,
+  and a phone's download); the history for the explorer's own asks (the study page knows the
+  moves that led to a position, the Practical search its tree: both could send them); the 23M
+  as the default; the Node scripts (`scripts/storm/maia.ts`, the skills) on the 23M.
+- **Known and left**: the storm's difficulty and the endgames' thresholds (`MAIA_TOP`, `MAIA_MIN`)
+  were tuned on the first model's numbers; with the 23M chosen they read the 23M's, on the same
+  scale. The cloud's gather (`scripts/storm-gather.ts`) stays on the first model.
+
+**Checked**: the export against PyTorch (the script's own check, above). This site's encoding on
+the vendored file under onnxruntime-web in Node against the official code on the official
+checkpoint (`scripts/maia3-reference.py` → `test/fixtures/maia/reference-23m.json`,
+`test/unit/engine/maia23.test.ts`): 25 positions, 12 with the positions before, the same top
+move in each, the top five within 0.002. The batch: with and without the positions before are
+two questions. In headless Chromium (`test/e2e/maia.spec.ts`, desktop): the model chosen, its
+download named (and the AGPL), only its file fetched, the start position's likelihoods the
+official code's to half a point, kept over a reload, and the first model chosen again with its
+own numbers. **Not checked**: whether it predicts the owner's opponents better (nothing here
+measures that: the paper's claim, on its test sets); the 23M on WebGPU (the switch's check
+would decide); a phone; the practice opponent's history in a browser test (the batch's unit
+test covers the path).
+
+**As built** (2026-11-15): `vendor/maia/maia3-23m.onnx`, `scripts/maia3-export.py`,
+`scripts/maia3-reference.py`, `src/core/maia/encode.ts` (`MAIA_HISTORY`, `maiaHistoryTokens`),
+`src/core/maia/batch.ts` (`history`, `ask`'s `before`), `src/core/maia/protocol.ts`
+(`MAIA_MODELS`, `init`'s `model`, `ask`'s `before`), `src/platform/maiaWorker.ts`,
+`src/app/maia.ts` (`MaiaPrefs.model`, `maiaFiles`, `setMaiaModel`, `maiaPolicy`'s `before`),
+`src/app/practice.ts` (`positionsBefore`), `src/app/continuation.ts` (`continuationFiles`),
+`src/ui/EngineSettings.tsx`, `src/ui/MaiaDialog.tsx`, `src/ui/Engines.tsx`, `vite.config.ts`
+(`maia23Model`).

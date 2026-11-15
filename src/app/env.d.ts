@@ -16,7 +16,12 @@ declare module 'virtual:repworks-engines' {
     stockfish19Wasm: EngineFile;
     stockfish19MtJs: EngineFile;
     stockfish19MtWasm: EngineFile;
+    stockfish19FullJs: EngineFile;
+    stockfish19FullWasm: EngineFile;
+    stockfish19FullMtJs: EngineFile;
+    stockfish19FullMtWasm: EngineFile;
     maiaModel: EngineFile;
+    maia23Model: EngineFile;
     lc0Model: EngineFile;
     ortWasm: EngineFile;
     ortMjs: EngineFile;

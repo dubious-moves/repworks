@@ -31,8 +31,10 @@ import { readSaved, resumable, type Saved } from '../core/games/resume.ts';
 import { covered, scanCandidate, tacticCandidates, TACTIC, type DetectedTactic, type Pv } from '../core/games/detect.ts';
 import type { Color } from '../core/games/record.ts';
 import { historyCard, practiceCard } from '../core/progress/cards.ts';
-import { ENDGAME_PRESET, firstSlip, GOAL_CP, GRADE_SECONDS, gradeOfTime, meanSeconds, type SolveGrade, held, keepsGoal, lineOf, MAIA_ELO, maiaCandidates, materialFor, opponentPick, pawnPushes, pushNow, slips, solvedBy, wonAfter, type Endgame, type OpponentLine } from '../core/endgames/endgames.ts';
+import { ENDGAME_PRESET, firstSlip, goalKept, GOAL_CP, GRADE_SECONDS, gradeOfTime, meanSeconds, type SolveGrade, held, lineOf, MAIA_ELO, maiaCandidates, materialFor, opponentPick, pawnPushes, pushNow, slips, solvedBy, wonAfter, type Endgame, type Goal, type OpponentLine } from '../core/endgames/endgames.ts';
 import { hangs, lc0Vetoed, replyOrder, trustPick } from '../core/endgames/variety.ts';
+import { keepingMoves, tablebaseVerdict, type TablebaseVerdict } from '../core/endgames/tablebase.ts';
+import { tablebase } from '../platform/tablebase.ts';
 import { endgameLc0 } from './endgameLc0.ts';
 import { authorFirst, endgameMaiaAlone, hintsAt, replyPlayed, tryBegun, tryEnded } from './endgameVariety.ts';
 import type { Grade } from '../core/progress/events.ts';
@@ -127,6 +129,8 @@ export interface PracticeMove extends PlayedMove {
   /** The position's lines before the user's move (first move, score for the mover), for the tactic scan. */
   pvs?: Pv[];
   judging?: boolean;
+  /** The tablebase's verdict on an endgame's move, where it answered (§5.187). */
+  tb?: TablebaseVerdict;
   /** The user's thinking time for this move (ms): from the turn's start (the answer on the board) to the move (§5.178). */
   ms?: number;
 }
@@ -359,8 +363,11 @@ async function endgameReply(fen: string, e: Endgame, userMoves: number, seen: Re
   return pick ? { uci: pick.uci, source: pick.maia ? `Maia ${MAIA_ELO}` : 'Stockfish', dbFailed: false } : undefined;
 }
 
+/** The game's positions before the one on the board, oldest first: what the 23M Maia reads beside it (§5.188). */
+const positionsBefore = (p: PracticeGame): string[] => (p.moves.length ? [p.moves[0]!.fenBefore, ...p.moves.slice(0, -1).map((m) => m.fen)] : []);
+
 /** The opponent's move: the database, then Maia, then Stockfish; undefined when none answers. */
-async function opponentMove(fen: string, o: Opponent): Promise<{ uci: string; source: string; dbFailed: boolean } | undefined> {
+async function opponentMove(fen: string, o: Opponent, before?: readonly string[]): Promise<{ uci: string; source: string; dbFailed: boolean } | undefined> {
   const pos = positionOf(fen);
   if (!pos) return undefined;
   let dbFailed = false;
@@ -370,7 +377,7 @@ async function opponentMove(fen: string, o: Opponent): Promise<{ uci: string; so
     const move = picked && parseUciMove(pos, picked.uci);
     if (picked && move) return { uci: uciOf(fen, picked.uci)!, source: `DB (${picked.white + picked.draws + picked.black})`, dbFailed };
   } else dbFailed = true;
-  const policy = await maiaPolicy(fen, o.maiaElo);
+  const policy = await maiaPolicy(fen, o.maiaElo, before);
   const m = policy && maiaPick(policy, o.precision, Math.random);
   if (m) return { uci: m.uci, source: 'Maia', dbFailed };
   const a = await analyseForStorm(fen, 1, 16, 4000);
@@ -438,11 +445,21 @@ function sanLine(fen: string, pv: readonly string[]): string[] {
  * judged by that search (§5.136); only when `recheckIf` says so, given it (an endgame's move, only
  * when it looks like a slip: nothing else about it is shown).
  */
-export async function judge(fenBefore: string, uci: string, fenAfter: string, recheckIf?: (bestCp: number, afterCp: number) => boolean, quick = false): Promise<Partial<PracticeMove> | undefined> {
+export async function judge(fenBefore: string, uci: string, fenAfter: string, recheckIf?: (bestCp: number, afterCp: number) => boolean, quick = false, goal?: Goal): Promise<Partial<PracticeMove> | undefined> {
   const pos = positionOf(fenBefore);
   if (!pos) return undefined;
   const moverLines = (a: Awaited<ReturnType<typeof analyse>>): MoverLine[] => (a?.lines ?? []).filter((l) => l.pv.length).map((l) => ({ move: l.pv[0]!, cp: moverScore(l.score, pos.turn) }));
+  // An endgame's move (§5.187): the tablebase asked beside Stockfish, and its verdict the judge where it has one.
+  const table = goal ? tablebase(fenBefore) : undefined;
   let a = await analyse(fenBefore, 3, quick);
+  const tbPos = await table;
+  const tb = tbPos && tablebaseVerdict(tbPos, uci);
+  // The move that keeps the goal: Stockfish's best if the tablebase agrees it does, else the tablebase's first.
+  const keeping = (best: string | undefined): string | undefined => {
+    if (!tbPos || !goal) return best;
+    const keep = keepingMoves(goal, tbPos);
+    return best && keep.includes(best) ? best : (keep[0] ?? best);
+  };
   let lines = moverLines(a);
   const matched = lines.find((l) => l.move === uci);
   let afterCp = matched?.cp;
@@ -454,8 +471,9 @@ export async function judge(fenBefore: string, uci: string, fenAfter: string, re
     if (l?.pv.length) afterCp = -moverScore(l.score, after.turn);
   }
   let j = judgeMove(lines, uci, afterCp);
-  if (!j) return undefined;
-  if (!ended && needsRecheck(j) && (recheckIf?.(j.bestCp, afterCp ?? j.bestCp - j.cpLoss) ?? true)) {
+  // Stockfish gone, the tablebase there: its verdict alone.
+  if (!j) return tb ? { tb, bestMoveUci: keeping(undefined) ?? '' } : undefined;
+  if (!tb && !ended && needsRecheck(j) && (recheckIf?.(j.bestCp, afterCp ?? j.bestCp - j.cpLoss) ?? true)) {
     const moves = recheckMoves(lines, uci);
     const deep = await search(fenBefore, moves.length, narrow() ? RECHECK.phoneDepth : RECHECK.depth, RECHECK.movetime, moves);
     const deepLines = moverLines(deep);
@@ -468,7 +486,7 @@ export async function judge(fenBefore: string, uci: string, fenAfter: string, re
     }
   }
   const best = a!.lines[0]!;
-  return { classification: j.classification, wpDrop: j.wpDrop, cpLoss: j.cpLoss, bestCp: j.bestCp, afterCp: afterCp ?? j.bestCp - j.cpLoss, bestMoveUci: j.bestMove ?? '', bestLine: sanLine(fenBefore, best.pv), pvs: lines.map((l) => ({ cp: l.cp, firstMove: l.move })) };
+  return { classification: j.classification, wpDrop: j.wpDrop, cpLoss: j.cpLoss, bestCp: j.bestCp, afterCp: afterCp ?? j.bestCp - j.cpLoss, bestMoveUci: keeping(j.bestMove) ?? '', ...(tb ? { tb } : {}), bestLine: sanLine(fenBefore, best.pv), pvs: lines.map((l) => ({ cp: l.cp, firstMove: l.move })) };
 }
 
 /** Judges still out, by game (a takeback or a resume starts a new one while the old judges finish). */
@@ -481,7 +499,7 @@ function judgeAt(g: number, i: number): Promise<void> {
   if (!p || !mv) return Promise.resolve();
   pendingBy.set(g, (pendingBy.get(g) ?? 0) + 1);
   const e = p.setup.endgame;
-  const job = judge(mv.fenBefore, mv.uci, mv.fen, e && ((best, after) => slips(e.goal, best, after, lineOf(e))), !!e).then((j) => {
+  const job = judge(mv.fenBefore, mv.uci, mv.fen, e && ((best, after) => slips(e.goal, best, after, lineOf(e))), !!e, e?.goal).then((j) => {
     patch(g, (q) => {
       const moves = [...q.moves];
       const { judging: _j, ...rest } = moves[i]!;
@@ -797,7 +815,7 @@ async function opponentTurn(g: number): Promise<void> {
   if (!p || p.gen !== g || p.phase !== 'opponent' || p.slip || p.ending) return;
   const fen = fenAfter(p);
   const at = p.moves.length;
-  const m = p.setup.kind === 'endgame' ? await endgameReply(fen, p.setup.endgame!, p.moves.filter((m) => m.isUser).length, seenKeys(p)) : await opponentMove(fen, p.setup.opponent);
+  const m = p.setup.kind === 'endgame' ? await endgameReply(fen, p.setup.endgame!, p.moves.filter((m) => m.isUser).length, seenKeys(p)) : await opponentMove(fen, p.setup.opponent, positionsBefore(p));
   const q = practice.peek();
   // An endgame stopped on a slip meanwhile lets the answer go; one played on asks again, and the
   // first answer in is the one played.
@@ -998,7 +1016,9 @@ async function writeHistory(g: number, reason: EndReason, result: 'win' | 'draw'
  * starts from these lines, so it is mostly in by the time Stockfish has answered.
  */
 function ponder(p: PracticeGame): void {
-  if (p.setup.kind === 'endgame' && p.phase === 'user') void analyse(fenAfter(p), 1, true);
+  if (p.setup.kind !== 'endgame' || p.phase !== 'user') return;
+  void analyse(fenAfter(p), 1, true);
+  void tablebase(fenAfter(p));
 }
 
 /**
@@ -1040,13 +1060,13 @@ function endgameJudged(g: number): void {
   const e = q.setup.endgame!;
   const from = q.playedOn ?? 0;
   // A judge that gave nothing (Stockfish gone): nothing can be told, nothing counts.
-  if (q.moves.some((m, i) => i >= from && m.isUser && !m.judging && m.afterCp === undefined)) return finish(g, 'interrupted');
+  if (q.moves.some((m, i) => i >= from && m.isUser && !m.judging && m.afterCp === undefined && !m.tb)) return finish(g, 'interrupted');
   const at = firstSlip(e.goal, q.moves, from, lineOf(e));
   if (typeof at === 'number') return slipAt(g, at);
   if (at === 'pending' || !q.ending || q.moves.some((m) => m.isUser && m.judging)) return;
   // The goal reached, as its last move's judge has it: a promotion that loses the new queen, say, isn't.
   const last = q.moves.at(-1)!;
-  if (q.ending === 'goal' && !(last.afterCp !== undefined && keepsGoal(e.goal, last.afterCp, lineOf(e)))) {
+  if (q.ending === 'goal' && !goalKept(e.goal, last, lineOf(e))) {
     replace(g, (r) => {
       const { ending: _e, ...rest } = r;
       return rest;
@@ -1068,7 +1088,8 @@ function slipAt(g: number, i: number): void {
     const { ending: _e, hint: _h, premove: _p, ...rest } = r;
     return { ...rest, slip: { at: i, ...(keep ? { uci: keep } : {}), ...(san ? { san } : {}) }, ...(r.missed ? {} : { missed: { fenBefore: mv.fenBefore, san: mv.san, ...(san ? { keep: san } : {}) } }) };
   });
-  endgameMiss(g, e.goal === 'win' && mv.afterCp! > -GOAL_CP.win ? 'draw' : 'loss', i + 1);
+  const drawn = mv.tb ? mv.tb.after === 'draw' : mv.afterCp! > -GOAL_CP.win;
+  endgameMiss(g, e.goal === 'win' && drawn ? 'draw' : 'loss', i + 1);
 }
 
 /**

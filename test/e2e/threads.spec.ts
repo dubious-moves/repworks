@@ -43,7 +43,7 @@ test('two threads: the page isolated from its next load, the threaded engine run
   expect(site.requests.some((r) => /\/engines\/stockfish-18-lite\.[0-9a-f]{10}\.wasm$/.test(r))).toBe(true);
   // Stockfish 19 chosen (§5.75): its threaded build, with the same two threads.
   await panel.getByRole('button', { name: 'Engine settings' }).click();
-  await dialog.getByRole('group', { name: 'Version' }).getByRole('button', { name: 'Stockfish 19' }).click();
+  await dialog.getByRole('group', { name: 'Version' }).getByRole('button', { name: 'Stockfish 19', exact: true }).click();
   await dialog.getByRole('button', { name: 'Save' }).click();
   await expect(panel.locator('.engine-name')).toHaveText('SF19 ×2');
   await expect(panel.locator('.engine-depth')).toHaveText(/^Depth (1[6-9]|2\d)/, { timeout: 30_000 });

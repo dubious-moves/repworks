@@ -102,6 +102,29 @@ later change replaced are folded into the later item; items already reported wor
 
 ## 2. Studies and the study page
 
+### Stockfish 19's full net (§5.186, 2026-11-15)
+- On the desktop: ⚙ → Version → "Stockfish 19, full net" → Save, then switch Stockfish on. It
+  downloads 99 MB once: how long does it take, and does the bar (`SF19F`) start searching after
+  it? With threads on it downloads a second 99 MB build.
+- Does it feel different from Stockfish 18 at the same depth (the storm's verdicts, an endgame's
+  "Checking your moves…")? Nothing here measured its strength at the app's depths.
+- On the phone, if tried: does it start at all (99 MB of wasm in memory), and how long?
+- **Checked**: Node and headless Chromium only: each build answers and searches; the choice
+  downloads the full build and no lite one, and is kept. No real device.
+
+### Maia's model: the official 23M (§5.188, 2026-11-15)
+- ⚙ → "Maia's model" → "Maia 3, 23M" → Save. With Maia on, the dialog asks for its download (60 MB
+  with the runtime, once). Do the explorer's Ml and Ms columns come as before, with somewhat
+  different percentages?
+- A practice game against Maia with it chosen: does the opponent play sensibly? (Only there does
+  it read the game's last moves.)
+- Is it as fast as the first model (the columns, the storm's ratings)? In the cloud they were
+  equal.
+- With "on the graphics processor" on too: what does Maia's line under the switch say? (This
+  export needs no 16-bit floats, unlike the first model; never run on any adapter.)
+- **Checked**: against the official code's numbers under Node and in headless Chromium
+  (desktop). No phone, no graphics processor, and nothing about whether it predicts better.
+
 ### Maia and Lc0 on the graphics processor (§5.184, 2026-11-15)
 - On the desktop and on the phone, each: ⚙ (engine settings) → "Maia and Lc0: on the graphics
   processor, where it is faster (WebGPU)". It downloads 16.8 MB once. With Maia and Lc0 on, open
@@ -1111,6 +1134,18 @@ later change replaced are folded into the later item; items already reported wor
   floor, the author's replies and when they stop, the queen that can be taken); Playwright's
   endgames spec (the course's reply played and the line shown). **Not** the app on a device, and
   not the owner's real course chapters.
+
+### An endgame's moves judged by the tablebase (PLAN.md §5.187, 2026-11-15)
+- Online, "Take the opposition": play Kd2. The slip should come quickly, with "The tablebase's
+  verdict, with best play: a win before the move, a draw after it." under it.
+- The bishop and knight's mate, or two bishops': moves that keep the mate but that Stockfish
+  scores low are no longer at risk of being called slips; a hung piece still is. Does any move
+  get stopped that shouldn't, or pass that shouldn't?
+- A repertoire or course endgame with more than seven pieces: judged by Stockfish as before, and
+  from the move the eighth piece leaves the board by the tablebase. Any oddity at that change?
+- Offline (flight mode): everything as before, Stockfish alone, with no wait.
+- **Checked**: the real tablebase from headless Chromium (answers, CORS, 0.2 to 0.7 s); the judge
+  with a fake tablebase and a fake Stockfish. Not the two real ones together.
 
 ### Focus on mistakes (§5.180, 2026-11-15)
 - Endgames → tick "Focus on mistakes" in the top card: only the endgames with a ✗ among their last

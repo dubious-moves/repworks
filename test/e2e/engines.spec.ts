@@ -61,7 +61,7 @@ test('Stockfish is downloaded when asked, then served from its cache with the si
 test('Maia is downloaded, and a deploy keeps the engines it still names', async ({ page }) => {
   const offSite = await setUp(page);
   await page.locator('details.settings > summary').click();
-  const maia = page.locator('.engine-files', { hasText: 'Maia 3' });
+  const maia = page.locator('.engine-files', { hasText: 'Maia 3 ·' });
   await expect(maia).toContainText('59.9 MB · not stored');
   await maia.getByRole('button', { name: 'Download' }).click();
   await expect(maia).toHaveAttribute('data-stored', 'yes', { timeout: 20_000 });
@@ -83,8 +83,8 @@ test('Maia is downloaded, and a deploy keeps the engines it still names', async 
   expect(await storedEngines(page)).not.toContain('stockfish-17.0000000000.wasm');
 
   // Deleted from the debug panel.
-  await page.locator('.engine-files', { hasText: 'Maia 3' }).getByRole('button', { name: 'Delete' }).click();
-  await expect(page.locator('.engine-files', { hasText: 'Maia 3' })).toHaveAttribute('data-stored', 'no');
+  await page.locator('.engine-files', { hasText: 'Maia 3 ·' }).getByRole('button', { name: 'Delete' }).click();
+  await expect(page.locator('.engine-files', { hasText: 'Maia 3 ·' })).toHaveAttribute('data-stored', 'no');
   expect(await storedEngines(page)).toEqual([]);
   expect(offSite).toEqual([]);
 });

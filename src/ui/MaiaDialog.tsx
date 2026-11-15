@@ -1,7 +1,7 @@
 // Qchess's Maia dialog (PLAN.md §5.32): what Maia is, the one-time download (the model and the
 // runtime, about 60 MB, kept on this device), credit to its authors, then the progress.
 import { useEffect, useRef } from 'preact/hooks';
-import { cancelMaia, downloadMaia, MAIA_FILES, maiaDialog, maiaElo, maiaState } from '../app/maia.ts';
+import { cancelMaia, downloadMaia, maiaDialog, maiaElo, maiaFiles, maiaPrefs, maiaState } from '../app/maia.ts';
 import { megabytes } from './Engines.tsx';
 
 export function MaiaDialog() {
@@ -14,7 +14,8 @@ function Dialog() {
     if (!ref.current!.open) ref.current!.showModal();
   }, []);
   const s = maiaState.value;
-  const bytes = MAIA_FILES.reduce((n, f) => n + f.bytes, 0);
+  const bytes = maiaFiles().reduce((n, f) => n + f.bytes, 0);
+  const big = maiaPrefs.value.model === 'maia3-23m';
   const phone = matchMedia('(max-width: 899px)').matches;
   return (
     <dialog ref={ref} class="study-dialog maia-dialog" aria-labelledby="dialog-maia" onCancel={(e) => (e.preventDefault(), s.kind !== 'downloading' && cancelMaia())}>
@@ -32,7 +33,7 @@ function Dialog() {
           <a href="https://www.maiachess.com/" target="_blank" rel="noopener">
             maiachess.com
           </a>
-          ), under the GPL-3.0: all credit to them.
+          ), under the {big ? 'AGPL-3.0 (the 23M model, from their official weights)' : 'GPL-3.0'}: all credit to them.
         </p>
         {s.kind === 'downloading' && (
           <div role="progressbar" aria-label="Maia’s download" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.floor((100 * s.received) / s.total)}>

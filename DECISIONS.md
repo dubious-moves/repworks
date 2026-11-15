@@ -2598,3 +2598,32 @@ The technical calls, each with its reason:
 - **Maia alone's board checks count exchanges, its pushes need 2% of Maia, and Lc0's veto measures
   against the best move that gives nothing away.** Why: the owner's reports of 2…f6 and 7.b5+ played
   on every try.
+
+## Revision of 2026-11-15 (Stockfish 19's full net: PLAN.md §5.186)
+- **Stockfish 19 with its full net is a third version to choose, taken from the npm package at
+  build time.** Why: the owner's word of 2026-11-15 (stronger judging at the same depth); and
+  not vendored because git refuses a file over 100 MB and the two builds are 99 MB each. Given
+  up: a devDependency (`stockfish@19.0.1`, pinned) where the engines were all vendored files, and
+  a built site of 352 MB instead of 110. D13's "downloaded when first used" stands: only a device
+  that chooses it downloads it.
+
+## Revision of 2026-11-15 (the tablebase judges an endgame's moves: PLAN.md §5.187)
+- **An endgame's move with seven pieces or fewer is judged by Lichess's tablebase where it
+  answers; Stockfish's line (+2, −2, or the endgame's own) only where it doesn't.** Why: the
+  owner's word of 2026-11-15; the tablebase is exact where the line was a threshold. Given up:
+  one more request to Lichess a move (the position alone, no token), and a judge that differs
+  online and offline at the margin (offline it is Stockfish's, as before). No data format
+  changed: a try's event is the same, its `cp` Stockfish's when it has one.
+
+## Revision of 2026-11-15 (the official 23M Maia 3: PLAN.md §5.188; D11)
+- **D11: a second Maia model, the official 23M with the positions before, to choose per device;
+  the first stays the default.** Exported here from the official checkpoint
+  (`scripts/maia3-export.py`), weights at half precision. Why: the owner's word of 2026-11-15.
+- **Its licence is AGPL-3.0** (CSSLab/maia3's), where the first model's source was GPL-3.0. The
+  file is vendored under the AGPL beside this repository's GPL-3.0-or-later code (GPLv3 §13
+  allows it). Given up: anyone serving a changed copy of the site with that model must offer
+  their source to its users, which this public repository does already. If that is not wanted,
+  the model is one file and one choice to take out.
+- **Found**: the first model is as large (22.7 million parameters); the look of 2026-11-15 was
+  wrong to call the 23M larger. The 79M model is not built (316 MB).
+

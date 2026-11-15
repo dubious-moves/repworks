@@ -14,6 +14,7 @@ import { makeSquare as squareName, parseSquare } from 'chessops/util';
 import type { PositionKey } from '../chess/positionKey.ts';
 import { DEFAULT_PARAMS, Grade, newCard, review, type FsrsCard, type FsrsParams } from '../progress/fsrs.ts';
 import type { Category } from './repertoire.ts';
+import { outcomeKeeps, tablebaseSlips, type TablebaseVerdict } from './tablebase.ts';
 import { captureGain, replyOrder } from './variety.ts';
 
 export type Goal = 'win' | 'draw';
@@ -317,12 +318,19 @@ export const keepsGoal = (goal: Goal, cp: number, line: number = GOAL_CP[goal]):
 /** A move that throws the goal away: kept before it (by the best move's score), not after it. */
 export const slips = (goal: Goal, bestCp: number, afterCp: number, line: number = GOAL_CP[goal]): boolean => keepsGoal(goal, bestCp, line) && !keepsGoal(goal, afterCp, line);
 
+/** Whether the goal stands after a move, as its judge has it: by the tablebase where it answered, else by the score. */
+export function goalKept(goal: Goal, m: Pick<JudgedMove, 'afterCp' | 'tb'>, line: number = GOAL_CP[goal]): boolean {
+  return m.tb ? outcomeKeeps(goal, m.tb.after) : m.afterCp !== undefined && keepsGoal(goal, m.afterCp, line);
+}
+
 /** A move of the game as the slip's search reads it: the user's or not, its judge out or in. */
 export interface JudgedMove {
   isUser: boolean;
   judging?: boolean;
   bestCp?: number;
   afterCp?: number;
+  /** The tablebase's verdict on the move, where it has one (§5.187): it decides, the scores don't. */
+  tb?: TablebaseVerdict;
 }
 
 /**
@@ -337,7 +345,7 @@ export function firstSlip(goal: Goal, moves: readonly JudgedMove[], from = 0, li
     const m = moves[i]!;
     if (!m.isUser) continue;
     if (m.judging) return 'pending';
-    if (m.bestCp !== undefined && m.afterCp !== undefined && slips(goal, m.bestCp, m.afterCp, line)) return i;
+    if (m.tb ? tablebaseSlips(goal, m.tb) : m.bestCp !== undefined && m.afterCp !== undefined && slips(goal, m.bestCp, m.afterCp, line)) return i;
   }
   return undefined;
 }

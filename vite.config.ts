@@ -62,7 +62,15 @@ const ENGINE_FILES: Record<string, string> = {
   stockfish19Wasm: 'vendor/stockfish/stockfish-19-lite-single.wasm',
   stockfish19MtJs: 'vendor/stockfish/stockfish-19-lite.js',
   stockfish19MtWasm: 'vendor/stockfish/stockfish-19-lite.wasm',
+  // The full net (§5.186), 99 MB a build: from the npm package, not vendored (git refuses a file
+  // over 100 MB, and warns over 50).
+  stockfish19FullJs: 'node_modules/stockfish/bin/stockfish-19-single.js',
+  stockfish19FullWasm: 'node_modules/stockfish/bin/stockfish-19-single.wasm',
+  stockfish19FullMtJs: 'node_modules/stockfish/bin/stockfish-19.js',
+  stockfish19FullMtWasm: 'node_modules/stockfish/bin/stockfish-19.wasm',
   maiaModel: 'vendor/maia/maia3_simplified.onnx',
+  // The official 23M model, exported with its weights at half precision (§5.188).
+  maia23Model: 'vendor/maia/maia3-23m.onnx',
   lc0Model: 'vendor/lc0/791556.onnx',
   ortWasm: 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm',
   ortMjs: 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.mjs',

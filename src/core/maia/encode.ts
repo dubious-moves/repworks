@@ -51,6 +51,26 @@ export function maiaTokens(fen: string): Float32Array {
   return t;
 }
 
+/** The positions the 23M model reads (§5.188): the one to move in and the seven before it. */
+export const MAIA_HISTORY = 8;
+
+/**
+ * The 23M model's tokens `[64, 12 × 8]`: the last eight positions' pieces, oldest first, each from
+ * its own side to move's view (so the board turns from one to the next, as the official
+ * `tokenize_board` has it). `fens` ends with the position to move in; with fewer than eight, the
+ * earliest is repeated in front (the official engine's padding; with one, the position eight times).
+ */
+export function maiaHistoryTokens(fens: readonly string[]): Float32Array {
+  const last = fens.slice(-MAIA_HISTORY);
+  const t = new Float32Array(MAIA_TOKENS * MAIA_HISTORY);
+  const boards = last.map(maiaTokens);
+  for (let h = 0; h < MAIA_HISTORY; h++) {
+    const b = boards[Math.max(0, h - (MAIA_HISTORY - boards.length))]!;
+    for (let sq = 0; sq < 64; sq++) for (let k = 0; k < 12; k++) if (b[sq * 12 + k]) t[sq * 12 * MAIA_HISTORY + h * 12 + k] = 1;
+  }
+  return t;
+}
+
 const square = (s: string): number => (s.charCodeAt(1) - 49) * 8 + (s.charCodeAt(0) - 97);
 const flip = (s: string): string => s[0]! + (9 - Number(s[1]));
 

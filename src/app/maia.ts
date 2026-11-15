@@ -5,7 +5,7 @@
 // position and Qchess's Ms for the first rows. Answers are kept for the session.
 import { computed, signal } from '@preact/signals';
 import { maiaEloFor, type MaiaMove } from '../core/maia/encode.ts';
-import type { FromMaia, ToMaia } from '../core/maia/protocol.ts';
+import { MAIA_MODELS, type FromMaia, type MaiaModel, type ToMaia } from '../core/maia/protocol.ts';
 import { ENGINES, ensure, remove, stored } from '../platform/blobs.ts';
 import { linkMaia, prefs as explorerPrefs, setPrefs as setExplorerPrefs } from './explorer.ts';
 import { gpuInit, gpuPrefs, noteGpu } from './gpu.ts';
@@ -15,17 +15,27 @@ export interface MaiaPrefs {
   on: boolean;
   /** Maia's rating, or 0 for the explorer's filter's (q_extension's `maiaEloFor`). */
   rating: number;
+  /** The model Maia runs on this device (§5.188): everything that asks Maia asks this one. */
+  model: MaiaModel;
 }
 
-export const DEFAULT_MAIA_PREFS: MaiaPrefs = { on: false, rating: 0 };
+export const DEFAULT_MAIA_PREFS: MaiaPrefs = { on: false, rating: 0, model: 'maia3' };
+
+/** A model's name where one is chosen or downloaded. */
+export const maiaModelName = (model: MaiaModel): string => (model === 'maia3-23m' ? 'Maia 3, 23M' : 'Maia 3');
 const PREFS_KEY = 'repworks-maia';
 const IDLE_MS = 90_000;
-export const MAIA_FILES = [ENGINES.maiaModel, ENGINES.ortWasm, ENGINES.ortMjs];
+/** A model's files: the model and the runtime. */
+export const maiaFilesOf = (model: MaiaModel) => [model === 'maia3-23m' ? ENGINES.maia23Model : ENGINES.maiaModel, ENGINES.ortWasm, ENGINES.ortMjs];
+/** The files of the model chosen on this device. */
+export const maiaFiles = () => maiaFilesOf(maiaPrefs.peek().model);
 
 function loadPrefs(): MaiaPrefs {
   try {
     const raw = localStorage.getItem(PREFS_KEY);
-    return { ...DEFAULT_MAIA_PREFS, ...(raw ? (JSON.parse(raw) as Partial<MaiaPrefs>) : {}) };
+    const prefs = { ...DEFAULT_MAIA_PREFS, ...(raw ? (JSON.parse(raw) as Partial<MaiaPrefs>) : {}) };
+    if (!MAIA_MODELS.includes(prefs.model)) prefs.model = DEFAULT_MAIA_PREFS.model;
+    return prefs;
   } catch {
     return { ...DEFAULT_MAIA_PREFS };
   }
@@ -137,7 +147,23 @@ function startWorker(): void {
     worker = undefined;
   };
   const gpu = gpuInit('maia');
-  post({ type: 'init', ...(gpu ? { gpu } : {}) });
+  post({ type: 'init', model: maiaPrefs.peek().model, ...(gpu ? { gpu } : {}) });
+}
+
+/**
+ * Another model chosen (§5.188): the worker ended (it runs one model), the other's answers
+ * dropped, and, Maia on, started on the new one; its download is asked for when it isn't here.
+ */
+export function setMaiaModel(model: MaiaModel): void {
+  if (model === maiaPrefs.peek().model) return;
+  setMaiaPrefs({ model });
+  worker?.terminate();
+  worker = undefined;
+  for (const w of waiting.values()) w({ type: 'error', id: 0, reason: 'Maia was stopped' });
+  waiting.clear();
+  maiaSeen.value = new Map();
+  maiaState.value = { kind: 'off' };
+  if (maiaPrefs.peek().on) startWorker();
 }
 
 /** Qchess's Maia switch. On also opens the explorer, where Maia's columns are. */
@@ -156,7 +182,7 @@ export function setMaiaOn(on: boolean): void {
 /** The dialog's Download: the model and the runtime into the engines' cache, then Maia starts. */
 export async function downloadMaia(): Promise<void> {
   try {
-    await ensure(MAIA_FILES, (p) => (maiaState.value = { kind: 'downloading', ...p }));
+    await ensure(maiaFiles(), (p) => (maiaState.value = { kind: 'downloading', ...p }));
   } catch (e) {
     maiaState.value = { kind: 'failed', reason: `The download failed: ${e instanceof Error ? e.message : String(e)}` };
     return;
@@ -176,7 +202,7 @@ export function cancelMaia(): void {
 /** Deletes the stored model and runtime (Maia goes off). */
 export async function deleteMaia(): Promise<void> {
   setMaiaOn(false);
-  await remove(MAIA_FILES);
+  await remove(maiaFiles());
 }
 
 function update(key: string, fn: (s: MaiaSeen) => MaiaSeen): void {
@@ -214,20 +240,21 @@ export function requestPolicy(fen: string): void {
 
 /**
  * Maia's policy at `fen` and `elo`, for practice's opponent (§5.57): null when Maia is off, or not
- * ready within 5 s of starting (mistake-lab waits as long for its model).
+ * ready within 5 s of starting (mistake-lab waits as long for its model). `before`: the positions
+ * that led here, oldest first, which the 23M model reads (§5.188).
  */
-export async function maiaPolicy(fen: string, elo: number): Promise<MaiaMove[] | null> {
+export async function maiaPolicy(fen: string, elo: number, before?: readonly string[]): Promise<MaiaMove[] | null> {
   if (!maiaPrefs.peek().on) return null;
   if (asleep()) startWorker();
   const starting = () => maiaState.peek().kind === 'loading' || (maiaState.peek().kind === 'idle' && !!worker);
   for (let waited = 0; starting() && waited < 5000; waited += 100) await new Promise((r) => setTimeout(r, 100));
   if (maiaState.peek().kind !== 'ready') return null;
-  const r = await ask<Extract<FromMaia, { type: 'answer' } | { type: 'error' }>>({ type: 'ask', fen, elo });
+  const r = await ask<Extract<FromMaia, { type: 'answer' } | { type: 'error' }>>({ type: 'ask', fen, elo, ...(before?.length ? { before: [...before] } : {}) });
   return r.type === 'answer' ? r.policy : null;
 }
 
 /** Whether Maia's files are on this device (downloaded once, §5.32). */
-export const maiaStored = (): Promise<boolean> => stored(MAIA_FILES);
+export const maiaStored = (): Promise<boolean> => stored(maiaFiles());
 
 /**
  * Maia's policy at `fen` at each of `elos`, in one batch, for the storm's ratings (§5.82): asked

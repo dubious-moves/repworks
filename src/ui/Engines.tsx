@@ -2,7 +2,7 @@
 // stored or not, their size, a download with progress and a delete.
 import { useEffect, useState } from 'preact/hooks';
 import { ENGINES, ensure, remove, stored, type EngineFile, type Progress } from '../platform/blobs.ts';
-import { deleteMaia, maiaPrefs } from '../app/maia.ts';
+import { deleteMaia, maiaFiles, maiaPrefs } from '../app/maia.ts';
 import { deleteLc0, lc0Prefs } from '../app/lc0.ts';
 import { deleteGpuRuntime, GPU_FILES } from '../app/gpu.ts';
 
@@ -11,14 +11,17 @@ const GROUPS: { name: string; files: EngineFile[] }[] = [
   { name: 'Stockfish 18 threads', files: [ENGINES.stockfishMtJs, ENGINES.stockfishMtWasm] },
   { name: 'Stockfish 19', files: [ENGINES.stockfish19Js, ENGINES.stockfish19Wasm] },
   { name: 'Stockfish 19 threads', files: [ENGINES.stockfish19MtJs, ENGINES.stockfish19MtWasm] },
+  { name: 'Stockfish 19 full net', files: [ENGINES.stockfish19FullJs, ENGINES.stockfish19FullWasm] },
+  { name: 'Stockfish 19 full net threads', files: [ENGINES.stockfish19FullMtJs, ENGINES.stockfish19FullMtWasm] },
   { name: 'Maia 3', files: [ENGINES.maiaModel, ENGINES.ortWasm, ENGINES.ortMjs] },
+  { name: 'Maia 3, 23M', files: [ENGINES.maia23Model, ENGINES.ortWasm, ENGINES.ortMjs] },
   { name: 'Lc0 791556', files: [ENGINES.lc0Model, ENGINES.ortWasm, ENGINES.ortMjs] },
   { name: 'WebGPU runtime (Maia, Lc0)', files: GPU_FILES },
 ];
 
 /** Delete: Maia or Lc0 switched off first when on; Lc0 leaves the runtime it shares with Maia. */
 function del(files: EngineFile[]): Promise<void> {
-  if (files.includes(ENGINES.maiaModel) && maiaPrefs.peek().on) return deleteMaia();
+  if (files.includes(maiaFiles()[0]!) && maiaPrefs.peek().on) return deleteMaia();
   if (files.includes(ENGINES.lc0Model)) return lc0Prefs.peek().on ? deleteLc0() : remove([ENGINES.lc0Model]);
   // The graphics processor's switch goes off with its runtime (§5.184).
   if (files === GPU_FILES) return deleteGpuRuntime();

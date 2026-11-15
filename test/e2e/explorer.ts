@@ -35,7 +35,32 @@ export function fakeExplorer(): FakeExplorer {
 
 const key = (fen: string) => fen.split(' ').slice(0, 4).join(' ');
 
+/** A position as Lichess's tablebase answers it: its category for the side to move, each move's for the side to move after it. */
+export interface FakeTablebase {
+  /** By the FEN's first four fields. */
+  positions: Map<string, { category: string; moves: [uci: string, category: string][] }>;
+  /** Every request's FEN, as asked (spaces as underscores). */
+  requests: string[];
+}
+
+/**
+ * A fake Lichess tablebase (PLAN.md §5.187): the positions given, "unknown" for the rest, so an
+ * endgame's judge never reaches the network in tests and is Stockfish's alone unless a spec says
+ * otherwise. Every page gets one through `serveExplorer`; a spec's own, routed later, wins.
+ */
+export async function serveTablebase(page: Page, fake: FakeTablebase = { positions: new Map(), requests: [] }): Promise<FakeTablebase> {
+  await page.route('https://tablebase.lichess.ovh/**', async (route) => {
+    const fen = new URL(route.request().url()).searchParams.get('fen') ?? '';
+    fake.requests.push(fen);
+    const known = fake.positions.get(key(fen.replace(/_/g, ' ')));
+    const body = known ? { category: known.category, moves: known.moves.map(([uci, category]) => ({ uci, category })) } : { category: 'unknown', moves: [] };
+    await route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*', 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  });
+  return fake;
+}
+
 export async function serveExplorer(page: Page, fake: FakeExplorer = fakeExplorer()): Promise<FakeExplorer> {
+  await serveTablebase(page);
   await page.route('https://explorer.lichess.org/**', async (route) => {
     const request = route.request();
     if (request.method() === 'OPTIONS') {

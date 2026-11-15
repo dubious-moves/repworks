@@ -807,6 +807,11 @@ function EndgameGame(props: { game: PracticeGame; endgame: Endgame; rep?: Repert
         <p class={`feedback train-feedback${slip ? ' endgame-slip' : over ? (solved ? ' endgame-solved' : ' endgame-missed') : ''}`} role="status" data-testid="endgame-feedback">
           {feedback}
         </p>
+        {slipped?.tb && (
+          <p class="muted" data-testid="endgame-tablebase">
+            The tablebase’s verdict, with best play: {OUTCOME_WORD[slipped.tb.best]} before the move, {OUTCOME_WORD[slipped.tb.after]} after it.
+          </p>
+        )}
         {playedPast && (
           <p class="muted" data-testid="endgame-slip-later">
             Found after you had played on: the board is back on that move, and Take back takes the moves after it too.
@@ -943,6 +948,9 @@ function numbered(fenBefore: string, san: string): string {
   const [, turn, , , , n] = fenBefore.split(' ');
   return `${n ?? 1}${turn === 'b' ? '…' : '.'}${san}`;
 }
+
+/** A tablebase outcome, for the user. */
+const OUTCOME_WORD = { win: 'a win', draw: 'a draw', loss: 'a loss' } as const;
 
 /** What the try counted for, and its first slip when it had one. */
 function countedText(p: PracticeGame, e: Endgame): string {

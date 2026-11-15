@@ -18,6 +18,7 @@ import { makeSanAndPlay } from 'chessops/san';
 import { parseUciMove } from '../core/chess/uci.ts';
 import type { PlayedLine } from '../core/repertoire/lines.ts';
 import { openEngineSettings } from './EngineSettings.tsx';
+import { stockfishShort } from '../platform/stockfish.ts';
 import { maiaPrefs, maiaState, setMaiaOn } from '../app/maia.ts';
 import { side } from '../app/editor.ts';
 import { lc0Answer, lc0Prefs, lc0State, setLc0On, type Lc0Answer } from '../app/lc0.ts';
@@ -98,7 +99,7 @@ export function EnginePanel(props: { board: Position | undefined }) {
           <input type="checkbox" role="switch" aria-label="Engine" checked={on} onChange={(e) => updateEnginePrefs({ on: e.currentTarget.checked })} />
           <span class="slider" />
         </label>
-        <span class="engine-name">SF{enginePrefs.value.version}{on && runningThreads() > 1 ? ` ×${runningThreads()}` : ''}</span>
+        <span class="engine-name">{stockfishShort(enginePrefs.value.version)}{on && runningThreads() > 1 ? ` ×${runningThreads()}` : ''}</span>
         <span class="engine-depth" aria-live="polite">
           {on ? statusText(props.board, shown) : ''}
         </span>

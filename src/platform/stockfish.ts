@@ -16,13 +16,24 @@ export interface EngineEvents {
 }
 
 const HANDSHAKE_MS = 10_000;
+/** The full net's 99 MB of wasm take longer to compile and to read than the lite builds'. */
+const HANDSHAKE_FULL_MS = 60_000;
 
-/** The vendored versions (§5.75): 18, proven on the owner's phone, and 19, an option. */
-export const STOCKFISH_VERSIONS = [18, 19] as const;
+/**
+ * The versions (§5.75): 18, proven on the owner's phone; 19, an option; and 19 with its full net
+ * (§5.186), stronger at the same depth and 99 MB to download, for a desktop.
+ */
+export const STOCKFISH_VERSIONS = [18, 19, '19 full'] as const;
 export type StockfishVersion = (typeof STOCKFISH_VERSIONS)[number];
+
+/** "Stockfish 19, full net". */
+export const stockfishName = (version: StockfishVersion): string => (version === '19 full' ? 'Stockfish 19, full net' : `Stockfish ${version}`);
+/** The engine bar's "SF19F". */
+export const stockfishShort = (version: StockfishVersion): string => (version === '19 full' ? 'SF19F' : `SF${version}`);
 
 /** The build's files: the single-threaded one, or the threaded one (§5.36, isolated pages only). */
 export function stockfishFiles(threads: number, version: StockfishVersion = 18) {
+  if (version === '19 full') return threads > 1 ? [ENGINES.stockfish19FullMtJs, ENGINES.stockfish19FullMtWasm] : [ENGINES.stockfish19FullJs, ENGINES.stockfish19FullWasm];
   if (version === 19) return threads > 1 ? [ENGINES.stockfish19MtJs, ENGINES.stockfish19MtWasm] : [ENGINES.stockfish19Js, ENGINES.stockfish19Wasm];
   return threads > 1 ? [ENGINES.stockfishMtJs, ENGINES.stockfishMtWasm] : [ENGINES.stockfishJs, ENGINES.stockfishWasm];
 }
@@ -34,6 +45,7 @@ export function startStockfish(events: EngineEvents, hashMb: number, threads = 1
   const queue: string[] = [];
   let ready = false;
   let dead = false;
+  const handshakeMs = version === '19 full' ? HANDSHAKE_FULL_MS : HANDSHAKE_MS;
   let expect: 'uciok' | 'readyok' | undefined = 'uciok';
   const fail = (reason: string) => {
     if (dead) return;
@@ -42,7 +54,7 @@ export function startStockfish(events: EngineEvents, hashMb: number, threads = 1
     worker.terminate();
     events.crashed(reason);
   };
-  let timer = setTimeout(() => fail('Stockfish did not start (no uciok)'), HANDSHAKE_MS);
+  let timer = setTimeout(() => fail('Stockfish did not start (no uciok)'), handshakeMs);
   worker.addEventListener('error', (e) => fail(e.message || 'Stockfish stopped working'));
   worker.addEventListener('message', (e: MessageEvent<unknown>) => {
     if (dead || typeof e.data !== 'string') return;
@@ -50,7 +62,7 @@ export function startStockfish(events: EngineEvents, hashMb: number, threads = 1
     if (expect === 'uciok' && line === 'uciok') {
       expect = 'readyok';
       clearTimeout(timer);
-      timer = setTimeout(() => fail('Stockfish did not start (no readyok)'), HANDSHAKE_MS);
+      timer = setTimeout(() => fail('Stockfish did not start (no readyok)'), handshakeMs);
       worker.postMessage(`setoption name Hash value ${hashMb}`);
       if (threads > 1) worker.postMessage(`setoption name Threads value ${threads}`);
       worker.postMessage('isready');

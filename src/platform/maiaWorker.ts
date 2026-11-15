@@ -7,29 +7,44 @@ import { parseFen } from 'chessops/fen';
 import { parseSan } from 'chessops/san';
 import type { GpuInit } from '../core/engine/gpu.ts';
 import { createMaiaBatch } from '../core/maia/batch.ts';
-import { maiaTokens } from '../core/maia/encode.ts';
-import type { FromMaia, ToMaia } from '../core/maia/protocol.ts';
+import { MAIA_HISTORY, maiaHistoryTokens, maiaTokens } from '../core/maia/encode.ts';
+import type { FromMaia, MaiaModel, ToMaia } from '../core/maia/protocol.ts';
 import { ENGINES, stored } from './blobs.ts';
 import { openSession, type Opened } from './ortSession.ts';
 
-const scope = self as unknown as { postMessage(m: FromMaia): void; onmessage: ((e: MessageEvent<ToMaia>) => void) | null };
+const scope = self as unknown as {
+  postMessage(m: FromMaia): void;
+  onmessage: ((e: MessageEvent<ToMaia>) => void) | null;
+};
 
 let opened: Opened | undefined;
 let loading: Promise<void> | undefined;
+/** The model this worker runs, told at `init` (a worker runs one: the page starts another for another). */
+let model: MaiaModel = 'maia3';
+const history = () => model === 'maia3-23m';
+const modelFile = () => (history() ? ENGINES.maia23Model : ENGINES.maiaModel);
+const planes = () => (history() ? 12 * MAIA_HISTORY : 12);
+let batch = newBatch();
 
-const batch = createMaiaBatch({
-  run: async (tokens, elos, n) => {
-    if (!opened) throw new Error('Maia is not loaded');
-    const { ort, session } = opened;
-    const out = await session.run({
-      tokens: new ort.Tensor('float32', tokens, [n, 64, 12]),
-      elo_self: new ort.Tensor('float32', elos, [n]),
-      elo_oppo: new ort.Tensor('float32', Float32Array.from(elos), [n]),
-    });
-    return { moves: out.logits_move!.data as Float32Array, values: out.logits_value!.data as Float32Array };
-  },
-  defer: (fn) => setTimeout(fn, 0),
-});
+function newBatch() {
+  return createMaiaBatch({
+    history: history(),
+    run: async (tokens, elos, n) => {
+      if (!opened) throw new Error('Maia is not loaded');
+      const { ort, session } = opened;
+      const out = await session.run({
+        tokens: new ort.Tensor('float32', tokens, [n, 64, planes()]),
+        elo_self: new ort.Tensor('float32', elos, [n]),
+        elo_oppo: new ort.Tensor('float32', Float32Array.from(elos), [n]),
+      });
+      return {
+        moves: out.logits_move!.data as Float32Array,
+        values: out.logits_value!.data as Float32Array,
+      };
+    },
+    defer: (fn) => setTimeout(fn, 0),
+  });
+}
 
 /** The positions the graphics processor is checked on (§5.184): an opening, a middlegame, an ending, at three ratings, as one batch. */
 const PROBE: readonly [fen: string, elo: number][] = [
@@ -41,14 +56,19 @@ const PROBE: readonly [fen: string, elo: number][] = [
 
 function load(gpu?: GpuInit): Promise<void> {
   loading ??= (async () => {
-    opened = await openSession(ENGINES.maiaModel.url, 'the model', gpu, {
+    opened = await openSession(modelFile().url, 'the model', gpu, {
       outputs: ['logits_move', 'logits_value'],
       feeds: (ort) => {
         const n = PROBE.length;
-        const tokens = new Float32Array(n * 64 * 12);
-        PROBE.forEach(([fen], i) => tokens.set(maiaTokens(fen), i * 64 * 12));
+        const width = 64 * planes();
+        const tokens = new Float32Array(n * width);
+        PROBE.forEach(([fen], i) => tokens.set(history() ? maiaHistoryTokens([fen]) : maiaTokens(fen), i * width));
         const elos = Float32Array.from(PROBE, ([, elo]) => elo);
-        return { tokens: new ort.Tensor('float32', tokens, [n, 64, 12]), elo_self: new ort.Tensor('float32', elos, [n]), elo_oppo: new ort.Tensor('float32', Float32Array.from(elos), [n]) };
+        return {
+          tokens: new ort.Tensor('float32', tokens, [n, 64, planes()]),
+          elo_self: new ort.Tensor('float32', elos, [n]),
+          elo_oppo: new ort.Tensor('float32', Float32Array.from(elos), [n]),
+        };
       },
     });
   })();
@@ -64,12 +84,23 @@ const position = (fen: string) => {
 async function handle(m: ToMaia, reply: (r: FromMaia) => void): Promise<void> {
   if (m.type === 'init') {
     try {
-      if (!(await stored([ENGINES.maiaModel, ENGINES.ortWasm, ENGINES.ortMjs]))) return reply({ type: 'status', status: 'missing' });
+      if (!loading && m.model && m.model !== model) {
+        model = m.model;
+        batch = newBatch();
+      }
+      if (!(await stored([modelFile(), ENGINES.ortWasm, ENGINES.ortMjs]))) return reply({ type: 'status', status: 'missing' });
       await load(m.gpu);
-      reply({ type: 'status', status: 'ready', ...(opened?.gpu ? { gpu: opened.gpu } : {}) });
+      reply({
+        type: 'status',
+        status: 'ready',
+        ...(opened?.gpu ? { gpu: opened.gpu } : {}),
+      });
     } catch (e) {
       loading = undefined;
-      reply({ type: 'failed', reason: e instanceof Error ? e.message : String(e) });
+      reply({
+        type: 'failed',
+        reason: e instanceof Error ? e.message : String(e),
+      });
     }
     return;
   }
@@ -90,7 +121,7 @@ async function handle(m: ToMaia, reply: (r: FromMaia) => void): Promise<void> {
     await load();
     const pos = position(m.fen);
     if (m.type === 'ask') {
-      const a = await batch.ask(pos, m.elo);
+      const a = await batch.ask(pos, m.elo, m.before);
       reply({ type: 'answer', id: m.id, policy: a.policy, value: a.value });
       return;
     }
@@ -109,7 +140,11 @@ async function handle(m: ToMaia, reply: (r: FromMaia) => void): Promise<void> {
     );
     reply({ type: 'scores', id: m.id, scores });
   } catch (e) {
-    reply({ type: 'error', id: m.id, reason: e instanceof Error ? e.message : String(e) });
+    reply({
+      type: 'error',
+      id: m.id,
+      reason: e instanceof Error ? e.message : String(e),
+    });
   }
 }
 

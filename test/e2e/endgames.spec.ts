@@ -29,7 +29,7 @@ import type { FakeGit } from '../support/fakeGit.ts';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
 import { clickSquare } from './board.ts';
 import { commands, fakeEngine } from './engine.ts';
-import { lichessLogin } from './explorer.ts';
+import { lichessLogin, serveTablebase, type FakeTablebase } from './explorer.ts';
 import { serveGithub, world } from './github.ts';
 import { serveSite, type SiteServer } from './server.ts';
 
@@ -372,6 +372,54 @@ test('an endgame: a move that lets the win slip, found after playing on, taken b
   await expect(page.getByTestId('endgame-next')).toHaveText('Next due: Take the opposition');
   await expect(page.locator('.chip')).toHaveText(/^synced/);
   expect(endgameEvents(git).length).toBe(1);
+});
+
+test('the tablebase’s verdict judges where it answers: a move Stockfish scores as a slip kept, the move Stockfish likes stopped, the keeping move the tablebase’s', async ({ page }) => {
+  test.setTimeout(60_000);
+  // The fake tablebase against the fake Stockfish (which has Ke3 +9.00, Kd2 and Kc3 0.00): Kd2 keeps
+  // the win, Ke3 and Kc3 only draw. Not chess: it shows whose verdict counts.
+  const table: FakeTablebase = { positions: new Map([[OPPOSITION, { category: 'win', moves: [['d3d2', 'loss'], ['d3e3', 'draw'], ['d3c3', 'draw'], ['e2e4', 'unknown']] }]]), requests: [] };
+  const git = await setUp(page, async () => void (await serveTablebase(page, table)));
+  await page.goto(`${site.url}#/endgames/opposition`);
+  const game = page.getByTestId('endgame-game');
+  const feedback = page.getByTestId('endgame-feedback');
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  // Asked while the user thinks, the FEN's spaces as underscores.
+  await expect.poll(() => table.requests).toContain(`${OPPOSITION.replace(/ /g, '_')}_0_1`);
+  // Counted, not sliced: the log is in each engine's own order, and an earlier test's page shares it.
+  const rechecks = () => commands(site.requests).filter((c) => / searchmoves d3e3 d3d2$/.test(c)).length;
+  const before = rechecks();
+
+  // Kd2: 0.00 against +9.00 by Stockfish, a win kept by the tablebase. No slip, and no deeper search of it.
+  await clickSquare(page, 'd3', 'white');
+  await clickSquare(page, 'd2', 'white');
+  await page.waitForSelector('[data-testid="endgame-game"][data-moves="2"][data-phase="user"]', { timeout: ENGINE_MS * 3 });
+  await page.waitForTimeout(ENGINE_MS * 3);
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  await expect(feedback).toHaveText('Your move');
+  expect(rechecks()).toBe(before);
+  // The position after the answer isn't the fake tablebase's ("unknown"): asked, then Stockfish's alone.
+  expect(table.requests.some((f) => f.startsWith(AFTER_KD5.replace(/ /g, '_')))).toBe(true);
+
+  // Again, Ke3: Stockfish's own best move, a draw by the tablebase. Stopped, with its verdict said
+  // and the move that keeps the win the tablebase's (Kd2), not Stockfish's.
+  await page.getByRole('button', { name: 'Restart' }).click();
+  await expect(game).toHaveAttribute('data-moves', '0');
+  await clickSquare(page, 'd3', 'white');
+  await clickSquare(page, 'e3', 'white');
+  await expect(game).toHaveAttribute('data-phase', 'slip', { timeout: ENGINE_MS * 8 });
+  await expect(feedback).toHaveText('Ke3 lets the win slip. Take it back and find a better move.');
+  await expect(page.getByTestId('endgame-tablebase')).toHaveText('The tablebase’s verdict, with best play: a win before the move, a draw after it.');
+  await page.getByRole('button', { name: 'Show a move that keeps it' }).click();
+  await expect(game).toHaveAttribute('data-moves', '0');
+  await expect(game.locator('cg-container svg.cg-shapes g[cgHash]')).toHaveCount(1);
+  await expect(game.locator('cg-container svg.cg-shapes g[cgHash]')).toHaveAttribute('cgHash', /d3.*d2/);
+  await expect(page.getByTestId('endgame-tablebase')).toHaveCount(0);
+
+  // Two tries missed: the first given up by Restart, the second a draw (the win let go) at Ke3.
+  await page.locator('.chip').click();
+  await expect.poll(() => endgameEvents(git).length, { timeout: 15_000 }).toBe(2);
+  expect(endgameEvents(git).at(-1)).toMatchObject({ card: `x|${OPPOSITION}`, res: 'draw', preset: 'endgame', mv: 1 });
 });
 
 test('an endgame solved first time: the breakthrough along Stockfish’s line, the pawn queened, graded easy from the time, marked hard, back tomorrow', async ({ page }) => {
@@ -1019,7 +1067,8 @@ test('the courses’ scores, removals and tries follow the user to a second devi
   await there.getByRole('button', { name: 'Put the 1 removed back' }).click();
   await expect(there.locator('.endgame-item')).toHaveCount(4);
   await second.locator('.chip').click();
-  await expect(second.locator('.chip')).toHaveText(/^synced/);
+  // Longer than the default: a sync under a loaded machine took over 5 s once (2026-11-15).
+  await expect(second.locator('.chip')).toHaveText(/^synced/, { timeout: 15_000 });
   await page.locator('.chip').click();
   await expect(items).toHaveCount(4, { timeout: 30_000 });
   await context.close();

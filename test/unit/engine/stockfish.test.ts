@@ -14,9 +14,16 @@ import { positionKeyOf } from '../../../src/core/chess/positionKey.ts';
 import { createSearch, type Analysis, type Search, type SearchRequest } from '../../../src/core/engine/search.ts';
 import { pvToSan } from '../../../src/core/engine/uci.ts';
 
-const VENDOR = join(import.meta.dirname, '..', '..', '..', 'vendor', 'stockfish');
+const ROOT = join(import.meta.dirname, '..', '..', '..');
+const VENDOR = join(ROOT, 'vendor', 'stockfish');
+// The lite builds, vendored, and 19's full net (§5.186), from the npm package.
+const BUILDS = [
+  { version: '18', id: 'Stockfish 18 Lite WASM', build: join(VENDOR, 'stockfish-18-lite-single') },
+  { version: '19', id: 'Stockfish 19 Lite WASM', build: join(VENDOR, 'stockfish-19-lite-single') },
+  { version: '19, full net', id: 'Stockfish 19 WASM', build: join(ROOT, 'node_modules', 'stockfish', 'bin', 'stockfish-19-single') },
+];
 
-for (const version of [18, 19]) {
+for (const { version, id, build } of BUILDS) {
   describe(`Stockfish ${version}`, () => {
     let dir: string;
     let engine: ChildProcessWithoutNullStreams;
@@ -26,8 +33,8 @@ for (const version of [18, 19]) {
 
     before(async () => {
       dir = mkdtempSync(join(tmpdir(), 'repworks-sf-'));
-      copyFileSync(join(VENDOR, `stockfish-${version}-lite-single.js`), join(dir, 'sf.cjs'));
-      copyFileSync(join(VENDOR, `stockfish-${version}-lite-single.wasm`), join(dir, 'sf.wasm'));
+      copyFileSync(`${build}.js`, join(dir, 'sf.cjs'));
+      copyFileSync(`${build}.wasm`, join(dir, 'sf.wasm'));
       engine = spawn(process.execPath, [join(dir, 'sf.cjs')]);
       const ready = new Promise<void>((resolve) => {
         createInterface({ input: engine.stdout }).on('line', (line) => {
@@ -73,8 +80,8 @@ for (const version of [18, 19]) {
 
     const san = (a: Analysis, i = 0) => pvToSan(Chess.fromSetup(parseFen(a.fen).unwrap()).unwrap(), a.lines[i]!.pv);
 
-    test(`it is Stockfish ${version} lite`, () => {
-      assert.ok(lines.includes(`id name Stockfish ${version} Lite WASM`));
+    test(`it is ${id}`, () => {
+      assert.ok(lines.includes(`id name ${id}`));
     });
 
     test('mate in one, for White and for Black, scored from White’s side', async () => {

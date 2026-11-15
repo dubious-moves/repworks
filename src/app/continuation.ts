@@ -11,12 +11,12 @@ import type { MoveStat, SearchResult } from '../core/lc0/search.ts';
 import type { FromWorker, ToWorker } from '../core/explorer/service.ts';
 import { addLine } from '../core/study/ops.ts';
 import { nodeAt, positionsTo, type Path } from '../core/study/tree.ts';
-import { ENGINES, ensure, stored } from '../platform/blobs.ts';
+import { ensure, stored } from '../platform/blobs.ts';
 import { chapter, doc, edit, feedback, goTo } from './editor.ts';
 import { gpuInit, noteGpu } from './gpu.ts';
 import { onWorker, postToWorker, prefs as explorerPrefs } from './explorer.ts';
 import { LC0_FILES } from './lc0.ts';
-import { maiaElo, maiaPolicies } from './maia.ts';
+import { maiaElo, maiaFiles, maiaPolicies } from './maia.ts';
 
 export const NODE_CHOICES = [100, 400, 800, 1600] as const;
 export const PLY_CHOICES = [2, 4, 6, 8, 10, 12] as const;
@@ -31,7 +31,7 @@ export const DEFAULT_CONTINUATION_PREFS: ContinuationPrefs = { plies: 6, nodes: 
 const PREFS_KEY = 'repworks-continuation';
 /** The database's answer is waited for this long (it queues behind the panel's asks). */
 const DB_WAIT_MS = 60_000;
-export const CONTINUATION_FILES = [...new Set([...LC0_FILES, ENGINES.maiaModel])];
+export const continuationFiles = () => [...new Set([...LC0_FILES, ...maiaFiles()])];
 
 function loadPrefs(): ContinuationPrefs {
   try {
@@ -252,11 +252,11 @@ export async function runContinuation(download = false): Promise<void> {
   const c = chapter.peek();
   if (!r || !c || c.id !== r.chapterId || r.phase === 'running' || r.phase === 'downloading') return;
   const id = ++runId;
-  if (!(await stored(CONTINUATION_FILES).catch(() => false))) {
+  if (!(await stored(continuationFiles()).catch(() => false))) {
     if (!download) return patch(id, () => ({ phase: 'missing' }));
     patch(id, () => ({ phase: 'downloading', received: 0, total: 0 }));
     try {
-      await ensure(CONTINUATION_FILES, (p) => patch(id, () => ({ received: p.received, total: p.total })));
+      await ensure(continuationFiles(), (p) => patch(id, () => ({ received: p.received, total: p.total })));
     } catch (e) {
       return patch(id, () => ({ phase: 'failed', error: `The download failed: ${e instanceof Error ? e.message : String(e)}` }));
     }

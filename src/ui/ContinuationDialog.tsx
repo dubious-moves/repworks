@@ -6,7 +6,7 @@ import {
   addContinuation,
   closeContinuation,
   continuation,
-  CONTINUATION_FILES,
+  continuationFiles,
   continuationText,
   NODE_CHOICES,
   PLY_CHOICES,
@@ -58,10 +58,10 @@ function Dialog() {
   const r = continuation.value!;
   useEffect(() => {
     if (!ref.current!.open) ref.current!.showModal();
-    void storedBytes(CONTINUATION_FILES).then(setHave);
+    void storedBytes(continuationFiles()).then(setHave);
   }, []);
   const busy = r.phase === 'running' || r.phase === 'downloading';
-  const bytes = CONTINUATION_FILES.reduce((n, f) => n + f.bytes, 0) - have;
+  const bytes = continuationFiles().reduce((n, f) => n + f.bytes, 0) - have;
   const next = r.startPly + r.moves.length;
   const copy = async () => {
     try {

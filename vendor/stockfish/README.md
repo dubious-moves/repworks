@@ -36,3 +36,18 @@ Stockfish.js 19, with the small net `nn-61e7af4bb97d`, from the npm package `sto
 The site serves them under content-hashed names and downloads them when the engine is first
 switched on (vite.config.ts, `src/platform/blobs.ts`). The worker finds its wasm from the hash of
 its own URL (`new Worker('<js>#<wasm url>')`).
+
+## Stockfish 19 with its full net (an option, PLAN.md §5.186): not vendored
+
+The full-net builds are 99 MB each, more than belongs in git (it refuses a file over 100 MB), so
+they are not in this directory: the build takes them from the npm package `stockfish@19.0.1`
+(a devDependency, pinned), `node_modules/stockfish/bin/`, unchanged. Net `nn-1a298aa575a0`; same
+authors and licence.
+
+| File | Bytes | sha256 |
+| --- | --- | --- |
+| `stockfish-19-single.js` | 28,130 | `8071dee87312f74805a859de933e1a1ef465579ab1a51fbd597388cdce9d444d` |
+| `stockfish-19-single.wasm` | 99,169,054 | `991bede2f253ebb08ff01fcc48270f4b9c8e66b12d5bd5f8d6f52eb3e3b3a740` |
+| `stockfish-19.js` | 33,326 | `623ee70a10d6dc202375127b49e2e1822635f9ab07693ae7be28e50a787f6218` |
+| `stockfish-19.wasm` | 99,076,105 | `a599d78d72e0722d8895be84aca8b492d12e8bba3cdfcbcbc4a64017888c6667` |
+

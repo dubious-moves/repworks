@@ -1,7 +1,9 @@
 // Maia in the browser (PLAN.md §5.32, §5.33), with the real model and worker: Qchess's dialog
 // and its one-time download, the explorer's Ml and Ms columns and Maia's own rows beside the
 // fake explorer's games, the Ml sort, Maia remembered without a second download, and the
-// worker's numbers equal to onnxruntime-web's under Node (the same wasm) to 1e-6.
+// worker's numbers equal to onnxruntime-web's under Node (the same wasm) to 1e-6. And the 23M
+// model (§5.188) chosen in the engine's settings: its own download, its likelihoods at the start
+// the official code's, kept over a reload, and the first model chosen again.
 import { test, expect, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -24,6 +26,7 @@ interface Ref {
   web: { san: string; prob: number }[];
 }
 const refs = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'fixtures', 'maia', 'reference.json'), 'utf8')) as Ref[];
+const refs23 = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'fixtures', 'maia', 'reference-23m.json'), 'utf8')) as { fens: string[]; elo: number; top5: { uci: string; prob: number }[] }[];
 const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -';
 const fmt = (p: number) => (p * 100 < 9.95 ? `${(p * 100).toFixed(1)}%` : `${Math.round(p * 100)}%`);
 
@@ -95,6 +98,59 @@ test('Maia’s dialog, its download, the Ml and Ms columns and its own rows; rem
   await page.getByRole('switch', { name: 'Maia' }).uncheck();
   await expect(page.locator('.explorer-head .ex-ml')).toHaveCount(0);
   await expect(rows(page).locator('.ex-san')).toHaveText(['e4', 'd4']);
+});
+
+test('the 23M model chosen in the engine settings: its own download, its likelihoods the official code’s, the choice kept; back to the first model', async ({ page }) => {
+  test.setTimeout(150_000);
+  test.skip(test.info().project.name === 'phone', 'the model is the same on a phone; once is enough for 46 MB');
+  await setUp(page);
+  // The engine's settings: Maia's model, with what the 23M one is.
+  await page.getByRole('region', { name: 'Engine' }).getByRole('button', { name: 'Engine settings' }).click();
+  const settings = page.getByRole('dialog', { name: 'Engine settings' });
+  await expect(settings.getByTestId('maia-model-note')).toHaveText('The Maia platform’s model: the position alone.');
+  await settings.getByRole('button', { name: 'Maia 3, 23M', exact: true }).click();
+  await expect(settings.getByTestId('maia-model-note')).toContainText('A download of 45.8 MB, once');
+  await expect(settings.locator('.engine-files', { hasText: 'Maia 3, 23M ·' })).toHaveAttribute('data-stored', 'no');
+  await settings.getByRole('button', { name: 'Save' }).click();
+  expect(site.requests.filter((r) => r.includes('/engines/'))).toEqual([]);
+
+  // Switched on: the dialog names the 23M model's download and licence; only its file is fetched.
+  await page.getByRole('switch', { name: 'Maia' }).check();
+  const dialog = page.getByRole('dialog', { name: 'Enable Maia' });
+  await expect(dialog).toContainText('one-time 60.1 MB download');
+  await expect(dialog).toContainText('AGPL-3.0');
+  await dialog.getByRole('button', { name: /^Download/ }).click();
+  await expect(dialog).toHaveCount(0, { timeout: 60_000 });
+  await expect(page.locator('.explorer-head').getByRole('button', { name: 'Ml' })).toBeVisible({ timeout: 60_000 });
+  expect(site.requests.some((r) => /\/engines\/maia3-23m\.[0-9a-f]{10}\.onnx$/.test(r))).toBe(true);
+  expect(site.requests.some((r) => r.includes('/engines/maia3_simplified'))).toBe(false);
+  // The starting position at 1100, alone: the official code's likelihoods on the official checkpoint, to half a point.
+  const ref = refs23.at(-1)!;
+  const want = new Map(ref.top5.map((m) => [m.uci, m.prob]));
+  await expect(rows(page).locator('.ex-san').first()).toHaveText('e4', { timeout: 60_000 });
+  await expect(rows(page).locator('.ex-ml').first()).toHaveText(/%$/, { timeout: 60_000 });
+  const ml = async (i: number) => Number((await rows(page).nth(i).locator('.ex-ml').textContent())!.replace('%', '')) / 100;
+  expect(Math.abs((await ml(0)) - want.get('e2e4')!)).toBeLessThan(0.006);
+  expect(Math.abs((await ml(1)) - want.get('d2d4')!)).toBeLessThan(0.006);
+
+  // Kept over a reload, from the stored file.
+  const before = site.requests.filter((r) => r.includes('/engines/maia')).length;
+  await page.reload();
+  await expect(page.locator('.explorer-head').getByRole('button', { name: 'Ml' })).toBeVisible({ timeout: 60_000 });
+  await expect(rows(page).locator('.ex-ml').first()).toHaveText(/%$/, { timeout: 60_000 });
+  expect(Math.abs((await ml(0)) - want.get('e2e4')!)).toBeLessThan(0.006);
+  expect(site.requests.filter((r) => r.includes('/engines/maia')).length).toBe(before);
+
+  // Back to the first model: not on this device, so its download is asked for; its numbers are its own.
+  await page.getByRole('region', { name: 'Engine' }).getByRole('button', { name: 'Engine settings' }).click();
+  await settings.getByRole('button', { name: 'Maia 3', exact: true }).click();
+  await settings.getByRole('button', { name: 'Save' }).click();
+  await expect(dialog).toContainText('one-time 59.9 MB download');
+  await expect(dialog).toContainText('under the GPL-3.0');
+  await dialog.getByRole('button', { name: /^Download/ }).click();
+  await expect(dialog).toHaveCount(0, { timeout: 60_000 });
+  const first = refs.find((r) => r.fen.startsWith(START) && r.elo === 1100)!;
+  await expect(rows(page).locator('.ex-ml').first()).toHaveText(fmt(first.web.find((m) => m.san === 'e4')!.prob), { timeout: 60_000 });
 });
 
 test('Maia’s columns stay when its worker is ended for being unused, and it starts again by itself; with no games, Maia’s moves are the rows', async ({ page }) => {
