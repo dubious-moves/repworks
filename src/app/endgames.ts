@@ -3,7 +3,7 @@
 // Stockfish, §5.147, each move judged for the goal: src/app/practice.ts).
 import { computed, signal } from '@preact/signals';
 import { keyFen } from '../core/chess/positionKey.ts';
-import { attemptsByEndgame, ENDGAMES, sideOf, standingOf, type Endgame, type Standing } from '../core/endgames/endgames.ts';
+import { attemptsByEndgame, ENDGAME_PRESET, ENDGAMES, sideOf, standingOf, type Attempt, type Endgame, type Standing } from '../core/endgames/endgames.ts';
 import { warmEndgameLc0 } from './endgameLc0.ts';
 import { endgameMaiaAlone } from './endgameVariety.ts';
 import { maiaState, maiaStored } from './maia.ts';
@@ -12,6 +12,12 @@ import { practiceResults } from './repertoireCheck.ts';
 
 /** Each endgame's tries, from every device's log. */
 export const endgameAttempts = computed(() => attemptsByEndgame(practiceResults.value, (e) => keyFen(e.fen)?.key));
+
+/** Every try at an endgame from `fen` (theoretical, the repertoire's or a course's), oldest first: for a grade's next time (§5.178). */
+export function attemptsAt(fen: string): Attempt[] {
+  const key = keyFen(fen)?.key;
+  return practiceResults.value.filter((r) => r.preset === ENDGAME_PRESET && r.key === key).map((r) => ({ t: r.t, res: r.res, ...(r.g ? { g: r.g } : {}) }));
+}
 
 /** Where each endgame stands at `now`. */
 export function endgameStandings(now: number): Map<string, Standing> {

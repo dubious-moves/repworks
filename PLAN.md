@@ -7992,7 +7992,7 @@ about technique once Maia or the database answers. This adds that, built on the 
   the game's (a win let go is `draw`, a draw lost `loss`), `cp` and `mv` as practice writes them.
   The bot lens of the weak spots (§5.60) leaves them out; no history entry, no tactic scan.
 - **Spacing**: a solved endgame comes back after 1, 3, 7, 14, 30 and 60 days by its solves in a
-  row; a missed one is due at once. "Next" takes the first due in the list's order, else the first
+  row; a missed one is due at once. (Since §5.178: FSRS, from each solve's grade.) "Next" takes the first due in the list's order, else the first
   never tried.
 - **The method**: each position carries a few sentences of method (written here from standard
   endgame theory; no course content), open before a first try and folded after.
@@ -10322,3 +10322,43 @@ about 0.3 s, so the user plays ahead of Stockfish's judges (§5.146), and the en
 
 **As built** (2026-11-14): `analyse(fen, lines, quick)`, `ENDGAME_JUDGE_MS`, `judge(…, quick)`,
 `ponder`, `practiceHint` in `src/app/practice.ts`; the `ahead` job in `src/app/stormEngine.ts`.
+
+#### 5.178 Endgames: spaced by FSRS, a solve graded hard, good or easy (the owner's request of 2026-11-15, built)
+
+The owner: "look into the spaced repetition of endgame drilling. How does the scheduling work for
+correct/wrong positions? Maybe we can also build in some levels of correct ("hard", "good", "easy")
+depending on the time spent? and a way to mark it as easy/good/hard."
+
+- **What it was** (§5.145): a ladder by solves in a row, 1, 3, 7, 14, 30 and 60 days; a miss (a slip,
+  a hint, a take-back, giving up) made it due at once and started the ladder again. Two faults found:
+  a solve before it was due climbed the ladder too (six tries in one sitting: back in 60 days), and
+  one miss after a long run threw the run away.
+- **Now**: the repertoire's scheduler, FSRS-5 (§4.8, `core/progress/fsrs.ts`), at 90% recall and a
+  year at most (`ENDGAME_FSRS`), replayed over the tries: a miss is Again, a solve its grade. A missed
+  endgame is still due at once (FSRS's Again would wait a day). First solve: Hard back tomorrow, Good
+  in 3 days, Easy in 16; Good each time it comes due goes about 3, 11, 35, 100 days. A try before it
+  is due adds about nothing (FSRS counts the time since the last), and a miss after a long run keeps
+  more than a new endgame has. A try from before grades counts as Good.
+- **The grade from the time** (`gradeOfTime`): each of the user's moves timed from the turn's start
+  (the board set up, the answer played; a premove about none) to the move, capped at a minute (a
+  pause). Easy at 5 s a move or less with no move over 20 s, Hard over 15 s a move, Good between.
+  Only a solved try (first time, nothing taken back) is graded.
+- **Marked by hand**: the end of a solved try says "Solved first time, 4 s a move: easy, back in 16
+  days." with Hard · tomorrow, Good · 3 days, Easy · 16 days under it, the grade from the time pressed.
+  Another pressed: the endgame's spacing follows it ("(your grade)"). The same for the theoretical,
+  the repertoire's and the courses' endgames.
+- **Data** (additive, no new layout): the `practice` event of an endgame's solved try carries `g`
+  (2 hard, 3 good, 4 easy) and `ms` (the thinking time, each move capped at a minute); a new event
+  kind `grade` (`{"k":"grade","card":"x|<start's key>","g":2}`) is the user's own grade of the latest
+  try at that position, replacing the event's. Readers that don't know them skip them (D4).
+- **Checked**: unit tests (the first intervals by grade, growing gaps, no climb from one sitting, a
+  lapse after a run, the time's grade, the event and the grade event read and written) and
+  Playwright's endgames spec on a desktop and an emulated phone (the breakthrough played at once:
+  graded easy, back in 16 days; Hard pressed: a `grade` event synced and "back tomorrow" on the list).
+  **Not checked** on the owner's devices: whether the thresholds fit how the owner plays.
+
+**As built** (2026-11-15): `GRADE_SECONDS`, `gradeOfTime`, `meanSeconds`, `ENDGAME_FSRS`, `standingOf`,
+`fsrsOf`, `nextAfter` in `src/core/endgames/endgames.ts`; `GradeEvent` and the `practice` event's `g`
+and `ms` in `src/core/progress/events.ts`; each move's `ms`, `solveGrade` and `regradeEndgame` in
+`src/app/practice.ts`; `practiceResults` applying a `grade` in `src/app/repertoireCheck.ts`;
+`attemptsAt` in `src/app/endgames.ts`; `GradeChoice` in `src/ui/Endgames.tsx`.

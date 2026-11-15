@@ -1675,3 +1675,12 @@ does. Start with the spike: its log decides what the later parts change (CHESSNU
   the one played), and nothing wins that shouldn't (a drawn position played to a "win").
 - **Checked**: Stockfish under Node over a guessed king and pawn line (24.4 s of judges with three
   lines, 7.5 s with one) and Playwright's endgames spec; **not** the app on a device.
+
+### Endgames graded hard, good or easy (PLAN.md §5.178, 2026-11-15)
+- Solve a few endgames at your own pace, on the desktop and the phone: does the grade from the time
+  (easy at 5 s a move or less, hard over 15 s) match how it felt? If most land on the wrong one, say
+  which way: the thresholds are one line (`GRADE_SECONDS`). Press another grade: the end's words and
+  the list's "back in …" follow it, and the next device shows the same.
+- The list's "back in …" for endgames you had solved before: now FSRS's from those tries, so some
+  dates moved (a run of solves in one sitting no longer counts as a long run).
+- **Checked**: unit tests and Playwright's endgames spec (desktop, emulated phone); **not** on a device.

@@ -17,7 +17,9 @@ import {
   GOAL_CP,
   GROUPS,
   held,
-  INTERVAL_DAYS,
+  gradeOfTime,
+  meanSeconds,
+  nextAfter,
   keepsGoal,
   lineOf,
   materialFor,
@@ -169,32 +171,66 @@ test('a result read as the goal: a win for a win; a draw or better for a draw', 
   assert.equal(solvedBy('draw', 'loss'), false);
 });
 
-test('where an endgame stands: new, due after a miss, then spaced by the solves in a row', () => {
+test('where an endgame stands: new, due after a miss, then spaced by FSRS from its grades', () => {
   const t0 = Date.UTC(2026, 9, 1);
   assert.deepEqual(standingOf('win', [], t0), { state: 'new', tries: 0, solves: 0, streak: 0, last: [] });
   const missed = standingOf('win', [{ t: t0, res: 'draw' }], t0 + 1000);
   assert.equal(missed.state, 'due');
   assert.equal(missed.streak, 0);
-  // One solve after the miss: back in a day; due once the day has passed.
+  // One solve after a miss the same day: back in a day; due once the day has passed.
   const once = [
     { t: t0 + 2000, res: 'win' as const },
     { t: t0, res: 'loss' as const },
   ];
   const s1 = standingOf('win', once, t0 + 3000);
   assert.equal(s1.state, 'later');
-  assert.equal(s1.next, t0 + 2000 + INTERVAL_DAYS[0] * DAY);
+  assert.equal(s1.next, t0 + 2000 + DAY);
+  assert.equal(s1.grade, 3);
   assert.deepEqual(s1.last, [false, true]);
   assert.equal(standingOf('win', once, t0 + 2000 + DAY).state, 'due');
-  // Three in a row: 7 days; six and more: 60.
-  const run = (n: number) => Array.from({ length: n }, (_, i) => ({ t: t0 + i * 100 * DAY, res: 'draw' as const }));
-  const s3 = standingOf('draw', run(3), t0 + 200 * DAY + 1);
-  assert.equal(s3.next, t0 + 200 * DAY + 7 * DAY);
-  assert.equal(s3.streak, 3);
-  const s8 = standingOf('draw', run(8), t0 + 700 * DAY + 1);
-  assert.equal(s8.next, t0 + 700 * DAY + 60 * DAY);
-  assert.equal(s8.last.length, 5);
-  assert.equal(s8.tries, 8);
-  assert.equal(s8.solves, 8);
+  // A first solve: Hard back in a day, Good in 3, Easy in 16 (FSRS-5's first stabilities).
+  const first = (g: 2 | 3 | 4) => (standingOf('win', [{ t: t0, res: 'win', g }], t0 + 1).next! - t0) / DAY;
+  assert.deepEqual([first(2), first(3), first(4)], [1, 3, 16]);
+  // Good each time it comes due: the gaps grow (3, then about 11, then about a month and more).
+  let tries: { t: number; res: 'draw' }[] = [];
+  const gaps: number[] = [];
+  let t = t0;
+  for (let i = 0; i < 4; i++) {
+    tries = [...tries, { t, res: 'draw' }];
+    const s = standingOf('draw', tries, t + 1);
+    gaps.push(Math.round((s.next! - t) / DAY));
+    t = s.next!;
+  }
+  assert.equal(gaps[0], 3);
+  for (let i = 1; i < gaps.length; i++) assert.ok(gaps[i]! > gaps[i - 1]! * 2, `gaps grow: ${gaps.join(', ')}`);
+  const s4 = standingOf('draw', tries, t - 1);
+  assert.equal(s4.streak, 4);
+  assert.equal(s4.state, 'later');
+  // Played again and again the same day: no climb (the ladder gave 60 days after six).
+  const cram = Array.from({ length: 6 }, (_, i) => ({ t: t0 + i * 60_000, res: 'win' as const }));
+  assert.ok(standingOf('win', cram, t0 + DAY).next! - t0 <= 4 * DAY);
+  assert.equal(standingOf('win', cram, t0 + DAY).streak, 6);
+  // A miss after a long run keeps more than a new endgame's first solve gives.
+  const lapsed = [...tries, { t, res: 'loss' as const }, { t: t + 1000, res: 'draw' as const }];
+  assert.ok(standingOf('draw', lapsed, t + 2000).next! - (t + 1000) >= DAY);
+  // The last solve's grade; `nextAfter` gives what a grade would bring, the earlier tries only.
+  assert.equal(standingOf('win', [{ t: t0, res: 'win', g: 4 }], t0 + 1).grade, 4);
+  assert.equal(nextAfter('win', [{ t: t0 + 5, res: 'win', g: 4 }], t0, 2), t0 + DAY);
+  assert.equal(nextAfter('win', [], t0, 4), standingOf('win', [{ t: t0, res: 'win', g: 4 }], t0).next);
+});
+
+test('a solve’s grade from the thinking time: easy fast, hard slow, good between', () => {
+  const s = (...secs: number[]) => secs.map((x) => x * 1000);
+  assert.equal(gradeOfTime([]), 3);
+  assert.equal(gradeOfTime(s(2, 3, 4, 5)), 4);
+  // One long think keeps it from easy.
+  assert.equal(gradeOfTime(s(2, 2, 2, 2, 2, 2, 2, 2, 2, 25)), 3);
+  assert.equal(gradeOfTime(s(8, 12, 10)), 3);
+  assert.equal(gradeOfTime(s(20, 15, 18)), 2);
+  // A pause counts a minute at most.
+  assert.equal(gradeOfTime(s(600, 1, 1, 1, 1, 1)), 3);
+  assert.equal(meanSeconds(s(600, 1, 1, 1, 1, 1)), 11);
+  assert.equal(meanSeconds([]), 0);
 });
 
 test('tries are the endgame preset’s practice results at each start position', () => {

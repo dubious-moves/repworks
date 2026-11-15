@@ -14,7 +14,7 @@ import { dismissCard, gameCard } from '../core/progress/cards.ts';
 import { gameRows, gamesPrefs, itemsOf, playedOf, practiceHistory, savedDeck } from './games.ts';
 import { recordEvent } from './state.ts';
 import { trainData } from './train.ts';
-import { ENDGAME_PRESET } from '../core/endgames/endgames.ts';
+import { ENDGAME_PRESET, type SolveGrade } from '../core/endgames/endgames.ts';
 
 /** The checklist's presets (§5.62), for the bot lens's buckets. */
 export const PRESET_NAMES = ['easy', 'medium', 'hard'] as const;
@@ -54,14 +54,25 @@ export const repertoireCheck = computed(() => {
 /** The human lens (§5.60): the opponent's replies the real games score badly against. */
 export const humanSpots = computed(() => humanWeakSpots(walkGames.value));
 
-/** Every practice result (`practice` events), oldest first. */
-export const practiceResults = computed<(PracticeResult & { t: number })[]>(() => {
+/**
+ * Every practice result (`practice` events), oldest first; an endgame's grade (§5.178) its event's,
+ * or the latest `grade` event's after it (the user's own).
+ */
+export const practiceResults = computed<(PracticeResult & { t: number; g?: SolveGrade; ms?: number })[]>(() => {
   const data = trainData.value;
   if (!data) return [];
-  const out: (PracticeResult & { t: number })[] = [];
+  const out: (PracticeResult & { t: number; g?: SolveGrade; ms?: number })[] = [];
   for (const card of data.states.keys()) {
     if (!card.startsWith('x|')) continue;
-    for (const e of data.eventsOf(card)) if (e.event?.k === 'practice') out.push({ key: card.slice(2) as PositionKey, res: e.event.res, ...(e.event.preset ? { preset: e.event.preset } : {}), t: e.t });
+    let last: { g?: SolveGrade } | undefined;
+    for (const e of data.eventsOf(card)) {
+      const ev = e.event;
+      if (ev?.k === 'practice') {
+        const r = { key: card.slice(2) as PositionKey, res: ev.res, ...(ev.preset ? { preset: ev.preset } : {}), t: e.t, ...(ev.g ? { g: ev.g } : {}), ...(ev.ms !== undefined ? { ms: ev.ms } : {}) };
+        out.push(r);
+        last = r;
+      } else if (ev?.k === 'grade' && last) last.g = ev.g;
+    }
   }
   return out.sort((a, b) => a.t - b.t);
 });

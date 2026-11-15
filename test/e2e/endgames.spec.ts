@@ -270,6 +270,14 @@ function endgameEvents(git: FakeGit): Record<string, unknown>[] {
     .filter((e) => e['k'] === 'practice' && e['preset'] === 'endgame');
 }
 
+function gradeEvents(git: FakeGit): Record<string, unknown>[] {
+  return [...git.textsOf()]
+    .filter(([p]) => p.startsWith('progress/'))
+    .flatMap(([, t]) => t.split('\n').filter(Boolean))
+    .map((l) => JSON.parse(l) as Record<string, unknown>)
+    .filter((e) => e['k'] === 'grade');
+}
+
 const sq = (uci: string, i: number) => uci.slice(i, i + 2);
 
 test('an endgame: a move that lets the win slip, found after playing on, taken back, the keeping move shown; the try counted once as missed', async ({ page }) => {
@@ -366,7 +374,7 @@ test('an endgame: a move that lets the win slip, found after playing on, taken b
   expect(endgameEvents(git).length).toBe(1);
 });
 
-test('an endgame solved first time: the breakthrough along Stockfish’s line, the pawn queened, back tomorrow', async ({ page }) => {
+test('an endgame solved first time: the breakthrough along Stockfish’s line, the pawn queened, graded easy from the time, marked hard, back tomorrow', async ({ page }) => {
   test.setTimeout(60_000);
   const git = await setUp(page);
   await page.evaluate(() => (location.hash = '#/endgames/breakthrough'));
@@ -386,11 +394,23 @@ test('an endgame solved first time: the breakthrough along Stockfish’s line, t
   // The end waits for the judges still out.
   await expect(game).toHaveAttribute('data-phase', 'over', { timeout: ENGINE_MS * 8 });
   await expect(page.getByTestId('endgame-feedback')).toHaveText('The pawn queens: the win is yours.');
-  await expect(page.getByTestId('endgame-counted')).toHaveText('Solved first time: it comes back in a while.');
+  // Played at once after each answer: easy from the thinking time (§5.178), back in 16 days.
+  await expect(page.getByTestId('endgame-counted')).toHaveText(/^Solved first time, \d+ s a move: easy, back in 16 days\.$/);
+  const grade = page.getByTestId('endgame-grade');
+  await expect(grade.getByRole('button')).toHaveText(['Hard · tomorrow', 'Good · 3 days', 'Easy · 16 days']);
+  await expect(grade.getByRole('button', { name: /^Easy/ })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('.chip')).toHaveText('1 change waiting');
   await page.locator('.chip').click();
   await expect.poll(() => endgameEvents(git).length, { timeout: 15_000 }).toBe(1);
-  expect(endgameEvents(git)[0]).toMatchObject({ card: `x|${BREAKTHROUGH[0]![0]}`, res: 'win', preset: 'endgame', mv: 5 });
+  expect(endgameEvents(git)[0]).toMatchObject({ card: `x|${BREAKTHROUGH[0]![0]}`, res: 'win', preset: 'endgame', mv: 5, g: 4 });
+  expect(endgameEvents(git)[0]!['ms']).toEqual(expect.any(Number));
+  // Marked hard instead: a grade event, and it comes back tomorrow.
+  await grade.getByRole('button', { name: /^Hard/ }).click();
+  await expect(grade.getByRole('button', { name: /^Hard/ })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('endgame-counted')).toHaveText(/^Solved first time, \d+ s a move: hard \(your grade\), back tomorrow\.$/);
+  await page.locator('.chip').click();
+  await expect.poll(() => gradeEvents(git).length, { timeout: 15_000 }).toBe(1);
+  expect(gradeEvents(git)[0]).toMatchObject({ card: `x|${BREAKTHROUGH[0]![0]}`, g: 2 });
   await page.evaluate(() => (location.hash = '#/endgames'));
   await expect(page.locator('[data-endgame="breakthrough"] [data-testid="endgame-standing"]')).toHaveText('Solved once · back tomorrow ✓');
 });
@@ -483,7 +503,7 @@ test('rook against a pawn: the king first, the pawn won, the rest a rook mate', 
   // run one after another now, a search each.
   await expect(game).toHaveAttribute('data-phase', 'over', { timeout: ENGINE_MS * 14 });
   await expect(page.getByTestId('endgame-feedback')).toHaveText('The pawn has fallen: the rest is a rook mate.');
-  await expect(page.getByTestId('endgame-counted')).toHaveText('Solved first time: it comes back in a while.');
+  await expect(page.getByTestId('endgame-counted')).toHaveText(/^Solved first time, \d+ s a move: (easy|good), back in \d+ days\.$/);
 });
 
 test('the opponent: Stockfish alone without Maia; with Maia, its move once Stockfish finds it sound', async ({ page }) => {

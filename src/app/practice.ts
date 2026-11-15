@@ -31,7 +31,7 @@ import { readSaved, resumable, type Saved } from '../core/games/resume.ts';
 import { covered, scanCandidate, tacticCandidates, TACTIC, type DetectedTactic, type Pv } from '../core/games/detect.ts';
 import type { Color } from '../core/games/record.ts';
 import { historyCard, practiceCard } from '../core/progress/cards.ts';
-import { ENDGAME_PRESET, firstSlip, GOAL_CP, held, keepsGoal, lineOf, MAIA_ELO, maiaCandidates, materialFor, opponentPick, pawnPushes, pushNow, slips, solvedBy, wonAfter, type Endgame, type OpponentLine } from '../core/endgames/endgames.ts';
+import { ENDGAME_PRESET, firstSlip, GOAL_CP, GRADE_SECONDS, gradeOfTime, meanSeconds, type SolveGrade, held, keepsGoal, lineOf, MAIA_ELO, maiaCandidates, materialFor, opponentPick, pawnPushes, pushNow, slips, solvedBy, wonAfter, type Endgame, type OpponentLine } from '../core/endgames/endgames.ts';
 import { hangs, lc0Vetoed, replyOrder, trustPick } from '../core/endgames/variety.ts';
 import { endgameLc0 } from './endgameLc0.ts';
 import { endgameMaiaAlone, hintsAt, replyPlayed, tryBegun, tryEnded } from './endgameVariety.ts';
@@ -127,6 +127,8 @@ export interface PracticeMove extends PlayedMove {
   /** The position's lines before the user's move (first move, score for the mover), for the tactic scan. */
   pvs?: Pv[];
   judging?: boolean;
+  /** The user's thinking time for this move (ms): from the turn's start (the answer on the board) to the move (§5.178). */
+  ms?: number;
 }
 
 /** `draw` is insufficient material; `repetition` and `fifty` the rules' draws; `agreed` a draw offered and accepted; `goal` an endgame's goal reached (a pawn queened, a bare king, a draw held). */
@@ -174,10 +176,28 @@ export interface PracticeGame {
   ending?: EndReason;
   /** The moves before this one were played on past a slip (Play on): no slip is looked for among them. */
   playedOn?: number;
+  /**
+   * A solved endgame try's grade (§5.178): `auto` from the thinking time (`secs` a move), `g` as it
+   * stands (the user's own once changed), `t` the try's recorded time.
+   */
+  solveGrade?: { auto: SolveGrade; g: SolveGrade; secs: number; t: number };
 }
 
 export const practice = signal<PracticeGame | undefined>(undefined);
 let gen = 0;
+
+// When the user's turn began (§5.178): the board set up, or the answer played. A move's thinking
+// time runs from there; a premove's is about none.
+let turnAt = 0;
+let turnOf = '';
+practice.subscribe((p) => {
+  if (!p || p.phase !== 'user') return;
+  const k = `${p.gen}:${p.moves.length}`;
+  if (k !== turnOf) {
+    turnOf = k;
+    turnAt = Date.now();
+  }
+});
 
 const narrow = smallDevice;
 
@@ -660,7 +680,7 @@ export async function practiceMove(uci: string): Promise<void> {
   const tried = p.tried && p.tried.key === key && p.tried.uci !== uci ? p.tried : undefined;
   const next = replace(g, (q) => {
     const { deviation: _d, hint: _h, ...rest } = q;
-    const mv: PracticeMove = { san: after.san, uci, isUser: true, fenBefore: before, fen: after.fen, judging: true, ...(tried ? { repTried: { san: tried.san, uci: tried.uci } } : {}) };
+    const mv: PracticeMove = { san: after.san, uci, isUser: true, fenBefore: before, fen: after.fen, judging: true, ms: Math.max(0, Date.now() - turnAt), ...(tried ? { repTried: { san: tried.san, uci: tried.uci } } : {}) };
     const out: PracticeGame = { ...rest, moves: [...q.moves, mv], phase: 'opponent' };
     if (tried) delete out.tried;
     return out;
@@ -1062,7 +1082,24 @@ function recordEndgame(p: PracticeGame, res: 'win' | 'draw' | 'loss', upTo = p.m
   const moves = p.moves.slice(0, upTo);
   const cp = [...moves].reverse().find((m) => m.isUser && m.afterCp !== undefined)?.afterCp;
   const white = cp === undefined ? undefined : p.setup.color === 'white' ? cp : -cp;
-  void recordEvent({ t: new Date().toISOString(), k: 'practice', card: practiceCard(key), res, preset: ENDGAME_PRESET, ...(white !== undefined ? { cp: Math.round(white) } : {}), mv: moves.filter((m) => m.isUser).length });
+  // A solved try's grade from the thinking time (§5.178); a miss is Again, with no grade.
+  const think = moves.filter((m) => m.isUser && m.ms !== undefined).map((m) => m.ms!);
+  const solved = solvedBy(p.setup.endgame!.goal, res);
+  const ms = think.reduce((a, x) => a + Math.min(x, GRADE_SECONDS.cap * 1000), 0);
+  const g = solved ? gradeOfTime(think) : undefined;
+  const now = new Date();
+  if (g) patch(p.gen, () => ({ solveGrade: { auto: g, g, secs: meanSeconds(think), t: now.getTime() } }));
+  void recordEvent({ t: now.toISOString(), k: 'practice', card: practiceCard(key), res, preset: ENDGAME_PRESET, ...(white !== undefined ? { cp: Math.round(white) } : {}), mv: moves.filter((m) => m.isUser).length, ...(g ? { g } : {}), ...(think.length ? { ms: Math.round(ms) } : {}) });
+}
+
+/** The user's own grade of the endgame try just solved (§5.178): a `grade` event at its start, when it changes. */
+export function regradeEndgame(g: SolveGrade): void {
+  const p = practice.peek();
+  const sg = p?.solveGrade;
+  const key = p && keyFen(p.setup.fen)?.key;
+  if (!p || !sg || !key || sg.g === g) return;
+  patch(p.gen, () => ({ solveGrade: { ...sg, g } }));
+  void recordEvent({ t: new Date().toISOString(), k: 'grade', card: practiceCard(key), g });
 }
 
 /** An endgame's end: its result as the game's, recorded when the try hasn't been already. No history entry, no tactic scan. */

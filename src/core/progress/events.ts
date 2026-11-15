@@ -165,6 +165,19 @@ export interface PracticeEvent extends Base {
   cp?: number;
   /** The user's moves played. */
   mv?: number;
+  /** A solved endgame's grade from the thinking time (§5.178): 2 hard, 3 good, 4 easy. */
+  g?: 2 | 3 | 4;
+  /** The user's thinking time over the try, in milliseconds (each move capped at a minute). */
+  ms?: number;
+}
+/**
+ * The user's own grade of an endgame's latest try at this position (§5.178), given after it: it
+ * replaces the grade the `practice` event before it took from the thinking time.
+ */
+export interface GradeEvent extends Base {
+  k: 'grade';
+  card: string;
+  g: 2 | 3 | 4;
 }
 /** A checklist line as the `checklist` event keeps it (§5.130): its moves from the start in UCI, spaced, and its share. */
 export interface ChecklistLine {
@@ -278,8 +291,9 @@ export type KnownEvent =
   | PickEvent
   | RankEvent
   | CourseScoreEvent
-  | CourseDrillEvent;
-export const KNOWN_KINDS = ['review', 'suspend', 'unsuspend', 'forget', 'taught', 'pin', 'unpin', 'drill', 'alt', 'storm', 'snapshot', 'drop', 'relapse', 'plan', 'idea', 'dismiss', 'saved', 'played', 'practice', 'line', 'note', 'checklist', 'pick', 'rank', 'cscore', 'cdrill'] as const;
+  | CourseDrillEvent
+  | GradeEvent;
+export const KNOWN_KINDS = ['review', 'suspend', 'unsuspend', 'forget', 'taught', 'pin', 'unpin', 'drill', 'alt', 'storm', 'snapshot', 'drop', 'relapse', 'plan', 'idea', 'dismiss', 'saved', 'played', 'practice', 'line', 'note', 'checklist', 'pick', 'rank', 'cscore', 'cdrill', 'grade'] as const;
 
 /** A line as read. `event` is set for the kinds this code knows; `raw` is always the line itself. */
 export interface LogLine {
@@ -491,6 +505,16 @@ function knownEvent(o: Record<string, unknown>): KnownEvent | string {
         if (!Number.isSafeInteger(x)) return `${f} must be an integer`;
         event[f] = x as number;
       }
+      const g = o['g'];
+      if (g !== undefined) {
+        if (g !== 2 && g !== 3 && g !== 4) return 'g must be 2, 3 or 4';
+        event.g = g;
+      }
+      const ms = o['ms'];
+      if (ms !== undefined) {
+        if (!Number.isSafeInteger(ms) || (ms as number) < 0) return 'ms must be a non-negative integer';
+        event.ms = ms as number;
+      }
       return event;
     }
     case 'line': {
@@ -559,6 +583,12 @@ function knownEvent(o: Record<string, unknown>): KnownEvent | string {
       if (typeof on !== 'boolean') return 'on must be true or false';
       return { ...base, k: 'cdrill', on };
     }
+    case 'grade': {
+      if (!card.startsWith('x|') || card.length < 3) return 'card must be a position (x|<position>)';
+      const g = o['g'];
+      if (g !== 2 && g !== 3 && g !== 4) return 'g must be 2, 3 or 4';
+      return { ...base, k: 'grade', g };
+    }
     default:
       return { ...base, k: 'forget' };
   }
@@ -604,7 +634,10 @@ export function formatEvent(event: KnownEvent): string {
     if (event.preset !== undefined) o['preset'] = event.preset;
     if (event.cp !== undefined) o['cp'] = event.cp;
     if (event.mv !== undefined) o['mv'] = event.mv;
+    if (event.g !== undefined) o['g'] = event.g;
+    if (event.ms !== undefined) o['ms'] = event.ms;
   }
+  if (event.k === 'grade') o['g'] = event.g;
   if (event.k === 'storm') {
     o['b'] = event.b;
     if (event.u !== undefined) o['u'] = event.u;

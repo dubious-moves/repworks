@@ -6698,6 +6698,15 @@ a.button.disabled {
   color: var(--danger);
 }
 
+/* A solved try's grade (§5.178): Hard, Good, Easy, the one from the thinking time pressed. */
+.endgame-grade {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 8px;
+}
+
 .endgame-slip,
 .endgame-missed {
   color: var(--warn);

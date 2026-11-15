@@ -61,6 +61,23 @@ test('a note (§5.91): on a game card, its text kept as written; anything else r
   assert.deepEqual(problems.map((p) => p.reason), ['card must be a game card (m|…)', 'text must be a string']);
 });
 
+test('an endgame try’s grade (§5.178): on the practice event, and the user’s own after it; anything else refused', () => {
+  const solved: KnownEvent = { v: 1, n: 1, t: '2026-11-15T10:00:00.000Z', k: 'practice', card: 'x|abc', res: 'win', preset: 'endgame', cp: 900, mv: 5, g: 4, ms: 12000 };
+  const own: KnownEvent = { v: 1, n: 2, t: '2026-11-15T10:00:05.000Z', k: 'grade', card: 'x|abc', g: 2 };
+  assert.equal(formatEvent(solved), '{"v":1,"n":1,"t":"2026-11-15T10:00:00.000Z","k":"practice","card":"x|abc","res":"win","preset":"endgame","cp":900,"mv":5,"g":4,"ms":12000}');
+  assert.equal(formatEvent(own), '{"v":1,"n":2,"t":"2026-11-15T10:00:05.000Z","k":"grade","card":"x|abc","g":2}');
+  const at = (n: number, rest: string) => `{"v":1,"n":${n},"t":"2026-11-15T10:00:00.000Z",${rest}}`;
+  const bad = [
+    at(3, `"k":"practice","card":"x|abc","res":"win","g":1`),
+    at(4, `"k":"practice","card":"x|abc","res":"win","ms":-5`),
+    at(5, `"k":"grade","card":"r|abc|e2e4","g":3`),
+    at(6, `"k":"grade","card":"x|abc","g":5`),
+  ];
+  const { lines, problems } = parseLog([formatEvent(solved), formatEvent(own), ...bad].join('\n'));
+  assert.deepEqual(lines.map((l) => l.event), [solved, own]);
+  assert.deepEqual(problems.map((p) => p.reason), ['g must be 2, 3 or 4', 'ms must be a non-negative integer', 'card must be a position (x|<position>)', 'g must be 2, 3 or 4']);
+});
+
 test('a line added to a checklist (§5.142): on a study, a side, its moves and on; anything else refused', () => {
   const pick: KnownEvent = { v: 1, n: 1, t: '2026-10-31T10:00:00.000Z', k: 'pick', card: 't|Rep0Najd', color: 'black', m: 'e2e4 c7c5 c2c3', on: true };
   const line = formatEvent(pick);

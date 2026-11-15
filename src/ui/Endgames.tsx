@@ -8,7 +8,7 @@
 // that start from a position, scored on the device, by the course's own groups, with the course's
 // text for the chapter kept under the board.
 import { useEffect, useMemo, useState } from 'preact/hooks';
-import { checkEndgameMaia, endgameMaiaHere, endgameStandings, startEndgame } from '../app/endgames.ts';
+import { attemptsAt, checkEndgameMaia, endgameMaiaHere, endgameStandings, startEndgame } from '../app/endgames.ts';
 import { endgameMaiaAlone, setEndgameMaiaAlone } from '../app/endgameVariety.ts';
 import { courseById, courseCandidates, courseJustRemoved, courseNow, courseScores, courseScoring, courseStandings, loadCourse, removeCourseDrill, restoreCourseDrill, restoreCourseDrills, scoreCourse, stopCourseScoring } from '../app/courseEndgames.ts';
 import { readSearchChapters, searchChapters } from '../app/search.ts';
@@ -16,9 +16,9 @@ import { dataVersion } from '../app/sync.ts';
 import { gatherRepEndgames, loadRepEndgames, removeRepEndgame, repById, repEndgames, repGather, repStandings, stopRepGather } from '../app/repertoireEndgames.ts';
 import { maiaDialog } from '../app/maia.ts';
 import { analyseFrom, entryKey, open } from '../app/mode.ts';
-import { canTakeBack, leavePractice, parkPractice, playOnAfterSlip, practice, practiceHint, practiceMove, showSlipMove, stopPractice, takeBack, takeUpPractice, type PracticeGame } from '../app/practice.ts';
+import { canTakeBack, leavePractice, parkPractice, playOnAfterSlip, practice, practiceHint, practiceMove, regradeEndgame, showSlipMove, stopPractice, takeBack, takeUpPractice, type PracticeGame } from '../app/practice.ts';
 import { decidingNow } from '../app/time.ts';
-import { bareTarget, CONVERT_LEAD, endgameById, ENDGAMES, GROUPS, MAIA_ELO, nextEndgame, sideOf, solvedBy, taskOf, type Endgame, type Standing } from '../core/endgames/endgames.ts';
+import { bareTarget, CONVERT_LEAD, endgameById, ENDGAMES, GRADE_WORD, GROUPS, MAIA_ELO, nextAfter, nextEndgame, sideOf, solvedBy, taskOf, type Endgame, type Standing } from '../core/endgames/endgames.ts';
 import { asCourseEndgame, courseText, groupsOf, isCourseId, type CourseDrill } from '../core/endgames/courses.ts';
 import { asEndgame, CATEGORIES, categoryById, isRepertoireId, REP, type Category, type RepertoireEndgame } from '../core/endgames/repertoire.ts';
 import { lineTail } from '../core/storm/sources.ts';
@@ -746,6 +746,7 @@ function EndgameGame(props: { game: PracticeGame; endgame: Endgame; rep?: Repert
         <BoardNote />
         {props.course && <CourseRemovedNote />}
         {over && <p class="muted" data-testid="endgame-counted">{countedText(p, e)}</p>}
+        {over && <GradeChoice game={p} endgame={e} />}
         {!over && p.failed && !slip && <p class="muted">This try counts as missed: play it out, or start again.</p>}
         <MoveList moves={p.moves} baseFen={e.fen} marks={false} slipAt={slip?.at} />
         <div class="actions train-actions">
@@ -877,5 +878,28 @@ function countedText(p: PracticeGame, e: Endgame): string {
     return `${solved ? 'Reached after a take-back' : 'The try counts as missed'}: the first slip was ${numbered(m.fenBefore, m.san)}${keep}.${solved ? ' The try counts as missed.' : ''}`;
   }
   if (p.failed) return solved ? 'Reached after a hint or a take-back: the try counts as missed.' : 'The try counts as missed.';
+  const sg = p.solveGrade;
+  if (solved && sg) {
+    const next = nextAfter(e.goal, attemptsAt(e.fen), sg.t, sg.g);
+    return `Solved first time, ${sg.secs} s a move: ${GRADE_WORD[sg.g]}${sg.g === sg.auto ? '' : ' (your grade)'}, back ${inDays(next, sg.t)}.`;
+  }
   return solved ? 'Solved first time: it comes back in a while.' : 'The try counts as missed: it stays due.';
+}
+
+/** A solved try's grade (§5.178): the one from the thinking time pressed, each with when it brings the endgame back. */
+function GradeChoice(props: { game: PracticeGame; endgame: Endgame }) {
+  const sg = props.game.solveGrade;
+  if (!sg) return null;
+  const e = props.endgame;
+  const earlier = attemptsAt(e.fen);
+  return (
+    <div class="endgame-grade" role="group" aria-label="How it felt" data-testid="endgame-grade">
+      <span class="muted">How it felt:</span>
+      {([2, 3, 4] as const).map((g) => (
+        <button type="button" key={g} class={`chip-toggle${sg.g === g ? ' on' : ''}`} aria-pressed={sg.g === g} title={`Back ${inDays(nextAfter(e.goal, earlier, sg.t, g), sg.t)}`} onClick={() => regradeEndgame(g)}>
+          {GRADE_WORD[g][0]!.toUpperCase() + GRADE_WORD[g].slice(1)} · {inDays(nextAfter(e.goal, earlier, sg.t, g), sg.t).replace(/^in /, '')}
+        </button>
+      ))}
+    </div>
+  );
 }

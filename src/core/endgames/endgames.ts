@@ -12,6 +12,7 @@
 import type { Position } from 'chessops/chess';
 import { makeSquare as squareName } from 'chessops/util';
 import type { PositionKey } from '../chess/positionKey.ts';
+import { DEFAULT_PARAMS, Grade, newCard, review, type FsrsCard, type FsrsParams } from '../progress/fsrs.ts';
 import type { Category } from './repertoire.ts';
 import { replyOrder } from './variety.ts';
 
@@ -502,14 +503,43 @@ export function pawnPushes(pos: Position): string[] {
 
 /* ------------------------------------------------------------------ the record and its spacing */
 
+/** How a solved try felt (§5.178): FSRS's Hard, Good and Easy. A miss is Again. */
+export type SolveGrade = 2 | 3 | 4;
+export const GRADE_WORD: Record<SolveGrade, string> = { 2: 'hard', 3: 'good', 4: 'easy' };
+
 export interface Attempt {
   t: number;
   res: 'win' | 'draw' | 'loss';
+  /** A solved try's grade (§5.178); a try from before grades counts as Good. */
+  g?: SolveGrade;
 }
 
-/** Days until the next try after 1, 2, 3… solves in a row. */
-export const INTERVAL_DAYS = [1, 3, 7, 14, 30, 60] as const;
-const DAY = 86_400_000;
+/**
+ * A solved try's grade from the user's thinking time (§5.178): each move's time from the answer
+ * on the board to the user's move, capped at a minute (a pause, the phone put down). Easy at 5
+ * seconds a move or less with no move over 20; Hard over 15 seconds a move; Good between.
+ */
+export const GRADE_SECONDS = { easy: 5, easyLongest: 20, hard: 15, cap: 60 } as const;
+export function gradeOfTime(thinkMs: readonly number[]): SolveGrade {
+  if (!thinkMs.length) return Grade.good;
+  const secs = thinkMs.map((ms) => Math.min(Math.max(0, ms) / 1000, GRADE_SECONDS.cap));
+  const mean = secs.reduce((a, b) => a + b, 0) / secs.length;
+  if (mean > GRADE_SECONDS.hard) return Grade.hard;
+  return mean <= GRADE_SECONDS.easy && Math.max(...secs) <= GRADE_SECONDS.easyLongest ? Grade.easy : Grade.good;
+}
+
+/** The mean thinking time a move, in whole seconds, as the grade counts it. */
+export const meanSeconds = (thinkMs: readonly number[]): number =>
+  thinkMs.length ? Math.round(thinkMs.reduce((a, ms) => a + Math.min(Math.max(0, ms) / 1000, GRADE_SECONDS.cap), 0) / thinkMs.length) : 0;
+
+/**
+ * The scheduler (§5.178, was §5.145's ladder of 1, 3, 7, 14, 30 and 60 days by solves in a row):
+ * FSRS, as the repertoire's moves, at 90% recall and a year at most. A miss is Again, a solve its
+ * grade. A try before it was due adds little (FSRS counts the time since the last), so playing an
+ * endgame again the same day no longer climbs the ladder; a miss after a long run keeps more than
+ * a fresh start does.
+ */
+export const ENDGAME_FSRS: FsrsParams = DEFAULT_PARAMS;
 
 export interface Standing {
   /** Never tried, due (missed last, or its interval passed), or not due until `next`. */
@@ -522,23 +552,41 @@ export interface Standing {
   next?: number;
   /** The last five tries, oldest first: solved or not. */
   last: boolean[];
+  /** The last try's grade, when it was solved. */
+  grade?: SolveGrade;
 }
 
 /** Where an endgame stands from its attempts (any order) at `now`. */
-export function standingOf(goal: Goal, attempts: readonly Attempt[], now: number): Standing {
+export function standingOf(goal: Goal, attempts: readonly Attempt[], now: number, params: FsrsParams = ENDGAME_FSRS): Standing {
   const sorted = [...attempts].sort((a, b) => a.t - b.t);
   const marks = sorted.map((a) => solvedBy(goal, a.res));
   let streak = 0;
   for (let i = marks.length - 1; i >= 0 && marks[i]; i--) streak++;
   const base = { tries: marks.length, solves: marks.filter(Boolean).length, streak, last: marks.slice(-5) };
   if (!sorted.length) return { state: 'new', ...base };
+  // A missed endgame is due at once (FSRS's Again would wait a day): practised until solved.
   if (!streak) return { state: 'due', ...base };
-  const next = sorted[sorted.length - 1]!.t + INTERVAL_DAYS[Math.min(streak, INTERVAL_DAYS.length) - 1]! * DAY;
-  return next <= now ? { state: 'due', ...base } : { state: 'later', next, ...base };
+  const card = fsrsOf(goal, sorted, params);
+  const grade = sorted[sorted.length - 1]!.g ?? Grade.good;
+  const next = card.due!;
+  return next <= now ? { state: 'due', ...base, grade } : { state: 'later', next, ...base, grade };
+}
+
+/** The FSRS card after `sorted`'s tries, oldest first. */
+export function fsrsOf(goal: Goal, sorted: readonly Attempt[], params: FsrsParams = ENDGAME_FSRS): FsrsCard {
+  let card = newCard();
+  for (const a of sorted) card = review(card, solvedBy(goal, a.res) ? (a.g ?? Grade.good) : Grade.again, a.t, params);
+  return card;
+}
+
+/** When a solve at `t` with `grade` would bring the endgame back, after its earlier tries. */
+export function nextAfter(goal: Goal, earlier: readonly Attempt[], t: number, grade: SolveGrade, params: FsrsParams = ENDGAME_FSRS): number {
+  const sorted = [...earlier].filter((a) => a.t < t).sort((a, b) => a.t - b.t);
+  return review(fsrsOf(goal, sorted, params), grade, t, params).due!;
 }
 
 /** The attempts at each endgame of `list`, from practice results (`practice` events) at their start positions. */
-export function attemptsByEndgame(results: readonly { key: PositionKey; res: Attempt['res']; preset?: string; t: number }[], keyOf: (e: Pick<Endgame, 'id' | 'fen'>) => PositionKey | undefined, list: readonly Pick<Endgame, 'id' | 'fen'>[] = ENDGAMES): Map<string, Attempt[]> {
+export function attemptsByEndgame(results: readonly { key: PositionKey; res: Attempt['res']; preset?: string; t: number; g?: SolveGrade }[], keyOf: (e: Pick<Endgame, 'id' | 'fen'>) => PositionKey | undefined, list: readonly Pick<Endgame, 'id' | 'fen'>[] = ENDGAMES): Map<string, Attempt[]> {
   const byKey = new Map<string, string>();
   for (const e of list) {
     const k = keyOf(e);
@@ -551,7 +599,7 @@ export function attemptsByEndgame(results: readonly { key: PositionKey; res: Att
     if (!id) continue;
     let list = out.get(id);
     if (!list) out.set(id, (list = []));
-    list.push({ t: r.t, res: r.res });
+    list.push({ t: r.t, res: r.res, ...(r.g ? { g: r.g } : {}) });
   }
   return out;
 }

@@ -2518,3 +2518,15 @@ The technical calls, each with its reason:
   other side (the earlier rule: the user never gets the side the author is against).
 - **Stored course scores are versioned `v: 3`, the old (`v: 1`, `v: 2`) scored again.** Why: the rule
   changed which side drills have. Cheaper than before: only a flipped chapter needs a second search.
+
+## Revision of 2026-11-15 (endgames spaced by FSRS, a solve graded: PLAN.md §5.178)
+- **An endgame's spacing is FSRS's** (the repertoire's scheduler, 90% recall, a year at most), from its
+  tries: a miss Again, a solve Hard, Good or Easy. Replaces §5.145's ladder (1, 3, 7, 14, 30, 60 days by
+  solves in a row). Why: the owner asked for grades of a solve; and the ladder climbed on tries made
+  before an endgame was due (six in a sitting gave 60 days) and lost a whole run to one miss. A missed
+  endgame stays due at once.
+- **A solve's grade comes from the thinking time** (Easy at 5 s a move or less and no move over 20 s,
+  Hard over 15 s, Good between; a move counts a minute at most), and the user can change it at the
+  try's end. Stored on the `practice` event (`g`, `ms`), and a changed grade as a new event kind
+  `grade` on the same card; readers that don't know them skip them (D4). Tries from before count Good.
+
