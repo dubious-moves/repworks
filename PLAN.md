@@ -11274,7 +11274,12 @@ turn; stepping at once drives nothing, the move stopped on after a second; "Play
 by hand), with five controls run (no wait, no mirror, no lights for the user's move, no words, no
 delay while stepping), each failing its tests. The simulated board now records where the board
 stood when each drive was sent (`journeys`) and every pattern of lights (`lit`). The full
-Playwright run and `npm test` pass. **Not checked**: anything on a real board (`TESTING.md` §14);
+Playwright run (469 passed, 18 skipped) and `npm test` pass. That run had one flaky test, not of
+this change: `chessnutPractice.spec.ts`'s third queen moved its hand once the chip's dot was green,
+which it is with no screen mirrored too, so under load the hand could come before the game's board
+was handed to the link and was driven back, not read; the test now waits for "In step with the
+screen." (run four times over on both projects with the board's other specs: 96 passed).
+**Not checked**: anything on a real board (`TESTING.md` §14);
 how long a line's setup and a robot's move really take, which decides how Learn from the start
 feels; show and grade, the mistakes' drills and the Interactive view on the board have no browser
 test of their own (they run on the same screen and the same wait).
