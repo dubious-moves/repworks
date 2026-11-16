@@ -1,4 +1,4 @@
-// The ply limit (PLAN.md §5.193), on a desktop viewport and an emulated phone, with the fixture
+// The ply limit (PLAN.md §5.194), on a desktop viewport and an emulated phone, with the fixture
 // repertoire of train.spec.ts (a Black Sicilian: 1... c5 due, 2... d6 suspended, 3... cxd4 new). A
 // line picked stops at the limit and waits: "Continue" walks on past it, "Finish" ends there. The
 // chip in the counters' row shows the limit, its ✕ takes it off, and the training settings set it.

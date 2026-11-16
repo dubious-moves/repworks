@@ -884,6 +884,66 @@ test('the courses’ endgames: a reference study scored on the device, listed by
   await expect(section.getByRole('button', { name: /^Score/ })).toHaveCount(0);
 });
 
+test('a course drill’s own goal (§5.193): a draw held for fewer moves, a win to mate, the course’s own back; synced, kept over a reload', async ({ page }) => {
+  test.setTimeout(120_000);
+  const git = await setUpCourse(page);
+  await page.getByRole('navigation', { name: 'Pages' }).getByRole('link', { name: /^Endgames/ }).click();
+  const section = page.getByTestId('endgame-courses');
+  await section.getByRole('button', { name: 'Score the course (5)' }).click();
+  await expect(page.getByTestId('course-scoring')).toHaveText('Every chapter scored: 4 drills from 5.', { timeout: ENGINE_MS * 20 });
+  const items = section.locator('.endgame-item');
+
+  // The draw: 15 moves by the course's bands, 4 chosen.
+  await items.getByRole('link', { name: 'Test 1', exact: true }).click();
+  const game = page.getByTestId('endgame-game');
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  await expect(game.locator('.train-counters')).toHaveText('Black to play and draw (hold 15 moves) · held 0 of 15');
+  const goal = page.getByTestId('course-goal');
+  await expect(goal.locator('summary')).toHaveText('Change the goal');
+  await goal.locator('summary').click();
+  await expect(page.getByTestId('course-goal-apply')).toBeDisabled();
+  await page.getByTestId('course-goal-hold').fill('0');
+  await expect(page.getByTestId('course-goal-apply')).toBeDisabled();
+  await page.getByTestId('course-goal-hold').fill('4');
+  await page.getByTestId('course-goal-apply').click();
+  await expect(game.locator('.train-counters')).toHaveText('Black to play and draw (hold 4 moves) · held 0 of 4');
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  await expect(page.getByTestId('course-goal').locator('summary')).toHaveText('Your goal (changed)');
+  await page.locator('.chapter-head .back').click();
+  await expect(items.nth(2)).toContainText('Black to play and draw (hold 4 moves) · your goal');
+
+  // The win: a lead or a pawn by the course's bands, mate chosen, then the course's own again.
+  await items.getByRole('link', { name: 'Win the Race - 2', exact: true }).click();
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  await page.getByTestId('course-goal').locator('summary').click();
+  await expect(page.getByTestId('course-goal-until').locator('option')).toHaveText(['Mate', 'Queen a pawn', 'Win the pawn', 'Queen a pawn or go 5 points up']);
+  await page.getByTestId('course-goal-until').selectOption('mate');
+  await page.getByTestId('course-goal-apply').click();
+  await expect(game.locator('.train-counters')).toHaveText('White to play and win (mate)');
+  await page.getByTestId('course-goal').locator('summary').click();
+  await page.getByTestId('course-goal-own').click();
+  await expect(game.locator('.train-counters')).toHaveText('White to play and win (queen a pawn or go 5 points up)');
+  await expect(page.getByTestId('course-goal').locator('summary')).toHaveText('Change the goal');
+
+  // Synced as `cgoal` events; nothing counted as a try (no move was played).
+  const goals = () =>
+    [...git.textsOf()]
+      .filter(([p]) => p.startsWith('progress/'))
+      .flatMap(([, t]) => t.split('\n').filter(Boolean))
+      .map((l) => JSON.parse(l) as Record<string, unknown>)
+      .filter((e) => e['k'] === 'cgoal')
+      .map((e) => e['g']);
+  await page.locator('.chip').click();
+  await expect.poll(goals, { timeout: 15_000 }).toEqual([{ hold: 4 }, { until: 'mate' }, {}]);
+  expect(endgameEvents(git)).toHaveLength(0);
+
+  await page.locator('.chapter-head .back').click();
+  await page.reload();
+  await expect(items.nth(2)).toContainText('Black to play and draw (hold 4 moves) · your goal');
+  await expect(items.nth(1)).toContainText('White to play and win (queen a pawn or go 5 points up)');
+  await expect(items.nth(1)).not.toContainText('your goal');
+});
+
 test('a course chapter whose first move is the author’s marked mistake is played from the side that punishes it', async ({ page }) => {
   test.setTimeout(60_000);
   await setUpCourse(page, [['Ch07Blun', 'Part 3: Endgames for Class D (1200-1399): The Deep - 7', '7k/8/5K2/8/8/8/7P/8 w - - 0 1', '{ White holds the draw, but disaster struck: } 1. Kf7?? { Suddenly Black is winning. } Kh7 2. Kf6']]);

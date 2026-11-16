@@ -515,7 +515,7 @@ function Session(props: { s: SessionView }) {
   // line" when it waits for it. With lines from the comments to quiz it always waits, for "Next
   // line" or "Quiz lines" (§5.98), at the session's last line too.
   const endQuiz = !s.done && s.phase === 'lineDone' ? (s.endQuiz ?? 0) : 0;
-  // Stopped at the ply limit (§5.193): "Continue" goes on past it, beside "Next line"; the
+  // Stopped at the ply limit (§5.194): "Continue" goes on past it, beside "Next line"; the
   // session's last line always waits there, for "Continue" or "Finish".
   const limit = !s.done && s.phase === 'lineDone' ? s.limit : undefined;
   const holding = (!s.done && s.phase === 'lineDone' && s.upcoming !== undefined && (s.of.kind === 'learn' || s.of.kind === 'queue' || s.of.kind === 'show' || s.of.kind === 'difficult')) || endQuiz > 0 || !!limit;
@@ -744,12 +744,12 @@ function Session(props: { s: SessionView }) {
 }
 
 
-/** The sessions a ply limit stops (§5.193): the queue's, show and grade, difficult lines, a line picked, Learn. */
+/** The sessions a ply limit stops (§5.194): the queue's, show and grade, difficult lines, a line picked, Learn. */
 function usesLimit(of: SessionKind): boolean {
   return of.kind === 'queue' || of.kind === 'show' || of.kind === 'difficult' || of.kind === 'line' || of.kind === 'learn';
 }
 
-/** The ply limit set (§5.193): a chip in the counters' row, opening the settings; ✕ takes it off, from the next line. */
+/** The ply limit set (§5.194): a chip in the counters' row, opening the settings; ✕ takes it off, from the next line. */
 function PlyLimitChip(props: { ply: number }) {
   return (
     <span class="ply-limit-chip">

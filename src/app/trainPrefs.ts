@@ -24,7 +24,7 @@ export interface TrainPrefs {
   mistakeRetries: number;
   /** In review, the lines from the comments quizzed at a line's end (the owner's request, 2026-10-12). */
   comments: CommentQuiz;
-  /** A ply limit for training (§5.193): each line stops after this many moves from its chapter's start; 0: none. */
+  /** A ply limit for training (§5.194): each line stops after this many moves from its chapter's start; 0: none. */
   plyLimit: number;
 }
 
@@ -36,7 +36,7 @@ export const DEFAULT_PREFS: TrainPrefs = { newMoves: 'show', sequenceLength: 5, 
 
 const KEY = 'repworks.trainPrefs';
 
-/** The highest ply limit that can be set (§5.193). */
+/** The highest ply limit that can be set (§5.194). */
 export const MAX_PLY_LIMIT = 200;
 
 /** A ply limit as the move it stops after, from move 1 with White to move: 16 is "after Black's 8th move". */

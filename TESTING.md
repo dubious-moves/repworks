@@ -483,7 +483,7 @@ led to the one asked about. The first model ignores them, so nothing changes the
 
 Training and Learn on the Chessnut Move: see 14 (PLAN.md §5.192).
 
-### A ply limit (§5.193, 2026-11-16)
+### A ply limit (§5.194, 2026-11-16)
 - Set **Ply limit** in the training settings (say 8; the dialog names the move: "after Black's 4th
   move"). The training screen shows a "Ply limit 8" chip. Train today's queue: each line should
   stop after its 8th ply with "Ply limit: n more moves in this line", **Continue** and **Next
@@ -1173,6 +1173,15 @@ Training and Learn on the Chessnut Move: see 14 (PLAN.md §5.192).
   phone: the waits while each move is judged (Stockfish in the background).
 
 ## 8. Endgames
+
+### A course drill's own goal (§5.193, 2026-11-16)
+- A course drill held for a draw: "Change the goal" under the task line, set to fewer moves (say 5);
+  does the drill start again with "held 0 of 5", and does holding 5 moves count as solved? A win:
+  are the ends offered the right ones for the position, and does Mate play on past a queened pawn?
+- On a second device after a sync: the list shows "· your goal" and the drill the chosen goal;
+  "The course's own" puts it back on both.
+- Checked: unit tests and the endgames spec (desktop and emulated phone). Not on a device, not with
+  the real course.
 
 ### The endgames' defence: the course's replies, and three fixes (§5.185, 2026-11-15)
 - A course drill whose chapter goes on after your first move (the Silman king-and-pawn race,

@@ -128,7 +128,7 @@ test('each session kind runs with its settings: the queue starts as set for it, 
   for (const kind of kinds) assert.deepEqual(optionsFor(kind, prefs), {});
 });
 
-test('the ply limit (§5.193): stored per device, off by default, out of range is off; given to the walking sessions only', () => {
+test('the ply limit (§5.194): stored per device, off by default, out of range is off; given to the walking sessions only', () => {
   assert.equal(DEFAULT_PREFS.plyLimit, 0);
   assert.equal(parsePrefs(JSON.stringify({ plyLimit: 16 })).plyLimit, 16);
   for (const bad of [-1, 1.5, 'x', 999]) assert.equal(parsePrefs(JSON.stringify({ plyLimit: bad })).plyLimit, 0);

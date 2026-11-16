@@ -250,13 +250,75 @@ export interface CourseDrill {
   until?: Until;
   flipped?: string;
   by?: FlipBy;
+  /** A draw's moves to hold, when the user chose them (`chosen`); else the course's `REP.hold`. */
+  hold?: number;
+  /** The user's own end for the drill (`CourseGoalChoice`), when one is set and fits it. */
+  chosen?: CourseGoalChoice;
+}
+
+/* ------------------------------------------------------------------ the user's own goal */
+
+/**
+ * The user's own end for a course drill (the owner's request of 2026-11-16: "lower the amount of
+ * moves needed to hold a draw"): a draw held for `hold` moves, or a win ended by `until`. The goal's
+ * kind (win or draw) is Stockfish's and stays: a win asked of a drawn position would slip on every
+ * move. Synced as `cgoal` events (`{}` is the course's own again).
+ */
+export interface CourseGoalChoice {
+  hold?: number;
+  until?: Until;
+}
+
+/** The moves a held draw may be set to. */
+export const HOLD_MIN = 1;
+export const HOLD_MAX = 50;
+
+/**
+ * The ends a win from `fen` can be given, for the side to move: mate always; a pawn queened when
+ * that side has a pawn; the defender's material won, or a converting lead, when the defender has
+ * more than its king (against a bare king both are there at the start).
+ */
+export function untilsFor(fen: string): Until[] {
+  const pos = positionOf(fen);
+  if (!pos) return ['mate'];
+  const side = pos.turn;
+  const theirs = pos.board[side === 'white' ? 'black' : 'white'];
+  const out: Until[] = ['mate'];
+  if (pos.board[side].intersect(pos.board.pawn).nonEmpty()) out.push('promote');
+  if (theirs.size() > 1) out.push('bare', 'convert');
+  return out;
+}
+
+/** A stored choice as this version reads it: a whole number of moves to hold, or a known end; `{}` the course's own. */
+export function readGoalChoice(x: unknown): CourseGoalChoice | undefined {
+  if (typeof x !== 'object' || x === null || Array.isArray(x)) return undefined;
+  const o = x as Record<string, unknown>;
+  const out: CourseGoalChoice = {};
+  if (o['hold'] !== undefined) {
+    const h = o['hold'];
+    if (typeof h !== 'number' || !Number.isInteger(h) || h < HOLD_MIN || h > HOLD_MAX) return undefined;
+    out.hold = h;
+  }
+  if (o['until'] !== undefined) {
+    const u = o['until'];
+    if (u !== 'mate' && u !== 'promote' && u !== 'bare' && u !== 'convert') return undefined;
+    out.until = u;
+  }
+  return out;
+}
+
+/** The part of a choice that fits a drill: a hold for a draw, an end its position allows for a win; undefined when none does. */
+export function fitChoice(choice: CourseGoalChoice | undefined, goal: Goal, fen: string): CourseGoalChoice | undefined {
+  if (!choice) return undefined;
+  if (goal === 'draw') return choice.hold !== undefined ? { hold: choice.hold } : undefined;
+  return choice.until && untilsFor(fen).includes(choice.until) ? { until: choice.until } : undefined;
 }
 
 /**
  * The candidates, joined with their scores: the drills (not removed), the ones with no goal, those
  * not scored yet, those removed.
  */
-export function courseState(cands: readonly Candidate[], scores: ReadonlyMap<string, CourseScore>, removed: ReadonlySet<string>): { drills: CourseDrill[]; left: number; todo: Candidate[]; removed: number } {
+export function courseState(cands: readonly Candidate[], scores: ReadonlyMap<string, CourseScore>, removed: ReadonlySet<string>, goals: ReadonlyMap<string, CourseGoalChoice> = new Map()): { drills: CourseDrill[]; left: number; todo: Candidate[]; removed: number } {
   const drills: CourseDrill[] = [];
   const todo: Candidate[] = [];
   let left = 0;
@@ -266,7 +328,12 @@ export function courseState(cands: readonly Candidate[], scores: ReadonlyMap<str
     if (!score) todo.push(cand);
     else if (!score.drill) left++;
     else if (removed.has(cand.id)) gone++;
-    else drills.push({ id: cand.id, cand, score, fen: score.drill.fen, side: score.drill.side, goal: score.drill.goal, ...(score.drill.until ? { until: score.drill.until } : {}), ...(score.drill.flipped ? { flipped: score.drill.flipped } : {}), ...(score.drill.by ? { by: score.drill.by } : {}) });
+    else {
+      const dr = score.drill;
+      const chosen = fitChoice(goals.get(cand.key), dr.goal, dr.fen);
+      const until = chosen?.until ?? dr.until;
+      drills.push({ id: cand.id, cand, score, fen: dr.fen, side: dr.side, goal: dr.goal, ...(until ? { until } : {}), ...(dr.flipped ? { flipped: dr.flipped } : {}), ...(dr.by ? { by: dr.by } : {}), ...(chosen?.hold ? { hold: chosen.hold } : {}), ...(chosen ? { chosen } : {}) });
+    }
   }
   return { drills, left, todo, removed: gone };
 }
@@ -278,7 +345,7 @@ export function courseState(cands: readonly Candidate[], scores: ReadonlyMap<str
 export function asCourseEndgame(d: CourseDrill, chapter?: Chapter): Endgame {
   const from = positionOf(d.fen);
   const author = chapter && from ? authorReplies(chapter, d.side === 'white' ? 'black' : 'white', positionKeyOf(from)) : {};
-  return { id: d.id, group: 'course', title: d.cand.title, fen: d.fen, goal: d.goal, ...(d.goal === 'win' ? { until: d.until ?? 'convert' } : { hold: REP.hold }), idea: '', ...(Object.keys(author).length ? { author } : {}) };
+  return { id: d.id, group: 'course', title: d.cand.title, fen: d.fen, goal: d.goal, ...(d.goal === 'win' ? { until: d.until ?? 'convert' } : { hold: d.hold ?? REP.hold }), idea: '', ...(Object.keys(author).length ? { author } : {}) };
 }
 
 /**
@@ -311,6 +378,11 @@ export function authorReplies(chapter: Chapter, side: Color, from?: PositionKey)
   return out;
 }
 
+/** The course's own end for a drill, before the user's choice: what "The course's own" puts back. */
+export function ownGoal(d: CourseDrill): CourseGoalChoice {
+  return d.goal === 'draw' ? { hold: REP.hold } : { until: d.score.drill?.until ?? 'convert' };
+}
+
 /** The groups in the order of their first drill, each with its drills' count. */
 export function groupsOf(drills: readonly CourseDrill[]): { group: string; n: number }[] {
   const out: { group: string; n: number }[] = [];
@@ -336,8 +408,11 @@ export function readCourseScore(x: unknown): CourseScore | undefined {
  * `cscore` of each card `e|<key>` is its score, the latest `cdrill` says whether it is removed.
  * Removals are by chapter key, so they hold for a score made on another device.
  */
-export function courseFromLog(cards: Iterable<string>, eventsOf: (card: string) => readonly DeviceEvent[]): { scores: Map<string, CourseScore>; removed: Set<string>; removedAt: Map<string, number> } {
+export function courseFromLog(cards: Iterable<string>, eventsOf: (card: string) => readonly DeviceEvent[]): { scores: Map<string, CourseScore>; removed: Set<string>; removedAt: Map<string, number>; goals: Map<string, CourseGoalChoice>; goalsAt: Map<string, number> } {
   const scores = new Map<string, CourseScore>();
+  /** The user's own goal of each drill (the latest `cgoal`; `{}` is none) and when it was written. */
+  const goals = new Map<string, CourseGoalChoice>();
+  const goalsAt = new Map<string, number>();
   const removed = new Set<string>();
   /** When the latest `cdrill` of each card was written (ms), so a change made here and not read back yet can be told from an older one. */
   const removedAt = new Map<string, number>();
@@ -352,11 +427,17 @@ export function courseFromLog(cards: Iterable<string>, eventsOf: (card: string) 
       } else if (e.event?.k === 'cdrill') {
         off = e.event.on;
         removedAt.set(key, e.t);
+      } else if (e.event?.k === 'cgoal') {
+        const g = readGoalChoice(e.event.g);
+        if (!g) continue;
+        goalsAt.set(key, e.t);
+        if (g.hold !== undefined || g.until !== undefined) goals.set(key, g);
+        else goals.delete(key);
       }
     }
     if (off) removed.add(key);
   }
-  return { scores, removed, removedAt };
+  return { scores, removed, removedAt, goals, goalsAt };
 }
 
 /* ------------------------------------------------------------------ the course's text */

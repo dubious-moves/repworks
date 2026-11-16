@@ -59,7 +59,7 @@
 //   quizzed), which plays them one after another, back at the line's end after them. For each,
 //   the board goes back to where it starts, the opponent's moves are played and the user finds
 //   their own. Nothing is graded or recorded; the lines of a walk are offered once a session.
-// - A ply limit (`plyLimit`, the owner's request, 2026-11-16, §5.193): a walk stops after the line's
+// - A ply limit (`plyLimit`, the owner's request, 2026-11-16, §5.194): a walk stops after the line's
 //   first `plyLimit` moves, as at a line's end (its mistakes retried, its passes walked), and waits
 //   there with `continue` (on past the limit, this line only) beside "Next line"; it never ends the
 //   session by itself. A line that would ask nothing before the limit is skipped: the moves the plan
@@ -315,7 +315,7 @@ export interface TrainerSetup {
   commentLines?(line: Line): readonly QuizLine[];
   /** Which of them are quizzed (default `off`). */
   comments?: CommentQuiz;
-  /** A line's walk stops after this many of its moves, waiting for `continue` or `next` (§5.193); unset or 0: no limit. */
+  /** A line's walk stops after this many of its moves, waiting for `continue` or `next` (§5.194); unset or 0: no limit. */
   plyLimit?: number;
 }
 
@@ -362,7 +362,7 @@ export interface TrainerView {
   shown?: { uci: string; san: string };
   /** At a line's end: the line that comes next, if any. */
   upcoming?: PlannedLine;
-  /** At a line's end that is the ply limit's (§5.193): the limit, and how many of the line's moves are past it. */
+  /** At a line's end that is the ply limit's (§5.194): the limit, and how many of the line's moves are past it. */
   limit?: { ply: number; past: number };
   /** After a wrong move: the move that "Save as alternative" would save (§5.18). */
   wrongMove?: { uci: string; san: string };
@@ -731,7 +731,7 @@ export class Trainer {
     out.push({ type: 'done', summary: this.summary() });
   }
 
-  /** The ply limit (§5.193), when one is set. */
+  /** The ply limit (§5.194), when one is set. */
   private limit(): number | undefined {
     const n = Math.round(this.options.plyLimit ?? 0);
     return n > 0 ? n : undefined;
@@ -964,13 +964,13 @@ export class Trainer {
     out.push({ type: 'lineDone' });
     this.upcoming = this.findNext();
     const quiz = this.endQuiz().length > 0;
-    // Stopped at the ply limit (§5.193): the session's last line waits for "Continue" or "Finish".
+    // Stopped at the ply limit (§5.194): the session's last line waits for "Continue" or "Finish".
     const limited = this.end < this.fullEnd;
     if (!this.upcoming && !quiz && !limited) return this.finish(out);
     if (!this.options.holdLineEnd && !quiz && this.upcoming) this.wait(this.pauses.lineEndMs ?? this.pace * (this.options.lineEndPaces ?? 2), out);
   }
 
-  /** Stopped at the ply limit: the line goes on past it to its end, this line only (§5.193). */
+  /** Stopped at the ply limit: the line goes on past it to its end, this line only (§5.194). */
   private goPast(now: number, out: TrainerEffect[]) {
     if (this.phase !== 'lineDone' || this.inAside || this.end >= this.fullEnd) return;
     this.waitId++;

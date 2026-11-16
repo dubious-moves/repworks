@@ -209,7 +209,7 @@ export interface SessionView {
   total: number;
   /** At a line's end: the line that comes next in the session (§5.17). */
   upcoming?: Line;
-  /** Stopped at the ply limit (§5.193): the limit, and the line's moves past it. */
+  /** Stopped at the ply limit (§5.194): the limit, and the line's moves past it. */
   limit?: { ply: number; past: number };
   /** Show sequence, while shown: the plies it spans. */
   sequence?: { from: number; to: number };
@@ -234,7 +234,7 @@ export interface SessionView {
   /** The planned asks and teaches not answered yet. */
   dueLeft: number;
   newLeft: number;
-  /** With a ply limit (§5.193): of `dueLeft`, the moves past it on their lines, which the walks stop short of. */
+  /** With a ply limit (§5.194): of `dueLeft`, the moves past it on their lines, which the walks stop short of. */
   pastLimit?: number;
   /** The last card suspended, for its undo. */
   suspended?: { card: CardId; san: string };

@@ -2688,3 +2688,17 @@ The technical calls, each with its reason:
   too).
 - No data format changed; nothing new is written or synced; no new setting. A review's `ms`
   includes the robot's last move where the board is slower than the hand; nothing schedules by it.
+
+## Revision of 2026-11-16 (a course drill's own goal: PLAN.md §5.193)
+- **A course drill's end can be chosen by the user, synced as a `cgoal` progress event** (card
+  `e|<chapter start's key>`, `g` `{hold}`, `{until}` or `{}` for the course's own; the latest
+  decides). Why: the owner, 2026-11-16: "Allow the user to change the condition/goal of the
+  position. For example lower the amount of moves needed to hold a draw." The log, as for the
+  course's scores and removals (D4): more than one device changes it, and the drill should read the
+  same everywhere. Additive: older builds skip the kind, compaction keeps it.
+- **Win or draw stays Stockfish's verdict**; only the hold (1–50 moves) or a win's end (mate, a pawn
+  queened, the defender's material, a converting lead, as the position allows) changes. Why: a win
+  asked of a drawn position would fail on every move.
+- **Changing the goal restarts the drill as Restart does** (a try begun counts as missed). Why: a
+  try's goal can't change under it, and a goal changed after a slip must not wipe the miss.
+

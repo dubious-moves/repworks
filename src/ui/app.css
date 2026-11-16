@@ -2643,7 +2643,7 @@ table.cards td {
   padding: 0 10px;
 }
 
-/* The ply limit set (Train.tsx's PlyLimitChip, PLAN.md §5.193): a quiet chip in the counters' row,
+/* The ply limit set (Train.tsx's PlyLimitChip, PLAN.md §5.194): a quiet chip in the counters' row,
    its ✕ taking the limit off. */
 .ply-limit-chip {
   flex: none;
@@ -6912,6 +6912,23 @@ a.button.disabled {
 .endgame-remove {
   align-self: flex-start;
   font-size: 0.85rem;
+}
+
+/* A course drill's own goal (Endgames.tsx, PLAN.md §5.193). */
+.course-goal-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.course-goal-form input[type='number'] {
+  width: 4.5em;
+}
+
+.course-goal-form select {
+  max-width: 100%;
 }
 
 /* The courses' endgames (Endgames.tsx, PLAN.md §5.175): the course's own text under the board. */

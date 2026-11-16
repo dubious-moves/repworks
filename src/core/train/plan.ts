@@ -169,7 +169,7 @@ export function withoutAnswered(plan: SessionPlan, answered: ReadonlySet<string>
 }
 
 /**
- * With a ply limit (§5.193): how many of the plan's asks not answered yet lie at or past it on
+ * With a ply limit (§5.194): how many of the plan's asks not answered yet lie at or past it on
  * their line, so that the walks stop short of them and they stay due. 0 without a limit.
  */
 export function pastLimit(plan: SessionPlan, answered: ReadonlySet<string>, limit: number): number {

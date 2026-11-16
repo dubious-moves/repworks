@@ -1265,7 +1265,7 @@ test('comment lines: "Quiz now" at the line\'s end plays the one picked; "Quiz l
   assert.deepEqual(plays(effects).slice(6), ['opponent:Nc3', 'user:Nc6', 'opponent:g3', 'user:g6', 'opponent:c3', 'user:Nf6', 'opponent:e5', 'user:Nd5']);
 });
 
-// The ply limit (§5.193): a walk stops after the line's first `plyLimit` moves.
+// The ply limit (§5.194): a walk stops after the line's first `plyLimit` moves.
 const limitWorld = () => {
   const w = world(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 Nc6 3. Bb5 (3. Bc4 Bc5 4. c3) 3... a6 4. Ba4'));
   const states = new Map<string, CardState>([...w.ix.cards.keys()].map((c) => [c, notDue]));

@@ -9,7 +9,7 @@
 // log, and cleared (`migrateLegacy`).
 import { computed, effect, signal } from '@preact/signals';
 import { keyFen, type PositionKey } from '../core/chess/positionKey.ts';
-import { candidatesOf, courseFromLog, courseId, courseState, readCourseScore, scoreCandidate, type CourseDrill, type CourseScore } from '../core/endgames/courses.ts';
+import { candidatesOf, courseFromLog, courseId, courseState, readCourseScore, scoreCandidate, type CourseDrill, type CourseGoalChoice, type CourseScore } from '../core/endgames/courses.ts';
 import { attemptsByEndgame, standingOf, type Standing } from '../core/endgames/endgames.ts';
 import { courseCard } from '../core/progress/cards.ts';
 import { positionOf } from '../core/storm/walk.ts';
@@ -100,11 +100,26 @@ effect(() => {
   if (trainData.value) void migrateLegacy();
 });
 
+/** Goals chosen on this device, shown before the log is read again (as `removedHere`). */
+const goalsHere = signal<Map<string, { g: CourseGoalChoice; at: number }>>(new Map());
+
+/** The user's own goals (by the chapter start's key), every device's: the latest decides. */
+export const courseGoals = computed<Map<string, CourseGoalChoice>>(() => {
+  const l = logged.value;
+  const out = new Map(l?.goals ?? []);
+  for (const [key, h] of goalsHere.value) {
+    if (h.at <= (l?.goalsAt.get(key) ?? -1)) continue;
+    if (h.g.hold !== undefined || h.g.until !== undefined) out.set(key, h.g);
+    else out.delete(key);
+  }
+  return out;
+});
+
 /** The candidates of the reference studies' chapters, as read. */
 export const courseCandidates = computed(() => candidatesOf(searchChapters.value ?? []));
 
 /** The course's state: drills, chapters with no goal, chapters still to score, drills removed. */
-export const courseNow = computed(() => courseState(courseCandidates.value, courseScores.value ?? new Map(), courseRemoved.value));
+export const courseNow = computed(() => courseState(courseCandidates.value, courseScores.value ?? new Map(), courseRemoved.value, courseGoals.value));
 
 export const courseById = (id: string): CourseDrill | undefined => courseNow.value.drills.find((d) => d.id === id);
 
@@ -183,6 +198,18 @@ async function setRemoved(keys: readonly PositionKey[], on: boolean): Promise<vo
   removedHere.value = new Map([...removedHere.peek(), ...keys.map((k) => [k, { on, at: now }] as const)]);
   const t = new Date(now).toISOString();
   await recordEvents(keys.map((key) => ({ t, k: 'cdrill' as const, card: courseCard(key), on })));
+}
+
+/**
+ * Sets a drill's own goal (§5.193), on every device: a draw's moves to hold or a win's end; `{}`
+ * puts the course's own back. The list and the drill change at once; the log is written after.
+ */
+export async function setCourseGoal(id: string, g: CourseGoalChoice): Promise<void> {
+  const key = keyOfId(id);
+  if (!key) return;
+  const now = Date.now();
+  goalsHere.value = new Map([...goalsHere.peek(), [key, { g, at: now }]]);
+  await recordEvents([{ t: new Date(now).toISOString(), k: 'cgoal' as const, card: courseCard(key), g: { ...g } as Record<string, unknown> }]);
 }
 
 /** Takes a drill off the list (its tries stay in the log), on every device. */
