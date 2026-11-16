@@ -286,7 +286,10 @@ test("a third queen: the set can't make it, the panel says so, and the game goes
   await page.evaluate((fen) => (location.hash = '#/practice?fen=' + encodeURIComponent(fen)), QUEENS);
   const game = page.locator('.practice-game');
   await expect(game).toHaveAttribute('data-phase', 'user');
-  // The board shows it already: nothing driven.
+  // The board shows it already: nothing driven. In step with the game's board, not only linked
+  // (the dot is green with no screen mirrored too, and a hand before the game's board is mirrored
+  // would be driven back as the board differing, not read as a move).
+  await expect(page.getByTestId('board-chip')).toHaveAttribute('title', 'In step with the screen.');
   await expect(page.getByTestId('board-chip').locator('[data-dot]')).toHaveAttribute('data-dot', 'ok');
   expect(await b.drives()).toEqual([]);
   // b8=Q by hand (the spare queen): read as a promotion, played; a third white queen.
