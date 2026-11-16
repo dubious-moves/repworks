@@ -31,6 +31,9 @@ import { quizLinesOf, type QuizLine } from '../core/train/commentQuiz.ts';
 import { Trainer, type Note, type Summary, type TrainerCommand, type TrainerEffect, type TrainerOptions, type TrainerView } from '../core/train/trainer.ts';
 import type { IdbStore } from '../platform/idbStore.ts';
 import { say, stopSpeaking } from '../platform/speech.ts';
+import { sessionSpeech } from '../core/board/speech.ts';
+import { boardLink } from './boardLink.ts';
+import { boardPrefs } from './boardPrefs.ts';
 import { moveMs, pausesOf, paceSettings, savePaceSettings, type Pace } from './pace.ts';
 import { decidingNow } from './time.ts';
 import { trainPrefs, type TrainPrefs } from './trainPrefs.ts';
@@ -221,6 +224,8 @@ export interface SessionView {
   wrongMove?: string;
   /** The wrong move just played, marked on the board for a moment after it is taken back (§5.158); `n` counts them. */
   miss?: { uci: string; n: number };
+  /** Who played the last move on the board: the Chessnut Move lights the user's own right move green (§5.192). */
+  lastBy?: 'opponent' | 'auto' | 'user' | 'preview';
   savedAlt?: string;
   /** Show and grade's Space (§5.114): the alternatives saved for the move asked or shown, drawn in blue until the board moves. */
   alts?: { uci: string; san: string }[];
@@ -446,6 +451,32 @@ function stopTimer() {
   if (timer !== undefined) clearTimeout(timer);
   timer = undefined;
   held = undefined;
+  boardWait++;
+}
+
+/** Bumped whenever the timer is stopped: a tick left waiting for the Chessnut Move then sends nothing. */
+let boardWait = 0;
+
+/**
+ * A tick that is due. While the line is read, or the board analysed, the session waits: the tick
+ * comes when the reading ends, or the session is come back to. With the Chessnut Move following
+ * the session's board (PLAN.md §5.192), the tick waits until the board shows the position on the
+ * screen, so each move played for the user is seen played by the robot before the next one comes,
+ * and a move is asked for on a board that is ready for it. `shows` answers at once when the board
+ * isn't following (not linked, another position mirrored, a drive that didn't arrive, pieces the
+ * set doesn't have): the session never waits on a board that needs the user.
+ */
+function tickDue(id: number, waited = false): void {
+  if (readingAt.peek() !== undefined || away) {
+    held = id;
+    return;
+  }
+  const pos = session.peek()?.position;
+  if (waited || !pos || !boardLink.linked() || !boardLink.mirrored.peek()) return send({ type: 'tick', id, now: Date.now() });
+  const mine = ++boardWait;
+  void boardLink.shows(makeFen(pos.toSetup())).then(() => {
+    if (mine === boardWait && trainer) tickDue(id, true);
+  });
 }
 
 /**
@@ -646,12 +677,14 @@ function apply(t: Trainer, effects: readonly ShowGradeEffect[], always = false):
         delete next.alts;
         delete next.suspended;
         delete next.missed;
+        delete next.lastBy;
         newLine = true;
         break;
       }
       case 'play':
         delete next.arrow;
         delete next.alts;
+        next.lastBy = e.by;
         break;
       case 'alternatives':
         // A second press takes them away again.
@@ -683,10 +716,7 @@ function apply(t: Trainer, effects: readonly ShowGradeEffect[], always = false):
         stopTimer();
         timer = setTimeout(() => {
           timer = undefined;
-          // While the line is read, or the board analysed, the session waits: the tick comes when
-          // the reading ends, or the session is come back to.
-          if (readingAt.peek() !== undefined || away) held = e.id;
-          else send({ type: 'tick', id: e.id, now: Date.now() });
+          tickDue(e.id);
         }, e.ms);
         break;
       case 'answer':
@@ -711,9 +741,18 @@ function apply(t: Trainer, effects: readonly ShowGradeEffect[], always = false):
         if (speech.peek()) say(e.text);
         break;
       case 'takeback':
+        delete next.lastBy;
+        break;
       case 'lineDone':
         break;
     }
+  }
+  // On the Chessnut Move, with its speech on (PLAN.md §5.192): the moves played for the user and
+  // what the feedback line asks, for a session followed on the board. Show and grade's own speech
+  // says its moves already.
+  if (boardPrefs.peek().speak && boardLink.linked() && !(shower && speech.peek())) {
+    const words = sessionSpeech(effects, { shown: s.selfGrade });
+    if (words) say(words);
   }
   const v = t.view;
   // Retry and drill: the mistake a line asks can be pinned from the line's start, as it is met.

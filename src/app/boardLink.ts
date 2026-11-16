@@ -108,6 +108,14 @@ export interface BoardLink {
   checkPieces(): Promise<PieceCheck | undefined>;
   /** Resolves true when the board shows `fen` (logical), false when it can't (unmakeable, off). */
   reached(fen: string): Promise<boolean>;
+  /**
+   * For a session that paces itself by the board (the repertoire trainer, PLAN.md §5.192): resolves
+   * true when the board shows `fen`, the position of the screen's board mirrored now; false at once
+   * when the board isn't following it and so won't by itself: not linked, no board or another
+   * position mirrored, the pieces parked by Reset the pieces, a position the set can't make, or a
+   * drive that didn't arrive. Unlike `reached`, it never waits on a board that needs the user.
+   */
+  shows(fen: string): Promise<boolean>;
   /** The settings changed: the mirror's turn and the lights recomputed. */
   refresh(): void;
   /** Whether the board is linked and in use now (the storm's setup asks). */
@@ -253,6 +261,8 @@ export function createBoardLink(deps: BoardLinkDeps): BoardLink {
         if (applied?.owner === owner && applied.spec.fen === spec.fen) run({ t: 'want', want: wantOf(applied.spec), now: deps.now() });
       });
       showLights();
+      // A wait on the position before this one (`shows`) ends here: it is no longer mirrored.
+      checkWaiters();
     } else run({ t: 'want', want, now: deps.now() });
   }
 
@@ -464,6 +474,26 @@ export function createBoardLink(deps: BoardLinkDeps): BoardLink {
     });
   }
 
+  function shows(fen: string): Promise<boolean> {
+    return new Promise((resolve) => {
+      const check = () => {
+        const done = (v: boolean) => {
+          waiters.delete(check);
+          resolve(v);
+        };
+        if (status.peek().state !== 'on') return done(false);
+        if (!applied || applied.spec.fen !== fen) return done(false);
+        // Mirrored, not handed to the link: its delay is running (a sequence stepped through), and
+        // it is waited on; or the pieces are parked by Reset the pieces, and it is not.
+        if (link.want?.fen !== fen) return cancelDelay ? undefined : done(false);
+        if (link.phase === 'unmakeable' || link.phase === 'stuck') return done(false);
+        if (link.phase === 'synced' && !!link.seen && !!link.target && link.seen.every((c, s) => c === link.target![s])) done(true);
+      };
+      waiters.add(check);
+      check();
+    });
+  }
+
   return {
     status,
     seen,
@@ -478,6 +508,7 @@ export function createBoardLink(deps: BoardLinkDeps): BoardLink {
     battery: readBattery,
     checkPieces,
     reached,
+    shows,
     refresh: () => (applied ? apply(true, true) : showLights()),
     linked: () => status.peek().state === 'on',
   };

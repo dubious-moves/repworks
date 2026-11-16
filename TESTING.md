@@ -481,6 +481,8 @@ led to the one asked about. The first model ignores them, so nothing changes the
 
 ## 3. Training
 
+Training and Learn on the Chessnut Move: see 14 (PLAN.md §5.192).
+
 ### The wrong move shown (§5.158, 2026-11-10)
 - **A wrong move in training**: its square goes red with a ✕ (the square it came from faintly)
   for about a second after it is taken back. Is it long enough, or too much?
@@ -1765,7 +1767,7 @@ does. Start with the spike: its log decides what the later parts change (CHESSNU
   before a move is read feel right? Does 2 s before a wrong position is put back? (Both are in the
   dialog's settings.) Castle with the king first (moving the rook first says so once, under the
   game). An endgame and a checklist drill on the board too.
-- Worth noting as you go: with "Say verdicts and the opponent's moves" on (the dialog) and voice
+- Worth noting as you go: with "Say verdicts and the moves played for you" on (the dialog) and voice
   input off, the opponent's moves are said, and the study move after one put back; a hand on the
   board during the opponent's turn is put back after 2 s; a capture made by hand (the captured piece
   off first, then yours on its square) is read as one move; a promotion with the spare queen; the
@@ -1826,6 +1828,34 @@ does. Start with the spike: its log decides what the later parts change (CHESSNU
   board's four Playwright specs on a desktop and an emulated phone with the simulated board, with
   one more for the take-back (the simulated board silent while it drives). The bytes read again
   against Chessnut's README and the chessnut-move SDK. Nothing on a real board.
+
+### Repertoire training and Learn on the Chessnut Move (PLAN.md §5.192, 2026-11-16)
+- Connect from the ♞ chip, then Train (the day's queue), with a Black and a White repertoire: the
+  line's start set up (turned for Black), each move played for you driven one at a time and lit
+  blue, your move by hand read; a wrong move put back by the robot and lit red, the right one lit
+  green until the next move; a new move's and a hint's squares lit green. Then Learn a chapter:
+  from the start the robot plays every move of the line (Learn's default): is that the lesson you
+  want on a board, or too slow? ("At its first new or due move" in the training settings sets the
+  position up whole instead; in the queue, "Where it branches from the last line" moves fewest
+  pieces.)
+- How long does a line's setup take, and one move? The session waits for the board at every step:
+  does it ever wait when it shouldn't (the chip's dot amber with nothing moving), or run ahead?
+- Worth noting as you go: with "Say verdicts and the moves played for you" on (the dialog), the
+  moves played for you, "Not in your repertoire. Try again.", "Play …", "New move: play …" and
+  "Line done."; new moves shown as a sequence (training settings): each driven, and stepping with
+  ← → moves the robot only to the move you stop on for a second; show and grade on the board (the
+  robot plays the move shown; a press while it plays may need pressing again); a line from the
+  comments quizzed on the board; a move made by hand while the robot is still moving isn't read
+  (put the piece back and wait for the board); after connecting, Space is the hint again (the chip
+  no longer keeps the focus).
+- **Checked**: unit tests (the wait on the board and each case it must not wait in; the session's
+  words), their controls run; Playwright on a desktop and an emulated phone with the simulated
+  board (the day's queue: every move played for the user sent only once the board showed the move
+  before, lit and said, a wrong move by hand put back and lit red, the right one green and
+  recorded, a new move's arrow lit, a move on the screen driven; Learn with a sequence shown: its
+  moves driven in turn, stepping, "Play it", the new move by hand), five controls run. Show and
+  grade, the drills and the Interactive view on the board have no browser test of their own.
+  Nothing on a real board.
 
 ### Lc0 vetoes a Maia-alone move (PLAN.md §5.176, 2026-11-14)
 - With Lc0 downloaded (the study page's engine bar), switch "Maia alone" on in the Endgames list and

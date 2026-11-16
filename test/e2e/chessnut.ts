@@ -64,6 +64,10 @@ export function installFakeMove(o: FakeMoveOptions = {}): void {
   let driveTimers: ReturnType<typeof setTimeout>[] = [];
   const writes: string[] = [];
   const drives: string[] = [];
+  /** Each drive with the position the board showed when it was sent. */
+  const journeys: [string, string][] = [];
+  /** Every pattern of lights the board was sent, in order. */
+  const lit: number[][] = [];
 
   class Char extends EventTarget {
     value: DataView | undefined;
@@ -102,6 +106,7 @@ export function installFakeMove(o: FakeMoveOptions = {}): void {
       const target = unpack(b, 2).map((c) => CODES[c]!);
       if (b.slice(2).every((x) => x === 0)) return;
       drives.push(fenOf(target));
+      journeys.push([fenOf(squares), fenOf(target)]);
       const ms = o.driveMs ?? 300;
       if (o.reportOnTheWay !== false)
         driveTimers.push(
@@ -120,6 +125,7 @@ export function installFakeMove(o: FakeMoveOptions = {}): void {
       );
     } else if (b[0] === 0x43) {
       lights = unpack(b, 2);
+      lit.push(lights.slice());
     } else if (b[0] === 0x41 && b[2] === 0x0c) {
       response.emit([0x41, 0x03, 0x0c, 0x00, 87]);
     } else if (b[0] === 0x41 && b[2] === 0x0b) {
@@ -174,6 +180,10 @@ export function installFakeMove(o: FakeMoveOptions = {}): void {
     lights: () => lights.slice(),
     writes: () => writes.slice(),
     drives: () => drives.slice(),
+    /** Each drive as [the board when it was sent, the position driven to]. */
+    journeys: () => journeys.map((j) => [...j]),
+    /** Every pattern of lights sent, in order (a light that came and went before the test looked). */
+    lit: () => lit.map((l) => l.slice()),
     /** The board goes away (off, out of range). */
     drop: () => server.disconnect(),
   };

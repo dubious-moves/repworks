@@ -1,6 +1,7 @@
 // What a game on the Chessnut Move says (CHESSNUT.md §4.10, §5.4): the opponent's moves as they
 // come, and the study move when the repertoire check takes the user's back. Pure: the game's
-// state in, the words and what has been heard out; src/app/boardSpeech.ts says them.
+// state in, the words and what has been heard out; src/app/boardSpeech.ts says them. A storm
+// verdict's words, and a repertoire session's (PLAN.md §5.192), are here too.
 import { moveToSpeech } from '../games/voice.ts';
 
 /** The parts of a game the words come from (a practice game has them all). */
@@ -64,4 +65,65 @@ export function verdictSpeech(v: SpokenVerdict): string {
   const word = BAND_SAID[v.band];
   if (!word) return '';
   return v.bestSan ? `${word}. The best move was ${moveToSpeech(v.bestSan)}.` : `${word}.`;
+}
+
+/** The trainer's effects the words come from (src/core/train/trainer.ts; show and grade's own are passed over). */
+type SessionEffect =
+  | { type: 'play'; san: string; by: 'opponent' | 'auto' | 'user' | 'preview' }
+  | { type: 'note'; note: { kind: string; san?: string; count?: number; pass?: number; of?: number } }
+  | { type: string };
+
+/**
+ * What a repertoire session says on the board after a step (PLAN.md §5.192): each move played for
+ * the user (the opponent's, an own move not asked, a sequence shown), then what the feedback line
+ * asks of the user (a wrong move, the move shown, a new move), then a line's or the session's end.
+ * The user's own right move says nothing: the opponent's answer follows it. `shown`: show and
+ * grade, where a move shown is named, not asked for.
+ */
+export function sessionSpeech(effects: readonly SessionEffect[], o: { shown?: boolean } = {}): string {
+  const out: string[] = [];
+  let end: string | undefined;
+  for (const e of effects) {
+    if (e.type === 'play' && 'by' in e) {
+      if (e.by !== 'user') out.push(`${moveToSpeech(e.san)}.`);
+    } else if (e.type === 'note' && 'note' in e) {
+      const words = noteSpeech(e.note, o.shown === true);
+      if (words) out.push(words);
+    } else if (e.type === 'lineDone') end ??= 'Line done.';
+    else if (e.type === 'done') end = 'Session done.';
+  }
+  if (end) out.push(end);
+  return out.join(' ');
+}
+
+function noteSpeech(note: { kind: string; san?: string; count?: number; pass?: number; of?: number }, shown: boolean): string {
+  const move = note.san === undefined ? '' : moveToSpeech(note.san);
+  switch (note.kind) {
+    case 'wrong':
+      return 'Not in your repertoire. Try again.';
+    case 'shown':
+      return shown ? `${move}.` : `Play ${move}.`;
+    case 'newMove':
+      return shown ? `New move: ${move}.` : `New move: play ${move}.`;
+    case 'newTry':
+      return 'A new move: find it.';
+    case 'sequence':
+      return note.count === 1 ? 'A new move: watch it, then play it.' : `${note.count} new moves: watch them, then play them.`;
+    case 'alsoPlays':
+      return 'Also in your repertoire. It has another move here: find it.';
+    case 'alternative':
+      return `${move} is a good alternative, but your repertoire plays something else. Try again.`;
+    case 'retryMistakes':
+      return note.count === 1 ? 'Your mistake again.' : `Your ${note.count} mistakes again.`;
+    case 'repeat':
+      return `The line again, ${note.pass} of ${note.of}.`;
+    case 'missedAgain':
+      return 'Missed earlier: once more.';
+    case 'asideWrong':
+      return 'Not the comment’s move. Try again.';
+    case 'asideAlso':
+      return 'The comments play that here too, in another line. Find this one’s.';
+    default:
+      return '';
+  }
 }

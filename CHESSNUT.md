@@ -4,7 +4,8 @@ Status: planned 2026-11-06 at the owner's request; **built 2026-11-14**, parts (
 plan, at the owner's word ("Go ahead and build it"), before the board arrives. What waits is §7's live
 checks and `TESTING.md` §14's entries, once the board is bought. What each
 part changed from this plan is in `PLAN.md` §5.153's "As built" notes; a scan of the whole build
-on 2026-11-16 fixed four details (its note there, and §4.4 and §2 below). Everything here can be built
+on 2026-11-16 fixed four details (its note there, and §4.4 and §2 below); **repertoire training and
+Learn were added the same day** at the owner's request (§5.5 below, `PLAN.md` §5.192). Everything here can be built
 and tested before the board arrives (a simulated board in the tests), and part (a)'s spike page
 checks on the first day what only the real board can show. Read with
 `CLAUDE.md`, `PLAN.md` (§5.153 points here) and `DECISIONS.md` (its revision log of 2026-11-06).
@@ -26,7 +27,7 @@ Contents:
 2. The board and its protocol
 3. What was checked, and how
 4. Design: the decisions and why
-5. The sessions on the board: what the user sees
+5. The sessions on the board: what the user sees (§5.5: repertoire training and Learn, added 2026-11-16)
 6. Build plan, part by part
 7. Live checks, and what to change for each answer
 8. Prompts for the build sessions
@@ -67,7 +68,8 @@ For the owner:
 Scope, in the owner's order: the storm's untimed sessions (Set of 6, show and grade, with
 puzzles) and practice (with the advantage and checklist drills and the endgames, which are
 practice games), then the timed storm (its clock stopped while the board sets up) and the
-storm's review.
+storm's review. Since 2026-11-16 also repertoire training and Learn, with every other session of
+the training screen (§5.5).
 
 ---
 
@@ -299,7 +301,7 @@ Kept in `localStorage` under `repworks-board` (one JSON object), as the other pr
 | `turnForBlack` | on | | a Black player's positions turned (§4.6) |
 | `settleMs` | 600 | 300–1500 | how long the board holds a move before it's read |
 | `putBackMs` | 2000 | 1000–5000 | how long a wrong position stays before the robot puts it back; also a held storm card's Try again |
-| `speak` | off | | verdicts and the opponent's moves said |
+| `speak` | off | | verdicts and the moves played for the user said (the opponent's; in training, own moves not asked too, and what the feedback line asks) |
 | `autoNext` | on | | a set's next card comes by itself after a verdict while the board is linked |
 | `autoRetry` | on | | a held set card's move is taken back after `putBackMs` |
 | `playArrival` | off | | a storm card set up one move early, the move that reached it then played |
@@ -367,6 +369,29 @@ only in `solving` (`setPhase`, `src/app/storm.ts`), so setting up never costs ti
 | A hand during the opponent's turn | | put back after `putBackMs` |
 | The end | the result, as now | left as it is until Reset the pieces or the next game |
 | An endgame's slip | as now (Take back or Play on) | follows the screen |
+
+### 5.5 Repertoire training and Learn (added 2026-11-16, `PLAN.md` §5.192)
+
+Every session of the training screen: the day's queue, Learn, a line picked, show and grade,
+difficult lines, the mistakes' retry and drill, the pins, the Interactive view. The trainer is
+unchanged; nothing new is written.
+
+| Moment | The screen | The board |
+| --- | --- | --- |
+| A line starts | as now | its starting position set up whole, turned for a Black repertoire |
+| A move played for the user (the opponent's, an own move not asked) | as now, but **only once the board shows the position before it**: each timed step waits for the robot | driven, lit blue; said if `speak` is on |
+| A move asked | as now | waits; a move by hand is read once the board shows the position |
+| The right move by hand | as if played on the screen | stays, lit green until the next move |
+| A wrong move by hand | taken back, "Not in your repertoire: try again" | put back by the robot after half a second (§4.4 rule 1), its two squares lit red until the move asked is played; said |
+| A second repertoire move, an alternative saved | as now (taken back, the note) | put back; said |
+| A new move shown, Hint, a second wrong move | the arrow, as now | the move's two squares lit green; said ("Play …", "New move: play …") |
+| A sequence shown (Show sequence) | as now | each move driven as it is shown; stepped with ← →, only the move stopped on for a second is driven; "Play it" sets its start up at once |
+| A line's end | waits for "Next line" or goes on, as set | left as it is; the study's arrows of the last move lit; "Line done." said |
+| A line walked again, mistakes asked again | as now | set back by the robot |
+| Show and grade | the keys and the ring, as now | follows; takes no move; the move shown is played by the robot |
+| A line from the comments quizzed | as now | played on the board as the line is |
+| A comment's line stepped through, Read, Analyse | as now | not followed: the board stays as it is, and takes no move |
+| A position the set can't make, a drive that didn't arrive | the note under the panel (Set up again) | the session goes on on the screen (it never waits on a board that needs the user) |
 
 ---
 
@@ -814,10 +839,11 @@ the spike before a part is built, the session reads the owner's log first and ap
 
 ## 10. Not in this plan
 
-The repertoire trainer and Learn on the board (the robot playing the line's other side: natural,
-not asked), the study page and the analysis board followed by the board, the board's Wi-Fi, its
+The study page and the analysis board followed by the board, the Read view, game cards and idea
+cards on the board (each a `mirror` on its own board when asked), the board's Wi-Fi, its
 stored games, Chessnut's other boards (the same UUIDs, other commands), voice combined with the
-board beyond speaking the opponent's move, and a local bridge (§4.1).
+board beyond speaking the opponent's move, and a local bridge (§4.1). The repertoire trainer and
+Learn were here ("natural, not asked") until the owner asked, 2026-11-16: §5.5.
 
 ---
 

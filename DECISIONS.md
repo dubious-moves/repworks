@@ -2662,3 +2662,29 @@ The technical calls, each with its reason:
   stayed mixed in silently. Old files and old versions are unaffected. A device on the 23M makes
   the first model's ratings again in the background; merged files keep the better model's.
 
+
+## Revision of 2026-11-16 (the Chessnut Move in repertoire training and Learn: PLAN.md §5.192)
+- **The training screen's board is followed by the Chessnut Move**: the day's queue, Learn, a line
+  picked, and every other session that runs there (show and grade, difficult lines, the mistakes'
+  drills, the pins, the Interactive view). Why: the owner, 2026-11-16: "Let's integrate Chessnut
+  Move into repertoire Train and Learn. Update the plan and implement it as you think is best."
+  `CHESSNUT.md` §10 had left it out as not asked; its §5.5 now has it.
+- **A session's timed steps wait for the board**: a move played for the user comes only once the
+  board shows the position before it. Why: the robot takes seconds over a move and the trainer's
+  pace is 600 ms; unwaited, the robot is sent straight to the last position with every piece
+  moving at once, and a move is asked for on a board that can't yet be read. The wait is in the app
+  (`src/app/train.ts`), the trainer unchanged. Given up: a session on the board is as slow as the
+  robot; nothing on the screen says so but the chip's dot.
+- **A training session never waits on a board that needs the user** (`boardLink.shows`): a drive
+  that didn't arrive (20 s), pieces the set doesn't have, Reset the pieces, a dropped link, and
+  the session goes on on the screen. Why: unlike the storm's setup it has no "Play on the screen"
+  to press, and a session must never hang on a flat piece.
+- **The user's own right move is lit green, a wrong one red** (put back by the robot), **and with
+  `speak` on the session says the moves played for the user and what the feedback line asks**. Why:
+  a user looking at the board has no other word that a move was taken. The setting reads "Say
+  verdicts and the moves played for you" (was "the opponent's moves").
+- **The board's chip lets go of the focus once connected.** Why: Space and Enter on the focused
+  chip opened its dialog where a session meant a hint or the next card (the storm and practice
+  too).
+- No data format changed; nothing new is written or synced; no new setting. A review's `ms`
+  includes the robot's last move where the board is slower than the hand; nothing schedules by it.

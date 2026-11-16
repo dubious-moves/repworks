@@ -514,3 +514,110 @@ test('the settings: kept as stored, each checked; an unknown or out-of-range val
   assert.equal(p.turnForBlack, false);
   assert.equal(parseBoardPrefs(JSON.stringify({ settleMs: 200 })).settleMs, 600);
 });
+
+// ---- `shows`: a session that paces itself by the board (the repertoire trainer, PLAN.md §5.192) ----
+
+test('shows: true once the board shows the position mirrored, at once when it already does; a report on the way is not it', async () => {
+  const { link, board, time } = setUp();
+  await link.connect();
+  const owner = {};
+  link.setMirror(owner, spec(full(START, 'w')));
+  assert.equal(await link.shows(full(START, 'w')), true);
+  link.setMirror(owner, spec(full(E4E5, 'w'), { movable: false }));
+  let shown: boolean | undefined;
+  void link.shows(full(E4E5, 'w')).then((v) => (shown = v));
+  board.report(E4);
+  await time.advance(800);
+  assert.equal(shown, undefined);
+  board.arrive();
+  await flush();
+  assert.equal(shown, true);
+});
+
+test('shows: false at once when the board is not following: not linked, nothing mirrored, another position, pieces the set lacks; a wait ends when the screen moves on or the link drops', async () => {
+  const { link, board } = setUp();
+  assert.equal(await link.shows(full(E4, 'b')), false);
+  await link.connect();
+  assert.equal(await link.shows(full(E4, 'b')), false);
+  const owner = {};
+  link.setMirror(owner, spec(full(D4, 'b'), { movable: false }));
+  assert.equal(await link.shows(full(E4, 'b')), false);
+  // Waiting on the position mirrored; the screen moves on: the wait is over.
+  let shown: boolean | undefined;
+  void link.shows(full(D4, 'b')).then((v) => (shown = v));
+  await flush();
+  assert.equal(shown, undefined);
+  link.setMirror(owner, spec(full(E4, 'b'), { movable: false }));
+  await flush();
+  assert.equal(shown, false);
+  // The link drops while a position is on its way.
+  let dropped: boolean | undefined;
+  void link.shows(full(E4, 'b')).then((v) => (dropped = v));
+  await flush();
+  assert.equal(dropped, undefined);
+  board.drop();
+  await flush();
+  assert.equal(dropped, false);
+  // A third queen: never waited on.
+  const queens = setUp();
+  await queens.link.connect();
+  const three = 'QQQ1k3/8/8/8/8/8/8/4K3 w - - 0 1';
+  queens.link.setMirror({}, spec(three, { movable: false }));
+  assert.equal(await queens.link.shows(three), false);
+});
+
+test('shows: a drive that never arrives ends the wait after 20 s, and is not waited on again', async () => {
+  const { link, time } = setUp();
+  await link.connect();
+  link.setMirror({}, spec(full(E4, 'b'), { movable: false }));
+  let shown: boolean | undefined;
+  void link.shows(full(E4, 'b')).then((v) => (shown = v));
+  await time.advance(19_000);
+  assert.equal(shown, undefined);
+  await time.advance(1100);
+  assert.equal(phase(link), 'stuck');
+  assert.equal(shown, false);
+  assert.equal(await link.shows(full(E4, 'b')), false);
+});
+
+test('shows: Reset the pieces ends the wait; the parked position is not waited on', async () => {
+  const { link, board } = setUp();
+  await link.connect();
+  link.setMirror({}, spec(full(E4E5, 'w'), { movable: false }));
+  let shown: boolean | undefined;
+  void link.shows(full(E4E5, 'w')).then((v) => (shown = v));
+  await flush();
+  assert.equal(shown, undefined);
+  link.resetPieces();
+  await flush();
+  assert.equal(shown, false);
+  board.arrive();
+  assert.equal(await link.shows(full(E4E5, 'w')), false);
+});
+
+test("shows: a position waiting out its delay (a sequence stepped through) is waited on until it is driven and shown; stepped past, the wait is over", async () => {
+  const { link, board, time } = setUp();
+  await link.connect();
+  const owner = {};
+  link.setMirror(owner, spec(full(E4, 'b'), { movable: false, delayMs: 1000 }));
+  let shown: boolean | undefined;
+  void link.shows(full(E4, 'b')).then((v) => (shown = v));
+  await time.advance(900);
+  assert.deepEqual(board.drives, []);
+  assert.equal(shown, undefined);
+  await time.advance(200);
+  assert.deepEqual(board.drives, [E4]);
+  assert.equal(shown, undefined);
+  board.arrive();
+  await flush();
+  assert.equal(shown, true);
+  // Stepped on before the second is over: the position left is not waited on.
+  link.setMirror(owner, spec(full(E4E5, 'w'), { movable: false, delayMs: 1000 }));
+  let left: boolean | undefined;
+  void link.shows(full(E4E5, 'w')).then((v) => (left = v));
+  await time.advance(300);
+  assert.equal(left, undefined);
+  link.setMirror(owner, spec(full(D4, 'b'), { movable: false, delayMs: 1000 }));
+  await flush();
+  assert.equal(left, false);
+});

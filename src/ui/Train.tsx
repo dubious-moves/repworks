@@ -9,7 +9,8 @@ import { chessgroundDests, chessgroundMove } from 'chessops/compat';
 import { normalizeMove, type Position } from 'chessops/chess';
 import { makeUci, parseSquare, parseUci } from 'chessops/util';
 import type { Key } from '@lichess-org/chessground/types';
-import type { Role, SquareName } from 'chessops/types';
+import { isNormal, type Role, type SquareName } from 'chessops/types';
+import { standardUci } from '../core/chess/uci.ts';
 import { analyseFrom, entryKey, open } from '../app/mode.ts';
 import { commentId, endPreview, preview, stepPreview } from '../app/preview.ts';
 import { beginTraining } from '../app/state.ts';
@@ -28,6 +29,8 @@ import { header } from '../core/study/model.ts';
 import { nodeAt, positionAt, startPosition } from '../core/study/tree.ts';
 import { lineThrough } from '../core/train/browse.ts';
 import { Board } from './Board.tsx';
+import { useBoardMirror } from './boardMirror.ts';
+import { BoardNote } from './BoardLink.tsx';
 import { ModeSwitch } from './ModeSwitch.tsx';
 import { CommentText, endPreviewOnBoard, PreviewBar, previewBoard } from './CommentText.tsx';
 import { firstNewLine, LineList, nextLine } from './LineList.tsx';
@@ -42,6 +45,8 @@ import { positionKeyOf } from '../core/chess/positionKey.ts';
 import type { PlayedLine } from '../core/repertoire/lines.ts';
 
 const ASKING = new Set(['ask', 'teach', 'wrong', 'shown']);
+/** On the Chessnut Move, a sequence stepped through (← →): only the move stopped on this long is driven (ms). */
+const BOARD_STEP_MS = 1000;
 const COMMENTS_SHOWN = new Set(['teach', 'wrong', 'shown', 'lineDone']);
 
 /**
@@ -414,17 +419,25 @@ function Session(props: { s: SessionView }) {
   const board = useMemo(() => {
     if (!pos) return undefined;
     let lastMove: [Key, Key] | undefined;
+    // The last move as the Chessnut Move lights it: castling as the king's two squares.
+    let lastUci: string | undefined;
     if (s.chapter && s.path.length) {
       const start = startPosition(s.chapter);
       if (start) {
         for (const san of s.path.slice(0, -1)) start.play(parseSan(start, san)!);
         const m = parseSan(start, s.path[s.path.length - 1]!);
-        if (m) lastMove = chessgroundMove(m) as [Key, Key];
+        if (m) {
+          lastMove = chessgroundMove(m) as [Key, Key];
+          lastUci = isNormal(m) ? standardUci(start, m) : undefined;
+        }
       }
     }
     // A line from the comments (§5.98): its own last move, once one is played.
-    if (s.aside && s.aside.ply > 0) lastMove = asideLastMove(s);
-    return { fen: makeFen(pos.toSetup()), dests: chessgroundDests(pos) as Map<Key, Key[]>, lastMove, check: pos.isCheck() };
+    if (s.aside && s.aside.ply > 0) {
+      lastMove = asideLastMove(s);
+      lastUci = lastMove?.join('');
+    }
+    return { fen: makeFen(pos.toSetup()), dests: chessgroundDests(pos) as Map<Key, Key[]>, lastMove, lastUci, check: pos.isCheck() };
     // The tick sets the board again after a takeback, to the same position.
   }, [pos, s.tick]);
 
@@ -453,6 +466,28 @@ function Session(props: { s: SessionView }) {
     return m && 'from' in m ? [{ brush: 'blue' as const, orig: sq(m.from), dest: sq(m.to) }] : [];
   });
   const shapes = [...(arrow && 'from' in arrow ? [{ brush: 'green' as const, orig: sq(arrow.from), dest: sq(arrow.to) }] : []), ...alts, ...(atEnd && !shownLine ? (node?.shapes ?? []) : [])];
+  // The Chessnut Move follows the session's board (PLAN.md §5.192): its position driven, a move
+  // made by hand played as one made here, the arrows lit as they are drawn, the user's own move
+  // green once it is taken and a wrong one red until the move asked is played. A comment's line
+  // stepped through on the screen is not followed: the board stays on the session's position,
+  // taking no move.
+  const lastUci = board?.lastUci;
+  useBoardMirror(
+    board
+      ? {
+          fen: board.fen,
+          movable: asking && !shownLine,
+          orientation: s.side,
+          onMove: playMove,
+          marks: {
+            lastUci,
+            arrows: shapes,
+            played: shownLine ? undefined : s.miss ? { uci: s.miss.uci, brush: 'red' } : s.lastBy === 'user' && !show && lastUci ? { uci: lastUci, brush: 'green' } : undefined,
+          },
+          ...(s.phase === 'previewed' ? { delayMs: BOARD_STEP_MS } : {}),
+        }
+      : undefined,
+  );
   // Comments of the move reached only where they are read (the owner's request, 2026-10-11): a
   // move taught or shown, after a wrong move, and at the line's end. While the moves go by and
   // one is asked they stay hidden: they came and went with each move, and could give it away.
@@ -669,6 +704,7 @@ function Session(props: { s: SessionView }) {
           )}
         </div>
         )}
+        <BoardNote />
         {comments.length > 0 && (
           <div class="train-comments">
             {comments.map((c, i) => (

@@ -2,7 +2,8 @@
 // opponent's moves" on, a game on the board (practice, a drill, an endgame) says the opponent's
 // moves as they come, and the study move when the repertoire check takes one back, so the game can
 // be played without looking at the screen. Voice input (src/app/voice.ts) says both already: while
-// it is on, nothing is said here. Started once by the composition root.
+// it is on, nothing is said here. Started once by the composition root. A repertoire session's
+// words are said by the session itself (src/app/train.ts, PLAN.md §5.192).
 import { effect } from '@preact/signals';
 import { NOTHING_HEARD, spokenFor, type Heard } from '../core/board/speech.ts';
 import { say } from '../platform/speech.ts';

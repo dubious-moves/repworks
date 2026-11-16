@@ -63,10 +63,13 @@ function phaseWords(s: BoardStatus): string {
 export function BoardChip() {
   if (!boardOffered()) return null;
   const s = boardLink.status.value;
-  const click = async () => {
+  const click = async (chip: HTMLElement) => {
     if (s.state === 'connecting') return;
     if (s.state === 'off') {
       await boardLink.connect();
+      // The chip keeps no focus once it has connected: Space and Enter are a session's keys (a
+      // hint, "Play it", the next card), and on a focused chip they would open this dialog instead.
+      chip.blur();
       // A connect that failed in words (no Web Bluetooth, Brave's flag, Bluetooth off) says so in the dialog.
       const after = boardLink.status.peek();
       if (after.state === 'off' && after.error) openBoardDialog();
@@ -77,7 +80,7 @@ export function BoardChip() {
   const text = s.state === 'off' ? 'Board' : s.state === 'connecting' ? 'Connecting…' : s.state === 'lost' ? (s.trying ? 'Reconnecting' : 'Reconnect') : s.battery ? `${s.battery.percent}%` : 'On';
   const dot = s.state === 'on' ? dotOf(s) : undefined;
   return (
-    <button type="button" class={`chip board-chip${s.state === 'lost' || (s.state === 'off' && s.error) ? ' chip-warn' : ''}`} data-testid="board-chip" data-state={s.state} title={s.state === 'off' && !s.error ? 'Connect the Chessnut Move' : linkWords(s)} onClick={() => void click()} disabled={s.state === 'connecting'}>
+    <button type="button" class={`chip board-chip${s.state === 'lost' || (s.state === 'off' && s.error) ? ' chip-warn' : ''}`} data-testid="board-chip" data-state={s.state} title={s.state === 'off' && !s.error ? 'Connect the Chessnut Move' : linkWords(s)} onClick={(e) => void click(e.currentTarget)} disabled={s.state === 'connecting'}>
       <span aria-hidden="true">♞ </span>
       {text}
       {dot && <span class={`board-dot board-dot-${dot}`} data-dot={dot} aria-label={dot === 'ok' ? 'in step' : dot === 'busy' ? 'setting up' : 'needs a hand'} role="img" />}
@@ -86,7 +89,7 @@ export function BoardChip() {
 }
 
 /**
- * The board's word under a game's panel (practice, an endgame, a checklist's lead-up) while the
+ * The board's word under a game's panel (practice, an endgame, a checklist's lead-up, a training session) while the
  * screen's board is mirrored, when the board needs the user: a position the set can't make (the
  * game goes on on the screen), a drive that didn't arrive (Set up again), or a rook moved first.
  * The chip says the same in its title; on a phone that's not read, so the panel says it too.
@@ -226,7 +229,7 @@ const SWITCHES: readonly [keyof BoardPrefs, string][] = [
   ['autoNext', 'The next card by itself after a verdict (a set, show and grade)'],
   ['autoRetry', 'A held card’s move taken back by itself'],
   ['playArrival', 'A card set up one move early, then that move played'],
-  ['speak', 'Say verdicts and the opponent’s moves'],
+  ['speak', 'Say verdicts and the moves played for you'],
 ];
 
 const steps = (r: { min: number; max: number; step: number }) => Array.from({ length: Math.round((r.max - r.min) / r.step) + 1 }, (_, i) => r.min + i * r.step);

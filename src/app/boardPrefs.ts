@@ -14,7 +14,7 @@ export interface BoardPrefs {
   settleMs: number;
   /** How long a wrong position stays before the robot puts it back (ms); also a held storm card's Try again. */
   putBackMs: number;
-  /** Verdicts and the opponent's moves said. */
+  /** Verdicts and the moves played for the user said (the opponent's; in training, own moves not asked too). */
   speak: boolean;
   /** A set's next card comes by itself after a verdict while the board is linked. */
   autoNext: boolean;
