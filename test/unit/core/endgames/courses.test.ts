@@ -9,7 +9,7 @@ import { parseSquare } from 'chessops/util';
 import { parseChapterFile } from '../../../../src/core/pgn/parse.ts';
 import { positionOf } from '../../../../src/core/storm/walk.ts';
 import { positionKey, positionKeyOf } from '../../../../src/core/chess/positionKey.ts';
-import { asCourseEndgame, authorReplies, candidatesOf, courseGoal, courseId, courseState, courseText, groupsOf, isCourseId, nameParts, readCourseScore, scoreCandidate, type Candidate, type CourseChapter, type CourseScore } from '../../../../src/core/endgames/courses.ts';
+import { asCourseEndgame, authorReplies, candidatesOf, courseGoal, courseId, courseState, courseText, fitChoice, groupsOf, isCourseId, nameParts, ownGoal, readCourseScore, readGoalChoice, scoreCandidate, untilsFor, type Candidate, type CourseChapter, type CourseScore } from '../../../../src/core/endgames/courses.ts';
 import { attemptsByEndgame, taskOf, wonAfter } from '../../../../src/core/endgames/endgames.ts';
 import { REP } from '../../../../src/core/endgames/repertoire.ts';
 import { courseFromLog } from '../../../../src/core/endgames/courses.ts';
@@ -327,4 +327,69 @@ test('the course author’s replies for the opponent (the owner’s request of 2
   after.play({ from: sq('e5'), to: sq('f5') });
   assert.deepEqual(Object.values(authorReplies(w.chapter, 'black', positionKeyOf(after))), ['f5f4']);
   assert.deepEqual(Object.values(authorReplies(w.chapter, 'black')).sort(), ['e5f5', 'f5f4']);
+});
+
+test('the user’s own goal (§5.193): a draw’s moves to hold, a win’s end the position allows, the course’s own back', async () => {
+  const cands = candidatesOf(ALL);
+  const scores = new Map<string, CourseScore>();
+  for (const c of cands.slice(0, 3)) {
+    const r = await scoreCandidate(c, at(c.fen), scorer(PLAIN), 1);
+    if (r) scores.set(c.key, r);
+  }
+  const drawKey = positionKey(KP_DRAW);
+  const winKey = positionKey(KP_WIN);
+  const mateKey = positionKey(QR);
+  const goals = new Map([
+    [drawKey, { hold: 6 }],
+    [winKey, { until: 'mate' as const }],
+    // Against a bare king a lead is there at the start: not an end the position allows.
+    [mateKey, { until: 'convert' as const }],
+  ]);
+  const st = courseState(cands, scores, new Set(), goals);
+  const draw = st.drills.find((d) => d.goal === 'draw')!;
+  assert.deepEqual([draw.hold, draw.chosen, asCourseEndgame(draw).hold], [6, { hold: 6 }, 6]);
+  assert.equal(taskOf(asCourseEndgame(draw)), 'Black to play and draw (hold 6 moves)');
+  assert.deepEqual(ownGoal(draw), { hold: REP.hold });
+  const win = st.drills.find((d) => d.cand.title === 'King and Pawn - 2')!;
+  assert.deepEqual([win.until, asCourseEndgame(win).until, ownGoal(win)], ['mate', 'mate', { until: 'promote' }]);
+  const mate = st.drills.find((d) => d.cand.title === 'The Staircase - 1')!;
+  assert.deepEqual([mate.until, mate.chosen], ['mate', undefined]);
+  // The ends a win can have: a pawn only with a pawn, a lead or the defender's material only against more than a king.
+  assert.deepEqual(untilsFor(KP_WIN), ['mate', 'promote']);
+  assert.deepEqual(untilsFor(QR), ['mate']);
+  assert.deepEqual(untilsFor('8/8/8/4k3/2p5/8/8/R3K3 w - - 0 1'), ['mate', 'bare', 'convert']);
+  // Only the part that fits the goal's kind.
+  assert.equal(fitChoice({ until: 'mate' }, 'draw', KP_DRAW), undefined);
+  assert.equal(fitChoice({ hold: 5 }, 'win', KP_WIN), undefined);
+  // Read: whole moves within the range and known ends; `{}` is the course's own.
+  assert.deepEqual(readGoalChoice({}), {});
+  assert.deepEqual(readGoalChoice({ hold: 3 }), { hold: 3 });
+  assert.equal(readGoalChoice({ hold: 0 }), undefined);
+  assert.equal(readGoalChoice({ hold: 2.5 }), undefined);
+  assert.equal(readGoalChoice({ hold: 51 }), undefined);
+  assert.equal(readGoalChoice({ until: 'soon' }), undefined);
+  assert.equal(readGoalChoice([]), undefined);
+});
+
+test('the user’s own goal in the progress log (§5.193): the latest `cgoal` of a card decides, `{}` the course’s own', () => {
+  const key = positionKeyOf(at(KP_DRAW));
+  const ev = (n: number, t: string, g: Record<string, unknown>): KnownEvent => ({ v: 1, n, t, card: courseCard(key), k: 'cgoal', g }) as unknown as KnownEvent;
+  const one = ev(1, '2026-11-16T10:00:00.000Z', { hold: 6 });
+  assert.equal(formatEvent(one), `{"v":1,"n":1,"t":"2026-11-16T10:00:00.000Z","k":"cgoal","card":"e|${key}","g":{"hold":6}}`);
+  const read = (...events: KnownEvent[]) => {
+    const log = parseLog(events.map(formatEvent).join('\n'));
+    assert.deepEqual(log.problems, []);
+    const r = new Replay();
+    r.add(toDeviceEvents('devA0001', log.lines));
+    return courseFromLog(r.states.keys(), (c) => r.eventsOf(c));
+  };
+  assert.deepEqual(read(one).goals.get(key), { hold: 6 });
+  assert.deepEqual(read(one, ev(2, '2026-11-16T10:01:00.000Z', { hold: 4 })).goals.get(key), { hold: 4 });
+  const back = read(one, ev(2, '2026-11-16T10:01:00.000Z', {}));
+  assert.equal(back.goals.has(key), false);
+  assert.equal(back.goalsAt.has(key), true);
+  // One this version can't read is skipped, the one before it kept.
+  assert.deepEqual(read(one, ev(2, '2026-11-16T10:01:00.000Z', { hold: 'six' })).goals.get(key), { hold: 6 });
+  const bad = [`{"v":1,"n":1,"t":"2026-11-16T10:00:00.000Z","k":"cgoal","card":"x|${key}","g":{}}`, `{"v":1,"n":2,"t":"2026-11-16T10:00:00.000Z","k":"cgoal","card":"e|${key}","g":5}`];
+  assert.deepEqual(parseLog(bad.join('\n')).problems.map((p) => p.reason), ['card must be a course endgame (e|<position>)', 'g must be an object']);
 });

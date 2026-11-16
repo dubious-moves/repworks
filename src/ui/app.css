@@ -6886,6 +6886,23 @@ a.button.disabled {
   font-size: 0.85rem;
 }
 
+/* A course drill's own goal (Endgames.tsx, PLAN.md §5.193). */
+.course-goal-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.course-goal-form input[type='number'] {
+  width: 4.5em;
+}
+
+.course-goal-form select {
+  max-width: 100%;
+}
+
 /* The courses' endgames (Endgames.tsx, PLAN.md §5.175): the course's own text under the board. */
 .course-note {
   margin-top: 8px;

@@ -11,7 +11,7 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from 'preact/hooks';
 import { attemptsAt, checkEndgameMaia, endgameMaiaHere, endgameStandings, mistakesOnly, setMistakesOnly, startEndgame } from '../app/endgames.ts';
 import { authorFirst, endgameMaiaAlone, setEndgameMaiaAlone } from '../app/endgameVariety.ts';
-import { courseById, courseCandidates, courseJustRemoved, courseNow, courseOnly, courseOnlyAsked, setCourseOnly, courseScores, courseScoring, courseStandings, loadCourse, removeCourseDrill, restoreCourseDrill, restoreCourseDrills, scoreCourse, stopCourseScoring } from '../app/courseEndgames.ts';
+import { courseById, courseCandidates, setCourseGoal, courseJustRemoved, courseNow, courseOnly, courseOnlyAsked, setCourseOnly, courseScores, courseScoring, courseStandings, loadCourse, removeCourseDrill, restoreCourseDrill, restoreCourseDrills, scoreCourse, stopCourseScoring } from '../app/courseEndgames.ts';
 import { readSearchChapters, searchChapters } from '../app/search.ts';
 import { dataVersion } from '../app/sync.ts';
 import { gatherRepEndgames, loadRepEndgames, removeRepEndgame, repById, repEndgames, repGather, repStandings, stopRepGather } from '../app/repertoireEndgames.ts';
@@ -19,8 +19,8 @@ import { maiaDialog } from '../app/maia.ts';
 import { analyseFrom, entryKey, open } from '../app/mode.ts';
 import { canTakeBack, leavePractice, parkPractice, playOnAfterSlip, practice, practiceHint, practiceMove, regradeEndgame, showSlipMove, stopPractice, takeBack, takeUpPractice, type PracticeGame } from '../app/practice.ts';
 import { decidingNow } from '../app/time.ts';
-import { bareTarget, CONVERT_LEAD, endgameById, ENDGAMES, GRADE_WORD, GROUPS, isMistake, MAIA_ELO, mistakeOrder, nextAfter, nextEndgame, nextMistake, sideOf, solvedBy, taskOf, type Endgame, type Standing } from '../core/endgames/endgames.ts';
-import { asCourseEndgame, courseText, groupsOf, isCourseId, type CourseDrill } from '../core/endgames/courses.ts';
+import { bareTarget, CONVERT_LEAD, endgameById, ENDGAMES, GRADE_WORD, GROUPS, isMistake, MAIA_ELO, mistakeOrder, nextAfter, nextEndgame, nextMistake, sideOf, solvedBy, taskOf, type Endgame, type Standing, type Until } from '../core/endgames/endgames.ts';
+import { asCourseEndgame, courseText, groupsOf, HOLD_MAX, HOLD_MIN, isCourseId, ownGoal, untilsFor, type CourseDrill, type CourseGoalChoice } from '../core/endgames/courses.ts';
 import { asEndgame, CATEGORIES, categoryById, isRepertoireId, REP, type Category, type RepertoireEndgame } from '../core/endgames/repertoire.ts';
 import { lineTail } from '../core/storm/sources.ts';
 import { positionOf } from '../core/storm/walk.ts';
@@ -88,7 +88,8 @@ function CourseDrillScreen(props: { id: string }) {
   const d = courseById(props.id);
   // With its chapter: the course author's replies are the defence until a try against them is solved.
   const chapter = d && searchChapters.value.find((c) => c.sid === d.cand.sid && c.cid === d.cand.cid)?.chapter;
-  return d ? <EndgameDrill key={d.id} endgame={asCourseEndgame(d, chapter)} course={d} /> : <EndgameList />;
+  // Keyed by its goal too: a goal changed (§5.193) starts the drill afresh.
+  return d ? <EndgameDrill key={`${d.id}|${d.hold ?? ''}|${d.until ?? ''}`} endgame={asCourseEndgame(d, chapter)} course={d} /> : <EndgameList />;
 }
 
 function EndgameList() {
@@ -580,7 +581,10 @@ function CourseItem(props: { drill: CourseDrill; standing: Standing; now: number
         <a class="endgame-title" href={`#/endgames/${d.id}`}>
           {d.cand.title}
         </a>
-        <span class="muted">{taskOf(e)}</span>
+        <span class="muted">
+          {taskOf(e)}
+          {d.chosen ? ' · your goal' : ''}
+        </span>
         <span class="muted endgame-source">
           {d.cand.group}
           {d.flipped ? ` · after the course’s ${d.flipped}` : ''}
@@ -633,6 +637,80 @@ function CourseText(props: { course: CourseDrill; over: boolean }) {
           ))}
         </div>
       ))}
+    </details>
+  );
+}
+
+/** A win's ends, as the goal's choice names them. */
+function untilWord(u: Until, d: CourseDrill): string {
+  if (u === 'mate') return 'Mate';
+  if (u === 'promote') return 'Queen a pawn';
+  if (u === 'bare') return `Win ${bareTarget(d)}`;
+  return `Queen a pawn or go ${CONVERT_LEAD} points up`;
+}
+
+const sameGoal = (a: CourseGoalChoice, b: CourseGoalChoice): boolean => a.hold === b.hold && a.until === b.until;
+
+/**
+ * The drill's own goal, chosen by the user (the owner's request of 2026-11-16: "lower the amount of
+ * moves needed to hold a draw"): a draw's moves to hold, or a win's end; the course's own back with
+ * a press. Win or draw stays Stockfish's. Synced; changing it starts the drill again, a try begun
+ * counting as missed (as Restart does).
+ */
+function CourseGoal(props: { course: CourseDrill; begun: boolean }) {
+  const d = props.course;
+  const own = ownGoal(d);
+  const now: CourseGoalChoice = d.goal === 'draw' ? { hold: d.hold ?? own.hold! } : { until: d.until ?? own.until! };
+  const [hold, setHold] = useState(String(now.hold ?? ''));
+  const [until, setUntil] = useState<Until>(now.until ?? 'mate');
+  const untils = useMemo(() => untilsFor(d.fen), [d.fen]);
+  const n = Number(hold);
+  const want: CourseGoalChoice | undefined = d.goal === 'draw' ? (Number.isInteger(n) && n >= HOLD_MIN && n <= HOLD_MAX ? { hold: n } : undefined) : { until };
+  const apply = (g: CourseGoalChoice) => {
+    if (props.begun) stopPractice();
+    leavePractice();
+    void setCourseGoal(d.id, sameGoal(g, own) ? {} : g);
+  };
+  const ownWord = d.goal === 'draw' ? `hold ${own.hold} moves` : untilWord(own.until!, d).toLowerCase();
+  return (
+    <details class="endgame-method course-goal" data-testid="course-goal">
+      <summary>{d.chosen ? 'Your goal (changed)' : 'Change the goal'}</summary>
+      <form
+        class="course-goal-form"
+        onSubmit={(ev) => {
+          ev.preventDefault();
+          if (want && !sameGoal(want, now)) apply(want);
+        }}
+      >
+        {d.goal === 'draw' ? (
+          <label>
+            Hold the draw for{' '}
+            <input type="number" inputMode="numeric" min={HOLD_MIN} max={HOLD_MAX} value={hold} onInput={(ev) => setHold((ev.target as HTMLInputElement).value)} data-testid="course-goal-hold" /> moves
+          </label>
+        ) : (
+          <label>
+            Win by{' '}
+            <select value={until} onChange={(ev) => setUntil((ev.target as HTMLSelectElement).value as Until)} data-testid="course-goal-until">
+              {untils.map((u) => (
+                <option key={u} value={u}>
+                  {untilWord(u, d)}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        <button type="submit" class="secondary" disabled={!want || sameGoal(want, now)} data-testid="course-goal-apply">
+          Set
+        </button>
+        {d.chosen && (
+          <button type="button" class="link" onClick={() => apply(own)} data-testid="course-goal-own">
+            The course’s own ({ownWord})
+          </button>
+        )}
+      </form>
+      <p class="muted">
+        For this drill on every device; {props.begun ? 'the drill starts again, and the try begun counts as missed.' : 'the drill starts again.'} Win or draw stays Stockfish’s verdict on the position.
+      </p>
     </details>
   );
 }
@@ -725,7 +803,8 @@ function EndgameDrill(props: { endgame: Endgame; rep?: RepertoireEndgame; course
   // A repertoire endgame's technique is general: folded, its source open instead.
   const [method, setMethod] = useState(!props.rep && !props.course && standing?.state === 'new');
   useEffect(() => {
-    if (!resumed || practice.peek()?.setup.endgame?.id !== e.id) startEndgame(e);
+    const was = practice.peek()?.setup.endgame;
+    if (!resumed || was?.id !== e.id || was.hold !== e.hold || was.until !== e.until) startEndgame(e);
     return () => parkPractice(entry);
   }, []);
   const p = practice.value?.setup.endgame?.id === e.id ? practice.value : undefined;
@@ -804,6 +883,7 @@ function EndgameGame(props: { game: PracticeGame; endgame: Endgame; rep?: Repert
           {e.goal === 'draw' ? ` · held ${Math.min(userMoves, e.hold ?? 0)} of ${e.hold}` : userMoves ? ` · ${userMoves} move${userMoves === 1 ? '' : 's'}` : ''}
           {fiftyLeft !== undefined && <span class="endgame-fifty"> · fifty-move rule: {fiftyLeft} left</span>}
         </p>
+        {props.course && <CourseGoal course={props.course} begun={!over && userMoves > 0} />}
         <p class={`feedback train-feedback${slip ? ' endgame-slip' : over ? (solved ? ' endgame-solved' : ' endgame-missed') : ''}`} role="status" data-testid="endgame-feedback">
           {feedback}
         </p>

@@ -265,6 +265,15 @@ export interface CourseDrillEvent extends Base {
   card: string;
   on: boolean;
 }
+/**
+ * A course drill's own goal, chosen by the user (PLAN.md §5.193, card `e|<key>`): `g` is
+ * `{ hold }` (a draw's moves) or `{ until }` (a win's end), `{}` the course's own again. The latest decides.
+ */
+export interface CourseGoalEvent extends Base {
+  k: 'cgoal';
+  card: string;
+  g: Record<string, unknown>;
+}
 export type KnownEvent =
   | ReviewEvent
   | SuspendEvent
@@ -292,8 +301,9 @@ export type KnownEvent =
   | RankEvent
   | CourseScoreEvent
   | CourseDrillEvent
+  | CourseGoalEvent
   | GradeEvent;
-export const KNOWN_KINDS = ['review', 'suspend', 'unsuspend', 'forget', 'taught', 'pin', 'unpin', 'drill', 'alt', 'storm', 'snapshot', 'drop', 'relapse', 'plan', 'idea', 'dismiss', 'saved', 'played', 'practice', 'line', 'note', 'checklist', 'pick', 'rank', 'cscore', 'cdrill', 'grade'] as const;
+export const KNOWN_KINDS = ['review', 'suspend', 'unsuspend', 'forget', 'taught', 'pin', 'unpin', 'drill', 'alt', 'storm', 'snapshot', 'drop', 'relapse', 'plan', 'idea', 'dismiss', 'saved', 'played', 'practice', 'line', 'note', 'checklist', 'pick', 'rank', 'cscore', 'cdrill', 'cgoal', 'grade'] as const;
 
 /** A line as read. `event` is set for the kinds this code knows; `raw` is always the line itself. */
 export interface LogLine {
@@ -583,6 +593,12 @@ function knownEvent(o: Record<string, unknown>): KnownEvent | string {
       if (typeof on !== 'boolean') return 'on must be true or false';
       return { ...base, k: 'cdrill', on };
     }
+    case 'cgoal': {
+      if (!card.startsWith('e|') || card.length < 3) return 'card must be a course endgame (e|<position>)';
+      const g = o['g'];
+      if (typeof g !== 'object' || g === null || Array.isArray(g)) return 'g must be an object';
+      return { ...base, k: 'cgoal', g: g as Record<string, unknown> };
+    }
     case 'grade': {
       if (!card.startsWith('x|') || card.length < 3) return 'card must be a position (x|<position>)';
       const g = o['g'];
@@ -627,6 +643,7 @@ export function formatEvent(event: KnownEvent): string {
   if (event.k === 'rank') o['p'] = event.p;
   if (event.k === 'cscore') o['sc'] = event.sc;
   if (event.k === 'cdrill') o['on'] = event.on;
+  if (event.k === 'cgoal') o['g'] = event.g;
   if (event.k === 'saved') o['item'] = event.item;
   if (event.k === 'played') o['game'] = event.game;
   if (event.k === 'practice') {
