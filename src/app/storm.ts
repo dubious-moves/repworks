@@ -47,6 +47,8 @@ import { missingPieces, squaresOfFen } from '../core/board/read.ts';
 import { verdictSpeech } from '../core/board/speech.ts';
 import { parseUciMove, standardUci } from '../core/chess/uci.ts';
 import { say } from '../platform/speech.ts';
+import { cleanSideChoice, onSide, type SideChoice } from '../core/chess/sideChoice.ts';
+import type { Color } from 'chessops/types';
 
 /* ------------------------------------------------------------------ settings (per device) */
 
@@ -69,14 +71,16 @@ export interface StormPrefs {
   focused: boolean;
   /** Level up's ratings and gap (§5.118). */
   levelUp: LevelUp;
+  /** The colour dealt (§5.195): the positions and puzzles the user plays with it alone. */
+  side: SideChoice;
 }
 const PREFS_KEY = 'repworks-storm';
-const DEFAULT_PREFS: StormPrefs = { minPly: STORM.minPly, maxPly: STORM.maxPly, source: 'both', deepen: !smallDevice(), maia: true, focus: [], focusPuzzles: false, overnight: false, focused: false, levelUp: LEVEL_DEFAULT };
+const DEFAULT_PREFS: StormPrefs = { minPly: STORM.minPly, maxPly: STORM.maxPly, source: 'both', deepen: !smallDevice(), maia: true, focus: [], focusPuzzles: false, overnight: false, focused: false, levelUp: LEVEL_DEFAULT, side: 'both' };
 
 function loadPrefs(): StormPrefs {
   try {
     const raw = JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}') as Partial<StormPrefs>;
-    return { ...DEFAULT_PREFS, ...raw, focus: cleanFocus(raw.focus), levelUp: cleanLevelUp(raw.levelUp) };
+    return { ...DEFAULT_PREFS, ...raw, focus: cleanFocus(raw.focus), levelUp: cleanLevelUp(raw.levelUp), side: cleanSideChoice(raw.side) };
   } catch {
     return DEFAULT_PREFS;
   }
@@ -217,6 +221,9 @@ export interface StormHome {
   /** The ready positions with each tag (§5.100), and those the focus chosen deals. */
   tags: Record<Focus, number>;
   matching: number;
+  /** The positions the focus deals, by the user's colour, whatever colour is chosen (§5.195); `tags`,
+   *  `matching` and `showable` count the colour chosen's alone. */
+  bySide: Record<Color, number>;
   /** Kept positions gathered on other devices (§5.102). */
   shared: number;
   /** Ready positions too easy to deal (§5.105): Maia at the user's rating finds a great move almost always. */
@@ -277,6 +284,8 @@ async function homeOf(s: StormScopeData): Promise<StormHome | undefined> {
   const tc = tagConfig();
   const tags = Object.fromEntries(FOCUSES.map((f) => [f, 0])) as Record<Focus, number>;
   const focus = stormPrefs.value.focus;
+  const side = stormPrefs.value.side;
+  const bySide = { white: 0, black: 0 };
   let matching = 0;
   let tooEasy = 0;
   let canShow = 0;
@@ -288,15 +297,18 @@ async function homeOf(s: StormScopeData): Promise<StormHome | undefined> {
       continue;
     }
     const t = positionTags(p, storedList(p), elo, tc);
+    const matches = matchesFocus(t, p.kind, focus);
+    if (matches) bySide[p.side]++;
+    if (!onSide(side, p.side)) continue;
     for (const f of t) tags[f]++;
-    if (matchesFocus(t, p.kind, focus)) {
+    if (matches) {
       matching++;
       if (showable(storedList(p), STORM)) canShow++;
     }
   }
   const maiaHere = await maiaStored().catch(() => false);
   const shared = all.filter((p) => p.from).length;
-  return { stored: all.length, done, ready: ready.length, deep, lines, maiaHere, rated, elo, tags, matching, shared, tooEasy, showable: canShow, likely };
+  return { stored: all.length, done, ready: ready.length, deep, lines, maiaHere, rated, elo, tags, matching, bySide, shared, tooEasy, showable: canShow, likely };
 }
 
 /* ------------------------------------------------------------------ the gather (§5.42) */
@@ -846,6 +858,8 @@ export interface StormSession {
   disguise: boolean;
   /** The focus dealt (§5.100; the unintuitive storm of §5.82 is one): none for the classic storm. */
   focus?: Focus[];
+  /** The colour dealt (§5.195), when one alone is. */
+  side?: Color;
   /** The user's Maia rating when it started: Maia's line on a card speaks of it. */
   elo: number;
   /** The next card comes by itself at this time (a storm's verdict, §18.1), unless paused. */
@@ -923,12 +937,12 @@ const update = (patch: Partial<StormSession>) => {
  * back (§14.15). The classic storm (no focus) deals the positions Maia at the user's rating finds
  * easily after the others.
  */
-async function dealt(s: StormScopeData, focus: readonly Focus[], elo: number): Promise<StoredPosition[]> {
+async function dealt(s: StormScopeData, focus: readonly Focus[], elo: number, side: SideChoice): Promise<StoredPosition[]> {
   const data = trainData.value;
   if (!data) return [];
-  // Too easy (§5.105): left out whatever the focus.
+  // Too easy (§5.105): left out whatever the focus; the other colour's when one is chosen (§5.195).
   const all = storedInScope(await stormStore().positions(), s).filter(
-    (p) => !tooEasyAt(p.maia, elo, storedList(p), STORM) && matchesFocus(positionTags(p, storedList(p), elo, tagConfig()), p.kind, focus),
+    (p) => onSide(side, p.side) && !tooEasyAt(p.maia, elo, storedList(p), STORM) && matchesFocus(positionTags(p, storedList(p), elo, tagConfig()), p.kind, focus),
   );
   const items = all.map((p) => ({ ...p, deep: judges(p, STORM) }));
   const order = drawOrder(items, histories(data), Math.random, STORM.reachTop);
@@ -943,9 +957,10 @@ export const stormEntry = (): string | undefined => sessionEntry;
 
 /**
  * Starts a timed storm or a set. `focus` (§5.100): only the positions that match it, and puzzles
- * only with `puzzles` (§5.125); none is the classic storm, puzzles at their share.
+ * only with `puzzles` (§5.125); none is the classic storm, puzzles at their share. `side` (§5.195):
+ * the positions and puzzles the user plays with that colour alone.
  */
-export async function startStorm(s: StormScopeData, mode: SessionMode, o: { focus?: readonly Focus[]; puzzles?: boolean } = {}): Promise<void> {
+export async function startStorm(s: StormScopeData, mode: SessionMode, o: { focus?: readonly Focus[]; puzzles?: boolean; side?: SideChoice } = {}): Promise<void> {
   endStormSession();
   sessionEntry = entryKey();
   stopDeepening();
@@ -958,12 +973,13 @@ export async function startStorm(s: StormScopeData, mode: SessionMode, o: { focu
   dealtLines = new Set();
   const elo = maiaElo.peek();
   const focus = cleanFocus(o.focus ?? []);
-  queue = await dealt(s, focus, elo);
+  const side = o.side ?? 'both';
+  queue = await dealt(s, focus, elo, side);
   // Show and grade: only the positions whose list may judge, so every move can be shown; no puzzles.
   if (mode === 'show') queue = queue.filter((p) => showable(storedList(p), STORM));
   share = mode === 'show' || (focus.length && !o.puzzles) ? 0 : puzzlePrefs.value.share;
   const data = trainData.value;
-  const ready = share > 0 ? await readyPuzzles(s) : [];
+  const ready = share > 0 ? (await readyPuzzles(s)).filter((p) => onSide(side, p.solver)) : [];
   puzzleQueue = data ? drawOrder(ready.map((p) => ({ card: 'z|' + p.id, p })), histories(data), Math.random, STORM.reachTop).map((x) => x.p) : [];
   // While the board is linked, positions its pieces can't make are left out (CHESSNUT.md §4.8), so
   // a set is six it can set up; `deal` skips one met later (the board linked mid-session).
@@ -984,7 +1000,7 @@ export async function startStorm(s: StormScopeData, mode: SessionMode, o: { focu
   secondPass = [];
   lookTried.clear();
   childTried.clear();
-  stormSession.value = { mode, scopeKey: s.key, title: s.title, phase: 'solving', item: undefined, history: [], points: 0, streak: 0, left: STORM.sessionMs, endsAt: undefined, pass: 1, revealed: false, note: '', total, disguise: puzzleQueue.length > 0, elo, ...(focus.length ? { focus } : {}) };
+  stormSession.value = { mode, scopeKey: s.key, title: s.title, phase: 'solving', item: undefined, history: [], points: 0, streak: 0, left: STORM.sessionMs, endsAt: undefined, pass: 1, revealed: false, note: '', total, disguise: puzzleQueue.length > 0, elo, ...(focus.length ? { focus } : {}), ...(side !== 'both' ? { side } : {}) };
   if (mode === 'storm') {
     tick = setInterval(() => {
       const st = stormSession.value;

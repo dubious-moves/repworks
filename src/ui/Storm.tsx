@@ -99,6 +99,7 @@ import { useBoardMirror } from './boardMirror.ts';
 import { BoardNote } from './BoardLink.tsx';
 import { collect, fillBodies, puzzlePrefs, puzzleState, refreshPuzzles, setPuzzlePrefs, SHARD_MB, SHARES, SHARDS_PER_COLLECT, stopPuzzles, WORKING_SET } from '../app/puzzles.ts';
 import { Back, Stuck } from './Back.tsx';
+import { asSide, SidePicker } from './SidePicker.tsx';
 import { NoteButton } from './CardNote.tsx';
 import { EngineLinePanel } from './EngineLinePanel.tsx';
 import { lineFen, moveAt } from '../core/games/engineLine.ts';
@@ -274,7 +275,19 @@ function Home(props: { scope: StormScopeData; where: StormWhere }) {
   }, [prefs.maia, home?.ready, home?.rated, home?.maiaHere, maiaKind === 'ready']);
   // Positions, or puzzles when they are dealt.
   const focus = prefs.focus;
-  const puzzlesReady = prefs2.share > 0 && (!focus.length || prefs.focusPuzzles) ? (puzzleState.value?.ready ?? 0) : 0;
+  // The colour chosen (§5.195): its positions and the puzzles it solves alone.
+  const side = prefs.side;
+  const pz = puzzleState.value;
+  const puzzlesDealt = prefs2.share > 0 && (!focus.length || prefs.focusPuzzles);
+  const puzzlesBySide = { white: puzzlesDealt ? (pz?.readyBySide?.white ?? 0) : 0, black: puzzlesDealt ? (pz?.readyBySide?.black ?? 0) : 0 };
+  const puzzlesReady = puzzlesDealt ? ((side === 'both' ? pz?.ready : puzzlesBySide[side]) ?? 0) : 0;
+  // Each colour's cards: its positions, and its puzzles when they are dealt.
+  const sideCounts = home && { white: home.bySide.white + puzzlesBySide.white, black: home.bySide.black + puzzlesBySide.black };
+  const otherSide = side === 'white' ? 'black' : 'white';
+  const chooseSide = (c: typeof side) => {
+    setStormPrefs({ side: c });
+    void refreshHome(scope);
+  };
   const canStart = !!home?.matching || puzzlesReady > 0;
   const ends = scope.frontiers.length;
   const plies = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
@@ -286,7 +299,7 @@ function Home(props: { scope: StormScopeData; where: StormWhere }) {
           <p class="storm-count" data-testid="storm-count">
             {home ? (
               <>
-                <strong>{home.matching}</strong> position{home.matching === 1 ? '' : 's'} ready{focus.length ? ` for ${focusTitle(focus)}` : ''}
+                <strong>{home.matching}</strong> position{home.matching === 1 ? '' : 's'} ready{asSide(side)}{focus.length ? ` for ${focusTitle(focus)}` : ''}
                 {home.done ? ` · ${home.done} done for now` : ''}
                 {home.tooEasy ? ` · ${home.tooEasy} too easy, left out (Maia at ${home.elo} finds a great move ${Math.round(STORM.tooEasyShare * 100)}% of the time or more)` : ''}
               </>
@@ -303,12 +316,22 @@ function Home(props: { scope: StormScopeData; where: StormWhere }) {
             </p>
           )}
         </div>
+        {home && (home.ready > 0 || (pz?.ready ?? 0) > 0) && (
+          <SidePicker
+            value={side}
+            counts={sideCounts}
+            disabled={!!g?.running}
+            testid="storm-side"
+            title="Deal only the positions and puzzles you play as one colour (a robotic board then needn’t turn round between them); kept on this device"
+            onChange={chooseSide}
+          />
+        )}
         {home && <FocusPicker scope={scope} home={home} disabled={!!g?.running} />}
         <div class="actions storm-start">
-          <button type="button" class="primary" disabled={!canStart || g?.running} onClick={() => void startStorm(scope, 'storm', { focus, puzzles: prefs.focusPuzzles })}>
+          <button type="button" class="primary" disabled={!canStart || g?.running} onClick={() => void startStorm(scope, 'storm', { focus, puzzles: prefs.focusPuzzles, side })}>
             {focus.length ? `${focusTitle(focus)} storm` : 'Start storm'}
           </button>
-          <button type="button" class="secondary" disabled={!canStart || g?.running} onClick={() => void startStorm(scope, 'set', { focus, puzzles: prefs.focusPuzzles })}>
+          <button type="button" class="secondary" disabled={!canStart || g?.running} onClick={() => void startStorm(scope, 'set', { focus, puzzles: prefs.focusPuzzles, side })}>
             Set of {STORM.setSize}
           </button>
           <button
@@ -317,18 +340,20 @@ function Home(props: { scope: StormScopeData; where: StormWhere }) {
             data-testid="storm-show-start"
             disabled={!home?.showable || g?.running}
             title={home?.showable ? 'No clock: think of a move, show every move Stockfish scored, and say whether yours was a good one' : `Only positions Stockfish has scored to depth ${STORM.judgeDepth} or more can be shown: let it re-score them on this page`}
-            onClick={() => void startStorm(scope, 'show', { focus })}
+            onClick={() => void startStorm(scope, 'show', { focus, side })}
           >
             Show and grade{home ? ` (${home.showable})` : ''}
           </button>
         </div>
         {home && !canStart && !g?.running && (
           <p class="storm-empty" data-testid="storm-empty">
-            {home.ready === 0
-              ? 'Gather positions first: Gather positions, below, finds them in the games played from your lines.'
-              : home.matching === 0 && home.tooEasy === home.ready
-                ? `Every position ready is too easy at your rating (Maia at ${home.elo} finds a great move): gather more, below.`
-                : 'No position ready matches this focus: pick another, or gather more below.'}
+            {side !== 'both' && sideCounts && sideCounts[side] === 0 && sideCounts[otherSide] > 0
+              ? `Nothing ready${asSide(side)}${focus.length ? ' for this focus' : ''}: play both colours or the other, or gather more below.`
+              : home.ready === 0
+                ? 'Gather positions first: Gather positions, below, finds them in the games played from your lines.'
+                : home.matching === 0 && home.tooEasy === home.ready
+                  ? `Every position ready is too easy at your rating (Maia at ${home.elo} finds a great move): gather more, below.`
+                  : 'No position ready matches this focus: pick another, or gather more below.'}
           </p>
         )}
         <p class="muted storm-about">
@@ -1582,10 +1607,10 @@ function Review(props: { s: StormSession; scope: StormScopeData }) {
           </div>
         </div>
         <div class="actions">
-          <button type="button" class="primary" onClick={() => void startStorm(props.scope, s.mode, { focus: s.focus ?? [] })}>
+          <button type="button" class="primary" onClick={() => void startStorm(props.scope, s.mode, { focus: s.focus ?? [], side: s.side ?? 'both' })}>
             {again}
           </button>
-          <button type="button" class="secondary" onClick={() => void startStorm(props.scope, s.mode === 'storm' ? 'set' : 'storm', { focus: s.focus ?? [] })}>
+          <button type="button" class="secondary" onClick={() => void startStorm(props.scope, s.mode === 'storm' ? 'set' : 'storm', { focus: s.focus ?? [], side: s.side ?? 'both' })}>
             {s.mode === 'storm' ? `Set of ${STORM.setSize}` : 'Storm'}
           </button>
           <button type="button" class="secondary" onClick={() => (stormSession.value = undefined)}>

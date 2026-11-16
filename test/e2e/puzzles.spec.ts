@@ -175,4 +175,17 @@ test('puzzles: the size asked first, collected, dealt with the disguise, solved 
   await expect(page.locator('.storm-card')).toHaveAttribute('data-card', /^z\|/);
   const wide = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(wide).toBeLessThanOrEqual(0);
+
+  // One colour (§5.195): the puzzles are solved as White, so Black alone has nothing to deal.
+  await page.evaluate(() => localStorage.setItem('repworks-storm', JSON.stringify({ deepen: false })));
+  await page.reload();
+  const side = page.getByTestId('storm-side');
+  await expect(side.locator('[data-side="white"]')).toHaveText(/^White[1-9]/);
+  await expect(side.locator('[data-side="black"]')).toHaveText('Black0');
+  await side.locator('[data-side="black"]').click();
+  await expect(page.getByRole('button', { name: 'Start storm' })).toBeDisabled();
+  await expect(page.getByTestId('storm-empty')).toHaveText(/^Nothing ready as Black/);
+  await side.locator('[data-side="white"]').click();
+  await page.getByRole('button', { name: 'Start storm' }).click();
+  await expect(page.locator('.storm-card')).toHaveAttribute('data-side', 'white');
 });

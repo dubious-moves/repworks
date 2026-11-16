@@ -706,6 +706,13 @@ Training and Learn on the Chessnut Move: see 14 (PLAN.md §5.192).
 
 ## 5. The storm
 
+### One colour (§5.195, 2026-11-16)
+- On the storm's home: Play · Both colours · White · Black, with a count on each. Choose your
+  smaller colour: does the count read "n positions ready as Black", and does a set or a storm deal
+  only Black positions (the board never turning) and puzzles you solve as Black? Is the choice
+  still there after closing the app, and only on that device?
+- **Checked**: Playwright (desktop and emulated phone); nothing live yet.
+
 ### Maia's likely moves searched by the home's deepening, and kept (§5.161, 2026-11-10)
 - On the PC, with Maia on and the positions rated: open the storm's home with "Stockfish re-scores
   the positions" on. Once every list is scored, "Scoring Maia's likely moves: n of m searched"
@@ -1173,6 +1180,12 @@ Training and Learn on the Chessnut Move: see 14 (PLAN.md §5.192).
   phone: the waits while each move is judged (Stockfish in the background).
 
 ## 8. Endgames
+
+### One colour (§5.195, 2026-11-16)
+- On the Endgames page, under "Focus on mistakes": Play · Both colours · White · Black. With one
+  colour: only its endgames in all three sections (built-in, repertoire, course), each Next stays
+  on it, and the home's "Endgames · n due" counts only it. Both again brings everything back.
+- **Checked**: Playwright (desktop and emulated phone); nothing live yet.
 
 ### A course drill's own goal (§5.193, 2026-11-16)
 - A course drill held for a draw: "Change the goal" under the task line, set to fewer moves (say 5);
@@ -1765,6 +1778,10 @@ does. Start with the spike: its log decides what the later parts change (CHESSNU
   board (connect, a drive timed with a report on its way, the five setups, the lights' pattern, the
   pieces, a drop and Reconnect, Copy log; without Web Bluetooth, and Brave's flag). Nothing on a
   real board.
+
+### One colour on the board (§5.195, 2026-11-16)
+- With the board linked, a storm set and an endgame session with one colour chosen: the board
+  should never turn round between positions. See 5 and 8 for the choice itself.
 
 ### The board's chip and dialog (CHESSNUT.md part (c), 2026-11-14)
 - Connect from the ♞ chip (in the head on the phone, in the footer beside the sync status on a

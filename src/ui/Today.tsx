@@ -4,11 +4,12 @@
 // last read (the Games screen keeps it), the storm's positions once the home is drawn.
 import { useEffect } from 'preact/hooks';
 import { checklistViews, chapterNameAt } from '../app/checklist.ts';
-import { endgameStandings } from '../app/endgames.ts';
+import { endgameSide, endgameStandings } from '../app/endgames.ts';
 import { gameCountsNow } from '../app/games.ts';
 import { ideaEnrolled, ideaQueueNow } from '../app/ideas.ts';
-import { courseOnlyDue, courseStandings } from '../app/courseEndgames.ts';
-import { repStandings } from '../app/repertoireEndgames.ts';
+import { courseNow, courseOnlyDue, courseStandings } from '../app/courseEndgames.ts';
+import { repEndgames, repStandings } from '../app/repertoireEndgames.ts';
+import { ENDGAMES, sideOf } from '../core/endgames/endgames.ts';
 import { practiceResults } from '../app/repertoireCheck.ts';
 import { refreshStormReady, stormReadyAll } from '../app/storm.ts';
 import { dataVersion } from '../app/sync.ts';
@@ -31,10 +32,13 @@ export function useStormReady(): number | undefined {
   return stormReadyAll.value;
 }
 
-/** The endgames due, theoretical, the repertoire's and the courses' (the courses' alone with "Course only", §5.179), and the first of them. */
+/** The endgames due, theoretical, the repertoire's and the courses' (the courses' alone with "Course only", §5.179; the colour played's alone, §5.195), and the first of them. */
 export function endgamesDue(now: number): { due: number; first?: string } {
   const all = courseOnlyDue.value ? [...courseStandings(now)] : [...endgameStandings(now), ...repStandings(now), ...courseStandings(now)];
-  const due = all.filter(([, s]) => s.state === 'due');
+  // The colour played (§5.195): the other colour's aren't due here.
+  const side = endgameSide.value;
+  const keep = side === 'both' ? undefined : new Set([...ENDGAMES.filter((e) => sideOf(e) === side), ...(repEndgames.value ?? []).filter((r) => r.side === side), ...courseNow.value.drills.filter((d) => d.side === side)].map((x) => x.id));
+  const due = all.filter(([id, s]) => s.state === 'due' && (!keep || keep.has(id)));
   return due.length ? { due: due.length, first: `#/endgames/${due[0]![0]}` } : { due: 0 };
 }
 

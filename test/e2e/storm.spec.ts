@@ -1146,6 +1146,7 @@ test('the home’s deepening (§5.161): the positions after Maia’s likely move
 interface Kept {
   card: string;
   fen: string;
+  side: 'white' | 'black';
   scored: { u: string; s: number }[];
   src: 'cdb' | 'sf';
   depth: number;
@@ -1215,6 +1216,75 @@ test('the focus: Quiet chosen and kept, only its positions dealt, the card namin
   expect(quiet.map((p) => p.card)).toContain(card);
   await play(page, ranked(await cardFen(page))[0]!);
   await expect(page.getByTestId('storm-kinds')).toContainText('Quiet');
+});
+
+/** A FEN with the colours swapped and the board turned top to bottom: the same position for the other side. */
+function mirrorFen(fen: string): string {
+  const [board, turn, castling, ep, ...rest] = fen.split(' ');
+  const swap = (x: string) => x.replace(/[a-zA-Z]/g, (c) => (c === c.toUpperCase() ? c.toLowerCase() : c.toUpperCase()));
+  const c = castling === '-' ? '-' : swap(castling!).split('').sort((a, b) => (a < 'a' ? 0 : 1) - (b < 'a' ? 0 : 1)).join('');
+  return [swap(board!.split('/').reverse().join('/')), turn === 'w' ? 'b' : 'w', c, ep === '-' ? '-' : ep![0]! + (9 - Number(ep![1])), ...rest].join(' ');
+}
+const mirrorUci = (u: string) => u[0]! + (9 - Number(u[1])) + u[2]! + (9 - Number(u[3])) + u.slice(4);
+
+test('one colour (§5.195): the chips count each, only the colour chosen dealt in a set, kept on this device; both by default', async ({ page }) => {
+  test.setTimeout(90_000);
+  const w = await setUp(page);
+  await gathered(page, w);
+  // The fixture's positions are all Black's: one of them turned into White's, as a White repertoire's would be.
+  const black = await keptPositions(page);
+  expect(black.every((p) => p.side === 'black')).toBe(true);
+  const white = { ...black[0]!, card: 's|white-test', key: 'white-test', fen: mirrorFen(black[0]!.fen), side: 'white', arrived: null, scored: black[0]!.scored.map((m) => ({ ...m, u: mirrorUci(m.u) })) };
+  await page.evaluate(
+    (p) =>
+      new Promise<void>((resolve, reject) => {
+        const open = indexedDB.open('repworks-storm');
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const tx = open.result.transaction('positions', 'readwrite');
+          tx.objectStore('positions').put(p, p.card);
+          tx.oncomplete = () => (open.result.close(), resolve());
+          tx.onerror = () => reject(tx.error);
+        };
+      }),
+    white,
+  );
+  await page.reload();
+  await expect(page.locator('.storm-home')).toBeVisible();
+  const kept = await keptPositions(page);
+  const top = new Map(kept.map((p) => [p.card, p.scored[0]!.u]));
+  const n = { white: 1, black: black.length };
+  const picker = page.getByTestId('storm-side');
+  const chip = (c: string) => picker.locator(`[data-side="${c}"]`);
+  await expect(chip('both')).toHaveAttribute('aria-pressed', 'true');
+  await expect(chip('both')).toHaveText(`Both colours${n.white + n.black}`);
+  await expect(chip('white')).toHaveText(`White${n.white}`);
+  await expect(chip('black')).toHaveText(`Black${n.black}`);
+  const card = page.locator('.storm-card');
+  /** A set of the colour chosen: every card dealt is that colour's, as many as it has (six at most). */
+  const setOf = async (side: 'white' | 'black', word: string) => {
+    await chip(side).click();
+    await expect(chip(side)).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByTestId('storm-count')).toContainText(`${n[side]} position${n[side] === 1 ? '' : 's'} ready as ${word}`);
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('repworks-storm')!).side)).toBe(side);
+    await page.getByRole('button', { name: /^Set of/ }).click();
+    await expect(page.getByTestId('storm-set')).toContainText(`1 of ${Math.min(6, n[side])}`);
+    for (let i = 0; i < Math.min(3, n[side]); i++) {
+      await expect(card).toHaveAttribute('data-phase', 'solving');
+      await expect(card).toHaveAttribute('data-side', side);
+      const fen = await cardFen(page);
+      await play(page, top.get((await card.getAttribute('data-card'))!)!);
+      await expect(page.getByTestId('storm-verdict')).toContainText(/(Best|Great|Good) move/);
+      if (i + 1 < Math.min(3, n[side])) {
+        await page.getByRole('button', { name: /^Next position/ }).click();
+        await expect(card).not.toHaveAttribute('data-fen', fen);
+      }
+    }
+  };
+  await setOf('white', 'White');
+  await page.reload();
+  await expect(page.locator('.storm-home')).toBeVisible();
+  await setOf('black', 'Black');
 });
 
 /** The win% a move gives up against the best, from the fake ChessDB's ladder (Lichess's curve). */

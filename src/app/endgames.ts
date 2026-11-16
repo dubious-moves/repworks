@@ -9,6 +9,7 @@ import { endgameMaiaAlone } from './endgameVariety.ts';
 import { maiaState, maiaStored } from './maia.ts';
 import { DEFAULT_OPPONENT, endgameMaia, startPractice } from './practice.ts';
 import { practiceResults } from './repertoireCheck.ts';
+import { cleanSideChoice, type SideChoice } from '../core/chess/sideChoice.ts';
 
 /** Each endgame's tries, from every device's log. */
 export const endgameAttempts = computed(() => attemptsByEndgame(practiceResults.value, (e) => keyFen(e.fen)?.key));
@@ -43,6 +44,29 @@ export function setMistakesOnly(on: boolean): void {
   try {
     if (on) localStorage.setItem(MISTAKES_KEY, '1');
     else localStorage.removeItem(MISTAKES_KEY);
+  } catch {
+    // Not kept: the choice is a convenience.
+  }
+}
+
+/**
+ * The colour played (§5.195): the endgames the user plays as White or Black alone, on the page, its
+ * Next and what's due on the home. Kept on the device; both by default.
+ */
+const SIDE_KEY = 'repworks-endgames-side';
+function readSide(): SideChoice {
+  try {
+    return cleanSideChoice(localStorage.getItem(SIDE_KEY));
+  } catch {
+    return 'both';
+  }
+}
+export const endgameSide = signal<SideChoice>(readSide());
+export function setEndgameSide(c: SideChoice): void {
+  endgameSide.value = c;
+  try {
+    if (c === 'both') localStorage.removeItem(SIDE_KEY);
+    else localStorage.setItem(SIDE_KEY, c);
   } catch {
     // Not kept: the choice is a convenience.
   }

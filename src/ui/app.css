@@ -7270,3 +7270,22 @@ button.course-group.on {
 .game-items .rank-select.rank-high {
   font-weight: 600;
 }
+
+/* The colour a drill deals (PLAN.md §5.195): the storm's home and the endgames' page. */
+.side-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 8px 0;
+}
+
+.side-picker-label {
+  font-size: 0.85rem;
+}
+
+.side-picker .chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}

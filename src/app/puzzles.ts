@@ -11,6 +11,8 @@ import { stormHistories } from '../core/storm/store.ts';
 import { DEFAULT_PUZZLE_BASE, normalizeBase, puzzleData, type PuzzleData } from '../platform/puzzleData.ts';
 import { stormStore, type StormScopeData } from './storm.ts';
 import { trainData } from './train.ts';
+import { countBySide } from '../core/chess/sideChoice.ts';
+import type { Color } from 'chessops/types';
 
 export interface PuzzlePrefs {
   base: string;
@@ -69,6 +71,8 @@ export interface PuzzleState {
   shardsLeft: number;
   candidates: number;
   ready: number;
+  /** Of `ready`, the ones solved as White and as Black (§5.195). */
+  readyBySide: Record<Color, number>;
   /** A collect or a fill running, and what it says. */
   running: boolean;
   note: string;
@@ -103,7 +107,7 @@ export async function refreshPuzzles(s: StormScopeData, patch: Partial<PuzzleSta
   const done = doneIds();
   const ready = (await stormStore().all<ReadyPuzzle>('puzzleBodies')).filter((p) => chapters.has(p.chapter) && !done.has(p.id));
   const prev = puzzleState.value;
-  puzzleState.value = { anchors: as.length, scanned: as.length - as.filter((a) => !seen.has(a.key)).length, shardsLeft: left.size, candidates: cands.length, ready: ready.length, running: prev?.running ?? false, note: prev?.note ?? '', ...patch };
+  puzzleState.value = { anchors: as.length, scanned: as.length - as.filter((a) => !seen.has(a.key)).length, shardsLeft: left.size, candidates: cands.length, ready: ready.length, readyBySide: countBySide(ready, (p) => p.solver), running: prev?.running ?? false, note: prev?.note ?? '', ...patch };
 }
 
 /** The puzzles ready to deal in the scope, not done (§5.48). */

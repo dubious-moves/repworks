@@ -2702,3 +2702,10 @@ The technical calls, each with its reason:
 - **Changing the goal restarts the drill as Restart does** (a try begun counts as missed). Why: a
   try's goal can't change under it, and a goal changed after a slip must not wipe the miss.
 
+## Revision of 2026-11-16 (one colour in the storm and the endgames: PLAN.md §5.195)
+- **The storm and the endgames can deal one colour alone** (Both colours, White, Black; both by
+  default), kept per device and not synced. Why: the owner, 2026-11-16, for the Chessnut Move ("to
+  avoid rotating every other position") and for normal use. Per device because the board is: a
+  phone without it keeps both while the PC with it plays one.
+- **The endgames' colour also decides what's due on the home**, as "Course only" does. Why: the
+  home's count leads to the page; one counting endgames the page hides would point at nothing.

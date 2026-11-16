@@ -245,7 +245,8 @@ it (the robot is on its way elsewhere, and its arrival there would read as a mov
 
 A position the user plays as Black is set up **turned 180°** (square `s` ↔ `63 − s`; Chessnut's
 `reversed`), so every card and game comes from the near edge, as the screen turns its board. A
-storm changes sides card by card; the robot turns the board while it sets up anyway. Moves read
+storm changes sides card by card; the robot turns the board while it sets up anyway (or, with one
+colour chosen on the storm's home or the endgames' page, PLAN.md §5.195, never does). Moves read
 and lights are turned back the same way. A setting ("Black from the far side") keeps White at the
 near edge instead. A 180° turn keeps each square's colour, so the board still looks right.
 

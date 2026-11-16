@@ -9,7 +9,9 @@
 // text for the chapter kept under the board. "Focus on mistakes" (§5.180) holds the page and its
 // Next to the endgames missed in one of their last five tries, due or not.
 import { useEffect, useLayoutEffect, useMemo, useState } from 'preact/hooks';
-import { attemptsAt, checkEndgameMaia, endgameMaiaHere, endgameStandings, mistakesOnly, setMistakesOnly, startEndgame } from '../app/endgames.ts';
+import { attemptsAt, checkEndgameMaia, endgameMaiaHere, endgameSide, endgameStandings, mistakesOnly, setEndgameSide, setMistakesOnly, startEndgame } from '../app/endgames.ts';
+import { countBySide, onSide } from '../core/chess/sideChoice.ts';
+import { SidePicker } from './SidePicker.tsx';
 import { authorFirst, endgameMaiaAlone, setEndgameMaiaAlone } from '../app/endgameVariety.ts';
 import { courseById, courseCandidates, setCourseGoal, courseJustRemoved, courseNow, courseOnly, courseOnlyAsked, setCourseOnly, courseScores, courseScoring, courseStandings, loadCourse, removeCourseDrill, restoreCourseDrill, restoreCourseDrills, scoreCourse, stopCourseScoring } from '../app/courseEndgames.ts';
 import { readSearchChapters, searchChapters } from '../app/search.ts';
@@ -97,13 +99,21 @@ function EndgameList() {
   const standings = endgameStandings(now);
   // Focus on mistakes (§5.180): the endgames missed in one of their last five tries alone, due or not.
   const focus = mistakesOnly.value;
-  const mistakes = mistakeOrder(standings, ENDGAMES);
-  const next = focus ? mistakes[0] : nextEndgame(standings);
-  const due = ENDGAMES.filter((e) => standings.get(e.id)?.state === 'due').length;
-  const fresh = ENDGAMES.filter((e) => standings.get(e.id)?.state === 'new').length;
-  const soonest = Math.min(...ENDGAMES.map((e) => standings.get(e.id)?.next ?? Infinity));
+  // The colour played (§5.195): the endgames played as the other colour put aside, in every section.
+  const side = endgameSide.value;
+  const theory = ENDGAMES.filter((e) => onSide(side, sideOf(e)));
+  const mistakes = mistakeOrder(standings, theory);
+  const next = focus ? mistakes[0] : nextEndgame(standings, undefined, theory);
+  const due = theory.filter((e) => standings.get(e.id)?.state === 'due').length;
+  const fresh = theory.filter((e) => standings.get(e.id)?.state === 'new').length;
+  const soonest = Math.min(...theory.map((e) => standings.get(e.id)?.next ?? Infinity));
   // Course only (§5.179): the course's section alone, the built-in endgames and the repertoire's put aside.
   const only = courseOnly.value;
+  // Each colour's count over the sections shown.
+  const sides = countBySide(
+    [...(only ? [] : [...ENDGAMES.map(sideOf), ...(repEndgames.value ?? []).map((r) => r.side)]), ...courseNow.value.drills.map((d) => d.side)],
+    (c) => c,
+  );
   useEffect(checkEndgameMaia, []);
   return (
     <div class="games endgames" data-course-only={only ? '1' : undefined}>
@@ -133,6 +143,13 @@ function EndgameList() {
           <input type="checkbox" checked={focus} onChange={(ev) => setMistakesOnly(ev.currentTarget.checked)} data-testid="endgame-mistakes" /> Focus on mistakes: only the endgames
           you missed in one of their last five tries, due or not, the ones missed last time first
         </label>
+        <SidePicker
+          value={side}
+          counts={sides}
+          testid="endgame-side"
+          title="Only the endgames you play as one colour, here, in each Next and in what’s due on the home (a robotic board then needn’t turn round between them); kept on this device"
+          onChange={setEndgameSide}
+        />
         {!only && (
           <div class="actions">
             {focus ? (
@@ -160,7 +177,7 @@ function EndgameList() {
       <CourseEndgames now={now} />
       {!only &&
         GROUPS.map((g) => {
-          const items = ENDGAMES.filter((e) => e.group === g.id && (!focus || isMistake(standings.get(e.id))));
+          const items = theory.filter((e) => e.group === g.id && (!focus || isMistake(standings.get(e.id))));
           if (!items.length) return null;
           return (
             <section key={g.id} class="card endgame-group" aria-labelledby={`endgame-group-${g.id}`}>
@@ -258,7 +275,9 @@ function RepertoireEndgames(props: { now: number }) {
   const standings = repStandings(props.now);
   const stateOf = (r: RepertoireEndgame) => standings.get(r.id)?.state ?? 'new';
   const focus = mistakesOnly.value;
-  const kept = focus ? list.filter((r) => isMistake(standings.get(r.id))) : list;
+  const side = endgameSide.value;
+  const played = list.filter((r) => onSide(side, r.side));
+  const kept = focus ? played.filter((r) => isMistake(standings.get(r.id))) : played;
   const shown = cat === 'all' ? kept : kept.filter((r) => r.category === cat);
   // What to play first at the top: due, then new, then the rest, each in the list's order; the mistakes alone in theirs.
   const ordered = focus ? mistakeOrder(standings, shown) : [...shown].sort((a, b) => STATE_RANK[stateOf(a)] - STATE_RANK[stateOf(b)]);
@@ -395,7 +414,8 @@ function RepSource(props: { rep: RepertoireEndgame }) {
 }
 
 function RepNextButton(props: { after: string; primary: boolean }) {
-  const list = repEndgames.value ?? [];
+  const side = endgameSide.value;
+  const list = (repEndgames.value ?? []).filter((x) => onSide(side, x.side));
   const r = list.find((x) => x.id === props.after);
   const among = r ? list.filter((x) => x.category === r.category) : list;
   const focus = mistakesOnly.value;
@@ -443,7 +463,9 @@ function CourseEndgames(props: { now: number }) {
   const standings = courseStandings(props.now);
   const stateOf = (d: CourseDrill) => standings.get(d.id)?.state ?? 'new';
   const focus = mistakesOnly.value;
-  const drills = focus ? state.drills.filter((d) => isMistake(standings.get(d.id))) : state.drills;
+  const side = endgameSide.value;
+  const played = state.drills.filter((d) => onSide(side, d.side));
+  const drills = focus ? played.filter((d) => isMistake(standings.get(d.id))) : played;
   const shown = group ? drills.filter((d) => d.cand.group === group) : drills;
   const ordered = focus ? mistakeOrder(standings, shown) : [...shown].sort((a, b) => STATE_RANK[stateOf(a)] - STATE_RANK[stateOf(b)]);
   const next = focus ? ordered[0] : nextEndgame(standings, undefined, shown);
@@ -717,7 +739,8 @@ function CourseGoal(props: { course: CourseDrill; begun: boolean }) {
 
 /** The course drill to play after `after`: the next due, else new, in its group, else in the whole list. */
 function nextCourseDrill(after: string): CourseDrill | undefined {
-  const list = courseNow.value.drills;
+  const side = endgameSide.value;
+  const list = courseNow.value.drills.filter((x) => onSide(side, x.side));
   const d = list.find((x) => x.id === after);
   const among = d ? list.filter((x) => x.cand.group === d.cand.group) : list;
   const standings = courseStandings(decidingNow());
@@ -968,7 +991,9 @@ function EndgameGame(props: { game: PracticeGame; endgame: Endgame; rep?: Repert
 function NextButton(props: { after: string; primary: boolean }) {
   const focus = mistakesOnly.value;
   const standings = endgameStandings(decidingNow());
-  const next = focus ? nextMistake(standings, props.after, ENDGAMES) : nextEndgame(standings, props.after);
+  const side = endgameSide.value;
+  const theory = ENDGAMES.filter((e) => onSide(side, sideOf(e)));
+  const next = focus ? nextMistake(standings, props.after, theory) : nextEndgame(standings, props.after, theory);
   if (!next)
     return (
       <a class="button secondary" href="#/endgames">

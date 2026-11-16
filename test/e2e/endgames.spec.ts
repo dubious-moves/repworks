@@ -1085,6 +1085,55 @@ test('focus on mistakes: only the endgames missed in their last five tries, due 
   await expect(page.getByTestId('endgame-counts')).toHaveText('1 due · 21 new');
 });
 
+test('one colour (§5.195): the endgames played as the other put aside, on the page, in its Next and in what’s due; kept on this device', async ({ page }) => {
+  test.setTimeout(90_000);
+  await setUp(page);
+  const nav = page.getByRole('navigation', { name: 'Pages' }).getByRole('link', { name: /^Endgames/ });
+  await nav.click();
+  const picker = page.getByTestId('endgame-side');
+  const chip = (c: string) => picker.locator(`[data-side="${c}"]`);
+  const game = page.getByTestId('endgame-game');
+  // Both by default, each colour counted.
+  await expect(chip('both')).toHaveAttribute('aria-pressed', 'true');
+  await expect(chip('both')).toHaveText('Both colours23');
+  await expect(chip('white')).toHaveText('White12');
+  await expect(chip('black')).toHaveText('Black11');
+  // A White endgame missed: due.
+  await page.getByRole('link', { name: 'The breakthrough', exact: true }).click();
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  await game.getByRole('button', { name: 'Hint' }).click();
+  await expect(game).toContainText('This try counts as missed');
+  await page.locator('.chapter-head .back').click();
+  await expect(page.getByTestId('endgame-counts')).toHaveText('1 due · 22 new');
+  await page.locator('.chapter-head .back').click();
+  await expect(nav).toHaveText('Endgames · 1 due');
+  await nav.click();
+  // Black alone: only Black's, none due, the home's count too.
+  await chip('black').click();
+  await expect(chip('black')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.endgame-item')).toHaveCount(11);
+  await expect(page.locator('.endgame-item .endgame-text > .muted')).toHaveText(Array(11).fill(/^Black to play/));
+  await expect(page.getByTestId('endgame-counts')).toHaveText('0 due · 11 new');
+  await expect(page.getByTestId('endgame-next')).toHaveText('Next new: The square of the pawn');
+  await page.locator('.chapter-head .back').click();
+  await expect(nav).toHaveText('Endgames');
+  await nav.click();
+  // White alone, kept over a reload: the breakthrough is the one due.
+  await chip('white').click();
+  await page.reload();
+  await expect(chip('white')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.endgame-item')).toHaveCount(12);
+  await expect(page.getByTestId('endgame-counts')).toHaveText('1 due · 11 new');
+  await expect(page.getByTestId('endgame-next')).toHaveText('Next due: The breakthrough');
+  await page.locator('.chapter-head .back').click();
+  await expect(nav).toHaveText('Endgames · 1 due');
+  await nav.click();
+  // Both again: everything back.
+  await chip('both').click();
+  await expect(page.locator('.endgame-item')).toHaveCount(23);
+  await expect(page.getByTestId('endgame-counts')).toHaveText('1 due · 22 new');
+});
+
 test('the courses’ scores, removals and tries follow the user to a second device, which scores nothing', async ({ page, browser }) => {
   test.setTimeout(120_000);
   const w = courseWorld();

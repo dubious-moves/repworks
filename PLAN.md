@@ -11362,3 +11362,43 @@ and given to the right sessions, the move named). Playwright on a desktop and an
 Finish at the limit, the chip's ✕, the setting saved from the dialog), and the training specs
 (`train`, `autoplay`, `repetitions`, `chessnutTrain`). **Not checked**: on the owner's devices
 (`TESTING.md` §3).
+
+#### 5.195 One colour in the storm and the endgames (the owner's request, 2026-11-16, built)
+
+"Make it possible to focus only on a specific colour when it comes to Storm and Endgame drilling.
+This is in preparation for the Chessnut Move board (to avoid rotating every other position), but it
+should be possible during normal use as well. Default should be both colours."
+
+- **The choice**: *Play* · Both colours · White · Black, three chips with how many each would deal
+  (`SidePicker`, `src/ui/SidePicker.tsx`). Both by default. Kept per device, not synced (Claude's
+  call): it belongs to the board and the setting a device is used in, as the storm's focus and the
+  endgames' "Focus on mistakes" are. The user's colour is the one each kind already has: a storm
+  position's `side` (the repertoire's), a puzzle's `solver`, an endgame's side to move at the start
+  (`sideOf`), a repertoire endgame's and a course drill's `side` (the side the course teaches).
+- **The storm** (`stormPrefs.side`): on the home between the counts and the focus, shown once
+  anything is ready. A session (storm, set, show and grade, and the review's "again") deals only
+  that colour's positions and the puzzles it solves; the count reads "14 positions ready as
+  Black", and the focus chips, Show and grade's count and the home's "Storm · n ready" follow it.
+  The chips' numbers count the focus's positions and, when puzzles are dealt, the puzzles, by
+  colour. With nothing of the colour chosen ready, Start is off and the home says "Nothing ready as
+  White: play both colours or the other, or gather more below." The gather is unchanged: it keeps
+  both colours.
+- **The endgames** (`endgameSide`, `src/app/endgames.ts`): under "Focus on mistakes", over the
+  whole page: the built-in endgames (12 White, 11 Black), the repertoire's and the course's lists,
+  their counts and categories, every Next (the page's and a drill's), and **what's due on the home**
+  (`endgamesDue`, as "Course only" does, §5.179): with White alone, a Black endgame due isn't
+  counted there, so the home doesn't point at a page that hides it. A drill opened by its address
+  plays whatever its colour.
+- **Why chips, not a setting in a dialog**: it is switched often (the board on or off), and the
+  counts say at once what each choice leaves.
+
+**As built**: `SideChoice`, `onSide`, `countBySide` (`src/core/chess/sideChoice.ts`); `StormPrefs.side`,
+`StormHome.bySide`, `dealt(…, side)`, `startStorm`'s `side`, `StormSession.side` (`src/app/storm.ts`);
+`PuzzleState.readyBySide` (`src/app/puzzles.ts`). **Checked**: unit tests
+(`test/unit/core/chess/sideChoice.test.ts`); Playwright on a desktop and an emulated phone:
+`storm.spec.ts` (the fixture's positions are Black's, one turned into White's in the store: the
+chips' counts, the count's words, the choice kept, a set of each colour dealing only its own; the
+control, the deal's filter taken out, fails it), `puzzles.spec.ts` (the White puzzles: Black alone
+can't start and says why, White deals one), `endgames.spec.ts` (the counts by colour, Black alone:
+11 listed, its Next, the home's due count without the White endgame missed; White kept over a
+reload; both again). **Not checked**: on the owner's devices (`TESTING.md` §5, §8).
