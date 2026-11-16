@@ -120,3 +120,63 @@ test('the gallery: a frame per theme, following each other, never syncing', asyn
   expect(await page.evaluate(() => localStorage.getItem('repworks-theme'))).toBe('midnight');
   expect(fromFrames).toEqual([]);
 });
+
+test('boards seen from a distance: bigger outlined pieces and the slate board, off until ticked and kept', async ({ page }) => {
+  await setUp(page);
+  const html = page.locator('html');
+  await expect(html).not.toHaveAttribute('data-pieces', /./);
+  await expect(html).not.toHaveAttribute('data-board', /./);
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf`);
+  const piece = page.locator('cg-board piece.black').first();
+  const board = page.locator('cg-board').first();
+  await expect(piece).toBeVisible();
+  const style = (l: Locator) =>
+    l.evaluate((el) => {
+      const b = el.getBoundingClientRect();
+      const c = el.closest('cg-container')?.getBoundingClientRect() ?? b;
+      const [x, y] = ((el as HTMLElement).style.transform.match(/-?[\d.]+/g) ?? ['0', '0']).map(Number);
+      const square = c.width / 8;
+      return {
+        width: b.width / c.width,
+        // How far the piece's centre is from its square's (chessground's translate is the square's corner).
+        offCentre: Math.hypot(b.x + b.width / 2 - (c.x + x! + square / 2), b.y + b.height / 2 - (c.y + y! + square / 2)),
+        filter: getComputedStyle(el).filter, background: getComputedStyle(el).backgroundImage,
+      };
+    });
+  const before = { piece: await style(piece), board: await style(board) };
+  expect(before.piece.width).toBeCloseTo(0.125, 3);
+  expect(before.piece.filter).toBe('none');
+  expect(before.board.background).not.toContain('conic');
+
+  await page.goto(`${site.url}#/`);
+  await page.locator('details.settings > summary').click();
+  await page.getByLabel('Pieces easy to see from a distance').check();
+  await page.getByLabel('High-contrast board').check();
+  await expect(html).toHaveAttribute('data-pieces', 'big');
+  await expect(html).toHaveAttribute('data-board', 'contrast');
+
+  await page.reload();
+  await expect(html).toHaveAttribute('data-pieces', 'big');
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf`);
+  await expect(piece).toBeVisible();
+  const after = { black: await style(piece), white: await style(page.locator('cg-board piece.white').first()), board: await style(board) };
+  expect(after.black.width).toBeCloseTo(0.1375, 3);
+  // Still centred on its square.
+  expect(after.black.offCentre).toBeLessThan(1);
+  expect(after.white.offCentre).toBeLessThan(1);
+  // Black's outline white and thicker than White's black one, both sharp (no blur).
+  expect(after.black.filter).toMatch(/drop-shadow\(rgb\(255, 255, 255\) [\d.]+px 0px 0px\)/);
+  expect(after.white.filter).toMatch(/drop-shadow\(rgb\(0, 0, 0\) [\d.]+px 0px 0px\)/);
+  const rim = (f: string) => Number(/\) ([\d.]+)px/.exec(f)![1]);
+  expect(rim(after.black.filter)).toBeGreaterThan(rim(after.white.filter));
+  expect(rim(after.black.filter)).toBeGreaterThan(0.5);
+  expect(after.board.background).toContain('conic');
+  expect(after.board.background).toContain('rgb(95, 122, 142)');
+
+  await page.goto(`${site.url}#/`);
+  await page.locator('details.settings > summary').click();
+  await page.getByLabel('Pieces easy to see from a distance').uncheck();
+  await page.getByLabel('High-contrast board').uncheck();
+  await expect(html).not.toHaveAttribute('data-pieces', /./);
+  await expect(html).not.toHaveAttribute('data-board', /./);
+});

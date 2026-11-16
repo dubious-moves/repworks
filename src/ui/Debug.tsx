@@ -16,6 +16,7 @@ import { EngineFiles } from './Engines.tsx';
 import { isoDay } from './day.ts';
 import { isTheme, setTheme, theme, THEMES } from '../app/theme.ts';
 import { setSoundOn, soundOn } from '../app/sound.ts';
+import { bigPieces, contrastBoard, setBigPieces, setContrastBoard } from '../app/distance.ts';
 
 /** The look (src/ui/themes.css): this device's theme, and the gallery that shows them side by side. */
 function Look() {
@@ -32,6 +33,12 @@ function Look() {
         </select>
       </label>{' '}
       <a href={`${import.meta.env.BASE_URL}styles.html`}>Compare the themes</a>
+      <label class="check">
+        <input type="checkbox" checked={bigPieces.value} onChange={(e) => setBigPieces(e.currentTarget.checked)} /> Pieces easy to see from a distance: a little bigger, with a sharp outline
+      </label>
+      <label class="check">
+        <input type="checkbox" checked={contrastBoard.value} onChange={(e) => setContrastBoard(e.currentTarget.checked)} /> High-contrast board (slate) on every board, over the usual colours
+      </label>
       <label class="check">
         <input type="checkbox" checked={soundOn.value} onChange={(e) => setSoundOn(e.currentTarget.checked)} /> Sounds: a move, a capture, the best move found, and a wrong move (with a short buzz on a phone)
       </label>

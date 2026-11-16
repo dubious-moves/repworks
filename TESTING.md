@@ -683,6 +683,17 @@ Training and Learn on the Chessnut Move: see 14 (PLAN.md §5.192).
 
 ## 4. Show and grade
 
+### Boards seen from a distance (§5.196, 2026-11-16)
+- Settings → tick "Pieces easy to see from a distance" and "High-contrast board (slate)" on the
+  tablet (and the phone). Show and grade from about 2 m: can you tell the pieces apart, and the
+  sides? If the outline should be thicker or thinner, or the pieces bigger, say which: each is one
+  number in `app.css`.
+- Drag a piece and play a few moves: each piece sits centred on its square, the last move's and
+  the check's highlights still show on the slate squares, and the arrows read on them.
+- Other boards (training, the storm, practice, analysis) look the same; untick both and they are
+  back as they were. The phone that doesn't tick them is unchanged.
+- **Checked**: Playwright (desktop, emulated phone) and headless screenshots; **not** on a device.
+
 ### Show and grade retries its mistakes (§5.127, 2026-10-19)
 - Show and grade from the training card: miss a move with 4 (or the ring). At the line's end the
   board goes back to the move before it, the note reads "Not a new line: your mistake again" in

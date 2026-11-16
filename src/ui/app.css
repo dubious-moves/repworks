@@ -1297,6 +1297,32 @@ textarea.script {
   filter: drop-shadow(0 0 1px rgb(var(--ink) / 90%)) drop-shadow(0 0 1px rgb(var(--ink) / 60%));
 }
 
+/* Pieces seen from a distance (Settings, src/app/distance.ts, PLAN.md §5.196): a tenth bigger, and
+   a sharp outline in the other side's colour, sized by the square (12.5cqw of the board's
+   container) so a tablet's board gets a thicker one than a phone's: 2% of the square around Black's
+   pieces, under 1% around White's, which have their own black edge already. Four unblurred
+   shadows, one each way, make the outline. The size is the piece's box, a square and a tenth,
+   centred by margins (a percentage of the board's width, as the box's is): `scale` or a transform
+   would scale chessground's own translate too, putting the pieces off their squares. */
+:root[data-pieces='big'] cg-container {
+  container-type: inline-size;
+}
+
+:root[data-pieces='big'] cg-board piece {
+  width: 13.75%;
+  height: 13.75%;
+  margin: -0.625%;
+  --rim-colour: #000; /* fixed */
+  --rim: calc(12.5cqw * 0.009);
+  filter: drop-shadow(var(--rim) 0 0 var(--rim-colour)) drop-shadow(calc(-1 * var(--rim)) 0 0 var(--rim-colour))
+    drop-shadow(0 var(--rim) 0 var(--rim-colour)) drop-shadow(0 calc(-1 * var(--rim)) 0 var(--rim-colour));
+}
+
+:root[data-pieces='big'] cg-board piece.black {
+  --rim-colour: #fff; /* fixed */
+  --rim: calc(12.5cqw * 0.02);
+}
+
 .board-material piece + piece {
   margin-left: -10px;
 }

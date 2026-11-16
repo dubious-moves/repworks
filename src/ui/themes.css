@@ -547,6 +547,17 @@
   background: repeating-conic-gradient(var(--board-dark) 0 25%, var(--board-light) 0 50%) 0 0 / 25% 25%;
 }
 
+/* The high-contrast board (Settings, src/app/distance.ts, PLAN.md §5.196): slate, near-white and a
+   deep blue-grey, over every theme's own board; the coordinates (app.css) follow its colours. */
+:root[data-board='contrast'] {
+  --board-light: #eef1f3;
+  --board-dark: #5f7a8e;
+}
+
+:root[data-board='contrast'] cg-board {
+  background: repeating-conic-gradient(var(--board-dark) 0 25%, var(--board-light) 0 50%) 0 0 / 25% 25%;
+}
+
 /* The installed app on a desktop has no top bar (app.css): its window's title bar takes the page's
    background instead of the accent. Last, so it wins over every theme's own. */
 @media (display-mode: standalone) and (hover: hover) and (pointer: fine) and (min-width: 900px) {

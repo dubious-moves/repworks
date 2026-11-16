@@ -11402,3 +11402,38 @@ control, the deal's filter taken out, fails it), `puzzles.spec.ts` (the White pu
 can't start and says why, White deals one), `endgames.spec.ts` (the counts by colour, Black alone:
 11 listed, its Next, the home's due count without the White endgame missed; White kept over a
 reload; both again). **Not checked**: on the owner's devices (`TESTING.md` §5, §8).
+
+#### 5.196 Boards seen from a distance (the owner's request, 2026-11-16, built)
+
+"I sometimes use 'show and grade' from 2m~ distance (mobile/tablet) and my eyesight isn't perfect.
+Can you make alternative piece visuals that are easier to see from a distance? This should be off
+by default and needed to be toggled on."
+
+Chosen by the owner from mockups (big solid silhouettes, letter tokens and pieces on discs were
+shown and passed over): the normal cburnett pieces, a tenth bigger, with a sharp outline in the
+other side's colour, thinner around White's pieces (they have a black edge of their own); and the
+high-contrast slate board. On every board, not only show and grade.
+
+- **Two switches** under Settings, by the theme: "Pieces easy to see from a distance" and
+  "High-contrast board (slate)". Each is off until ticked, kept per device in localStorage
+  (`repworks-big-pieces`, `repworks-contrast-board`), not synced: a tablet on a stand and a phone
+  in the hand differ. `index.html` sets both on `<html>` before the first paint, as it does the
+  theme, so a board never flashes the other look.
+- **The pieces** (`:root[data-pieces='big'] cg-board piece`, `app.css`): the piece's box is 13.75%
+  of the board, not 12.5%, centred by a −0.625% margin. Not `scale` or a transform: those scale
+  chessground's own translate too, which put the pieces off their squares (seen in a screenshot,
+  and the e2e test's centring check fails on it). The outline is four unblurred drop-shadows, one
+  each way, sized by the square through container units (`cg-container` is an inline-size
+  container while the switch is on): 2% of the square, white, around Black's pieces; 0.9%, black,
+  around White's. A tablet's bigger board gets a proportionally thicker outline. The material rows
+  by the board and the promotion picker keep the normal pieces.
+- **The board** (`:root[data-board='contrast']`, `themes.css`): `--board-light` #eef1f3 and
+  `--board-dark` #5f7a8e over every theme's own (the coordinates follow them) and the flat squares
+  drawn in place of chessground's brown.
+
+**As built**: `src/app/distance.ts`, `Look` in `src/ui/Debug.tsx`. **Checked**: Playwright on a
+desktop and an emulated phone (`themes.spec.ts`: off by default, both on and kept over a reload,
+the piece's box a tenth bigger and still centred on its square, Black's outline white and thicker
+than White's black one, the slate board's colours, both off again; the control, `scale` in place of
+the box, fails the centring check), and headless screenshots of a study's board on both. **Not
+checked**: on the owner's phone and tablet from two metres (`TESTING.md` §4).

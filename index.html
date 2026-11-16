@@ -11,6 +11,9 @@
       try {
         var t = new URLSearchParams(location.search).get('theme') || localStorage.getItem('repworks-theme');
         if (t) document.documentElement.dataset.theme = t;
+        // Boards seen from a distance (src/app/distance.ts keeps these afterwards).
+        if (localStorage.getItem('repworks-big-pieces') === '1') document.documentElement.dataset.pieces = 'big';
+        if (localStorage.getItem('repworks-contrast-board') === '1') document.documentElement.dataset.board = 'contrast';
       } catch (e) {}
     </script>
     <link rel="manifest" href="/manifest.webmanifest" />
