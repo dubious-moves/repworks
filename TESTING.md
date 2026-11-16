@@ -483,6 +483,19 @@ led to the one asked about. The first model ignores them, so nothing changes the
 
 Training and Learn on the Chessnut Move: see 14 (PLAN.md §5.192).
 
+### A ply limit (§5.193, 2026-11-16)
+- Set **Ply limit** in the training settings (say 8; the dialog names the move: "after Black's 4th
+  move"). The training screen shows a "Ply limit 8" chip. Train today's queue: each line should
+  stop after its 8th ply with "Ply limit: n more moves in this line", **Continue** and **Next
+  line**. Continue plays on to the line's end; Next line goes to the next.
+- Lines whose due moves are all past the limit should be skipped with "A line starts" at its first
+  new or due move. With "from the start" and auto-play off, they should be played up to the limit.
+  Is that how you want it?
+- The counters should say "(n past the limit)" for the due moves left unasked; they stay due.
+- The chip's ✕ takes the limit off from the next line. Learn and a picked line stop there too.
+- **Checked**: unit tests and Playwright (desktop and emulated phone, a picked line); not on a
+  device, and not the queue in a browser test.
+
 ### The wrong move shown (§5.158, 2026-11-10)
 - **A wrong move in training**: its square goes red with a ✕ (the square it came from faintly)
   for about a second after it is taken back. Is it long enough, or too much?

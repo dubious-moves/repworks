@@ -17,8 +17,8 @@ import { beginTraining } from '../app/state.ts';
 import { dataVersion } from '../app/sync.ts';
 import { decidingNow, timeOffset } from '../app/time.ts';
 import { goOnMs, moveMs, PACE_NAMES, paceSettings } from '../app/pace.ts';
-import { analyseSession, command, leaveSession, resumeSession, seekSequence, isGraded, leaveForStudy, pinMissed, playMove, press, queueOf, quizComments, readLine, readingAt, session, sessionProblem, setPace, setSelfGrade, setSpeech, speech, trainData, undoSuspend, type SessionKind, type SessionView, type TrainData } from '../app/train.ts';
-import { trainPrefs } from '../app/trainPrefs.ts';
+import { analyseSession, command, configureSession, leaveSession, resumeSession, seekSequence, isGraded, leaveForStudy, pinMissed, playMove, press, queueOf, quizComments, readLine, readingAt, session, sessionProblem, setPace, setSelfGrade, setSpeech, speech, trainData, undoSuspend, type SessionKind, type SessionView, type TrainData } from '../app/train.ts';
+import { plyLimitMove, saveTrainPrefs, trainPrefs } from '../app/trainPrefs.ts';
 import type { Line, RepertoireIndex } from '../core/repertoire/index.ts';
 import type { Mode } from '../core/app/fsm.ts';
 import { pressOf } from '../core/train/showGrade.ts';
@@ -515,9 +515,17 @@ function Session(props: { s: SessionView }) {
   // line" when it waits for it. With lines from the comments to quiz it always waits, for "Next
   // line" or "Quiz lines" (§5.98), at the session's last line too.
   const endQuiz = !s.done && s.phase === 'lineDone' ? (s.endQuiz ?? 0) : 0;
-  const holding = (!s.done && s.phase === 'lineDone' && s.upcoming !== undefined && (s.of.kind === 'learn' || s.of.kind === 'queue' || s.of.kind === 'show' || s.of.kind === 'difficult')) || endQuiz > 0;
-  const waits = holding && (trainPrefs.value.lineEnd === 'wait' || endQuiz > 0);
+  // Stopped at the ply limit (§5.193): "Continue" goes on past it, beside "Next line"; the
+  // session's last line always waits there, for "Continue" or "Finish".
+  const limit = !s.done && s.phase === 'lineDone' ? s.limit : undefined;
+  const holding = (!s.done && s.phase === 'lineDone' && s.upcoming !== undefined && (s.of.kind === 'learn' || s.of.kind === 'queue' || s.of.kind === 'show' || s.of.kind === 'difficult')) || endQuiz > 0 || !!limit;
+  const waits = holding && (trainPrefs.value.lineEnd === 'wait' || endQuiz > 0 || (!!limit && !s.upcoming));
   const nextLabel = s.upcoming ? 'Next line' : 'Finish';
+  const continueButton = limit && (
+    <button type="button" class="secondary train-continue" onClick={() => command('continue')} title={`On past the ply limit: this line's last ${limit.past === 1 ? 'move' : `${limit.past} moves`}`}>
+      Continue
+    </button>
+  );
   const upcoming = s.upcoming && `Line ${lineNumber(s.data.index, s.upcoming)}${s.line && s.upcoming.cid !== s.line.cid ? ` · ${chapterNameOf(s, s.upcoming)}` : ''}`;
   // On a phone the button that goes on at a line's end is beside the feedback line, under the
   // board: in the panel it was below the fold (the owner's request, 2026-10-27). Hint keeps its
@@ -553,7 +561,7 @@ function Session(props: { s: SessionView }) {
         {/* One line, always its height, so the board never moves (§5.17). */}
         <div class="train-feedback-row">
         <p class={`feedback train-feedback note-${holding ? 'next' : (s.note?.kind ?? 'none')}${s.note?.kind === 'aside' && s.note.important ? ' important' : ''}${s.retry && !holding ? ' retrying' : ''}`} role="status">
-          {s.done ? '' : holding ? `Line done${upcoming ? ` · Next: ${upcoming}` : ''}` : s.alts ? (s.alts.length ? `Alternatives: ${s.alts.map((m) => m.san).join(', ')}` : 'No alternatives saved here') : noteText(s.note, show && !!s.retry)}
+          {s.done ? '' : holding ? `${limit ? `Ply limit: ${limit.past} more move${limit.past === 1 ? '' : 's'} in this line` : 'Line done'}${upcoming ? ` · Next: ${upcoming}` : ''}` : s.alts ? (s.alts.length ? `Alternatives: ${s.alts.map((m) => m.san).join(', ')}` : 'No alternatives saved here') : noteText(s.note, show && !!s.retry)}
         </p>
         {/* On a phone the panel's buttons are below the fold: a misclick is taken back beside the note. */}
         {!s.done && s.wrongMove && !show && (
@@ -561,6 +569,7 @@ function Session(props: { s: SessionView }) {
             Misclick
           </button>
         )}
+        {nextNear && continueButton}
         {nextNear && (
           <button type="button" class="train-next-near" onClick={() => command('next')}>
             {nextLabel}
@@ -578,7 +587,10 @@ function Session(props: { s: SessionView }) {
             </>
           ) : isGraded(s.of) ? (
             <>
-              <span>{s.dueLeft} due</span> · <span>{s.newLeft} new</span> · line {s.number} of {s.total}
+              <span>
+                {s.dueLeft} due{s.pastLimit ? <span class="train-past-limit" title="Due moves past the ply limit: they stay due"> ({s.pastLimit} past the limit)</span> : null}
+              </span>{' '}
+              · <span>{s.newLeft} new</span> · line {s.number} of {s.total}
               {s.pass && <span class="train-pass"> · {s.pass.n} of {s.pass.of} times</span>}
               {s.retry && <span class="train-retry"> · mistakes left {s.retry.left}</span>}
             </>
@@ -589,6 +601,7 @@ function Session(props: { s: SessionView }) {
           )}
         </p>
         <CommentOffer s={s} />
+        {usesLimit(s.of) && trainPrefs.value.plyLimit > 0 && <PlyLimitChip ply={trainPrefs.value.plyLimit} />}
         <TrainMenu graded={isGraded(s.of)} suspend={!s.done && asking && !aside} skip={!s.done && s.of.kind !== 'play' && s.of.kind !== 'line'} />
         </div>
         <p class="train-line">
@@ -632,9 +645,12 @@ function Session(props: { s: SessionView }) {
               {nextNear ? (
                 hint
               ) : (
-                <button type="button" onClick={() => command('next')}>
-                  {nextLabel}
-                </button>
+                <>
+                  <button type="button" onClick={() => command('next')}>
+                    {nextLabel}
+                  </button>
+                  {continueButton}
+                </>
               )}
               {endQuiz > 0 && (
                 <button type="button" onClick={() => quizComments()} title="Play the lines from the comments met on this line on the board, one after another">
@@ -642,6 +658,8 @@ function Session(props: { s: SessionView }) {
                 </button>
               )}
             </>
+          ) : limit && !nextNear ? (
+            continueButton
           ) : (
             hint
           )}
@@ -665,7 +683,7 @@ function Session(props: { s: SessionView }) {
           </button>
         </div>
         )}
-        {!s.done && ((show && waits && !nextNear) || (s.wrongMove && !show) || s.savedAlt || s.missed || s.suspended || aside) && (
+        {!s.done && ((show && waits && !nextNear) || (show && limit && !nextNear) || (s.wrongMove && !show) || s.savedAlt || s.missed || s.suspended || aside) && (
         <div class="actions train-actions train-extra">
           {aside && (
             <button type="button" class="secondary" onClick={() => command('skipComment')} title="On to the next line from the comments, or back to where the line was">
@@ -677,6 +695,7 @@ function Session(props: { s: SessionView }) {
               {nextLabel}
             </button>
           )}
+          {show && !nextNear && continueButton}
           {s.wrongMove && !show && (
             <button type="button" class="secondary train-misclick-panel" onClick={() => command('misclick')} title={`A slip of the hand: ${s.wrongMove} isn’t counted as wrong (Backspace)`}>
               Misclick: take {s.wrongMove} back
@@ -724,6 +743,34 @@ function Session(props: { s: SessionView }) {
   );
 }
 
+
+/** The sessions a ply limit stops (§5.193): the queue's, show and grade, difficult lines, a line picked, Learn. */
+function usesLimit(of: SessionKind): boolean {
+  return of.kind === 'queue' || of.kind === 'show' || of.kind === 'difficult' || of.kind === 'line' || of.kind === 'learn';
+}
+
+/** The ply limit set (§5.193): a chip in the counters' row, opening the settings; ✕ takes it off, from the next line. */
+function PlyLimitChip(props: { ply: number }) {
+  return (
+    <span class="ply-limit-chip">
+      <button type="button" class="ply-limit-set" onClick={openTrainSettings} title={`Each line stops ${plyLimitMove(props.ply)} (ply ${props.ply}): change it in the training settings`}>
+        Ply limit {props.ply}
+      </button>
+      <button
+        type="button"
+        class="ply-limit-off"
+        aria-label="Take the ply limit off"
+        title="Take the ply limit off, from the next line"
+        onClick={() => {
+          saveTrainPrefs({ ...trainPrefs.peek(), plyLimit: 0 });
+          configureSession();
+        }}
+      >
+        ✕
+      </button>
+    </span>
+  );
+}
 
 /**
  * The session's "⋯" menu (the owner's request, 2026-10-11): what is seldom pressed, out of the

@@ -22,7 +22,7 @@ import { pinsOf, type PinState } from '../core/train/pins.ts';
 import { alternativesOf } from '../core/train/alternatives.ts';
 import { lineMarksOf, markLines } from '../core/train/paused.ts';
 import { difficultPlan, findLine, learnPlan, pickedPlan } from '../core/train/browse.ts';
-import { interactivePlan, planSession, withoutAnswered, type SessionPlan } from '../core/train/plan.ts';
+import { interactivePlan, pastLimit, planSession, withoutAnswered, type SessionPlan } from '../core/train/plan.ts';
 import { ShowGrade, type Press, type ShowGradeEffect } from '../core/train/showGrade.ts';
 import { todaysQueue, type DailyQueue, type Day } from '../core/train/queue.ts';
 import { SETTINGS_FILE, trainSettings, type TrainSettings } from '../core/train/settings.ts';
@@ -209,6 +209,8 @@ export interface SessionView {
   total: number;
   /** At a line's end: the line that comes next in the session (§5.17). */
   upcoming?: Line;
+  /** Stopped at the ply limit (§5.193): the limit, and the line's moves past it. */
+  limit?: { ply: number; past: number };
   /** Show sequence, while shown: the plies it spans. */
   sequence?: { from: number; to: number };
   /** A line walked again (repetitions), and the mistakes retried at a walk's end (§5.77). */
@@ -232,6 +234,8 @@ export interface SessionView {
   /** The planned asks and teaches not answered yet. */
   dueLeft: number;
   newLeft: number;
+  /** With a ply limit (§5.193): of `dueLeft`, the moves past it on their lines, which the walks stop short of. */
+  pastLimit?: number;
   /** The last card suspended, for its undo. */
   suspended?: { card: CardId; san: string };
   /** The last move answered wrong, or in retry and drill the mistake on the board, which can be pinned (§5.8). */
@@ -384,16 +388,16 @@ export function optionsFor(of: SessionKind, prefs: TrainPrefs): TrainerOptions {
   };
   switch (of.kind) {
     case 'queue':
-      return { ...common, retryShown: true, autoPlay: prefs.autoPlayQueue, lineStart: prefs.startQueue, holdLineEnd: prefs.lineEnd === 'wait', comments: prefs.comments };
+      return { ...common, plyLimit: prefs.plyLimit, retryShown: true, autoPlay: prefs.autoPlayQueue, lineStart: prefs.startQueue, holdLineEnd: prefs.lineEnd === 'wait', comments: prefs.comments };
     case 'show':
-      return { ...common, retryShown: true, autoPlay: prefs.autoPlayQueue, lineStart: prefs.startQueue, holdLineEnd: prefs.lineEnd === 'wait' };
+      return { ...common, plyLimit: prefs.plyLimit, retryShown: true, autoPlay: prefs.autoPlayQueue, lineStart: prefs.startQueue, holdLineEnd: prefs.lineEnd === 'wait' };
     // Difficult lines walk as the queue's: its difficult moves are asked whatever auto-play says.
     case 'difficult':
-      return { ...common, retryShown: true, autoPlay: prefs.autoPlayQueue, lineStart: prefs.startQueue, holdLineEnd: prefs.lineEnd === 'wait', comments: prefs.comments };
+      return { ...common, plyLimit: prefs.plyLimit, retryShown: true, autoPlay: prefs.autoPlayQueue, lineStart: prefs.startQueue, holdLineEnd: prefs.lineEnd === 'wait', comments: prefs.comments };
     case 'line':
-      return { ...common, retryShown: true, autoPlay: prefs.autoPlayLearn, lineStart: prefs.startLearn, comments: prefs.comments };
+      return { ...common, plyLimit: prefs.plyLimit, retryShown: true, autoPlay: prefs.autoPlayLearn, lineStart: prefs.startLearn, comments: prefs.comments };
     case 'learn':
-      return { ...common, autoPlay: prefs.autoPlayLearn, lineStart: prefs.startLearn, holdLineEnd: prefs.lineEnd === 'wait', lineEndPaces: 4 };
+      return { ...common, plyLimit: prefs.plyLimit, autoPlay: prefs.autoPlayLearn, lineStart: prefs.startLearn, holdLineEnd: prefs.lineEnd === 'wait', lineEndPaces: 4 };
     default:
       return {};
   }
@@ -500,7 +504,7 @@ export function readLine(ply: number | undefined): void {
 }
 
 /** A command from the screen, with the time now. */
-export function command(type: 'hint' | 'suspend' | 'skipLine' | 'stop' | 'next' | 'ready' | 'saveAlt' | 'unsaveAlt' | 'misclick' | 'skipComment'): void {
+export function command(type: 'hint' | 'suspend' | 'skipLine' | 'stop' | 'next' | 'continue' | 'ready' | 'saveAlt' | 'unsaveAlt' | 'misclick' | 'skipComment'): void {
   send({ type, now: Date.now() });
 }
 /** A line from the comments met quizzed now, the walk resuming after it; without a key, at a line's end, the lines on (§5.98). */
@@ -626,7 +630,7 @@ export function endSession(): void {
 function send(c: TrainerCommand): void {
   const t = trainer;
   if (!t) return;
-  if (shower && (c.type === 'tick' || c.type === 'stop' || c.type === 'skipLine' || c.type === 'next')) {
+  if (shower && (c.type === 'tick' || c.type === 'stop' || c.type === 'skipLine' || c.type === 'next' || c.type === 'continue')) {
     apply(t, c.type === 'tick' ? shower.tick(c.id, c.now) : shower.send(c));
     return;
   }
@@ -767,6 +771,8 @@ function apply(t: Trainer, effects: readonly ShowGradeEffect[], always = false):
   next.total = v.total;
   if (v.upcoming) next.upcoming = v.upcoming.line;
   else delete next.upcoming;
+  if (v.limit) next.limit = v.limit;
+  else delete next.limit;
   if (v.sequence) next.sequence = v.sequence;
   else delete next.sequence;
   if (v.pass) next.pass = v.pass;
@@ -785,6 +791,9 @@ function apply(t: Trainer, effects: readonly ShowGradeEffect[], always = false):
     else delete next[k];
   }
   next.dueLeft = s.plan.lines.flatMap((l) => l.ask).filter((c) => !answered.has(c)).length;
+  const past = pastLimit(s.plan, answered, optionsFor(s.of, trainPrefs.peek()).plyLimit ?? 0);
+  if (past > 0) next.pastLimit = past;
+  else delete next.pastLimit;
   next.newLeft = s.plan.lines.flatMap((l) => l.teach).filter((c) => !answered.has(c)).length;
   session.value = next;
 }

@@ -59,6 +59,12 @@
 //   quizzed), which plays them one after another, back at the line's end after them. For each,
 //   the board goes back to where it starts, the opponent's moves are played and the user finds
 //   their own. Nothing is graded or recorded; the lines of a walk are offered once a session.
+// - A ply limit (`plyLimit`, the owner's request, 2026-11-16, §5.193): a walk stops after the line's
+//   first `plyLimit` moves, as at a line's end (its mistakes retried, its passes walked), and waits
+//   there with `continue` (on past the limit, this line only) beside "Next line"; it never ends the
+//   session by itself. A line that would ask nothing before the limit is skipped: the moves the plan
+//   needs all lie past it, unless the line starts at the chapter's start (or where it branches from
+//   the line before) and the auto-play mode asks a move before the limit. Moves past it stay due.
 import type { Position } from 'chessops/chess';
 import { makeSan, parseSan } from 'chessops/san';
 import { isNormal, type NormalMove } from 'chessops/types';
@@ -231,6 +237,8 @@ export type TrainerCommand =
   | { type: 'hint'; now: number }
   /** At a line's end held by `holdLineEnd`: the next line. */
   | { type: 'next'; now: number }
+  /** Stopped at the ply limit: the line goes on past it. */
+  | { type: 'continue'; now: number }
   /** Show and grade: play the move asked, without grading it yet. */
   | { type: 'show' }
   /** Show and grade: the move was known or not; the card is graded and the line goes on. */
@@ -307,10 +315,12 @@ export interface TrainerSetup {
   commentLines?(line: Line): readonly QuizLine[];
   /** Which of them are quizzed (default `off`). */
   comments?: CommentQuiz;
+  /** A line's walk stops after this many of its moves, waiting for `continue` or `next` (§5.193); unset or 0: no limit. */
+  plyLimit?: number;
 }
 
 /** The options a running session can change (the training settings, §5.17). */
-export type TrainerOptions = Pick<TrainerSetup, 'autoPlay' | 'tryNew' | 'sequence' | 'lineStart' | 'holdLineEnd' | 'lineEndPaces' | 'repetitions' | 'retryMistakes' | 'retryShown' | 'comments'>;
+export type TrainerOptions = Pick<TrainerSetup, 'autoPlay' | 'tryNew' | 'sequence' | 'lineStart' | 'holdLineEnd' | 'lineEndPaces' | 'repetitions' | 'retryMistakes' | 'retryShown' | 'comments' | 'plyLimit'>;
 
 interface Ply {
   san: string;
@@ -352,6 +362,8 @@ export interface TrainerView {
   shown?: { uci: string; san: string };
   /** At a line's end: the line that comes next, if any. */
   upcoming?: PlannedLine;
+  /** At a line's end that is the ply limit's (§5.193): the limit, and how many of the line's moves are past it. */
+  limit?: { ply: number; past: number };
   /** After a wrong move: the move that "Save as alternative" would save (§5.18). */
   wrongMove?: { uci: string; san: string };
   /** An alternative just saved, while "Undo" can take it back. */
@@ -436,6 +448,8 @@ export class Trainer {
   /** Positions after each ply count: positions[i] is the board after i moves. */
   private positions: Position[] = [];
   private end = 0;
+  /** The walk's end without the ply limit: `end` is short of it while the walk stops at the limit. */
+  private fullEnd = 0;
   private ply = 0;
   /** Where the line's first move the plan needs is: the moves before it are its prefix. */
   private prefix = 0;
@@ -478,8 +492,8 @@ export class Trainer {
 
   constructor(setup: TrainerSetup) {
     this.setup = setup;
-    const { autoPlay, tryNew, sequence, lineStart, holdLineEnd, lineEndPaces, repetitions, retryMistakes, retryShown, comments } = setup;
-    this.options = { autoPlay, tryNew, sequence, lineStart, holdLineEnd, lineEndPaces, repetitions, retryMistakes, retryShown, comments };
+    const { autoPlay, tryNew, sequence, lineStart, holdLineEnd, lineEndPaces, repetitions, retryMistakes, retryShown, comments, plyLimit } = setup;
+    this.options = { autoPlay, tryNew, sequence, lineStart, holdLineEnd, lineEndPaces, repetitions, retryMistakes, retryShown, comments, plyLimit };
     this.pace = Math.max(MIN_PACE_MS, setup.paceMs);
     this.pauses = clampPauses(setup.pauses);
     this.record = setup.record ?? true;
@@ -565,6 +579,7 @@ export class Trainer {
     if (met.length && this.quizNow()) v.canQuiz = true;
     if (this.asideCounts.lines > 0) v.asides = { ...this.asideCounts };
     if (this.phase === 'lineDone' && this.upcoming) v.upcoming = this.lines[this.upcoming.at]!;
+    if (this.phase === 'lineDone' && this.end < this.fullEnd) v.limit = { ply: this.end, past: this.fullEnd - this.end };
     if (this.seq && !this.seq.replay) v.sequence = { from: this.seq.from, to: this.seq.to };
     const p = this.pending;
     if (p?.lastWrong) v.wrongMove = { ...p.lastWrong };
@@ -600,6 +615,9 @@ export class Trainer {
         if (this.phase !== 'lineDone') break;
         this.waitId++;
         this.nextLine(command.now, out);
+        break;
+      case 'continue':
+        this.goPast(command.now, out);
         break;
       case 'show':
         this.showMove(out);
@@ -713,10 +731,37 @@ export class Trainer {
     out.push({ type: 'done', summary: this.summary() });
   }
 
-  /** Whether a planned line still has something to ask or teach on its walked part. */
+  /** The ply limit (§5.193), when one is set. */
+  private limit(): number | undefined {
+    const n = Math.round(this.options.plyLimit ?? 0);
+    return n > 0 ? n : undefined;
+  }
+
+  /**
+   * Whether a planned line still has something to ask or teach on its walked part. With a ply limit
+   * short of its end: before the limit; or, when it has something past it, an own move before the
+   * limit that a walk from where it starts (the chapter's start, or where it branches) asks.
+   */
   private needed(planned: PlannedLine, plies: readonly Ply[]): boolean {
     if (planned.ask.length + planned.teach.length === 0 || this.redo.has(planned)) return true;
-    return plies.some((p, i) => i < planned.end && p.card !== undefined && (this.setup.askOnly ? this.kindOf(p.card) !== 'auto' : this.needs(p.card) !== undefined));
+    const needs = (to: number) => plies.some((p, i) => i < to && p.card !== undefined && (this.setup.askOnly ? this.kindOf(p.card) !== 'auto' : this.needs(p.card) !== undefined));
+    const limit = this.limit();
+    if (limit === undefined || limit >= planned.end) return needs(planned.end);
+    if (needs(limit)) return true;
+    const start = this.options.lineStart;
+    if ((start !== 'start' && start !== 'branch') || !needs(planned.end)) return false;
+    const from = start === 'branch' ? this.splitFrom(planned) : 0;
+    return plies.some((p, i) => i >= from && i < limit && p.card !== undefined && !this.suspended(p.card) && this.kindOf(p.card) !== 'auto');
+  }
+
+  /** Where a line would branch from the walk on the board (`branch`, §5.121): the moves they share in the same chapter, else 0. */
+  private splitFrom(planned: PlannedLine): number {
+    const board = this.at >= 0 ? this.lines[this.at] : undefined;
+    if (!board || board.line.sid !== planned.line.sid || board.line.cid !== planned.line.cid) return 0;
+    const walked = board.line.path.slice(0, this.reached);
+    let split = 0;
+    while (split < walked.length && walked[split] === planned.line.path[split]) split++;
+    return split;
   }
 
   /** The next planned line after the current one with something to walk, and its moves. */
@@ -764,7 +809,8 @@ export class Trainer {
     if (this.redo.has(planned)) this.askAgain = new Set(planned.ask);
     this.plies = found.plies;
     this.positions = found.positions;
-    this.end = Math.min(planned.end, found.plies.length);
+    this.fullEnd = Math.min(planned.end, found.plies.length);
+    this.end = Math.min(this.fullEnd, this.limit() ?? Infinity);
     const start = this.options.lineStart;
     this.prefix = start === undefined ? 0 : this.prefixEnd(this.plies, this.end);
     // Where the board already is when the line shares its moves, up to its first ask or teach: the
@@ -918,8 +964,23 @@ export class Trainer {
     out.push({ type: 'lineDone' });
     this.upcoming = this.findNext();
     const quiz = this.endQuiz().length > 0;
-    if (!this.upcoming && !quiz) return this.finish(out);
-    if (!this.options.holdLineEnd && !quiz) this.wait(this.pauses.lineEndMs ?? this.pace * (this.options.lineEndPaces ?? 2), out);
+    // Stopped at the ply limit (§5.193): the session's last line waits for "Continue" or "Finish".
+    const limited = this.end < this.fullEnd;
+    if (!this.upcoming && !quiz && !limited) return this.finish(out);
+    if (!this.options.holdLineEnd && !quiz && this.upcoming) this.wait(this.pauses.lineEndMs ?? this.pace * (this.options.lineEndPaces ?? 2), out);
+  }
+
+  /** Stopped at the ply limit: the line goes on past it to its end, this line only (§5.193). */
+  private goPast(now: number, out: TrainerEffect[]) {
+    if (this.phase !== 'lineDone' || this.inAside || this.end >= this.fullEnd) return;
+    this.waitId++;
+    this.upcoming = undefined;
+    this.retrying = undefined;
+    this.ply = this.end;
+    this.end = this.fullEnd;
+    out.push({ type: 'arrow' });
+    out.push({ type: 'takeback', path: this.path() });
+    this.advance(now, out);
   }
 
   /** What the feedback line says at an ask: a retry's streak, a missed line again, or nothing. */
@@ -1293,6 +1354,7 @@ export class Trainer {
     this.plies = built.plies;
     this.positions = built.positions;
     this.end = built.plies.length;
+    this.fullEnd = this.end;
     this.pending = { ...p, card: ply.card, uci: ply.uci, san: ply.san };
     return true;
   }

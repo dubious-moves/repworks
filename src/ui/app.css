@@ -2643,6 +2643,34 @@ table.cards td {
   padding: 0 10px;
 }
 
+/* The ply limit set (Train.tsx's PlyLimitChip, PLAN.md §5.193): a quiet chip in the counters' row,
+   its ✕ taking the limit off. */
+.ply-limit-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  border: 1px solid var(--warn);
+  border-radius: 999px;
+  color: var(--warn);
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.ply-limit-chip button {
+  min-height: 30px;
+  padding: 0 8px;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font: inherit;
+}
+
+.ply-limit-chip .ply-limit-set {
+  padding-right: 2px;
+}
+
 /* The lines from the comments offered in review (CommentOffer.tsx, PLAN.md §5.98): a quiet chip in
    the counters' row, in the comment lines' blue, gold when one is important. Its card of small
    boards opens on a hover, a tap or the keyboard: under the row and as wide as it, over the panel,

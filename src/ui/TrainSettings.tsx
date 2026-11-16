@@ -15,7 +15,7 @@ import { saveTrainSettings } from '../app/trainSettings.ts';
 import { configureSession } from '../app/train.ts';
 import { DEFAULT_PACE, MAX_PACE_MS, PACE_NAMES, PACES, paceSettings, savePaceSettings, type Pace, type PaceSettings } from '../app/pace.ts';
 import { MIN_PACE_MS } from '../core/train/trainer.ts';
-import { saveTrainPrefs, trainPrefs, type LearnStart, type TrainPrefs } from '../app/trainPrefs.ts';
+import { MAX_PLY_LIMIT, plyLimitMove, saveTrainPrefs, trainPrefs, type LearnStart, type TrainPrefs } from '../app/trainPrefs.ts';
 import { FORECAST_DAYS, newMovesForecast } from '../core/train/newMoves.ts';
 import { DEFAULT_TRAIN, type TrainSettings } from '../core/train/settings.ts';
 import type { AutoPlay, CommentQuiz, LineStart } from '../core/train/trainer.ts';
@@ -80,6 +80,7 @@ function Dialog() {
   const [seqLength, setSeqLength] = useState(String(prefs.sequenceLength));
   const [repetitions, setRepetitions] = useState(String(prefs.repetitions));
   const [retries, setRetries] = useState(String(prefs.mistakeRetries));
+  const [plyLimit, setPlyLimit] = useState(prefs.plyLimit > 0 ? String(prefs.plyLimit) : '');
   const [pace, setPace] = useState<Pace>(paceSettings.peek().pace);
   const [customMs, setCustomMs] = useState(String(paceSettings.peek().customMs));
   const [lineEndMs, setLineEndMs] = useState(String(paceSettings.peek().lineEndMs ?? ''));
@@ -121,6 +122,8 @@ function Dialog() {
     if (!(Number.isInteger(reps) && reps >= 1 && reps <= 5)) return setError('Repetitions: a whole number from 1 to 5.');
     const mistakeRetries = Number(retries);
     if (!(Number.isInteger(mistakeRetries) && mistakeRetries >= 0 && mistakeRetries <= 5)) return setError('Mistakes retried: a whole number from 0 to 5.');
+    const limit = plyLimit.trim() === '' ? 0 : Number(plyLimit);
+    if (!(Number.isInteger(limit) && limit >= 0 && limit <= MAX_PLY_LIMIT)) return setError(`Ply limit: empty for none, or a whole number from 1 to ${MAX_PLY_LIMIT}.`);
     const range = `from ${MIN_PACE_MS} to ${MAX_PACE_MS} milliseconds`;
     const wholeMs = (text: string) => (/^\d+$/.test(text.trim()) && Number(text) >= MIN_PACE_MS && Number(text) <= MAX_PACE_MS ? Number(text) : undefined);
     const custom = wholeMs(customMs);
@@ -131,7 +134,7 @@ function Dialog() {
     if (lookMs.trim() !== '' && look === undefined) return setError(`Pause to look at a position: empty, or a whole number of milliseconds, ${range}.`);
     const done = await saveTrainSettings(values);
     if (!done.ok) return setError(done.error);
-    saveTrainPrefs({ ...(prefs.newMoves === 'sequence' ? { ...prefs, sequenceLength } : prefs), repetitions: reps, mistakeRetries });
+    saveTrainPrefs({ ...(prefs.newMoves === 'sequence' ? { ...prefs, sequenceLength } : prefs), repetitions: reps, mistakeRetries, plyLimit: limit });
     const next: PaceSettings = { pace, customMs: custom ?? paceSettings.peek().customMs };
     if (lineEnd !== undefined) next.lineEndMs = lineEnd;
     if (look !== undefined) next.lookMs = look;
@@ -192,6 +195,14 @@ function Dialog() {
           Mistakes retried <span class="muted">(asked again when the line ends, until right this many times in a row, 0–5; 0: not)</span>
           <input type="number" name="mistake-retries" min={0} max={5} step={1} inputMode="numeric" value={retries} onInput={(e) => setRetries(e.currentTarget.value)} />
         </label>
+        <label>
+          Ply limit <span class="muted">(each line stops after this many moves from its start, White’s and Black’s counted apart; empty: none)</span>
+          <input type="number" name="ply-limit" min={1} max={MAX_PLY_LIMIT} step={1} inputMode="numeric" value={plyLimit} placeholder="None" onInput={(e) => setPlyLimit(e.currentTarget.value)} />
+        </label>
+        <p class="muted" data-testid="ply-limit-help">
+          {Number.isInteger(Number(plyLimit)) && Number(plyLimit) > 0 ? `Ply ${Number(plyLimit)}: ${plyLimitMove(Number(plyLimit))} (from move 1). ` : ''}
+          At the limit a line waits for “Continue”, on past it, or “Next line”. A line with nothing to ask before the limit is skipped, unless it starts from the start and auto-play asks a move before it. Moves past the limit stay due. For the day's queue, Learn and a line picked.
+        </p>
         <p class="muted">Auto-play: moves played for you; the others are asked, a move due or new whatever it says. With “answered right”, a move’s latest answer this session counts. Moves set to “always play this for me” are always played. A line starting from the start is played or asked from move 1 as auto-play says; at its first new or due move, the moves before it are skipped; where it branches from the last line, it starts after the last move the two share, played or asked from there as auto-play says (from move 1 for a chapter’s first line).</p>
         <fieldset>
           <legend>In the day's queue</legend>

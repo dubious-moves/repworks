@@ -16,7 +16,7 @@ import { DEFAULT_TRAIN } from '../../../src/core/train/settings.ts';
 import { dayOf, optionsFor, type SessionKind } from '../../../src/app/train.ts';
 import { decidingNow, offsetLabel, setTimeOffset, timeOffset } from '../../../src/app/time.ts';
 import { DEFAULT_PACE, moveMs, parsePace, pausesOf } from '../../../src/app/pace.ts';
-import { DEFAULT_PREFS, parsePrefs } from '../../../src/app/trainPrefs.ts';
+import { DEFAULT_PREFS, parsePrefs, plyLimitMove } from '../../../src/app/trainPrefs.ts';
 import { shiftedClock } from '../../../src/platform/browser.ts';
 import { asDevice, iso } from '../../support/reviewHistory.ts';
 
@@ -90,7 +90,7 @@ test('the pace: defaults, the old preset kept, each field checked, the custom sp
 test('the per-device settings: defaults, each field checked', () => {
   assert.deepEqual(parsePrefs(null), DEFAULT_PREFS);
   assert.deepEqual(parsePrefs('not json'), DEFAULT_PREFS);
-  const stored = { newMoves: 'sequence', sequenceLength: 8, lineEnd: 'go', startQueue: 'start', startLearn: 'first', autoPlayQueue: 'session', autoPlayLearn: 'off', repetitions: 3, mistakeRetries: 0, comments: 'important' };
+  const stored = { newMoves: 'sequence', sequenceLength: 8, lineEnd: 'go', startQueue: 'start', startLearn: 'first', autoPlayQueue: 'session', autoPlayLearn: 'off', repetitions: 3, mistakeRetries: 0, comments: 'important', plyLimit: 14 };
   assert.deepEqual(parsePrefs(JSON.stringify(stored)), stored);
   assert.deepEqual(parsePrefs(JSON.stringify({ autoPlayQueue: 'always', autoPlayLearn: 1, startQueue: 3, sequenceLength: 0, repetitions: 0, mistakeRetries: 1.5, comments: 'some' })), DEFAULT_PREFS);
   // Where a line branches from the last: the queue's only (§5.121).
@@ -111,7 +111,7 @@ test('the settings stored before §5.113: one auto-play for both; from the start
 
 test('each session kind runs with its settings: the queue starts as set for it, the queue and Learn wait or go on, retry and the views keep their walk', () => {
   const prefs = { ...DEFAULT_PREFS, newMoves: 'try' as const, startQueue: 'start' as const, autoPlayQueue: 'session' as const, autoPlayLearn: 'off' as const, repetitions: 3, mistakeRetries: 1 };
-  const common = { tryNew: true, sequence: 0, repetitions: 3, retryMistakes: 1 };
+  const common = { tryNew: true, sequence: 0, repetitions: 3, retryMistakes: 1, plyLimit: 0 };
   // The lines from the comments in review: the queue and a line picked (§5.98). Auto-play set apart
   // for the queue and for a line picked or learned (§5.113).
   assert.deepEqual(optionsFor({ kind: 'queue' }, prefs), { ...common, retryShown: true, autoPlay: 'session', lineStart: 'start', holdLineEnd: true, comments: 'all' });
@@ -126,4 +126,15 @@ test('each session kind runs with its settings: the queue starts as set for it, 
   assert.equal(sequence.sequence, 3);
   const kinds: SessionKind[] = [{ kind: 'retry' }, { kind: 'drill' }, { kind: 'pinned', all: true }, { kind: 'play', sid: 's', cid: 'c', at: [] }];
   for (const kind of kinds) assert.deepEqual(optionsFor(kind, prefs), {});
+});
+
+test('the ply limit (§5.193): stored per device, off by default, out of range is off; given to the walking sessions only', () => {
+  assert.equal(DEFAULT_PREFS.plyLimit, 0);
+  assert.equal(parsePrefs(JSON.stringify({ plyLimit: 16 })).plyLimit, 16);
+  for (const bad of [-1, 1.5, 'x', 999]) assert.equal(parsePrefs(JSON.stringify({ plyLimit: bad })).plyLimit, 0);
+  const prefs = { ...DEFAULT_PREFS, plyLimit: 12 };
+  const kinds: SessionKind[] = [{ kind: 'queue' }, { kind: 'show' }, { kind: 'difficult' }, { kind: 'line', sid: 's', cid: 'c', at: [] }, { kind: 'learn', sid: 's', cid: 'c' }];
+  for (const k of kinds) assert.equal(optionsFor(k, prefs).plyLimit, 12, k.kind);
+  for (const k of [{ kind: 'retry' }, { kind: 'drill' }, { kind: 'play', sid: 's', cid: 'c', at: [] }] as SessionKind[]) assert.equal(optionsFor(k, prefs).plyLimit, undefined, k.kind);
+  assert.deepEqual([1, 2, 16, 21, 22, 23].map(plyLimitMove), ['after White’s 1st move', 'after Black’s 1st move', 'after Black’s 8th move', 'after White’s 11th move', 'after Black’s 11th move', 'after White’s 12th move']);
 });

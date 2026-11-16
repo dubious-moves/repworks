@@ -24,15 +24,27 @@ export interface TrainPrefs {
   mistakeRetries: number;
   /** In review, the lines from the comments quizzed at a line's end (the owner's request, 2026-10-12). */
   comments: CommentQuiz;
+  /** A ply limit for training (§5.193): each line stops after this many moves from its chapter's start; 0: none. */
+  plyLimit: number;
 }
 
 /** Where a line picked or learned can start: where it branches is only for the day's queue (§5.121). */
 export type LearnStart = Exclude<LineStart, 'branch'>;
 const LEARN_STARTS: readonly LearnStart[] = ['first', 'start'];
 
-export const DEFAULT_PREFS: TrainPrefs = { newMoves: 'show', sequenceLength: 5, lineEnd: 'wait', startQueue: 'first', startLearn: 'start', autoPlayQueue: 'due', autoPlayLearn: 'off', repetitions: 2, mistakeRetries: 2, comments: 'all' };
+export const DEFAULT_PREFS: TrainPrefs = { newMoves: 'show', sequenceLength: 5, lineEnd: 'wait', startQueue: 'first', startLearn: 'start', autoPlayQueue: 'due', autoPlayLearn: 'off', repetitions: 2, mistakeRetries: 2, comments: 'all', plyLimit: 0 };
 
 const KEY = 'repworks.trainPrefs';
+
+/** The highest ply limit that can be set (§5.193). */
+export const MAX_PLY_LIMIT = 200;
+
+/** A ply limit as the move it stops after, from move 1 with White to move: 16 is "after Black's 8th move". */
+export function plyLimitMove(ply: number): string {
+  const move = Math.ceil(ply / 2);
+  const suffix = move % 100 >= 11 && move % 100 <= 13 ? 'th' : (['th', 'st', 'nd', 'rd'][move % 10] ?? 'th');
+  return `after ${ply % 2 ? 'White' : 'Black'}’s ${move}${suffix} move`;
+}
 
 /**
  * The stored settings, each field checked: an unknown value is the default. Settings stored before
@@ -61,6 +73,7 @@ export function parsePrefs(raw: string | null): TrainPrefs {
     repetitions: whole(v.repetitions, 1, 5, DEFAULT_PREFS.repetitions),
     mistakeRetries: whole(v.mistakeRetries, 0, 5, DEFAULT_PREFS.mistakeRetries),
     comments: pick(v.comments, COMMENT_QUIZZES, DEFAULT_PREFS.comments),
+    plyLimit: whole(v.plyLimit, 0, MAX_PLY_LIMIT, DEFAULT_PREFS.plyLimit),
   };
 }
 

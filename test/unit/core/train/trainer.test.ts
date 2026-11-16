@@ -12,7 +12,7 @@ import { newCard, State } from '../../../../src/core/progress/fsrs.ts';
 import type { CardState } from '../../../../src/core/progress/replay.ts';
 import { parseChapterFile } from '../../../../src/core/pgn/parse.ts';
 import { indexStudies, type Line, type RepertoireIndex } from '../../../../src/core/repertoire/index.ts';
-import { interactivePlan, planSession, type PlannedLine, type SessionPlan } from '../../../../src/core/train/plan.ts';
+import { interactivePlan, pastLimit, planSession, type PlannedLine, type SessionPlan } from '../../../../src/core/train/plan.ts';
 import { statusOf, todaysQueue, type Day } from '../../../../src/core/train/queue.ts';
 import { DEFAULT_TRAIN } from '../../../../src/core/train/settings.ts';
 import { quizLinesOf } from '../../../../src/core/train/commentQuiz.ts';
@@ -1263,4 +1263,74 @@ test('comment lines: "Quiz now" at the line\'s end plays the one picked; "Quiz l
   });
   assert.deepEqual(ends, [2, 1]);
   assert.deepEqual(plays(effects).slice(6), ['opponent:Nc3', 'user:Nc6', 'opponent:g3', 'user:g6', 'opponent:c3', 'user:Nf6', 'opponent:e5', 'user:Nd5']);
+});
+
+// The ply limit (§5.193): a walk stops after the line's first `plyLimit` moves.
+const limitWorld = () => {
+  const w = world(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 Nc6 3. Bb5 (3. Bc4 Bc5 4. c3) 3... a6 4. Ba4'));
+  const states = new Map<string, CardState>([...w.ix.cards.keys()].map((c) => [c, notDue]));
+  // Due: Nf3 before the limit, Ba4 past it on the first line, Bc4 past it on the second (its fork).
+  for (const c of [card('e4 e5 Nf3'), card('e4 e5 Nf3 Nc6 Bb5 a6 Ba4'), card('e4 e5 Nf3 Nc6 Bc4')]) states.set(c, dueNow);
+  return { w, states };
+};
+
+test('a ply limit stops the walk, waits there, and skips a line whose moves to ask all lie past it', () => {
+  const { w, states } = limitWorld();
+  const ends: TrainerView[] = [];
+  const t = trainer(w, planOf(w, states), states, { lineStart: 'first', holdLineEnd: true, plyLimit: 4 });
+  const { effects, records } = run(t, right, day.now, [], (v) => (ends.push(v), undefined));
+  // At its first due move: the board starts after 1. e4, for the opponent's move.
+  assert.deepEqual(plays(effects), ['opponent:e5', 'user:Nf3', 'opponent:Nc6']);
+  assert.deepEqual(records.map((r) => r.k === 'review' && r.card), [card('e4 e5 Nf3')]);
+  // The only line walked stopped at the limit: it waited for "Continue" or "Finish", with no line after it.
+  assert.equal(ends.length, 1);
+  assert.deepEqual(ends[0]!.limit, { ply: 4, past: 3 });
+  assert.equal(ends[0]!.upcoming, undefined);
+  assert.equal(effects.filter((e) => e.type === 'line').length, 1);
+});
+
+test('Continue at the ply limit walks the line on to its end, asking what lies past it', () => {
+  const { w, states } = limitWorld();
+  const t = trainer(w, planOf(w, states), states, { lineStart: 'first', holdLineEnd: true, plyLimit: 4 });
+  const { effects, records } = run(t, right, day.now, [], (v) => (v.limit ? { type: 'continue', now: 0 } : undefined));
+  assert.deepEqual(plays(effects), ['opponent:e5', 'user:Nf3', 'opponent:Nc6', 'auto:Bb5', 'opponent:a6', 'user:Ba4']);
+  assert.deepEqual(records.map((r) => r.k === 'review' && r.card), [card('e4 e5 Nf3'), card('e4 e5 Nf3 Nc6 Bb5 a6 Ba4')]);
+  // Continued past the limit, the line ended for good; the next line, whose fork is past the limit, is still skipped.
+  assert.equal(effects.filter((e) => e.type === 'line').length, 1);
+});
+
+test('from the start with auto-play off, a line forking past the ply limit is walked up to it, its own moves asked', () => {
+  const { w, states } = limitWorld();
+  const lines: string[] = [];
+  const t = trainer(w, planOf(w, states), states, { lineStart: 'start', autoPlay: 'off', holdLineEnd: true, plyLimit: 4 });
+  const { effects } = run(t, right, day.now, [], (v) => (lines.push(v.line!.line.path.join(' ')), undefined));
+  assert.deepEqual(plays(effects), ['user:e4', 'opponent:e5', 'user:Nf3', 'opponent:Nc6', 'user:e4', 'opponent:e5', 'user:Nf3', 'opponent:Nc6']);
+  assert.equal(lines.length, 2);
+  // With auto-play playing what isn't due, nothing before the limit is asked on the second line: skipped.
+  const due = trainer(w, planOf(w, states), states, { lineStart: 'start', autoPlay: 'due', holdLineEnd: true, plyLimit: 4 });
+  assert.equal(run(due, right).effects.filter((e) => e.type === 'line').length, 1);
+});
+
+test('going on at a line end, a stop at the ply limit with a line after it pauses and goes on; the last one waits', () => {
+  const w = world(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 (2. Bc4 Bc5 3. c3) 2... Nc6 3. Bb5'));
+  const states = new Map<string, CardState>([...w.ix.cards.keys()].map((c) => [c, notDue]));
+  for (const c of [card('e4 e5 Nf3'), card('e4 e5 Nf3 Nc6 Bb5'), card('e4 e5 Bc4'), card('e4 e5 Bc4 Bc5 c3')]) states.set(c, dueNow);
+  const presses: TrainerView[] = [];
+  const t = trainer(w, planOf(w, states), states, { lineStart: 'first', plyLimit: 4 });
+  const { effects, records } = run(t, right, day.now, [], (v) => (presses.push(v), undefined));
+  assert.equal(effects.filter((e) => e.type === 'line').length, 2);
+  // Only the moves before the limit are asked: Bb5 and c3 stay due.
+  assert.deepEqual(new Set(records.map((r) => r.k === 'review' && r.card)), new Set([card('e4 e5 Nf3'), card('e4 e5 Bc4')]));
+  assert.equal(presses.length, 1);
+  assert.deepEqual(presses[0]!.limit, { ply: 4, past: 1 });
+  assert.equal(presses[0]!.upcoming, undefined);
+});
+
+test('the asks past the ply limit are counted, less those answered; none without a limit', () => {
+  const { w, states } = limitWorld();
+  const plan = planOf(w, states);
+  assert.equal(pastLimit(plan, new Set(), 4), 2);
+  assert.equal(pastLimit(plan, new Set([card('e4 e5 Nf3 Nc6 Bc4')]), 4), 1);
+  assert.equal(pastLimit(plan, new Set(), 2), 3);
+  assert.equal(pastLimit(plan, new Set(), 0), 0);
 });
