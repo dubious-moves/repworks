@@ -1953,3 +1953,11 @@ does. Start with the spike: its log decides what the later parts change (CHESSNU
 - **Checked**: unit tests, Playwright (desktop, emulated phone) with a fake tablebase, and a real
   answer's layout in headless Chromium; **not** on a device.
 
+
+### Show and grade's lines mode at a line's end (PLAN.md §5.198, 2026-11-16)
+- In show and grade, at the end of a line whose last move has a comment with clickable lines:
+  press 4 (or the ring's previous) once: the feedback line says to press it again. Again: the
+  comment's first move is on the board. 2 and 4 (next and previous) step through every clickable
+  move of all the comments; past the last, the board is back at the line's end, and 2 goes on.
+- With "go on by itself" at a line's end: does the next line wait while you step?
+- **Checked**: unit tests and Playwright (desktop, emulated phone) by keys; **not** with the ring.

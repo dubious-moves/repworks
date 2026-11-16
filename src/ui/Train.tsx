@@ -17,7 +17,8 @@ import { beginTraining } from '../app/state.ts';
 import { dataVersion } from '../app/sync.ts';
 import { decidingNow, timeOffset } from '../app/time.ts';
 import { goOnMs, moveMs, PACE_NAMES, paceSettings } from '../app/pace.ts';
-import { analyseSession, command, configureSession, leaveSession, resumeSession, seekSequence, isGraded, leaveForStudy, pinMissed, playMove, press, queueOf, quizComments, readLine, readingAt, session, sessionProblem, setPace, setSelfGrade, setSpeech, speech, trainData, undoSuspend, type SessionKind, type SessionView, type TrainData } from '../app/train.ts';
+import { analyseSession, command, configureSession, leaveSession, linesMode, quizzedLater, resumeSession, seekSequence, isGraded, leaveForStudy, pinMissed, playMove, press, queueOf, quizComments, readLine, readingAt, session, sessionProblem, setPace, setSelfGrade, setSpeech, speech, trainData, undoSuspend, type SessionKind, type SessionView, type TrainData } from '../app/train.ts';
+import { pressKey } from '../app/trainLines.ts';
 import { plyLimitMove, saveTrainPrefs, trainPrefs } from '../app/trainPrefs.ts';
 import type { Line, RepertoireIndex } from '../core/repertoire/index.ts';
 import type { Mode } from '../core/app/fsm.ts';
@@ -41,8 +42,6 @@ import { LineReader } from './Read.tsx';
 import { phone } from './phone.ts';
 import { FloatingMenu } from './MoveMenu.tsx';
 import { asideLastMove, CommentOffer } from './CommentOffer.tsx';
-import { positionKeyOf } from '../core/chess/positionKey.ts';
-import type { PlayedLine } from '../core/repertoire/lines.ts';
 
 const ASKING = new Set(['ask', 'teach', 'wrong', 'shown']);
 /** On the Chessnut Move, a sequence stepped through (← →): only the move stopped on this long is driven (ms). */
@@ -175,7 +174,7 @@ export function TrainScreen(props: { of: SessionKind }) {
       }
       if (!runningNow.current) return;
       if (e.key === 'Escape') command('stop');
-      else if (showing && !e.repeat && pressOf(e.key)) press(pressOf(e.key)!);
+      else if (showing && !e.repeat && pressOf(e.key)) pressKey(pressOf(e.key)!);
       // "1" switches a session to show and grade, as in Chessable (§5.16).
       else if (!showing && !e.repeat && e.key === '1') setSelfGrade(true);
       else if (!showing && e.key === ' ' && !(target && target.tagName === 'BUTTON')) command('hint');
@@ -191,7 +190,7 @@ export function TrainScreen(props: { of: SessionKind }) {
   // The ring's buttons, when they arrive as media keys rather than key events (§5.9).
   useEffect(() => {
     if (!showing) return;
-    const keys = holdMediaKeys({ onNext: () => press('next'), onPrevious: () => press('wrong') });
+    const keys = holdMediaKeys({ onNext: () => pressKey('next'), onPrevious: () => pressKey('wrong') });
     return () => keys.stop();
   }, [showing]);
 
@@ -454,6 +453,9 @@ function Session(props: { s: SessionView }) {
   };
 
   const shownLine = previewBoard('train');
+  // Show and grade's lines mode at a line's end (§5.198).
+  const lines = linesMode.value;
+  const stepping = show && lines === 'on' && !s.done && s.phase === 'lineDone';
   const arrow = s.arrow && !shownLine ? parseUci(s.arrow) : undefined;
   const sq = (n: number) => `${'abcdefgh'[n & 7]}${(n >> 3) + 1}` as SquareName;
   const node = s.chapter ? nodeAt(s.chapter, s.path) : undefined;
@@ -494,13 +496,7 @@ function Session(props: { s: SessionView }) {
   // Not while a line from the comments is on the board: the comment there writes its moves.
   const comments = s.aside ? [] : s.done || COMMENTS_SHOWN.has(s.phase) ? (node?.comments ?? []) : [];
   // A line of a comment shown that is still to be quizzed is left out of its text (§5.98).
-  const toQuiz = (s.comments ?? []).filter((c) => c.on && !c.done).map((c) => c.line);
-  const quizzedLater = (l: PlayedLine) => {
-    const start = l.positions[0];
-    if (!start || !toQuiz.length) return false;
-    const key = positionKeyOf(start);
-    return toQuiz.some((q) => q.key.startsWith(`${key}|`) && q.ucis.every((u, i) => l.ucis[i] === u));
-  };
+  const quizzed = quizzedLater(s);
   const start = s.chapter ? startPosition(s.chapter) : undefined;
   const moves = start ? numbered(start, s.path) : s.path.join(' ');
   const aside = s.aside;
@@ -561,7 +557,7 @@ function Session(props: { s: SessionView }) {
         {/* One line, always its height, so the board never moves (§5.17). */}
         <div class="train-feedback-row">
         <p class={`feedback train-feedback note-${holding ? 'next' : (s.note?.kind ?? 'none')}${s.note?.kind === 'aside' && s.note.important ? ' important' : ''}${s.retry && !holding ? ' retrying' : ''}`} role="status">
-          {s.done ? '' : holding ? `${limit ? `Ply limit: ${limit.past} more move${limit.past === 1 ? '' : 's'} in this line` : 'Line done'}${upcoming ? ` · Next: ${upcoming}` : ''}` : s.alts ? (s.alts.length ? `Alternatives: ${s.alts.map((m) => m.san).join(', ')}` : 'No alternatives saved here') : noteText(s.note, show && !!s.retry)}
+          {s.done ? '' : stepping ? 'The comments’ lines: 2 the next move, 4 the one before; on from the last, back to the line’s end' : holding ? `${lines === 'armed' && show ? '4 again: step through the comments’ lines by 2 and 4 · ' : ''}${limit ? `Ply limit: ${limit.past} more move${limit.past === 1 ? '' : 's'} in this line` : 'Line done'}${upcoming ? ` · Next: ${upcoming}` : ''}` : s.alts ? (s.alts.length ? `Alternatives: ${s.alts.map((m) => m.san).join(', ')}` : 'No alternatives saved here') : noteText(s.note, show && !!s.retry)}
         </p>
         {/* On a phone the panel's buttons are below the fold: a misclick is taken back beside the note. */}
         {!s.done && s.wrongMove && !show && (
@@ -625,11 +621,11 @@ function Session(props: { s: SessionView }) {
           {s.sequence && <SequenceControls s={s} seq={s.sequence} />}
           {show ? (
             <>
-              <button type="button" class="press press-next" onClick={() => press('next')}>
-                {s.phase === 'shown' ? 'Knew it' : 'Show'} <span class="muted">(2)</span>
+              <button type="button" class="press press-next" onClick={() => pressKey('next')}>
+                {stepping ? 'Next move' : s.phase === 'shown' ? 'Knew it' : 'Show'} <span class="muted">(2)</span>
               </button>
-              <button type="button" class="press press-wrong" onClick={() => press('wrong')}>
-                Missed it <span class="muted">(4)</span>
+              <button type="button" class="press press-wrong" onClick={() => pressKey('wrong')} title={s.phase === 'lineDone' && !stepping ? 'Twice: step through the comments’ lines by 2 and 4' : undefined}>
+                {stepping ? 'Previous move' : 'Missed it'} <span class="muted">(4)</span>
               </button>
               <button type="button" class="secondary" disabled={!ASKING.has(s.phase)} onClick={() => press('alternatives')} title="The alternatives saved for this move, as blue arrows">
                 Alternatives <span class="muted">(Space)</span>
@@ -728,7 +724,7 @@ function Session(props: { s: SessionView }) {
           <div class="train-comments">
             {comments.map((c, i) => (
               <p key={i}>
-                <CommentText text={c} owner="train" id={commentId(s.path.join(' '), c)} positions={commentPositions} hidden={quizzedLater} />
+                <CommentText text={c} owner="train" id={commentId(s.path.join(' '), c)} positions={commentPositions} hidden={quizzed} />
               </p>
             ))}
           </div>

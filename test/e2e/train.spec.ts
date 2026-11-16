@@ -513,3 +513,56 @@ test('a line’s comments: folded list at the start, hidden while asked, shown a
   await expect(bar).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Session done' })).toBeVisible();
 });
+
+test('show and grade’s lines mode (§5.198): at a line’s end 4 twice steps through every clickable move of the comments by 2 and 4, then 2 goes on', async ({ page }) => {
+  await walkOnce(page);
+  await setUp(page);
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf?at=e4`);
+  await page.locator('.move[data-path="e4 c5 Nf3 d6"]').click({ position: { x: 6, y: 8 } });
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 d6');
+  // Lines that start with the user's own move: never quizzed, so all clickable.
+  await comment(page, 'Also (2... Nc6 3. d4) and (2... e6)');
+
+  await page.goto(`${site.url}#/show`);
+  const grid = page.locator('.train-grid');
+  // 2 until the first line's end.
+  await expect(async () => {
+    if ((await grid.getAttribute('data-phase')) !== 'lineDone') await page.keyboard.press('2');
+    await expect(grid).toHaveAttribute('data-phase', 'lineDone', { timeout: 500 });
+  }).toPass();
+  await expect(page.locator('.train-line')).toContainText('2. Nf3 d6');
+  const comments = page.locator('.train-comments');
+  await expect(comments).toContainText('Also');
+  const bar = page.getByRole('group', { name: 'Line from the comment' });
+  const current = comments.locator('.line-move.current');
+
+  // One 4 says what a second does; the second shows the first clickable move.
+  await page.keyboard.press('4');
+  await expect(feedback(page)).toHaveText(/^4 again: step through the comments’ lines/);
+  await expect(bar).toHaveCount(0);
+  await page.keyboard.press('4');
+  await expect(bar).toContainText('From the comment: Nc6');
+  await expect(current).toHaveText('Nc6');
+  await expect(page.getByRole('button', { name: 'Next move (2)' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Previous move (4)' })).toBeVisible();
+
+  // 2 on through the line and into the next one; 4 back; 4 at the first move stays.
+  await page.keyboard.press('2');
+  await expect(current).toHaveText('d4');
+  await page.keyboard.press('2');
+  await expect(current).toHaveText('e6');
+  await page.keyboard.press('4');
+  await expect(current).toHaveText('d4');
+  await page.keyboard.press('4');
+  await page.keyboard.press('4');
+  await expect(current).toHaveText('Nc6');
+  await expect(grid).toHaveAttribute('data-phase', 'lineDone');
+
+  // On from the last move: back to the line's end; the next 2 goes on to the next line.
+  for (let i = 0; i < 3; i++) await page.keyboard.press('2');
+  await expect(bar).toHaveCount(0);
+  await expect(grid).toHaveAttribute('data-phase', 'lineDone');
+  await expect(feedback(page)).toHaveText(/^Line done/);
+  await page.keyboard.press('2');
+  await expect(grid).not.toHaveAttribute('data-phase', 'lineDone');
+});

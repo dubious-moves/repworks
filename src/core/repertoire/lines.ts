@@ -273,3 +273,39 @@ export function switchLine(lines: readonly PlayedLine[], c: Cursor, dir: 1 | -1)
   for (let i = c.line + dir; i >= 0 && i < lines.length; i += dir) if (legal(lines[i]) > 0) return land(lines, { line: i, ply: 1 }, 1);
   return undefined;
 }
+
+/** The last move of the last line that has one legal move, if any (past passes, going back). */
+export function lastCursor(lines: readonly PlayedLine[]): Cursor | undefined {
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const n = legal(lines[i]);
+    const c = n > 0 ? land(lines, { line: i, ply: n }, -1) : undefined;
+    if (c) return c;
+  }
+  return undefined;
+}
+
+/** A move of one comment among several: the comment's index and the cursor in its lines. */
+export interface CommentsCursor {
+  comment: number;
+  cursor: Cursor;
+}
+
+/**
+ * One step through every comment's lines, one comment after another (PLAN.md §5.198): within a
+ * comment as `stepCursor` does, then on to the next comment's first move, or back to the previous
+ * one's last. From nowhere (`at` undefined), 1 is the first move of all. Undefined past either end:
+ * on from the last move, or back from the first.
+ */
+export function stepComments(comments: readonly (readonly PlayedLine[])[], at: CommentsCursor | undefined, dir: 1 | -1): CommentsCursor | undefined {
+  if (at) {
+    const lines = comments[at.comment];
+    const next = lines && stepCursor(lines, at.cursor, dir);
+    if (next && (next.line !== at.cursor.line || next.ply !== at.cursor.ply)) return { comment: at.comment, cursor: next };
+  } else if (dir === -1) return undefined;
+  const from = at ? at.comment + dir : 0;
+  for (let i = from; i >= 0 && i < comments.length; i += dir) {
+    const c = dir === 1 ? firstCursor(comments[i]!) : lastCursor(comments[i]!);
+    if (c) return { comment: i, cursor: c };
+  }
+  return undefined;
+}

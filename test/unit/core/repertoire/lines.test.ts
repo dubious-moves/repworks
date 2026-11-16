@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseChapterFile } from '../../../../src/core/pgn/parse.ts';
-import { cursorAt, firstCursor, lineStart, parseCommentLines, playedLines, playLine, stepCursor, switchLine } from '../../../../src/core/repertoire/lines.ts';
+import { cursorAt, firstCursor, lastCursor, lineStart, parseCommentLines, playedLines, playLine, stepComments, stepCursor, switchLine } from '../../../../src/core/repertoire/lines.ts';
 import { makeFen } from 'chessops/fen';
 import type { Chapter } from '../../../../src/core/study/model.ts';
 import { nodeAt, positionAt, startPosition } from '../../../../src/core/study/tree.ts';
@@ -304,4 +304,30 @@ test('lead-in words: placed by number and side alone, so a remark naming a move 
   assert.equal(lines[0]!.placed, true);
   assert.deepEqual(lines[0]!.sans, ['Nc6', 'Bb5', 'a6']);
   assert.equal(lines[1]!.placed, false);
+});
+
+test('show and grade’s lines mode walks every comment’s lines, one comment after another (§5.198)', () => {
+  const c = chapter('1. e4 c5 2. Nf3 { First (2... d6 3. d4) } { No moves here } { Second (2... Nc6) and (2... e6) }');
+  const path = ['e4', 'c5', 'Nf3'];
+  const node = nodeAt(c, path)!;
+  const all = node.comments.map((t) => playedLines(t, positionAt(c, path)!, positionAt(c, path.slice(0, -1))));
+  assert.deepEqual(lastCursor(all[2]!), { line: 1, ply: 1 });
+  assert.equal(lastCursor(all[1]!), undefined);
+  const walk = [stepComments(all, undefined, 1)!];
+  for (;;) {
+    const next = stepComments(all, walk.at(-1), 1);
+    if (!next) break;
+    walk.push(next);
+  }
+  assert.deepEqual(walk, [
+    { comment: 0, cursor: { line: 0, ply: 1 } },
+    { comment: 0, cursor: { line: 0, ply: 2 } },
+    { comment: 2, cursor: { line: 0, ply: 1 } },
+    { comment: 2, cursor: { line: 1, ply: 1 } },
+  ]);
+  // Back over the comment with no line to the first comment's last move, and nowhere before its first.
+  assert.deepEqual(stepComments(all, walk[2], -1), walk[1]);
+  assert.equal(stepComments(all, walk[0], -1), undefined);
+  assert.equal(stepComments(all, undefined, -1), undefined);
+  assert.equal(stepComments([[]], undefined, 1), undefined);
 });

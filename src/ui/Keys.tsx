@@ -33,6 +33,7 @@ const TRAINING: readonly Section[] = [
       ['4', 'Wrong (a headset’s previous)'],
       ['1', 'Repeat'],
       ['Space', 'The alternatives saved here'],
+      ['4 4', 'At a line’s end: step through the comments’ lines by 2 and 4'],
     ],
   },
   LINE_ON_BOARD,

@@ -11473,3 +11473,30 @@ outlines' widths 3% and 1.35% of the square; back to the usual leaves nothing on
 storage; §5.196's tick read as 110% and 2), every set's preview in a headless screenshot, and the
 built service worker listing the twelve sheets. **Not checked**: on the owner's devices
 (`TESTING.md` §4).
+
+#### 5.198 Show and grade's lines mode at a line's end (the owner's request, 2026-11-16, built)
+
+"During 'show and grade' in Repertoire train, on variation end, let's make a 'navigate clickable
+lines' mode where the user can go back and forth in all clickables with 2/4 or next/prev. It's
+fine if the user have to navigate til the end before they can continue to the next variation.
+They can enter it by pressing 4/previous twice."
+
+- **Where**: show and grade at a line's end (phase `lineDone`), when the last move's comments have
+  a clickable move. 4 there did nothing before; now the first 4 arms the mode (the feedback line
+  says "4 again: …"), the second puts the comments' first clickable move on the board, as a click
+  on it would (the preview bar, the move highlighted in the comment). A 2 while armed is the usual
+  "Next line". With no clickable move, 4 stays a no-op. The ring's media keys are the same presses.
+- **In it**: 2 the next clickable move, 4 the one before, through every comment of the move one
+  after another (within a comment as ← → step, §5.12: lines end to end, passes stepped over).
+  4 at the first move stays; 2 on from the last leaves the mode, the board back at the line's end,
+  and the next 2 goes on. The two buttons read "Next move (2)" and "Previous move (4)". A line
+  still to be quizzed (§5.98, shown as `(…)`) is skipped. Escape, the bar's Back or a click on the
+  board also leave it; "Next line" and Stop still work at any time.
+- **The session waits** while the mode is on, as while the line is read: with "go on by itself" at
+  a line's end (§5.17), the next line comes only once the mode is left.
+
+**As built**: `stepComments` and `lastCursor` in `src/core/repertoire/lines.ts`, the mode in
+`src/app/trainLines.ts` (apart from `train.ts`, which Node's tests load: the preview pulls in the
+editor), `linesMode` and the held tick in `train.ts`. **Checked**: a unit test of the walk, and
+Playwright (`train.spec.ts`, desktop and emulated phone) by keys. **Not checked**: the ring's
+buttons on the owner's phone (`TESTING.md`).

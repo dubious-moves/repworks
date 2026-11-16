@@ -17,6 +17,8 @@ import { combineIndex, indexChapter, type ChapterIndexing, type Line, type Reper
 import { header, type Chapter, type StudyKind } from '../core/study/model.ts';
 import { parseStudyMeta, reconcileChapterOrder } from '../core/study/studyMeta.ts';
 import { lineThrough, startPosition } from '../core/study/tree.ts';
+import type { PlayedLine } from '../core/repertoire/lines.ts';
+import { positionKeyOf } from '../core/chess/positionKey.ts';
 import { cardLine, drillLines, retryLines, todaysMistakes, type Mistake } from '../core/train/mistakes.ts';
 import { pinsOf, type PinState } from '../core/train/pins.ts';
 import { alternativesOf } from '../core/train/alternatives.ts';
@@ -471,7 +473,7 @@ let boardWait = 0;
  * set doesn't have): the session never waits on a board that needs the user.
  */
 function tickDue(id: number, waited = false): void {
-  if (readingAt.peek() !== undefined || away) {
+  if (readingAt.peek() !== undefined || away || linesMode.peek() === 'on') {
     held = id;
     return;
   }
@@ -621,6 +623,7 @@ export function endSession(): void {
   away = undefined;
   stopTimer();
   readingAt.value = undefined;
+  linesMode.value = undefined;
   trainer = undefined;
   shower = undefined;
   stopSpeaking();
@@ -642,6 +645,35 @@ export function press(p: Press): void {
   const t = trainer;
   if (!t || !shower) return;
   apply(t, shower.press(p, Date.now()));
+}
+
+/**
+ * Show and grade's lines mode at a line's end (§5.198, `trainLines.ts`): `armed` after one 4
+ * there, `on` while 2 and 4 step through the comments' lines. The session waits while it is on,
+ * as when the line is read.
+ */
+export const linesMode = signal<'armed' | 'on' | undefined>(undefined);
+
+/**
+ * A comment's line that is still to be quizzed (§5.98): left out of the comment's text, and out
+ * of the lines mode.
+ */
+export function quizzedLater(s: SessionView): (l: PlayedLine) => boolean {
+  const toQuiz = (s.comments ?? []).filter((c) => c.on && !c.done).map((c) => c.line);
+  return (l) => {
+    const start = l.positions[0];
+    if (!start || !toQuiz.length) return false;
+    const key = positionKeyOf(start);
+    return toQuiz.some((q) => q.key.startsWith(`${key}|`) && q.ucis.every((u, i) => l.ucis[i] === u));
+  };
+}
+
+/** The tick held while the lines mode was on, played now that it is left (§5.198). */
+export function releaseHeld(): void {
+  if (held === undefined || !trainer || linesMode.peek() === 'on') return;
+  const id = held;
+  held = undefined;
+  send({ type: 'tick', id, now: Date.now() });
 }
 
 /** Speech, per device: off by default (§5.2). */
