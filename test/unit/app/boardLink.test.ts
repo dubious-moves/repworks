@@ -18,6 +18,11 @@
 // - `parkedAt` never set by Reset the pieces: "Reset the pieces: the start driven, the screen's
 //   position waits …";
 // - `castleSaid` never set (part (d)): "a rook moved first when castling was legal: …".
+// Controls of 2026-11-16 (the scan of the build):
+// - `reached` answering false on `unmakeable` whatever position the link wants: "a position asked
+//   for after one the set couldn't make is waited on …";
+// - `unread` left empty by `checkPieces`: "Check the pieces: those under 20%, those with no battery
+//   reading …".
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { boardFenOf, LIGHT, squaresOf, type Battery, type Light, type PieceState, type Squares } from '../../../src/core/board/chessnut.ts';
@@ -406,6 +411,26 @@ test("a position the set can't make: unmakeable, the pieces named, never waited 
   assert.equal(await link.reached(three), false);
 });
 
+test("a position asked for after one the set couldn't make is waited on: the wait ends on its own setup", async () => {
+  // The storm asks `reached` as it deals the card, before the screen's board has handed the card's
+  // position over: the link's phase is still the last position's.
+  const { link, board } = setUp();
+  await link.connect();
+  const owner = {};
+  link.setMirror(owner, spec('QQQ1k3/8/8/8/8/8/8/4K3 w - - 0 1', { movable: false }));
+  assert.equal(phase(link), 'unmakeable');
+  let reached: boolean | undefined;
+  void link.reached(full(E4, 'b')).then((v) => (reached = v));
+  await flush();
+  assert.equal(reached, undefined);
+  link.setMirror(owner, spec(full(E4, 'b'), { movable: false }));
+  await flush();
+  assert.equal(reached, undefined);
+  board.arrive();
+  await flush();
+  assert.equal(reached, true);
+});
+
 test('a rook moved first when castling was legal: read as a rook move, "Castle with the king first" said once, until the next move read', async () => {
   const CASTLE = 'r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R';
   const RF1 = 'r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3KR2';
@@ -452,12 +477,13 @@ test('the lights off, or only the basic colours, as set', async () => {
   assert.deepEqual(board.lit.at(-1), new Array(64).fill(LIGHT.off));
 });
 
-test('Check the pieces: those under 20% and those off the board', async () => {
+test('Check the pieces: those under 20%, those with no battery reading and those off the board', async () => {
   const board = new FakeBoard();
   board.pieces_ = [
     { piece: 'P', x: 10, y: 10, battery: 12, onBoard: true },
     { piece: 'q', x: 0, y: 0, battery: 90, onBoard: false },
     { piece: 'K', x: 50, y: 10, battery: 70, onBoard: true },
+    { piece: 'n', x: 60, y: 200, battery: undefined, onBoard: true },
   ];
   const { link } = setUp({ board });
   await link.connect();
@@ -465,6 +491,10 @@ test('Check the pieces: those under 20% and those off the board', async () => {
   assert.deepEqual(
     c.low.map((p) => p.piece),
     ['P'],
+  );
+  assert.deepEqual(
+    c.unread.map((p) => p.piece),
+    ['n'],
   );
   assert.deepEqual(
     c.off.map((p) => p.piece),

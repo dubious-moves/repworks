@@ -54,6 +54,8 @@ export interface BoardLinkDeps {
 export const DRIVE_MS = 20_000;
 /** A move handed over and refused (the site's position unchanged) is put back after this (ms). */
 export const REFUSED_MS = 500;
+/** A drive sent over another, to the position the board last reported, is taken as arrived after this (ms). */
+export const QUIET_MS = 1500;
 /** The reconnects after a drop, from the drop (CHESSNUT.md §4.9). */
 export const RECONNECT_AFTER_MS = [1000, 2000, 4000, 8000, 16000] as const;
 const TICK_MS = 100;
@@ -76,9 +78,11 @@ export function connectError(e: unknown, brave: boolean): string | undefined {
   return `The board didn't answer: is Chessnut's app still connected to it? (${message})`;
 }
 
-/** The pieces worth naming: a low battery, or not on the board. */
+/** The pieces worth naming: a low battery, no battery reading, or not on the board. */
 export interface PieceCheck {
   low: PieceState[];
+  /** The board has no battery reading for these (a piece flat, or out of its reach). */
+  unread: PieceState[];
   off: PieceState[];
   all: PieceState[];
 }
@@ -153,7 +157,7 @@ export function createBoardLink(deps: BoardLinkDeps): BoardLink {
 
   function run(e: Event): void {
     const p = deps.prefs();
-    const [next, actions] = step(link, e, { settleMs: p.settleMs, putBackMs: p.putBackMs, driveMs: DRIVE_MS, refusedMs: REFUSED_MS });
+    const [next, actions] = step(link, e, { settleMs: p.settleMs, putBackMs: p.putBackMs, driveMs: DRIVE_MS, refusedMs: REFUSED_MS, quietMs: QUIET_MS });
     link = next;
     for (const a of actions) act(a);
     showState();
@@ -438,7 +442,7 @@ export function createBoardLink(deps: BoardLinkDeps): BoardLink {
   async function checkPieces(): Promise<PieceCheck | undefined> {
     const all = await board?.pieces();
     if (!all) return undefined;
-    return { all, low: all.filter((p) => p.battery < LOW_PIECE_BATTERY), off: all.filter((p) => !p.onBoard) };
+    return { all, low: all.filter((p) => p.battery !== undefined && p.battery < LOW_PIECE_BATTERY), unread: all.filter((p) => p.battery === undefined), off: all.filter((p) => !p.onBoard) };
   }
 
   function reached(fen: string): Promise<boolean> {
@@ -448,8 +452,12 @@ export function createBoardLink(deps: BoardLinkDeps): BoardLink {
           waiters.delete(check);
           resolve(v);
         };
-        if (status.peek().state !== 'on' || link.phase === 'unmakeable') return done(false);
-        if (link.phase === 'synced' && link.want?.fen === fen && !!link.seen && !!link.target && link.seen.every((c, s) => c === link.target![s])) done(true);
+        if (status.peek().state !== 'on') return done(false);
+        // Only once the link wants this position: before the screen's board has handed it over, the
+        // phase is still the last position's (one the pieces couldn't make must not end this wait).
+        if (link.want?.fen !== fen) return;
+        if (link.phase === 'unmakeable') return done(false);
+        if (link.phase === 'synced' && !!link.seen && !!link.target && link.seen.every((c, s) => c === link.target![s])) done(true);
       };
       waiters.add(check);
       check();

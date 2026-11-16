@@ -7,7 +7,8 @@
 //   "the start position, byte for byte", "the SDK example" and "stop and lights" fail (round
 //   trips still pass: the codec agrees with itself, not with the board);
 // - `wire` as the identity (a1 first on the wire): the same three fail;
-// - `readBattery`'s charging read from byte 4: "battery and pieces" fails.
+// - `readBattery`'s charging read from byte 4: "battery and pieces" fails;
+// - a piece's `ff` battery read as a number (2026-11-16, `Math.min(100, …)` alone): the same test.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ASK_BATTERY, boardFenOf, driveTo, LIGHT, lightsCommand, readBattery, readPieces, readReport, squaresOf, STOP_DRIVE } from '../../../../src/core/board/chessnut.ts';
@@ -71,6 +72,9 @@ test('battery and pieces', () => {
   const p = readPieces(b)!;
   assert.deepEqual(p[0], { piece: 'P', x: 10, y: 20, battery: 90, onBoard: true });
   assert.deepEqual(p[33], { piece: 'k', x: 0, y: 0, battery: 5, onBoard: false });
+  // `ff`: the board has no reading for the piece (the chessnut-move SDK), not a full battery.
+  b.set([7, 30, 40, 0xff], 3 + 17 * 4);
+  assert.deepEqual(readPieces(b)![17], { piece: 'p', x: 30, y: 40, battery: undefined, onBoard: true });
 });
 
 test('a board FEN that is not one is not read', () => {

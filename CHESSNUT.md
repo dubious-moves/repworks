@@ -3,7 +3,8 @@
 Status: planned 2026-11-06 at the owner's request; **built 2026-11-14**, parts (a) to (f), the whole
 plan, at the owner's word ("Go ahead and build it"), before the board arrives. What waits is §7's live
 checks and `TESTING.md` §14's entries, once the board is bought. What each
-part changed from this plan is in `PLAN.md` §5.153's "As built" notes. Everything here can be built
+part changed from this plan is in `PLAN.md` §5.153's "As built" notes; a scan of the whole build
+on 2026-11-16 fixed four details (its note there, and §4.4 and §2 below). Everything here can be built
 and tested before the board arrives (a simulated board in the tests), and part (a)'s spike page
 checks on the first day what only the real board can show. Read with
 `CLAUDE.md`, `PLAN.md` (§5.153 points here) and `DECISIONS.md` (its revision log of 2026-11-06).
@@ -114,7 +115,7 @@ h7 … a1, the first of each pair in the low nibble. With chessops's square numb
 | Stop a drive | `42 21` + 33 zeros | without response | |
 | Lights | `43 20` + 32 bytes, a colour code a square, same order: 34 bytes | without response | 0 off, 1 red, 2 green, 3 blue (README); 4 dark green, 5 bright green, 6 yellow, 7 orange (Chessnut's app only) |
 | Battery | `41 01 0c` → `41 03 0c <charging 0/1> <percent>` | with response | |
-| Pieces | `41 01 0b` → `41 89 0b` + 34 × (kind, x, y, battery %) | with response | kinds 1–6 White P R N B Q K, 7–12 Black; the order White's P×8 R×2 N×2 B×2 Q×2 K then Black's; x, y 0–255 over the board, both 0 when the piece isn't on it |
+| Pieces | `41 01 0b` → `41 89 0b` + 34 × (kind, x, y, battery %) | with response | kinds 1–6 White P R N B Q K, 7–12 Black; the order White's P×8 R×2 N×2 B×2 Q×2 K then Black's; x, y 0–255 over the board, both 0 when the piece isn't on it; a battery of `ff` is "no reading" (the SDK) |
 
 Two things the sources disagree on: Chessnut's README says the reports **stop** during a drive;
 Chessnut's app has a guard against "intermediate FENs while the motor is moving". The design
@@ -201,14 +202,15 @@ tick goes in; the next state and what to do come out. Its phases:
 | Phase | Meaning | Reports | On a tick |
 | --- | --- | --- | --- |
 | `idle` | no mirror | kept as the last seen | nothing |
-| `driving` | a position sent, not yet reported | compared with the position sent only; equal → `synced` | 20 s (`driveMs`) without it → `stuck` |
+| `driving` | a position sent, not yet reported | compared with the position sent only; equal → `synced` | 20 s (`driveMs`) without it → `stuck`; sent over another drive to the position last reported: 1.5 s (`quietMs`) with no other report → `synced` |
 | `synced` | the board showed the position | kept, with when it last changed | see below |
 | `stuck` | the drive didn't arrive | equal to the position → `synced` (fixed by hand, or the drive finished late) | nothing; the screen offers Send again |
 | `unmakeable` | the pieces can't make it (§4.8) | ignored | nothing; the screen plays on alone |
 
 In `synced`, when the board differs from the position wanted, on each tick:
 1. A move handed to the site that left its position unchanged after 500 ms (`refusedMs`; the
-   repertoire check refused it): **put back at once**.
+   repertoire check refused it): **put back at once**; if the hand has changed the board in that
+   half second, the board is read afresh instead (the move handed over is forgotten either way).
 2. Held under 600 ms: wait.
 3. If the user may move and the board shows one legal move's result: **hand the move over** (once
    for that report).
@@ -219,8 +221,10 @@ In `synced`, when the board differs from the position wanted, on each tick:
    elsewhere) are never put back: a hand still holds them. During the opponent's turn and while
    the site grades, every hand move falls here.
 
-Two guards make it safe: a report acted on is never acted on again (`actedOn`), and a drive's
-reports are only compared with its position, whether the board reports on the way or not.
+Three guards make it safe: a report acted on is never acted on again (`actedOn`); a drive's
+reports are only compared with its position, whether the board reports on the way or not; and a
+position wanted while a drive is under way is driven too, even when the board's last report shows
+it (the robot is on its way elsewhere, and its arrival there would read as a move by hand).
 
 ### 4.5 The port and the platform
 

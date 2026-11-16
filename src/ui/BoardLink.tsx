@@ -201,19 +201,20 @@ function PiecesAnswer(props: { pieces: PieceCheck | 'asking' | 'none' | undefine
   if (p === undefined) return null;
   if (p === 'asking') return <p class="muted">Asking the pieces…</p>;
   if (p === 'none') return <p class="warn">The board didn’t answer in 3 s.</p>;
-  const lowest = Math.min(...p.all.map((x) => x.battery));
+  const read = p.all.flatMap((x) => (x.battery === undefined ? [] : [x.battery]));
   return (
     <div data-testid="board-pieces">
       <p>
-        {p.all.length} pieces; the lowest battery {lowest}%.
+        {p.all.length} pieces{read.length ? `; the lowest battery ${Math.min(...read)}%` : ''}.
       </p>
       {p.low.length > 0 && (
         <p class="warn">
           Under {LOW_PIECE_BATTERY}%: {list(p.low.map((x) => `${pieceName(x.piece)} ${x.battery}%`))}. Put {p.low.length === 1 ? 'it' : 'them'} on the charging pad.
         </p>
       )}
+      {p.unread.length > 0 && <p class="warn">No battery reading: {list(p.unread.map((x) => pieceName(x.piece)))}. A flat piece reads so: try the charging pad.</p>}
       {p.off.length > 0 && <p>Not on the board: {list(p.off.map((x) => pieceName(x.piece)))}.</p>}
-      {p.low.length === 0 && p.off.length === 0 && <p class="muted">All charged and on the board.</p>}
+      {p.low.length === 0 && p.unread.length === 0 && p.off.length === 0 && <p class="muted">All charged and on the board.</p>}
     </div>
   );
 }

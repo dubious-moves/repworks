@@ -181,12 +181,13 @@ async function pieces(): Promise<void> {
   for (const h of ['Piece', 'On the board', 'x', 'y', 'Battery']) head.appendChild(document.createElement('th')).textContent = h;
   for (const x of p) {
     const row = table.insertRow();
-    for (const v of [x.piece, x.onBoard ? 'yes' : 'no', x.x, x.y, `${x.battery}%`]) row.insertCell().textContent = String(v);
+    for (const v of [x.piece, x.onBoard ? 'yes' : 'no', x.x, x.y, x.battery === undefined ? 'no reading' : `${x.battery}%`]) row.insertCell().textContent = String(v);
   }
-  const low = p.filter((x) => x.battery < 20).map((x) => `${x.piece} ${x.battery}%`);
+  const low = p.filter((x) => x.battery !== undefined && x.battery < 20).map((x) => `${x.piece} ${x.battery}%`);
+  const unread = p.filter((x) => x.battery === undefined).map((x) => x.piece);
   const off = p.filter((x) => !x.onBoard).map((x) => x.piece);
-  log(`pieces: ${p.length}; under 20%: ${low.join(', ') || 'none'}; not on the board: ${off.join('') || 'none'}`);
-  log(`pieces raw: ${p.map((x) => `${x.piece}(${x.x},${x.y},${x.battery})`).join(' ')}`);
+  log(`pieces: ${p.length}; under 20%: ${low.join(', ') || 'none'}; no battery reading: ${unread.join('') || 'none'}; not on the board: ${off.join('') || 'none'}`);
+  log(`pieces raw: ${p.map((x) => `${x.piece}(${x.x},${x.y},${x.battery ?? '?'})`).join(' ')}`);
 }
 
 async function setups(): Promise<void> {

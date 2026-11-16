@@ -108,10 +108,11 @@ export interface PieceState {
   /** 0–255 across the board; both 0 when it isn't on it. */
   x: number;
   y: number;
-  battery: number;
+  /** Its battery in percent; undefined when the board has no reading for it (it sends `ff`). */
+  battery: number | undefined;
   onBoard: boolean;
 }
-/** `41 89 0b` then 34 × (kind, x, y, battery). */
+/** `41 89 0b` then 34 × (kind, x, y, battery); a battery of `ff` is "no reading" (the chessnut-move SDK). */
 export function readPieces(bytes: Uint8Array): PieceState[] | undefined {
   if (bytes.length < 3 + 34 * 4 || bytes[0] !== 0x41 || bytes[2] !== 0x0b) return undefined;
   const KIND = ' PRNBQKprnbqk';
@@ -119,7 +120,8 @@ export function readPieces(bytes: Uint8Array): PieceState[] | undefined {
     const at = 3 + i * 4;
     const x = bytes[at + 1]!;
     const y = bytes[at + 2]!;
-    return { piece: KIND[bytes[at]!]?.trim() || PIECE_ORDER[i]!, x, y, battery: Math.min(100, bytes[at + 3]!), onBoard: x !== 0 || y !== 0 };
+    const battery = bytes[at + 3]!;
+    return { piece: KIND[bytes[at]!]?.trim() || PIECE_ORDER[i]!, x, y, battery: battery === 0xff ? undefined : Math.min(100, battery), onBoard: x !== 0 || y !== 0 };
   });
 }
 

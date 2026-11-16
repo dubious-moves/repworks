@@ -13,8 +13,13 @@ export interface LinkSettings {
   driveMs: number;
   /** A move handed to the site that leaves its position as it was (refused) is put back after this (ms). */
   refusedMs: number;
+  /**
+   * A drive sent over another, to the position the board last reported, is taken as arrived when no
+   * report has said otherwise for this long (ms): a board that hadn't left it has nothing to report.
+   */
+  quietMs: number;
 }
-export const LINK_DEFAULTS: LinkSettings = { settleMs: 600, putBackMs: 2000, driveMs: 20000, refusedMs: 500 };
+export const LINK_DEFAULTS: LinkSettings = { settleMs: 600, putBackMs: 2000, driveMs: 20000, refusedMs: 500, quietMs: 1500 };
 
 /** What the site shows on the board mirrored (one at a time). */
 export interface Want {
@@ -101,7 +106,12 @@ export function step(state: LinkState, e: Event, o: LinkSettings = LINK_DEFAULTS
         setPhase('unmakeable', missing);
         return [s, out];
       }
-      if (same(s.seen, target)) {
+      // A drive under way (or one that never arrived) is taking the pieces elsewhere, and the board
+      // may report nothing until it ends (Chessnut's README): its last report then says where they
+      // were, not where they are. The new position is driven too, even when that report shows it,
+      // or the robot's arrival at the earlier one would be read as a move by hand.
+      const driven = s.phase === 'driving' || s.phase === 'stuck';
+      if (same(s.seen, target) && !driven) {
         // The board shows it already: whatever was acted on before is gone from it.
         delete s.actedOn;
         setPhase('synced');
@@ -123,8 +133,10 @@ export function step(state: LinkState, e: Event, o: LinkSettings = LINK_DEFAULTS
     // A drive is done when the board shows its position; reports on the way are only watched. Once
     // it shows it, the report acted on before is history: the same move made again is new (a held
     // storm card's wrong move played again after the robot took it back).
+    // A move handed over is off the board again with it (taken back by hand before the site answered).
     if (same(s.seen, s.target)) {
       delete s.actedOn;
+      delete s.handed;
       if (s.phase === 'driving' || s.phase === 'stuck') setPhase('synced');
     }
     return [s, out];
@@ -133,16 +145,28 @@ export function step(state: LinkState, e: Event, o: LinkSettings = LINK_DEFAULTS
   // A tick.
   const now = e.now;
   if (s.phase === 'driving') {
-    if (s.sentAt !== undefined && now - s.sentAt >= o.driveMs) setPhase('stuck');
+    const since = s.sentAt === undefined ? 0 : now - s.sentAt;
+    if (same(s.seen, s.target)) {
+      // Sent over another drive, to the position the board last reported: nothing has said
+      // otherwise for `quietMs`, so the pieces are there (they may never have left).
+      if (since >= o.quietMs) {
+        delete s.actedOn;
+        setPhase('synced');
+      }
+    } else if (since >= o.driveMs) setPhase('stuck');
     return [s, out];
   }
   if (s.phase !== 'synced' || !s.want || !s.target || !s.seen || s.seenAt === undefined) return [s, out];
   if (same(s.seen, s.target)) return [s, out];
-  // A move handed over that the site turned down (its position unchanged): put back at once.
-  if (s.handed && now - s.handed.at >= o.refusedMs && same(s.seen, s.actedOn)) {
+  // A move handed over that the site turned down (its position unchanged): put back at once. If
+  // the hand has changed the board since, it is read afresh instead, as any position is: the move
+  // handed over is forgotten either way, so the board never waits on an answer that won't come.
+  if (s.handed && now - s.handed.at >= o.refusedMs) {
     delete s.handed;
-    drive(now);
-    return [s, out];
+    if (same(s.seen, s.actedOn)) {
+      drive(now);
+      return [s, out];
+    }
   }
   if (s.handed || same(s.seen, s.actedOn)) {
     // Acted on already: wait for the site, or for the hand to change something.

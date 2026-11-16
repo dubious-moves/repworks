@@ -12,19 +12,26 @@
 // - A third queen: a promotion by hand the set can't make; the panel says so and the game goes on
 //   on the screen.
 // - An endgame: its position driven, a move by hand played.
+// - A move on the screen taken back while the robot still carries it out, the board silent while
+//   it drives (as Chessnut's README has it): the start driven over the first drive, the move never
+//   played again by the robot's arrival, the board reading on (PLAN.md §5.153's scan, 2026-11-16).
 // The checklist's lead-up passes `mirror` as these do; a move off its prep is put back by the
 // link's refused-move rule (test/unit/app/boardLink.test.ts, test/unit/core/board/link.test.ts).
 //
 // Controls (each run once, 2026-11-14, and each failed the named tests):
 // - `mirror` not passed by PracticeBoard: every practice test;
 // - `boardPlayed` without the deviation's red: "as Black …";
-// - FEEDBACK_BRUSH's blunder as 'bandGood': "as White …".
+// - FEEDBACK_BRUSH's blunder as 'bandGood': "as White …";
+// - 2026-11-16: the link taking a position wanted during a drive as shown when the board's last
+//   report shows it (`!driven` gone from `link.ts`): "a move on the screen taken back while the
+//   robot still carries it out …" (the start never driven over the first drive).
 import { test, expect, type Page } from '@playwright/test';
 import { Chess } from 'chessops/chess';
 import { makeFen, parseFen } from 'chessops/fen';
 import { parseSan } from 'chessops/san';
 import { makeUci } from 'chessops/util';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
+import { clickSquare } from './board.ts';
 import { installFakeMove, type FakeMoveOptions } from './chessnut.ts';
 import { fakeEngine, SLOW } from './engine.ts';
 import { fakeExplorer, lichessLogin, serveExplorer, type FakeExplorer } from './explorer.ts';
@@ -193,6 +200,45 @@ test('as White on the board: the start driven, moves read by hand, the answers d
   await expect(game).toHaveAttribute('data-moves', '4');
   await expect.poll(async () => (await b.drives()).at(-1)).toBe(BEFORE_D4.board);
   await expect.poll(b.position).toBe(BEFORE_D4.board);
+});
+
+test('a move on the screen taken back while the robot still carries it out: brought home, never played again by itself', async ({ page }) => {
+  test.setTimeout(60_000);
+  // The board reports nothing while it drives, and takes 2.5 s a drive.
+  await setUp(page, { board: { driveMs: 2500, reportOnTheWay: false }, explorer: explorerAlong(GAME, 1) });
+  // The opponent's answer to 1.e4 comes late: Take back comes first.
+  const E4 = after(['e4']);
+  await page.route('https://explorer.lichess.org/**', async (route) => {
+    const fen = new URL(route.request().url()).searchParams.get('fen') ?? '';
+    if (route.request().method() !== 'OPTIONS' && fen.split(' ').slice(0, 4).join(' ') === E4.key) await new Promise((r) => setTimeout(r, 15_000));
+    await route.fallback();
+  });
+  const b = move(page);
+  await page.evaluate(() => (location.hash = '#/practice?fen=' + encodeURIComponent('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1')));
+  const game = page.locator('.practice-game');
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR';
+  // The board shows the start already: nothing driven.
+  expect(await b.drives()).toEqual([]);
+
+  // 1.e4 on the screen: driven; taken back before the robot is there.
+  await clickSquare(page, 'e2', 'white');
+  await clickSquare(page, 'e4', 'white');
+  await expect(game).toHaveAttribute('data-moves', '1');
+  await expect.poll(b.drives).toEqual([E4.board]);
+  await game.getByTestId('practice-takeback').click();
+  await expect(game).toHaveAttribute('data-moves', '0');
+  // The start driven over it, though the board's last report shows the start.
+  await expect.poll(b.drives).toEqual([E4.board, START]);
+  // Past the first drive's arrival and the window a move is read after: nothing played.
+  await page.waitForTimeout(4000);
+  await expect(game).toHaveAttribute('data-moves', '0');
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  expect(await b.position()).toBe(START);
+  await expect(page.getByTestId('board-chip').locator('.board-dot')).toHaveAttribute('data-dot', 'ok');
+  // The board reads on: 1.e4 by hand is played.
+  await b.hand(E4.board);
+  await expect(game).toHaveAttribute('data-moves', '1');
 });
 
 test('as Black on the board: turned to the user; a move off the repertoire put back, lit red and the study move said; the hint lit', async ({ page }) => {

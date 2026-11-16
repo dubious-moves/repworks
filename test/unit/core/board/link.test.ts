@@ -16,6 +16,16 @@
 //   then the site's new position 300 ms later".
 // - `actedOn` kept once the board shows the position again (part (e), 2026-11-14): "the same move
 //   made again after the robot set the position back is read again".
+// Controls of 2026-11-16 (the scan of the build; each run once, and each failed the named tests):
+// - a position wanted during a drive taken as shown when the last report shows it (`!driven` gone):
+//   "a position taken back on the screen while its drive is under way …", "a held card's move
+//   played again on the screen while the robot takes it back …" and "a drive sent over another …";
+// - `quietMs` never ending a drive (the tick's `same(s.seen, s.target)` branch gone): "a drive sent
+//   over another, to the position the board last showed: in step after 1.5 s with no report";
+// - a move handed over forgotten only when the board still shows it (`handed` cleared inside the
+//   `same(s.seen, s.actedOn)` test alone, and not by a report of the position wanted): "a move
+//   turned down, the hand at the board again within the half second …" and "a move handed over,
+//   taken back by hand before the site answers …".
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Squares } from '../../../../src/core/board/chessnut.ts';
@@ -170,7 +180,7 @@ test('the window respected exactly: 599 ms nothing, 600 ms read', () => {
   assert.deepEqual(at.actions, []);
   assert.deepEqual(kinds(run([{ t: 'tick', now: 1600 }], at.state).actions), ['move:e2e4']);
   // Another setting: 300 ms.
-  const quick = { settleMs: 300, putBackMs: 2000, driveMs: 20000, refusedMs: 500 };
+  const quick = { settleMs: 300, putBackMs: 2000, driveMs: 20000, refusedMs: 500, quietMs: 1500 };
   const [s1] = step(syncedAt(FEN0), { t: 'report', squares: sq(FEN1), now: 1000 }, quick);
   assert.deepEqual(step(s1, { t: 'tick', now: 1299 }, quick)[1], []);
   assert.deepEqual(kinds(step(s1, { t: 'tick', now: 1300 }, quick)[1]), ['move:e2e4']);
@@ -252,4 +262,111 @@ test('the same move made again after the robot set the position back is read aga
   ]);
   assert.deepEqual(kinds(actions), ['phase:synced', 'move:e2e4', 'drive', 'phase:driving', 'phase:synced', 'move:e2e4']);
   assert.equal(state.handed?.uci, 'e2e4');
+});
+
+test('a position taken back on the screen while its drive is under way is driven too: the robot arriving at the first is never read', () => {
+  // 1.e4 played on the screen is driven; Take back before the board has reported anything (it may
+  // report nothing while it drives): its last report still shows the start, but the robot is on
+  // its way to 1.e4, a legal move from the position wanted now.
+  const { state, actions } = run(
+    [
+      { t: 'want', want: { fen: FEN1, movable: false, turned: false }, now: 1000 },
+      { t: 'want', want: { fen: FEN0, movable: true, turned: false }, now: 1500 },
+      // The robot arrives where it was first sent, then goes back.
+      { t: 'report', squares: sq(FEN1), now: 3000 },
+      { t: 'tick', now: 3700 },
+      { t: 'tick', now: 5200 },
+      { t: 'report', squares: sq(FEN0), now: 6000 },
+      { t: 'tick', now: 6100 },
+    ],
+    syncedAt(FEN0),
+  );
+  assert.deepEqual(kinds(actions), ['drive', 'phase:driving', 'drive', 'phase:synced']);
+  assert.deepEqual(actions.filter((a) => a.t === 'drive')[1], { t: 'drive', squares: sq(FEN0) });
+  assert.equal(state.phase, 'synced');
+});
+
+test('a drive sent over another, to the position the board last showed: in step after 1.5 s with no report', () => {
+  // The same take-back, the second drive reaching the board before a piece had left its square:
+  // nothing changed, so the board has nothing to report.
+  const events: Event[] = [
+    { t: 'want', want: { fen: FEN1, movable: false, turned: false }, now: 1000 },
+    { t: 'want', want: { fen: FEN0, movable: true, turned: false }, now: 1100 },
+    { t: 'tick', now: 2500 },
+  ];
+  const waiting = run(events, syncedAt(FEN0));
+  assert.equal(waiting.state.phase, 'driving');
+  const { state, actions } = run([{ t: 'tick', now: 2600 }], waiting.state);
+  assert.deepEqual(kinds(actions), ['phase:synced']);
+  // The next move by hand is read as ever.
+  const next = run(
+    [
+      { t: 'report', squares: sq(FEN1), now: 4000 },
+      { t: 'tick', now: 4600 },
+    ],
+    state,
+  );
+  assert.deepEqual(kinds(next.actions), ['move:e2e4']);
+  // A drive that never arrives is still stuck after 20 s, not in step after 1.5 s.
+  const stuck = run([{ t: 'want', want: { fen: FEN2, movable: true, turned: false }, now: 100 }, { t: 'tick', now: 1700 }, { t: 'tick', now: 20100 }], syncedAt(FEN0));
+  assert.deepEqual(kinds(stuck.actions), ['drive', 'phase:driving', 'phase:stuck']);
+});
+
+test("a held card's move played again on the screen while the robot takes it back: its arrival isn't Try again", () => {
+  // The held card's move (1.e4) is on the board; Try again drives the card's position; before the
+  // board reports it the move is played again on the screen. The robot arriving at the card's
+  // position shows the take-back's position, which a hand would mean as Try again.
+  const { state, actions } = run(
+    [
+      { t: 'want', want: { fen: FEN0, movable: true, turned: false }, now: 1000 },
+      { t: 'want', want: { fen: FEN1, movable: false, turned: false, undoFen: FEN0 }, now: 1500 },
+      { t: 'report', squares: sq(FEN0), now: 3000 },
+      { t: 'tick', now: 3700 },
+      { t: 'report', squares: sq(FEN1), now: 5000 },
+    ],
+    syncedAt(FEN1),
+  );
+  assert.deepEqual(kinds(actions), ['drive', 'phase:driving', 'drive', 'phase:synced']);
+  assert.equal(state.phase, 'synced');
+});
+
+test('a move turned down, the hand at the board again within the half second: read afresh, never waited on', () => {
+  const LIFTED = 'rnbqkbnr/pppppppp/8/8/8/8/PPPP1PPP/RNBQKBNR w KQkq - 0 1';
+  const D4 = 'rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1';
+  const { state, actions } = run(
+    [
+      { t: 'report', squares: sq(FEN1), now: 1000 },
+      // Read and handed over; the site turns it down (its position stays).
+      { t: 'tick', now: 1600 },
+      // The pawn is in the hand again before the robot would have put it back.
+      { t: 'report', squares: sq(LIFTED), now: 1900 },
+      { t: 'tick', now: 2200 },
+      // Only lifted: never put back, however long.
+      { t: 'tick', now: 9000 },
+      // Put down as another move: read.
+      { t: 'report', squares: sq(D4), now: 9500 },
+      { t: 'tick', now: 10100 },
+    ],
+    syncedAt(FEN0),
+  );
+  assert.deepEqual(kinds(actions), ['move:e2e4', 'move:d2d4']);
+  assert.equal(state.handed?.uci, 'd2d4');
+});
+
+test('a move handed over, taken back by hand before the site answers: forgotten, the next move read', () => {
+  const D4 = 'rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1';
+  const { state, actions } = run(
+    [
+      { t: 'report', squares: sq(FEN1), now: 1000 },
+      { t: 'tick', now: 1600 },
+      // Back on its square 300 ms later: the board shows the position wanted.
+      { t: 'report', squares: sq(FEN0), now: 1900 },
+      { t: 'tick', now: 2200 },
+      { t: 'report', squares: sq(D4), now: 3000 },
+      { t: 'tick', now: 3600 },
+    ],
+    syncedAt(FEN0),
+  );
+  assert.deepEqual(kinds(actions), ['move:e2e4', 'move:d2d4']);
+  assert.equal(state.handed?.uci, 'd2d4');
 });

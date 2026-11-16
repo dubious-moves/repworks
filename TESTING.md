@@ -1804,6 +1804,18 @@ does. Start with the spike: its log decides what the later parts change (CHESSNU
   driven; the review stepped quickly driving only the row stopped on, the played move lit red and
   the best green; a retry by hand graded, lit and said). Nothing on a real board.
 
+### The Chessnut Move: a scan of the build (PLAN.md §5.153's last note, 2026-11-16)
+- With the board, in a practice game: play a move on the screen and press Take back while the
+  robot is still carrying it out: the robot should bring the piece home and the move must not be
+  played again by itself. Then play a move outside the repertoire by hand and pick the piece up
+  again at once (within a second): put it home and play another move: it should be read.
+- Check the pieces with a piece left off the charging pad until flat: it should be named under "No
+  battery reading" (or under 20%), never as charged.
+- **Checked**: unit tests, each fix's control run (the fix taken out, its tests failing); the
+  board's four Playwright specs on a desktop and an emulated phone with the simulated board, with
+  one more for the take-back (the simulated board silent while it drives). The bytes read again
+  against Chessnut's README and the chessnut-move SDK. Nothing on a real board.
+
 ### Lc0 vetoes a Maia-alone move (PLAN.md §5.176, 2026-11-14)
 - With Lc0 downloaded (the study page's engine bar), switch "Maia alone" on in the Endgames list and
   play a draw drill in a king and pawn ending ("Hold with the opposition", the breakthrough and the
