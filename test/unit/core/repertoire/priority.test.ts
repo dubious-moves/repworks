@@ -249,3 +249,21 @@ test('Maia fills in where the explorer is thin; each position is looked up once;
   const again = await rankLines(input(ix, startOf, explorer, { natural: true, maia }));
   assert.deepEqual(paths(again.lines), paths(r.lines));
 });
+
+test('Maia is asked at a thin position with the positions the line passed through before it (§5.190)', async () => {
+  const { ix, startOf } = setUp([chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 Nc6 3. Bb5 a6')]);
+  const asked: { fen: string; before: readonly string[] }[] = [];
+  const { explorer } = explorerOf({ '': { total: 5, moves: { e4: 1 } }, 'e4': { total: 5, moves: { e5: 1 } }, 'e4 e5 Nf3': { total: 5, moves: { Nc6: 1 } } });
+  const scored = await scoreLines({
+    ...input(ix, startOf, explorer),
+    maia: async (fen, before) => {
+      asked.push({ fen, before });
+      return undefined;
+    },
+  });
+  assert.ok(scored);
+  const at = (sans: string) => asked.find((a) => a.fen === fenAfter(sans));
+  assert.deepEqual(at('')?.before, [], 'the start has nothing before it');
+  assert.deepEqual(at('e4')?.before, [fenAfter('')]);
+  assert.deepEqual(at('e4 e5 Nf3')?.before, ['', 'e4', 'e4 e5'].map((m) => fenAfter(m)));
+});

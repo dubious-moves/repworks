@@ -31,7 +31,8 @@ import { MoveBoard, PracticeBoard, ResumeBanner } from './Practice.tsx';
 import { expectedCell, expectedTitle, explorerRows, openingNameAt, reaches } from '../core/games/openings.ts';
 import { keyFen } from '../core/chess/positionKey.ts';
 import { fenAfterUci, START_FEN, uciToSan } from '../core/storm/walk.ts';
-import { discardSaved, resumePractice, savedPractice } from '../app/practice.ts';
+import { beforeOf } from '../core/maia/history.ts';
+import { discardSaved, rememberLead, resumePractice, savedPractice } from '../app/practice.ts';
 import { useWakeLock } from './wakeLock.ts';
 import { commentId, endPreview, preview, stepPreview } from '../app/preview.ts';
 import { CommentText, endPreviewOnBoard, PreviewBar, previewBoard } from './CommentText.tsx';
@@ -487,7 +488,14 @@ function GameView(props: { id: string; ply?: number }) {
           })}
         </ul>
         <div class="actions">
-          <button type="button" onClick={() => open({ name: 'playOn', fen, side: g.color })}>
+          <button
+            type="button"
+            onClick={() => {
+              // The game's own moves before this position, which the 23M Maia reads (§5.190).
+              rememberLead(fen, played.plies.slice(0, ply).map((p) => p.fenBefore));
+              open({ name: 'playOn', fen, side: g.color });
+            }}
+          >
             Practise from here
           </button>
           <button
@@ -983,7 +991,17 @@ function GamesExplorer() {
                 Start
               </button>
               {at && (
-                <button type="button" class="secondary" onClick={() => open({ name: 'playOn', fen, side: f.color || positionOf(fen)!.turn })}>
+                <button
+                  type="button"
+                  class="secondary"
+                  onClick={() => {
+                    // The moves the explorer is at, from the start: what the 23M Maia reads before the position (§5.190).
+                    const line = [START_FEN];
+                    for (const u of moves) line.push(fenAfterUci(line[line.length - 1]!, u) ?? line[line.length - 1]!);
+                    rememberLead(fen, beforeOf(line));
+                    open({ name: 'playOn', fen, side: f.color || positionOf(fen)!.turn });
+                  }}
+                >
                   Practise from here
                 </button>
               )}

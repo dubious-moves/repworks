@@ -130,3 +130,24 @@ test('a detected tactic saved as an item, read back, and known as saved', async 
   assert.equal(tacticSaved([item], t), true);
   assert.equal(tacticSaved([{ ...item, fenBefore: moves[2]!.fenBefore }], t), false);
 });
+
+test('Maia\'s line is asked each position with the game\'s positions and the chain\'s before it (§5.190)', async () => {
+  let checked = 0;
+  for (const g of j.games) {
+    const moves = played(g);
+    for (const cand of tacticCandidates(moves, g.color)) {
+      const r = await buildChain(analyse, cand);
+      const asked: { fen: string; before: readonly string[] }[] = [];
+      const lead = ['lead-a', 'lead-b'];
+      await maiaLine(analyse, async (fen, before) => (asked.push({ fen, before: [...before] }), maia(fen)), cand.preFen, r.moves, undefined, lead);
+      for (const a of asked) {
+        // Before each ask: the lead, the position the line started from, then the plies played since, the last just before the asked one.
+        assert.deepEqual(a.before.slice(0, 3), [...lead, cand.preFen]);
+        assert.notEqual(a.before.at(-1), a.fen);
+        checked++;
+      }
+      if (asked.length > 1) assert.equal(asked[1]!.before.length, asked[0]!.before.length + 2, 'two plies later: the user\'s move and Maia\'s');
+    }
+  }
+  assert.ok(checked > 0);
+});

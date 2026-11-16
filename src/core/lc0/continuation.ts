@@ -9,6 +9,7 @@ import { makeFen } from 'chessops/fen';
 import { makeSanAndPlay } from 'chessops/san';
 import { parseUciMove, standardUci } from '../chess/uci.ts';
 import type { MaiaMove } from '../maia/encode.ts';
+import { beforeOf } from '../maia/history.ts';
 import type { SearchResult } from './search.ts';
 
 /** From this many games the database's shares alone pick the move; under it Maia is blended in. */
@@ -101,7 +102,8 @@ export interface ContinuationPorts {
   /** The database's games at a position, or an error's text. */
   db(fen: string): Promise<DbMoves | { error: string }>;
   /** Maia's policy at a position, or undefined when Maia can't answer. */
-  maia(fen: string): Promise<readonly MaiaMove[] | undefined>;
+  /** `before`: the positions that led to `fen`, oldest first (the 23M Maia reads them, §5.190). */
+  maia(fen: string, before: readonly string[]): Promise<readonly MaiaMove[] | undefined>;
 }
 
 export interface ContinuationOptions {
@@ -140,7 +142,7 @@ export async function modelContinuation(o: ContinuationOptions): Promise<Continu
       const db = await o.ports.db(fen);
       const dbMoves = 'error' in db ? undefined : db;
       // Maia only where it counts: under BLEND_GAMES games, or with no database answer.
-      const maia = dbWeight(dbMoves?.total ?? 0) < 1 ? await o.ports.maia(fen) : undefined;
+      const maia = dbWeight(dbMoves?.total ?? 0) < 1 ? await o.ports.maia(fen, beforeOf(line)) : undefined;
       const pick = opponentPick(pos, dbMoves, maia);
       if (!pick) return { plies, ended: 'no move' };
       ply = { uci: pick.uci, by: 'people', people: pick, ...('error' in db ? { dbError: db.error } : {}) };

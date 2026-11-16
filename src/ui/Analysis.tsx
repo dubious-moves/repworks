@@ -9,7 +9,9 @@ import { checkSequence, saveSequence, sourceMistake, type CheckResult } from '..
 import type { Chapter } from '../core/study/model.ts';
 import { goBack, mode, open } from '../app/mode.ts';
 import type { BackMode, Mode } from '../core/app/fsm.ts';
-import { positionAt, startPosition } from '../core/study/tree.ts';
+import { positionAt, positionsTo, startPosition } from '../core/study/tree.ts';
+import { beforeOf } from '../core/maia/history.ts';
+import { rememberLead } from '../app/practice.ts';
 import { loadOpenings, openingBook } from '../app/openings.ts';
 import { openingLabel, openingOfLine } from '../core/openings/names.ts';
 import { Back } from './Back.tsx';
@@ -131,7 +133,11 @@ export function AnalysisHead() {
         title="Play the game on from the move shown against the database, Maia and Stockfish, as the side the board is seen from"
         onClick={() => {
           const pos = c && positionAt(c, line);
-          if (pos) open({ name: 'playOn', fen: makeFen(pos.toSetup()), side: side.peek() });
+          if (pos && c) {
+            const fen = makeFen(pos.toSetup());
+            rememberLead(fen, beforeOf(positionsTo(c, line)));
+            open({ name: 'playOn', fen, side: side.peek() });
+          }
         }}
       >
         Practise

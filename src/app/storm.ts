@@ -38,6 +38,7 @@ import { puzzlePrefs, readyPuzzles } from './puzzles.ts';
 import { keptPolicy, likelyToSearch, missingRatings, type MaiaRating } from '../core/storm/maia.ts';
 import { cleanFocus, cleanLevelUp, easyAt, FOCUSES, LEVEL_DEFAULT, tooEasyAt, matchesFocus, positionTags, withLevelUp, type Focus, type LevelUp } from '../core/storm/kinds.ts';
 import { maiaElo, maiaPolicies, maiaStored } from './maia.ts';
+import { storedBefore } from '../core/storm/history.ts';
 import type { ReadyPuzzle } from '../core/puzzles/puzzles.ts';
 import { smallDevice } from './device.ts';
 import { boardLink, boardLinked } from './boardLink.ts';
@@ -611,7 +612,7 @@ export async function rateWithMaia(s: StormScopeData): Promise<void> {
     for (const p of todo) {
       if (busy()) return;
       const elos = missingRatings(p.maia, elo, levelElos());
-      const policies = await maiaPolicies(p.fen, elos);
+      const policies = await maiaPolicies(p.fen, elos, beforeStored(p));
       // Maia couldn't answer (stopped, or failed): tried again on the next visit.
       if (!policies) return;
       const fresh: MaiaRating[] = elos.map((e, i) => keptPolicy(e, policies[i]!));
@@ -1635,9 +1636,9 @@ export function showStormLine(kind: 'refutation' | 'after'): void {
  * The opponent's reply at `fen`: Maia's at the user's rating (`elo`), drawn at `replyPrecision`;
  * Stockfish's best when Maia's files aren't on this device or it hasn't answered in time.
  */
-async function opponentReply(fen: string, elo: number): Promise<{ uci: string; by: string } | undefined> {
+async function opponentReply(fen: string, elo: number, before: readonly string[]): Promise<{ uci: string; by: string } | undefined> {
   const policy = await Promise.race([
-    maiaPolicies(fen, [elo]).then(
+    maiaPolicies(fen, [elo], before).then(
       (r) => r?.[0] ?? null,
       () => null,
     ),
@@ -1669,7 +1670,8 @@ export async function continueCard(): Promise<void> {
   stormSession.value = { ...rest, practice: true, replying: true };
   setPhase('grading');
   const after = fenAfterUci(item.card.fen, uci)!;
-  const reply = await opponentReply(after, s.elo);
+  const lead = [...beforeStored(item.card), item.card.fen];
+  const reply = await opponentReply(after, s.elo, lead);
   const now = stormSession.value;
   if (!now || seq !== gradeSeq || now.item !== item) return;
   const { replying: _r, ...was } = now;
@@ -1681,7 +1683,7 @@ export async function continueCard(): Promise<void> {
   const c = continuedCard(item.card, uci, reply.uci, Date.now());
   if (c.kind === 'illegal') return back(`${reply.by}'s reply couldn't be played here.`);
   if (c.kind === 'over') return back(`${reply.by} would answer ${c.san}, and the game is over: ${c.mate ? 'checkmate' : 'a draw'}.`);
-  stormSession.value = { ...was, item: { card: c.card, attempts: 0, by: reply.by }, revealed: false };
+  stormSession.value = { ...was, item: { card: { ...c.card, lead: [...lead, after] }, attempts: 0, by: reply.by }, revealed: false };
   setPhase('solving');
   void lookAhead();
 }
@@ -1719,6 +1721,9 @@ export async function saveStormMistake(item: StormItem, rank: CardRank = 'normal
   await recordSaved(gameCard(m.item.pid), { ...m.item }, rank);
   return true;
 }
+
+/** The positions that led to a stored position, for the 23M Maia (§5.190): its line's, from the chapter. */
+const beforeStored = (p: StoredPosition): string[] => storedBefore(p, (sid, cid) => trainData.peek()?.chapters.get(`${sid}/${cid}`));
 
 const chapterOf = (p: StoredPosition): string | undefined => (p.lines[0] ? `${p.lines[0].sid}/${p.lines[0].cid}` : undefined);
 

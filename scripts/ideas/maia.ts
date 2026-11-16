@@ -8,16 +8,27 @@ import { join } from 'node:path';
 import type { Position } from 'chessops/chess';
 import { makeFen } from 'chessops/fen';
 import * as ort from 'onnxruntime-web';
-import { clampElo, expectedScore, maiaTokens, policyFrom, type MaiaMove } from '../../src/core/maia/encode.ts';
+import { clampElo, expectedScore, maiaHistoryTokens, maiaTokens, policyFrom, type MaiaMove } from '../../src/core/maia/encode.ts';
+import { MAIA_BEFORE } from '../../src/core/maia/history.ts';
 
 export const MAIA_FLOOR = 2000;
 
 let session: Promise<ort.InferenceSession> | undefined;
+/**
+ * The model: the Maia platform's (the position alone), or the official 23M one (`MAIA_MODEL=23m`, or
+ * `useModel('23m')`), which reads the positions before too: callers that know the line pass them
+ * (PLAN.md §5.190). Chosen before the first read.
+ */
+let which: 'first' | '23m' = process.env['MAIA_MODEL'] === '23m' ? '23m' : 'first';
+export function useModel(m: 'first' | '23m'): void {
+  if (session && m !== which) throw new Error('the model is chosen before the first read');
+  which = m;
+}
 
 function model(): Promise<ort.InferenceSession> {
   if (!session) {
     ort.env.wasm.numThreads = 1;
-    session = ort.InferenceSession.create(readFileSync(join(import.meta.dirname, '..', '..', 'vendor', 'maia', 'maia3_simplified.onnx')));
+    session = ort.InferenceSession.create(readFileSync(join(import.meta.dirname, '..', '..', 'vendor', 'maia', which === '23m' ? 'maia3-23m.onnx' : 'maia3_simplified.onnx')));
   }
   return session;
 }
@@ -29,12 +40,13 @@ export interface MaiaRead {
   score: number;
 }
 
-export async function maia(pos: Position, elo: number): Promise<MaiaRead> {
+/** `before`: the positions that led to `pos`, oldest first (FENs), read by the 23M model. */
+export async function maia(pos: Position, elo: number, before: readonly string[] = []): Promise<MaiaRead> {
   if (elo < MAIA_FLOOR) throw new Error(`Maia at ${elo}: read it at ${MAIA_FLOOR} or more (it plays weaker than its number)`);
   const s = await model();
   const e = clampElo(elo);
   const out = await s.run({
-    tokens: new ort.Tensor('float32', maiaTokens(makeFen(pos.toSetup())), [1, 64, 12]),
+    tokens: which === '23m' ? new ort.Tensor('float32', maiaHistoryTokens([...before.slice(-MAIA_BEFORE), makeFen(pos.toSetup())]), [1, 64, 96]) : new ort.Tensor('float32', maiaTokens(makeFen(pos.toSetup())), [1, 64, 12]),
     elo_self: new ort.Tensor('float32', Float32Array.from([e]), [1]),
     elo_oppo: new ort.Tensor('float32', Float32Array.from([e]), [1]),
   });

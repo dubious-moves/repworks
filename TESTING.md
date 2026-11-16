@@ -123,7 +123,37 @@ later change replaced are folded into the later item; items already reported wor
 - With "on the graphics processor" on too: what does Maia's line under the switch say? (This
   export needs no 16-bit floats, unlike the first model; never run on any adapter.)
 - **Checked**: against the official code's numbers under Node and in headless Chromium
-  (desktop). No phone, no graphics processor, and nothing about whether it predicts better.
+  (desktop). No phone, no graphics processor. (Whether it predicts better, and with what, is
+  measured since: §5.190.)
+
+### Maia reading the line (§5.190, 2026-11-15)
+With "Maia 3, 23M" chosen (⚙ → Maia's model), everything that asks Maia sends the positions that
+led to the one asked about. The first model ignores them, so nothing changes there.
+- The study page: step along a line with the 23M chosen. Do the Ml percentages differ from the
+  first model's, and stay the same when you come back to the same position by the same moves? Does
+  it feel as fast? (A position now costs one run per line that reaches it.)
+- The Practical column with Maia on: do the values still arrive in about the time they did, and
+  does the purple preview? (Maia is asked once per position and line, so a search that meets the
+  same position by two move orders asks twice.)
+- "Practise from here" from the study menu, from the analysis board, from a game's position and
+  from the games' explorer, and a checklist's drill: does the opponent play sensibly from the
+  first move, knowing the moves before it? (Only a game's position and the checklist, the study
+  and the analysis board hand over their line: a position opened by its FEN alone starts with
+  none.)
+- The storm: Continue on a good move (Maia's reply), and the Maia ratings of the positions
+  gathered (the line is read from the chapter): is a position's difficulty and its likely moves
+  as before, give or take? Ratings made with the other model are kept as they are until the
+  positions are rated again (Clear gathered positions).
+- Endgames, "Maia alone": does the defence still play like a person? The continuation of a line
+  (Lc0 against people) with the 23M.
+- Node: `node scripts/storm-gather.ts … --maia-model 23m` rates the cloud's positions with the
+  23M and their lines; `MAIA_MODEL=23m node scripts/ideas/cv.ts maia <pos>` reads the 23M.
+- `node scripts/maia-eval.ts <dump.pgn.zst>` measures the models on a Lichess dump: run it on your
+  own part to check the numbers in PLAN.md §5.190 (about 40 minutes for every condition, 4 threads).
+- **Checked**: by unit tests (the batch and its key, the line along a study's path, a storm
+  position's line, the search's moves, the service's asks, the priority, continuation and tactic
+  walks) and in headless Chromium, desktop (the explorer's Maia column on a line equals the
+  model's numbers with the line and differs from the position alone). No phone, no device.
 
 ### Maia and Lc0 on the graphics processor (§5.184, 2026-11-15)
 - On the desktop and on the phone, each: ⚙ (engine settings) → "Maia and Lc0: on the graphics

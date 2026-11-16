@@ -41,6 +41,7 @@ import type { Grade } from '../core/progress/events.ts';
 import { positionOf } from '../core/storm/walk.ts';
 import { onWorker, postToWorker } from './explorer.ts';
 import { maiaPolicies, maiaPolicy, maiaPrefs } from './maia.ts';
+import { gameBefore } from '../core/maia/history.ts';
 import type { MaiaMove } from '../core/maia/encode.ts';
 import { recordEvent } from './state.ts';
 import { analyseForStorm } from './stormEngine.ts';
@@ -113,6 +114,8 @@ export interface PracticeSetup {
   leaf?: PositionKey;
   /** The positions before `fen` (a checklist's lead-up from the start), by key, for the repetition draw. */
   before?: string[];
+  /** The positions before `fen`, oldest first (FENs), for the 23M Maia's history: the line the game was started from (§5.190). */
+  lead?: string[];
   /** The endgame drilled (kind `endgame`). */
   endgame?: Endgame;
   /** Told the grade (an advantage card) once the game ends. */
@@ -260,8 +263,8 @@ const DRAW_LINES = 5;
  * (the switch can stay off); null without them, or when it doesn't answer within 30 s of starting
  * and 5 s of being asked (Stockfish alone then).
  */
-export async function endgameMaia(fen: string): Promise<MaiaMove[] | null> {
-  const asked = maiaPolicies(fen, [MAIA_ELO]).then((r) => r?.[0] ?? null);
+export async function endgameMaia(fen: string, before?: readonly string[]): Promise<MaiaMove[] | null> {
+  const asked = maiaPolicies(fen, [MAIA_ELO], before).then((r) => r?.[0] ?? null);
   return Promise.race([asked, new Promise<null>((r) => setTimeout(() => r(null), 35_000))]);
 }
 
@@ -273,7 +276,7 @@ export async function endgameMaia(fen: string): Promise<MaiaMove[] | null> {
  * over tries (§5.174): the replies met here before tried last, the last try's again after a miss.
  * With "Maia alone" on, Maia's reply is played without waiting on Stockfish (`trustPick`).
  */
-async function endgameReply(fen: string, e: Endgame, userMoves: number, seen: ReadonlySet<string> = new Set()): Promise<{ uci: string; source: string; dbFailed: boolean } | undefined> {
+async function endgameReply(fen: string, e: Endgame, userMoves: number, seen: ReadonlySet<string> = new Set(), before: readonly string[] = []): Promise<{ uci: string; source: string; dbFailed: boolean } | undefined> {
   const pos = positionOf(fen);
   if (!pos) return undefined;
   const goal = e.goal;
@@ -305,7 +308,7 @@ async function endgameReply(fen: string, e: Endgame, userMoves: number, seen: Re
   const authored = key ? e.author?.[key] : undefined;
   if (authored && authorFirst(e.id) && parseUciMove(pos, authored)) return { uci: authored, source: COURSE_SOURCE, dbFailed: false };
   if (endgameMaiaAlone.peek()) {
-    const policy = await endgameMaia(fen);
+    const policy = await endgameMaia(fen, before);
     if (policy?.length) {
       let ordered = [...new Set([...(replay ? [replay] : []), ...replyOrder(maiaCandidates(policy), hints.seen).map((m) => m.uci)])];
       let pushed = pushes;
@@ -335,7 +338,7 @@ async function endgameReply(fen: string, e: Endgame, userMoves: number, seen: Re
     }
   }
   const depth = narrow() ? 16 : 18;
-  const [a, maia] = await Promise.all([search(fen, goal === 'draw' ? DRAW_LINES : 1, depth, 6000, undefined, true), endgameMaia(fen)]);
+  const [a, maia] = await Promise.all([search(fen, goal === 'draw' ? DRAW_LINES : 1, depth, 6000, undefined, true), endgameMaia(fen, before)]);
   const scored = (r: typeof a): OpponentLine[] => (r?.lines ?? []).filter((l) => l.pv.length).map((l) => ({ cp: moverScore(l.score, pos.turn), pv: l.pv }));
   const lines = scored(a);
   const material = (pv: readonly string[]) => {
@@ -364,7 +367,7 @@ async function endgameReply(fen: string, e: Endgame, userMoves: number, seen: Re
 }
 
 /** The game's positions before the one on the board, oldest first: what the 23M Maia reads beside it (§5.188). */
-const positionsBefore = (p: PracticeGame): string[] => (p.moves.length ? [p.moves[0]!.fenBefore, ...p.moves.slice(0, -1).map((m) => m.fen)] : []);
+const positionsBefore = (p: PracticeGame, n: number = p.moves.length): string[] => gameBefore(p.setup.lead, p.setup.fen, p.moves.map((m) => m.fen), n);
 
 /** The opponent's move: the database, then Maia, then Stockfish; undefined when none answers. */
 async function opponentMove(fen: string, o: Opponent, before?: readonly string[]): Promise<{ uci: string; source: string; dbFailed: boolean } | undefined> {
@@ -526,6 +529,19 @@ function judgedAt(g: number, i: number): void {
 }
 
 /* ------------------------------------------------------------------ the game */
+
+/**
+ * The line a "play on from here" was opened from, by position: the screen opens on a FEN alone (the
+ * route has no room for a line), so the opener leaves the positions before it here for the 23M Maia to
+ * read (§5.190). Kept for this session; a game started elsewhere has none.
+ */
+const leads = new Map<string, string[]>();
+export function rememberLead(fen: string, before: readonly string[]): void {
+  leads.set(fen, before.slice(-7));
+  if (leads.size > 50) leads.delete(leads.keys().next().value!);
+}
+/** The positions remembered before `fen` (`rememberLead`), if any. */
+export const leadFor = (fen: string): string[] | undefined => leads.get(fen);
 
 export function startPractice(setup: PracticeSetup): void {
   const pos = positionOf(setup.fen);
@@ -815,7 +831,7 @@ async function opponentTurn(g: number): Promise<void> {
   if (!p || p.gen !== g || p.phase !== 'opponent' || p.slip || p.ending) return;
   const fen = fenAfter(p);
   const at = p.moves.length;
-  const m = p.setup.kind === 'endgame' ? await endgameReply(fen, p.setup.endgame!, p.moves.filter((m) => m.isUser).length, seenKeys(p)) : await opponentMove(fen, p.setup.opponent, positionsBefore(p));
+  const m = p.setup.kind === 'endgame' ? await endgameReply(fen, p.setup.endgame!, p.moves.filter((m) => m.isUser).length, seenKeys(p), positionsBefore(p)) : await opponentMove(fen, p.setup.opponent, positionsBefore(p));
   const q = practice.peek();
   // An endgame stopped on a slip meanwhile lets the answer go; one played on asks again, and the
   // first answer in is the one played.
@@ -1237,8 +1253,8 @@ async function scanLines(fen: string, lines: number): Promise<Pv[] | null> {
 }
 
 /** Maia's move for the opponent's side in the scan's human-like line, when Maia is on. */
-async function scanMaia(fen: string, o: Opponent): Promise<string | null> {
-  const policy = await maiaPolicy(fen, o.maiaElo);
+async function scanMaia(fen: string, o: Opponent, before?: readonly string[]): Promise<string | null> {
+  const policy = await maiaPolicy(fen, o.maiaElo, before);
   return (policy && maiaPick(policy, o.precision, Math.random)?.uci) ?? null;
 }
 
@@ -1250,11 +1266,11 @@ async function scanTactics(g: number): Promise<void> {
   detection.value = { gen: g, total: cands.length, done: 0, scanning: cands.length > 0, found: [] };
   const live = () => practice.peek()?.gen === g && detection.peek()?.gen === g;
   const skip = new Set<number>();
-  const maia = maiaPrefs.peek().on ? (fen: string) => scanMaia(fen, p.setup.opponent) : null;
+  const maia = maiaPrefs.peek().on ? (fen: string, before: readonly string[]) => scanMaia(fen, p.setup.opponent, before) : null;
   for (const cand of cands) {
     if (!live()) return;
     let t: DetectedTactic | null = null;
-    if (!skip.has(cand.moveIdx)) t = await scanCandidate(scanLines, maia, cand, p.moves[cand.moveIdx]?.uci, () => !live());
+    if (!skip.has(cand.moveIdx)) t = await scanCandidate(scanLines, maia, cand, p.moves[cand.moveIdx]?.uci, () => !live(), positionsBefore(p, cand.moveIdx));
     if (!live()) return;
     if (t) for (const k of covered(t)) skip.add(k);
     const d = detection.peek()!;

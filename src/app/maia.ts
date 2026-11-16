@@ -5,6 +5,7 @@
 // position and Qchess's Ms for the first rows. Answers are kept for the session.
 import { computed, signal } from '@preact/signals';
 import { maiaEloFor, type MaiaMove } from '../core/maia/encode.ts';
+import { historyKey, MAIA_BEFORE } from '../core/maia/history.ts';
 import { MAIA_MODELS, type FromMaia, type MaiaModel, type ToMaia } from '../core/maia/protocol.ts';
 import { ENGINES, ensure, remove, stored } from '../platform/blobs.ts';
 import { linkMaia, prefs as explorerPrefs, setPrefs as setExplorerPrefs } from './explorer.ts';
@@ -71,7 +72,19 @@ export interface MaiaSeen {
 
 /** What Maia said, by `<fen>|<elo>`; replaced (not mutated) so the explorer redraws. */
 export const maiaSeen = signal<ReadonlyMap<string, MaiaSeen>>(new Map());
-export const maiaKey = (fen: string, elo: number) => `${fen}|${elo}`;
+/**
+ * The positions before that the model chosen reads: the 23M's (the last seven), none for the first
+ * model, which ignores them (§5.190). What a caller passes, trimmed to what is sent and kept by.
+ */
+export function readBefore(before: readonly string[] | undefined): string[] | undefined {
+  if (!before?.length || maiaPrefs.peek().model !== 'maia3-23m') return undefined;
+  return before.slice(-MAIA_BEFORE);
+}
+/** What Maia said, by the position, the rating and, for the 23M, the positions before it (§5.190). */
+export const maiaKey = (fen: string, elo: number, before?: readonly string[]) => {
+  const led = readBefore(before);
+  return `${fen}|${elo}${led ? `|${historyKey(led)}` : ''}`;
+};
 
 export function setMaiaPrefs(patch: Partial<MaiaPrefs>): void {
   maiaPrefs.value = { ...maiaPrefs.value, ...patch };
@@ -222,18 +235,22 @@ function ask<T extends FromMaia>(m: WithoutId<Asked>): Promise<T> {
   });
 }
 
-/** Maia's policy at `fen`, at the rating in use; once per position and rating this session. */
-export function requestPolicy(fen: string): void {
+/**
+ * Maia's policy at `fen`, at the rating in use; once per position and rating this session (and, for
+ * the 23M, per line: `before`, the positions that led here, oldest first).
+ */
+export function requestPolicy(fen: string, before?: readonly string[]): void {
   if (!maiaPrefs.peek().on) return;
   const elo = maiaElo.peek();
-  const key = maiaKey(fen, elo);
+  const key = maiaKey(fen, elo, before);
+  const led = readBefore(before);
   const seen = maiaSeen.peek().get(key);
   if (seen?.policy || seen?.error || seen?.asked.has('')) return;
   // Ended after a while unused: started again, and asked once it is ready (the explorer asks again then).
   if (asleep()) return startWorker();
   if (maiaState.peek().kind !== 'ready') return;
   update(key, (s) => ({ ...s, asked: new Set([...s.asked, '']) }));
-  void ask<Extract<FromMaia, { type: 'answer' } | { type: 'error' }>>({ type: 'ask', fen, elo }).then((r) =>
+  void ask<Extract<FromMaia, { type: 'answer' } | { type: 'error' }>>({ type: 'ask', fen, elo, ...(led ? { before: led } : {}) }).then((r) =>
     update(key, (s) => (r.type === 'answer' ? { ...s, policy: r.policy } : { ...s, error: r.reason })),
   );
 }
@@ -249,7 +266,8 @@ export async function maiaPolicy(fen: string, elo: number, before?: readonly str
   const starting = () => maiaState.peek().kind === 'loading' || (maiaState.peek().kind === 'idle' && !!worker);
   for (let waited = 0; starting() && waited < 5000; waited += 100) await new Promise((r) => setTimeout(r, 100));
   if (maiaState.peek().kind !== 'ready') return null;
-  const r = await ask<Extract<FromMaia, { type: 'answer' } | { type: 'error' }>>({ type: 'ask', fen, elo, ...(before?.length ? { before: [...before] } : {}) });
+  const led = readBefore(before);
+  const r = await ask<Extract<FromMaia, { type: 'answer' } | { type: 'error' }>>({ type: 'ask', fen, elo, ...(led ? { before: led } : {}) });
   return r.type === 'answer' ? r.policy : null;
 }
 
@@ -259,8 +277,9 @@ export const maiaStored = (): Promise<boolean> => stored(maiaFiles());
 /**
  * Maia's policy at `fen` at each of `elos`, in one batch, for the storm's ratings (§5.82): asked
  * whether or not the switch is on, once the files are on this device; null when it can't answer.
+ * `before`: the positions that led here, oldest first, which the 23M model reads (§5.190).
  */
-export async function maiaPolicies(fen: string, elos: readonly number[]): Promise<MaiaMove[][] | null> {
+export async function maiaPolicies(fen: string, elos: readonly number[], before?: readonly string[]): Promise<MaiaMove[][] | null> {
   if (!worker) {
     if (!(await maiaStored().catch(() => false))) return null;
     startWorker();
@@ -268,22 +287,24 @@ export async function maiaPolicies(fen: string, elos: readonly number[]): Promis
   const starting = () => maiaState.peek().kind === 'loading' || (maiaState.peek().kind === 'idle' && !!worker);
   for (let waited = 0; starting() && waited < 30_000; waited += 100) await new Promise((r) => setTimeout(r, 100));
   if (maiaState.peek().kind !== 'ready') return null;
-  const answers = await Promise.all(elos.map((elo) => ask<Extract<FromMaia, { type: 'answer' } | { type: 'error' }>>({ type: 'ask', fen, elo })));
+  const led = readBefore(before);
+  const answers = await Promise.all(elos.map((elo) => ask<Extract<FromMaia, { type: 'answer' } | { type: 'error' }>>({ type: 'ask', fen, elo, ...(led ? { before: led } : {}) })));
   return answers.every((a) => a.type === 'answer') ? answers.map((a) => (a as Extract<FromMaia, { type: 'answer' }>).policy) : null;
 }
 
-/** Qchess's Ms for `sans` at `fen` (those not asked yet). */
-export function requestScores(fen: string, sans: readonly string[]): void {
+/** Qchess's Ms for `sans` at `fen` (those not asked yet); `before`: the positions that led to `fen` (§5.190). */
+export function requestScores(fen: string, sans: readonly string[], before?: readonly string[]): void {
   if (!maiaPrefs.peek().on) return;
   const elo = maiaElo.peek();
-  const key = maiaKey(fen, elo);
+  const key = maiaKey(fen, elo, before);
+  const led = readBefore(before);
   const seen = maiaSeen.peek().get(key);
   const fresh = sans.filter((s) => !seen?.asked.has(s));
   if (!fresh.length) return;
   if (asleep()) return startWorker();
   if (maiaState.peek().kind !== 'ready') return;
   update(key, (s) => ({ ...s, asked: new Set([...s.asked, ...fresh]) }));
-  void ask<Extract<FromMaia, { type: 'scores' } | { type: 'error' }>>({ type: 'scores', fen, sans: [...fresh], elo }).then((r) => {
+  void ask<Extract<FromMaia, { type: 'scores' } | { type: 'error' }>>({ type: 'scores', fen, sans: [...fresh], elo, ...(led ? { before: led } : {}) }).then((r) => {
     if (r.type === 'scores') update(key, (s) => ({ ...s, scores: { ...s.scores, ...r.scores } }));
   });
 }
@@ -293,10 +314,12 @@ export function requestScores(fen: string, sans: readonly string[]): void {
 effect(() => {
   const ready = maiaState.value.kind === 'ready' && maiaPrefs.value.on;
   const elo = maiaElo.value;
+  const model = maiaPrefs.value.model;
   linkMaia(
     ready && worker
       ? {
           elo,
+          model,
           connect: () => {
             const channel = new MessageChannel();
             worker?.postMessage({ type: 'port', port: channel.port1 }, [channel.port1]);

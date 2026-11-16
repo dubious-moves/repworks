@@ -7,6 +7,7 @@ import { parseFen } from 'chessops/fen';
 import { parseSan } from 'chessops/san';
 import type { GpuInit } from '../core/engine/gpu.ts';
 import { createMaiaBatch } from '../core/maia/batch.ts';
+import { beforeChild } from '../core/maia/history.ts';
 import { MAIA_HISTORY, maiaHistoryTokens, maiaTokens } from '../core/maia/encode.ts';
 import type { FromMaia, MaiaModel, ToMaia } from '../core/maia/protocol.ts';
 import { ENGINES, stored } from './blobs.ts';
@@ -135,7 +136,7 @@ async function handle(m: ToMaia, reply: (r: FromMaia) => void): Promise<void> {
         after.play(move);
         if (after.isCheckmate()) scores[san] = 1;
         else if (after.isEnd()) scores[san] = 0.5;
-        else scores[san] = 1 - (await batch.ask(after, m.elo)).value;
+        else scores[san] = 1 - (await batch.ask(after, m.elo, beforeChild(m.before, m.fen))).value;
       }),
     );
     reply({ type: 'scores', id: m.id, scores });

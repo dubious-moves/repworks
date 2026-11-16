@@ -204,12 +204,16 @@ export function dedupeLines<M extends { uci: string; isUser: boolean }>(primary:
 /**
  * `tacticGenerateMaiaLine`: Stockfish's unique move for the user at each step, Maia's move for the
  * opponent; kept when Maia leaves the main line's replies and the user has two moves or more.
+ * `lead`: the positions before `preFen` in the game, oldest first; Maia is asked each position with
+ * the positions that led to it, the game's and the chain's (the 23M model reads them, §5.190).
  */
-export async function maiaLine(analyse: Analyse, maia: (fen: string) => Promise<string | null>, preFen: string, primary: readonly ChainMove[], canceled: () => boolean = () => false): Promise<ChainMove[] | null> {
+export async function maiaLine(analyse: Analyse, maia: (fen: string, before: readonly string[]) => Promise<string | null>, preFen: string, primary: readonly ChainMove[], canceled: () => boolean = () => false, lead: readonly string[] = []): Promise<ChainMove[] | null> {
   if (primary.length < 3) return null;
   const primaryOpp = primary.filter((m) => !m.isUser).map((m) => m.uci);
   const chain: ChainMove[] = [];
   let fen = preFen;
+  /** The positions before `fen`, oldest first. */
+  const trail = [...lead];
   let first = true;
   let diverged = false;
   let oppIdx = 0;
@@ -225,9 +229,10 @@ export async function maiaLine(analyse: Analyse, maia: (fen: string) => Promise<
     const u = playUci(fen, uniq.bestMove);
     if (!u) break;
     chain.push({ uci: uniq.bestMove, san: u.san, fen: u.fen, isUser: true });
+    trail.push(fen);
     fen = u.fen;
     if (u.over) break;
-    const m = await maia(fen);
+    const m = await maia(fen, trail);
     if (canceled()) return null;
     if (!m) break;
     if (!diverged && oppIdx < primaryOpp.length) {
@@ -237,6 +242,7 @@ export async function maiaLine(analyse: Analyse, maia: (fen: string) => Promise<
     const o = playUci(fen, m);
     if (!o) break;
     chain.push({ uci: m, san: o.san, fen: o.fen, isUser: false, source: 'maia' });
+    trail.push(fen);
     fen = o.fen;
     if (o.over) break;
   }
@@ -256,12 +262,12 @@ export interface DetectedTactic {
  * The scan of one candidate (`startTacticScan`'s loop body): the chain walked, kept with two user
  * moves or more, its alternatives deduplicated and Maia's line added when it differs.
  */
-export async function scanCandidate(analyse: Analyse, maia: ((fen: string) => Promise<string | null>) | null, cand: TacticCandidate, userUci: string | undefined, canceled: () => boolean = () => false): Promise<DetectedTactic | null> {
+export async function scanCandidate(analyse: Analyse, maia: ((fen: string, before: readonly string[]) => Promise<string | null>) | null, cand: TacticCandidate, userUci: string | undefined, canceled: () => boolean = () => false, lead: readonly string[] = []): Promise<DetectedTactic | null> {
   const r = await buildChain(analyse, cand, canceled);
   if (r.canceled || !r.moves.length || r.moves.filter((m) => m.isUser).length < TACTIC.minUserMoves) return null;
   let alts = dedupeLines(r.moves, r.alternativeLines);
   if (maia) {
-    const m = await maiaLine(analyse, maia, cand.preFen, r.moves, canceled);
+    const m = await maiaLine(analyse, maia, cand.preFen, r.moves, canceled, lead);
     if (m && !canceled()) {
       const combined = dedupeLines(r.moves, [...alts, m]);
       if (combined.length > alts.length) alts = combined.slice(0, TACTIC.maxAltLines);

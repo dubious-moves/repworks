@@ -21,7 +21,9 @@ import { trainData } from '../app/train.ts';
 import { positionKeyOf } from '../core/chess/positionKey.ts';
 import { chapterExportName, chapterFileText } from '../core/pgn/write.ts';
 import { header } from '../core/study/model.ts';
-import { nodeAt, positionAt } from '../core/study/tree.ts';
+import { nodeAt, positionAt, positionsTo } from '../core/study/tree.ts';
+import { beforeOf } from '../core/maia/history.ts';
+import { rememberLead } from '../app/practice.ts';
 import { copyFen, FloatingMenu } from './MoveMenu.tsx';
 
 const menu = signal<{ x: number; y: number; above: number; opener: Element } | undefined>(undefined);
@@ -217,7 +219,10 @@ function FromHere(props: { run: (f: () => void) => () => void }) {
         </button>
       )}
       {/* A game from this position against the database, Maia and Stockfish, as the chapter's side (§5.57). */}
-      <button type="button" role="menuitem" onClick={run(() => open({ name: 'playOn', fen, side: side.peek() }))}>
+      <button type="button" role="menuitem" onClick={run(() => {
+          if (c) rememberLead(fen, beforeOf(positionsTo(c, path)));
+          open({ name: 'playOn', fen, side: side.peek() });
+        })}>
         <span class="menu-check" aria-hidden="true" />
         Practise from here
       </button>

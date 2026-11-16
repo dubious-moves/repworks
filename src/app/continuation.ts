@@ -283,7 +283,7 @@ export async function runContinuation(download = false): Promise<void> {
           patch(id, () => ({ looking: true }));
           return dbMoves(fen, r.filter);
         },
-        maia: async (fen) => (await maiaPolicies(fen, [r.maiaElo]))?.[0],
+        maia: async (fen, before) => (await maiaPolicies(fen, [r.maiaElo], before))?.[0],
       },
       onPly: (ply) => patch(id, (x) => ({ moves: [...x.moves, ply], thinking: undefined, looking: false })),
     });

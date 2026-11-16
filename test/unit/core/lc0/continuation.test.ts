@@ -127,3 +127,27 @@ test('the database failing: Maia alone, the reason kept; the game over; stopped'
   assert.equal(stopped.ended, 'stopped');
   assert.equal(stopped.plies.length, 1);
 });
+
+test('Maia is asked with the positions of the line so far, the study\'s history first (§5.190)', async () => {
+  const history = [START.clone()];
+  const e4 = START.clone();
+  e4.play(parseSan(e4, 'e4')!);
+  history.push(e4);
+  const asked: { fen: string; before: readonly string[] }[] = [];
+  await modelContinuation({
+    history,
+    plies: 4,
+    lc0: 'white',
+    ports: {
+      lc0: lc0Fake([]),
+      db: async () => ({ total: 0, moves: [] }),
+      maia: async (fen, before) => (asked.push({ fen, before }), [{ uci: fen.startsWith('rnbqkbnr/pppppppp/8/8/4P3') ? 'e7e5' : 'd7d6', san: 'x', prob: 1 }]),
+    },
+  });
+  assert.equal(asked.length, 2);
+  // Black is to move after 1. e4, so Maia is asked there first, with the start before it.
+  assert.deepEqual(asked[0]!.before, [makeFen(START.toSetup())]);
+  // The second ask is two plies on: the start, 1. e4, 1... e5, 2. Nf3 are before it.
+  assert.equal(asked[1]!.before.length, 3);
+  assert.equal(asked[1]!.before[0], makeFen(START.toSetup()));
+});

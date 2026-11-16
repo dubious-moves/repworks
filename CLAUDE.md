@@ -76,6 +76,12 @@ Whether FSRS fitted to the progress log would beat the default weights (PLAN.md 
 that writes nothing: `node scripts/fsrs-fit.ts ../repworks-data --offset-minutes 60` (`--kinds r,m`
 adds the game cards; `--json`).
 
+Whether a Maia model predicts human moves better, measured on a Lichess dump part (PLAN.md §5.190;
+about 40 minutes for every condition on 4 threads; `--list`, `--conditions`, `--memo-stats`):
+`node scripts/maia-eval.ts <dump.pgn.zst> --sample sample.json --out scores.json` (the dump is
+`lichess_db_standard_rated_YYYY-MM.pgn.zst` or its first 250 MB from `curl -r 0-250000000`);
+blitz as `--speeds blitz`.
+
 The storm's "Gather positions" from a cloud session, as a device named `cloud` (PLAN.md §5.155),
 with the data repo checked out on `main`:
 `node scripts/storm-gather.ts ../repworks-data --minutes 60 --score-minutes 40 --push`; only

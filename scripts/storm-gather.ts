@@ -21,6 +21,8 @@
 //   --engines N        Stockfish engines at once (default: one a core)
 //   --elo N[,N…]       Maia's ratings beyond its ladder (default: those the devices' positions carry)
 //   --no-maia, --no-deepen     leave those to the devices
+//   --maia-model M     Maia's model: first (default, the devices' unless chosen otherwise) or 23m, the official 23M,
+//                      which reads each position's line (PLAN.md §5.190); the ratings are the model's they were made with
 //   --score-only       no gathering: Stockfish scores the cloud's positions short of the standard
 //                      (every device's with --all-devices; for --score-minutes at most), and that is all
 //   --all-devices      Stockfish scores every device's positions, not only the cloud's: each one
@@ -44,7 +46,8 @@ import { fenAfterUci, positionOf } from '../src/core/storm/walk.ts';
 import { readTree } from './read-tree.ts';
 import { addPositions, CLOUD_DEVICE, cloudDevice, findScope, gatherScope, maiaElos, ownFileChanges, positionsToWork, readRepertoire, readShared, withList } from './storm/data.ts';
 import { startEngines } from './storm/engine.ts';
-import { maiaPolicies } from './storm/maia.ts';
+import { maiaPolicies, useMaiaModel } from './storm/maia.ts';
+import { storedBefore } from '../src/core/storm/history.ts';
 
 /* ------------------------------------------------------------------ the options */
 
@@ -61,6 +64,8 @@ interface Options {
   engines: number;
   elos?: number[];
   maia: boolean;
+  /** Maia's model: the first (default), or the official 23M one, which reads each position's line (§5.190). */
+  maiaModel: 'first' | '23m';
   deepen: boolean;
   /** No walking (and no explorer, no Maia): the positions scored, nothing else. */
   scoreOnly: boolean;
@@ -70,7 +75,7 @@ interface Options {
 }
 
 function options(argv: string[]): Options {
-  const o: Options = { dir: '', overnight: false, source: 'both', minPly: STORM.minPly, maxPly: STORM.maxPly, engines: availableParallelism(), maia: true, deepen: true, scoreOnly: false, allDevices: false, push: false };
+  const o: Options = { dir: '', overnight: false, source: 'both', minPly: STORM.minPly, maxPly: STORM.maxPly, engines: availableParallelism(), maia: true, maiaModel: 'first', deepen: true, scoreOnly: false, allDevices: false, push: false };
   const num = (flag: string, v: string | undefined) => {
     const n = Number(v);
     if (!v || !Number.isFinite(n) || n <= 0) throw new Error(`${flag} wants a positive number`);
@@ -96,6 +101,11 @@ function options(argv: string[]): Options {
     else if (a === '--engines') o.engines = Math.floor(num(a, argv[++i]));
     else if (a === '--elo') o.elos = (argv[++i] ?? '').split(',').map((e) => num(a, e));
     else if (a === '--no-maia') o.maia = false;
+    else if (a === '--maia-model') {
+      const m = argv[++i];
+      if (m !== 'first' && m !== '23m') throw new Error('--maia-model is first or 23m');
+      o.maiaModel = m;
+    }
     else if (a === '--no-deepen') o.deepen = false;
     else if (a === '--score-only') o.scoreOnly = true;
     else if (a === '--all-devices') o.allDevices = true;
@@ -230,6 +240,8 @@ async function main(): Promise<void> {
   const device = cloudDevice(files, Math.random, new Date(started).toISOString());
   const shared = readShared(files, device.id);
   const store = shared.positions;
+  const chapterOf = new Map(rep.chapters.map((ch) => [`${ch.sid}/${ch.chapter.id}`, ch.chapter] as const));
+  useMaiaModel(o.maiaModel);
   const isOwn = (p: StoredPosition) => !p.from;
   const ownAtStart = [...store.values()].filter(isOwn).length;
   say(`repertoire: ${rep.chapters.length} chapters, ${rep.lines.length} lines${rep.paused ? ` (${rep.paused} paused, left out)` : ''}`);
@@ -394,7 +406,7 @@ async function main(): Promise<void> {
     for (const p of todo) {
       if (stopping) break;
       const want = missingRatings(p.maia, elos[0]!, elos);
-      const policies = await maiaPolicies(p.fen, want);
+      const policies = await maiaPolicies(p.fen, want, o.maiaModel === '23m' ? storedBefore(p, (sid, cid) => chapterOf.get(`${sid}/${cid}`)) : undefined);
       if (!policies) continue;
       const fresh = want.map((e, i) => keptPolicy(e, policies[i]!));
       const cur = store.get(p.card);

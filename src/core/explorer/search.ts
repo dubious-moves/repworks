@@ -94,6 +94,8 @@ export interface MaiaMove {
 export interface SearchInfo {
   reach: number;
   plies: number;
+  /** The moves (SAN) from the root position to this node's position, the row's own first: what a Maia that reads the line needs (§5.190). */
+  moves?: string[];
 }
 
 type Maybe<T> = T | null | undefined;
@@ -411,7 +413,7 @@ interface Up {
  *   analysing  positions and moves the search wanted an eval for and ChessDB had none; each is
  *              handed to provider.analyse, so a later search can use it
  */
-function makeSearch(provider: SearchProvider, opts: SearchOptions, rootSide: Side, stats: SearchStats, plies: number) {
+function makeSearch(provider: SearchProvider, opts: SearchOptions, rootSide: Side, stats: SearchStats, plies: number, lead?: string) {
   // Per iteration, keyed by position and remaining depth: a transposition inside the row's tree is
   // searched once. Reach is not in the key; the first path to arrive decides the pruning.
   const memo = new Map<string, Promise<SearchNode>>();
@@ -496,7 +498,7 @@ function makeSearch(provider: SearchProvider, opts: SearchOptions, rootSide: Sid
    */
   function opponentNodeRaw(pos: string, depthLeft: number, reach: number, leafWin: number | null, path: string[], hint: number | undefined, up: Up): Promise<SearchNode> {
     stats.positions++;
-    const info = { reach, plies };
+    const info: SearchInfo = { reach, plies, ...(lead ? { moves: [lead, ...path] } : {}) };
     const useMaia = !!opts.maia && typeof provider.maia === 'function';
     const skipEx = !!opts.maiaOnly || (!opts.explorerFree && hint != null && hint < (useMaia ? opts.maiaOnlyBelow : opts.skipExplorerBelow));
     return Promise.all([skipEx ? null : provider.explorer(pos, info), provider.chessdb(pos, info)])
@@ -819,7 +821,7 @@ export function evaluateRow(provider: SearchProvider, rootFen: string, san: stri
   } catch {
     return Promise.resolve({ state: 'error', reason: 'Not a legal move here: ' + san });
   }
-  const s = makeSearch(provider, opts, rootSide, stats, plies);
+  const s = makeSearch(provider, opts, rootSide, stats, plies, san);
   return s.opponentNode(rowFen, plies, 1, null, []).then((n) => {
     const out: RowResult = {
       state: 'none',

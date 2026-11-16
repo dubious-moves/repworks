@@ -3,10 +3,16 @@
 // fake explorer's games, the Ml sort, Maia remembered without a second download, and the
 // worker's numbers equal to onnxruntime-web's under Node (the same wasm) to 1e-6. And the 23M
 // model (§5.188) chosen in the engine's settings: its own download, its likelihoods at the start
-// the official code's, kept over a reload, and the first model chosen again.
+// the official code's, the positions that led to a position in a line read (§5.190), kept over a
+// reload, and the first model chosen again.
 import { test, expect, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { Chess } from 'chessops/chess';
+import { makeFen, parseFen } from 'chessops/fen';
+import { parseSan } from 'chessops/san';
+import * as ort from 'onnxruntime-web';
+import { maiaHistoryTokens, policyFrom } from '../../src/core/maia/encode.ts';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
 import { fakeExplorer, lichessLogin, serveExplorer } from './explorer.ts';
 import { serveGithub, world } from './github.ts';
@@ -132,6 +138,37 @@ test('the 23M model chosen in the engine settings: its own download, its likelih
   const ml = async (i: number) => Number((await rows(page).nth(i).locator('.ex-ml').textContent())!.replace('%', '')) / 100;
   expect(Math.abs((await ml(0)) - want.get('e2e4')!)).toBeLessThan(0.006);
   expect(Math.abs((await ml(1)) - want.get('d2d4')!)).toBeLessThan(0.006);
+
+  // On a line the 23M reads the positions that led there (§5.190): after 1. e4 c5 2. Nf3 it is asked
+  // with the three before it, not alone, and the rows are what the model gives with them.
+  ort.env.wasm.numThreads = 1;
+  const session = await ort.InferenceSession.create(readFileSync(join(import.meta.dirname, '..', '..', 'vendor', 'maia', 'maia3-23m.onnx')));
+  const line = Chess.default();
+  const fens = [makeFen(line.toSetup())];
+  for (const san of ['e4', 'c5', 'Nf3']) {
+    line.play(parseSan(line, san)!);
+    fens.push(makeFen(line.toSetup()));
+  }
+  const prob = async (list: string[], san: string) => {
+    const out = await session.run({
+      tokens: new ort.Tensor('float32', maiaHistoryTokens(list), [1, 64, 96]),
+      elo_self: new ort.Tensor('float32', Float32Array.of(1100), [1]),
+      elo_oppo: new ort.Tensor('float32', Float32Array.of(1100), [1]),
+    });
+    return policyFrom(Chess.fromSetup(parseFen(list.at(-1)!).unwrap()).unwrap(), out['logits_move']!.data as Float32Array).find((m) => m.san === san)!.prob;
+  };
+  const led = await prob(fens, 'd6');
+  const alone = await prob([fens.at(-1)!], 'd6');
+  expect(Math.abs(led - alone)).toBeGreaterThan(0.05);
+  await page.locator('.move', { hasText: 'Nf3' }).first().click();
+  const d6 = rows(page).filter({ has: page.locator('.ex-san', { hasText: /^d6$/ }) }).locator('.ex-ml');
+  await expect(d6).toHaveText(/%$/, { timeout: 60_000 });
+  const shown = Number((await d6.textContent())!.replace('%', '')) / 100;
+  expect(Math.abs(shown - led)).toBeLessThan(0.006);
+  expect(Math.abs(shown - alone)).toBeGreaterThan(0.05);
+  await page.locator('.move', { hasText: 'e4' }).first().click();
+  await expect(rows(page).locator('.ex-ml').first()).toHaveText(/%$/, { timeout: 60_000 });
+  await page.keyboard.press('Home');
 
   // Kept over a reload, from the stored file.
   const before = site.requests.filter((r) => r.includes('/engines/maia')).length;

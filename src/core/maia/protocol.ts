@@ -21,8 +21,8 @@ export type ToMaia =
   | { type: 'init'; gpu?: GpuInit; model?: MaiaModel }
   /** Maia's policy and score in a position; `before`, the positions that led to it, oldest first (read by the 23M model). */
   | { type: 'ask'; id: number; fen: string; elo: number; before?: string[] }
-  /** The mover's expected score after each of `sans` (Qchess's Ms). */
-  | { type: 'scores'; id: number; fen: string; sans: string[]; elo: number }
+  /** The mover's expected score after each of `sans` (Qchess's Ms); `before`: the positions that led to `fen`, oldest first. */
+  | { type: 'scores'; id: number; fen: string; sans: string[]; elo: number; before?: string[] }
   /** A port that asks as the page does (the explorer worker's, §5.34). */
   | { type: 'port'; port: MaiaPort };
 

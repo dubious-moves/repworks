@@ -195,6 +195,8 @@ export interface StoredPosition {
   at: number;
   /** Maia's policy at the ratings it was rated at (§5.82), added in the background. */
   maia?: MaiaRating[];
+  /** The positions before it, oldest first (FENs): set on a continued card (§5.154, §5.190), never stored; the others' come from their line. */
+  lead?: string[];
   /** A kind beyond the classic storm's (§5.100); absent for a classic position. */
   kind?: StoredKind;
   /** The device whose shared file it came from (§5.102); absent for one gathered here. */

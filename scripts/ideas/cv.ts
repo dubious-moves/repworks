@@ -8,6 +8,7 @@
 //   node scripts/ideas/cv.ts grade   <pos> <move>... [--depth 18]
 //   node scripts/ideas/cv.ts squares <pos> <square> [--depth 18]
 //   node scripts/ideas/cv.ts maia    <pos> [--elo 2000,2200] [--grade 14]
+//   MAIA_MODEL=23m before any of them reads the official 23M model instead (it reads the line where a command knows it, PLAN.md §5.190)
 //   node scripts/ideas/cv.ts tree    <repertoire.pgn> [--side black] [--min 1] [--ours] [--leaves]
 //   node scripts/ideas/cv.ts profile <repertoire.pgn> [--side black] [--engine 16] [--top 10]
 //   node scripts/ideas/cv.ts develop <repertoire.pgn> [--side black] [--piece f8-bishop]

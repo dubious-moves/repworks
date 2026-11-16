@@ -16,7 +16,7 @@ import { recordEvent } from '../app/state.ts';
 import { openingNameOf, practiceHistory, recordSaved, savedDeck } from '../app/games.ts';
 import type { CardRank } from '../core/progress/events.ts';
 import { SaveRankSelect } from './Rank.tsx';
-import { analyse, canOfferDraw, canTakeBack, claimVictory, offerDraw, clearPremove, detection, setFoundState, type FoundTactic, discardSaved, gameOfHistory, ignoreRepertoire, loadOpponent, practiceFeedback, practiceHint, resumePractice, setPracticeFeedback, showsFeedback, savedPractice, saveOpponent, judge, parkPractice, practice, practiceMove, takeUpPractice, practiceReview, setPremove, startPractice, stopPractice, takeBack, type Opponent, type PracticeGame, type PracticeMove } from '../app/practice.ts';
+import { leadFor, analyse, canOfferDraw, canTakeBack, claimVictory, offerDraw, clearPremove, detection, setFoundState, type FoundTactic, discardSaved, gameOfHistory, ignoreRepertoire, loadOpponent, practiceFeedback, practiceHint, resumePractice, setPracticeFeedback, showsFeedback, savedPractice, saveOpponent, judge, parkPractice, practice, practiceMove, takeUpPractice, practiceReview, setPremove, startPractice, stopPractice, takeBack, type Opponent, type PracticeGame, type PracticeMove } from '../app/practice.ts';
 import { parseUciMove, standardUci } from '../core/chess/uci.ts';
 import { makeFen } from 'chessops/fen';
 import { CLASSIFICATION, moverScore, type Classification } from '../core/games/grade.ts';
@@ -1044,7 +1044,10 @@ export function PracticeScreen(props: { fen: string; side?: 'white' | 'black' | 
   const start = () => {
     const pos = positionOf(props.fen);
     // Titled by the opening most of the user's games reaching it carry (mistake-lab's `lookupOpeningName`).
-    if (pos) startPractice({ kind: 'practice', fen: props.fen, color: props.side ?? pos.turn, silent: false, title: openingNameOf(props.fen) || 'From a position', opponent });
+    {
+      const lead = leadFor(props.fen);
+      if (pos) startPractice({ kind: 'practice', fen: props.fen, color: props.side ?? pos.turn, silent: false, title: openingNameOf(props.fen) || 'From a position', opponent, ...(lead ? { lead } : {}) });
+    }
   };
   useEffect(() => {
     const live = practice.peek();

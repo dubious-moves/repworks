@@ -33,7 +33,7 @@ function setPort(p: MessagePort | null): void {
   };
 }
 
-function askMaia(fen: string, elo: number): Promise<MaiaMove[] | null> {
+function askMaia(fen: string, elo: number, before?: string[]): Promise<MaiaMove[] | null> {
   const p = port;
   if (!p) return Promise.resolve(null);
   const id = nextId++;
@@ -46,7 +46,7 @@ function askMaia(fen: string, elo: number): Promise<MaiaMove[] | null> {
       clearTimeout(timer);
       resolve(moves);
     });
-    p.postMessage({ type: 'ask', id, fen, elo });
+    p.postMessage({ type: 'ask', id, fen, elo, ...(before?.length ? { before } : {}) });
   });
 }
 

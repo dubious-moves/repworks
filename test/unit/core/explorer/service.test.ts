@@ -37,7 +37,7 @@ function world(
     chessdb?: (fen: string, asked: number) => unknown;
     line?: (fen: string) => unknown;
     sleep?: (ms: number) => Promise<void>;
-    maia?: (fen: string, elo: number) => Promise<MaiaMove[] | null>;
+    maia?: (fen: string, elo: number, before?: string[]) => Promise<MaiaMove[] | null>;
     config?: Partial<ExplorerConfig>;
   } = {},
 ) {
@@ -571,4 +571,32 @@ test("the storm's games up to a month (an overnight gather's older pass, §5.102
   assert.ok(!ex[0]!.includes('until='));
   assert.match(ex[1]!, /&topGames=4&recentGames=4&until=2026-06$/);
   assert.ok(w.posts.some((m) => m.type === 'stormGames' && m.id === 2));
+});
+
+test('Maia asked with the line that led to each node: the root\'s before, the root, the moves down (§5.190)', async () => {
+  const asked: { fen: string; before?: string[] }[] = [];
+  const w = world({
+    explorer: thin,
+    maia: (fen, _elo, before) => {
+      asked.push({ fen, ...(before ? { before } : {}) });
+      const [a, b] = legalSans(fen, 2);
+      return Promise.resolve([{ san: a!.san, prob: 0.7 }, { san: b!.san, prob: 0.3 }]);
+    },
+    config: { options: { maia: true, maiaElo: 1700 } },
+  });
+  const lead = ['lead-1', 'lead-2'];
+  w.service.handle({ type: 'search', gen: 1, rootFen: START, rows: ['e4'], shares: { e4: 1 }, before: lead });
+  await settle();
+  const afterE4 = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1';
+  const row = asked.find((a) => a.fen === afterE4);
+  assert.ok(row, 'Maia was asked at the row\'s position');
+  assert.deepEqual(row.before, [...lead, START]);
+  // Deeper nodes carry the moves from the root: each ask's before ends at the position its move was played from.
+  const deeper = asked.filter((a) => a.fen !== afterE4);
+  assert.ok(deeper.length > 0, 'the search went below the row');
+  for (const a of deeper) {
+    assert.deepEqual(a.before!.slice(0, 3), [...lead, START]);
+    assert.ok(a.before!.length >= 4 && a.before!.length <= 7);
+    assert.notEqual(a.before!.at(-1), a.fen);
+  }
 });

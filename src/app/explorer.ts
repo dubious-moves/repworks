@@ -134,6 +134,8 @@ export function sixMonthsAgo(now: Date): string {
 /** Maia for the Practical search (§5.34): its rating, and a port into its worker. */
 export interface MaiaLink {
   elo: number;
+  /** The model Maia runs (§5.188): values found with another are another's (§5.190, which asks with the line). */
+  model: string;
   connect(): MessagePort;
 }
 
@@ -185,12 +187,12 @@ export const maiaSearchKey = signal('');
 export function linkMaia(link: MaiaLink | undefined): void {
   const was = maiaLink;
   maiaLink = link;
-  if (worker && (link?.elo !== was?.elo || !!link !== !!was)) {
+  if (worker && (link?.elo !== was?.elo || link?.model !== was?.model || !!link !== !!was)) {
     worker.postMessage({ type: 'maiaPort', port: null });
     connectMaia();
     postConfig();
   }
-  maiaSearchKey.value = link ? `maia ${link.elo}` : '';
+  maiaSearchKey.value = link ? `maia ${link.elo}${link.model === 'maia3' ? '' : ` ${link.model}`}` : '';
 }
 
 function connectMaia(): void {

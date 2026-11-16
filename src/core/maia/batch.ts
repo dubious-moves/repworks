@@ -5,6 +5,7 @@
 // flight is run once. The model's run, and how to wait for the turn's end, are passed in. Pure.
 import type { Position } from 'chessops/chess';
 import { positionKeyOf } from '../chess/positionKey.ts';
+import { historyKey, MAIA_BEFORE } from './history.ts';
 import { expectedScore, MAIA_HISTORY, MAIA_MOVES, MAIA_TOKENS, maiaHistoryTokens, maiaTokens, policyFrom, type MaiaMove } from './encode.ts';
 import { makeFen } from 'chessops/fen';
 
@@ -31,6 +32,8 @@ export interface MaiaBatchOptions {
   memo?: number;
   /** The model reads the positions before too (the 23M model, §5.188): `run`'s tokens are `[B, 64, 96]`. */
   history?: boolean;
+  /** How many of the positions before are read (at most 7, the default): fewer make the memo's keys shorter and its hits likelier (§5.190). */
+  before?: number;
 }
 
 export interface MaiaBatch {
@@ -52,6 +55,7 @@ export function createMaiaBatch(o: MaiaBatchOptions): MaiaBatch {
   const maxBatch = o.maxBatch ?? 32;
   const width = o.history ? MAIA_TOKENS * MAIA_HISTORY : MAIA_TOKENS;
   const memoMax = o.memo ?? 20000;
+  const depth = Math.max(0, Math.min(MAIA_BEFORE, o.before ?? MAIA_BEFORE));
   const memo = new Map<string, MaiaAnswer>();
   const inflight = new Map<string, Promise<MaiaAnswer>>();
   const queue: Queued[] = [];
@@ -102,8 +106,8 @@ export function createMaiaBatch(o: MaiaBatchOptions): MaiaBatch {
     ask(pos, elo, before) {
       const fen = makeFen(pos.toSetup());
       // The positions before, as the model sees them: their boards and sides to move.
-      const led = o.history && before?.length ? before.slice(-(MAIA_HISTORY - 1)) : [];
-      const key = `${positionKeyOf(pos)}|${elo}${led.length ? `|${led.map((f) => f.split(' ').slice(0, 2).join(' ')).join('|')}` : ''}`;
+      const led = o.history && before?.length && depth > 0 ? before.slice(-depth) : [];
+      const key = `${positionKeyOf(pos)}|${elo}${led.length ? `|${historyKey(led)}` : ''}`;
       const known = memo.get(key);
       if (known) return Promise.resolve(known);
       const flying = inflight.get(key);

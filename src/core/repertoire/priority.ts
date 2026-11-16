@@ -16,6 +16,7 @@
 // - Scoring (the lookups) and ordering are apart, so the panel's checkboxes re-order at once.
 // - Gaps: replies the scope doesn't cover, played at least `GAP_MIN_PROB` of the time at a
 //   position it reaches, by reach.
+import { beforeOf } from '../maia/history.ts';
 import type { Position } from 'chessops/chess';
 import { makeFen } from 'chessops/fen';
 import { makeSan, parseSan } from 'chessops/san';
@@ -39,7 +40,8 @@ export interface Shares {
 }
 export type ExplorerShares = (fen: string) => Promise<Shares>;
 /** Maia's probabilities at a position, by standard UCI; undefined when Maia isn't there. */
-export type MaiaShares = (fen: string) => Promise<ReadonlyMap<string, number> | undefined>;
+/** `before`: the positions the line passed through before `fen`, oldest first (the 23M Maia reads them, §5.190). */
+export type MaiaShares = (fen: string, before: readonly string[]) => Promise<ReadonlyMap<string, number> | undefined>;
 
 /** What scoring needs: the lines, and the explorer and Maia to look their positions up in. */
 export interface ScoreInput {
@@ -174,22 +176,23 @@ export async function scoreLines(input: ScoreInput): Promise<Scored> {
 
   // Coverage at the opponent's positions, and every position to look up (one lookup each).
   const covered = new Map<PositionKey, Map<string, string>>();
-  const fens = new Map<PositionKey, string>();
+  const fens = new Map<PositionKey, { fen: string; before: string[] }>();
   for (const w of walked)
-    for (const s of w.steps) {
-      if (!fens.has(s.key)) fens.set(s.key, s.fen);
-      if (s.own) continue;
+    w.steps.forEach((s, i) => {
+      // The first line to reach a position gives the history Maia is asked with.
+      if (!fens.has(s.key)) fens.set(s.key, { fen: s.fen, before: beforeOf(w.steps.slice(0, i + 1).map((x) => x.fen)) });
+      if (s.own) return;
       const here = covered.get(s.key) ?? new Map<string, string>();
       here.set(s.uci, s.san);
       covered.set(s.key, here);
-    }
+    });
   const explorer = new Map<PositionKey, Shares>();
   const maia = new Map<PositionKey, ReadonlyMap<string, number> | undefined>();
   let done = 0;
-  for (const [key, fen] of fens) {
+  for (const [key, { fen, before }] of fens) {
     const shares = await input.explorer(fen);
     explorer.set(key, shares);
-    if (shares.total < MIN_GAMES && input.maia) maia.set(key, await input.maia(fen));
+    if (shares.total < MIN_GAMES && input.maia) maia.set(key, await input.maia(fen, before));
     input.onProgress?.(++done, fens.size);
   }
 

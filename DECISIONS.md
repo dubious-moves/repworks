@@ -2633,3 +2633,22 @@ The technical calls, each with its reason:
   was only the endgame judge's). Given up: one more request to Lichess (the position alone, no
   token) per such position viewed on the analysis board, kept for the session. No data format
   changed.
+
+## Revision of 2026-11-15 (Maia reads the line wherever it is known; the gain measured: PLAN.md §5.190; D11)
+- **Everything that asks Maia sends the positions that led to the one asked (up to seven), where
+  the app knows them**: the explorer's columns and scores along the chapter's path, the Practical
+  search's tree, practice games (and the line they were started from), the endgames' defence, the
+  tactic scan, the continuation, the priority score, the storm's ratings and Continue. The first
+  model ignores them, so a device on it is unchanged. Why: the owner's task of 2026-11-15, after
+  §5.188 found that the 23M's whole gain is its history. Given up: the 23M's answers are kept
+  per line, so one position reached by two orders is asked twice (keys per position 1.13 at
+  seven positions, measured), and a Practical value is still kept by position.
+- **Measured, not believed** (`scripts/maia-eval.ts`, 7,876 Lichess middlegame positions): with
+  the line the 23M beats the first model by 0.055 NLL (95% −0.065..−0.046), better in every band,
+  also at a fixed rating and in blitz; without it, it is the first model's equal. **The default
+  stays the first model**; the recommendation (the 23M) and what changing it gives up are the
+  owner's question in §5.190. `MAIA_TOP`/`MAIA_MIN` and the storm's thresholds were not retuned:
+  measured, the 23M with the line is on the first model's scale.
+- No data format changed (`lead` on a continued card is never stored; a storm rating still
+  doesn't name its model, a field the owner is asked about).
+

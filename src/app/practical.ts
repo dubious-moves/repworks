@@ -61,7 +61,7 @@ export function excludedAt(fen: string): Set<string> {
   return new Set([...excluded].filter((k) => k.startsWith(prefix)).map((k) => k.slice(prefix.length)));
 }
 
-function send(rootFen: string, rows: string[], shares: ReadonlyMap<string, number>, remove: string[] = []) {
+function send(rootFen: string, rows: string[], shares: ReadonlyMap<string, number>, remove: string[] = [], before: readonly string[] = []) {
   const r = fenKey(rootFen);
   const s: Record<string, number> = {};
   for (const san of rows) {
@@ -70,7 +70,7 @@ function send(rootFen: string, rows: string[], shares: ReadonlyMap<string, numbe
     const key = `${r}|${san}`;
     if (results.get(key)?.state !== 'value') queued.add(key);
   }
-  postToWorker({ type: 'search', gen, rootFen, rows, shares: s, ...(remove.length ? { remove } : {}) });
+  postToWorker({ type: 'search', gen, rootFen, rows, shares: s, ...(remove.length ? { remove } : {}), ...(before.length ? { before: [...before] } : {}) });
   changed();
 }
 
@@ -78,8 +78,10 @@ function send(rootFen: string, rows: string[], shares: ReadonlyMap<string, numbe
  * The column at a position: `auto` the rows to compute without a click (rows.ts). A new position
  * cancels the rows still running for the old one; rows already answered stay, so going back is
  * instant. On the same position (the table's second answer), only rows not yet asked are added.
+ * `before`: the positions that led to `fen`, oldest first, for the 23M Maia (§5.190); a row's value
+ * is kept by position, so another way to the same position finds the first's.
  */
-export function practicalAt(fen: string, mine: boolean, auto: readonly string[], shares: ReadonlyMap<string, number>): void {
+export function practicalAt(fen: string, mine: boolean, auto: readonly string[], shares: ReadonlyMap<string, number>, before: readonly string[] = []): void {
   const r = fenKey(fen);
   if (r !== root) {
     gen++;
@@ -95,12 +97,12 @@ export function practicalAt(fen: string, mine: boolean, auto: readonly string[],
         if (!need.includes(san)) need.push(san);
       }
     }
-    send(fen, need, shares); // sent even when empty: it still cancels the old root
+    send(fen, need, shares, [], before); // sent even when empty: it still cancels the old root
     return;
   }
   if (!mine) return;
   const more = auto.filter((san) => !results.has(`${r}|${san}`) && !queued.has(`${r}|${san}`));
-  if (more.length) send(fen, more, shares);
+  if (more.length) send(fen, more, shares, [], before);
 }
 
 /** Nothing is wanted (the panel or the column off): the running search stops. */
@@ -114,11 +116,11 @@ export function practicalOff(): void {
 }
 
 /** A click on an empty cell (or a failed one: the retry) computes that row without playing it. */
-export function computeRow(fen: string, san: string, shares: ReadonlyMap<string, number>): void {
-  if (fenKey(fen) !== root) practicalAt(fen, true, [], shares);
+export function computeRow(fen: string, san: string, shares: ReadonlyMap<string, number>, before: readonly string[] = []): void {
+  if (fenKey(fen) !== root) practicalAt(fen, true, [], shares, before);
   const key = `${fenKey(fen)}|${san}`;
   if (results.get(key)?.state === 'error') results.delete(key);
-  send(fen, [san], shares);
+  send(fen, [san], shares, [], before);
 }
 
 /**

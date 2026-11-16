@@ -111,22 +111,29 @@ export function legalMoves(pos: Position): { uci: string; san: string }[] {
 }
 
 /**
- * Maia's policy in `pos` from the move logits of its row (`logits` from `offset`): the legal
- * moves, most likely first, the tail under `MIN_PROB` dropped. Empty with no legal move.
+ * The logit the model gives each legal move of `pos` (`logits` from `offset`), in the order of
+ * `legalMoves`; empty with no legal move. The whole distribution, for a score over every move.
  */
-export function policyFrom(pos: Position, logits: ArrayLike<number>, offset = 0): MaiaMove[] {
+export function legalLogits(pos: Position, logits: ArrayLike<number>, offset = 0): { san: string; uci: string; logit: number }[] {
   const black = pos.turn === 'black';
-  const moves = legalMoves(pos);
-  if (!moves.length) return [];
-  const ls = moves.map((m) => {
+  return legalMoves(pos).map((m) => {
     const move = parseUci(m.uci) as NormalMove;
     const sq = (n: number) => `${'abcdefgh'[n & 7]}${(n >> 3) + 1}`;
     const from = black ? flip(sq(move.from)) : sq(move.from);
     const to = black ? flip(sq(move.to)) : sq(move.to);
-    return logits[offset + moveIndex(from, to, move.promotion ? ROLE_LETTER[move.promotion] : undefined)]!;
+    return { ...m, logit: logits[offset + moveIndex(from, to, move.promotion ? ROLE_LETTER[move.promotion] : undefined)]! };
   });
-  const max = Math.max(...ls);
-  const e = ls.map((x) => Math.exp(x - max));
+}
+
+/**
+ * Maia's policy in `pos` from the move logits of its row (`logits` from `offset`): the legal
+ * moves, most likely first, the tail under `MIN_PROB` dropped. Empty with no legal move.
+ */
+export function policyFrom(pos: Position, logits: ArrayLike<number>, offset = 0): MaiaMove[] {
+  const moves = legalLogits(pos, logits, offset);
+  if (!moves.length) return [];
+  const max = Math.max(...moves.map((m) => m.logit));
+  const e = moves.map((m) => Math.exp(m.logit - max));
   const z = e.reduce((a, b) => a + b, 0);
   return moves
     .map((m, i) => ({ san: m.san, uci: m.uci, prob: e[i]! / z }))

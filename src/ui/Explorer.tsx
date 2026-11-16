@@ -24,7 +24,8 @@ import { cellOf, computeRow, excludedAt, practicalAt, practicalOff, practicalVer
 import type { PositionKey } from '../core/chess/positionKey.ts';
 import type { Occurrence } from '../core/repertoire/index.ts';
 import type { Chapter } from '../core/study/model.ts';
-import { nodeAt, positionAt, type Path } from '../core/study/tree.ts';
+import { nodeAt, positionAt, positionsTo, type Path } from '../core/study/tree.ts';
+import { beforeOf } from '../core/maia/history.ts';
 import { movesFrom, transposedFrom, transpositions } from '../core/study/transpositions.ts';
 import { play, SCRATCH, side as chapterSide, study } from '../app/editor.ts';
 import { askChildren, childAnswers, childKey, lookAt, lookup, pausedUntil, prefs, retryLookup, setPrefs, type ScoreView } from '../app/explorer.ts';
@@ -128,6 +129,8 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
   const shown = useRef<Shown | undefined>(undefined);
   const pos = useMemo(() => positionAt(props.chapter, props.path), [props.chapter, props.path]);
   const fen = pos ? makeFen(pos.toSetup()) : undefined;
+  // The positions that led here along the line the board is on, which the 23M Maia reads (§5.190).
+  const before = useMemo(() => beforeOf(positionsTo(props.chapter, props.path)), [props.chapter, props.path]);
   const filter = `${p.speeds.join()}|${p.ratings.join()}|${p.recent}|${p.local}`;
   useEffect(() => lookAt(p.on ? fen : undefined), [fen, p.on, p.tab, filter]);
   useEffect(() => () => lookAt(undefined), []);
@@ -140,9 +143,9 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
   const elo = maiaElo.value;
   useEffect(() => {
     if (!maiaOn || !fen) return;
-    const t = setTimeout(() => requestPolicy(fen), 120);
+    const t = setTimeout(() => requestPolicy(fen, before), 120);
     return () => clearTimeout(t);
-  }, [fen, maiaOn, maiaReady, elo]);
+  }, [fen, before, maiaOn, maiaReady, elo]);
 
   const s = study.value;
   /** The analysis board (§5.35): no study is open, so the third tab is the whole repertoire's (§5.165). */
@@ -194,7 +197,7 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
     repertoire: new Map([...repertoire].map(([san, o]) => [san, o.length])),
   };
   // Maia's likelihoods (Qchess shows its top 20) and its top four, once it has answered.
-  const seen = maiaOn ? maiaSeen.value.get(maiaKey(fen, elo)) : undefined;
+  const seen = maiaOn ? maiaSeen.value.get(maiaKey(fen, elo, before)) : undefined;
   if (seen?.policy) input.maia = { probs: new Map(seen.policy.slice(0, MAIA_SHOWN).map((m) => [m.san, m.prob] as const)), top: seen.policy.slice(0, MAIA_ROWS).map((m) => m.san) };
   // Maia's order without Maia: Qchess falls back to popularity.
   if (p.sort === 'maia' && !maiaOn) input.sort = 'popularity';
@@ -382,7 +385,7 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
           const shared = { chapter: props.chapter, path: props.path, pos, rows: asking ? undefined : table.rows, games, cols: { ...cols, prac: false, ml: false, ms: false }, source: p.tab === 'lichess' ? lichessLabel : 'Masters' };
           return scratch ? <RepertoireTab {...shared} /> : <StudyTab sid={s.sid} cid={s.cid} {...shared} />;
         })()}
-      {!p.study && prac && <PracticalDriver fen={fen} mine={mine} rows={table.rows} turn={turn} shares={shares} excludedKey={[...excludedAt(fen)].join()} />}
+      {!p.study && prac && <PracticalDriver fen={fen} before={before} mine={mine} rows={table.rows} turn={turn} shares={shares} excludedKey={[...excludedAt(fen)].join()} />}
       {!p.study && wantedFens.length > 0 && <ChildDriver tab={p.tab} fens={wantedFens} filter={filter} />}
       {!p.study && (
       <>
@@ -464,7 +467,7 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
       {stale && <StaleRows shown={stale} cols={colsOf(stale.games, stale.prac, stale.maia)} />}
       {!stale && table.rows.length > 0 && (
         <div class="explorer-rows" role="list">
-          {maiaOn && seen?.policy && <MaiaScores fen={fen} sans={table.rows.slice(0, MAIA_ROWS).map((r) => r.san)} ready={maiaReady} />}
+          {maiaOn && seen?.policy && <MaiaScores fen={fen} before={before} sans={table.rows.slice(0, MAIA_ROWS).map((r) => r.san)} ready={maiaReady} />}
           {table.rows.map((r, i) => {
             const cell = cells.get(r.san)!;
             const res = cell.result;
@@ -506,7 +509,7 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
                           viewMaia={viewMaia}
                           best={viewMaia ? (cell.maia && maiaBest.cmp.has(cell.maia) ? maiaBest.best : null) : res && best.cmp.has(res) ? best.best : null}
                           detail={detail}
-                          onCompute={() => computeRow(fen, r.san, shares)}
+                          onCompute={() => computeRow(fen, r.san, shares, before)}
                           onExclude={() => toggleExclude(fen, r.san, shares)}
                         />
                       ),
@@ -927,18 +930,18 @@ function MaiaCell(props: { fen: string; san: string; cell: CellState; mine: bool
 }
 
 /** Asks Maia for Qchess's Ms of the first rows, once its policy is in. */
-function MaiaScores(props: { fen: string; sans: string[]; ready: boolean }) {
+function MaiaScores(props: { fen: string; before: readonly string[]; sans: string[]; ready: boolean }) {
   const key = props.sans.join(' ');
-  useEffect(() => requestScores(props.fen, props.sans), [props.fen, key, props.ready]);
+  useEffect(() => requestScores(props.fen, props.sans, props.before), [props.fen, props.before, key, props.ready]);
   return null;
 }
 
 /** Asks the worker for the rows the column computes without a click, as the table changes. */
-function PracticalDriver(props: { fen: string; mine: boolean; rows: readonly TableRow[]; turn: 'w' | 'b'; shares: ReadonlyMap<string, number>; excludedKey: string }) {
+function PracticalDriver(props: { fen: string; before: readonly string[]; mine: boolean; rows: readonly TableRow[]; turn: 'w' | 'b'; shares: ReadonlyMap<string, number>; excludedKey: string }) {
   const p = prefs.value;
   const auto = props.mine ? autoRows(props.rows, props.turn, excludedAt(props.fen), { margin: p.ownMargin, maxCandidates: p.ownMaxCandidates, minShare: 0.02 }) : [];
   const key = auto.join(' ');
-  useEffect(() => practicalAt(props.fen, props.mine, auto, props.shares), [props.fen, props.mine, key]);
+  useEffect(() => practicalAt(props.fen, props.mine, auto, props.shares, props.before), [props.fen, props.mine, key]);
   useEffect(() => () => practicalOff(), []);
   return null;
 }

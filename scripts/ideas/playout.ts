@@ -44,9 +44,9 @@ export interface Playouts {
   moves: Record<Color, [string, number][]>;
 }
 
-async function choose(engine: Engine, pos: Position, player: Player, random: () => number): Promise<string | undefined> {
+async function choose(engine: Engine, pos: Position, player: Player, random: () => number, before: readonly string[] = []): Promise<string | undefined> {
   if (player.kind === 'maia') {
-    const read = await maia(pos, player.elo);
+    const read = await maia(pos, player.elo, before);
     let r = random();
     for (const m of read.moves) {
       r -= m.prob;
@@ -70,14 +70,17 @@ export async function playouts(engine: Engine, start: Position, o: { n: number; 
   for (let g = 0; g < o.n; g++) {
     const pos = start.clone();
     const sans: string[] = [];
+    /** The positions before `pos` in this game, for the 23M Maia. */
+    const seen: string[] = [];
     for (let ply = 0; ply < o.plies && !pos.isEnd(); ply++) {
-      const uci = await choose(engine, pos, pos.turn === 'white' ? o.white : o.black, random);
+      const uci = await choose(engine, pos, pos.turn === 'white' ? o.white : o.black, random, seen);
       const move = uci && parseUciMove(pos, uci);
       if (!move) break;
       const san = makeSan(pos, move);
       const group = moveGroup(pos, san);
       counts[pos.turn].set(group, (counts[pos.turn].get(group) ?? 0) + 1);
       sans.push(san);
+      seen.push(makeFen(pos.toSetup()));
       pos.play(move);
     }
     let end: string;

@@ -12,6 +12,7 @@ import { Chess } from 'chessops/chess';
 import { makeFen, parseFen } from 'chessops/fen';
 import { parseSan } from 'chessops/san';
 import { standardUci } from '../chess/uci.ts';
+import { trailBefore } from '../maia/history.ts';
 import { STORM } from '../storm/config.ts';
 import { LICHESS_RATE, OWN_BURST, type LimiterSnapshot, type Now, type Sleep } from './limiter.ts';
 import { createProviders, localAddress, SAME_CP, TTL, type CompactExplorer, type ExplorerCache, type ExplorerFilter, type Http, type ProviderStats } from './providers.ts';
@@ -71,9 +72,10 @@ export type ToWorker =
   | { type: 'counts'; id: number; fen: string }
   /**
    * The Practical rows of a root position. A higher `gen` is a new root: the old one's queued
-   * requests go at once. `shares` (the rows' shares of the games) order the requests.
+   * requests go at once. `shares` (the rows' shares of the games) order the requests. `before`: the
+   * positions that led to the root (oldest first), which the 23M Maia reads (§5.190).
    */
-  | { type: 'search'; gen: number; rootFen: string; rows: string[]; remove?: string[]; shares: Record<string, number> }
+  | { type: 'search'; gen: number; rootFen: string; rows: string[]; remove?: string[]; shares: Record<string, number>; before?: string[] }
   | { type: 'stats' }
   /**
    * The storm's gather (§5.42): a position's games at the storm's relaxed filter (every speed,
@@ -130,7 +132,8 @@ export interface ServiceOptions {
   sleep: Sleep;
   post(message: FromWorker): void;
   /** Maia's policy at a position and rating, or null when Maia can't answer (§5.34). */
-  maia?(fen: string, elo: number): Promise<MaiaMove[] | null>;
+  /** `before`: the positions that led to `fen`, oldest first, for the 23M Maia (§5.190). */
+  maia?(fen: string, elo: number, before?: string[]): Promise<MaiaMove[] | null>;
 }
 
 export interface ExplorerService {
@@ -386,7 +389,7 @@ export function createExplorerService(o: ServiceOptions): ExplorerService {
   // including ones added later by a click.
   const st: { gen: number; search: { add(sans: string[]): void; remove(san: string): boolean } | null; root: string } = { gen: 0, search: null, root: '' };
 
-  function startRoot(gen: number, rootFen: string, shares: Record<string, number>) {
+  function startRoot(gen: number, rootFen: string, shares: Record<string, number>, rootBefore: readonly string[] = []) {
     const rootStale = () => gen < st.gen;
     const filter: ExplorerFilter = { ...config.filter, db: 'lichess' };
     const budget: Budget = { limit: Number(config.budget) || DEFAULT_BUDGET, spent: 0 };
@@ -451,7 +454,18 @@ export function createExplorerService(o: ServiceOptions): ExplorerService {
           );
         };
       }
-      if (maiaOn) provider.maia = (fen: string) => (isStale() ? Promise.resolve(null) : ask!(fen, maiaElo).catch(() => null));
+      if (maiaOn) {
+        provider.maia = (fen: string, info) => {
+          if (isStale()) return Promise.resolve(null);
+          let before: string[] | undefined;
+          try {
+            before = trailBefore(rootBefore, rootFen, info?.moves, (f, s) => child(f, s).fen);
+          } catch {
+            before = undefined; // a move that isn't legal here: asked without
+          }
+          return ask!(fen, maiaElo, before).catch(() => null);
+        };
+      }
       return provider;
     }
 
@@ -509,7 +523,7 @@ export function createExplorerService(o: ServiceOptions): ExplorerService {
       // A new root: older rows are now stale, and their queued requests go at once.
       st.gen = msg.gen;
       st.root = fenKey(msg.rootFen);
-      st.search = startRoot(msg.gen, msg.rootFen, msg.shares || {});
+      st.search = startRoot(msg.gen, msg.rootFen, msg.shares || {}, msg.before);
       providers.sweep();
     }
     const search = st.search;

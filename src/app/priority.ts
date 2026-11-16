@@ -170,8 +170,8 @@ async function score(data: TrainData, scope: PriorityScope, onProgress?: (done: 
     },
     ...(useMaia
       ? {
-          maia: async (fen: string) => {
-            const policy = await maiaPolicy(fen, elo);
+          maia: async (fen: string, before: readonly string[]) => {
+            const policy = await maiaPolicy(fen, elo, before);
             return policy ? new Map(policy.map((m) => [m.uci, m.prob])) : undefined;
           },
         }
