@@ -71,6 +71,8 @@ const closeSettings = (page: Page) => page.getByRole('dialog', { name: 'Engine s
 test('the switch: its runtime downloaded once, Lc0 checked and answering from the graphics processor, Maia falling back; kept, and off', async ({ page, isMobile }) => {
   test.skip(isMobile, 'the same Chromium as the desktop project');
   test.setTimeout(240_000);
+  // The first model, which needs 16-bit floats in shaders (the 23M's export doesn't, §5.188): the default is the 23M since §5.191.
+  await page.addInitScript(() => localStorage.getItem('repworks-maia') ?? localStorage.setItem('repworks-maia', JSON.stringify({ on: false, rating: 0, model: 'maia3' })));
   await openChapter(page, { evenIfSlower: true });
   test.skip(!(await hasAdapter(page)), 'this Chromium offers no WebGPU adapter, even a software one');
 

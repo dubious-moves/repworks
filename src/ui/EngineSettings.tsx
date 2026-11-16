@@ -148,8 +148,8 @@ function Dialog() {
         <Choice label="Maia’s model" values={MAIA_MODELS} value={model} format={maiaModelName} onPick={setModel} />
         <p class="muted" data-testid="maia-model-note">
           {model === 'maia3-23m'
-            ? `The official 23M model: it reads the seven positions before too where a game gives them (a practice game’s opponent); elsewhere the position stands for them. A download of ${megabytes(maiaFilesOf(model)[0]!.bytes)}, once.`
-            : 'The Maia platform’s model: the position alone.'}
+            ? `The official 23M model, the default: it reads the seven positions before too, wherever the app knows the line (the study’s path, a game’s moves); elsewhere the position stands for them. A download of ${megabytes(maiaFilesOf(model)[0]!.bytes)}, once.`
+            : 'The Maia platform’s model: the position alone. The 23M model predicts human moves better where the line is known.'}
         </p>
         <GpuChoice />
         <EngineFiles />

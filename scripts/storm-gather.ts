@@ -21,8 +21,8 @@
 //   --engines N        Stockfish engines at once (default: one a core)
 //   --elo N[,N…]       Maia's ratings beyond its ladder (default: those the devices' positions carry)
 //   --no-maia, --no-deepen     leave those to the devices
-//   --maia-model M     Maia's model: first (default, the devices' unless chosen otherwise) or 23m, the official 23M,
-//                      which reads each position's line (PLAN.md §5.190); the ratings are the model's they were made with
+//   --maia-model M     Maia's model: 23m (default, the official 23M, which reads each position's line, PLAN.md §5.190)
+//                      or first; each rating is kept with the model that made it (§5.191)
 //   --score-only       no gathering: Stockfish scores the cloud's positions short of the standard
 //                      (every device's with --all-devices; for --score-minutes at most), and that is all
 //   --all-devices      Stockfish scores every device's positions, not only the cloud's: each one
@@ -41,7 +41,7 @@ import { validateDataRepo } from '../src/core/data/validate.ts';
 import { STORM, withPlyRange } from '../src/core/storm/config.ts';
 import { GATHER_STOPPED, runGather, serviceIo, type Gathering, type GatherSource, type StormAsk, type StormReply } from '../src/core/storm/gather.ts';
 import { afterOf, deepenedPosition, engineList, judges, needsDeepening, storedList, withAfter, type StoredPosition } from '../src/core/storm/harvest.ts';
-import { keptPolicy, likelyToSearch, missingRatings } from '../src/core/storm/maia.ts';
+import { keptPolicy, likelyToSearch, missingRatings, ratingModelOf } from '../src/core/storm/maia.ts';
 import { fenAfterUci, positionOf } from '../src/core/storm/walk.ts';
 import { readTree } from './read-tree.ts';
 import { addPositions, CLOUD_DEVICE, cloudDevice, findScope, gatherScope, maiaElos, ownFileChanges, positionsToWork, readRepertoire, readShared, withList } from './storm/data.ts';
@@ -75,7 +75,7 @@ interface Options {
 }
 
 function options(argv: string[]): Options {
-  const o: Options = { dir: '', overnight: false, source: 'both', minPly: STORM.minPly, maxPly: STORM.maxPly, engines: availableParallelism(), maia: true, maiaModel: 'first', deepen: true, scoreOnly: false, allDevices: false, push: false };
+  const o: Options = { dir: '', overnight: false, source: 'both', minPly: STORM.minPly, maxPly: STORM.maxPly, engines: availableParallelism(), maia: true, maiaModel: '23m', deepen: true, scoreOnly: false, allDevices: false, push: false };
   const num = (flag: string, v: string | undefined) => {
     const n = Number(v);
     if (!v || !Number.isFinite(n) || n <= 0) throw new Error(`${flag} wants a positive number`);
@@ -398,17 +398,18 @@ async function main(): Promise<void> {
     await Promise.all(Array.from({ length: engines.width }, lane));
     return kept;
   };
+  const by = ratingModelOf(o.maiaModel === '23m' ? 'maia3-23m' : 'maia3');
   const rate = async (): Promise<number> => {
-    const todo = ownToWork().filter((p) => missingRatings(p.maia, elos[0]!, elos).length);
+    const todo = ownToWork().filter((p) => missingRatings(p.maia, elos[0]!, elos, by).length);
     if (!todo.length) return 0;
     say(`Maia rating ${todo.length} positions at ${elos.join(', ')}`);
     let n = 0;
     for (const p of todo) {
       if (stopping) break;
-      const want = missingRatings(p.maia, elos[0]!, elos);
+      const want = missingRatings(p.maia, elos[0]!, elos, by);
       const policies = await maiaPolicies(p.fen, want, o.maiaModel === '23m' ? storedBefore(p, (sid, cid) => chapterOf.get(`${sid}/${cid}`)) : undefined);
       if (!policies) continue;
-      const fresh = want.map((e, i) => keptPolicy(e, policies[i]!));
+      const fresh = want.map((e, i) => keptPolicy(e, policies[i]!, by));
       const cur = store.get(p.card);
       if (cur) store.set(p.card, { ...cur, maia: [...(cur.maia ?? []).filter((r) => !want.includes(r.elo)), ...fresh].sort((a, b) => a.elo - b.elo) });
       n++;

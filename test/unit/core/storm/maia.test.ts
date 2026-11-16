@@ -18,7 +18,7 @@ import assert from 'node:assert/strict';
 import { STORM as C } from '../../../../src/core/storm/config.ts';
 import type { ScoredList, ScoredMove } from '../../../../src/core/storm/grade.ts';
 import { deepenedPosition, type StoredPosition } from '../../../../src/core/storm/harvest.ts';
-import { difficulty, difficultyWords, foundShare, judgeMove, keptPolicy, MAIA_LADDER, maiaChoice, maiaLine, likelyToSearch, missingRatings, unintuitive, unlistedLikely, type MaiaRating } from '../../../../src/core/storm/maia.ts';
+import { difficulty, difficultyWords, foundShare, judgeMove, keptPolicy, MAIA_LADDER, maiaChoice, maiaLine, likelyToSearch, missingRatings, ratingModelOf, unintuitive, unlistedLikely, type MaiaRating } from '../../../../src/core/storm/maia.ts';
 
 // Win% lost against the best (0): 30 cp ≈ 2.7 (great), 60 ≈ 5.5 (good), 100 ≈ 9.1 (inaccuracy),
 // 200 ≈ 17.6 (mistake), 400 a blunder.
@@ -150,4 +150,18 @@ test('the likely moves to search at several ratings (§5.161): each once, by its
   assert.deepEqual(likelyToSearch(ratings, [1500, 1000], sf(20), ['a2a3'], 0.2, C), ['h2h3']);
   assert.deepEqual(likelyToSearch(ratings, [1500], sf(14), [], 0.2, C), []);
   assert.deepEqual(likelyToSearch(undefined, [1500], sf(20), [], 0.2, C), []);
+});
+
+test('a rating keeps the model that made it; the first model\'s are wanted again by the 23M, never the other way (§5.191)', () => {
+  const policy = [{ uci: 'e2e4', prob: 0.6 }];
+  assert.deepEqual(keptPolicy(1800, policy), { elo: 1800, moves: [['e2e4', 0.6]] }, 'the first model: no mark, as every rating before');
+  assert.deepEqual(keptPolicy(1800, policy, '23m'), { elo: 1800, moves: [['e2e4', 0.6]], m: '23m' });
+  assert.equal(ratingModelOf('maia3'), undefined);
+  assert.equal(ratingModelOf('maia3-23m'), '23m');
+  const old = [1000, 1400, 1800, 2200, 2600].map((e) => rating(e, []));
+  assert.deepEqual(missingRatings(old, 1800, [], undefined), [], 'the first model is content with its own');
+  assert.deepEqual(missingRatings(old, 1800, [], '23m'), [...MAIA_LADDER], 'the 23M makes them again');
+  const mixed = [...old.slice(0, 3), { ...rating(2200, []), m: '23m' as const }, { ...rating(2600, []), m: '23m' as const }];
+  assert.deepEqual(missingRatings(mixed, 1800, [], '23m'), [1000, 1400, 1800]);
+  assert.deepEqual(missingRatings(mixed, 1800, [], undefined), [], 'the 23M\'s ratings stand for the first model\'s request');
 });

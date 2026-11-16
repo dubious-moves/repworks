@@ -6,7 +6,7 @@
 import { positionKeyOf } from '../chess/positionKey.ts';
 import { stormFilePath } from '../data/layout.ts';
 import { unionAfter, type AfterScore, type StoredPosition } from './harvest.ts';
-import type { MaiaRating } from './maia.ts';
+import { ratedAsWellAs, type MaiaRating } from './maia.ts';
 import { positionOf } from './walk.ts';
 
 /** Positions to a file: about 1.5 KB each, so a file stays under a megabyte. */
@@ -97,7 +97,7 @@ export function parsePositionLine(line: string): StoredPosition | null {
     games,
     at: o['at'],
   };
-  if (maia !== undefined) out.maia = (maia as { elo: number; moves: [string, number][] }[]).map((r) => ({ elo: r.elo, moves: r.moves.map((m): [string, number] => [m[0], m[1]]) }));
+  if (maia !== undefined) out.maia = (maia as { elo: number; moves: [string, number][]; m?: unknown }[]).map((r): MaiaRating => ({ elo: r.elo, moves: r.moves.map((m): [string, number] => [m[0], m[1]]), ...(r.m === '23m' ? { m: r.m } : {}) }));
   if (kind !== undefined) out.kind = kind as NonNullable<StoredPosition['kind']>;
   if (Array.isArray(after) && after.length) out.after = (after as Record<string, unknown>[]).map((a): AfterScore => ({ u: a['u'] as string, s: a['s'] as number, d: a['d'] as number }));
   return out;
@@ -146,14 +146,20 @@ function betterList(a: Pick<StoredPosition, 'src' | 'depth'>, b: Pick<StoredPosi
   return a.src === 'sf' && a.depth > b.depth;
 }
 
-/** Maia's ratings of both, by rating; `ours` where both have one. */
+/** Maia's ratings of both, by rating; `ours` where both have one, unless theirs is a better model's (§5.191). */
 function unionMaia(ours: readonly MaiaRating[] | undefined, theirs: readonly MaiaRating[] | undefined): MaiaRating[] | undefined {
   if (!theirs?.length) return ours ? [...ours] : undefined;
-  const have = new Set((ours ?? []).map((r) => r.elo));
-  const extra = theirs.filter((r) => !have.has(r.elo));
-  if (!extra.length) return ours ? [...ours] : undefined;
-  return [...(ours ?? []), ...extra].sort((a, b) => a.elo - b.elo);
+  const mine = new Map((ours ?? []).map((r) => [r.elo, r]));
+  for (const r of theirs) {
+    const have = mine.get(r.elo);
+    if (!have || (ratedAsWellAs(r, have) && !ratedAsWellAs(have, r))) mine.set(r.elo, r);
+  }
+  return [...mine.values()].sort((a, b) => a.elo - b.elo);
 }
+
+/** Whether two sets of ratings are the same: by rating and by the model that made each. */
+const sameMaia = (a: readonly MaiaRating[] | undefined, b: readonly MaiaRating[] | undefined): boolean =>
+  (a?.length ?? 0) === (b?.length ?? 0) && (a ?? []).every((r) => b!.some((x) => x.elo === r.elo && x.m === r.m));
 
 const sameAfter = (a: readonly AfterScore[], b: readonly AfterScore[] | undefined): boolean =>
   a.length === (b?.length ?? 0) && a.every((x) => b!.some((y) => y.u === x.u && y.d === x.d && y.s === x.s));
@@ -169,7 +175,7 @@ export function mergeShared(local: StoredPosition | undefined, incoming: StoredP
   let out: StoredPosition | null = null;
   if (betterList(incoming, local)) out = { ...local, scored: incoming.scored, src: incoming.src, depth: incoming.depth };
   const maia = unionMaia(local.maia, incoming.maia);
-  if (maia && maia.length !== (local.maia?.length ?? 0)) out = { ...(out ?? local), maia };
+  if (maia && !sameMaia(maia, local.maia)) out = { ...(out ?? local), maia };
   // The searches after moves (§5.161): each move's deeper one.
   const after = unionAfter(local.after, incoming.after);
   if (after && !sameAfter(after, local.after)) out = { ...(out ?? local), after };

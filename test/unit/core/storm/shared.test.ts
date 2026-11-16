@@ -140,3 +140,15 @@ test('searches after moves merged: each move’s deeper search, the rest kept; n
   // A position not kept here comes in with its searches.
   assert.deepEqual(mergeShared(undefined, theirs, 'Other123')!.after, theirs.after);
 });
+
+test('Maia ratings keep their model through a file; a better model\'s rating replaces another device\'s, never the other way (§5.191)', () => {
+  const first = { elo: 1500, moves: [['a7a6', 0.4]] as [string, number][] };
+  const big = { elo: 1500, moves: [['a7a6', 0.5]] as [string, number][], m: '23m' as const };
+  const back = parsePositionLine(positionLine(pos(FEN, T0, { maia: [{ ...big, elo: 1100 }, first] })))!;
+  assert.deepEqual(back.maia, [{ ...big, elo: 1100 }, first], 'the mark is written and read; an unmarked rating stays unmarked');
+  const mine = pos(FEN, T0, { maia: [first] });
+  const upgraded = mergeShared(mine, pos(FEN, T0, { maia: [big] }), 'Other123')!;
+  assert.deepEqual(upgraded.maia, [big], 'the same number of ratings, a better one: changed');
+  assert.equal(mergeShared(pos(FEN, T0, { maia: [big] }), pos(FEN, T0, { maia: [first] }), 'Other123'), null, 'a worse model\'s rating is not taken');
+  assert.equal(mergeShared(mine, pos(FEN, T0, { maia: [{ ...first, moves: [['a7a5', 0.9]] }] }), 'Other123'), null, 'the same model: the local one stands');
+});

@@ -35,9 +35,9 @@ import { analyseForStorm, cancelStormEngine, endStormEngine, focusedWidth, setSt
 import { lineView } from './lineView.ts';
 import { trainData, type TrainData } from './train.ts';
 import { puzzlePrefs, readyPuzzles } from './puzzles.ts';
-import { keptPolicy, likelyToSearch, missingRatings, type MaiaRating } from '../core/storm/maia.ts';
+import { keptPolicy, likelyToSearch, missingRatings, ratingModelOf, type MaiaRating } from '../core/storm/maia.ts';
 import { cleanFocus, cleanLevelUp, easyAt, FOCUSES, LEVEL_DEFAULT, tooEasyAt, matchesFocus, positionTags, withLevelUp, type Focus, type LevelUp } from '../core/storm/kinds.ts';
-import { maiaElo, maiaPolicies, maiaStored } from './maia.ts';
+import { maiaElo, maiaPolicies, maiaPrefs, maiaStored } from './maia.ts';
 import { storedBefore } from '../core/storm/history.ts';
 import type { ReadyPuzzle } from '../core/puzzles/puzzles.ts';
 import { smallDevice } from './device.ts';
@@ -273,7 +273,7 @@ async function homeOf(s: StormScopeData): Promise<StormHome | undefined> {
   const ready = all.filter((p) => !h.get(p.card)?.done);
   const lines = new Set(ready.map(positionLineKey).filter(Boolean)).size;
   const elo = maiaElo.peek();
-  const rated = ready.filter((p) => !missingRatings(p.maia, elo, levelElos()).length).length;
+  const rated = ready.filter((p) => !missingRatings(p.maia, elo, levelElos(), ratedBy()).length).length;
   const tc = tagConfig();
   const tags = Object.fromEntries(FOCUSES.map((f) => [f, 0])) as Record<Focus, number>;
   const focus = stormPrefs.value.focus;
@@ -608,14 +608,16 @@ export async function rateWithMaia(s: StormScopeData): Promise<void> {
     const data = trainData.value;
     const h = data ? histories(data) : new Map<string, StormHistory>();
     const elo = maiaElo.peek();
-    const todo = storedInScope(await stormStore().positions(), s).filter((p) => missingRatings(p.maia, elo, levelElos()).length && !h.get(p.card)?.done);
+    // The model that rates them (§5.191): ratings the first model made are made again by the 23M.
+    const by = ratedBy();
+    const todo = storedInScope(await stormStore().positions(), s).filter((p) => missingRatings(p.maia, elo, levelElos(), ratedBy()).length && !h.get(p.card)?.done);
     for (const p of todo) {
       if (busy()) return;
-      const elos = missingRatings(p.maia, elo, levelElos());
+      const elos = missingRatings(p.maia, elo, levelElos(), by);
       const policies = await maiaPolicies(p.fen, elos, beforeStored(p));
       // Maia couldn't answer (stopped, or failed): tried again on the next visit.
       if (!policies) return;
-      const fresh: MaiaRating[] = elos.map((e, i) => keptPolicy(e, policies[i]!));
+      const fresh: MaiaRating[] = elos.map((e, i) => keptPolicy(e, policies[i]!, by));
       await stormStore().updatePosition(p.card, (cur) => ({ ...cur, maia: [...(cur.maia ?? []).filter((r) => !elos.includes(r.elo)), ...fresh].sort((a, b) => a.elo - b.elo) }));
       if (!p.from) shareSoon(stormStore());
       if (Date.now() - shown > 2000) {
@@ -1721,6 +1723,9 @@ export async function saveStormMistake(item: StormItem, rank: CardRank = 'normal
   await recordSaved(gameCard(m.item.pid), { ...m.item }, rank);
   return true;
 }
+
+/** The mark a rating made now carries: the model chosen on this device (§5.191). */
+const ratedBy = () => ratingModelOf(maiaPrefs.peek().model);
 
 /** The positions that led to a stored position, for the 23M Maia (§5.190): its line's, from the chapter. */
 const beforeStored = (p: StoredPosition): string[] => storedBefore(p, (sid, cid) => trainData.peek()?.chapters.get(`${sid}/${cid}`));

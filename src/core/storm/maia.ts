@@ -18,21 +18,36 @@ export const JUDGED_MIN = 0.6;
 export interface MaiaRating {
   elo: number;
   moves: [string, number][];
+  /** The model that rated it (§5.191): `23m`, the official 23M; absent for the first model, which every rating before then came from. */
+  m?: RatingModel;
 }
 
+/** The models a rating can come from, worst first: a rating of a later one stands for an earlier's. */
+export const RATING_MODELS = ['first', '23m'] as const;
+export type RatingModel = Exclude<(typeof RATING_MODELS)[number], 'first'>;
+const rank = (m: RatingModel | undefined): number => (m ? RATING_MODELS.indexOf(m) : 0);
+/** Whether `a` was made by a model at least as good as `b`'s. */
+export const ratedAsWellAs = (a: MaiaRating, b: MaiaRating | RatingModel | undefined): boolean => rank(a.m) >= rank(typeof b === 'object' ? b.m : b);
+/** The model a rating made now carries: the 23M's mark, none for the first model. */
+export const ratingModelOf = (model: string): RatingModel | undefined => (model === 'maia3-23m' ? '23m' : undefined);
+
 /** A policy as kept with a position: the likely moves only, to three decimals. */
-export function keptPolicy(elo: number, policy: readonly { uci: string; prob: number }[]): MaiaRating {
+export function keptPolicy(elo: number, policy: readonly { uci: string; prob: number }[], m?: RatingModel): MaiaRating {
   const moves = policy
     .filter((m) => m.prob >= KEEP_PROB)
     .map((m): [string, number] => [m.uci, Math.round(m.prob * 1000) / 1000])
     .sort((a, b) => b[1] - a[1]);
-  return { elo, moves };
+  return { elo, moves, ...(m ? { m } : {}) };
 }
 
-/** The ratings a position still wants: the ladder's, the user's and `extra` (level up's, §5.118), those it has left out. */
-export function missingRatings(have: readonly MaiaRating[] | undefined, userElo: number, extra: readonly number[] = []): number[] {
+/**
+ * The ratings a position still wants: the ladder's, the user's and `extra` (level up's, §5.118),
+ * those it has left out, and those a worse model made than `model` (§5.191: the first model's
+ * ratings are made again by the 23M; a rating of the 23M stands for the first model's request).
+ */
+export function missingRatings(have: readonly MaiaRating[] | undefined, userElo: number, extra: readonly number[] = [], model?: RatingModel): number[] {
   const want = [...new Set([...MAIA_LADDER, userElo, ...extra])];
-  return want.filter((e) => !have?.some((r) => r.elo === e));
+  return want.filter((e) => !have?.some((r) => r.elo === e && ratedAsWellAs(r, model)));
 }
 
 /** Whether a list can judge a move (§5.80, §5.84): Stockfish's at `judgeDepth` or deeper, never ChessDB's. */

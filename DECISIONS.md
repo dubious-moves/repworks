@@ -2652,3 +2652,13 @@ The technical calls, each with its reason:
 - No data format changed (`lead` on a continued card is never stored; a storm rating still
   doesn't name its model, a field the owner is asked about).
 
+## Revision of 2026-11-16 (the 23M is the default, ratings record their model: PLAN.md §5.191; D11)
+- **D11: the default Maia model is the official 23M** (the first model stays one choice away),
+  on the owner's word, after §5.190 measured it 0.055 NLL better wherever the line is known.
+  Given up: a device with Maia on and no model chosen is asked for a 45.8 MB download once; the
+  AGPL-3.0 model is now the one most devices run (D11's note on the licence stands).
+- **A storm rating records its model**: an optional `"m":"23m"` on a rating in the shared storm
+  files, none meaning the first model. Why: after a model change, ratings made by the other
+  stayed mixed in silently. Old files and old versions are unaffected. A device on the 23M makes
+  the first model's ratings again in the background; merged files keep the better model's.
+

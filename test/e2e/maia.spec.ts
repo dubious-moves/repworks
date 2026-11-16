@@ -36,9 +36,10 @@ const refs23 = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'fixtures
 const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -';
 const fmt = (p: number) => (p * 100 < 9.95 ? `${(p * 100).toFixed(1)}%` : `${Math.round(p * 100)}%`);
 
-async function setUp(page: Page) {
+/** `model` the first model's choice kept on the device; none leaves the default, the 23M (§5.191). */
+async function setUp(page: Page, model?: 'maia3') {
   // Maia at 1100, the rating the fixture has for the start position.
-  await page.addInitScript(() => localStorage.getItem('repworks-maia') ?? localStorage.setItem('repworks-maia', JSON.stringify({ on: false, rating: 1100 })));
+  await page.addInitScript((m) => localStorage.getItem('repworks-maia') ?? localStorage.setItem('repworks-maia', JSON.stringify({ on: false, rating: 1100, ...(m ? { model: m } : {}) })), model);
   await lichessLogin(page);
   await serveGithub(page, world().github);
   const fake = fakeExplorer();
@@ -59,7 +60,7 @@ const panel = (page: Page) => page.getByRole('region', { name: 'Explorer' });
 
 test('Maia’s dialog, its download, the Ml and Ms columns and its own rows; remembered', async ({ page }) => {
   test.setTimeout(90_000);
-  await setUp(page);
+  await setUp(page, 'maia3');
   const maia = page.getByRole('switch', { name: 'Maia' });
   // Cancel: Maia stays off, nothing downloaded.
   await maia.check();
@@ -113,8 +114,9 @@ test('the 23M model chosen in the engine settings: its own download, its likelih
   // The engine's settings: Maia's model, with what the 23M one is.
   await page.getByRole('region', { name: 'Engine' }).getByRole('button', { name: 'Engine settings' }).click();
   const settings = page.getByRole('dialog', { name: 'Engine settings' });
-  await expect(settings.getByTestId('maia-model-note')).toHaveText('The Maia platform’s model: the position alone.');
-  await settings.getByRole('button', { name: 'Maia 3, 23M', exact: true }).click();
+  // The 23M is the default (§5.191): chosen with nothing chosen before.
+  await expect(settings.getByRole('button', { name: 'Maia 3, 23M', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(settings.getByTestId('maia-model-note')).toContainText('the default');
   await expect(settings.getByTestId('maia-model-note')).toContainText('A download of 45.8 MB, once');
   await expect(settings.locator('.engine-files', { hasText: 'Maia 3, 23M ·' })).toHaveAttribute('data-stored', 'no');
   await settings.getByRole('button', { name: 'Save' }).click();
@@ -192,7 +194,7 @@ test('the 23M model chosen in the engine settings: its own download, its likelih
 
 test('Maia’s columns stay when its worker is ended for being unused, and it starts again by itself; with no games, Maia’s moves are the rows', async ({ page }) => {
   test.setTimeout(120_000);
-  await setUp(page);
+  await setUp(page, 'maia3');
   // Timers the test can run: Maia's worker ends 90 s after its last use.
   await page.clock.install();
   await page.getByRole('switch', { name: 'Maia' }).check();
@@ -222,7 +224,7 @@ test('Maia’s columns stay when its worker is ended for being unused, and it st
 test('the worker in the browser gives onnxruntime-web’s numbers under Node, to 1e-6', async ({ page, isMobile }) => {
   test.skip(isMobile, 'the same Chromium as the desktop project');
   test.setTimeout(90_000);
-  await setUp(page);
+  await setUp(page, 'maia3');
   await page.getByRole('switch', { name: 'Maia' }).check();
   await page.getByRole('dialog', { name: 'Enable Maia' }).getByRole('button', { name: /^Download/ }).click();
   await expect(page.locator('.explorer-head').getByRole('button', { name: 'Ml' })).toBeVisible({ timeout: 30_000 });
@@ -252,7 +254,7 @@ test('the worker in the browser gives onnxruntime-web’s numbers under Node, to
 
 test('Maia in the Practical column: thin positions filled in (purple), and its preview behind the Prac title', async ({ page }) => {
   test.setTimeout(90_000);
-  await setUp(page);
+  await setUp(page, 'maia3');
   // After 1. e4 (Black's move: the chapter is Black's), few games: c5 and e5 alone, and nothing
   // deeper. ChessDB knows every position (its first three moves), so the leaves have evals.
   const { Chess } = await import('chessops/chess');

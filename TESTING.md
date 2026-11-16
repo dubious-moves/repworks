@@ -126,6 +126,17 @@ later change replaced are folded into the later item; items already reported wor
   (desktop). No phone, no graphics processor. (Whether it predicts better, and with what, is
   measured since: §5.190.)
 
+### The 23M as the default, ratings recording their model (§5.191, 2026-11-16)
+- A device with Maia on and no model ever chosen: does it ask for the 23M's download (45.8 MB) the
+  next time Maia starts, and the engine's settings show "Maia 3, 23M" with "the default"? Pick
+  "Maia 3" there to go back: its file is still stored, no second download.
+- The storm's home after the change: the positions' Maia ratings are "rated" fewer than before and
+  fill in again while the page is open (about a second a position); then difficulty and likely
+  moves are as before, give or take. With two devices, do their files end up with the 23M's
+  ratings on both?
+- The 23M on the graphics processor (§5.184's switch): what does Maia's line say? Never run on a
+  real adapter.
+
 ### Maia reading the line (§5.190, 2026-11-15)
 With "Maia 3, 23M" chosen (⚙ → Maia's model), everything that asks Maia sends the positions that
 led to the one asked about. The first model ignores them, so nothing changes there.

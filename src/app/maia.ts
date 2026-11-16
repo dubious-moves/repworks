@@ -20,7 +20,8 @@ export interface MaiaPrefs {
   model: MaiaModel;
 }
 
-export const DEFAULT_MAIA_PREFS: MaiaPrefs = { on: false, rating: 0, model: 'maia3' };
+/** The official 23M since the owner's word of 2026-11-16 (§5.191): it reads the line, and is the first model's size and speed. */
+export const DEFAULT_MAIA_PREFS: MaiaPrefs = { on: false, rating: 0, model: 'maia3-23m' };
 
 /** A model's name where one is chosen or downloaded. */
 export const maiaModelName = (model: MaiaModel): string => (model === 'maia3-23m' ? 'Maia 3, 23M' : 'Maia 3');
