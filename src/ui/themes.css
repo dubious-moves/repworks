@@ -547,7 +547,7 @@
   background: repeating-conic-gradient(var(--board-dark) 0 25%, var(--board-light) 0 50%) 0 0 / 25% 25%;
 }
 
-/* The high-contrast board (Settings, src/app/distance.ts, PLAN.md §5.196): slate, near-white and a
+/* The high-contrast board (Settings, src/app/boardLook.ts, PLAN.md §5.196): slate, near-white and a
    deep blue-grey, over every theme's own board; the coordinates (app.css) follow its colours. */
 :root[data-board='contrast'] {
   --board-light: #eef1f3;

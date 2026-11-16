@@ -11403,7 +11403,7 @@ can't start and says why, White deals one), `endgames.spec.ts` (the counts by co
 11 listed, its Next, the home's due count without the White endgame missed; White kept over a
 reload; both again). **Not checked**: on the owner's devices (`TESTING.md` §5, §8).
 
-#### 5.196 Boards seen from a distance (the owner's request, 2026-11-16, built)
+#### 5.196 Boards seen from a distance (the owner's request, 2026-11-16, built; its switch replaced by §5.197's settings)
 
 "I sometimes use 'show and grade' from 2m~ distance (mobile/tablet) and my eyesight isn't perfect.
 Can you make alternative piece visuals that are easier to see from a distance? This should be off
@@ -11431,9 +11431,45 @@ high-contrast slate board. On every board, not only show and grade.
   `--board-dark` #5f7a8e over every theme's own (the coordinates follow them) and the flat squares
   drawn in place of chessground's brown.
 
-**As built**: `src/app/distance.ts`, `Look` in `src/ui/Debug.tsx`. **Checked**: Playwright on a
+**As built**: `src/app/boardLook.ts`, `Look` in `src/ui/Debug.tsx`. **Checked**: Playwright on a
 desktop and an emulated phone (`themes.spec.ts`: off by default, both on and kept over a reload,
 the piece's box a tenth bigger and still centred on its square, Black's outline white and thicker
 than White's black one, the slate board's colours, both off again; the control, `scale` in place of
 the box, fails the centring check), and headless screenshots of a study's board on both. **Not
 checked**: on the owner's phone and tablet from two metres (`TESTING.md` §4).
+
+#### 5.197 The piece set, the pieces' size and the outline as settings (the owner's request, 2026-11-16, built)
+
+"Add the type of pieces as setting. Try get the pieces that chess.com use. Make outline thickness
+and piece size settings too."
+
+- **Not chess.com's pieces**: chess.com's sets (Neo and the rest) are its own artwork, with no
+  licence to copy them, and this repo is public. The sets offered are Lichess's whose licence
+  allows them here (lila's COPYING.md: GPL, Apache, or CC BY-NC-SA for a free, non-commercial
+  app, with credit): cburnett (as before, the default), Merida, Staunty, California, Maestro,
+  Cardinal, Fresca, Tatiana, Gioco, IC Pieces, Dubrovny, Chessnut and MPChess. Staunty,
+  California, Maestro, Tatiana and Gioco are the nearest to chess.com's rounded, shaded look.
+  Left out: Lichess's sets marked only "freeware" or "free for personal use" (alpha, companion,
+  leipzig, chess7) and those with no licence named.
+- **The files**: `scripts/piece-sets.mjs` fetches each set from lichess-org/lila and writes
+  `public/pieces/<set>.css`, its twelve SVGs inlined, under `:root[data-piece-set='<set>']`
+  (more specific than Board.tsx's cburnett, so it wins wherever it loads), and
+  `public/pieces/LICENSES.md` (authors and licences, linked from Settings). The app loads only the
+  chosen set's sheet (`link#piece-set`); the service worker precaches all of them with the rest of
+  public/, so any set works offline. The material rows by the board and the promotion picker take
+  the set too.
+- **The settings** (Settings, "The boards, for seeing from a distance"), per device as before: the
+  piece set; the piece size, 100–130% of the square by 5; the outline, none to 4 by 0.5 (percent
+  of the square around Black's pieces, 0.45 of it around White's); the high-contrast board. A small
+  board under them shows each change at once. The defaults are the app as it was; §5.196's tick, if
+  set, becomes 110% with an outline of 2. Stored as one JSON object, `repworks-pieces`, removed
+  when everything is back to the default; `index.html` applies it before the first paint.
+
+**As built**: `src/app/boardLook.ts` (replacing `distance.ts`), `BoardLook` in `src/ui/Debug.tsx`,
+`--piece-size` and `--outline` in `app.css`. **Checked**: Playwright on a desktop and an emulated
+phone (`themes.spec.ts`: the usual look until changed; Staunty, 115% and an outline of 3 on the
+preview at once and on a study's board after a reload, each piece still centred on its square, the
+outlines' widths 3% and 1.35% of the square; back to the usual leaves nothing on `<html>` or in
+storage; §5.196's tick read as 110% and 2), every set's preview in a headless screenshot, and the
+built service worker listing the twelve sheets. **Not checked**: on the owner's devices
+(`TESTING.md` §4).

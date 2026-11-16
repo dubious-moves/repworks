@@ -1,7 +1,7 @@
 // The home's Settings and Debug panels (PLAN.md §4.9, §4.11, §5.159): this device and its look,
 // engines and token; the sync's base, what is waiting, and the day's GitHub requests against the
 // limits, with buttons to sync and to record a test review.
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { requestCounts } from '../app/requests.ts';
 import { device, localStore, recordTestReview, settings, syncNow } from '../app/state.ts';
 import { dataVersion, syncStatus } from '../app/sync.ts';
@@ -16,7 +16,60 @@ import { EngineFiles } from './Engines.tsx';
 import { isoDay } from './day.ts';
 import { isTheme, setTheme, theme, THEMES } from '../app/theme.ts';
 import { setSoundOn, soundOn } from '../app/sound.ts';
-import { bigPieces, contrastBoard, setBigPieces, setContrastBoard } from '../app/distance.ts';
+import { contrastBoard, OUTLINE, PIECE_SETS, PIECE_SIZE, pieceLook, setContrastBoard, setPieceLook } from '../app/boardLook.ts';
+import { Chessground } from '@lichess-org/chessground';
+
+/** A middlegame with every kind of piece, to show the boards' look on. */
+const PREVIEW_FEN = 'r1bqk2r/pp2bppp/2n1pn2/3p4/2PP4/2N1PN2/PP1B1PPP/R2QKB1R';
+
+/**
+ * How the boards look on this device (src/app/boardLook.ts, PLAN.md §5.196, §5.197): the piece set,
+ * the pieces' size and outline, and the high-contrast board, with a board that shows them.
+ */
+function BoardLook() {
+  const look = pieceLook.value;
+  const el = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const api = Chessground(el.current!, { fen: PREVIEW_FEN, viewOnly: true, coordinates: false, animation: { enabled: false }, drawable: { enabled: false, visible: false } });
+    return () => api.destroy();
+  }, []);
+  return (
+    <fieldset class="board-look">
+      <legend>The boards, for seeing from a distance</legend>
+      <div class="board-look-controls">
+        <label>
+          Piece set{' '}
+          <select value={look.set} onChange={(e) => setPieceLook({ set: e.currentTarget.value as typeof look.set })}>
+            {PIECE_SETS.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Piece size{' '}
+          <input type="range" min={PIECE_SIZE.min} max={PIECE_SIZE.max} step={PIECE_SIZE.step} value={look.size} onInput={(e) => setPieceLook({ size: Number(e.currentTarget.value) })} />{' '}
+          <output>{look.size}%</output>
+        </label>
+        <label>
+          Outline{' '}
+          <input type="range" min={OUTLINE.min} max={OUTLINE.max} step={OUTLINE.step} value={look.outline} onInput={(e) => setPieceLook({ outline: Number(e.currentTarget.value) })} />{' '}
+          <output>{look.outline === 0 ? 'none' : look.outline}</output>
+        </label>
+        <label class="check">
+          <input type="checkbox" checked={contrastBoard.value} onChange={(e) => setContrastBoard(e.currentTarget.checked)} /> High-contrast board (slate), over the usual colours
+        </label>
+        <p class="muted">
+          Every board on this device. <a href={`${import.meta.env.BASE_URL}pieces/LICENSES.md`}>The piece sets’ authors and licences</a> (all from Lichess).
+        </p>
+      </div>
+      <div class="mini-board board-look-preview" data-testid="board-look-preview">
+        <div class="cg-host" ref={el} />
+      </div>
+    </fieldset>
+  );
+}
 
 /** The look (src/ui/themes.css): this device's theme, and the gallery that shows them side by side. */
 function Look() {
@@ -33,12 +86,7 @@ function Look() {
         </select>
       </label>{' '}
       <a href={`${import.meta.env.BASE_URL}styles.html`}>Compare the themes</a>
-      <label class="check">
-        <input type="checkbox" checked={bigPieces.value} onChange={(e) => setBigPieces(e.currentTarget.checked)} /> Pieces easy to see from a distance: a little bigger, with a sharp outline
-      </label>
-      <label class="check">
-        <input type="checkbox" checked={contrastBoard.value} onChange={(e) => setContrastBoard(e.currentTarget.checked)} /> High-contrast board (slate) on every board, over the usual colours
-      </label>
+      <BoardLook />
       <label class="check">
         <input type="checkbox" checked={soundOn.value} onChange={(e) => setSoundOn(e.currentTarget.checked)} /> Sounds: a move, a capture, the best move found, and a wrong move (with a short buzz on a phone)
       </label>

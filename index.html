@@ -11,9 +11,20 @@
       try {
         var t = new URLSearchParams(location.search).get('theme') || localStorage.getItem('repworks-theme');
         if (t) document.documentElement.dataset.theme = t;
-        // Boards seen from a distance (src/app/distance.ts keeps these afterwards).
-        if (localStorage.getItem('repworks-big-pieces') === '1') document.documentElement.dataset.pieces = 'big';
-        if (localStorage.getItem('repworks-contrast-board') === '1') document.documentElement.dataset.board = 'contrast';
+        // How the boards look (src/app/boardLook.ts checks and keeps these afterwards): the piece
+        // set's sheet, the pieces' size and outline, the high-contrast board.
+        var root = document.documentElement, p = JSON.parse(localStorage.getItem('repworks-pieces') || '{}');
+        if (/^[a-z]+$/.test(p.set) && p.set !== 'cburnett') {
+          root.dataset.pieceSet = p.set;
+          var link = document.createElement('link');
+          link.id = 'piece-set';
+          link.rel = 'stylesheet';
+          link.href = 'pieces/' + p.set + '.css';
+          document.head.append(link);
+        }
+        if (p.size > 100) (root.dataset.pieces = 'sized'), root.style.setProperty('--piece-size', p.size / 100);
+        if (p.outline > 0) (root.dataset.outline = ''), root.style.setProperty('--outline', p.outline);
+        if (localStorage.getItem('repworks-contrast-board') === '1') root.dataset.board = 'contrast';
       } catch (e) {}
     </script>
     <link rel="manifest" href="/manifest.webmanifest" />

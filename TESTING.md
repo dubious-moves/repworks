@@ -683,15 +683,17 @@ Training and Learn on the Chessnut Move: see 14 (PLAN.md §5.192).
 
 ## 4. Show and grade
 
-### Boards seen from a distance (§5.196, 2026-11-16)
-- Settings → tick "Pieces easy to see from a distance" and "High-contrast board (slate)" on the
-  tablet (and the phone). Show and grade from about 2 m: can you tell the pieces apart, and the
-  sides? If the outline should be thicker or thinner, or the pieces bigger, say which: each is one
-  number in `app.css`.
+### Boards seen from a distance: piece set, size, outline (§5.196, §5.197, 2026-11-16)
+- Settings → "The boards, for seeing from a distance": try the piece sets (Staunty, California,
+  Maestro, Tatiana and Gioco are the nearest to chess.com's look), the piece size and the outline;
+  the small board shows each change. Then show and grade on the tablet from about 2 m: which set,
+  size and outline read best? Are the slider steps (size by 5%, outline by 0.5) fine enough?
 - Drag a piece and play a few moves: each piece sits centred on its square, the last move's and
-  the check's highlights still show on the slate squares, and the arrows read on them.
-- Other boards (training, the storm, practice, analysis) look the same; untick both and they are
-  back as they were. The phone that doesn't tick them is unchanged.
+  the check's highlights still show, the arrows read on the slate squares, and a big size with a
+  big outline doesn't make neighbouring pieces run together.
+- Other boards (training, the storm, practice, analysis) look the same; offline, the chosen set
+  still shows. Back to Cburnett, 100%, no outline and the box unticked: as it always was. The
+  phone you don't change stays as it is.
 - **Checked**: Playwright (desktop, emulated phone) and headless screenshots; **not** on a device.
 
 ### Show and grade retries its mistakes (§5.127, 2026-10-19)
