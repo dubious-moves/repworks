@@ -1334,3 +1334,70 @@ test('the asks past the ply limit are counted, less those answered; none without
   assert.equal(pastLimit(plan, new Set(), 2), 3);
   assert.equal(pastLimit(plan, new Set(), 0), 0);
 });
+
+// "Again" at a line's end (§5.199): the line once more from its start, every own move asked, nothing graded.
+const againWorld = () => {
+  const w = world(chapter('Chapter1', 'white', '1. e4 e5 2. Nf3 (2. Bc4 Nf6 3. d3) 2... Nc6 3. Bb5'));
+  const states = new Map<string, CardState>([...w.ix.cards.keys()].map((c) => [c, notDue]));
+  for (const c of [card('e4 e5 Nf3'), card('e4 e5 Bc4')]) states.set(c, dueNow);
+  return { w, states };
+};
+
+test('Again at a held line end walks it from its start, every own move asked, nothing graded, then waits there as before', () => {
+  const { w, states } = againWorld();
+  const t = trainer(w, planOf(w, states), states, { lineStart: 'first', holdLineEnd: true, retryMistakes: 1 });
+  let agains = 0;
+  const upcoming: (string | undefined)[] = [];
+  // In the walk again, Bb5 is answered wrong once: nothing recorded, nothing retried.
+  const answer: Answerer = (v) => (agains === 1 && v.phase === 'ask' && v.path.length === 4 ? { type: 'move', uci: 'f1c4', now: 0 } : right(v, 0));
+  const { effects, records } = run(t, answer, day.now, [], (v) => {
+    upcoming.push(v.upcoming?.line.path.join(' '));
+    return v.number === 1 && agains++ === 0 ? { type: 'again', now: 0 } : undefined;
+  });
+  assert.deepEqual(plays(effects), [
+    'opponent:e5', 'user:Nf3', 'opponent:Nc6', 'auto:Bb5',
+    // Again: from the chapter's start, e4 and Bb5 asked though neither is due.
+    'user:e4', 'opponent:e5', 'user:Nf3', 'opponent:Nc6', 'user:Bb5',
+    // Then the next line, as it would have been.
+    'user:Bc4', 'opponent:Nf6', 'auto:d3',
+  ]);
+  assert.deepEqual(records.map((r) => r.k === 'review' && r.card), [card('e4 e5 Nf3'), card('e4 e5 Bc4')]);
+  // The answers of the walk again are repeats: counted nowhere.
+  const answers = effects.filter((e) => e.type === 'answer');
+  assert.equal(answers.filter((e) => !e.repeat).length, 2);
+  assert.equal(answers.filter((e) => e.repeat).length, 3);
+  assert.ok(effects.some((e) => e.type === 'note' && e.note.kind === 'replay'));
+  assert.ok(!effects.some((e) => e.type === 'note' && e.note.kind === 'retryMistakes'));
+  // The line's end came back with the same line next.
+  assert.equal(upcoming[0], upcoming[1]);
+  assert.ok(upcoming[0]);
+});
+
+test("Again at the session's end walks the last line once more, nothing graded, and ends the session again", () => {
+  const { w, states } = againWorld();
+  const line = w.ix.lines.find((l) => l.path.includes('Bc4'))!;
+  const plan: SessionPlan = { lines: [{ kind: 'review', line, end: line.path.length, ask: [card('e4 e5 Bc4')], teach: [] }] };
+  const t = trainer(w, plan, states, { lineStart: 'first' });
+  const first = run(t, right);
+  assert.equal(first.records.length, 1);
+  const out = t.send({ type: 'again', now: day.now });
+  assert.equal(t.view.phase, 'ask');
+  assert.deepEqual(out.find((e) => e.type === 'takeback'), { type: 'takeback', path: [] });
+  // Walked to its end by hand: e4, Bc4 and d3 asked, the opponent's moves on the timer.
+  const effects: TrainerEffect[] = [...out];
+  for (let guard = 0; guard < 100 && (t.view.phase as string) !== 'sessionDone'; guard++) {
+    if (t.view.phase === 'ask') effects.push(...t.send({ type: 'move', uci: expected(t.view), now: day.now }));
+    else {
+      const wait = effects.filter((e) => e.type === 'wait').at(-1) as { id: number };
+      effects.push(...t.send({ type: 'tick', id: wait.id, now: day.now }));
+    }
+  }
+  assert.deepEqual(plays(effects), ['user:e4', 'opponent:e5', 'user:Bc4', 'opponent:Nf6', 'user:d3']);
+  assert.ok(!effects.some((e) => e.type === 'record'));
+  assert.equal(effects.filter((e) => e.type === 'done').length, 1);
+  // Not in the middle of a line: Again waits for its end.
+  const t2 = trainer(w, plan, states, { lineStart: 'first' });
+  t2.send({ type: 'start', now: day.now });
+  assert.equal(t2.canReplay, false);
+  assert.deepEqual(t2.send({ type: 'again', now: day.now }), []);
+});

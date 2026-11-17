@@ -213,6 +213,8 @@ export interface SessionView {
   upcoming?: Line;
   /** Stopped at the ply limit (§5.194): the limit, and the line's moves past it. */
   limit?: { ply: number; past: number };
+  /** At a line's end, held or the session's: "Again" walks the line once more, nothing graded (§5.199). */
+  canReplay?: true;
   /** Show sequence, while shown: the plies it spans. */
   sequence?: { from: number; to: number };
   /** A line walked again (repetitions), and the mistakes retried at a walk's end (§5.77). */
@@ -506,7 +508,7 @@ export function readLine(ply: number | undefined): void {
 }
 
 /** A command from the screen, with the time now. */
-export function command(type: 'hint' | 'suspend' | 'skipLine' | 'stop' | 'next' | 'continue' | 'ready' | 'saveAlt' | 'unsaveAlt' | 'misclick' | 'skipComment'): void {
+export function command(type: 'hint' | 'suspend' | 'skipLine' | 'stop' | 'next' | 'continue' | 'again' | 'ready' | 'saveAlt' | 'unsaveAlt' | 'misclick' | 'skipComment'): void {
   send({ type, now: Date.now() });
 }
 /** A line from the comments met quizzed now, the walk resuming after it; without a key, at a line's end, the lines on (§5.98). */
@@ -633,7 +635,7 @@ export function endSession(): void {
 function send(c: TrainerCommand): void {
   const t = trainer;
   if (!t) return;
-  if (shower && (c.type === 'tick' || c.type === 'stop' || c.type === 'skipLine' || c.type === 'next' || c.type === 'continue')) {
+  if (shower && (c.type === 'tick' || c.type === 'stop' || c.type === 'skipLine' || c.type === 'next' || c.type === 'continue' || c.type === 'again')) {
     apply(t, c.type === 'tick' ? shower.tick(c.id, c.now) : shower.send(c));
     return;
   }
@@ -795,6 +797,10 @@ function apply(t: Trainer, effects: readonly ShowGradeEffect[], always = false):
   const asked = v.line?.ask[0];
   if (newLine && (s.of.kind === 'retry' || s.of.kind === 'drill') && asked && !pinned(s, asked)) next.missed = asked;
   next.phase = v.phase;
+  // "Again" from the session's end (§5.199): running again until the line's end ends it once more.
+  if (v.phase !== 'sessionDone') delete next.done;
+  if (t.canReplay) next.canReplay = true;
+  else delete next.canReplay;
   // At the session's end the trainer's view stays on the last line's moves, so the board and "back
   // to the chapter" stay at them (§5.17).
   next.path = v.path;

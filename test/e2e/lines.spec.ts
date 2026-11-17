@@ -108,9 +108,9 @@ test('the line list: a line picked and trained, then practised again, a miss rec
     ['taught', NC6, undefined],
   ]);
 
-  // Again: nothing on it is due now, and every move is asked anyway. A miss on 1... c5, reviewed
+  // Train again: nothing on it is due now, and every move is asked anyway. A miss on 1... c5, reviewed
   // before, is recorded (§5.106); 2... Nc6, in its learning step, is not graded.
-  await done.getByRole('button', { name: 'Again' }).click();
+  await done.getByRole('button', { name: 'Train again' }).click();
   await asked(page);
   await play(page, 'e7', 'e5');
   await expect(feedback(page)).toHaveText('Not in your repertoire: try again');

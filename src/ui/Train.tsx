@@ -101,6 +101,8 @@ export function noteText(note: Note | undefined, shownRetry = false): string {
       return `The line again: ${note.pass} of ${note.of}`;
     case 'missedAgain':
       return 'Missed earlier: once more';
+    case 'replay':
+      return 'The line again: nothing graded';
     case 'aside':
       return `${note.important ? 'Important line' : 'Line'} from the comments${note.of > 1 ? ` · ${note.n} of ${note.of}` : ''}`;
     case 'asideWrong':
@@ -298,6 +300,9 @@ function Done(props: { s: SessionView; inline?: boolean; nextNear?: boolean }) {
   }
   if (!practice && plan.lines.length === 0) return <NothingToTrain s={props.s} />;
   const after = of.kind === 'line' ? nextLine(trainData.value ?? props.s.data, props.s.scope, { sid: of.sid, cid: of.cid, path: of.at }) : undefined;
+  // "Again" (§5.199): the last line once more, nothing graded; the session started afresh is then
+  // "Train again".
+  const lineAgain = !practice && props.s.canReplay && plan.lines.length > 0;
   return (
     <section class={cls} aria-label="Session done">
       <h2>{plan.lines.length === 0 ? 'Nothing to practise now' : of.kind === 'line' ? 'Line done' : 'Session done'}</h2>
@@ -326,8 +331,9 @@ function Done(props: { s: SessionView; inline?: boolean; nextNear?: boolean }) {
       {after && trainPrefs.value.lineEnd === 'go' && <GoingOn line={after.line} number={after.number} data={trainData.value ?? props.s.data} from={props.s.line} />}
       <div class="actions">
         {after && !props.nextNear && <NextLineButton line={after.line} />}
-        <button type="button" class={after ? 'secondary' : undefined} onClick={() => void beginTraining(of)}>
-          {practice || of.kind === 'line' || of.kind === 'difficult' ? 'Again' : 'Train again'}
+        {lineAgain && <AgainButton />}
+        <button type="button" class={after || lineAgain ? 'secondary' : undefined} onClick={() => void beginTraining(of)}>
+          {!lineAgain && (practice || of.kind === 'line' || of.kind === 'difficult') ? 'Again' : 'Train again'}
         </button>
         {props.inline && props.s.line && (
           <button type="button" class="secondary" onClick={() => readLine(props.s.path.length)} title="Step through the whole line and its comments">
@@ -653,6 +659,7 @@ function Session(props: { s: SessionView }) {
                   Quiz lines ({endQuiz})
                 </button>
               )}
+              {s.canReplay && <AgainButton />}
             </>
           ) : limit && !nextNear ? (
             continueButton
@@ -679,7 +686,7 @@ function Session(props: { s: SessionView }) {
           </button>
         </div>
         )}
-        {!s.done && ((show && waits && !nextNear) || (show && limit && !nextNear) || (s.wrongMove && !show) || s.savedAlt || s.missed || s.suspended || aside) && (
+        {!s.done && ((show && waits && (!nextNear || s.canReplay)) || (show && limit && !nextNear) || (s.wrongMove && !show) || s.savedAlt || s.missed || s.suspended || aside) && (
         <div class="actions train-actions train-extra">
           {aside && (
             <button type="button" class="secondary" onClick={() => command('skipComment')} title="On to the next line from the comments, or back to where the line was">
@@ -692,6 +699,7 @@ function Session(props: { s: SessionView }) {
             </button>
           )}
           {show && !nextNear && continueButton}
+          {show && waits && s.canReplay && <AgainButton />}
           {s.wrongMove && !show && (
             <button type="button" class="secondary train-misclick-panel" onClick={() => command('misclick')} title={`A slip of the hand: ${s.wrongMove} isn’t counted as wrong (Backspace)`}>
               Misclick: take {s.wrongMove} back
@@ -1097,6 +1105,15 @@ function NothingToTrain(props: { s: SessionView }) {
         </button>
       </div>
     </section>
+  );
+}
+
+/** "Again" at a line's end (§5.199): the line once more from its start, every move asked, nothing graded. */
+function AgainButton() {
+  return (
+    <button type="button" class="secondary train-again" onClick={() => command('again')} title="This line once more from its start, every move asked: nothing graded">
+      Again
+    </button>
   );
 }
 

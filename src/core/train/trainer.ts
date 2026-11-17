@@ -65,6 +65,10 @@
 //   session by itself. A line that would ask nothing before the limit is skipped: the moves the plan
 //   needs all lie past it, unless the line starts at the chapter's start (or where it branches from
 //   the line before) and the auto-play mode asks a move before the limit. Moves past it stay due.
+// - Again (`again`, the owner's request, 2026-11-17, §5.199): at a line's end, held or the
+//   session's, the line walked is walked once more from the chapter's start to where the walk ended,
+//   every own move asked but a suspended one, nothing graded, taught, retried or counted, and back
+//   to the line's end as it was. In show and grade the moves are shown and told as before.
 import type { Position } from 'chessops/chess';
 import { makeSan, parseSan } from 'chessops/san';
 import { isNormal, type NormalMove } from 'chessops/types';
@@ -183,6 +187,8 @@ export type Note =
   | { kind: 'retry'; streak: number; need: number }
   /** At a line's end: it is walked again, pass `pass` of `of` (`repetitions`). */
   | { kind: 'repeat'; pass: number; of: number }
+  /** "Again" at a line's end: the line walked once more, nothing graded. */
+  | { kind: 'replay' }
   /** A move missed in retry, drill or the pins, asked again (`repeatMissed`). */
   | { kind: 'missedAgain' }
   /** A line from the comments on the board, `n` of `of`. */
@@ -239,6 +245,8 @@ export type TrainerCommand =
   | { type: 'next'; now: number }
   /** Stopped at the ply limit: the line goes on past it. */
   | { type: 'continue'; now: number }
+  /** At a line's end (held, or the session's): the line walked once more, nothing graded. */
+  | { type: 'again'; now: number }
   /** Show and grade: play the move asked, without grading it yet. */
   | { type: 'show' }
   /** Show and grade: the move was known or not; the card is graded and the line goes on. */
@@ -489,6 +497,8 @@ export class Trainer {
   private readonly asideCounts = { lines: 0, moves: 0, right: 0 };
   /** Planned lines added for moves missed in retry, drill or the pins (`repeatMissed`). */
   private readonly redo = new Set<PlannedLine>();
+  /** "Again": the line walked once more, nothing graded; the session's end it came from, if it did. */
+  private replaying: { fromDone: boolean } | undefined;
 
   constructor(setup: TrainerSetup) {
     this.setup = setup;
@@ -595,8 +605,18 @@ export class Trainer {
     return v;
   }
 
+  /** Whether "Again" can walk the line on the board once more: at its end, held or the session's. */
+  get canReplay(): boolean {
+    if (this.inAside || this.at < 0 || this.end <= 0 || this.ply < this.end) return false;
+    return this.phase === 'lineDone' || this.phase === 'sessionDone';
+  }
+
   send(command: TrainerCommand): TrainerEffect[] {
     const out: TrainerEffect[] = [];
+    if (command.type === 'again') {
+      this.walkAgain(command.now, out);
+      return out;
+    }
     if (this.phase === 'sessionDone') return out;
     switch (command.type) {
       case 'start':
@@ -674,6 +694,25 @@ export class Trainer {
     return out;
   }
 
+  /** "Again": the line from the chapter's start to where its walk ended, every own move asked, nothing graded. */
+  private walkAgain(now: number, out: TrainerEffect[]) {
+    if (!this.canReplay) return;
+    this.waitId++;
+    this.replaying = { fromDone: this.phase === 'sessionDone' };
+    this.upcoming = undefined;
+    this.pending = undefined;
+    this.waiting = undefined;
+    this.seq = undefined;
+    this.retrying = undefined;
+    this.missedOnLine.clear();
+    this.askAgain = new Set();
+    this.ply = 0;
+    out.push({ type: 'arrow' });
+    out.push({ type: 'takeback', path: [] });
+    out.push({ type: 'note', note: { kind: 'replay' } });
+    this.advance(now, out);
+  }
+
   private summary(): Summary {
     return { lines: this.walked, ...this.counts };
   }
@@ -712,6 +751,7 @@ export class Trainer {
 
   /** How an own move is met: asked, taught or played; `prefix` for a move before the line's first need. */
   private kindOf(card: CardId, prefix = false): Kind {
+    if (this.replaying) return this.suspended(card) ? 'auto' : 'ask';
     if (this.askAgain.has(card) && !this.suspended(card)) return 'ask';
     if (this.setup.askOnly) return !this.answered.has(card) && this.toAsk.has(card) ? 'ask' : 'auto';
     if (this.suspended(card)) return 'auto';
@@ -727,6 +767,7 @@ export class Trainer {
   }
 
   private finish(out: TrainerEffect[]) {
+    this.replaying = undefined;
     this.phase = 'sessionDone';
     out.push({ type: 'done', summary: this.summary() });
   }
@@ -788,6 +829,7 @@ export class Trainer {
     this.upcoming = undefined;
     this.seq = undefined;
     this.pass = 1;
+    this.replaying = undefined;
     this.taughtOnLine = [];
     this.missedOnLine.clear();
     this.retrying = undefined;
@@ -903,7 +945,7 @@ export class Trainer {
 
   /** Whether a line from the comments can take the board now: not in one, a retry, a sequence or show and grade. */
   private quizNow(): boolean {
-    if (this.inAside || this.retrying || this.seq || this.waiting || this.selfGrading) return false;
+    if (this.inAside || this.retrying || this.replaying || this.seq || this.waiting || this.selfGrading) return false;
     return ['ask', 'wrong', 'shown', 'opponent', 'auto', 'lineDone'].includes(this.phase);
   }
 
@@ -920,7 +962,7 @@ export class Trainer {
     this.pending = undefined;
     this.waiting = undefined;
     // The furthest the walk has gone (its first pass): the lines from the comments met.
-    if (!this.retrying && this.pass === 1) this.reached = Math.max(this.reached, this.ply);
+    if (!this.retrying && this.pass === 1 && !this.replaying) this.reached = Math.max(this.reached, this.ply);
     if (this.ply >= this.end) {
       // Its mistakes asked again, then the line walked again, before the line is done.
       if (this.walkEnd(out)) return;
@@ -960,13 +1002,16 @@ export class Trainer {
    */
   private lineEnd(out: TrainerEffect[]) {
     this.askAgain = new Set();
+    // Back from "Again": the line's end as it was, the session's end held at once again.
+    const replayed = this.replaying;
+    this.replaying = undefined;
     this.phase = 'lineDone';
     out.push({ type: 'lineDone' });
     this.upcoming = this.findNext();
     const quiz = this.endQuiz().length > 0;
     // Stopped at the ply limit (§5.194): the session's last line waits for "Continue" or "Finish".
     const limited = this.end < this.fullEnd;
-    if (!this.upcoming && !quiz && !limited) return this.finish(out);
+    if (replayed?.fromDone || (!this.upcoming && !quiz && !limited)) return this.finish(out);
     if (!this.options.holdLineEnd && !quiz && this.upcoming) this.wait(this.pauses.lineEndMs ?? this.pace * (this.options.lineEndPaces ?? 2), out);
   }
 
@@ -1000,7 +1045,7 @@ export class Trainer {
 
   /** Whether the move asked is asked again: a mistake retried, a later pass, a missed line again. */
   private repeating(): boolean {
-    return this.retrying !== undefined || this.pass > 1 || this.redo.has(this.lines[this.at]!);
+    return this.replaying !== undefined || this.retrying !== undefined || this.pass > 1 || this.redo.has(this.lines[this.at]!);
   }
 
   /**
@@ -1009,6 +1054,7 @@ export class Trainer {
    * Show and grade retries its mistakes (`retryShown`) but walks a line once.
    */
   private walkEnd(out: TrainerEffect[]): boolean {
+    if (this.replaying) return false;
     const need = this.need();
     if (need > 0 && this.missedOnLine.size > 0) {
       const items = [...this.missedOnLine].sort((a, b) => a[0] - b[0]).map(([ply, card]): Retry => ({ ply, card, streak: 0 }));
@@ -1090,7 +1136,7 @@ export class Trainer {
       this.pause('retry', out);
       return;
     }
-    if (!ok) {
+    if (!ok && !this.replaying) {
       if (this.setup.repeatMissed) {
         // Asked again after the plan's lines, as often as it is missed.
         const again: PlannedLine = { ...this.lines[this.at]!, ask: [card] };
@@ -1373,7 +1419,7 @@ export class Trainer {
    * A move in its learning step is graded only when due. Difficult lines grade only their due moves.
    */
   private graded(card: CardId) {
-    if (!this.record || this.answered.has(card)) return false;
+    if (!this.record || this.replaying || this.answered.has(card)) return false;
     if (this.gradeOnly && !this.gradeOnly.has(card)) return false;
     if (this.toAsk.has(card)) return true;
     const status = statusOf(this.state(card));
@@ -1386,6 +1432,8 @@ export class Trainer {
    * is played again (the owner's request, 2026-10-13, §5.107). A miss stays one for `difficult`.
    */
   private answer(card: CardId, ok: boolean, out: TrainerEffect[]) {
+    // "Again" changes nothing the session knows of the move: practice only.
+    if (this.replaying) return void out.push({ type: 'answer', card, ok, repeat: true });
     this.answered.add(card);
     if (ok) this.right.add(card);
     else {
@@ -1441,7 +1489,7 @@ export class Trainer {
     if (!this.selfGrading || !p) return;
     this.pending = undefined;
     const graded = this.graded(p.card);
-    this.answered.add(p.card);
+    if (!this.replaying) this.answered.add(p.card);
     // A move already tried wrong, or hinted, before the keys took over is failed whatever is told.
     this.waiting = { card: p.card, mode: p.mode, san: p.san, since: p.since, failed: p.mode === 'ask' && (p.wrong.length > 0 || p.hint), graded };
     out.push({ type: 'arrow', uci: p.uci });

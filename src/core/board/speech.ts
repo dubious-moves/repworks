@@ -119,6 +119,8 @@ function noteSpeech(note: { kind: string; san?: string; count?: number; pass?: n
       return `The line again, ${note.pass} of ${note.of}.`;
     case 'missedAgain':
       return 'Missed earlier: once more.';
+    case 'replay':
+      return 'The line again, nothing graded.';
     case 'asideWrong':
       return 'Not the comment’s move. Try again.';
     case 'asideAlso':

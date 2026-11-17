@@ -69,7 +69,7 @@ test('Finish at the ply limit ends the line there; the chip takes the limit off,
   // The limit taken off by the chip, and again: the line is walked to its end.
   await page.getByRole('button', { name: 'Take the ply limit off' }).click();
   await expect(page.locator('.ply-limit-chip')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Again' }).first().click();
+  await page.getByRole('button', { name: 'Train again' }).click();
   await expect(phase(page)).toHaveAttribute('data-phase', 'ask');
   await play(page, 'c7', 'c5');
   await expect(feedback(page)).toHaveText('New move: play cxd4');

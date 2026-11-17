@@ -1961,3 +1961,12 @@ does. Start with the spike: its log decides what the later parts change (CHESSNU
   move of all the comments; past the last, the board is back at the line's end, and 2 goes on.
 - With "go on by itself" at a line's end: does the next line wait while you step?
 - **Checked**: unit tests and Playwright (desktop, emulated phone) by keys; **not** with the ring.
+
+### "Again" at a line's end (PLAN.md §5.199, 2026-11-17)
+- In repertoire training with "Wait for Next line": at a line's end, "Again" walks the line from
+  the start, every move asked. Miss one on purpose: the line ends where it was, "Next line" names
+  the same line next, and after a sync nothing new is in the progress log for that walk.
+- At the session's last line, the summary's "Again" does the same; "Train again" starts afresh.
+- In show and grade: "Again" sits in the row with "Next line"; 2 and 4 show and tell as usual. Is
+  its place right on the phone, or should it be under the board beside "Next line"?
+- **Checked**: unit tests and Playwright (desktop, emulated phone); **not** on a device.

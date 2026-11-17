@@ -58,8 +58,8 @@ test('difficult lines: the difficult move asked, graded while due, practice once
   await expect.poll(() => reviews(git).length).toBe(1);
   expect(reviews(git)[0]).toMatchObject({ card: C5, g: 3 });
 
-  // Again: c5, answered right, isn't due now. Asked, missed, and nothing recorded.
-  await done.getByRole('button', { name: 'Again' }).click();
+  // Train again: c5, answered right, isn't due now. Asked, missed, and nothing recorded.
+  await done.getByRole('button', { name: 'Train again' }).click();
   await asked(page);
   await clickSquare(page, 'e7', 'black');
   await clickSquare(page, 'e5', 'black');

@@ -11500,3 +11500,31 @@ They can enter it by pressing 4/previous twice."
 editor), `linesMode` and the held tick in `train.ts`. **Checked**: a unit test of the walk, and
 Playwright (`train.spec.ts`, desktop and emulated phone) by keys. **Not checked**: the ring's
 buttons on the owner's phone (`TESTING.md`).
+
+#### 5.199 "Again" at a line's end (the owner's request, 2026-11-17, built)
+
+"After variation end in repertoire train, there should be an option 'Again' that let's the user
+repeat the whole variation ungraded."
+
+- **Where**: at a line's end held for "Next line" (the queue, show and grade, Learn, difficult
+  lines, a line picked), beside "Next line"; and at the session's end, in its summary, for the last
+  line (the graded kinds; retry, drill and the pins grade nothing, and keep their own "Again", which
+  starts them afresh). With "go on by itself" at a line's end the line doesn't wait, so there is no
+  "Again" there. In show and grade it sits in the row with "Next line".
+- **What it does**: the line walked once more from the chapter's start to where its walk ended (the
+  ply limit's stop, §5.194, or past it after "Continue"). Every own move is asked, due or not, but a
+  suspended one, which is played; in show and grade, shown and told by 2 and 4. Nothing is graded,
+  taught, retried, counted in "right first time", or offered from the comments; a misclick and an
+  alternative saved still work as ever, and a suspend is still the owner's choice. The feedback line
+  says "The line again: nothing graded". At its end, the line's end comes back as it was: the same
+  line next, "Again" offered again; from the session's end, the session's end again.
+- **"Train again"**: a line picked and difficult lines named their fresh start "Again", which grades
+  (a reviewed move missed is recorded, §5.106). With the new "Again" beside it, that button is now
+  "Train again", as the queue's always was.
+
+**As built**: the trainer's `again` command (`walkAgain`, `canReplay`, the `replaying` state that
+`kindOf`, `graded`, `answer` and `walkEnd` read) in `src/core/train/trainer.ts`; `canReplay` on the
+session view; `AgainButton` in `src/ui/Train.tsx`. **Checked**: unit tests (a held line end, a
+mistake in the walk again unrecorded and not retried, the session's end) and Playwright
+(`again.spec.ts`, desktop and emulated phone). **Not checked**: on the owner's devices
+(`TESTING.md`).

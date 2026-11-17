@@ -89,7 +89,7 @@ export class ShowGrade {
   }
 
   /** Stop, skip a line, and the rest of the trainer's own commands. */
-  send(command: { type: 'skipLine' | 'stop' | 'next' | 'continue'; now: number }): ShowGradeEffect[] {
+  send(command: { type: 'skipLine' | 'stop' | 'next' | 'continue' | 'again'; now: number }): ShowGradeEffect[] {
     this.queued = undefined;
     return this.after(this.trainer.send(command), command.now);
   }
