@@ -54,6 +54,7 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('message', (event) => {
   if (event.data === 'version') event.source?.postMessage({ version: __VERSION__ });
   if (event.data === 'isolation') isolate = undefined;
+  if (event.data === 'offline') offline = undefined;
 });
 
 self.addEventListener('fetch', (event) => {
@@ -71,6 +72,13 @@ self.addEventListener('fetch', (event) => {
 const FLAGS = 'repworks-flags';
 let isolate: Promise<boolean> | undefined;
 const isolating = (): Promise<boolean> => (isolate ??= caches.open(FLAGS).then((c) => c.match('isolate')).then((r) => !!r, () => false));
+
+// Offline mode (PLAN.md §5.203, src/platform/offline.ts): the app sets the flag, and while it is set
+// this worker answers from its caches only. A file it lacks (an engine never downloaded) fails as it
+// would with no network; nothing is fetched.
+let offline: Promise<boolean> | undefined;
+const offlineMode = (): Promise<boolean> => (offline ??= caches.open(FLAGS).then((c) => c.match('offline')).then((r) => !!r, () => false));
+const network = async (request: Request): Promise<Response> => ((await offlineMode()) ? Response.error() : fetch(request));
 
 /**
  * Cross-origin isolation (PLAN.md §5.36), which GitHub Pages can't send: when the app asks for it,
@@ -90,6 +98,9 @@ function isolated(response: Response): Response {
 }
 
 async function precache(): Promise<void> {
+  // A new version found while offline mode is on isn't downloaded: the install fails, the old worker
+  // keeps serving, and the browser tries again on a later visit.
+  if (await offlineMode()) throw new Error('offline mode is on: the new version waits');
   const cache = await caches.open(SHELL);
   const failures: string[] = [];
   await Promise.all(
@@ -133,13 +144,13 @@ async function respond(request: Request, url: URL, scope: URL): Promise<Response
   let path = url.pathname;
   if (path.startsWith(`${scope.pathname}engines/`)) {
     const stored = (await caches.has(ENGINES)) ? await (await caches.open(ENGINES)).match(path) : undefined;
-    return stored ?? fetch(request);
+    return stored ?? network(request);
   }
   if (request.mode === 'navigate' && path === scope.pathname) path += 'index.html';
   const current = await caches.open(SHELL);
   const hit = (await current.match(path)) ?? (await matchOlderShell(path));
   if (hit) return hit;
-  return fetch(request);
+  return network(request);
 }
 
 async function matchOlderShell(path: string): Promise<Response | undefined> {

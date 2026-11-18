@@ -35,6 +35,7 @@ import { ENDGAME_PRESET, firstSlip, goalKept, GOAL_CP, GRADE_SECONDS, gradeOfTim
 import { hangs, lc0Vetoed, replyOrder, trustPick } from '../core/endgames/variety.ts';
 import { keepingMoves, tablebaseVerdict, type TablebaseVerdict } from '../core/endgames/tablebase.ts';
 import { tablebase } from '../platform/tablebase.ts';
+import { offlineMode } from '../platform/offline.ts';
 import { endgameLc0 } from './endgameLc0.ts';
 import { authorFirst, endgameMaiaAlone, hintsAt, replyPlayed, tryBegun, tryEnded } from './endgameVariety.ts';
 import type { Grade } from '../core/progress/events.ts';
@@ -243,6 +244,8 @@ function explorerGames(fen: string, o: Opponent): Promise<PracticeReply | null> 
       w?.(r);
     });
   }
+  // Offline mode (§5.203): Maia at once, without asking the worker for what it may not fetch.
+  if (offlineMode()) return Promise.resolve(null);
   const id = nextId++;
   return new Promise((resolve) => {
     // mistake-lab's 5 s timeout: a database that doesn't answer is a failure, Maia then.

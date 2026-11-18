@@ -2,6 +2,7 @@
 // its outcome and every move's. Anyone may ask (no token; `access-control-allow-origin: *`,
 // checked live on 2026-11-15). An answer is kept for the session; after a failure (offline, a
 // timeout, 429) nothing is asked for a minute, so a judge never waits on it twice.
+import { networkUp } from './offline.ts';
 import { inTablebase, readTablebase, tablebaseUrl, type TablebasePosition } from '../core/endgames/tablebase.ts';
 
 /** A judge waits at most this long for the tablebase; Stockfish's search runs beside it. */
@@ -32,7 +33,7 @@ export function tablebase(fen: string): Promise<TablebasePosition | undefined> {
   const key = keyOf(fen);
   const kept = answers.get(key);
   if (kept) return kept;
-  if (Date.now() < quietUntil || (typeof navigator !== 'undefined' && navigator.onLine === false)) return Promise.resolve(undefined);
+  if (Date.now() < quietUntil || !networkUp()) return Promise.resolve(undefined);
   const p = ask(fen);
   answers.set(key, p);
   if (answers.size > KEPT) answers.delete(answers.keys().next().value!);

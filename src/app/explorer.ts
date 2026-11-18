@@ -2,6 +2,7 @@
 // makes every explorer and ChessDB request, and the panel's lookups. The worker starts on first
 // use; its answers are kept for the session, so going back to a position is instant (ChessDB's
 // asked again behind them until it has settled, §5.138).
+import { offlineMode, onOfflineMode } from '../platform/offline.ts';
 import { signal } from '@preact/signals';
 import type { LimiterSnapshot } from '../core/explorer/limiter.ts';
 import { localInfo, TTL, type CompactExplorer } from '../core/explorer/providers.ts';
@@ -208,6 +209,7 @@ function ensureWorker(): Worker | undefined {
   worker.onmessage = (e: MessageEvent<FromWorker>) => receive(e.data);
   connectMaia();
   postConfig();
+  if (offlineMode()) worker.postMessage({ type: 'offline', on: true });
   // The bucket as the last page left it, so a reload doesn't start with a full one.
   try {
     const saved = sessionStorage.getItem(LIMITER_KEY);
@@ -217,6 +219,9 @@ function ensureWorker(): Worker | undefined {
   }
   return worker;
 }
+
+// Offline mode (PLAN.md §5.203) reaches the worker at once.
+onOfflineMode((on) => worker?.postMessage({ type: 'offline', on }));
 
 // A login or logout on this device reaches the worker at once.
 lichessUser.subscribe(() => {

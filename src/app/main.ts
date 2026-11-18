@@ -1,8 +1,11 @@
 // The composition root: wires the platform adapters to the app state and mounts the UI.
+// Offline mode's guard on fetch comes before everything else (PLAN.md §5.203).
+import '../platform/offlineGuard.ts';
 import { h, render } from 'preact';
 import '../ui/themes.css';
 import '../ui/app.css';
 import { App } from '../ui/App.tsx';
+import { tellServiceWorker } from '../platform/offline.ts';
 import { registerServiceWorker } from '../platform/serviceWorker.ts';
 import { startBoardSpeech } from './boardSpeech.ts';
 import { carryOverLocalLists } from './checklist.ts';
@@ -38,6 +41,8 @@ startFileLaunch();
 startBoardSpeech();
 
 if (import.meta.env.PROD) {
+  // The service worker's copy of offline mode follows this device's setting (§5.203).
+  void tellServiceWorker();
   registerServiceWorker(import.meta.env.BASE_URL, {
     onUpdateReady: () => (updateReady.value = true),
     onVersion: (version) => (shellVersion.value = version),

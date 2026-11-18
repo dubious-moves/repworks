@@ -422,6 +422,44 @@ test('the tablebase’s verdict judges where it answers: a move Stockfish scores
   expect(endgameEvents(git).at(-1)).toMatchObject({ card: `x|${OPPOSITION}`, res: 'draw', preset: 'endgame', mv: 1 });
 });
 
+test('offline mode (§5.203): the tablebase not asked, Stockfish alone judging; the try kept and synced once it is off', async ({ page }) => {
+  test.setTimeout(60_000);
+  // The fake tablebase would keep Kd2's win; offline, nothing asks it, and Stockfish's 0.00 stops it.
+  const table: FakeTablebase = { positions: new Map([[OPPOSITION, { category: 'win', moves: [['d3d2', 'loss'], ['d3e3', 'draw']] }]]), requests: [] };
+  const git = await setUp(page, async () => void (await serveTablebase(page, table)));
+  // Stockfish downloaded first, by opening an endgame online; offline mode then from Settings.
+  await page.goto(`${site.url}#/endgames/opposition`);
+  const game = page.getByTestId('endgame-game');
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  // Its two files, the script and the wasm, both stored.
+  await expect.poll(() => page.evaluate(async () => (await (await caches.open('repworks-engines')).keys()).length)).toBeGreaterThanOrEqual(2);
+  await page.goto(site.url);
+  await page.locator('details.settings > summary').click();
+  await page.getByLabel('Offline mode: send nothing over the network').check();
+  await expect(page.locator('.sync-chip')).toHaveText('offline mode');
+  const asked = table.requests.length;
+  await page.goto(`${site.url}#/endgames/opposition`);
+  await expect(game).toHaveAttribute('data-phase', 'user');
+  await clickSquare(page, 'd3', 'white');
+  await clickSquare(page, 'd2', 'white');
+  await expect(game).toHaveAttribute('data-phase', 'slip', { timeout: ENGINE_MS * 8 });
+  await expect(page.getByTestId('endgame-feedback')).toHaveText('Kd2 lets the win slip. Take it back and find a better move.');
+  await expect(page.getByTestId('endgame-tablebase')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Show a move that keeps it' }).click();
+  await expect(game).toHaveAttribute('data-moves', '0');
+  await clickSquare(page, 'd3', 'white');
+  await clickSquare(page, 'e3', 'white');
+  await expect(game).toHaveAttribute('data-moves', '2');
+  await expect(game).toContainText('This try counts as missed: play it out, or start again.');
+  await expect(page.locator('.sync-chip')).toHaveText('offline mode · 1 change waiting');
+  expect(table.requests.length).toBe(asked);
+  expect(endgameEvents(git).length).toBe(0);
+  page.once('dialog', (d) => void d.accept());
+  await page.locator('.sync-chip').click();
+  await expect.poll(() => endgameEvents(git).length, { timeout: 15_000 }).toBe(1);
+  expect(endgameEvents(git)[0]).toMatchObject({ card: `x|${OPPOSITION}`, preset: 'endgame', mv: 1 });
+});
+
 test('an endgame solved first time: the breakthrough along Stockfish’s line, the pawn queened, graded easy from the time, marked hard, back tomorrow', async ({ page }) => {
   test.setTimeout(60_000);
   const git = await setUp(page);

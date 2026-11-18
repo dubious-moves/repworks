@@ -1,6 +1,7 @@
 // Lichess in the app (PLAN.md §4.10): the login on this device, its redirect back, and the client
 // the import uses. The redirect comes back to the site's own address with ?code=…&state=…; those
 // leave the address bar before anything else runs, like a setup link's token.
+import { offlineMode } from '../platform/offline.ts';
 import { signal } from '@preact/signals';
 import { LichessAuth, lichessClient, type AuthStorage } from '../platform/lichess.ts';
 import type { Notice } from './setup.ts';
@@ -69,6 +70,10 @@ export async function finishLichessLogin(url: string): Promise<{ notice: Notice;
 }
 
 export async function logInWithLichess(returnTo: string): Promise<void> {
+  if (offlineMode()) {
+    alert('Offline mode is on: the login goes to Lichess. Turn offline mode off first (Settings, or the sync status).');
+    return;
+  }
   location.href = await auth.start(returnTo);
 }
 

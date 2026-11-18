@@ -1,8 +1,9 @@
 // The sync status line and the banners that need the owner (PLAN.md §4.9): synced / N changes
-// waiting / offline / error, with the time of the last successful sync.
+// waiting / offline / error, with the time of the last successful sync; offline mode (§5.203).
 import { notice } from '../app/state.ts';
 import { syncStatus, type SyncStatus } from '../app/sync.ts';
 import { syncNow } from '../app/state.ts';
+import { setOfflineMode } from '../platform/offline.ts';
 
 export function formatTime(ms: number): string {
   const d = new Date(ms);
@@ -21,6 +22,8 @@ export function statusText(s: SyncStatus): string {
       return 'syncing…';
     case 'offline':
       return waiting ? `offline · ${waiting}` : 'offline';
+    case 'paused':
+      return waiting ? `offline mode · ${waiting}` : 'offline mode';
     case 'auth':
       return 'token refused';
     case 'rate':
@@ -36,11 +39,22 @@ export function statusText(s: SyncStatus): string {
   }
 }
 
+/** Offline mode's question, from the sync chip (§5.203): a tap there means "sync", which it can't. */
+export function askToGoOnline(): void {
+  if (confirm('Offline mode is on: nothing is sent and sync waits.\n\nTurn it off and sync now?')) void setOfflineMode(false);
+}
+
 export function SyncChip() {
   const s = syncStatus.value;
-  const bad = s.phase === 'offline' || s.phase === 'auth' || s.phase === 'error' || s.phase === 'rate';
+  const bad = s.phase === 'offline' || s.phase === 'paused' || s.phase === 'auth' || s.phase === 'error' || s.phase === 'rate';
   return (
-    <button type="button" class={bad ? 'chip sync-chip chip-warn' : 'chip sync-chip'} onClick={syncNow} title={s.message ?? 'Sync now'} data-phase={s.phase}>
+    <button
+      type="button"
+      class={bad ? 'chip sync-chip chip-warn' : 'chip sync-chip'}
+      onClick={s.phase === 'paused' ? askToGoOnline : syncNow}
+      title={s.phase === 'paused' ? 'Offline mode is on: tap to turn it off and sync' : (s.message ?? 'Sync now')}
+      data-phase={s.phase}
+    >
       {statusText(s)}
     </button>
   );

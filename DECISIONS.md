@@ -2709,3 +2709,17 @@ The technical calls, each with its reason:
   phone without it keeps both while the PC with it plays one.
 - **The endgames' colour also decides what's due on the home**, as "Course only" does. Why: the
   home's count leads to the page; one counting endgames the page hides would point at nothing.
+
+## Revision of 2026-11-18 (offline mode: PLAN.md §5.203; D4)
+- **Offline mode, a per-device switch under which nothing is sent and sync waits.** Why: the
+  owner, 2026-11-18: "no network requests are sent and sync is paused. Any progress made should be
+  synced later". D4's local copy already works offline and keeps changes for a later push; the
+  switch only makes the device behave so on purpose, with the network up. Per device and not
+  synced (localStorage): the reason for it is the device's (a flight, a metered connection).
+- **Enforced at the fetch calls' three doors** (the page's fetch, the explorer's worker, the
+  service worker), not feature by feature. Why: the app has many callers of the network; a guard
+  each would miss the next one added. A refusal is a TypeError, as with no network, so each
+  caller's existing offline path runs.
+- **Turning it off syncs at once** (pull and push), not on the usual 30 s push delay. Why: the
+  user turning it off has just said they are online and wants the work sent.
+- No data format changed; nothing new is synced.

@@ -11619,3 +11619,53 @@ reading the seven positions before (§5.191).
    (1100–2500) at each precision, so a setting for a wanted strength can be read off.
 
 **Results**: below, when the runs finish.
+
+#### 5.203 Offline mode (the owner's request, 2026-11-18, built)
+
+"Enable an "Offline mode" or "Airplane mode" (toggle) where no network requests are sent and sync is
+paused. Any progress made should be synced later when the user goes online again. I guess some
+features won't be available, but the important part is that the practice, train, storm and
+endgame drilling works."
+
+- **The switch**: "Offline mode: send nothing over the network", first in Settings, per device
+  (localStorage `repworks-offline`, not synced: a phone on a plane and the desktop at home differ),
+  followed by the device's other tabs. While it is on, the sync chip reads "offline mode" (with
+  "· N changes waiting"), amber; tapping it asks "Turn it off and sync now?". A device not set up
+  shows the same chip.
+- **Nothing leaves the device**, at three gates, so no feature has to remember it:
+  - the page's `fetch` is wrapped before any other module runs (`src/platform/offlineGuard.ts`,
+    imported first by `main.ts`): a request to another origin is refused at once with an
+    `OfflineModeError`, a TypeError as fetch throws with no network, so every caller already
+    sorts it as "offline" (GitHub's sync, Lichess, chess.com, the Gist, the puzzles' dataset, the
+    tablebase, a local explorer);
+  - the explorer's worker, which fetches on its own, is told (`{ type: 'offline' }`) and refuses
+    the same way; its kept answers still serve;
+  - the service worker reads the flag from `repworks-flags` (beside `isolate`) and answers the
+    site's own files from its caches only: an engine never downloaded fails as with no network,
+    and a new version found isn't downloaded (its install fails, the old shell keeps serving).
+    The page doesn't ask for a new worker while it is on. The browser's own check of `sw.js` on a
+    reload is outside the page's reach; with the radio off it simply fails.
+- **Sync pauses** (phase `paused`): the schedule is told "offline", nothing is asked, and changes
+  wait in the store as they always did with no network (§4.9). Turned off, what waited is pushed
+  at once, as Sync now would (not 30 s after the last change); with no network then, it reads
+  "offline" as before.
+- **What works**: everything that runs on the device from what it holds: training and Learn, the
+  storm's sessions from the positions gathered, the puzzles already stored, practice (the
+  opponent is Maia at once, without asking the explorer), the endgames (Stockfish alone judges,
+  the tablebase not asked), the analysis board with the engines. The engines must have been
+  downloaded once; one that isn't says "… isn't on this device yet, and offline mode is on: turn
+  it off once to download it". **What waits**: the explorer and ChessDB (kept answers only), a new
+  storm gather, the games' refresh, imports from Lichess, the Lichess login (it says why), the
+  tablebase.
+
+**As built**: `src/platform/offline.ts` (the switch, the guard, `networkUp`), the guard's import
+in `src/app/main.ts`, `src/sw/sw.ts` (the flag, `network()`, the install refused),
+`src/app/sync.ts` (`paused`), `src/ui/Sync.tsx` and `src/ui/App.tsx` (the chip),
+`src/ui/Debug.tsx` (the switch), and the explorer's worker, practice's opponent, the tablebase,
+the engines' download and the Lichess login. **Checked**: unit tests (`offline.test.ts`: the
+guard refusing and letting go) and Playwright (`offlineMode.spec.ts`: a review kept through a
+reload, no request leaving the site from the page, its workers or a study's explorer, the
+service worker refusing a file it lacks, the review pushed once turned off from the chip;
+`endgames.spec.ts`: an endgame played offline, Stockfish alone judging, the tablebase not asked,
+the try synced after); each gate's test was seen to fail with that gate removed. **Not
+checked**: on the owner's devices (`TESTING.md`).

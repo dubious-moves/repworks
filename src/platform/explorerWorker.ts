@@ -8,7 +8,7 @@ import { CHESSDB_URL, EXPLORER_BASE } from '../core/explorer/providers.ts';
 import type { FromMaia } from '../core/maia/protocol.ts';
 import { createExplorerCache } from './explorerCache.ts';
 
-type FromPage = ToWorker | { type: 'maiaPort'; port: MessagePort | null };
+type FromPage = ToWorker | { type: 'maiaPort'; port: MessagePort | null } | { type: 'offline'; on: boolean };
 const scope = self as unknown as { postMessage(m: unknown): void; onmessage: ((e: MessageEvent<FromPage>) => void) | null };
 
 // q_extension's MAIA_TIMEOUT_MS: the first answer may include loading the model.
@@ -56,8 +56,11 @@ function askMaia(fen: string, elo: number, before?: string[]): Promise<MaiaMove[
 const TIMEOUT_MS = 30_000;
 const timed = (url: string) => url.startsWith(EXPLORER_BASE) || url.startsWith(CHESSDB_URL);
 
+// Offline mode (PLAN.md §5.203), as the page says: nothing is asked, kept answers still serve.
+let offline = false;
+
 const service = createExplorerService({
-  http: (url, init) => fetch(url, timed(url) ? { ...init, signal: AbortSignal.timeout(TIMEOUT_MS) } : init),
+  http: (url, init) => (offline ? Promise.reject(new TypeError('Offline mode is on')) : fetch(url, timed(url) ? { ...init, signal: AbortSignal.timeout(TIMEOUT_MS) } : init)),
   cache: createExplorerCache(),
   now: () => Date.now(),
   sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
@@ -68,5 +71,9 @@ const service = createExplorerService({
 scope.onmessage = (e) => {
   const m = e.data;
   if (m.type === 'maiaPort') return setPort(m.port);
+  if (m.type === 'offline') {
+    offline = m.on;
+    return;
+  }
   service.handle(m);
 };

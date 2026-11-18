@@ -1,4 +1,5 @@
 // Registers the service worker (src/sw/sw.ts) and reports updates and the shell's version.
+import { offlineMode } from './offline.ts';
 
 export interface ServiceWorkerEvents {
   /** A new version took over while this page was running the old one. */
@@ -37,7 +38,7 @@ export function registerServiceWorker(base: string, events: ServiceWorkerEvents)
       let lastCheck = Date.now();
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState !== 'visible') return;
-        if (Date.now() - lastCheck < UPDATE_CHECK_INTERVAL_MS) return;
+        if (Date.now() - lastCheck < UPDATE_CHECK_INTERVAL_MS || offlineMode()) return;
         lastCheck = Date.now();
         registration.update().catch(() => undefined);
       });

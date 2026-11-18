@@ -1,6 +1,8 @@
 // The sync loop (PLAN.md §4.9): runs the sync step when the schedule says, under a Web Lock so
 // two tabs never sync at once, and tells the other tabs what changed over a BroadcastChannel.
-// Its state is a signal the status line reads.
+// Its state is a signal the status line reads. Offline mode (PLAN.md §5.203) pauses it: nothing is
+// asked of GitHub, the changes wait in the store as they do with no network, and turning it off
+// syncs at once.
 import { signal } from '@preact/signals';
 import type { FileConflict } from '../core/merge/files.ts';
 import { newId } from '../core/study/ids.ts';
@@ -12,9 +14,11 @@ import { repoInfo, type GithubConfig, type RequestInfo } from '../platform/githu
 import { graphqlRemote } from '../platform/githubGraphql.ts';
 import { restRemote } from '../platform/githubRest.ts';
 import type { IdbStore, RemoteSettings } from '../platform/idbStore.ts';
+import { offlineMode, onOfflineMode } from '../platform/offline.ts';
 import { countRequest } from './requests.ts';
 
-export type Phase = 'setup' | 'idle' | 'syncing' | 'offline' | 'auth' | 'rate' | 'busy' | 'error';
+/** `paused`: offline mode is on (§5.203). */
+export type Phase = 'setup' | 'idle' | 'syncing' | 'offline' | 'paused' | 'auth' | 'rate' | 'busy' | 'error';
 
 export interface SyncStatus {
   phase: Phase;
@@ -32,6 +36,7 @@ export const dataVersion = signal(0);
 type Message = { type: 'changed' } | { type: 'synced'; pulled: boolean };
 
 const LOCK = 'repworks-sync';
+const PAUSED = { phase: 'paused', message: 'Offline mode is on: sync waits until it is off' } as const;
 
 export class SyncController {
   private readonly store: IdbStore;
@@ -58,14 +63,24 @@ export class SyncController {
       this.update({ phase: 'setup' });
       return;
     }
-    if (syncStatus.value.phase === 'setup') this.update(navigator.onLine ? { phase: 'idle', message: undefined } : { phase: 'offline', message: 'no network' });
+    if (syncStatus.value.phase === 'setup') this.update(offlineMode() ? PAUSED : navigator.onLine ? { phase: 'idle', message: undefined } : { phase: 'offline', message: 'no network' });
     if (!this.started) {
       this.started = true;
       document.addEventListener('visibilitychange', () => this.trigger(document.visibilityState === 'visible' ? 'visible' : 'hidden'));
       addEventListener('focus', () => this.trigger('focus'));
-      addEventListener('online', () => this.trigger('online'));
+      addEventListener('online', () => {
+        if (!offlineMode()) this.trigger('online');
+      });
       addEventListener('offline', () => this.trigger('offline'));
-      if (!navigator.onLine) this.schedule.note('offline', Date.now());
+      onOfflineMode((on) => {
+        if (on) return this.trigger('offline');
+        if (!navigator.onLine) return this.update({ phase: 'offline', message: 'no network' });
+        // Turned off: what waited is pushed now, as Sync now would, not 30 s after the last change.
+        this.schedule.note('online', Date.now());
+        this.update({ phase: 'idle', message: undefined });
+        this.trigger('manual');
+      });
+      if (offlineMode() || !navigator.onLine) this.schedule.note('offline', Date.now());
       this.trigger('start');
     } else this.trigger('setup');
   }
@@ -84,7 +99,7 @@ export class SyncController {
 
   trigger(trigger: Trigger): void {
     this.schedule.note(trigger, Date.now());
-    if (trigger === 'offline') this.update({ phase: 'offline', message: 'no network' });
+    if (trigger === 'offline') this.update(offlineMode() ? PAUSED : { phase: 'offline', message: 'no network' });
     this.arm();
   }
 
@@ -136,7 +151,7 @@ export class SyncController {
   }
 
   private async run(push: boolean): Promise<void> {
-    if (this.running || !this.settings) return;
+    if (this.running || !this.settings || offlineMode()) return;
     this.running = true;
     this.update({ phase: 'syncing', message: undefined });
     let outcome: SyncOutcome | undefined;
@@ -158,9 +173,11 @@ export class SyncController {
       dataVersion.value++;
       this.channel?.postMessage({ type: 'synced', pulled: outcome.pulled } satisfies Message);
     }
+    // Offline mode turned on during the sync: its requests were refused, which is no error.
+    const paused = outcome.kind !== 'synced' && offlineMode();
     this.update({
-      phase: outcome.kind === 'synced' ? 'idle' : outcome.kind,
-      message: outcome.kind === 'synced' ? undefined : outcome.message,
+      phase: paused ? 'paused' : outcome.kind === 'synced' ? 'idle' : outcome.kind,
+      message: paused ? PAUSED.message : outcome.kind === 'synced' ? undefined : outcome.message,
       conflicts: outcome.conflicts.length ? outcome.conflicts : outcome.kind === 'synced' && outcome.pulled ? [] : syncStatus.value.conflicts,
     });
     this.running = false;

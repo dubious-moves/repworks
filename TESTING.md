@@ -1993,3 +1993,23 @@ does. Start with the spike: its log decides what the later parts change (CHESSNU
 - On the phone: does the bar under the board still fit with the extra button?
 - **Checked**: unit tests and Playwright (desktop, emulated phone, a fake engine); **not** on a
   device.
+
+### Offline mode (PLAN.md §5.203, 2026-11-18)
+
+- First, online: open an endgame, a storm session, practice and training once, so the engines and
+  Maia are on the device (Settings shows the engines' files).
+- Settings → "Offline mode: send nothing over the network". The sync chip reads "offline mode",
+  amber. Train some lines, play a storm session, a practice game and an endgame: do they all work
+  as before? The chip counts the changes waiting.
+- Close the app and open it again (still in offline mode): the changes still wait, the switch is
+  still on.
+- With the phone's radio on and offline mode on: does anything on the page say it fetched (the
+  explorer should say it can't ask; nothing else should change)? In DevTools' Network panel on
+  the desktop, does anything leave the site apart from the browser's own check of `sw.js` on a
+  reload?
+- Tap the chip: "Turn it off and sync now?" → OK. Does it sync straight away, and do the other
+  device's numbers show the work after its own sync?
+- An engine never downloaded (Stockfish 19 full, say) chosen while offline mode is on: does it say
+  it isn't on the device yet?
+- **Checked**: unit tests and Playwright (desktop, emulated phone, a fake GitHub and a fake engine);
+  **not** on a device.

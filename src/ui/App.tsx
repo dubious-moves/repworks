@@ -4,7 +4,7 @@ import { signal } from '@preact/signals';
 import { mode } from '../app/mode.ts';
 import { modeHash } from '../core/app/fsm.ts';
 import { findConflicts } from '../app/overview.ts';
-import { online, shellVersion, updateReady } from '../app/shell.ts';
+import { offlineOn, online, shellVersion, updateReady } from '../app/shell.ts';
 import { device, fatal, localStore, ready, starting, studies, type StudyRow } from '../app/state.ts';
 import { queueOf, studyMovesOf, trainData } from '../app/train.ts';
 import type { StudyMoves } from '../core/train/stats.ts';
@@ -31,7 +31,7 @@ import { ideaEnrolled, ideaQueueNow, startIdeaCards } from '../app/ideas.ts';
 import { enrolledIn } from '../core/ideas/cards.ts';
 import { ImportScreen } from './Import.tsx';
 import { SetupForm } from './Setup.tsx';
-import { SyncBanners, SyncChip } from './Sync.tsx';
+import { askToGoOnline, SyncBanners, SyncChip } from './Sync.tsx';
 import { BoardChip, BoardDialog } from './BoardLink.tsx';
 import { HomeLink } from './Back.tsx';
 import { SIDEWAYS } from './phone.ts';
@@ -129,7 +129,13 @@ function SyncStatus() {
       <SyncChip />
     </Guard>
   ) : (
-    !online.value && <span class="status status-offline">offline</span>
+    offlineOn.value ? (
+      <button type="button" class="chip sync-chip chip-warn" data-phase="paused" onClick={askToGoOnline} title="Offline mode is on: tap to turn it off">
+        offline mode
+      </button>
+    ) : (
+      !online.value && <span class="status status-offline">offline</span>
+    )
   );
 }
 

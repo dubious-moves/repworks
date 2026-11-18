@@ -16,6 +16,8 @@ import { EngineFiles } from './Engines.tsx';
 import { isoDay } from './day.ts';
 import { isTheme, setTheme, theme, THEMES } from '../app/theme.ts';
 import { setSoundOn, soundOn } from '../app/sound.ts';
+import { offlineOn } from '../app/shell.ts';
+import { setOfflineMode } from '../platform/offline.ts';
 import { contrastBoard, OUTLINE, PIECE_SETS, PIECE_SIZE, pieceLook, setContrastBoard, setPieceLook } from '../app/boardLook.ts';
 import { Chessground } from '@lichess-org/chessground';
 
@@ -168,12 +170,34 @@ export function Debug() {
   );
 }
 
+/**
+ * Offline mode (PLAN.md §5.203): a switch for this device under which nothing is sent over the
+ * network and sync waits; what is done meanwhile is kept and synced when it is turned off.
+ */
+export function OfflineMode() {
+  const on = offlineOn.value;
+  return (
+    <fieldset class="offline-mode">
+      <legend>Offline mode</legend>
+      <label class="check">
+        <input type="checkbox" checked={on} onChange={(e) => void setOfflineMode(e.currentTarget.checked)} /> Offline mode: send nothing over the network
+      </label>
+      <p class="muted">
+        Sync waits, and everything done meanwhile is kept on this device and synced once it is off. Training, practice, the storm and the endgames run on
+        this device: with the engines below downloaded first, they work as before. The explorer, Lichess, ChessDB, the tablebase, the games' refresh and
+        a new storm gather need the network and wait.
+      </p>
+    </fieldset>
+  );
+}
+
 function SettingsBody() {
   const d = device.value;
   const r = settings.value;
   const s = syncStatus.value;
   return (
     <>
+      <OfflineMode />
       <Look />
       <dl>
         <dt>Device</dt>

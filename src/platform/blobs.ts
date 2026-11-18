@@ -4,6 +4,7 @@
 // carry a hash of their content, so a stored file is always the right one. Works in a page and
 // in a worker alike.
 import { ENGINES, type EngineFile } from 'virtual:repworks-engines';
+import { offlineMode } from './offline.ts';
 
 export { ENGINES, type EngineFile };
 
@@ -52,6 +53,8 @@ export async function ensure(files: readonly EngineFile[], onProgress?: (p: Prog
       report();
       continue;
     }
+    // Offline mode (§5.203) says why, where the service worker's refusal would only fail.
+    if (offlineMode()) throw new Error(`${f.url.split('/').pop()} isn't on this device yet, and offline mode is on: turn it off once to download it`);
     const response = await fetch(f.url, signal ? { signal } : {});
     if (!response.ok || !response.body) throw new Error(`${f.url}: HTTP ${response.status}`);
     const reader = response.body.getReader();
