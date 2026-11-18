@@ -1,8 +1,9 @@
 // Converts an Lc0 network (`.pb.gz`) to the ONNX model the site runs (PLAN.md §5.143), as Lc0's
-// own `leela2onnx` builds it (src/neural/onnx/converter.cc at v0.32.1), for the one kind of
-// network vendored: a residual tower with squeeze-and-excitation (NETWORK_SE_WITH_HEADFORMAT),
-// the classical 112 input planes, an attention policy head and a win/draw/loss value head. The
-// moves-left head is left out (the site doesn't use it). Weights are stored as float16 and cast to
+// own `leela2onnx` builds it (src/neural/onnx/converter.cc at v0.32.1), for a residual tower with
+// squeeze-and-excitation (NETWORK_SE_WITH_HEADFORMAT), the classical 112 input planes and a
+// win/draw/loss value head: the network vendored (Mish, an attention policy head), and the
+// Maia-1 networks the opponents' strength is measured against (ReLU, a convolutional policy head,
+// PLAN.md §5.202; not vendored). The moves-left head is left out (the site doesn't use it). Weights are stored as float16 and cast to
 // float32 when the session loads them (onnxruntime folds the casts), so the file is half the size
 // and the arithmetic float32.
 //
@@ -104,9 +105,12 @@ function convBlock(f) {
 
 const net = parse(gunzipSync(readFileSync(netPath)));
 const format = sub(sub(net, 4), 2);
-const want = { 1: 1, 2: 2, 3: 4, 4: 3, 5: 2 }; // input classical, output WDL, SE with head format, attention policy, WDL value
+const want = { 1: 1, 2: 2, 3: 4, 5: 2 }; // input classical, output WDL, SE with head format, WDL value
 for (const [no, v] of Object.entries(want)) if (one(format, Number(no)) !== v) throw new Error(`network format field ${no} is ${one(format, Number(no))}, not ${v}`);
-if ((one(format, 7) ?? 0) !== 1) throw new Error('only Mish networks are supported');
+const policyKind = one(format, 4); // 2 convolution, 3 attention
+if (policyKind !== 2 && policyKind !== 3) throw new Error(`policy format ${policyKind}: only convolution (2) and attention (3) are supported`);
+const activation = one(format, 7) ?? 0; // 0 ReLU, 1 Mish
+if (activation !== 0 && activation !== 1) throw new Error(`activation ${activation}: only ReLU and Mish are supported`);
 const w = sub(net, 10);
 
 // --- Writing ONNX (onnx.proto: the messages and fields used here) ---
@@ -221,7 +225,8 @@ function constant(values, type) {
   return name;
 }
 const i64 = (...v) => constant(v, INT64);
-const mish = (x) => node('Mul', [x, node('Tanh', [node('Softplus', [x])])]);
+/** The network's default activation (named for the vendored network's). */
+const mish = (x) => (activation === 1 ? node('Mul', [x, node('Tanh', [node('Softplus', [x])])]) : node('Relu', [x]));
 
 const inputLayer = convBlock(sub(w, 1));
 const filters = inputLayer.biases.length;
@@ -250,35 +255,50 @@ for (const res of w.get(2) ?? []) {
 }
 const body = flow;
 
+/** The policy's 1858 outputs gathered from `all` by Lc0's map (`table` in src/neural/tables). */
+function policyOut(all, table, symbol, size) {
+  const header = readFileSync(join(lc0, 'src/neural/tables', table), 'utf8');
+  const mapText = header.slice(header.indexOf(`${symbol}[] = {`) + symbol.length + 6, header.indexOf('};', header.indexOf(symbol)));
+  const map = mapText.split(',').map((s) => s.trim()).filter(Boolean).map(Number);
+  if (map.length !== size) throw new Error(`${symbol} has ${map.length} entries`);
+  const gather = new Array(1858).fill(-1);
+  map.forEach((idx, i) => idx > -1 && (gather[idx] = i));
+  if (gather.includes(-1)) throw new Error(`${symbol} misses moves`);
+  nodes.push(bytes(sField(1, all), sField(1, constant(gather, INT32)), sField(2, 'policy'), sField(3, 'policy'), sField(4, 'Gather'), lField(5, attr('axis', 1))));
+}
+
 // The attention policy (converter.cc's MakeAttentionPolicy; SELU before the attention body).
-const polW = layer(sub(w, 4));
-const polB = layer(sub(w, 5));
-const pe = polB.length;
-const qB = layer(sub(w, 18));
-const d = qB.length;
-let p = node('Reshape', [node('Transpose', [body], { perm: [0, 2, 3, 1] }), i64(-1, filters)]);
-p = node('Selu', [node('Add', [node('MatMul', [p, weight(polW, [filters, pe], true)]), weight(polB, [pe])])]);
-const Q = node('Reshape', [node('Add', [node('MatMul', [p, weight(layer(sub(w, 17)), [pe, d], true)]), weight(qB, [d])]), i64(-1, 64, d)]);
-const K = node('Reshape', [node('Add', [node('MatMul', [p, weight(layer(sub(w, 19)), [pe, d], true)]), weight(layer(sub(w, 20)), [d])]), i64(-1, 64, d)]);
-const scale = constant([1 / Math.sqrt(d)], FLOAT);
-const logits = node('Mul', [node('MatMul', [Q, node('Transpose', [K], { perm: [0, 2, 1] })]), scale]);
-let prom = node('Slice', [K, i64(0, 56, 0), i64(2 ** 31 - 1, 64, d)]);
-prom = node('MatMul', [prom, weight(layer(sub(w, 22)), [d, 4], true)]);
-prom = node('Transpose', [prom], { perm: [0, 2, 1] });
-const [prom3, prom1] = node('Split', [prom, i64(3, 1)], { axis: 1 }, 2);
-prom = node('Reshape', [node('Transpose', [node('Add', [prom3, prom1])], { perm: [0, 2, 1] }), i64(-1, 1, 24)]);
-let sl = node('Reshape', [node('Slice', [logits, i64(0, 48, 56), i64(2 ** 31 - 1, 56, 64)]), i64(-1, 64, 1)]);
-sl = node('Reshape', [node('Concat', [sl, sl, sl], { axis: 2 }), i64(-1, 8, 24)]);
-prom = node('Reshape', [node('Add', [sl, prom]), i64(-1, 3, 64)]);
-const all = node('Reshape', [node('Concat', [logits, prom], { axis: 1 }), i64(-1, 67 * 64)]);
-const header = readFileSync(join(lc0, 'src/neural/tables/attention_policy_map.h'), 'utf8');
-const mapText = header.slice(header.indexOf('kAttnPolicyMap[] = {') + 20, header.indexOf('};', header.indexOf('kAttnPolicyMap')));
-const attn = mapText.split(',').map((s) => s.trim()).filter(Boolean).map(Number);
-if (attn.length !== 67 * 64) throw new Error(`the attention map has ${attn.length} entries`);
-const gather = new Array(1858).fill(-1);
-attn.forEach((idx, i) => idx > -1 && (gather[idx] = i));
-if (gather.includes(-1)) throw new Error('the attention map misses moves');
-nodes.push(bytes(sField(1, all), sField(1, constant(gather, INT32)), sField(2, 'policy'), sField(3, 'policy'), sField(4, 'Gather'), lField(5, attr('axis', 1))));
+let pe = 0;
+let d = 0;
+if (policyKind === 3) {
+  const polW = layer(sub(w, 4));
+  const polB = layer(sub(w, 5));
+  pe = polB.length;
+  const qB = layer(sub(w, 18));
+  d = qB.length;
+  let p = node('Reshape', [node('Transpose', [body], { perm: [0, 2, 3, 1] }), i64(-1, filters)]);
+  p = node('Selu', [node('Add', [node('MatMul', [p, weight(polW, [filters, pe], true)]), weight(polB, [pe])])]);
+  const Q = node('Reshape', [node('Add', [node('MatMul', [p, weight(layer(sub(w, 17)), [pe, d], true)]), weight(qB, [d])]), i64(-1, 64, d)]);
+  const K = node('Reshape', [node('Add', [node('MatMul', [p, weight(layer(sub(w, 19)), [pe, d], true)]), weight(layer(sub(w, 20)), [d])]), i64(-1, 64, d)]);
+  const scale = constant([1 / Math.sqrt(d)], FLOAT);
+  const logits = node('Mul', [node('MatMul', [Q, node('Transpose', [K], { perm: [0, 2, 1] })]), scale]);
+  let prom = node('Slice', [K, i64(0, 56, 0), i64(2 ** 31 - 1, 64, d)]);
+  prom = node('MatMul', [prom, weight(layer(sub(w, 22)), [d, 4], true)]);
+  prom = node('Transpose', [prom], { perm: [0, 2, 1] });
+  const [prom3, prom1] = node('Split', [prom, i64(3, 1)], { axis: 1 }, 2);
+  prom = node('Reshape', [node('Transpose', [node('Add', [prom3, prom1])], { perm: [0, 2, 1] }), i64(-1, 1, 24)]);
+  let sl = node('Reshape', [node('Slice', [logits, i64(0, 48, 56), i64(2 ** 31 - 1, 56, 64)]), i64(-1, 64, 1)]);
+  sl = node('Reshape', [node('Concat', [sl, sl, sl], { axis: 2 }), i64(-1, 8, 24)]);
+  prom = node('Reshape', [node('Add', [sl, prom]), i64(-1, 3, 64)]);
+  const all = node('Reshape', [node('Concat', [logits, prom], { axis: 1 }), i64(-1, 67 * 64)]);
+  policyOut(all, 'attention_policy_map.h', 'kAttnPolicyMap', 67 * 64);
+} else {
+  // The convolutional policy (converter.cc's MakePolicyHead): a 3×3 convolution with the
+  // activation, another to 80 planes without, then Lc0's map from the first 73 planes' 73 × 64
+  // outputs to the 1858 moves (the last 7 planes are unused).
+  const p = mish(conv(convBlock(sub(w, 11)), body, filters, filters, 3));
+  policyOut(node('Reshape', [conv(convBlock(sub(w, 3)), p, filters, 80, 3), i64(-1, 80 * 64)]), 'policy_map.h', 'kConvPolicyMap', 73 * 64);
+}
 
 // The value head: a 1×1 convolution to 32 channels, 128, then W/D/L.
 const valueBlock = convBlock(sub(w, 6));
@@ -299,4 +319,4 @@ const graph = bytes(
 );
 const model = bytes(vField(1, 8), lField(8, bytes(sField(1, ''), vField(2, 17))), sField(2, 'repworks lc0-onnx'), lField(7, graph));
 writeFileSync(outPath, model);
-console.log(`${outPath}: ${(model.length / 1e6).toFixed(1)} MB, ${(w.get(2) ?? []).length} blocks of ${filters} filters, policy embedding ${pe}, d ${d}`);
+console.log(`${outPath}: ${(model.length / 1e6).toFixed(1)} MB, ${(w.get(2) ?? []).length} blocks of ${filters} filters, ${activation === 1 ? 'Mish' : 'ReLU'}, ${policyKind === 3 ? `attention policy, embedding ${pe}, d ${d}` : 'convolutional policy'}`);

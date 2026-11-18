@@ -82,6 +82,13 @@ about 40 minutes for every condition on 4 threads; `--list`, `--conditions`, `--
 `lichess_db_standard_rated_YYYY-MM.pgn.zst` or its first 250 MB from `curl -r 0-250000000`);
 blitz as `--speeds blitz`.
 
+How strong the practice opponents (Easy, Medium, Hard) are on Lichess's scale (PLAN.md §5.202), a
+report that writes nothing; each step resumes from its file:
+`node scripts/opponent-strength.ts openings <dump.pgn.zst> --out openings.json`, then `match --nets
+<dir of maia-1100/1500/1900.onnx> --openings openings.json --out games.json` (about 2 hours on 4
+cores), `mistakes <dump.pgn.zst> --sample sample.json --out mistakes.json`, and `report --games
+games.json --mistakes mistakes.json`. The Maia-1 networks are converted with `scripts/lc0-onnx.mjs`.
+
 The storm's "Gather positions" from a cloud session, as a device named `cloud` (PLAN.md §5.155),
 with the data repo checked out on `main`:
 `node scripts/storm-gather.ts ../repworks-data --minutes 60 --score-minutes 40 --push`; only

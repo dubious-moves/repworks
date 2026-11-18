@@ -11579,3 +11579,43 @@ navigate all clickable lines without quizzing."
 (`src/app/preview.ts`), read by the analysis board's head (`src/ui/Analysis.tsx`). **Checked**:
 unit tests (`lines.test.ts`) and Playwright (`analysis.spec.ts`, desktop and emulated phone, with
 the fake engine). **Not checked**: on the owner's devices (`TESTING.md`).
+
+#### 5.202 How strong the practice opponents are, measured (the owner's question of 2026-11-18, built)
+
+"I'm unsure about the actual strength of the practice opponents (easy, medium, strong) - what their
+actual ratings are. My intuition tells me that it's 100-200 rating points below the actual number
+Maia gets." The owner suggested playing them against Lichess bots with real ratings; two
+measurements were agreed, both a report that writes nothing (`scripts/opponent-strength.ts`).
+
+The levels are the checklist's presets (`PRESETS`, `src/core/games/checklist.ts`): Easy Maia 3 at
+1750, precision 0.65 (`maiaPick`'s temperature 0.7); Medium 2000, 0.75 (0.5); Hard 2150, 0.85
+(0.3); each after the explorer's games run out. Measured on the app's default model, the 23M,
+reading the seven positions before (§5.191).
+
+1. **A match against the Lichess Maia bots' networks.** The CSSLab's bots maia1, maia5 and maia9
+   run the Maia-1 networks trained at 1100, 1500 and 1900 with `go nodes 1` (the likeliest move),
+   and their Lichess ratings come from hundreds of thousands of games, mostly against people. Their
+   networks are converted by `scripts/lc0-onnx.mjs` (which now takes ReLU networks with a
+   convolutional policy head, Maia-1's kind; checked: all of the policy on legal moves, the
+   human-like openings, a mate in one and a hanging queen taken) and played here, so no Lichess
+   account is needed. The levels play the bots, and the bots each other, from 100 positions of
+   real games between players of 1600–2200 (plies 10–16, Stockfish within ±0.8), both colours: 200
+   games a pair. Games end on the board, or by Stockfish (depth 10, every second ply): 8 pawns at
+   two checks in a row wins; a draw from ply 200 at ±0.5 over five checks; at ply 400 ±3 decides.
+   The players' Elo is fitted to the results (logistic, a draw half a point), and each level is
+   placed on the bots' Lichess ratings by the least-squares line through the three bots: how far
+   apart they are here against how far apart they are on Lichess. Intervals: the games resampled
+   within each pair, the bots' ratings drawn within their deviation. The levels don't play each
+   other by default (`--all-pairs`): Maia 3 on both sides is the slow part, and the mapping
+   doesn't need it.
+2. **The same positions as people.** Middlegame positions of rapid and classical games of the
+   dump (moves 11–35, 14–28 pieces, 30 s or more on the mover's clock, §5.190's criteria), 500 in
+   each band of the mover's rating 1100–2300 (±100). Stockfish (depth 14) scores the move played and
+   every move Maia gives 1% or more at any rating asked; a move's loss is the win% (Lichess's, as
+   `classifyWpDrop`) it gives up against the best found, a blunder more than 15 points. A level's
+   loss is the expectation over its tempered policy. Per band, the level's loss less the people's,
+   on the same positions; the line through the bands crosses 0 at the rating whose mistakes the
+   level makes, by the mean loss and by the blunders. The same for every Maia rating asked
+   (1100–2500) at each precision, so a setting for a wanted strength can be read off.
+
+**Results**: below, when the runs finish.
