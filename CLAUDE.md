@@ -85,7 +85,7 @@ blitz as `--speeds blitz`.
 How strong the practice opponents (Easy, Medium, Hard) are on Lichess's scale (PLAN.md §5.202), a
 report that writes nothing; each step resumes from its file:
 `node scripts/opponent-strength.ts openings <dump.pgn.zst> --out openings.json`, then `match --nets
-<dir of maia-1100/1500/1900.onnx> --openings openings.json --out games.json` (about 2 hours on 4
+<dir of maia-1100/1500/1900.onnx> --openings openings.json --out games.json` (about 50 minutes on 4
 cores), `mistakes <dump.pgn.zst> --sample sample.json --out mistakes.json`, and `report --games
 games.json --mistakes mistakes.json`. The Maia-1 networks are converted with `scripts/lc0-onnx.mjs`.
 
