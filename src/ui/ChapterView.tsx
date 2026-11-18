@@ -271,7 +271,7 @@ export function ChapterView() {
                 promotion={promotion && { dest: promotion.dest, onPick: (role) => (role ? promote_(role) : setPromotion(undefined)) }}
               />
               <EvalBar orientation={side.value} />
-              <PreviewBar owner="chapter" />
+              <PreviewBar owner="chapter" side={side.value} />
               <p class="feedback" role="status">
                 {feedback.value ?? ''}
               </p>

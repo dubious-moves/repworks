@@ -575,7 +575,7 @@ function PlayBoard(props: { run: CardRun; asking: boolean; arrows: { orig: strin
           }
         }
       />
-      <PreviewBar owner="games" />
+      <PreviewBar owner="games" side={r.card.item.color} />
     </div>
   );
 }

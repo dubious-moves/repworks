@@ -7,9 +7,10 @@ import { makeFen } from 'chessops/fen';
 import type { Position } from 'chessops/chess';
 import { parseUci } from 'chessops/util';
 import type { Key } from '@lichess-org/chessground/types';
-import { endPreview, previewOf, previewPosition, showLine, stepPreview, type PreviewOwner } from '../app/preview.ts';
+import { endPreview, previewOf, previewPosition, sequenceAsked, showLine, stepPreview, type PreviewOwner } from '../app/preview.ts';
+import { analyseFrom } from '../app/mode.ts';
 import { playLine } from '../app/editor.ts';
-import { cursorAt, parseCommentLines, playedLines, type PlayedLine } from '../core/repertoire/lines.ts';
+import { cursorAt, lineAsSequence, parseCommentLines, playedLines, type PlayedLine } from '../core/repertoire/lines.ts';
 
 export interface CommentPositions {
   /** The commented move's position (the start, for a comment before the first move). */
@@ -151,13 +152,17 @@ export function endPreviewOnBoard(e: MouseEvent): void {
   if ((e.target as Element | null)?.closest('.board')) endPreview();
 }
 
-/** Under the board while a line is previewed: where it is, and ◀ ▶ Back for the phone. */
-export function PreviewBar(props: { owner: PreviewOwner }) {
+/**
+ * Under the board while a line is previewed: where it is, and ◀ ▶ Back for the phone. A comment's
+ * line can be made a sequence (§5.201) when `side`, the board's side, has a move in it to ask.
+ */
+export function PreviewBar(props: { owner: PreviewOwner; side?: 'white' | 'black' }) {
   const p = previewOf(props.owner);
   if (!p) return null;
   const line = p.lines[p.cursor.line]!;
   const engine = p.source === 'engine';
   const shown = line.sans.slice(0, p.cursor.ply);
+  const seq = !engine && props.side ? lineAsSequence(line, props.side) : undefined;
   return (
     <div class="preview-bar" role="group" aria-label={engine ? 'Line from the engine' : 'Line from the comment'}>
       <span class="preview-moves">
@@ -173,6 +178,18 @@ export function PreviewBar(props: { owner: PreviewOwner }) {
         {engine && props.owner === 'chapter' && (
           <button type="button" title="Add these moves to the chapter, from the board's move" onClick={() => playLine(shown)}>
             Add
+          </button>
+        )}
+        {seq && props.side && (
+          <button
+            type="button"
+            title={`Save the whole line (${seq.sans.join(' ')}) as a sequence to drill, as ${props.side}: it opens on the analysis board, checked by Stockfish`}
+            onClick={() => {
+              sequenceAsked.value = true;
+              analyseFrom({ fen: seq.fen, line: seq.sans, show: Math.min(p.cursor.ply, seq.sans.length), side: props.side });
+            }}
+          >
+            Sequence…
           </button>
         )}
         <button type="button" class="secondary" onClick={endPreview}>

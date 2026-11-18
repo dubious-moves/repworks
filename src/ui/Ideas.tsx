@@ -204,7 +204,7 @@ function Asking(props: { s: IdeaSession; run: IdeaRun; counter: ComponentChildre
           onMove={onMove}
           promotion={promotion && { dest: promotion.dest, onPick: (role) => (setPromotion(undefined), role && send(promotion.orig, promotion.dest, role)) }}
         />
-        <PreviewBar owner="ideas" />
+        <PreviewBar owner="ideas" side={idea.side} />
       </div>
       <div class="train-panel">
         {props.counter}

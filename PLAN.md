@@ -11554,3 +11554,28 @@ navigate all clickable lines without quizzing."
 `src/app/trainLines.ts`; the keys, the row and the comments of the move browsed in
 `src/ui/Train.tsx`. **Checked**: Playwright (`commentLines.spec.ts`, desktop and emulated phone).
 **Not checked**: on the owner's devices (`TESTING.md`).
+
+#### 5.201 A comment's clickable line made a sequence (the owner's request, 2026-11-18, built)
+
+"Implement a way to convert a clickable line to a sequence."
+
+- **Where**: the bar under the board while a comment's line is previewed (§5.12) has a **Sequence…**
+  button, wherever the bar is: the chapter view, the Read view, training, a game card's note and
+  the idea cards. Not for an engine's line (that bar has Add).
+- **What it takes**: the whole line previewed, from its start (§5.12's `lineStart`: the commented
+  move's position, or the one before it for a line that replaces the move), not only up to the move
+  shown, and up to its first pass (`--`: a drill has no passes). The drill's side is the board's
+  side there (the study's orientation, training's side, the card's colour). A line opening with the
+  other side's move plays that move first, as the analysis board's sequences do (§5.74). The button
+  is left out when the line holds no move of the side to ask.
+- **How**: it opens the analysis board on the line (its start as the FEN, the line its main line,
+  the board at the move previewed, seen from the drill's side, "← Back to …" the page it came
+  from) with "Save as a sequence" already open: Stockfish's check, the warnings, the priority and
+  the dedup are §5.56's and §5.171's. Closing the dialog leaves the line on the board, to branch it
+  (other lines of the drill) and save again, or go back.
+
+**As built**: `lineAsSequence` in `src/core/repertoire/lines.ts`; the button in `PreviewBar`
+(`src/ui/CommentText.tsx`, the board's side passed by each page); `sequenceAsked`
+(`src/app/preview.ts`), read by the analysis board's head (`src/ui/Analysis.tsx`). **Checked**:
+unit tests (`lines.test.ts`) and Playwright (`analysis.spec.ts`, desktop and emulated phone, with
+the fake engine). **Not checked**: on the owner's devices (`TESTING.md`).

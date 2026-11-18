@@ -25,6 +25,12 @@ export const commentId = (nodeKey: string, text: string) => `${nodeKey}#${text}`
 
 export const preview = signal<Preview | undefined>(undefined);
 
+/**
+ * Set by the bar's "Sequence…" (§5.201) just before the analysis board opens on the line: the
+ * board opens its "Save as a sequence" dialog at once, and clears it.
+ */
+export const sequenceAsked = signal(false);
+
 export function showLine(owner: PreviewOwner, key: string, lines: PlayedLine[], cursor: Cursor, source?: 'engine'): void {
   preview.value = { owner, key, lines, cursor, ...(source ? { source } : {}) };
 }

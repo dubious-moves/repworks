@@ -28,6 +28,7 @@
 // - Each move keeps its glyph (`Nf6?!`, or `Nf6 $6` standing after it) and the move number printed
 //   before it, for the lines quizzed in review (src/core/train/commentQuiz.ts, PLAN.md §5.98).
 import type { Position } from 'chessops/chess';
+import { makeFen } from 'chessops/fen';
 import { makeSan, parseSan } from 'chessops/san';
 import type { Color } from 'chessops/types';
 import { makeUci } from 'chessops/util';
@@ -308,4 +309,19 @@ export function stepComments(comments: readonly (readonly PlayedLine[])[], at: C
     if (c) return { comment: i, cursor: c };
   }
   return undefined;
+}
+
+/**
+ * A comment's line as a sequence to save (PLAN.md §5.201): its start (FEN) and its moves, up to
+ * the first pass (a drill has no passes). Undefined when it holds no move of `side`'s to ask: the
+ * drill asks `side`'s moves, and a line opening with the other side's move plays that one first
+ * (the analysis board's sequence starts after it, §5.74).
+ */
+export function lineAsSequence(line: PlayedLine, side: Color): { fen: string; sans: string[] } | undefined {
+  const start = line.positions[0];
+  if (!start) return undefined;
+  const pass = line.sans.indexOf(NULL_SAN);
+  const sans = pass < 0 ? [...line.sans] : line.sans.slice(0, pass);
+  if (sans.length < (start.turn === side ? 1 : 2)) return undefined;
+  return { fen: makeFen(start.toSetup()), sans };
 }

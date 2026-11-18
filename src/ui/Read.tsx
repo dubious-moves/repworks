@@ -224,7 +224,7 @@ export function LineReader(props: { chapter: Chapter; line: readonly string[]; p
             onMove={() => undefined}
           />
         )}
-        <PreviewBar owner="read" />
+        <PreviewBar owner="read" side={side} />
         <div class="controls read-controls">
           <button type="button" aria-label="Start" disabled={shown === 0} onClick={() => go(0)}>
             ⏮

@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseChapterFile } from '../../../../src/core/pgn/parse.ts';
-import { cursorAt, firstCursor, lastCursor, lineStart, parseCommentLines, playedLines, playLine, stepComments, stepCursor, switchLine } from '../../../../src/core/repertoire/lines.ts';
+import { cursorAt, firstCursor, lastCursor, lineAsSequence, lineStart, parseCommentLines, playedLines, playLine, stepComments, stepCursor, switchLine } from '../../../../src/core/repertoire/lines.ts';
 import { makeFen } from 'chessops/fen';
 import type { Chapter } from '../../../../src/core/study/model.ts';
 import { nodeAt, positionAt, startPosition } from '../../../../src/core/study/tree.ts';
@@ -330,4 +330,21 @@ test('show and grade’s lines mode walks every comment’s lines, one comment a
   assert.equal(stepComments(all, walk[0], -1), undefined);
   assert.equal(stepComments(all, undefined, -1), undefined);
   assert.equal(stepComments([[]], undefined, 1), undefined);
+});
+
+test('a comment line as a sequence: its start and moves, cut at a pass, only with a move of the side to ask (§5.201)', () => {
+  const c = chapter('1. e4 c5 2. Nf3 d6 {(3. d4 cxd4 4. Nxd4) (2... e6 3. d4 d5) (3.-- Nf6 4. d4) (3. d4)}');
+  const [after, same, pass, one] = linesAt(c, ['e4', 'c5', 'Nf3', 'd6']);
+  const afterD6 = makeFen(positionAt(c, ['e4', 'c5', 'Nf3', 'd6'])!.toSetup());
+  // Black's drill from White's move: d4 plays first, cxd4 is asked.
+  assert.deepEqual(lineAsSequence(after!, 'black'), { fen: afterD6, sans: ['d4', 'cxd4', 'Nxd4'] });
+  assert.deepEqual(lineAsSequence(after!, 'white'), { fen: afterD6, sans: ['d4', 'cxd4', 'Nxd4'] });
+  // A line replacing the move starts before it.
+  assert.deepEqual(lineAsSequence(same!, 'black'), { fen: makeFen(positionAt(c, ['e4', 'c5', 'Nf3'])!.toSetup()), sans: ['e6', 'd4', 'd5'] });
+  // A pass ends it: nothing before it here.
+  assert.equal(lineAsSequence(pass!, 'white'), undefined);
+  // One opponent's move holds nothing to ask; as White, it is the move asked.
+  assert.equal(lineAsSequence(one!, 'black'), undefined);
+  assert.deepEqual(lineAsSequence(one!, 'white'), { fen: afterD6, sans: ['d4'] });
+  assert.equal(lineAsSequence(playLine(after!.line, undefined), 'black'), undefined);
 });

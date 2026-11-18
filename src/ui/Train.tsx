@@ -580,7 +580,7 @@ function Session(props: { s: SessionView }) {
             promotion={promotion && { dest: promotion.dest, onPick: (role) => (role ? promote(role) : setPromotion(undefined)) }}
           />
         )}
-        <PreviewBar owner="train" />
+        <PreviewBar owner="train" side={s.side} />
         {/* One line, always its height, so the board never moves (§5.17). */}
         <div class="train-feedback-row">
         <p class={`feedback train-feedback note-${holding ? 'next' : (s.note?.kind ?? 'none')}${s.note?.kind === 'aside' && s.note.important ? ' important' : ''}${s.retry && !holding ? ' retrying' : ''}`} role="status">

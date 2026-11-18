@@ -1982,3 +1982,14 @@ does. Start with the spike: its log decides what the later parts change (CHESSNU
 - On the phone: is the row of three buttons under the others a good place, or should they sit by
   the board?
 - **Checked**: Playwright (desktop, emulated phone); **not** on a device.
+
+### A comment's clickable line made a sequence (PLAN.md §5.201, 2026-11-18)
+
+- On a study, click a move of a line in a comment: the bar under the board has "Sequence…". It
+  opens the analysis board on the whole line with "Save as a sequence" open, Stockfish checking
+  it; save it, then find it among the game cards and drill it. Does the drill ask your side's
+  moves, with the opponent's first move (if the line opens with one) played for you?
+- The same from a comment's line in training, the Read view and a game card's note.
+- On the phone: does the bar under the board still fit with the extra button?
+- **Checked**: unit tests and Playwright (desktop, emulated phone, a fake engine); **not** on a
+  device.

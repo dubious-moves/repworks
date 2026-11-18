@@ -8,6 +8,7 @@ import { at, chapter, feedback, goTo, openScratch, side } from '../app/editor.ts
 import { checkSequence, saveSequence, sourceMistake, type CheckResult } from '../app/sequence.ts';
 import type { Chapter } from '../core/study/model.ts';
 import { goBack, mode, open } from '../app/mode.ts';
+import { sequenceAsked } from '../app/preview.ts';
 import type { BackMode, Mode } from '../core/app/fsm.ts';
 import { positionAt, positionsTo, startPosition } from '../core/study/tree.ts';
 import { beforeOf } from '../core/maia/history.ts';
@@ -108,7 +109,11 @@ export function AnalysisFen() {
 export function AnalysisHead() {
   const c = chapter.value;
   const [adding, setAdding] = useState(false);
-  const [saving, setSaving] = useState(false);
+  // Opened by a comment line's "Sequence…" (§5.201): its dialog at once.
+  const [saving, setSaving] = useState(() => sequenceAsked.peek());
+  useEffect(() => {
+    sequenceAsked.value = false;
+  }, []);
   const m = mode.value;
   const seq = m.name === 'analysis' ? m.seq : undefined;
   const line = at.value;

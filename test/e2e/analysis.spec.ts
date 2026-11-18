@@ -4,7 +4,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
 import type { FakeGit } from '../support/fakeGit.ts';
-import { clickSquare, studyMenu } from './board.ts';
+import { clickSquare, comment, studyMenu } from './board.ts';
 import { commands, fakeEngine } from './engine.ts';
 import { serveTablebase, type FakeTablebase } from './explorer.ts';
 import { serveGithub, world } from './github.ts';
@@ -217,4 +217,33 @@ test('any analysis saved as a sequence: the lines from the board’s start, the 
   // Saved once: asked again, it says so.
   await page.getByRole('button', { name: 'Save as a sequence…' }).click();
   await expect(dialog).toContainText('already saved');
+});
+
+test('a comment’s clickable line made a sequence: the board opens on it with the dialog, saved, back to the study (§5.201)', async ({ page }) => {
+  await setUp(page);
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf?at=e4,c5,Nf3,d6`);
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 d6');
+  await comment(page, 'Then (3. d4 cxd4 4. Nxd4) or (3.-- Nf6)');
+  const written = page.locator('.notation .comment', { hasText: 'Then' });
+  const bar = page.getByRole('group', { name: 'Line from the comment' });
+  // A line holding no Black move before its pass has nothing to drill.
+  await written.locator('.line-move', { hasText: '--' }).click();
+  await expect(bar).toContainText('From the comment: --');
+  await expect(bar.getByRole('button', { name: 'Sequence…' })).toHaveCount(0);
+  await written.locator('.line-move', { hasText: 'cxd4' }).click();
+  await expect(bar).toContainText('From the comment: d4 cxd4');
+  await bar.getByRole('button', { name: 'Sequence…' }).click();
+
+  // The whole line on the analysis board, seen as Black, the dialog open: White's d4 first, cxd4 asked.
+  await expect(page).toHaveURL(/#\/analysis\?/);
+  const dialog = page.getByTestId('sequence-dialog');
+  await expect(dialog.getByTestId('sequence-main')).toHaveText('cxd4 Nxd4');
+  await expect(dialog).toContainText('1 move to find');
+  await dialog.getByRole('button', { name: /^Save/ }).click();
+  await expect(dialog.getByTestId('sequence-saved')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Close' }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator('.notation .move[data-path]').last()).toHaveAttribute('data-path', 'd4 cxd4 Nxd4');
+  await page.getByRole('button', { name: /Back to the study/ }).click();
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 d6');
 });
