@@ -1970,3 +1970,15 @@ does. Start with the spike: its log decides what the later parts change (CHESSNU
 - In show and grade: "Again" sits in the row with "Next line"; 2 and 4 show and tell as usual. Is
   its place right on the phone, or should it be under the board beside "Next line"?
 - **Checked**: unit tests and Playwright (desktop, emulated phone); **not** on a device.
+
+### Browsing the comments' lines at a line's end (PLAN.md §5.200, 2026-11-18)
+
+- In the queue (not show and grade), at a line's end with lines in the comments of its moves: →
+  (or "Browse the comments' lines") shows the first clickable move of the line's first comment;
+  → and ← step through every comment of the line, the lines still to quiz shown too, the feedback
+  line naming the move ("After 2. Nf3"). Escape or "Back to the line's end" returns; "Quiz lines"
+  is still there and still quizzes them.
+- With "go on by itself" at a line's end: does the next line wait while browsing?
+- On the phone: is the row of three buttons under the others a good place, or should they sit by
+  the board?
+- **Checked**: Playwright (desktop, emulated phone); **not** on a device.

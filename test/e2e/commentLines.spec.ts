@@ -226,3 +226,47 @@ test('comment lines: off, nothing offered and nothing quizzed', async ({ page })
   await expect(feedback(page)).toHaveText(/^Line done · Next: /);
   await expect(chip(page)).toHaveCount(0);
 });
+
+test('browsing the comments’ lines at a line’s end (§5.200): → and ← through every clickable move of the line’s comments, those still to quiz shown, nothing quizzed', async ({ page }) => {
+  await walkOnce(page);
+  await setUp(page);
+  await page.goto(`${site.url}#/train`);
+  await expect(phase(page)).toHaveAttribute('data-phase', 'ask');
+  await play(page, 'c7', 'c5');
+  await expect(feedback(page)).toHaveText(/^Line done · Next: /);
+
+  const bar = page.getByRole('group', { name: 'Line from the comment' });
+  const comments = page.locator('.train-comments');
+  const current = comments.locator('.line-move.current');
+  // → starts at the first move of the first comment of the line: 1. e4's, a line still to quiz shown.
+  await expect(page.getByRole('button', { name: /Browse the comments’ lines/ })).toBeVisible();
+  await page.keyboard.press('ArrowRight');
+  await expect(bar).toContainText('From the comment: d4');
+  await expect(current).toHaveText('d4');
+  await expect(feedback(page)).toHaveText(/^The comments’ lines · After 1\. e4:/);
+  await expect(comments).toContainText('Or (1. d4!');
+  for (const san of ['Nf6', 'c4', 'e6']) {
+    await page.keyboard.press('ArrowRight');
+    await expect(current).toHaveText(san);
+  }
+  // On into 2. Nf3's comment, by the button too.
+  await page.getByRole('button', { name: 'Next move →' }).click();
+  await expect(current).toHaveText('c3');
+  await expect(feedback(page)).toHaveText(/^The comments’ lines · After 2\. Nf3:/);
+  await expect(comments).toContainText('White can also play (2. c3');
+  await page.keyboard.press('ArrowLeft');
+  await expect(current).toHaveText('e6');
+  await expect(feedback(page)).toHaveText(/After 1\. e4/);
+  // The session waits meanwhile; Escape goes back to the line's end, the lines to quiz there still.
+  await expect(phase(page)).toHaveAttribute('data-phase', 'lineDone');
+  await page.keyboard.press('Escape');
+  await expect(bar).toHaveCount(0);
+  await expect(feedback(page)).toHaveText(/^Line done · Next: /);
+  await expect(page.getByRole('button', { name: 'Quiz lines (2)' })).toBeVisible();
+  // ← from the line's end starts at the last move of all; ← before the first leaves.
+  await page.keyboard.press('ArrowLeft');
+  await expect(current).toHaveText('Nd5');
+  await page.getByRole('button', { name: 'Back to the line’s end' }).click();
+  await expect(bar).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Browse the comments’ lines/ })).toBeVisible();
+});

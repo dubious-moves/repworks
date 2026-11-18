@@ -5,7 +5,7 @@
 // end, and the next 2 goes on to the next line; 4 at the first move stays. The session waits
 // meanwhile. Kept apart from train.ts, which Node's tests load: the preview pulls in the editor.
 import { effect } from '@preact/signals';
-import { stepComments, playedLines, type CommentsCursor, type PlayedLine } from '../core/repertoire/lines.ts';
+import { lastCursor, stepComments, playedLines, type CommentsCursor, type PlayedLine } from '../core/repertoire/lines.ts';
 import { nodeAt, positionAt } from '../core/study/tree.ts';
 import type { Press } from '../core/train/showGrade.ts';
 import { commentId, endPreview, preview, showLine } from './preview.ts';
@@ -81,8 +81,98 @@ effect(() => {
   const shown = preview.value;
   const mode = linesMode.peek();
   if (!mode) return;
+  if (mode === 'browse') {
+    if (!atBrowseEnd(s)) {
+      linesMode.value = undefined;
+      if (shown?.owner === 'train') endPreview();
+      releaseHeld();
+    } else if (!shown) leave();
+    return;
+  }
   if (!atLineEnd(s)) {
     linesMode.value = undefined;
     if (mode === 'on' && shown?.owner === 'train') endPreview();
   } else if (mode === 'on' && !shown) leave();
 });
+
+// Browsing the comments' lines at a line's end outside show and grade (PLAN.md §5.200, the owner's
+// request, 2026-11-18): every clickable move of every comment of the line walked, from the
+// chapter's start to its last move, one comment after another, by ← → or the panel's buttons. The
+// lines still to be quizzed (§5.98) are shown too: browsing is looking, not quizzing, and "Quiz
+// lines" stays offered. The session waits meanwhile, as in show and grade's mode.
+
+/** A comment of a move of the line walked, with its lines played. */
+export interface BrowsedComment {
+  /** The moves to the comment's move (SANs from the chapter's start). */
+  path: string[];
+  key: string;
+  lines: PlayedLine[];
+}
+
+/** Whether the session is at a line's end outside show and grade, or at its end, where browsing works. */
+export const atBrowseEnd = (s: SessionView | undefined): s is SessionView => !!s && !s.selfGrade && !s.aside && (!!s.done || s.phase === 'lineDone');
+
+/** Every comment of the line walked, its start's first, each with its lines played. */
+export function lineComments(s: SessionView): BrowsedComment[] {
+  const c = s.chapter;
+  if (!c) return [];
+  const out: BrowsedComment[] = [];
+  for (let i = 0; i <= s.path.length; i++) {
+    const path = s.path.slice(0, i);
+    const node = nodeAt(c, path);
+    const after = positionAt(c, path);
+    if (!node || !after || !node.comments.length) continue;
+    const before = i ? positionAt(c, s.path.slice(0, i - 1)) : undefined;
+    for (const text of node.comments) out.push({ path, key: commentId(path.join(' '), text), lines: playedLines(text, after, before) });
+  }
+  return out;
+}
+
+/** Whether the line walked has a clickable move in its comments. */
+export const canBrowse = (s: SessionView): boolean => atBrowseEnd(s) && !!stepComments(lineComments(s).map((c) => c.lines), undefined, 1);
+
+/** The comment browsed, while browsing. */
+export function browsedComment(s: SessionView): BrowsedComment | undefined {
+  const shown = preview.value;
+  if (linesMode.value !== 'browse' || shown?.owner !== 'train') return undefined;
+  return lineComments(s).find((c) => c.key === shown.key);
+}
+
+/**
+ * ← or → at a line's end outside show and grade: true when taken. → from nowhere starts at the
+ * first move, ← at the last; from a move shown (one clicked in a comment too), the next or the one
+ * before across every comment. ← before the first move goes back to the line's end; → on the last
+ * stays.
+ */
+export function browseStep(dir: 1 | -1): boolean {
+  const s = session.peek();
+  if (!atBrowseEnd(s)) return false;
+  const comments = lineComments(s);
+  const all = comments.map((c) => c.lines);
+  const shown = preview.peek();
+  const i = shown?.owner === 'train' ? comments.findIndex((c) => c.key === shown.key) : -1;
+  // A line on the board that isn't one of these (one from an engine, say): ← → step it as ever.
+  if (shown && i < 0) return false;
+  let next: CommentsCursor | undefined;
+  if (i >= 0) next = stepComments(all, { comment: i, cursor: shown!.cursor }, dir);
+  else if (dir === 1) next = stepComments(all, undefined, 1);
+  else {
+    // ← from nowhere: the last move of all.
+    for (let j = comments.length - 1; j >= 0 && !next; j--) {
+      const c = lastCursor(all[j]!);
+      if (c) next = { comment: j, cursor: c };
+    }
+  }
+  if (next) {
+    linesMode.value = 'browse';
+    showLine('train', comments[next.comment]!.key, comments[next.comment]!.lines, next.cursor);
+  } else if (i >= 0 && dir === -1) leave();
+  else if (i < 0) return false;
+  else linesMode.value = 'browse';
+  return true;
+}
+
+/** Browsing left: the board back at the line's end. */
+export function endBrowse(): void {
+  leave();
+}

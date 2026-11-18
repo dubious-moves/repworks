@@ -11528,3 +11528,29 @@ session view; `AgainButton` in `src/ui/Train.tsx`. **Checked**: unit tests (a he
 mistake in the walk again unrecorded and not retried, the session's end) and Playwright
 (`again.spec.ts`, desktop and emulated phone). **Not checked**: on the owner's devices
 (`TESTING.md`).
+
+#### 5.200 Browsing the comments' lines at a line's end (the owner's request, 2026-11-18, built)
+
+"Outside 'show and grade' in repertoire train, in the end of the variation - make it possible to
+navigate all clickable lines without quizzing."
+
+- **Where**: at a line's end outside show and grade (phase `lineDone`), and at the session's end,
+  when a comment of the line walked has a clickable move. Show and grade keeps its own mode (§5.198).
+- **What "all" covers**: every comment of every move of the line walked, from the chapter's start to
+  its last move, one comment after another, not only the last move's comments (which were already
+  clickable one comment at a time, §5.12). The lines still to be quizzed (§5.98, written `(…)`) are
+  shown and stepped too: browsing is looking, not quizzing. "Quiz lines" stays offered, and the
+  lines are hidden again once browsing ends.
+- **How**: → (or "Browse the comments' lines", in a row of its own under the buttons) shows the
+  first move of all, ← from the line's end the last; then → and ← (or "Next move →" and
+  "← Previous move") step across the comments, within one as ← → always did (§5.12). A move clicked
+  in a comment is a place to step on from. → on the last move stays; ← before the first, Escape,
+  "Back to the line's end" or a click on the board go back to the line's end. The comments shown are
+  those of the move browsed, with the feedback line naming it ("After 2. Nf3").
+- **The session waits** while browsing, as in §5.198: with "go on by itself" the next line comes
+  once browsing ends.
+
+**As built**: `lineComments`, `browseStep` and the `browse` value of `linesMode` in
+`src/app/trainLines.ts`; the keys, the row and the comments of the move browsed in
+`src/ui/Train.tsx`. **Checked**: Playwright (`commentLines.spec.ts`, desktop and emulated phone).
+**Not checked**: on the owner's devices (`TESTING.md`).

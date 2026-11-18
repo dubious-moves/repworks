@@ -475,7 +475,7 @@ let boardWait = 0;
  * set doesn't have): the session never waits on a board that needs the user.
  */
 function tickDue(id: number, waited = false): void {
-  if (readingAt.peek() !== undefined || away || linesMode.peek() === 'on') {
+  if (readingAt.peek() !== undefined || away || linesMode.peek() === 'on' || linesMode.peek() === 'browse') {
     held = id;
     return;
   }
@@ -652,9 +652,10 @@ export function press(p: Press): void {
 /**
  * Show and grade's lines mode at a line's end (§5.198, `trainLines.ts`): `armed` after one 4
  * there, `on` while 2 and 4 step through the comments' lines. The session waits while it is on,
- * as when the line is read.
+ * as when the line is read. `browse`: the comments' lines browsed at a line's end outside show and
+ * grade (§5.200, `trainLines.ts`); the session waits as well.
  */
-export const linesMode = signal<'armed' | 'on' | undefined>(undefined);
+export const linesMode = signal<'armed' | 'on' | 'browse' | undefined>(undefined);
 
 /**
  * A comment's line that is still to be quizzed (§5.98): left out of the comment's text, and out
@@ -672,7 +673,7 @@ export function quizzedLater(s: SessionView): (l: PlayedLine) => boolean {
 
 /** The tick held while the lines mode was on, played now that it is left (§5.198). */
 export function releaseHeld(): void {
-  if (held === undefined || !trainer || linesMode.peek() === 'on') return;
+  if (held === undefined || !trainer || linesMode.peek() === 'on' || linesMode.peek() === 'browse') return;
   const id = held;
   held = undefined;
   send({ type: 'tick', id, now: Date.now() });

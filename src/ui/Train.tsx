@@ -18,7 +18,7 @@ import { dataVersion } from '../app/sync.ts';
 import { decidingNow, timeOffset } from '../app/time.ts';
 import { goOnMs, moveMs, PACE_NAMES, paceSettings } from '../app/pace.ts';
 import { analyseSession, command, configureSession, leaveSession, linesMode, quizzedLater, resumeSession, seekSequence, isGraded, leaveForStudy, pinMissed, playMove, press, queueOf, quizComments, readLine, readingAt, session, sessionProblem, setPace, setSelfGrade, setSpeech, speech, trainData, undoSuspend, type SessionKind, type SessionView, type TrainData } from '../app/train.ts';
-import { pressKey } from '../app/trainLines.ts';
+import { browsedComment, browseStep, canBrowse, endBrowse, pressKey } from '../app/trainLines.ts';
 import { plyLimitMove, saveTrainPrefs, trainPrefs } from '../app/trainPrefs.ts';
 import type { Line, RepertoireIndex } from '../core/repertoire/index.ts';
 import type { Mode } from '../core/app/fsm.ts';
@@ -126,6 +126,14 @@ export function numbered(start: Position, path: readonly string[]): string {
   return out.join(' ');
 }
 
+/** The last move of `path`, numbered (`5. Nf3`, `5... Nc6`). */
+function lastMoveNamed(start: Position, path: readonly string[]): string {
+  const i = path.length - 1;
+  const black = (i + (start.turn === 'black' ? 1 : 0)) % 2 === 1;
+  const n = start.fullmoves + Math.floor((i + (start.turn === 'black' ? 1 : 0)) / 2);
+  return `${n}${black ? '...' : '.'} ${path[i]}`;
+}
+
 /** Analyse: the analysis board at the session's position, the session kept for this entry. */
 const analyse = () => {
   const board = analyseSession();
@@ -172,8 +180,13 @@ export function TrainScreen(props: { of: SessionKind }) {
       // A line from a comment on the board takes ← → and Escape first (§5.12), at a session's end too.
       if (preview.peek()?.owner === 'train' && (e.key === 'Escape' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
         e.preventDefault();
-        return e.key === 'Escape' ? endPreview() : stepPreview(e.key === 'ArrowLeft' ? -1 : 1);
+        if (e.key === 'Escape') return endPreview();
+        // At a line's end outside show and grade, across every comment of the line (§5.200).
+        if (!browseStep(e.key === 'ArrowLeft' ? -1 : 1)) stepPreview(e.key === 'ArrowLeft' ? -1 : 1);
+        return;
       }
+      // ← → at a line's end outside show and grade browse the comments' lines (§5.200), at the session's end too.
+      if (!showing && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && browseStep(e.key === 'ArrowLeft' ? -1 : 1)) return e.preventDefault();
       if (!runningNow.current) return;
       if (e.key === 'Escape') command('stop');
       else if (showing && !e.repeat && pressOf(e.key)) pressKey(pressOf(e.key)!);
@@ -500,18 +513,26 @@ function Session(props: { s: SessionView }) {
   // move taught or shown, after a wrong move, and at the line's end. While the moves go by and
   // one is asked they stay hidden: they came and went with each move, and could give it away.
   // Not while a line from the comments is on the board: the comment there writes its moves.
-  const comments = s.aside ? [] : s.done || COMMENTS_SHOWN.has(s.phase) ? (node?.comments ?? []) : [];
+  // Browsing the comments' lines at a line's end (§5.200): the comments of the move browsed, named,
+  // every line in them shown, those still to be quizzed too.
+  const browsed = browsedComment(s);
+  const browsing = linesMode.value === 'browse';
+  const commentPath = browsed?.path ?? s.path;
+  const commentNode = browsed && s.chapter ? nodeAt(s.chapter, browsed.path) : node;
+  const comments = s.aside ? [] : s.done || COMMENTS_SHOWN.has(s.phase) ? (commentNode?.comments ?? []) : [];
   // A line of a comment shown that is still to be quizzed is left out of its text (§5.98).
-  const quizzed = quizzedLater(s);
+  const quizzed = browsing ? undefined : quizzedLater(s);
+  const browsable = !show && canBrowse(s);
   const start = s.chapter ? startPosition(s.chapter) : undefined;
   const moves = start ? numbered(start, s.path) : s.path.join(' ');
   const aside = s.aside;
   const asideMoves = aside && aside.ply > 0 ? numbered(aside.line.positions[0]!, aside.line.sans.slice(0, aside.ply)) : '';
   const chapterName = s.chapter ? (header(s.chapter, 'ChapterName') ?? s.chapter.id) : '';
   const commentPositions = () => {
-    const after = s.chapter && positionAt(s.chapter, s.path);
-    return after ? { after, before: s.path.length ? positionAt(s.chapter!, s.path.slice(0, -1)) : undefined } : undefined;
+    const after = s.chapter && positionAt(s.chapter, commentPath);
+    return after ? { after, before: commentPath.length ? positionAt(s.chapter!, commentPath.slice(0, -1)) : undefined } : undefined;
   };
+  const browsedMove = browsed && start ? (browsed.path.length ? `After ${lastMoveNamed(start, browsed.path)}` : 'At the start') : '';
 
   // A line's end in Learn, the queue or show and grade (§5.17): the next line named, and "Next
   // line" when it waits for it. With lines from the comments to quiz it always waits, for "Next
@@ -563,7 +584,7 @@ function Session(props: { s: SessionView }) {
         {/* One line, always its height, so the board never moves (§5.17). */}
         <div class="train-feedback-row">
         <p class={`feedback train-feedback note-${holding ? 'next' : (s.note?.kind ?? 'none')}${s.note?.kind === 'aside' && s.note.important ? ' important' : ''}${s.retry && !holding ? ' retrying' : ''}`} role="status">
-          {s.done ? '' : stepping ? 'The comments’ lines: 2 the next move, 4 the one before; on from the last, back to the line’s end' : holding ? `${lines === 'armed' && show ? '4 again: step through the comments’ lines by 2 and 4 · ' : ''}${limit ? `Ply limit: ${limit.past} more move${limit.past === 1 ? '' : 's'} in this line` : 'Line done'}${upcoming ? ` · Next: ${upcoming}` : ''}` : s.alts ? (s.alts.length ? `Alternatives: ${s.alts.map((m) => m.san).join(', ')}` : 'No alternatives saved here') : noteText(s.note, show && !!s.retry)}
+          {s.done ? '' : browsing ? `The comments’ lines${browsedMove ? ` · ${browsedMove}` : ''}: → the next move, ← the one before, Escape back to the line’s end` : stepping ? 'The comments’ lines: 2 the next move, 4 the one before; on from the last, back to the line’s end' : holding ? `${lines === 'armed' && show ? '4 again: step through the comments’ lines by 2 and 4 · ' : ''}${limit ? `Ply limit: ${limit.past} more move${limit.past === 1 ? '' : 's'} in this line` : 'Line done'}${upcoming ? ` · Next: ${upcoming}` : ''}` : s.alts ? (s.alts.length ? `Alternatives: ${s.alts.map((m) => m.san).join(', ')}` : 'No alternatives saved here') : noteText(s.note, show && !!s.retry)}
         </p>
         {/* On a phone the panel's buttons are below the fold: a misclick is taken back beside the note. */}
         {!s.done && s.wrongMove && !show && (
@@ -727,12 +748,33 @@ function Session(props: { s: SessionView }) {
           )}
         </div>
         )}
+        {browsable && (
+        <div class="actions train-actions train-browse-row">
+          {browsing ? (
+            <>
+              <button type="button" class="secondary train-browse-prev" onClick={() => browseStep(-1)}>
+                ← Previous move
+              </button>
+              <button type="button" class="secondary train-browse-next" onClick={() => browseStep(1)}>
+                Next move →
+              </button>
+              <button type="button" class="secondary train-browse-end" onClick={endBrowse}>
+                Back to the line’s end
+              </button>
+            </>
+          ) : (
+            <button type="button" class="secondary train-browse" onClick={() => browseStep(1)} title="Step through every clickable move in the comments of this line, those still to quiz too, by ← and →; nothing is quizzed">
+              Browse the comments’ lines <span class="muted">(→)</span>
+            </button>
+          )}
+        </div>
+        )}
         <BoardNote />
         {comments.length > 0 && (
           <div class="train-comments">
             {comments.map((c, i) => (
               <p key={i}>
-                <CommentText text={c} owner="train" id={commentId(s.path.join(' '), c)} positions={commentPositions} hidden={quizzed} />
+                <CommentText text={c} owner="train" id={commentId(commentPath.join(' '), c)} positions={commentPositions} hidden={quizzed} />
               </p>
             ))}
           </div>
