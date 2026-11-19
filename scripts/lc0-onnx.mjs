@@ -1,11 +1,14 @@
 // Converts an Lc0 network (`.pb.gz`) to the ONNX model the site runs (PLAN.md §5.143), as Lc0's
-// own `leela2onnx` builds it (src/neural/onnx/converter.cc at v0.32.1), for a residual tower with
-// squeeze-and-excitation (NETWORK_SE_WITH_HEADFORMAT), the classical 112 input planes and a
-// win/draw/loss value head: the network vendored (Mish, an attention policy head), and the
+// own `leela2onnx` builds it (src/neural/onnx/converter.cc at v0.32.1), with the classical 112
+// input planes: a residual tower with squeeze-and-excitation (NETWORK_SE_WITH_HEADFORMAT) and a
+// win/draw/loss value head, as the network vendored (Mish, an attention policy head) and the
 // Maia-1 networks the opponents' strength is measured against (ReLU, a convolutional policy head,
-// PLAN.md §5.202; not vendored). The moves-left head is left out (the site doesn't use it). Weights are stored as float16 and cast to
-// float32 when the session loads them (onnxruntime folds the casts), so the file is half the size
-// and the arithmetic float32.
+// PLAN.md §5.202; not vendored); or an attention body (NETWORK_ATTENTIONBODY_*: Lc0's
+// transformers, the dense input embedding, smolgen, the attention policy's vanilla head), as
+// dala's networks (PLAN.md §5.204; not vendored), whose value head is left out. The moves-left
+// head is left out (the site doesn't use it). Weights are stored as float16 and cast to float32
+// when the session loads them (onnxruntime folds the casts), so the file is half the size and the
+// arithmetic float32.
 //
 // Lc0 itself can't be built in a cloud container (its build runs downloaded code), so this is a
 // port of the converter, checked by test/unit/core/lc0.test.ts (the policy's mass on legal moves,
@@ -17,8 +20,11 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { gunzipSync } from 'node:zlib';
 
-const [netPath, lc0, outPath] = process.argv.slice(2);
-if (!netPath || !lc0 || !outPath) throw new Error('usage: node scripts/lc0-onnx.mjs <net.pb.gz> <lc0 checkout> <out.onnx>');
+const [netPath, lc0, outPath, headName = 'vanilla'] = process.argv.slice(2);
+if (!netPath || !lc0 || !outPath) throw new Error('usage: node scripts/lc0-onnx.mjs <net.pb.gz> <lc0 checkout> <out.onnx> [policy head: vanilla, optimistic, soft, opponent]');
+/** Lc0's `PolicyHead` option: the head of a multi-head network (`policy_heads`' fields). */
+const HEADS = { vanilla: 3, optimistic: 4, soft: 5, opponent: 6 };
+if (!(headName in HEADS)) throw new Error(`policy head ${headName}`);
 
 // --- Reading protobuf (wire format only: the fields used here) ---
 
@@ -105,10 +111,15 @@ function convBlock(f) {
 
 const net = parse(gunzipSync(readFileSync(netPath)));
 const format = sub(sub(net, 4), 2);
-const want = { 1: 1, 2: 2, 3: 4, 5: 2 }; // input classical, output WDL, SE with head format, WDL value
-for (const [no, v] of Object.entries(want)) if (one(format, Number(no)) !== v) throw new Error(`network format field ${no} is ${one(format, Number(no))}, not ${v}`);
+// Input classical, output WDL, value WDL; the body a residual tower with squeeze-and-excitation
+// (4) or an attention body (6, 7: Lc0's transformers, BT4 and its kin, PLAN.md §5.204).
+for (const [no, v] of Object.entries({ 1: 1, 2: 2, 5: 2 })) if (one(format, Number(no)) !== v) throw new Error(`network format field ${no} is ${one(format, Number(no))}, not ${v}`);
+const structure = one(format, 3);
+if (structure !== 4 && structure !== 6 && structure !== 7) throw new Error(`network structure ${structure}: only a residual tower with SE (4) and an attention body (6, 7) are supported`);
+const isAttention = structure !== 4;
 const policyKind = one(format, 4); // 2 convolution, 3 attention
 if (policyKind !== 2 && policyKind !== 3) throw new Error(`policy format ${policyKind}: only convolution (2) and attention (3) are supported`);
+if (isAttention && policyKind !== 3) throw new Error('an attention body needs the attention policy');
 const activation = one(format, 7) ?? 0; // 0 ReLU, 1 Mish
 if (activation !== 0 && activation !== 1) throw new Error(`activation ${activation}: only ReLU and Mish are supported`);
 const w = sub(net, 10);
@@ -227,33 +238,134 @@ function constant(values, type) {
 const i64 = (...v) => constant(v, INT64);
 /** The network's default activation (named for the vendored network's). */
 const mish = (x) => (activation === 1 ? node('Mul', [x, node('Tanh', [node('Softplus', [x])])]) : node('Relu', [x]));
+/** An `ActivationFunction` of net.proto (0 the default, 1 Mish, 2 ReLU, 3 none, 7 Swish, 8 ReLU²). */
+function act(x, kind) {
+  if (kind === 0) return mish(x);
+  if (kind === 1) return node('Mul', [x, node('Tanh', [node('Softplus', [x])])]);
+  if (kind === 2) return node('Relu', [x]);
+  if (kind === 3) return x;
+  if (kind === 7) return node('Mul', [node('Sigmoid', [x]), x]);
+  if (kind === 8) {
+    const r = node('Relu', [x]);
+    return node('Mul', [r, r]);
+  }
+  throw new Error(`activation function ${kind}`);
+}
 
-const inputLayer = convBlock(sub(w, 1));
-const filters = inputLayer.biases.length;
+let filters = 0;
 function conv(block, input, inputs, outputs, size) {
   return node('Conv', [input, weight(block.weights, [outputs, inputs, size, size]), weight(block.biases, [outputs])], { pads: Array(4).fill((size - 1) / 2) });
 }
 
-let flow = mish(conv(inputLayer, 'input', 112, filters, 3));
-for (const res of w.get(2) ?? []) {
-  const r = parse(res);
-  const c1 = mish(conv(convBlock(sub(r, 1)), flow, filters, filters, 3));
-  let c2 = conv(convBlock(sub(r, 2)), c1, filters, filters, 3);
-  const se = sub(r, 3);
-  if (se) {
-    const w1 = layer(sub(se, 1));
-    const b1 = layer(sub(se, 2));
-    const seFilters = b1.length;
-    let s = node('ReduceMean', [c2], { axes: [2, 3], keepdims: 0 });
-    s = mish(node('Add', [node('MatMul', [s, weight(w1, [filters, seFilters], true)]), weight(b1, [seFilters])]));
-    s = node('Add', [node('MatMul', [s, weight(layer(sub(se, 3)), [seFilters, 2 * filters], true)]), weight(layer(sub(se, 4)), [2 * filters])]);
-    s = node('Reshape', [s, i64(-1, 2 * filters, 1, 1)]);
-    const [g, b] = node('Split', [s, i64(filters, filters)], { axis: 1 }, 2);
-    c2 = node('Add', [node('Mul', [node('Sigmoid', [g]), c2]), b]);
+/** The residual tower (converter.cc's MakeResidualBlock). */
+function residualBody() {
+  const inputLayer = convBlock(sub(w, 1));
+  filters = inputLayer.biases.length;
+
+  let flow = mish(conv(inputLayer, 'input', 112, filters, 3));
+  for (const res of w.get(2) ?? []) {
+    const r = parse(res);
+    const c1 = mish(conv(convBlock(sub(r, 1)), flow, filters, filters, 3));
+    let c2 = conv(convBlock(sub(r, 2)), c1, filters, filters, 3);
+    const se = sub(r, 3);
+    if (se) {
+      const w1 = layer(sub(se, 1));
+      const b1 = layer(sub(se, 2));
+      const seFilters = b1.length;
+      let s = node('ReduceMean', [c2], { axes: [2, 3], keepdims: 0 });
+      s = mish(node('Add', [node('MatMul', [s, weight(w1, [filters, seFilters], true)]), weight(b1, [seFilters])]));
+      s = node('Add', [node('MatMul', [s, weight(layer(sub(se, 3)), [seFilters, 2 * filters], true)]), weight(layer(sub(se, 4)), [2 * filters])]);
+      s = node('Reshape', [s, i64(-1, 2 * filters, 1, 1)]);
+      const [g, b] = node('Split', [s, i64(filters, filters)], { axis: 1 }, 2);
+      c2 = node('Add', [node('Mul', [node('Sigmoid', [g]), c2]), b]);
+    }
+    flow = mish(node('Add', [c2, flow]));
   }
-  flow = mish(node('Add', [c2, flow]));
+  return flow;
 }
-const body = flow;
+
+/** Linear: x [rows, inputs] · W (stored [outputs][inputs]) + b. */
+const dense = (x, wl, bl, inputs, outputs) => node('Add', [node('MatMul', [x, weight(layer(wl), [inputs, outputs], true)]), weight(layer(bl), [outputs])]);
+const layerNorm = (x, g, b, size, eps) => node('LayerNormalization', [x, weight(layer(g), [size]), weight(layer(b), [size])], { axis: 1, epsilon: eps });
+const scalar = (v) => constant([v], FLOAT);
+
+/** A feed-forward block with its skip (converter.cc's MakeFFN). */
+function ffn(f, x, size, kind, alpha) {
+  const dff = layer(sub(f, 2)).length;
+  let y = act(dense(x, sub(f, 1), sub(f, 2), size, dff), kind);
+  y = dense(y, sub(f, 3), sub(f, 4), dff, size);
+  if (alpha !== 1) y = node('Mul', [y, scalar(alpha)]);
+  return node('Add', [y, x]);
+}
+
+/** An encoder layer (converter.cc's MakeEncoderLayer, with MakeSmolgen). */
+function encoderLayer(e, x, size, heads, kind, alpha, eps, smolgenW) {
+  const mha = sub(e, 1);
+  const dModel = layer(sub(mha, 2)).length;
+  const depth = dModel / heads;
+  const shape = i64(-1, 64, heads, depth);
+  const proj = (wNo) => node('Reshape', [dense(x, sub(mha, wNo), sub(mha, wNo + 1), size, dModel), shape]);
+  const Q = node('Transpose', [proj(1)], { perm: [0, 2, 1, 3] });
+  const K = node('Transpose', [proj(3)], { perm: [0, 2, 3, 1] });
+  const V = node('Transpose', [proj(5)], { perm: [0, 2, 1, 3] });
+  let flow = node('Mul', [node('MatMul', [Q, K]), scalar(1 / Math.sqrt(depth))]);
+  const sg = sub(mha, 9);
+  if (sg) {
+    const sgKind = one(format, 8) ?? 0;
+    const compress = layer(sub(sg, 1));
+    const hiddenChannels = compress.length / size;
+    const hidden = layer(sub(sg, 3)).length;
+    const gen = layer(sub(sg, 7)).length / heads;
+    let s = node('MatMul', [x, weight(compress, [size, hiddenChannels], true)]);
+    s = node('Reshape', [s, i64(-1, 64 * hiddenChannels)]);
+    s = layerNorm(act(dense(s, sub(sg, 2), sub(sg, 3), 64 * hiddenChannels, hidden), sgKind), sub(sg, 4), sub(sg, 5), hidden, 1e-3);
+    s = layerNorm(act(dense(s, sub(sg, 6), sub(sg, 7), hidden, gen * heads), sgKind), sub(sg, 8), sub(sg, 9), gen * heads, 1e-3);
+    s = node('MatMul', [node('Reshape', [s, i64(-1, heads, gen)]), smolgenW]);
+    flow = node('Add', [flow, node('Reshape', [s, i64(-1, heads, 64, 64)])]);
+  }
+  flow = node('MatMul', [node('Softmax', [flow], { axis: 3 }), V]);
+  if (heads > 1) flow = node('Transpose', [flow], { perm: [0, 2, 1, 3] });
+  flow = dense(node('Reshape', [flow, i64(-1, dModel)]), sub(mha, 7), sub(mha, 8), dModel, size);
+  if (alpha !== 1) flow = node('Mul', [flow, scalar(alpha)]);
+  flow = layerNorm(node('Add', [flow, x]), sub(e, 2), sub(e, 3), size, eps);
+  const ffnKind = one(format, 9) ?? 0;
+  flow = ffn(sub(e, 4), flow, size, ffnKind === 0 ? 0 : ffnKind, alpha);
+  return layerNorm(flow, sub(e, 5), sub(e, 6), size, eps);
+}
+
+/** The attention body (converter.cc's MakeAttentionBody): rows of [batch × 64 squares, embedding]. */
+let embedding = 0;
+function attentionBody() {
+  const embeddingKind = one(format, 10) ?? 0;
+  if (embeddingKind !== 2) throw new Error(`input embedding ${embeddingKind}: only the dense one (2) is supported`);
+  const eps = 1e-3; // default_eps_ with the dense embedding
+  let flow = node('Reshape', [node('Transpose', ['input'], { perm: [0, 2, 3, 1] }), i64(-1, 64, 112)]);
+  const preB = layer(sub(w, 38));
+  const denseSize = preB.length / 64;
+  let pos = node('Reshape', [node('Slice', [flow, i64(0, 0, 0), i64(2 ** 31 - 1, 64, 12)]), i64(-1, 64 * 12)]);
+  pos = node('Add', [node('MatMul', [pos, weight(layer(sub(w, 37)), [64 * 12, 64 * denseSize], true)]), weight(preB, [64 * denseSize])]);
+  pos = node('Reshape', [pos, i64(-1, 64, denseSize)]);
+  flow = node('Reshape', [node('Concat', [flow, pos], { axis: 2 }), i64(-1, 112 + denseSize)]);
+  embedding = layer(sub(w, 26)).length;
+  flow = mish(dense(flow, sub(w, 25), sub(w, 26), 112 + denseSize, embedding));
+  flow = layerNorm(flow, sub(w, 39), sub(w, 40), embedding, 1e-3);
+  if (w.has(33) || w.has(34)) {
+    flow = node('Reshape', [flow, i64(-1, 64, embedding)]);
+    if (w.has(33)) flow = node('Mul', [flow, weight(layer(sub(w, 33)), [64, embedding], true)]);
+    if (w.has(34)) flow = node('Add', [flow, weight(layer(sub(w, 34)), [64, embedding], true)]);
+  }
+  flow = node('Reshape', [flow, i64(-1, embedding)]);
+  const encoders = w.get(27) ?? [];
+  const alpha = Math.pow(2 * encoders.length, -0.25);
+  flow = layerNorm(ffn(sub(w, 41), flow, embedding, 0, alpha), sub(w, 42), sub(w, 43), embedding, 1e-3);
+  const sgW = layer(sub(w, 35));
+  const smolgenW = sgW.length ? weight(sgW, [sgW.length / 4096, 4096], true) : undefined;
+  const heads = one(w, 28);
+  for (const e of encoders) flow = encoderLayer(parse(e), flow, embedding, heads, 0, alpha, eps, smolgenW);
+  return flow;
+}
+
+const body = isAttention ? attentionBody() : residualBody();
 
 /** The policy's 1858 outputs gathered from `all` by Lc0's map (`table` in src/neural/tables). */
 function policyOut(all, table, symbol, size) {
@@ -271,19 +383,33 @@ function policyOut(all, table, symbol, size) {
 let pe = 0;
 let d = 0;
 if (policyKind === 3) {
-  const polW = layer(sub(w, 4));
-  const polB = layer(sub(w, 5));
+  // The policy head's weights: an attention body's from `policy_heads` (vanilla unless named) (its embedding
+  // there or in `policy_heads`), a residual tower's at the top level (network_legacy.cc).
+  const heads = sub(w, 45);
+  const vanilla = heads && sub(heads, HEADS[headName]);
+  if (heads && !vanilla) throw new Error(`the network has no ${headName} policy head`);
+  if (!heads && headName !== 'vanilla') throw new Error('the network has one policy head only');
+  const P = vanilla
+    ? { w: sub(vanilla, 1) ?? sub(heads, 1), b: sub(vanilla, 2) ?? sub(heads, 2), qw: sub(vanilla, 3), qb: sub(vanilla, 4), kw: sub(vanilla, 5), kb: sub(vanilla, 6), ppo: sub(vanilla, 7), encoders: vanilla.get(8) ?? [] }
+    : { w: sub(w, 4), b: sub(w, 5), qw: sub(w, 17), qb: sub(w, 18), kw: sub(w, 19), kb: sub(w, 20), ppo: sub(w, 22), encoders: w.get(21) ?? [] };
+  if (P.encoders.length) throw new Error('policy encoder layers are not supported');
+  const polW = layer(P.w);
+  const polB = layer(P.b);
   pe = polB.length;
-  const qB = layer(sub(w, 18));
+  const qB = layer(P.qb);
   d = qB.length;
-  let p = node('Reshape', [node('Transpose', [body], { perm: [0, 2, 3, 1] }), i64(-1, filters)]);
-  p = node('Selu', [node('Add', [node('MatMul', [p, weight(polW, [filters, pe], true)]), weight(polB, [pe])])]);
-  const Q = node('Reshape', [node('Add', [node('MatMul', [p, weight(layer(sub(w, 17)), [pe, d], true)]), weight(qB, [d])]), i64(-1, 64, d)]);
-  const K = node('Reshape', [node('Add', [node('MatMul', [p, weight(layer(sub(w, 19)), [pe, d], true)]), weight(layer(sub(w, 20)), [d])]), i64(-1, 64, d)]);
+  let p;
+  if (isAttention) p = mish(node('Add', [node('MatMul', [body, weight(polW, [embedding, pe], true)]), weight(polB, [pe])]));
+  else {
+    p = node('Reshape', [node('Transpose', [body], { perm: [0, 2, 3, 1] }), i64(-1, filters)]);
+    p = node('Selu', [node('Add', [node('MatMul', [p, weight(polW, [filters, pe], true)]), weight(polB, [pe])])]);
+  }
+  const Q = node('Reshape', [node('Add', [node('MatMul', [p, weight(layer(P.qw), [pe, d], true)]), weight(qB, [d])]), i64(-1, 64, d)]);
+  const K = node('Reshape', [node('Add', [node('MatMul', [p, weight(layer(P.kw), [pe, d], true)]), weight(layer(P.kb), [d])]), i64(-1, 64, d)]);
   const scale = constant([1 / Math.sqrt(d)], FLOAT);
   const logits = node('Mul', [node('MatMul', [Q, node('Transpose', [K], { perm: [0, 2, 1] })]), scale]);
   let prom = node('Slice', [K, i64(0, 56, 0), i64(2 ** 31 - 1, 64, d)]);
-  prom = node('MatMul', [prom, weight(layer(sub(w, 22)), [d, 4], true)]);
+  prom = node('MatMul', [prom, weight(layer(P.ppo), [d, 4], true)]);
   prom = node('Transpose', [prom], { perm: [0, 2, 1] });
   const [prom3, prom1] = node('Split', [prom, i64(3, 1)], { axis: 1 }, 2);
   prom = node('Reshape', [node('Transpose', [node('Add', [prom3, prom1])], { perm: [0, 2, 1] }), i64(-1, 1, 24)]);
@@ -300,14 +426,17 @@ if (policyKind === 3) {
   policyOut(node('Reshape', [conv(convBlock(sub(w, 3)), p, filters, 80, 3), i64(-1, 80 * 64)]), 'policy_map.h', 'kConvPolicyMap', 73 * 64);
 }
 
-// The value head: a 1×1 convolution to 32 channels, 128, then W/D/L.
-const valueBlock = convBlock(sub(w, 6));
-const vc = valueBlock.biases.length;
-let v = mish(conv(valueBlock, body, filters, vc, 1));
-v = node('Reshape', [v, i64(-1, vc * 64)]);
-v = mish(node('Add', [node('MatMul', [v, weight(layer(sub(w, 7)), [vc * 64, 128], true)]), weight(layer(sub(w, 8)), [128])]));
-v = node('Add', [node('MatMul', [v, weight(layer(sub(w, 9)), [128, 3], true)]), weight(layer(sub(w, 10)), [3])]);
-nodes.push(bytes(sField(1, v), sField(2, 'wdl'), sField(3, 'wdl'), sField(4, 'Softmax'), lField(5, attr('axis', 1))));
+// The value head (a residual tower's only: an attention body's isn't needed here, so it is left out).
+if (!isAttention) {
+  // The value head: a 1×1 convolution to 32 channels, 128, then W/D/L.
+  const valueBlock = convBlock(sub(w, 6));
+  const vc = valueBlock.biases.length;
+  let v = mish(conv(valueBlock, body, filters, vc, 1));
+  v = node('Reshape', [v, i64(-1, vc * 64)]);
+  v = mish(node('Add', [node('MatMul', [v, weight(layer(sub(w, 7)), [vc * 64, 128], true)]), weight(layer(sub(w, 8)), [128])]));
+  v = node('Add', [node('MatMul', [v, weight(layer(sub(w, 9)), [128, 3], true)]), weight(layer(sub(w, 10)), [3])]);
+  nodes.push(bytes(sField(1, v), sField(2, 'wdl'), sField(3, 'wdl'), sField(4, 'Softmax'), lField(5, attr('axis', 1))));
+}
 
 const graph = bytes(
   ...nodes.map((n) => lField(1, n)),
@@ -315,8 +444,8 @@ const graph = bytes(
   ...inits.map((t) => lField(5, t)),
   lField(11, valueInfo('input', ['batch', 112, 8, 8])),
   lField(12, valueInfo('policy', ['batch', 1858])),
-  lField(12, valueInfo('wdl', ['batch', 3])),
+  ...(isAttention ? [] : [lField(12, valueInfo('wdl', ['batch', 3]))]),
 );
 const model = bytes(vField(1, 8), lField(8, bytes(sField(1, ''), vField(2, 17))), sField(2, 'repworks lc0-onnx'), lField(7, graph));
 writeFileSync(outPath, model);
-console.log(`${outPath}: ${(model.length / 1e6).toFixed(1)} MB, ${(w.get(2) ?? []).length} blocks of ${filters} filters, ${activation === 1 ? 'Mish' : 'ReLU'}, ${policyKind === 3 ? `attention policy, embedding ${pe}, d ${d}` : 'convolutional policy'}`);
+console.log(`${outPath}: ${(model.length / 1e6).toFixed(1)} MB, ${isAttention ? `${(w.get(27) ?? []).length} encoder layers of ${embedding}, ${one(w, 28)} heads` : `${(w.get(2) ?? []).length} blocks of ${filters} filters`}, ${activation === 1 ? 'Mish' : 'ReLU'}, ${policyKind === 3 ? `attention policy, embedding ${pe}, d ${d}` : 'convolutional policy'}`);

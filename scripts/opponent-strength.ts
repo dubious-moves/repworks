@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // How strong are the practice opponents (Easy, Medium, Hard) on Lichess's scale (PLAN.md §5.202)?
-// Two measurements, each a report that writes nothing to the app or the data repo:
+// And which opponent plays most like a 2000 over whole games (§5.204)?
+// Three measurements, each a report that writes nothing to the app or the data repo:
 //
 //   1. A match. The levels (Maia 3 at the preset's rating, sampled at its precision, as practice
 //      plays them: the app's default model, the 23M, reading the seven positions before; `--model
@@ -14,6 +15,16 @@
 //      average (its sampled policy over the moves scored). The rating where a level gives up as
 //      much as people do is the rating its mistakes match: by the mean, and by the blunders.
 //
+//   3. Whole games (PLAN.md §5.204). Games between two people of a band (1900–2100) from the
+//      dump, from ply 12; each candidate opponent plays itself from the same starts (the match
+//      step with --openings humans.json and --pairs x:x); every position scored by Stockfish until
+//      a side is decided; the moves' losses by phase, a lead kept, how soon games are decided. And
+//      how well Maia 3 and dala's networks predict the people's moves of those games, by phase.
+//
+// The anchors include dala-2000 (hrschubert's Lc0 transformer trained on 2000-rated games, a draw
+// from its soft policy head as fitted to its own Lichess games, §5.204), rated mostly against other
+// bots, beside the Maia bots, rated mostly against people.
+//
 // Steps (each resumable: a file that exists is read and continued):
 //
 //   node scripts/opponent-strength.ts openings <dump.pgn.zst> --out openings.json
@@ -21,17 +32,27 @@
 //   node scripts/opponent-strength.ts match --nets <dir> --openings openings.json --out games.json
 //       --players easy,medium,hard,maia-1100,maia-1500,maia-1900 --concurrency 48 --engines 3
 //       --check-depth 10 --threads 2 --seed 1 --model 23m|first [--all-pairs: the levels against each other too]
+//       [--pairs a:b,c:d: those pairs only] [a player id=elo@precision: a level of its own, e.g. r2300=2300@0.85]
+//       [--ort-node <folder with node_modules/onnxruntime-node> --net-threads 2: the networks on onnxruntime-node]
 //   node scripts/opponent-strength.ts mistakes <dump.pgn.zst> --sample sample.json --out mistakes.json
 //       --bands 1100,1300,…,2300 --per-band 500 --speeds rapid,classical --depth 14 --elos 1100,…,2500 --model 23m|first
 //       [--sample-only: draw the sample and stop]
-//   node scripts/opponent-strength.ts report --games games.json --mistakes mistakes.json [--json] [--boot 1000]
+//   node scripts/opponent-strength.ts humans <dump.pgn.zst> --out humans.json --ratings 1900,2100
+//       --speeds rapid,classical --start 12 --count 300 --max-cp 150 --depth 12
+//   node scripts/opponent-strength.ts score --openings humans.json [--games selfplay.json] --out scored.json --depth 12
+//   node scripts/opponent-strength.ts predict --openings humans.json --nets <dir> --net-ids dala-2000 --out predict.json
+//   node scripts/opponent-strength.ts report --games games.json --mistakes mistakes.json --scored scored.json
+//       --predict predict.json [--json] [--boot 1000]
 //
 // `--nets` is a folder with maia-1100.onnx, maia-1500.onnx and maia-1900.onnx, converted from the
 // CSSLab's networks (github.com/CSSLab/maia-chess, maia_weights/maia-<r>.pb.gz) by
-// `node scripts/lc0-onnx.mjs <net.pb.gz> <lc0 checkout or its src/neural/tables> <out.onnx>`.
+// `node scripts/lc0-onnx.mjs <net.pb.gz> <lc0 checkout or its src/neural/tables> <out.onnx>`, and
+// dala-2000.onnx, converted with its soft policy head (`… dala-2000.onnx soft`) from
+// github.com/hrschubert/dala-training's release Release-v1 (dala-2000-distill-00500000-fixed.pb.gz).
 // The bots' Lichess ratings are read from lichess.org when the match starts and kept in its file.
 // The dump: database.lichess.org's monthly file, or its first 250 MB (as scripts/maia-eval.ts).
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { availableParallelism } from 'node:os';
 import { join } from 'node:path';
 import { Chess, type Position } from 'chessops/chess';
@@ -41,22 +62,34 @@ import { positionKeyOf } from '../src/core/chess/positionKey.ts';
 import { parseUciMove } from '../src/core/chess/uci.ts';
 import { LC0_INPUT, lc0Planes, lc0Policy } from '../src/core/lc0/encode.ts';
 import { createMaiaBatch, type MaiaBatch } from '../src/core/maia/batch.ts';
+import { whiteShare } from '../src/core/engine/winning.ts';
 import { candidatesFrom, dumpLines, gamesOf, MIDDLEGAME, pliesOf, replay, rng, speedOf, takeSample } from './maia-eval-lib.ts';
 import type { EvalPosition } from './maia-eval-types.ts';
 import {
   adjudicate,
+  type Anchor,
   ANCHORS,
   boardEnd,
+  botMove,
+  type BotPlay,
   type BotRatings,
   type Condition,
   gameKey,
   type GameRecord,
   gameRng,
+  type Level,
   LEVELS,
   levelMove,
+  MAIA_ANCHORS,
   matchReport,
   type MistakePosition,
   mistakeReport,
+  DECIDED,
+  type Phase,
+  phaseOf,
+  type ScoredGame,
+  wholeGameReport,
+  parseLevel,
   movesToScore,
   moverWin,
   type Result,
@@ -95,18 +128,41 @@ const readJson = <T>(path: string, fallback: T): T => (existsSync(path) ? (JSON.
 
 const fromFen = (fen: string): Position => Chess.fromSetup(parseFen(fen).unwrap()).unwrap();
 
-function maia3(model: 'first' | '23m', threads: number): MaiaBatch {
+/** Float32 inputs by name, each with its shape. */
+type Feeds = Record<string, { data: Float32Array; dims: number[] }>;
+interface Session {
+  run(feeds: Feeds): Promise<Record<string, { data: unknown }>>;
+}
+/**
+ * An ONNX model's session: onnxruntime-web by default; `--ort-node <folder>`: onnxruntime-node from
+ * that folder's node_modules (not a dependency of this repository), several times faster for the
+ * 23M Maia and dala's transformers (PLAN.md §5.204).
+ */
+function onnxSession(path: string, threads: number): Promise<Session> {
+  const nodeDir = flags.get('ort-node');
+  if (nodeDir) {
+    const ortNode = createRequire(join(nodeDir, 'x.js'))('onnxruntime-node');
+    return ortNode.InferenceSession.create(path, { intraOpNumThreads: threads }).then((sess: { run(f: Record<string, unknown>): Promise<Record<string, { data: unknown }>> }) => ({
+      run: (f: Feeds) => sess.run(Object.fromEntries(Object.entries(f).map(([k, v]) => [k, new ortNode.Tensor('float32', v.data, v.dims)]))),
+    }));
+  }
   ort.env.wasm.numThreads = threads;
-  const session = ort.InferenceSession.create(readFileSync(join(VENDOR, model === '23m' ? 'maia3-23m.onnx' : 'maia3_simplified.onnx')));
+  return ort.InferenceSession.create(readFileSync(path)).then((sess) => ({
+    run: (f: Feeds) => sess.run(Object.fromEntries(Object.entries(f).map(([k, v]) => [k, new ort.Tensor('float32', v.data, v.dims)]))),
+  }));
+}
+
+function maia3(model: 'first' | '23m', threads: number): MaiaBatch {
+  const session = onnxSession(join(VENDOR, model === '23m' ? 'maia3-23m.onnx' : 'maia3_simplified.onnx'), threads);
   return createMaiaBatch({
     history: model === '23m',
     memo: 200000,
     run: async (tokens, elos, n) => {
       const s = await session;
       const out = await s.run({
-        tokens: new ort.Tensor('float32', tokens, [n, 64, model === '23m' ? 96 : 12]),
-        elo_self: new ort.Tensor('float32', elos, [n]),
-        elo_oppo: new ort.Tensor('float32', Float32Array.from(elos), [n]),
+        tokens: { data: tokens, dims: [n, 64, model === '23m' ? 96 : 12] },
+        elo_self: { data: elos, dims: [n] },
+        elo_oppo: { data: Float32Array.from(elos), dims: [n] },
       });
       return { moves: out['logits_move']!.data as Float32Array, values: out['logits_value']!.data as Float32Array };
     },
@@ -114,12 +170,23 @@ function maia3(model: 'first' | '23m', threads: number): MaiaBatch {
   });
 }
 
-/** A Maia-1 network as its Lichess bot plays it: the policy's likeliest move, positions batched. */
-function maia1(path: string): (history: readonly Position[]) => Promise<string> {
-  const session = ort.InferenceSession.create(readFileSync(path));
-  let queue: { history: readonly Position[]; resolve(uci: string): void; reject(e: unknown): void }[] = [];
+/** An Lc0 network as its Lichess bot plays it (`play`: the likeliest move, or dala's draw), positions batched. */
+function lc0Net(path: string, play: BotPlay): (history: readonly Position[], rand: () => number) => Promise<string> {
+  const policies = lc0Policies(path, play.kind === 'sample' ? play.temperature : 1);
+  return async (history, rand) => {
+    const m = botMove(await policies(history), play, rand);
+    if (!m) throw new Error('the network gave no move');
+    return m.uci;
+  };
+}
+
+type NetMove = { uci: string; prob: number };
+/** An Lc0 network's policy at a softmax temperature (likeliest first, no floor), positions batched and remembered. */
+function lc0Policies(path: string, temperature = 1): (history: readonly Position[]) => Promise<NetMove[]> {
+  const session = onnxSession(path, num('net-threads', 2));
+  let queue: { history: readonly Position[]; resolve(policy: NetMove[]): void; reject(e: unknown): void }[] = [];
   let scheduled = false;
-  const memo = new Map<string, string>();
+  const memo = new Map<string, NetMove[]>();
   const run = async () => {
     scheduled = false;
     const jobs = queue.splice(0, 64);
@@ -127,9 +194,9 @@ function maia1(path: string): (history: readonly Position[]) => Promise<string> 
     try {
       const input = new Float32Array(jobs.length * LC0_INPUT);
       jobs.forEach((j, i) => lc0Planes(j.history, input, i * LC0_INPUT));
-      const out = await (await session).run({ input: new ort.Tensor('float32', input, [jobs.length, 112, 8, 8]) });
+      const out = await (await session).run({ input: { data: input, dims: [jobs.length, 112, 8, 8] } });
       const logits = out['policy']!.data as Float32Array;
-      jobs.forEach((j, i) => j.resolve(lc0Policy(j.history[j.history.length - 1]!, logits, i * 1858, 1, 0)[0]!.uci));
+      jobs.forEach((j, i) => j.resolve(lc0Policy(j.history[j.history.length - 1]!, logits, i * 1858, temperature, 0).map((m) => ({ uci: m.uci, prob: m.prob }))));
     } catch (e) {
       for (const j of jobs) j.reject(e);
     }
@@ -143,22 +210,23 @@ function maia1(path: string): (history: readonly Position[]) => Promise<string> 
   return async (history) => {
     // The planes read the last eight positions and the repetitions among them: the key is those.
     const key = history.slice(-9).map((p) => makeFen(p.toSetup())).join('/');
-    const hit = memo.get(key);
-    if (hit) return hit;
-    const uci = await new Promise<string>((resolve, reject) => {
-      queue.push({ history, resolve, reject });
-      schedule();
-    });
-    if (memo.size > 500000) memo.clear();
-    memo.set(key, uci);
-    return uci;
+    let policy = memo.get(key);
+    if (!policy) {
+      policy = await new Promise<NetMove[]>((resolve, reject) => {
+        queue.push({ history, resolve, reject });
+        schedule();
+      });
+      if (memo.size > 200000) memo.clear();
+      memo.set(key, policy);
+    }
+    return policy;
   };
 }
 
 /** The bots' ratings on Lichess now. */
-async function botRatings(): Promise<BotRatings> {
+async function botRatings(anchors: readonly Anchor[]): Promise<BotRatings> {
   const out: BotRatings = {};
-  for (const a of ANCHORS) {
+  for (const a of anchors) {
     const res = await fetch(`https://lichess.org/api/user/${a.bot}`, { headers: { accept: 'application/json' } });
     if (!res.ok) throw new Error(`lichess.org/api/user/${a.bot}: ${res.status}`);
     const perfs = ((await res.json()) as { perfs?: Record<string, { rating: number; rd: number; games: number }> }).perfs ?? {};
@@ -245,6 +313,10 @@ async function openings(): Promise<void> {
 interface MatchFile {
   ratings: BotRatings;
   ratingsAt: string;
+  /** When each bot's rating was read, if not at `ratingsAt` (a bot added to a match later). */
+  ratingsAtByBot?: Record<string, string>;
+  /** The levels played, when not only the presets. */
+  levels?: Level[];
   model: string;
   games: GameRecord[];
 }
@@ -254,26 +326,44 @@ async function match(): Promise<void> {
   const nets = need('nets');
   const opens = readJson<Opening[]>(need('openings'), []);
   if (!opens.length) throw new Error('no openings');
-  const players = flag('players', [...LEVELS.map((l) => l.id), ...ANCHORS.map((a) => a.id)].join(',')).split(',');
+  const players = flag('players', [...LEVELS.map((l) => l.id), ...MAIA_ANCHORS.map((a) => a.id)].join(',')).split(',');
   const model = flag('model', '23m') as 'first' | '23m';
   const seed = num('seed', 1);
   const checkDepth = num('check-depth', 10);
   const file = readJson<MatchFile>(out, { ratings: {}, ratingsAt: '', model, games: [] });
   if (file.model !== model) throw new Error(`${out} was played with the ${file.model} model`);
+  const anchors = ANCHORS.filter((a) => players.includes(a.id));
+  const levels = new Map<string, Level>((file.levels ?? LEVELS).map((l) => [l.id, l]));
+  for (const p of players.filter((id) => !anchors.some((a) => a.id === id))) {
+    const l = parseLevel(p.includes('=') ? p : (levels.get(p) ? `${p}=${levels.get(p)!.elo}@${levels.get(p)!.precision}` : p));
+    const was = levels.get(l.id);
+    if (was && (was.elo !== l.elo || was.precision !== l.precision)) throw new Error(`${out} played ${l.id} as ${was.elo}@${was.precision}`);
+    levels.set(l.id, l);
+  }
+  file.levels = [...levels.values()];
+  const ids = players.map((p) => p.split('=')[0]!);
   if (!file.ratingsAt || flags.has('refresh-ratings')) {
-    file.ratings = await botRatings();
+    file.ratings = await botRatings(anchors);
     file.ratingsAt = new Date().toISOString();
+    delete file.ratingsAtByBot;
+  } else {
+    const missing = anchors.filter((a) => !file.ratings[a.bot]);
+    if (missing.length) {
+      Object.assign(file.ratings, await botRatings(missing));
+      const at = new Date().toISOString();
+      file.ratingsAtByBot = { ...file.ratingsAtByBot, ...Object.fromEntries(missing.map((a) => [a.bot, at])) };
+    }
   }
   const maia = maia3(model, num('threads', 2));
-  const nets1 = new Map(ANCHORS.filter((a) => players.includes(a.id)).map((a) => [a.id, maia1(join(nets, `${a.id}.onnx`))]));
+  const nets1 = new Map(anchors.map((a) => [a.id, lc0Net(join(nets, `${a.id}.onnx`), a.play)]));
   const engines = startEngines(num('engines', Math.max(1, availableParallelism() - 1)));
   say(`${engines.label} ×${engines.width}; Maia 3 (${model}); bots' ratings of ${file.ratingsAt.slice(0, 10)}`);
 
   /** A player's move in the game so far (positions from the start, the last the one to move in). */
   const moveOf = async (player: string, history: readonly Position[], rand: () => number): Promise<string> => {
     const net = nets1.get(player);
-    if (net) return net(history);
-    const level = LEVELS.find((l) => l.id === player);
+    if (net) return net(history, rand);
+    const level = levels.get(player);
     if (!level) throw new Error(`no player ${player}`);
     const pos = history[history.length - 1]!;
     const before = history.slice(-8, -1).map((p) => makeFen(p.toSetup()));
@@ -285,18 +375,16 @@ async function match(): Promise<void> {
 
   const done = new Set(file.games.map((g) => gameKey(g.white, g.black, g.opening)));
   const jobs: { white: string; black: string; opening: number }[] = [];
+  // `--pairs a:b,c:d`: those pairs only; otherwise every pair but two levels against each other.
+  const pairs = flags.has('pairs')
+    ? need('pairs').split(',').map((p) => p.split(':') as [string, string])
+    : ids.flatMap((a, i) => ids.slice(i + 1).map((b) => [a, b] as [string, string])).filter(([a, b]) => flags.has('all-pairs') || !(levels.has(a) && levels.has(b)));
+  for (const [a, b] of pairs) if (!ids.includes(a) || !ids.includes(b)) throw new Error(`the pair ${a}:${b} has a player not in --players`);
   for (let k = 0; k < opens.length; k++)
-    for (let i = 0; i < players.length; i++)
-      for (let j = i + 1; j < players.length; j++) {
-        const levels = [players[i]!, players[j]!].filter((p) => LEVELS.some((l) => l.id === p)).length;
-        // Two levels against each other: Maia 3 on both sides, the slowest games, and not needed for the mapping.
-        if (levels === 2 && !flags.has('all-pairs')) continue;
-        for (const [w, b] of [
-          [players[i]!, players[j]!],
-          [players[j]!, players[i]!],
-        ] as const)
-          if (!done.has(gameKey(w, b, k))) jobs.push({ white: w, black: b, opening: k });
-      }
+    for (const [a, b] of pairs)
+      // A player against itself (`x:x`, self-play) once from each start.
+      for (const [w, bl] of a === b ? ([[a, a]] as const) : ([[a, b], [b, a]] as const))
+        if (!done.has(gameKey(w, bl, k))) jobs.push({ white: w, black: bl, opening: k });
   say(`${jobs.length} games to play (${file.games.length} already)`);
   const started = performance.now();
   let played = 0;
@@ -430,6 +518,164 @@ async function mistakes(): Promise<void> {
   say(`${file.positions.length} positions in ${out}`);
 }
 
+/* ------------------------------------------------------------------ 3. whole games (§5.204) */
+
+/** A human game from a start: the start as an opening the match can play from, and the rest as played. */
+interface HumanGame extends Opening {
+  /** The moves the people played from the start on (UCI). */
+  rest: string[];
+  result: string;
+  termination: string;
+  ratings: [number, number];
+  speed: string;
+}
+
+/** Games between two people of a band, from the same ply, balanced there: the reference, and the starts for self-play. */
+async function humans(): Promise<void> {
+  const dump = positional[0];
+  if (!dump) throw new Error('usage: humans <dump> --out humans.json');
+  const out = need('out');
+  const count = num('count', 300);
+  const start = num('start', 12);
+  const [r0, r1] = nums('ratings', '1900,2100') as [number, number];
+  const speeds = flag('speeds', 'rapid,classical').split(',');
+  const maxCp = num('max-cp', 150);
+  const depth = num('depth', 12);
+  const seen = new Set<string>();
+  const candidates: HumanGame[] = [];
+  for await (const g of gamesOf(dumpLines(dump))) {
+    const h = g.headers;
+    const speed = speedOf(h['Event'] ?? '');
+    if (!speed || !speeds.includes(speed)) continue;
+    const wr = Number(h['WhiteElo']);
+    const br = Number(h['BlackElo']);
+    if (!(wr >= r0 && wr <= r1 && br >= r0 && br <= r1)) continue;
+    const { fens, ucis } = replay(pliesOf(g.moves));
+    if (ucis.length < start + 20) continue;
+    const key = positionKeyOf(fromFen(fens[start]!));
+    if (seen.has(key)) continue;
+    seen.add(key);
+    candidates.push({ game: /\/(\w+)$/.exec(h['Site'] ?? '')?.[1] ?? '', moves: ucis.slice(0, start), fen: fens[start]!, cp: 0, rest: ucis.slice(start), result: h['Result'] ?? '*', termination: h['Termination'] ?? '', ratings: [wr, br], speed });
+    if (candidates.length >= count * 2) break;
+  }
+  say(`${candidates.length} candidate games; scoring their starts at depth ${depth}`);
+  const engines = startEngines(num('engines', availableParallelism()));
+  const kept: HumanGame[] = [];
+  await pool(candidates, engines.width * 2, async (c) => {
+    const s = await scoreOf(engines, c.fen, depth);
+    if (s && s.mate === undefined && Math.abs(s.cp) <= maxCp) kept.push({ ...c, cp: s.cp });
+  });
+  engines.quit();
+  const order = new Map(candidates.map((c, i) => [c.game, i]));
+  kept.sort((a, b) => order.get(a.game)! - order.get(b.game)!);
+  writeFileSync(out, JSON.stringify(kept.slice(0, count)));
+  say(`${Math.min(count, kept.length)} games within ±${maxCp} at ply ${start} written to ${out}`);
+}
+
+/** Every position of the humans' games and of the self-play games from their starts, scored by Stockfish until decided. */
+async function score(): Promise<void> {
+  const out = need('out');
+  const starts = readJson<HumanGame[]>(need('openings'), []);
+  const depth = num('depth', 12);
+  const file = readJson<{ depth: number; games: ScoredGame[] }>(out, { depth, games: [] });
+  if (file.depth !== depth) throw new Error(`${out} was scored at depth ${file.depth}`);
+  const todo: { player: string; game: string; opening: number; moves: string[]; won: boolean }[] = starts.map((h, i) => ({ player: 'human', game: `human|${i}`, opening: i, moves: h.rest, won: h.result === '1-0' || h.result === '0-1' }));
+  const gamesPath = flags.get('games');
+  if (gamesPath)
+    for (const g of readJson<MatchFile>(gamesPath, { ratings: {}, ratingsAt: '', model: '', games: [] }).games) {
+      if (g.white !== g.black) continue;
+      todo.push({ player: g.white, game: `${g.white}|${g.opening}`, opening: g.opening, moves: g.moves, won: g.result !== 0.5 });
+    }
+  const done = new Set(file.games.map((g) => g.game));
+  const jobs = todo.filter((t) => !done.has(t.game));
+  const engines = startEngines(num('engines', availableParallelism()));
+  say(`${jobs.length} games to score (${file.games.length} already), depth ${depth}, ${engines.label} ×${engines.width}`);
+  let saved = performance.now();
+  const save = () => writeFileSync(out, JSON.stringify(file));
+  await pool(jobs, engines.width, async (t) => {
+    let pos = fromFen(starts[t.opening]!.fen);
+    const firstWhite = pos.turn === 'white';
+    const win: (number | null)[] = [];
+    const phase: Phase[] = [];
+    for (let i = 0; i <= t.moves.length; i++) {
+      const s = await scoreOf(engines, makeFen(pos.toSetup()), depth);
+      const w = s ? whiteShare(s) : null;
+      win.push(w === null ? null : Math.round(w * 10) / 10);
+      phase.push(phaseOf(pos));
+      if (w !== null && Math.max(w, 100 - w) >= DECIDED) break;
+      if (i === t.moves.length) break;
+      const m = parseUciMove(pos, t.moves[i]!);
+      if (!m) throw new Error(`illegal ${t.moves[i]} in ${t.game}`);
+      pos = pos.clone();
+      pos.play(m);
+    }
+    // Scored to its last move without reaching DECIDED, and won: decided at its end.
+    const last = win[win.length - 1];
+    const reached = last != null && Math.max(last, 100 - last) >= DECIDED;
+    file.games.push({ player: t.player, game: t.game, win, phase, firstWhite, ...(t.won && !reached && win.length === t.moves.length + 1 ? { decisiveEnd: true } : {}) });
+    if (performance.now() - saved > 30000) {
+      saved = performance.now();
+      save();
+      say(`${file.games.length} games scored`);
+    }
+  });
+  save();
+  engines.quit();
+  say(`${file.games.length} games in ${out}`);
+}
+
+/** How well Maia 3 and the networks predict the people's moves of those games, by phase. */
+interface Prediction {
+  game: number;
+  ply: number;
+  phase: Phase;
+  /** Each model's probability of the move played, and whether it was its likeliest. */
+  models: Record<string, { p: number; top: boolean }>;
+}
+async function predict(): Promise<void> {
+  const out = need('out');
+  const starts = readJson<HumanGame[]>(need('openings'), []);
+  const maxPlies = num('plies', 80);
+  const nets = flags.get('nets');
+  const netIds = flag('net-ids', '').split(',').filter(Boolean);
+  const maia = maia3('23m', num('threads', 2));
+  const policyOf = new Map(netIds.map((id) => [id, lc0Policies(join(nets ?? '.', `${id}.onnx`))]));
+  const rows: Prediction[] = [];
+  await pool(
+    starts.map((h, i) => [h, i] as const),
+    num('concurrency', 32),
+    async ([h, gi]) => {
+      let pos = Chess.default();
+      const history: Position[] = [pos.clone()];
+      const all = [...h.moves, ...h.rest];
+      for (let i = 0; i < all.length && i < h.moves.length + maxPlies; i++) {
+        const uci = all[i]!;
+        if (i >= h.moves.length) {
+          const before = history.slice(-8, -1).map((p) => makeFen(p.toSetup()));
+          const elo = h.ratings[pos.turn === 'white' ? 0 : 1];
+          const models: Prediction['models'] = {};
+          const answer = await maia.ask(pos, Math.round(elo / 100) * 100, before);
+          const pm = answer.policy.find((m) => m.uci === uci)?.prob ?? 0;
+          models['maia3-23m'] = { p: pm, top: answer.policy[0]?.uci === uci };
+          for (const [id, net] of policyOf) {
+            const policy = await net(history);
+            models[id] = { p: policy.find((m) => m.uci === uci)?.prob ?? 0, top: policy[0]?.uci === uci };
+          }
+          rows.push({ game: gi, ply: i, phase: phaseOf(pos), models });
+        }
+        const m = parseUciMove(pos, uci);
+        if (!m) throw new Error(`illegal ${uci} in game ${gi}`);
+        pos = pos.clone();
+        pos.play(m);
+        history.push(pos);
+      }
+      if (gi % 25 === 0) say(`${gi} games`);
+    },
+  );
+  writeFileSync(out, JSON.stringify(rows));
+  say(`${rows.length} moves in ${out}`);
+}
+
 /* ------------------------------------------------------------------ the report */
 
 const fmt = (e: { value: number; lo: number; hi: number }, digits = 0) => `${e.value.toFixed(digits)} (${e.lo.toFixed(digits)}–${e.hi.toFixed(digits)})`;
@@ -442,20 +688,43 @@ function report(): void {
   const gamesPath = flags.get('games');
   if (gamesPath) {
     const file = readJson<MatchFile>(gamesPath, { ratings: {}, ratingsAt: '', model: '23m', games: [] });
-    const r = matchReport(file.games, file.ratings, { boot, seed });
-    json['match'] = { ...r, ratings: file.ratings, ratingsAt: file.ratingsAt, model: file.model };
+    const levels = file.levels ?? [...LEVELS];
+    const played = new Set(file.games.flatMap((g) => [g.white, g.black]));
+    const anchorSets: [string, readonly Anchor[]][] = [['the Maia bots', MAIA_ANCHORS.filter((a) => played.has(a.id))]];
+    const all = ANCHORS.filter((a) => played.has(a.id));
+    if (all.length > anchorSets[0]![1].length) anchorSets.push(['every bot', all]);
+    const reports = anchorSets.map(([name, anchors]) => [name, matchReport(file.games, file.ratings, { boot, seed, levels, anchors })] as const);
+    const r = reports[reports.length - 1]![1];
+    json['match'] = { ...r, byAnchors: Object.fromEntries(reports), ratings: file.ratings, ratingsAt: file.ratingsAt, ratingsAtByBot: file.ratingsAtByBot, model: file.model, levels };
     const reasons = new Map<string, number>();
     for (const g of file.games) reasons.set(g.reason, (reasons.get(g.reason) ?? 0) + 1);
-    lines.push(`## 1. The match (${r.games} games; Maia 3 ${file.model}; bots' ratings of ${file.ratingsAt.slice(0, 10)})`, '');
+    lines.push(`## 1. The match (${r.games} games; Maia 3 ${file.model}; bots' ratings of ${file.ratingsAt.slice(0, 10)}${file.ratingsAtByBot ? `, ${Object.entries(file.ratingsAtByBot).map(([b, at]) => `${b}'s of ${at.slice(0, 10)}`).join(', ')}` : ''})`, '');
     lines.push(`Ends: ${[...reasons].map(([k, v]) => `${k} ${v}`).join(', ')}`, '');
-    lines.push('| player | local Elo (the bots\' mean 0) |', '| --- | --- |');
+    lines.push(`Levels: ${levels.filter((l) => played.has(l.id)).map((l) => `${l.label} (Maia ${l.elo} at ${l.precision})`).join(', ')}`, '');
+    lines.push(`| player | local Elo (${anchorSets[anchorSets.length - 1]![0]}' mean 0) |`, '| --- | --- |');
     for (const [p, e] of Object.entries(r.elo).sort((a, b) => a[1].value - b[1].value)) lines.push(`| ${p} | ${fmt(e)} |`);
     lines.push('', '| pair | games | first player\'s score |', '| --- | --- | --- |');
     for (const p of r.pairs) lines.push(`| ${p.a} – ${p.b} | ${p.games} | ${((100 * p.score) / p.games).toFixed(1)}% |`);
-    lines.push('', '| speed | bots on Lichess (maia1, maia5, maia9) | slope | ' + LEVELS.map((l) => `${l.label} (${l.elo})`).join(' | ') + ' |', '| --- | --- | --- | ' + LEVELS.map(() => '---').join(' | ') + ' |');
-    for (const [s, m] of Object.entries(r.speeds)) {
-      const bots = ANCHORS.map((a) => file.ratings[a.bot]?.[s as (typeof SPEEDS)[number]]?.rating ?? '?').join(', ');
-      lines.push(`| ${s} | ${bots} | ${fmt(m.slope, 2)} | ` + LEVELS.map((l) => (m.levels[l.id] ? `${fmt(m.levels[l.id]!.line)}; nearest bot ${Math.round(m.levels[l.id]!.nearest.value)}` : '')).join(' | ') + ' |');
+    const shown = levels.filter((l) => played.has(l.id));
+    for (const [name, rr] of reports) {
+      const anchors = anchorSets.find(([n]) => n === name)![1];
+      lines.push('', `Placed on Lichess by the line through ${name} (${anchors.map((a) => a.bot).join(', ')}):`, '');
+      const placed = Object.keys(Object.values(rr.speeds)[0]?.levels ?? {});
+      const head = (id: string) => {
+        const l = shown.find((x) => x.id === id);
+        return l ? `${l.label} (${l.elo}@${l.precision})` : id;
+      };
+      lines.push('| speed | the bots on Lichess | slope | ' + placed.map(head).join(' | ') + ' |', '| --- | --- | --- | ' + placed.map(() => '---').join(' | ') + ' |');
+      for (const [sp, m] of Object.entries(rr.speeds)) {
+        const bots = anchors.map((a) => file.ratings[a.bot]?.[sp as (typeof SPEEDS)[number]]?.rating ?? '?').join(', ');
+        lines.push(`| ${sp} | ${bots} | ${fmt(m.slope, 2)} | ` + placed.map((id) => (m.levels[id] ? `${fmt(m.levels[id]!.line)}; nearest bot ${Math.round(m.levels[id]!.nearest.value)}` : '')).join(' | ') + ' |');
+      }
+    }
+    if (Object.values(r.leaveOneOut).some((x) => Object.keys(x ?? {}).length)) {
+      lines.push('', 'Each bot placed by the line through the others, against its own rating (do the bots agree on one scale?):', '');
+      const ids = Object.keys(Object.values(r.leaveOneOut)[0] ?? {});
+      lines.push('| speed | ' + ids.join(' | ') + ' |', '| --- | ' + ids.map(() => '---').join(' | ') + ' |');
+      for (const [sp, x] of Object.entries(r.leaveOneOut)) lines.push(`| ${sp} | ` + ids.map((id) => (x![id] ? `${x![id]!.rating} → ${Math.round(x![id]!.placed)}` : '')).join(' | ') + ' |');
     }
     lines.push('');
   }
@@ -482,6 +751,42 @@ function report(): void {
     lines.push('| Maia rating | ' + precisions.map((p) => `precision ${p}`).join(' | ') + ' |', '| --- | ' + precisions.map(() => '---').join(' | ') + ' |');
     for (const elo of elos) lines.push(`| ${elo} | ` + precisions.map((p) => rate(r.ratings[`${elo}@${p}`]!.loss)).join(' | ') + ' |');
   }
+  const scoredPath = flags.get('scored');
+  if (scoredPath) {
+    const file = readJson<{ depth: number; games: ScoredGame[] }>(scoredPath, { depth: 0, games: [] });
+    const r = wholeGameReport(file.games, { boot, seed });
+    json['wholeGames'] = { ...r, depth: file.depth };
+    const players = Object.keys(r).sort((a, b) => (a === 'human' ? -1 : b === 'human' ? 1 : a.localeCompare(b)));
+    lines.push(`## 3. Whole games from the same starts (Stockfish depth ${file.depth}; the moves until a side reached ${DECIDED}%)`, '');
+    lines.push('| | ' + players.join(' | ') + ' |', '| --- | ' + players.map(() => '---').join(' | ') + ' |');
+    const row = (name: string, f: (x: (typeof r)[string]) => string) => lines.push(`| ${name} | ` + players.map((p) => f(r[p]!)).join(' | ') + ' |');
+    row('games, moves', (x) => `${x.games}, ${x.moves}`);
+    for (const ph of ['all', 'middlegame', 'endgame'] as const) {
+      row(`win% given up a move (${ph})`, (x) => fmt(x.loss[ph], 2));
+      row(`mistakes, % of moves (${ph})`, (x) => fmt(x.mistakes[ph], 1));
+      row(`blunders, % of moves (${ph})`, (x) => fmt(x.blunders[ph], 1));
+    }
+    row('moves in the endgame, %', (x) => fmt(x.endgameShare, 0));
+    row('a lead kept (of games where a side got to 75%), %', (x) => fmt(x.converted, 0));
+    row('decided within 60 plies, %', (x) => fmt(x.decided60, 0));
+    row('plies to the decision (median)', (x) => fmt(x.decidedMedian, 0));
+    lines.push('');
+  }
+  const predictPath = flags.get('predict');
+  if (predictPath) {
+    const rows = readJson<{ phase: Phase; models: Record<string, { p: number; top: boolean }> }[]>(predictPath, []);
+    const models = Object.keys(rows[0]?.models ?? {});
+    lines.push(`## 4. The people's moves of those games predicted (${rows.length} moves): the likeliest move's share, and the mean −log p (p at least 0.001)`, '');
+    lines.push('| phase | moves | ' + models.join(' | ') + ' |', '| --- | --- | ' + models.map(() => '---').join(' | ') + ' |');
+    const stat = {} as Record<string, Record<string, { top: number; nll: number; n: number }>>;
+    for (const ph of ['all', 'middlegame', 'endgame']) {
+      const rs = rows.filter((x) => ph === 'all' || x.phase === ph);
+      stat[ph] = Object.fromEntries(models.map((m) => [m, { n: rs.length, top: rs.filter((x) => x.models[m]!.top).length / rs.length, nll: rs.reduce((a, x) => a - Math.log(Math.max(x.models[m]!.p, 0.001)), 0) / rs.length }]));
+      lines.push(`| ${ph} | ${rs.length} | ` + models.map((m) => `${(100 * stat[ph]![m]!.top).toFixed(1)}%, ${stat[ph]![m]!.nll.toFixed(3)}`).join(' | ') + ' |');
+    }
+    json['predict'] = stat;
+    lines.push('');
+  }
   if (flags.has('json')) process.stdout.write(JSON.stringify(json, null, 1) + '\n');
   else process.stdout.write(lines.join('\n') + '\n');
 }
@@ -491,5 +796,8 @@ function report(): void {
 if (step === 'openings') await openings();
 else if (step === 'match') await match();
 else if (step === 'mistakes') await mistakes();
+else if (step === 'humans') await humans();
+else if (step === 'score') await score();
+else if (step === 'predict') await predict();
 else if (step === 'report') report();
 else say('usage: node scripts/opponent-strength.ts openings|match|mistakes|report … (see the head of the file)');

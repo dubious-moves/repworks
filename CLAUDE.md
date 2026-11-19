@@ -88,6 +88,14 @@ report that writes nothing; each step resumes from its file:
 <dir of maia-1100/1500/1900.onnx> --openings openings.json --out games.json` (about 50 minutes on 4
 cores), `mistakes <dump.pgn.zst> --sample sample.json --out mistakes.json`, and `report --games
 games.json --mistakes mistakes.json`. The Maia-1 networks are converted with `scripts/lc0-onnx.mjs`.
+Which opponent plays most like a 2000 over whole games (§5.204): `humans <dump.pgn.zst> --out
+humans.json` (2000-vs-2000 games from ply 12), self-play from their starts as a `match --openings
+humans.json --pairs medium:medium,dala-2000:dala-2000 --out selfplay.json`, `score --openings
+humans.json --games selfplay.json --out scored.json`, `predict --openings humans.json --nets <dir>
+--net-ids dala-2000 --out predict.json`, and `report --scored scored.json --predict predict.json`.
+dala-2000 is converted with its soft policy head (`node scripts/lc0-onnx.mjs <net.pb.gz> <lc0>
+dala-2000.onnx soft`). dala's transformer (174M parameters) and the 23M Maia want `--ort-node <folder>`:
+onnxruntime-node installed there with `npm i --ignore-scripts onnxruntime-node` (not a dependency of this repo).
 
 The storm's "Gather positions" from a cloud session, as a device named `cloud` (PLAN.md §5.155),
 with the data repo checked out on `main`:

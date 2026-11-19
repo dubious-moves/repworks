@@ -1,6 +1,6 @@
 // The parts of scripts/opponent-strength.ts that need no model or engine (PLAN.md §5.202): a game's
 // end and adjudication, the Elo fit and its mapping onto the bots' ratings, the levels' sampling,
-// and the same-position comparison.
+// the same-position comparison, and the whole games (PLAN.md §5.204).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Chess, type Position } from 'chessops/chess';
@@ -13,7 +13,16 @@ import { rng } from '../../../scripts/maia-eval-lib.ts';
 import {
   adjudicate,
   ADJUDICATION,
+  AHEAD,
   boardEnd,
+  botMove,
+  courseOf,
+  DECIDED,
+  parseLevel,
+  phaseOf,
+  type ScoredGame,
+  scoredMoves,
+  wholeGameReport,
   crossing,
   eloDiff,
   expectedScore,
@@ -266,4 +275,81 @@ test('the same-position report: people by band against a level, with intervals f
 test('a level is played from the positions of a real game: fens round-trip', () => {
   const { pos } = play('e4 c5 Nf3');
   assert.equal(makeFen(pos.toSetup()), 'rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2');
+});
+
+test("botMove: the likeliest move for argmax, a draw above the cutoff for dala's sampling", () => {
+  const policy = [
+    { uci: 'e2e4', prob: 0.5 },
+    { uci: 'd2d4', prob: 0.3 },
+    { uci: 'c2c4', prob: 0.16 },
+    { uci: 'g2g4', prob: 0.04 },
+  ];
+  assert.equal(botMove(policy, { kind: 'argmax' }, () => 0.99)!.uci, 'e2e4');
+  const play = { kind: 'sample', temperature: 1, minPolicy: 5 } as const;
+  // g2g4 (4%) is under the cutoff: the draw is over 0.96.
+  assert.equal(botMove(policy, play, () => 0.5 / 0.96 - 1e-9)!.uci, 'e2e4');
+  assert.equal(botMove(policy, play, () => 0.5 / 0.96 + 1e-9)!.uci, 'd2d4');
+  assert.equal(botMove(policy, play, () => 0.999)!.uci, 'c2c4');
+  // The likeliest move is kept whatever the cutoff.
+  assert.equal(botMove([{ uci: 'a2a3', prob: 0.02 }], play, () => 0.7)!.uci, 'a2a3');
+  assert.equal(botMove([], play, () => 0.5), null);
+});
+
+test('a level is a preset by its id, or a Maia rating at a precision', () => {
+  assert.deepEqual(parseLevel('medium'), LEVELS.find((l) => l.id === 'medium'));
+  assert.deepEqual(parseLevel('r2300=2300@0.85'), { id: 'r2300', label: 'r2300', elo: 2300, precision: 0.85 });
+  assert.throws(() => parseLevel('nonsense'));
+});
+
+test("the endgame is Lichess's: six or fewer pieces other than pawns and kings", () => {
+  assert.equal(phaseOf(Chess.default()), 'middlegame');
+  assert.equal(phaseOf(play('', 'r3k2r/pppq1ppp/2n5/8/8/2N5/PPPQ1PPP/R3K2R w KQkq - 0 1').pos), 'middlegame');
+  assert.equal(phaseOf(play('', 'r3k2r/ppp2ppp/2n5/8/8/2N5/PPP2PPP/R3K2R w KQkq - 0 1').pos), 'endgame');
+});
+
+const scored = (player: string, win: number[], firstWhite = true): ScoredGame => ({ player, game: `${player}|${win.join(',')}`, win, phase: win.map(() => 'middlegame'), firstWhite });
+
+test("a scored game's moves: each side's loss, until a side reaches the decided win%", () => {
+  // White 50 → 48 (White gave 2), Black 48 → 60 (Black gave 12), White 60 → 95, then decided.
+  const g = scored('x', [50, 48, 60, 95, 96]);
+  assert.deepEqual(scoredMoves(g).map((m) => m.loss), [2, 12, 0]);
+  // Black to move first: the first move is Black's.
+  assert.deepEqual(scoredMoves(scored('x', [50, 55, 40], false)).map((m) => m.loss), [5, 15]);
+  // A position without a score skips the moves next to it.
+  assert.deepEqual(scoredMoves({ ...g, win: [50, null, 60, 61] }).map((m) => m.loss), [0]);
+});
+
+test("a game's course: when it was decided, and whether a lead was kept", () => {
+  assert.deepEqual(courseOf(scored('x', [50, AHEAD + 1, 80, DECIDED, 99])), { decidedAt: 3, converted: true });
+  assert.deepEqual(courseOf(scored('x', [50, 100 - AHEAD - 1, 49, 51, 30])), { decidedAt: null, converted: false });
+  assert.deepEqual(courseOf(scored('x', [50, 55, 45])), { decidedAt: null, converted: null });
+  // A game won before the score got there (a resignation): decided at its end.
+  assert.deepEqual(courseOf({ ...scored('x', [50, 60, 80]), decisiveEnd: true }), { decidedAt: 2, converted: true });
+});
+
+test('the whole-game report counts each player apart, with intervals', () => {
+  const games = [scored('human', [50, 40, 45, 30, 35]), scored('human', [50, 50, 50]), scored('bot', [50, 45, 50, 20, 20])];
+  const r = wholeGameReport(games, { boot: 50, seed: 1 });
+  assert.deepEqual(Object.keys(r).sort(), ['bot', 'human']);
+  assert.equal(r['human']!.games, 2);
+  // The human's moves: 10, 5 (Black's), 15, 5, then 0 and 0.
+  assert.equal(r['human']!.moves, 6);
+  assert.ok(Math.abs(r['human']!.loss.all.value - 35 / 6) < 1e-9);
+  assert.equal(r['human']!.blunders.all.value, 0, 'a blunder is more than 15');
+  assert.equal(r['bot']!.blunders.all.value, 25, 'one of four moves gave up 30');
+  assert.ok(r['bot']!.loss.all.lo <= r['bot']!.loss.all.value && r['bot']!.loss.all.value <= r['bot']!.loss.all.hi);
+});
+
+test('each bot is placed by the line through the others', () => {
+  const all = [
+    ...games('maia-1500', 'maia-1100', 4000, expectedScore(200)),
+    ...games('maia-1900', 'maia-1500', 4000, expectedScore(200)),
+    ...games('maia-1900', 'maia-1100', 4000, expectedScore(400)),
+  ];
+  // Locally 0, 200, 400; on Lichess 1400, 1500 and, off the line, 1700.
+  const ratings = { maia1: { rapid: { rating: 1400, rd: 0, games: 1 } }, maia5: { rapid: { rating: 1500, rd: 0, games: 1 } }, maia9: { rapid: { rating: 1700, rd: 0, games: 1 } } };
+  const loo = matchReport(all, ratings, { boot: 0, seed: 1 }).leaveOneOut.rapid!;
+  assert.equal(loo['maia-1900']!.rating, 1700);
+  assert.ok(Math.abs(loo['maia-1900']!.placed - 1600) < 10, `${loo['maia-1900']!.placed}`);
+  assert.ok(Math.abs(loo['maia-1100']!.placed - 1300) < 10, `${loo['maia-1100']!.placed}`);
 });

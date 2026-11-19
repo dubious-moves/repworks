@@ -23,8 +23,18 @@ export interface Level {
 export const LEVELS: readonly Level[] = PRESET_ORDER.map((p) => ({ id: p, label: PRESETS[p].label, elo: PRESETS[p].maiaElo, precision: PRESETS[p].precision }));
 
 /**
- * The Maia-1 networks the CSSLab's Lichess bots run (`go nodes 1`: the likeliest move, no search),
- * whose Lichess ratings come from hundreds of thousands of games, mostly against people.
+ * How a bot plays from its network's policy (no search): the likeliest move, as the CSSLab's Maia
+ * bots (`go nodes 1`), or a draw weighted by the policy as dala's (hrschubert/lichess-bot's
+ * `multipv_random` with `selection: policy`): Lc0's policy at its softmax temperature, the moves
+ * under `minPolicy` percent left out, the likeliest always kept (PLAN.md §5.204).
+ */
+export type BotPlay = { kind: 'argmax' } | { kind: 'sample'; temperature: number; minPolicy: number };
+
+/**
+ * The bots the levels are measured against: the Maia-1 networks the CSSLab's Lichess bots run,
+ * rated in hundreds of thousands of games, mostly against people, and dala-2000 (hrschubert's Lc0
+ * transformer trained on 2000-rated games, PLAN.md §5.204), rated mostly against other bots.
+ * (dala-1600's network has no soft head and no games of it were read: its play is unknown.)
  */
 export interface Anchor {
   id: string;
@@ -32,12 +42,49 @@ export interface Anchor {
   trained: number;
   /** Its Lichess bot. */
   bot: string;
+  play: BotPlay;
 }
+/**
+ * dala-2000's play, fitted to its own moves in 600 of its Lichess games (PLAN.md §5.204): its
+ * network's *soft* policy head (converted with `lc0-onnx.mjs … soft`), at temperature 0.45 on
+ * that head's logits, no cutoff. The vanilla head at Lc0's 1.359 with the bot client's example 5%
+ * cutoff, the published defaults, doesn't fit: the bot plays moves that head gives under 0.1%.
+ */
+export const DALA_PLAY: BotPlay = { kind: 'sample', temperature: 0.45, minPolicy: 0 };
 export const ANCHORS: readonly Anchor[] = [
-  { id: 'maia-1100', trained: 1100, bot: 'maia1' },
-  { id: 'maia-1500', trained: 1500, bot: 'maia5' },
-  { id: 'maia-1900', trained: 1900, bot: 'maia9' },
+  { id: 'maia-1100', trained: 1100, bot: 'maia1', play: { kind: 'argmax' } },
+  { id: 'maia-1500', trained: 1500, bot: 'maia5', play: { kind: 'argmax' } },
+  { id: 'maia-1900', trained: 1900, bot: 'maia9', play: { kind: 'argmax' } },
+  { id: 'dala-2000', trained: 2000, bot: 'dala-2000', play: DALA_PLAY },
 ];
+/** The anchors of §5.202's match, the Maia bots. */
+export const MAIA_ANCHORS: readonly Anchor[] = ANCHORS.filter((a) => a.id.startsWith('maia-'));
+
+/**
+ * A bot's move from its policy (likeliest first, as `lc0Policy` gives it at the play's
+ * temperature, with no floor): the first, or a draw among the first and those of `minPolicy`
+ * percent or more, weighted by their probability.
+ */
+export function botMove<M extends { prob: number }>(policy: readonly M[], play: BotPlay, rand: () => number): M | null {
+  if (!policy.length) return null;
+  if (play.kind === 'argmax') return policy[0]!;
+  const kept = policy.filter((m, i) => i === 0 || m.prob * 100 >= play.minPolicy);
+  let r = rand() * kept.reduce((s, m) => s + m.prob, 0);
+  for (const m of kept) {
+    r -= m.prob;
+    if (r <= 0) return m;
+  }
+  return kept[kept.length - 1]!;
+}
+
+/** A level from `id=elo@precision` (`r2300=2300@0.85`), or one of the presets by its id. */
+export function parseLevel(spec: string): Level {
+  const preset = LEVELS.find((l) => l.id === spec);
+  if (preset) return preset;
+  const m = /^([\w-]+)=(\d+)@([\d.]+)$/.exec(spec);
+  if (!m) throw new Error(`a level is a preset's id or id=elo@precision, not ${spec}`);
+  return { id: m[1]!, label: m[1]!, elo: Number(m[2]), precision: Number(m[3]) };
+}
 export const SPEEDS = ['blitz', 'rapid', 'classical'] as const;
 export type Speed = (typeof SPEEDS)[number];
 /** The bots' ratings by speed, as Lichess gave them (`/api/user/<bot>`), and their deviation. */
@@ -242,6 +289,11 @@ export interface MatchReport {
   /** Each pair's games and the first player's score. */
   pairs: { a: string; b: string; games: number; score: number }[];
   speeds: Partial<Record<Speed, SpeedMapping>>;
+  /**
+   * Each anchor placed by the line through the others, against its own Lichess rating (point
+   * values): whether the bots' ratings agree with each other on one scale.
+   */
+  leaveOneOut: Partial<Record<Speed, Record<string, { rating: number; placed: number }>>>;
 }
 
 /**
@@ -256,7 +308,8 @@ export function matchReport(games: readonly GameRecord[], ratings: BotRatings, o
   const ts = tallies(games);
   const players = [...new Set(ts.flatMap((t) => [t.a, t.b]))];
   const anchorIds = anchors.map((a) => a.id).filter((id) => players.includes(id));
-  const levelIds = levels.map((l) => l.id).filter((id) => players.includes(id));
+  // The levels, and any other player not an anchor here (a bot left out of the line), are placed.
+  const levelIds = [...levels.map((l) => l.id).filter((id) => players.includes(id)), ...players.filter((id) => !anchorIds.includes(id) && !levels.some((l) => l.id === id))];
   const rand = rng(o.seed);
   const speeds = SPEEDS.filter((s) => anchorIds.length >= 2 && anchorIds.every((id) => ratings[anchors.find((a) => a.id === id)!.bot]?.[s]));
   const map = (elo: Map<string, number>, s: Speed, jitter: boolean) => {
@@ -294,8 +347,22 @@ export function matchReport(games: readonly GameRecord[], ratings: BotRatings, o
       }
     }
   }
+  const leaveOneOut = Object.fromEntries(
+    speeds.map((s) => {
+      const rows = anchorIds.map((id) => ({ id, x: elo.get(id)!, y: ratings[anchors.find((a) => a.id === id)!.bot]![s]!.rating }));
+      const out: Record<string, { rating: number; placed: number }> = {};
+      if (rows.length >= 3)
+        for (const r of rows) {
+          const others = rows.filter((o) => o !== r);
+          const line = fitLine(others.map((o) => o.x), others.map((o) => o.y));
+          out[r.id] = { rating: r.y, placed: line.a + line.b * r.x };
+        }
+      return [s, out];
+    }),
+  );
   return {
     games: games.length,
+    leaveOneOut,
     elo: Object.fromEntries(players.map((p) => [p, estimate(elo.get(p)!, bootElo[p]!)])),
     pairs: ts.map((t) => ({ a: t.a, b: t.b, games: t.w + t.d + t.l, score: t.w + t.d / 2 })),
     speeds: Object.fromEntries(
@@ -507,4 +574,167 @@ export function mistakeReport(ps: readonly MistakePosition[], conditions: readon
     ratings[c.id] = r;
   }
   return { positions: rows.length, stats, ratings };
+}
+
+/* ------------------------------------------------------------------ whole games (PLAN.md §5.204) */
+
+/** The app's mistake: more than 10 points of win% given up (`classifyWpDrop`). */
+export const MISTAKE = 10;
+/** A game is decided from here on, for the statistics: the leader's win% (about ±600 centipawns). */
+export const DECIDED = 90;
+/** Ahead: the leader's win% from which a conversion is counted (about +300 centipawns). */
+export const AHEAD = 75;
+
+export type Phase = 'middlegame' | 'endgame';
+/** Lichess's endgame (its `Divider`): six or fewer queens, rooks, bishops and knights on the board. */
+export const phaseOf = (pos: Position): Phase => (pos.board.occupied.diff(pos.board.pawn).diff(pos.board.king).size() <= 6 ? 'endgame' : 'middlegame');
+
+/**
+ * A game from a start: White's win% at each position from the start (index 0) on, as far as it was
+ * scored, each position's phase, and who played (`human`, or a player's id on both sides).
+ */
+export interface ScoredGame {
+  player: string;
+  game: string;
+  /** White's win% (Lichess's, 0–100) at each position; null where Stockfish gave none. */
+  win: (number | null)[];
+  phase: Phase[];
+  /** Whether White is to move at the start. */
+  firstWhite: boolean;
+  /** The game ended in a win before the score reached `DECIDED` (a resignation, a flag, a mate): decided at its end. */
+  decisiveEnd?: boolean;
+}
+
+/** One side's move in a scored game, while the game was undecided. */
+export interface ScoredMove {
+  /** Win% the move gave up for its side. */
+  loss: number;
+  phase: Phase;
+}
+
+/** The moves a game's statistics count: from the start until the game is decided (`DECIDED`). */
+export function scoredMoves(g: ScoredGame): ScoredMove[] {
+  const out: ScoredMove[] = [];
+  for (let i = 0; i + 1 < g.win.length; i++) {
+    const a = g.win[i];
+    const b = g.win[i + 1];
+    if (a == null || b == null) continue;
+    if (Math.max(a, 100 - a) >= DECIDED) break;
+    const white = (i % 2 === 0) === g.firstWhite;
+    out.push({ loss: Math.max(0, white ? a - b : b - a), phase: g.phase[i]! });
+  }
+  return out;
+}
+
+/** A game's course: when it was decided, and what became of a lead. */
+export interface GameCourse {
+  /** Plies from the start until a side reached `DECIDED` by the score, or the end of a game won before; null: never. */
+  decidedAt: number | null;
+  /** A side reached `AHEAD`: did it keep it (never fell back to 50% or less afterwards)? null: no side did. */
+  converted: boolean | null;
+}
+export function courseOf(g: ScoredGame): GameCourse {
+  let decidedAt: number | null = null;
+  let leader: 'white' | 'black' | undefined;
+  let converted: boolean | null = null;
+  for (let i = 0; i < g.win.length; i++) {
+    const w = g.win[i];
+    if (w == null) continue;
+    if (!leader && (w >= AHEAD || w <= 100 - AHEAD)) {
+      leader = w >= AHEAD ? 'white' : 'black';
+      converted = true;
+    }
+    if (leader && converted && (leader === 'white' ? w <= 50 : w >= 50)) converted = false;
+    if (Math.max(w, 100 - w) >= DECIDED) {
+      decidedAt = i;
+      break;
+    }
+  }
+  if (decidedAt === null && g.decisiveEnd) decidedAt = g.win.length - 1;
+  return { decidedAt, converted };
+}
+
+/** A player's whole-game statistics, each with a 95% interval over its games. */
+export interface WholeGameStats {
+  games: number;
+  moves: number;
+  loss: Record<'all' | Phase, Estimate>;
+  /** Shares of moves (percent). */
+  mistakes: Record<'all' | Phase, Estimate>;
+  blunders: Record<'all' | Phase, Estimate>;
+  /** Share of the moves counted that were in the endgame (percent). */
+  endgameShare: Estimate;
+  /** Of the games where a side got ahead, the share where it kept the lead (percent). */
+  converted: Estimate;
+  /** Share of games decided within 60 plies of the start (percent). */
+  decided60: Estimate;
+  /** Median plies to the decision, over the games decided. */
+  decidedMedian: Estimate;
+}
+
+function wholeStats(gs: readonly ScoredGame[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  const acc = { all: [0, 0, 0, 0], middlegame: [0, 0, 0, 0], endgame: [0, 0, 0, 0] } as Record<'all' | Phase, number[]>;
+  let ahead = 0;
+  let kept = 0;
+  let in60 = 0;
+  const decided: number[] = [];
+  for (const g of gs) {
+    for (const m of scoredMoves(g))
+      for (const k of ['all', m.phase] as const) {
+        const a = acc[k];
+        a[0]!++;
+        a[1]! += m.loss;
+        if (m.loss > MISTAKE) a[2]!++;
+        if (m.loss > BLUNDER) a[3]!++;
+      }
+    const c = courseOf(g);
+    if (c.converted !== null) {
+      ahead++;
+      if (c.converted) kept++;
+    }
+    if (c.decidedAt !== null) {
+      decided.push(c.decidedAt);
+      if (c.decidedAt <= 60) in60++;
+    }
+  }
+  for (const k of ['all', 'middlegame', 'endgame'] as const) {
+    const [n, l, mi, bl] = acc[k] as [number, number, number, number];
+    out[`loss.${k}`] = n ? l / n : NaN;
+    out[`mistakes.${k}`] = n ? (100 * mi) / n : NaN;
+    out[`blunders.${k}`] = n ? (100 * bl) / n : NaN;
+  }
+  out['moves'] = acc.all[0]!;
+  out['endgameShare'] = acc.all[0] ? (100 * acc.endgame[0]!) / acc.all[0]! : NaN;
+  out['converted'] = ahead ? (100 * kept) / ahead : NaN;
+  out['decided60'] = gs.length ? (100 * in60) / gs.length : NaN;
+  const sorted = [...decided].sort((a, b) => a - b);
+  out['decidedMedian'] = sorted.length ? sorted[Math.floor(sorted.length / 2)]! : NaN;
+  return out;
+}
+
+/** Each player's whole-game statistics, with intervals from `boot` resamples of its games. */
+export function wholeGameReport(games: readonly ScoredGame[], o: { boot: number; seed: number }): Record<string, WholeGameStats> {
+  const rand = rng(o.seed);
+  const out: Record<string, WholeGameStats> = {};
+  for (const player of [...new Set(games.map((g) => g.player))]) {
+    const gs = games.filter((g) => g.player === player);
+    const point = wholeStats(gs);
+    const boots: Record<string, number>[] = [];
+    for (let i = 0; i < o.boot; i++) boots.push(wholeStats(Array.from({ length: gs.length }, () => gs[Math.floor(rand() * gs.length)]!)));
+    const e = (k: string): Estimate => estimate(point[k]!, boots.map((b) => b[k]!).filter((x) => !Number.isNaN(x)));
+    const byPhase = (k: string) => ({ all: e(`${k}.all`), middlegame: e(`${k}.middlegame`), endgame: e(`${k}.endgame`) });
+    out[player] = {
+      games: gs.length,
+      moves: point['moves']!,
+      loss: byPhase('loss'),
+      mistakes: byPhase('mistakes'),
+      blunders: byPhase('blunders'),
+      endgameShare: e('endgameShare'),
+      converted: e('converted'),
+      decided60: e('decided60'),
+      decidedMedian: e('decidedMedian'),
+    };
+  }
+  return out;
 }
