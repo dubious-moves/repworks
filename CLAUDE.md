@@ -100,7 +100,8 @@ onnxruntime-node installed there with `npm i --ignore-scripts onnxruntime-node` 
 The database past a line's end, where practice's opponent plays the explorer's games (PLAN.md
 §5.206), a report that writes nothing; each step resumes from its file: `node scripts/db-handover.ts
 walks --out walks.json --walks 40` (the explorer at the app's 16 requests a minute, a Lichess token in
-`LICHESS_TOKEN`; about 75 minutes), `score --walks walks.json` (`STOCKFISH=<native binary>` for speed:
+`LICHESS_TOKEN`; about 75 minutes), `thin --walks walks.json` (the thin positions' older games and
+named players; about 40 minutes), `score --walks walks.json` (`STOCKFISH=<native binary>` for speed:
 `apt-get install stockfish` gives /usr/games/stockfish), and `report --walks walks.json`.
 
 The storm's "Gather positions" from a cloud session, as a device named `cloud` (PLAN.md §5.155),

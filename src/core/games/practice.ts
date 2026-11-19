@@ -99,21 +99,29 @@ function preparedWeight(data: { white?: number; draws?: number; black?: number; 
 
 /**
  * The database's games and Maia's policy as one estimate of what people play (PLAN.md §5.206).
- * Past a line's end the explorer's sample thins move by move, and a move five of twelve players
- * chose is no evidence that people choose it. Maia's policy counts as `k` games beside the
- * sample (fitted to the explorer's own positions: the blend predicts what everyone at the filter
- * plays better than the sample or Maia alone). A position with fewer than `thin` games at the
- * filter is thin: the opponent's move comes from the blend, checked as Maia's moves are; with
- * more, from the games alone, unchecked, as before (a mistake that many players make is one to
- * learn to punish).
+ * Past a line's end the explorer's sample thins move by move. Maia's policy counts as `k` games
+ * beside it: measured on the explorer's own positions, the mix predicts players better than the
+ * sample or Maia alone (best between 15 and 50 games, the curve nearly flat there: 15–20 on
+ * samples drawn from well-sampled positions, 30–50 on thin positions' games up to 2022 against
+ * the players since). A position with fewer than `thin` games at the filter is thin: the
+ * opponent's move comes from the mix, checked as Maia's moves are; with more, from the games
+ * alone, unchecked, as before (a mistake that many players make is one to learn to punish).
+ * A move the games themselves show at least half as often as their likeliest, with `minGames`
+ * or more, is natural whatever Maia says (the owner, 2026-11-19: "if the majority of 12 players
+ * chose the move, it should probably be a possibility"; measured: such moves came from different
+ * players, and later players kept choosing them, three times as often as Maia expected).
  */
-export const BLEND = { k: 50, thin: 300 } as const;
+export const BLEND = { k: 20, thin: 300 } as const;
 
-/** A move of the blend: `prob` people's odds (the games, Maia's policy as `k` games); `weight` the opponent's (Maia's share at the level's precision). */
+/**
+ * A move of the blend: `prob` people's odds (the games, Maia's policy as `k` games); `weight` the
+ * opponent's (Maia's share at the level's precision); `dbNatural` the games alone make it natural.
+ */
 export interface BlendMove {
   uci: string;
   prob: number;
   weight: number;
+  dbNatural: boolean;
 }
 
 /** Maia's odds at a precision, as `maiaPick` draws them: the likeliest alone at 1, else at temperature (1 − precision) × 2. */
@@ -142,9 +150,13 @@ export function blendMoves(db: readonly { uci: string; white: number; draws: num
   if (n + kk === 0) return [];
   const odds = new Map(policy.map((m) => [m.uci, m.prob]));
   const tempered = temperedOdds(policy, precision);
+  const top = Math.max(0, ...games.values());
   const ucis = [...new Set([...games.keys(), ...odds.keys()])];
   return ucis
-    .map((uci) => ({ uci, prob: ((games.get(uci) ?? 0) + kk * (odds.get(uci) ?? 0)) / (n + kk), weight: (games.get(uci) ?? 0) + kk * (tempered.get(uci) ?? 0) }))
+    .map((uci) => {
+      const g = games.get(uci) ?? 0;
+      return { uci, prob: (g + kk * (odds.get(uci) ?? 0)) / (n + kk), weight: g + kk * (tempered.get(uci) ?? 0), dbNatural: g >= PRACTICE.minGames && g >= GUARD.naturalShare * top };
+    })
     .sort((a, b) => b.prob - a.prob);
 }
 
@@ -204,14 +216,15 @@ export const guardNeedsBefore = (bestWp: number, wps: readonly number[]): boolea
  * The opponent's move from the candidates scored (`wp`: the opponent's win% after each), the best
  * move's win% now and the opponent's before the user's move (undefined when not needed or not
  * known). `wrong`: a blunder was played. Null with no candidate. `weight` (the blend's, §5.206):
- * which move drawn by those weights rather than by `prob` at the precision.
+ * which move drawn by those weights rather than by `prob` at the precision; `dbNatural` (§5.206):
+ * natural by the database's games whatever the odds.
  */
-export function guardedChoice<M extends { uci: string; prob: number; wp: number; weight?: number }>(policy: readonly { prob: number }[], cands: readonly M[], bestWp: number, beforeWp: number | undefined, precision: number, rnd: () => number): { move: M; wrong: boolean } | null {
+export function guardedChoice<M extends { uci: string; prob: number; wp: number; weight?: number; dbNatural?: boolean }>(policy: readonly { prob: number }[], cands: readonly M[], bestWp: number, beforeWp: number | undefined, precision: number, rnd: () => number): { move: M; wrong: boolean } | null {
   if (!cands.length) return null;
   const reference = beforeWp === undefined ? bestWp : Math.min(bestWp, beforeWp);
   const bad = (m: M) => reference - m.wp > GUARD.limitWp;
   const sound = cands.filter((m) => !bad(m));
-  const natural = cands.filter((m) => bad(m) && naturalMove(policy, m));
+  const natural = cands.filter((m) => bad(m) && (naturalMove(policy, m) || m.dbNatural === true));
   // Every likely move a blunder, none natural: the least bad.
   if (!sound.length && !natural.length) return { move: cands.reduce((a, b) => (b.wp > a.wp ? b : a)), wrong: true };
   const mass = (l: readonly M[]) => l.reduce((s, m) => s + m.prob, 0);

@@ -2747,14 +2747,24 @@ The technical calls, each with its reason:
 
 ## Revision of 2026-11-19, last (the database past a line's end: PLAN.md §5.206)
 - **A thin database is weighed with Maia and checked.** Where the opponent's filter has fewer than
-  300 games, Maia's policy counts as ⟨K⟩ games beside them, and Medium and Hard check the result as
+  300 games, Maia's policy counts as 20 games beside them, and Medium and Hard check the result as
   they check Maia's moves. Why: the owner, 2026-11-19 ("Start by implementing nr 2"): past a line's
-  end the sample thins, and a move chosen in a handful of games is no evidence that people choose
-  it, yet it was played unchecked. ⟨K⟩ is fitted to the explorer's own positions.
+  end the sample thins, and its moves were played unchecked. 20 is where the mix predicts players
+  best (between 15 and 50 by two measurements, the curve flat there). Measured, thin samples
+  blunder no more than well-sampled ones, so the gain is small (Hard's thin-position blunders 2.6%
+  → 1.3%).
+- **A move the games themselves show often is natural whatever Maia says**: 5 games or more and at
+  least half as many as the games' likeliest. Why: the owner, 2026-11-19: "if the majority of 12
+  players chose the move, it should probably be a possibility"; measured, such moves were chosen by
+  several different players (three or more in 83–88% of them, never one alone), and later players
+  kept choosing them, about three times as often as Maia expected.
 - **A well-sampled database stays unchecked** (300 games or more), as decided earlier today: a
   reply at the 5% floor then has 15 games behind it.
-- **Hard draws the database's replies as a prepared opponent**, weighted by how they score for it.
-  Why: the owner agreed to it, with Hard's target kept at 2150–2200.
+- **Hard draws the database's replies as a prepared opponent** (β 0.1, scores drawn toward the
+  position's by 50 games). Why: the owner agreed to it, with Hard's target kept at 2150–2200;
+  measured, its replies score about a point better and its blunders there fall from 2.5% to 1.5%,
+  with its choices as varied.
 - **Medium's database from 1800** (and practice from a position's default). Why: weighted by
-  games, the 1600s outvoted the 2200s, and the moves' mean rating sat near 1880 against Maia's 2000.
+  games, the 1600s outvoted the 2200s: the moves' games averaged 1923 against Maia's 2000; from
+  1800, 2001.
 - No data format changed; the Opponent settings on a device gain a field, read as off when absent.

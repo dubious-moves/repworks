@@ -1100,8 +1100,8 @@ Training and Learn on the Chessnut Move: see 14 (PLAN.md §5.192).
 - Drill a few checklist lines at Medium and Hard and play on until the explorer runs out (the
   Opponent line, in practice from a position, shows "DB (n)", then "DB (n) + Maia (checked)" once
   fewer than 300 games are left, then "Maia (checked)"). Do the moves just after your prep still
-  look like what people play there, and does the opponent no longer throw a piece away on a move a
-  few players chose?
+  look like what people play there? A move most of the few games chose may still come, now and
+  then, even when it loses; one only a few of them chose that throws the game away shouldn't.
 - Hard: does it pick the testing replies more often (the ones that score well for it), and still
   vary? Does it feel within 2150–2200?
 - The reply time in the thin stretch on the phone: those moves are now searched as Maia's are.

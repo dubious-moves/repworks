@@ -16,6 +16,11 @@
 //       Medium's filter (1600–2499), at 1800–2499 and at Hard's (2000+), and Maia 3 (23M, the seven
 //       positions before) at 2000 and 2150. Resumable, walk by walk. One request at a time at the
 //       app's 16 a minute (`--gap 3750` ms): 40 walks take about 75 minutes.
+//   node scripts/db-handover.ts thin --walks walks.json
+//       For each thin position (under 300 games at Medium's filter from 1800 or Hard's): the games up
+//       to 2022-12 (about half; the players since are the ones to predict) and the games the explorer
+//       names (eight newest, eight newest up to the split), each with its move and the player who
+//       chose it. Two requests a position at the same pace.
 //   node scripts/db-handover.ts score --walks walks.json --depth 14 --engines 4
 //       Stockfish's score of each candidate (the databases' moves with games, Maia's of 2% or more)
 //       as the position after it at depth − 1, and the best at depth: the mover's win% (the app's
@@ -411,7 +416,7 @@ function lossOf(p: OppPosition, odds: readonly { uci: string; p: number }[]): { 
 /**
  * The check's draw (§5.205 as built), its chances worked out rather than drawn: Maia's likely moves
  * (2% or more, eight at most), a blunder (more than 10 win% below the best now) played only when
- * natural (half the likeliest's probability or more), wrong on the odds of the natural blunders
+ * natural (half the likeliest's probability or more, or by the database's games, §5.206), wrong on the odds of the natural blunders
  * against the sound moves, which move at the precision. `odds`: the people's odds the check reads.
  */
 function checkedOdds(p: OppPosition, odds: readonly Pol[], weight: (m: Pol) => number): { uci: string; p: number }[] | undefined {
@@ -422,7 +427,7 @@ function checkedOdds(p: OppPosition, odds: readonly Pol[], weight: (m: Pol) => n
   const ref = referenceOf(p);
   const bad = (m: Pol) => ref - p.wp![m.uci]! > MISTAKE;
   const sound = cands.filter((m) => !bad(m));
-  const natural = cands.filter((m) => bad(m) && m.prob >= 0.5 * top);
+  const natural = cands.filter((m) => bad(m) && (m.prob >= 0.5 * top || (m as Pol & { dbNatural?: boolean }).dbNatural === true));
   if (!sound.length && !natural.length) {
     const least = cands.reduce((a, b) => (p.wp![b.uci]! > p.wp![a.uci]! ? b : a));
     return [{ uci: least.uci, p: 1 }];

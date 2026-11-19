@@ -273,30 +273,47 @@ test('the blend (§5.206): a thin sample’s games with Maia as k games; the opp
   assert.equal(explorerTotal(null), 0);
 });
 
-test('the check over the blend (§5.206): a thin sample’s blunder is no natural move; the move drawn by the weights', () => {
-  const db = [
-    { uci: 'x', white: 4, draws: 1, black: 2 },
-    { uci: 'y', white: 2, draws: 1, black: 2 },
-  ];
+test('the check over the blend (§5.206): a thin sample’s strong move stays natural, a minority’s blunder never is; the move drawn by the weights', () => {
   const policy = [
     { uci: 'y', prob: 0.8 },
     { uci: 'z', prob: 0.14 },
     { uci: 'x', prob: 0.01 },
   ];
   const wp: Record<string, number> = { x: 20, y: 55, z: 52 };
-  const blend = blendMoves(db, policy, 0.75, 50);
-  const scored = guardCandidates(blend).map((m) => ({ ...m, wp: wp[m.uci]! }));
-  assert.deepEqual(scored.map((m) => m.uci), ['y', 'x', 'z']);
-  // x, seven games of twelve, throws the game away: Maia puts it at 1%, so in the blend it is no natural move.
-  const blended = shares((r) => guardedChoice(blend, scored, 56, undefined, 0.75, () => r)?.move.uci);
-  assert.equal(blended.get('x'), undefined, 'never played');
-  // Which sound move: by the weights, y's 5 games and 48.5 of Maia's against z's 1.5.
-  near(blended.get('y'), blend[0]!.weight / (blend[0]!.weight + blend[2]!.weight), 0.002);
-  // The games alone (as a well-sampled position would be read): x is the likeliest, a natural blunder, played on its odds.
-  const games = blendMoves(db, [], 0.75);
-  const raw = games.map((m) => ({ ...m, wp: wp[m.uci]! }));
-  assert.equal(guardedChoice(games, raw, 56, undefined, 0.75, () => 0)!.move.uci, 'x');
-  // Without weights, the draw is maiaPick's at the precision, as before.
+  const scoredOf = (b: ReturnType<typeof blendMoves>) => guardCandidates(b).map((m) => ({ ...m, wp: wp[m.uci]! }));
+  // The owner's case: seven of twelve games chose x, which throws the game away and Maia gives 1%.
+  const twelve = [
+    { uci: 'x', white: 4, draws: 1, black: 2 },
+    { uci: 'y', white: 2, draws: 1, black: 2 },
+  ];
+  const b12 = blendMoves(twelve, policy, 0.75);
+  assert.equal(BLEND.k, 20);
+  near(b12.find((m) => m.uci === 'x')!.prob, 7.2 / 32, 1e-9);
+  assert.deepEqual(b12.map((m) => [m.uci, m.dbNatural]), [['y', true], ['x', true], ['z', false]]);
+  // Natural by the games (a majority of them), so played: as often as the blend's odds say go wrong.
+  // Two dice: whether it goes wrong, then which move.
+  const s12 = new Map<string | undefined, number>();
+  for (let i = 0; i < 200; i++)
+    for (let j = 0; j < 200; j++) {
+      const dice = [(i + 0.5) / 200, (j + 0.5) / 200];
+      const k = guardedChoice(b12, scoredOf(b12), 56, undefined, 0.75, () => dice.shift()!)?.move.uci;
+      s12.set(k, (s12.get(k) ?? 0) + 1 / 40000);
+    }
+  near(s12.get('x'), 7.2 / (21 + 2.8 + 7.2), 0.005, 'x on the blend’s odds');
+  // Which sound move: by the weights, y's 5 games and Maia's share of 20 at the precision against z's.
+  const t = temperedOdds(policy, 0.75);
+  near(s12.get('y'), (1 - 7.2 / 31) * (5 + 20 * t.get('y')!) / (5 + 20 * t.get('y')! + 20 * t.get('z')!), 0.005);
+  // Five of thirty games chose x: a minority of the games, and Maia gives it 1%: never played.
+  const thirty = [
+    { uci: 'x', white: 3, draws: 0, black: 2 },
+    { uci: 'y', white: 10, draws: 5, black: 10 },
+  ];
+  const b30 = blendMoves(thirty, policy, 0.75);
+  assert.equal(b30.find((m) => m.uci === 'x')!.dbNatural, false);
+  assert.equal(shares((r) => guardedChoice(b30, scoredOf(b30), 56, undefined, 0.75, () => r)?.move.uci).get('x'), undefined, 'never played');
+  // The database's own draw would play it one time in six.
+  near(shares((r) => pickExplorerMove({ moves: thirty.map((m) => ({ ...m, san: m.uci })) }, () => r)?.uci).get('x'), 5 / 30, 0.001);
+  // Without weights or the games' mark, the draw is §5.205's: maiaPick's at the precision, as before.
   const plain = policy.map((m) => ({ ...m, wp: wp[m.uci]! }));
   for (const r of [0, 0.5, 0.97, 0.999]) assert.equal(guardedChoice(policy, plain, 56, undefined, 0.75, () => r)!.move.uci, maiaPick(plain.filter((m) => m.uci !== 'x'), 0.75, () => r)!.uci);
 });

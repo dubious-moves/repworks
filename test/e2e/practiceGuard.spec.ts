@@ -4,9 +4,10 @@
 // though the dice would have drawn Maia's least likely move unchecked; when Nf3, Maia's likeliest,
 // is the one move that loses and the dice are low (Maia's odds say "go wrong"), the natural blunder
 // is played. With the check off, nothing is searched and the dice's unlikely move is played.
-// The database past a line's end (§5.206): a thin sample (12 games) whose likelier move throws the
-// game away is weighed with Maia and checked, and Nf3 is played; a position of 500 games is the
-// database's own draw, unchecked, as before; a prepared opponent draws the reply that scores best.
+// The database past a line's end (§5.206): a thin sample (36 games) whose minority move throws the
+// game away is weighed with Maia and checked, and Nf3 is played; a thin sample's majority that
+// throws it away (seven of twelve) stays possible; a position of 500 games is the database's own
+// draw, unchecked, as before; a prepared opponent draws the reply that scores best.
 import { test, expect, type Page } from '@playwright/test';
 import { Chess } from 'chessops/chess';
 import { makeFen, parseFen } from 'chessops/fen';
@@ -114,21 +115,36 @@ test('the check off: the unlikely pick played, nothing asked', async ({ page }) 
   await expect(page.getByLabel('No nonsense blunders')).not.toBeChecked();
 });
 
-test('a thin database (§5.206): its likelier move, a blunder Maia hardly plays, weighed with Maia and refused', async ({ page }) => {
+test('a thin database (§5.206): a minority’s blunder, which Maia hardly plays, weighed with Maia and refused', async ({ page }) => {
   test.setTimeout(150_000);
   site.requests.length = 0;
   nf3Holds = true;
-  // Twelve games: Qh5 in seven, Nf3 in five. The database alone would play Qh5 at these dice.
+  // 36 games: Qh5 in six, Nf3 in thirty. The database alone would play Qh5 at these dice.
   const games = [
-    { san: 'Qh5', uci: 'd1h5', white: 4, draws: 1, black: 2 },
-    { san: 'Nf3', uci: 'g1f3', white: 2, draws: 1, black: 2 },
+    { san: 'Qh5', uci: 'd1h5', white: 4, draws: 0, black: 2 },
+    { san: 'Nf3', uci: 'g1f3', white: 12, draws: 6, black: 12 },
   ];
-  expect(7 + 5).toBeLessThan(BLEND.thin);
-  await setUp(page, true, 0.3, { games });
+  expect(6 + 30).toBeLessThan(BLEND.thin);
+  await setUp(page, true, 0.1, { games });
   const asked = checked(site);
   expect(asked).toHaveLength(1);
   expect(asked[0]).toEqual(expect.arrayContaining(['d1h5', 'g1f3']));
   await expect(page.getByTestId('practice-moves')).toContainText('2. Nf3');
+  await expect(page.getByText('Opponent: DB (36) + Maia (checked)')).toBeVisible();
+});
+
+test('a thin database: its majority, a blunder Maia hardly plays, stays possible (the owner’s seven of twelve)', async ({ page }) => {
+  test.setTimeout(150_000);
+  site.requests.length = 0;
+  nf3Holds = true;
+  const games = [
+    { san: 'Qh5', uci: 'd1h5', white: 4, draws: 1, black: 2 },
+    { san: 'Nf3', uci: 'g1f3', white: 2, draws: 1, black: 2 },
+  ];
+  // Dice low: the blend's odds say go wrong, and Qh5, natural by the games, is played.
+  await setUp(page, true, 0.02, { games });
+  expect(checked(site)[0]).toEqual(expect.arrayContaining(['d1h5', 'g1f3']));
+  await expect(page.getByTestId('practice-moves')).toContainText('2. Qh5');
   await expect(page.getByText('Opponent: DB (12) + Maia (checked)')).toBeVisible();
 });
 
