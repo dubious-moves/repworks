@@ -12002,3 +12002,53 @@ quarter, those not earned by a third, the endgame's a little. Medium is now clea
 2000-rated people (blunders about 60% of theirs, half in the middlegame, the same in the endgame),
 which is what the owner asked. On maia9's rating alone that is about 1970 rapid (1920 unchecked);
 on the line through the Maia bots, which compresses gaps, about 1880.
+
+#### 5.206 The database past a line's end: a thin sample weighed with Maia and checked, Medium's from 1800, Hard prepared (the owner's request, 2026-11-19, built)
+
+After §5.205 the owner asked for ideas to make Medium and Hard better for practising whole games
+from an opening's lines. The second of six was that the moves right after the prep were never
+measured (§5.204's whole games started Maia at ply 12, while the app's opponent plays the
+explorer's games until they run out) and that the check skips them: a move drawn from a handful of
+games is played unchecked. The owner: "I agree with 'Hard could play like a prepared opponent' and
+that it could get better at punishing mistakes - but my target is still 2150-2200. Start by
+implementing nr 2."
+
+**Measured first** (`scripts/db-handover.ts`, a report that writes nothing; 2026-11-19, the
+explorer as the app asks it with a Lichess token, one request at a time at the app's 16 a minute):
+⟨WALKS⟩
+
+**Built**:
+- **A thin position** (fewer than `BLEND.thin` = 300 games at the opponent's filter): Maia's
+  policy (at the level's rating, the positions before) counts as `BLEND.k` = ⟨K⟩ games beside the
+  explorer's (`blendMoves`): people's odds (games + k × Maia) / (games + k), the opponent's weights
+  games + k × Maia at the level's precision. With the check (Medium, Hard, practice from a position
+  by default) the blend's likely moves are searched together as Maia's are (§5.205): a blunder is
+  played only when natural in the blend, on its odds; which move by the weights. So a move five of
+  twelve players chose, which Maia gives 1%, is no natural move, and with no games the draw is
+  §5.205's exactly. Without the check (Easy, or the box off): the database's own draw as often as
+  its games weigh against Maia's (games / (games + k)), else Maia's. Maia off: the database as
+  before. The source line reads "DB (12) + Maia (checked)".
+- **A well-sampled position** (300 games or more): the database's draw, unchecked, as before (a
+  mistake 5% of 300 players make is one to learn to punish, D-revision of 2026-11-19); 300 games is
+  where a reply at the 5% floor has 15 games behind it, its share known within about 3–8%.
+- **Hard is a prepared opponent** (`PREPARED`, `pickExplorerMove`'s `prepared`): each reply's
+  games weighted by e^(β × its score for the opponent above the position's, in points), β = ⟨B⟩,
+  the score drawn toward the position's by 50 games (q_extension's prepared prior) so a reply of a
+  few games can't stand out on luck. ⟨PREP⟩ Its Maia (2150 at 0.85, checked) is unchanged: the
+  target stays 2150–2200.
+- **Medium's database from 1800** (1800–2499, mistake-lab's 1600–2499 before), and practice from a
+  position's default with it (a device's saved Opponent settings keep their own filter): ⟨RATING⟩
+- The Opponent settings gain "Prepared", and say where the games and Maia are weighed together.
+
+**As built**: `src/core/games/practice.ts` (`BLEND`, `blendMoves`, `temperedOdds`,
+`databaseShare`, `explorerTotal`, `PREPARED`, `pickExplorerMove`'s `prepared`, `guardedChoice`'s
+draw by the blend's weights), `src/core/games/checklist.ts` (the presets), `src/app/practice.ts`
+(`opponentMove`; `DEFAULT_OPPONENT`), `src/ui/Practice.tsx` (the box) and `src/ui/Checklist.tsx`
+(the drill's opponent). **Checked**: unit tests (the blend's odds and weights, the check over it
+refusing a thin sample's blunder that the games alone would play, the prepared weights and their
+prior; controls: Maia as no games, the score not drawn toward the position's, the weights ignored,
+each failing its test); Playwright with the real 23M Maia and a fake engine and explorer (desktop
+and emulated phone, `practiceGuard.spec.ts`): twelve games whose likelier move loses, searched with
+Maia's moves and refused; 500 games, the database's draw unchecked as before; a prepared opponent
+drawing the reply that scores best at the same dice (control: every answer taken as well-sampled
+fails the first). Not on a device (`TESTING.md`).

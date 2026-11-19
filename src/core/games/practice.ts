@@ -50,26 +50,106 @@ export interface ExplorerMove {
   black: number;
 }
 
+const gamesOf = (m: { white: number; draws: number; black: number }) => m.white + m.draws + m.black;
+
+/** The position's games at the filter (the answer's white + draws + black, as mistake-lab reads them; else the moves'). */
+export function explorerTotal(data: { white?: number; draws?: number; black?: number; moves: readonly ExplorerMove[] } | null | undefined): number {
+  if (!data) return 0;
+  return data.white !== undefined ? data.white + (data.draws ?? 0) + (data.black ?? 0) : data.moves.reduce((s, m) => s + gamesOf(m), 0);
+}
+
+/**
+ * A prepared opponent (PLAN.md §5.206, Hard): each reply's games weighted by how it scores for the
+ * mover in them, e^(`beta` × its score above the position's, in points), the score drawn toward the
+ * position's by `prior` games so a reply of a few games can't stand out on luck.
+ */
+export const PREPARED = { beta: 0.1, prior: 50 } as const;
+
 /**
  * mistake-lab's `pickExplorerMove`: the moves with at least `minGames` games and `minFreq` of the
- * position's, one drawn weighted by its games; null when none passes.
+ * position's, one drawn weighted by its games; null when none passes. `prepared` (the mover's
+ * colour): the games weighted by each move's score for the mover (`PREPARED`).
  */
-export function pickExplorerMove<M extends ExplorerMove>(data: { white?: number; draws?: number; black?: number; moves: readonly M[] } | null | undefined, rnd: () => number, o: { minGames: number; minFreq: number } = PRACTICE): M | null {
+export function pickExplorerMove<M extends ExplorerMove>(data: { white?: number; draws?: number; black?: number; moves: readonly M[] } | null | undefined, rnd: () => number, o: { minGames: number; minFreq: number; prepared?: Color } = PRACTICE): M | null {
   if (!data || !data.moves.length) return null;
-  const games = (m: ExplorerMove) => m.white + m.draws + m.black;
-  // The position's games (the answer's white + draws + black), as mistake-lab reads them.
-  const total = data.white !== undefined ? data.white + (data.draws ?? 0) + (data.black ?? 0) : data.moves.reduce((s, m) => s + games(m), 0);
+  const total = explorerTotal(data);
   if (total === 0) return null;
-  const candidates = data.moves.filter((m) => games(m) >= o.minGames && games(m) / total >= o.minFreq);
+  const candidates = data.moves.filter((m) => gamesOf(m) >= o.minGames && gamesOf(m) / total >= o.minFreq);
   if (!candidates.length) return null;
-  const weight = candidates.reduce((s, m) => s + games(m), 0);
+  const weightOf = o.prepared ? preparedWeight(data, o.prepared) : gamesOf;
+  const weight = candidates.reduce((s, m) => s + weightOf(m), 0);
   let r = rnd() * weight;
   for (const m of candidates) {
-    r -= games(m);
+    r -= weightOf(m);
     if (r <= 0) return m;
   }
   return candidates[candidates.length - 1]!;
 }
+
+/** A move's weight for a prepared opponent of `mover`'s colour at this answer (`PREPARED`). */
+function preparedWeight(data: { white?: number; draws?: number; black?: number; moves: readonly ExplorerMove[] }, mover: Color): (m: ExplorerMove) => number {
+  const points = (m: { white?: number; draws?: number; black?: number }) => (mover === 'white' ? (m.white ?? 0) : (m.black ?? 0)) + (m.draws ?? 0) / 2;
+  const total = explorerTotal(data);
+  const mean = data.white !== undefined ? points(data) / total : data.moves.reduce((s, m) => s + points(m), 0) / total;
+  return (m) => {
+    const score = (points(m) + PREPARED.prior * mean) / (gamesOf(m) + PREPARED.prior);
+    return gamesOf(m) * Math.exp(PREPARED.beta * 100 * (score - mean));
+  };
+}
+
+/**
+ * The database's games and Maia's policy as one estimate of what people play (PLAN.md §5.206).
+ * Past a line's end the explorer's sample thins move by move, and a move five of twelve players
+ * chose is no evidence that people choose it. Maia's policy counts as `k` games beside the
+ * sample (fitted to the explorer's own positions: the blend predicts what everyone at the filter
+ * plays better than the sample or Maia alone). A position with fewer than `thin` games at the
+ * filter is thin: the opponent's move comes from the blend, checked as Maia's moves are; with
+ * more, from the games alone, unchecked, as before (a mistake that many players make is one to
+ * learn to punish).
+ */
+export const BLEND = { k: 50, thin: 300 } as const;
+
+/** A move of the blend: `prob` people's odds (the games, Maia's policy as `k` games); `weight` the opponent's (Maia's share at the level's precision). */
+export interface BlendMove {
+  uci: string;
+  prob: number;
+  weight: number;
+}
+
+/** Maia's odds at a precision, as `maiaPick` draws them: the likeliest alone at 1, else at temperature (1 − precision) × 2. */
+export function temperedOdds<M extends { uci: string; prob: number }>(policy: readonly M[], precision: number): Map<string, number> {
+  if (!policy.length) return new Map();
+  if (precision >= 1) return new Map([[policy.reduce((a, b) => (b.prob > a.prob ? b : a)).uci, 1]]);
+  const t = (1 - precision) * 2;
+  const scaled = policy.map((m) => Math.log(Math.max(m.prob, 1e-12)) / t);
+  const max = Math.max(...scaled);
+  const exps = scaled.map((l) => Math.exp(l - max));
+  const sum = exps.reduce((a, b) => a + b, 0);
+  return new Map(policy.map((m, i) => [m.uci, exps[i]! / sum]));
+}
+
+/**
+ * The blend of the database's moves (their UCI as Maia writes it) and Maia's policy, likeliest first:
+ * people's odds (games + k × Maia) / (games + k), and the opponent's weights, games + k × Maia at
+ * the precision, so with no games the opponent draws as `maiaPick` would and with many as the
+ * database does. No policy: the games alone.
+ */
+export function blendMoves(db: readonly { uci: string; white: number; draws: number; black: number }[], policy: readonly { uci: string; prob: number }[], precision: number, k: number = BLEND.k): BlendMove[] {
+  const games = new Map<string, number>();
+  for (const m of db) if (gamesOf(m) > 0) games.set(m.uci, (games.get(m.uci) ?? 0) + gamesOf(m));
+  const kk = policy.length ? k : 0;
+  const n = [...games.values()].reduce((a, b) => a + b, 0);
+  if (n + kk === 0) return [];
+  const odds = new Map(policy.map((m) => [m.uci, m.prob]));
+  const tempered = temperedOdds(policy, precision);
+  const ucis = [...new Set([...games.keys(), ...odds.keys()])];
+  return ucis
+    .map((uci) => ({ uci, prob: ((games.get(uci) ?? 0) + kk * (odds.get(uci) ?? 0)) / (n + kk), weight: (games.get(uci) ?? 0) + kk * (tempered.get(uci) ?? 0) }))
+    .sort((a, b) => b.prob - a.prob);
+}
+
+/** The chance the database's own draw answers rather than Maia's, unchecked: its games against Maia's `k` (1 with no Maia). */
+export const databaseShare = (total: number, maia: boolean, k: number = BLEND.k): number => (!maia ? 1 : total + k > 0 ? total / (total + k) : 0);
 
 /**
  * mistake-lab's `maiaSampleMove` on Maia's probabilities (its logits' softmax): precision 1 the
@@ -123,9 +203,10 @@ export const guardNeedsBefore = (bestWp: number, wps: readonly number[]): boolea
 /**
  * The opponent's move from the candidates scored (`wp`: the opponent's win% after each), the best
  * move's win% now and the opponent's before the user's move (undefined when not needed or not
- * known). `wrong`: a blunder was played. Null with no candidate.
+ * known). `wrong`: a blunder was played. Null with no candidate. `weight` (the blend's, §5.206):
+ * which move drawn by those weights rather than by `prob` at the precision.
  */
-export function guardedChoice<M extends { uci: string; prob: number; wp: number }>(policy: readonly { prob: number }[], cands: readonly M[], bestWp: number, beforeWp: number | undefined, precision: number, rnd: () => number): { move: M; wrong: boolean } | null {
+export function guardedChoice<M extends { uci: string; prob: number; wp: number; weight?: number }>(policy: readonly { prob: number }[], cands: readonly M[], bestWp: number, beforeWp: number | undefined, precision: number, rnd: () => number): { move: M; wrong: boolean } | null {
   if (!cands.length) return null;
   const reference = beforeWp === undefined ? bestWp : Math.min(bestWp, beforeWp);
   const bad = (m: M) => reference - m.wp > GUARD.limitWp;
@@ -135,7 +216,20 @@ export function guardedChoice<M extends { uci: string; prob: number; wp: number 
   if (!sound.length && !natural.length) return { move: cands.reduce((a, b) => (b.wp > a.wp ? b : a)), wrong: true };
   const mass = (l: readonly M[]) => l.reduce((s, m) => s + m.prob, 0);
   const wrong = !sound.length || (natural.length > 0 && rnd() * (mass(sound) + mass(natural)) < mass(natural));
-  return { move: maiaPick(wrong ? natural : sound, precision, rnd)!, wrong };
+  const group = wrong ? natural : sound;
+  return { move: drawWeighted(group, rnd) ?? maiaPick(group, precision, rnd)!, wrong };
+}
+
+/** A move drawn by its `weight`; null when the moves carry none (or none above 0). */
+function drawWeighted<M extends { weight?: number }>(moves: readonly M[], rnd: () => number): M | null {
+  const total = moves.reduce((s, m) => s + (m.weight ?? 0), 0);
+  if (!(total > 0)) return null;
+  let r = rnd() * total;
+  for (const m of moves) {
+    r -= m.weight ?? 0;
+    if (r <= 0 && (m.weight ?? 0) > 0) return m;
+  }
+  return [...moves].reverse().find((m) => (m.weight ?? 0) > 0)!;
 }
 
 /* ------------------------------------------------------------------ the advantage drill */

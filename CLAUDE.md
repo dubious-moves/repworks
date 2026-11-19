@@ -97,6 +97,12 @@ A level's own settings with the check of §5.205: `--players m=2000@0.75+guard` 
 dala-2000.onnx soft`). dala's transformer (174M parameters) and the 23M Maia want `--ort-node <folder>`:
 onnxruntime-node installed there with `npm i --ignore-scripts onnxruntime-node` (not a dependency of this repo).
 
+The database past a line's end, where practice's opponent plays the explorer's games (PLAN.md
+§5.206), a report that writes nothing; each step resumes from its file: `node scripts/db-handover.ts
+walks --out walks.json --walks 40` (the explorer at the app's 16 requests a minute, a Lichess token in
+`LICHESS_TOKEN`; about 75 minutes), `score --walks walks.json` (`STOCKFISH=<native binary>` for speed:
+`apt-get install stockfish` gives /usr/games/stockfish), and `report --walks walks.json`.
+
 The storm's "Gather positions" from a cloud session, as a device named `cloud` (PLAN.md §5.155),
 with the data repo checked out on `main`:
 `node scripts/storm-gather.ts ../repworks-data --minutes 60 --score-minutes 40 --push`; only

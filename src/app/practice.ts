@@ -27,8 +27,9 @@ import { parseUciMove, standardUci } from '../core/chess/uci.ts';
 import type { FromWorker, ToWorker } from '../core/explorer/service.ts';
 import { winPct } from '../core/games/extract.ts';
 import { judgeMove, moverScore, needsRecheck, RECHECK, recheckMoves, rejudge, type MoverLine } from '../core/games/grade.ts';
-import { advantageGrade, drawAccepted, guardCandidates, guardedChoice, guardNeedsBefore, historyEntry, maiaPick, pickExplorerMove, PRACTICE, plyOf, repertoireCheck, repertoireVerdict, resultOf, reviewOf, ruleDraw, startTrack, trackAdvantage, type AdvantageOutcome, type AdvantageTrack, type HistoryEntry, type HistorySource, type PlayedMove, type RepertoireVerdict, type Review } from '../core/games/practice.ts';
+import { advantageGrade, BLEND, blendMoves, databaseShare, drawAccepted, explorerTotal, guardCandidates, guardedChoice, guardNeedsBefore, historyEntry, maiaPick, pickExplorerMove, PRACTICE, plyOf, repertoireCheck, repertoireVerdict, resultOf, reviewOf, ruleDraw, startTrack, trackAdvantage, type AdvantageOutcome, type AdvantageTrack, type HistoryEntry, type HistorySource, type PlayedMove, type RepertoireVerdict, type Review } from '../core/games/practice.ts';
 import { readSaved, resumable, type Saved } from '../core/games/resume.ts';
+import { PRESETS } from '../core/games/checklist.ts';
 import { covered, scanCandidate, tacticCandidates, TACTIC, type DetectedTactic, type Pv } from '../core/games/detect.ts';
 import type { Color } from '../core/games/record.ts';
 import { historyCard, practiceCard } from '../core/progress/cards.ts';
@@ -56,10 +57,13 @@ export interface Opponent {
   speeds: string[];
   maiaElo: number;
   precision: number;
-  /** Maia's unlikely picks checked by Stockfish, a nonsense blunder drawn again (§5.205): Medium and Hard, and the settings' default. */
+  /** Maia's likely moves checked by Stockfish, a nonsense blunder never played (§5.205), and a thin database's moves with them (§5.206): Medium and Hard, and the settings' default. */
   guard?: boolean;
+  /** A prepared opponent (§5.206): the database's replies weighted by how they score for it. Hard. */
+  prepared?: boolean;
 }
-export const DEFAULT_OPPONENT: Opponent = { ratings: [...PRACTICE.ratings], speeds: [...PRACTICE.speeds], maiaElo: PRACTICE.maiaElo, precision: PRACTICE.maiaPrecision, guard: true };
+/** Practice from a position: Medium's opponent (its database from 1800, §5.206; Maia 2000 at 0.75, checked), at mistake-lab's speeds. */
+export const DEFAULT_OPPONENT: Opponent = { ratings: [...PRESETS.medium.ratings], speeds: [...PRACTICE.speeds], maiaElo: PRACTICE.maiaElo, precision: PRACTICE.maiaPrecision, guard: true };
 
 /** The opponent's settings on this device (mistake-lab's continuation settings). */
 const OPP_KEY = 'repworks-practice';
@@ -375,21 +379,42 @@ async function endgameReply(fen: string, e: Endgame, userMoves: number, seen: Re
 /** The game's positions before the one on the board, oldest first: what the 23M Maia reads beside it (§5.188). */
 const positionsBefore = (p: PracticeGame, n: number = p.moves.length): string[] => gameBefore(p.setup.lead, p.setup.fen, p.moves.map((m) => m.fen), n);
 
-/** The opponent's move: the database, then Maia, then Stockfish; undefined when none answers. */
+/**
+ * The opponent's move: the database, then Maia, then Stockfish; undefined when none answers. A
+ * position with plenty of games at the filter (`BLEND.thin`): the database's draw, unchecked (a
+ * prepared opponent's weighted by how each reply scores for it). A thin one (§5.206): the games and
+ * Maia's policy as one estimate, checked by Stockfish as Maia's moves are (Medium and Hard); without
+ * the check, the database's draw as often as its games weigh against Maia's, else Maia's.
+ */
 async function opponentMove(fen: string, o: Opponent, before?: readonly string[], userFen?: string): Promise<{ uci: string; source: string; dbFailed: boolean } | undefined> {
   const pos = positionOf(fen);
   if (!pos) return undefined;
   let dbFailed = false;
   const db = await explorerGames(fen, o);
-  if (db && 'games' in db) {
-    const picked = pickExplorerMove(db.games, Math.random);
+  const games = db && 'games' in db ? db.games : null;
+  if (!games) dbFailed = true;
+  const total = explorerTotal(games);
+  const fromDb = () => {
+    const picked = pickExplorerMove(games, Math.random, { ...PRACTICE, ...(o.prepared ? { prepared: pos.turn } : {}) });
     const move = picked && parseUciMove(pos, picked.uci);
-    if (picked && move) return { uci: uciOf(fen, picked.uci)!, source: `DB (${picked.white + picked.draws + picked.black})`, dbFailed };
-  } else dbFailed = true;
+    return picked && move ? { uci: uciOf(fen, picked.uci)!, source: `DB (${picked.white + picked.draws + picked.black})`, dbFailed } : undefined;
+  };
+  if (total >= BLEND.thin) {
+    const m = fromDb();
+    if (m) return m;
+  }
   const policy = await maiaPolicy(fen, o.maiaElo, before);
   if (policy && o.guard) {
-    const c = await guardChoice(fen, policy, o.precision, userFen);
-    if (c) return { uci: c.move.uci, source: 'Maia (checked)', dbFailed };
+    const dbMoves = (games?.moves ?? []).flatMap((m) => {
+      const uci = uciOf(fen, m.uci);
+      return uci ? [{ ...m, uci }] : [];
+    });
+    const c = await guardChoice(fen, blendMoves(dbMoves, policy, o.precision), o.precision, userFen);
+    if (c) return { uci: c.move.uci, source: total > 0 ? `DB (${total}) + Maia (checked)` : 'Maia (checked)', dbFailed };
+  }
+  if (Math.random() < databaseShare(total, !!policy)) {
+    const m = fromDb();
+    if (m) return m;
   }
   const m = policy && maiaPick(policy, o.precision, Math.random);
   if (m) return { uci: m.uci, source: 'Maia', dbFailed };
@@ -409,7 +434,7 @@ const GUARD_LINES_MS = 5000;
  * score before the user's move at `userFen` (missing the user's mistake is no blunder). Null when
  * Stockfish can't score them all: Maia's pick is played unchecked.
  */
-async function guardChoice(fen: string, policy: readonly MaiaMove[], precision: number, userFen?: string) {
+async function guardChoice(fen: string, policy: readonly { uci: string; prob: number; weight?: number }[], precision: number, userFen?: string) {
   const pos = positionOf(fen);
   if (!pos) return null;
   const cands = guardCandidates(policy);

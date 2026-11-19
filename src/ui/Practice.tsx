@@ -20,7 +20,7 @@ import { leadFor, analyse, canOfferDraw, canTakeBack, claimVictory, offerDraw, c
 import { parseUciMove, standardUci } from '../core/chess/uci.ts';
 import { makeFen } from 'chessops/fen';
 import { CLASSIFICATION, moverScore, type Classification } from '../core/games/grade.ts';
-import { GUARD, positionEvals, PRACTICE, type Review } from '../core/games/practice.ts';
+import { BLEND, GUARD, positionEvals, PRACTICE, type Review } from '../core/games/practice.ts';
 import { lineFen, lineScore, moveAt } from '../core/games/engineLine.ts';
 import { whiteShare } from '../core/engine/winning.ts';
 import { makeSan } from 'chessops/san';
@@ -51,7 +51,7 @@ function OpponentSettings(props: { value: Opponent; onChange(o: Opponent): void 
   return (
     <details class="practice-opponent">
       <summary>Opponent</summary>
-      <p class="muted">The explorer’s games at this filter (a move drawn by its games: at least {PRACTICE.minGames} games and {PRACTICE.minFreq * 100}% of the position’s), then Maia, then Stockfish.</p>
+      <p class="muted">The explorer’s games at this filter (a move drawn by its games: at least {PRACTICE.minGames} games and {PRACTICE.minFreq * 100}% of the position’s), then Maia, then Stockfish. Where the filter has fewer than {BLEND.thin} games, the games and Maia are weighed together (Maia counting as {BLEND.k} games).</p>
       <div class="games-filters">
         {[1600, 1800, 2000, 2200, 2500].map((r) => (
           <label key={r} class="chip">
@@ -77,7 +77,11 @@ function OpponentSettings(props: { value: Opponent; onChange(o: Opponent): void 
       <label class="chip">
         <input type="checkbox" checked={o.guard !== false} onChange={(e) => props.onChange({ ...o, guard: (e.target as HTMLInputElement).checked })} /> No nonsense blunders
       </label>
-      <p class="muted">Stockfish checks Maia’s likely moves (a few seconds a move): a move throwing away more than {GUARD.limitWp}% win chance is played only when it is natural (at least half as likely as Maia’s first choice), and only as often as players at that rating play it.</p>
+      <label class="chip">
+        <input type="checkbox" data-testid="practice-prepared" checked={o.prepared === true} onChange={(e) => props.onChange({ ...o, prepared: (e.target as HTMLInputElement).checked })} /> Prepared
+      </label>
+      <p class="muted">No nonsense blunders: Stockfish checks Maia’s likely moves, and the explorer’s where its games are few (a few seconds a move): a move throwing away more than {GUARD.limitWp}% win chance is played only when it is natural (at least half as likely as the first choice), and only as often as players at that rating play it.</p>
+      <p class="muted">Prepared: the explorer’s replies drawn by their games and by how well they score for the opponent, as someone who prepared the line would choose.</p>
     </details>
   );
 }

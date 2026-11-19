@@ -2744,3 +2744,17 @@ The technical calls, each with its reason:
   owner, 2026-11-19, on the measured table: Medium went wrong too often where most players do (95%
   against people's 73%), because the precision squares Maia's odds; and "I don't mind waiting 5-10
   seconds on a move", so a search every move is affordable.
+
+## Revision of 2026-11-19, last (the database past a line's end: PLAN.md §5.206)
+- **A thin database is weighed with Maia and checked.** Where the opponent's filter has fewer than
+  300 games, Maia's policy counts as ⟨K⟩ games beside them, and Medium and Hard check the result as
+  they check Maia's moves. Why: the owner, 2026-11-19 ("Start by implementing nr 2"): past a line's
+  end the sample thins, and a move chosen in a handful of games is no evidence that people choose
+  it, yet it was played unchecked. ⟨K⟩ is fitted to the explorer's own positions.
+- **A well-sampled database stays unchecked** (300 games or more), as decided earlier today: a
+  reply at the 5% floor then has 15 games behind it.
+- **Hard draws the database's replies as a prepared opponent**, weighted by how they score for it.
+  Why: the owner agreed to it, with Hard's target kept at 2150–2200.
+- **Medium's database from 1800** (and practice from a position's default). Why: weighted by
+  games, the 1600s outvoted the 2200s, and the moves' mean rating sat near 1880 against Maia's 2000.
+- No data format changed; the Opponent settings on a device gain a field, read as off when absent.
