@@ -594,11 +594,14 @@ export const phaseOf = (pos: Position): Phase => (pos.board.occupied.diff(pos.bo
 
 /**
  * A game from a start: White's win% at each position from the start (index 0) on, as far as it was
- * scored, each position's phase, and who played (`human`, or a player's id on both sides).
+ * scored, each position's phase, and who played (`human`, or a player's id on both sides; with
+ * `side`, the player of that side alone, against another).
  */
 export interface ScoredGame {
   player: string;
   game: string;
+  /** The side `player` had in a game against another player: only its moves and its leads count. */
+  side?: 'white' | 'black';
   /** White's win% (Lichess's, 0–100) at each position; null where Stockfish gave none. */
   win: (number | null)[];
   phase: Phase[];
@@ -624,6 +627,7 @@ export function scoredMoves(g: ScoredGame): ScoredMove[] {
     if (a == null || b == null) continue;
     if (Math.max(a, 100 - a) >= DECIDED) break;
     const white = (i % 2 === 0) === g.firstWhite;
+    if (g.side && g.side !== (white ? 'white' : 'black')) continue;
     out.push({ loss: Math.max(0, white ? a - b : b - a), phase: g.phase[i]! });
   }
   return out;
@@ -633,7 +637,7 @@ export function scoredMoves(g: ScoredGame): ScoredMove[] {
 export interface GameCourse {
   /** Plies from the start until a side reached `DECIDED` by the score, or the end of a game won before; null: never. */
   decidedAt: number | null;
-  /** A side reached `AHEAD`: did it keep it (never fell back to 50% or less afterwards)? null: no side did. */
+  /** A side reached `AHEAD` (with `side`, that side): did it keep it (never fell back to 50% or less afterwards)? null: no side did. */
   converted: boolean | null;
 }
 export function courseOf(g: ScoredGame): GameCourse {
@@ -643,7 +647,7 @@ export function courseOf(g: ScoredGame): GameCourse {
   for (let i = 0; i < g.win.length; i++) {
     const w = g.win[i];
     if (w == null) continue;
-    if (!leader && (w >= AHEAD || w <= 100 - AHEAD)) {
+    if (!leader && (g.side !== 'black' && w >= AHEAD || g.side !== 'white' && w <= 100 - AHEAD)) {
       leader = w >= AHEAD ? 'white' : 'black';
       converted = true;
     }

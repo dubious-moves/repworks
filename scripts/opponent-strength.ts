@@ -611,22 +611,23 @@ async function humans(): Promise<void> {
   say(`${Math.min(count, kept.length)} games within ±${maxCp} at ply ${start} written to ${out}`);
 }
 
-/** Every position of the humans' games and of the self-play games from their starts, scored by Stockfish until decided. */
+/** Every position of the humans' games and of the games played from their starts (self-play, or two players each counted on its side), scored by Stockfish until decided. */
 async function score(): Promise<void> {
   const out = need('out');
   const starts = readJson<HumanGame[]>(need('openings'), []);
   const depth = num('depth', 12);
   const file = readJson<{ depth: number; games: ScoredGame[] }>(out, { depth, games: [] });
   if (file.depth !== depth) throw new Error(`${out} was scored at depth ${file.depth}`);
-  const todo: { player: string; game: string; opening: number; moves: string[]; won: boolean }[] = starts.map((h, i) => ({ player: 'human', game: `human|${i}`, opening: i, moves: h.rest, won: h.result === '1-0' || h.result === '0-1' }));
+  const todo: { player: string; game: string; opening: number; moves: string[]; won: boolean; black?: string }[] = starts.map((h, i) => ({ player: 'human', game: `human|${i}`, opening: i, moves: h.rest, won: h.result === '1-0' || h.result === '0-1' }));
   const gamesPath = flags.get('games');
   if (gamesPath)
     for (const g of readJson<MatchFile>(gamesPath, { ratings: {}, ratingsAt: '', model: '', games: [] }).games) {
-      if (g.white !== g.black) continue;
-      todo.push({ player: g.white, game: `${g.white}|${g.opening}`, opening: g.opening, moves: g.moves, won: g.result !== 0.5 });
+      // Self-play counts both sides for its player; a game between two players, each side for its own.
+      if (g.white === g.black) todo.push({ player: g.white, game: `${g.white}|${g.opening}`, opening: g.opening, moves: g.moves, won: g.result !== 0.5 });
+      else todo.push({ player: g.white, game: `${g.white}-${g.black}|${g.opening}`, opening: g.opening, moves: g.moves, won: g.result !== 0.5, black: g.black });
     }
   const done = new Set(file.games.map((g) => g.game));
-  const jobs = todo.filter((t) => !done.has(t.game));
+  const jobs = todo.filter((t) => !done.has(t.game) && !done.has(`${t.game}|white`));
   const engines = startEngines(num('engines', availableParallelism()));
   say(`${jobs.length} games to score (${file.games.length} already), depth ${depth}, ${engines.label} ×${engines.width}`);
   let saved = performance.now();
@@ -651,7 +652,9 @@ async function score(): Promise<void> {
     // Scored to its last move without reaching DECIDED, and won: decided at its end.
     const last = win[win.length - 1];
     const reached = last != null && Math.max(last, 100 - last) >= DECIDED;
-    file.games.push({ player: t.player, game: t.game, win, phase, firstWhite, ...(t.won && !reached && win.length === t.moves.length + 1 ? { decisiveEnd: true } : {}) });
+    const scored = { win, phase, firstWhite, ...(t.won && !reached && win.length === t.moves.length + 1 ? { decisiveEnd: true } : {}) };
+    if (t.black === undefined) file.games.push({ player: t.player, game: t.game, ...scored });
+    else file.games.push({ player: t.player, game: `${t.game}|white`, side: 'white', ...scored }, { player: t.black, game: `${t.game}|black`, side: 'black', ...scored });
     if (performance.now() - saved > 30000) {
       saved = performance.now();
       save();

@@ -324,6 +324,9 @@ test("a scored game's moves: each side's loss, until a side reaches the decided 
   assert.deepEqual(scoredMoves(scored('x', [50, 55, 40], false)).map((m) => m.loss), [5, 15]);
   // A position without a score skips the moves next to it.
   assert.deepEqual(scoredMoves({ ...g, win: [50, null, 60, 61] }).map((m) => m.loss), [0]);
+  // A game between two players: each side's moves for its own player.
+  assert.deepEqual(scoredMoves({ ...g, side: 'white' }).map((m) => m.loss), [2, 0]);
+  assert.deepEqual(scoredMoves({ ...g, side: 'black' }).map((m) => m.loss), [12]);
 });
 
 test("a game's course: when it was decided, and whether a lead was kept", () => {
@@ -332,6 +335,10 @@ test("a game's course: when it was decided, and whether a lead was kept", () => 
   assert.deepEqual(courseOf(scored('x', [50, 55, 45])), { decidedAt: null, converted: null });
   // A game won before the score got there (a resignation): decided at its end.
   assert.deepEqual(courseOf({ ...scored('x', [50, 60, 80]), decisiveEnd: true }), { decidedAt: 2, converted: true });
+  // A side's own leads only: Black's lead given back counts for Black, not for White.
+  const blackLed = scored('x', [50, 100 - AHEAD - 1, 49, 51, 30]);
+  assert.deepEqual(courseOf({ ...blackLed, side: 'black' }), { decidedAt: null, converted: false });
+  assert.deepEqual(courseOf({ ...blackLed, side: 'white' }), { decidedAt: null, converted: null });
 });
 
 test('the whole-game report counts each player apart, with intervals', () => {
