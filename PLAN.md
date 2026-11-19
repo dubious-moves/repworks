@@ -11933,3 +11933,25 @@ scoring, the check at depth 14 as in the app):
 - **Tighter gates, weighed** (the owner's question): of the 400 blunders left, a pick under 15%
   being checked would have reached 9 (1.2% more moves checked), not in Maia's top three 5, under
   20% 35, not the top two 28, anything but the likeliest 111 (about one move in five checked).
+- **Hard positions** (the owner's question: a position where the one sound move has 20% and the
+  failing ones 5–15% each; would the check stop the opponent from failing as 80% of people do?).
+  Simulated on §5.202's 3,500 positions, Stockfish's score of every move Maia gives 1% or more:
+  the 936 positions of 1900–2100 players not yet decided, each rule's chance that Medium plays a
+  move giving up more than 10 win%, by how many 2000s Maia expects to go wrong there (B, its own
+  probability of those moves; close to the people's real rate):
+
+  | B | positions | people | Maia unsampled | Medium unchecked | the check | + a 15% floor | first choice only |
+  | --- | --- | --- | --- | --- | --- | --- | --- |
+  | under 10% | 673 | 2.1% | 2.0% | 0.2% | 0.0% | 0.0% | 0.0% |
+  | 10–30% | 140 | 14.3% | 18.3% | 6.3% | 2.2% | 2.0% | 0.2% |
+  | 30–50% | 61 | 27.9% | 39.1% | 30.3% | 23.6% | 23.6% | 12.8% |
+  | 50–80% | 47 | 57.4% | 63.6% | 65.5% | 61.0% | 60.5% | 51.8% |
+  | 80–100% | 15 | 73.3% | 88.9% | 96.1% | 95.5% | 95.5% | 93.8% |
+
+  The check already judges by the position more than by the move: "half the likeliest" is a low
+  bar when no move stands out, so in a position most people get wrong Medium goes wrong as often
+  as they do, and in an easy one (where people still slip 2% of the time) never. The owner's own
+  example (20% sound; failing moves of 15, 12, 11, 10, 9, 8, 7, 6 and 2%): unchecked 67%, the
+  check 60%, a 15% floor 36%, first choice only 0%. So the floor and first-choice-only would take
+  away exactly the earned failures; neither is built. The grey zone is B 10–30% (people 14%,
+  Medium 2%): there a 2000 sometimes falls, Medium seldom.
