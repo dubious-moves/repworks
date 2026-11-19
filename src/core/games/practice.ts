@@ -93,15 +93,18 @@ export function maiaPick<M extends { prob: number }>(policy: readonly M[], preci
 }
 
 /**
- * The check on the opponent's move (the owner's request, 2026-11-19, PLAN.md §5.205): a game won by
- * the opponent's nonsense blunder teaches nothing about the opening. Maia's pick is played at once
- * when it is a natural move (at least `naturalShare` of the likeliest's probability: people fall for
- * those, and a trap that works is earned); an unlikely pick is played when Stockfish finds it gives
- * up at most `limitWp` win% against the better of the best move now and where the opponent stood
- * before the user's move (missing the user's mistake hands the user nothing), else drawn again
- * without it, `redraws` times at most, and then the likeliest move is played. Endgames alike.
+ * The check on the opponent's move (the owner's requests of 2026-11-19, PLAN.md §5.205): a game won
+ * by the opponent's nonsense blunder teaches nothing about the opening, yet a position most players
+ * at the rating get wrong should be got wrong about as often. Stockfish scores Maia's likely moves
+ * (`guardCandidates`); a move is a blunder when it gives up more than `limitWp` win% against the
+ * lower of the best move now and where the opponent stood before the user's move (missing the user's
+ * mistake hands the user nothing). A blunder may be played only when it is natural (at least
+ * `naturalShare` of the likeliest's probability: people fall for those, and a trap that works is
+ * earned). Whether the opponent goes wrong is drawn on Maia's own odds of those natural blunders
+ * against the sound moves; which move, at the level's precision (`maiaPick`). The precision alone
+ * would make the move most players choose almost certain, a blunder included. Endgames alike.
  */
-export const GUARD = { limitWp: 10, naturalShare: 0.5, redraws: 3 } as const;
+export const GUARD = { limitWp: 10, naturalShare: 0.5, minProb: 0.02, maxMoves: 8 } as const;
 
 /** Whether `m` is a natural move: at least `naturalShare` of the likeliest move's probability. */
 export function naturalMove<M extends { prob: number }>(policy: readonly M[], m: M): boolean {
@@ -109,28 +112,30 @@ export function naturalMove<M extends { prob: number }>(policy: readonly M[], m:
   return m.prob >= GUARD.naturalShare * top;
 }
 
-/**
- * Whether an unlikely pick is kept, from the win% (for the opponent) of the best move now, of the
- * pick, and of the position before the user's move (best play there; undefined when not known).
- */
-export function guardKeeps(bestWp: number, pickWp: number, beforeWp?: number): boolean {
-  const reference = beforeWp === undefined ? bestWp : Math.min(bestWp, beforeWp);
-  return reference - pickWp <= GUARD.limitWp;
+/** The moves Stockfish scores: Maia's of `minProb` or more, the likeliest `maxMoves` (the likeliest always). */
+export function guardCandidates<M extends { prob: number }>(policy: readonly M[]): M[] {
+  return [...policy].sort((a, b) => b.prob - a.prob).filter((m, i) => i === 0 || m.prob >= GUARD.minProb).slice(0, GUARD.maxMoves);
 }
 
+/** Whether the position before the user's move is needed: a candidate gives up more than the limit against the best now. */
+export const guardNeedsBefore = (bestWp: number, wps: readonly number[]): boolean => wps.some((w) => bestWp - w > GUARD.limitWp);
+
 /**
- * Maia's pick under the check: `keeps` asks Stockfish of an unlikely pick (null when it can't
- * answer: the pick is played). `redrawn` counts the picks drawn again.
+ * The opponent's move from the candidates scored (`wp`: the opponent's win% after each), the best
+ * move's win% now and the opponent's before the user's move (undefined when not needed or not
+ * known). `wrong`: a blunder was played. Null with no candidate.
  */
-export async function guardedPick<M extends { uci: string; prob: number }>(policy: readonly M[], precision: number, rnd: () => number, keeps: (uci: string) => Promise<boolean | null>): Promise<{ move: M; redrawn: number } | null> {
-  if (!policy.length) return null;
-  let pool = [...policy];
-  for (let n = 0; n <= GUARD.redraws && pool.length; n++) {
-    const m = maiaPick(pool, precision, rnd)!;
-    if (naturalMove(policy, m) || (await keeps(m.uci)) !== false) return { move: m, redrawn: n };
-    pool = pool.filter((x) => x !== m);
-  }
-  return { move: policy.reduce((a, b) => (b.prob > a.prob ? b : a)), redrawn: GUARD.redraws + 1 };
+export function guardedChoice<M extends { uci: string; prob: number; wp: number }>(policy: readonly { prob: number }[], cands: readonly M[], bestWp: number, beforeWp: number | undefined, precision: number, rnd: () => number): { move: M; wrong: boolean } | null {
+  if (!cands.length) return null;
+  const reference = beforeWp === undefined ? bestWp : Math.min(bestWp, beforeWp);
+  const bad = (m: M) => reference - m.wp > GUARD.limitWp;
+  const sound = cands.filter((m) => !bad(m));
+  const natural = cands.filter((m) => bad(m) && naturalMove(policy, m));
+  // Every likely move a blunder, none natural: the least bad.
+  if (!sound.length && !natural.length) return { move: cands.reduce((a, b) => (b.wp > a.wp ? b : a)), wrong: true };
+  const mass = (l: readonly M[]) => l.reduce((s, m) => s + m.prob, 0);
+  const wrong = !sound.length || (natural.length > 0 && rnd() * (mass(sound) + mass(natural)) < mass(natural));
+  return { move: maiaPick(wrong ? natural : sound, precision, rnd)!, wrong };
 }
 
 /* ------------------------------------------------------------------ the advantage drill */

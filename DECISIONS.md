@@ -2736,3 +2736,11 @@ The technical calls, each with its reason:
   be stricter in endgames; Easy's loose moves are what make it easy; a mistake 5% of rated players
   make in the opening is one to learn to punish.
 - No data format changed; the Opponent settings on a device gain a field, read as on when absent.
+
+## Revision of 2026-11-19, later (the check goes wrong on Maia's odds: PLAN.md §5.205)
+- **Every Maia move of Medium and Hard is checked**, its likely moves scored together, replacing
+  the check of unlikely picks alone. **Whether the opponent goes wrong is drawn on Maia's own odds**
+  of its natural blunders against its sound moves; which move, at the level's precision. Why: the
+  owner, 2026-11-19, on the measured table: Medium went wrong too often where most players do (95%
+  against people's 73%), because the precision squares Maia's odds; and "I don't mind waiting 5-10
+  seconds on a move", so a search every move is affordable.

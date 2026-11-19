@@ -17,7 +17,7 @@ import { readFileSync } from 'node:fs';
 import { Chess } from 'chessops/chess';
 import { makeFen } from 'chessops/fen';
 import { parseSan } from 'chessops/san';
-import { advantageGrade, drawAccepted, GUARD, guardedPick, guardKeeps, naturalMove, plyOf, positionEvals, repertoireVerdict, historyEntry, historyOf, maiaPick, pickExplorerMove, readHistoryEntry, resultOf, reviewOf, ruleDraw, startTrack, trackAdvantage, type ExplorerMove, type PlayedMove } from '../../../../src/core/games/practice.ts';
+import { advantageGrade, drawAccepted, GUARD, guardCandidates, guardedChoice, guardNeedsBefore, naturalMove, plyOf, positionEvals, repertoireVerdict, historyEntry, historyOf, maiaPick, pickExplorerMove, readHistoryEntry, resultOf, reviewOf, ruleDraw, startTrack, trackAdvantage, type ExplorerMove, type PlayedMove } from '../../../../src/core/games/practice.ts';
 import { parseLog } from '../../../../src/core/progress/events.ts';
 import { toDeviceEvents, type DeviceEvent } from '../../../../src/core/progress/replay.ts';
 
@@ -183,38 +183,43 @@ test('a draw offered: accepted from move 20 when the last five moves and the pos
   assert.equal(drawAccepted({ ply: 60, userCps: [0, 0, 0, 0, 0], nowCp: undefined }), false);
 });
 
-test('the check on the opponent (§5.205): natural moves played, nonsense blunders drawn again', async () => {
+test('the check on the opponent (§5.205): natural blunders on Maia’s odds, nonsense ones never, missed chances no blunder', () => {
   const policy = [
-    { uci: 'e2e4', prob: 0.5 },
-    { uci: 'd2d4', prob: 0.3 },
-    { uci: 'g2g4', prob: 0.2 },
+    { uci: 'a', prob: 0.4 },
+    { uci: 'b', prob: 0.3 },
+    { uci: 'c', prob: 0.15 },
+    { uci: 'd', prob: 0.1 },
+    { uci: 'e', prob: 0.04 },
+    { uci: 'f', prob: 0.01 },
   ];
-  // Natural: at least half the likeliest's probability.
+  // The candidates: 2% or more, the likeliest always, at most `maxMoves`.
+  assert.deepEqual(guardCandidates(policy).map((m) => m.uci), ['a', 'b', 'c', 'd', 'e']);
+  assert.deepEqual(guardCandidates([{ uci: 'x', prob: 0.01 }]).map((m) => m.uci), ['x']);
+  assert.equal(guardCandidates(Array.from({ length: 20 }, (_, i) => ({ uci: `m${i}`, prob: 0.05 }))).length, GUARD.maxMoves);
   assert.equal(naturalMove(policy, policy[1]!), true);
   assert.equal(naturalMove(policy, policy[2]!), false);
-  // Kept within the limit of the best move; missing the user's mistake is no blunder.
-  assert.equal(guardKeeps(60, 60 - GUARD.limitWp), true);
-  assert.equal(guardKeeps(60, 59 - GUARD.limitWp), false, 'a blunder against the best move');
-  assert.equal(guardKeeps(90, 50, 50), true, 'the user blundered (50 → 90) and the opponent missed it');
-  assert.equal(guardKeeps(90, 30, 50), false, 'missed it and blundered besides');
-  assert.equal(guardKeeps(50, 30, 80), false, 'the user played well: the best move now is the reference');
+  assert.equal(guardNeedsBefore(60, [55, 50]), false);
+  assert.equal(guardNeedsBefore(60, [55, 49]), true);
 
-  // The draws: g2g4 (rnd 0.99 under precision 0 picks the last), checked and refused, drawn again.
-  const asked: string[] = [];
-  const rolls = [0.99, 0.99];
-  const r = await guardedPick(policy, 0, () => rolls.shift() ?? 0, async (uci) => (asked.push(uci), uci !== 'g2g4'));
-  assert.deepEqual(asked, ['g2g4'], 'only the unlikely pick is asked about');
-  assert.equal(r?.move.uci, 'd2d4');
-  assert.equal(r?.redrawn, 1);
-  // A natural blunder is played unasked.
-  const n = await guardedPick(policy, 0, () => 0.5, async () => false);
-  assert.equal(n?.redrawn, 0);
-  // Stockfish not answering: the pick played.
-  assert.equal((await guardedPick(policy, 0, () => 0.99, async () => null))?.move.uci, 'g2g4');
-  // Every unlikely pick refused: the likeliest move after `redraws`.
-  const flat = Array.from({ length: 10 }, (_, i) => ({ uci: `m${i}`, prob: i === 0 ? 0.5 : 0.05 }));
-  const all = await guardedPick(flat, 0, () => 0.999, async () => false);
-  assert.equal(all?.move.uci, 'm0');
-  assert.equal(all?.redrawn, GUARD.redraws + 1);
-  assert.equal(await guardedPick([], 0.75, Math.random, async () => true), null);
+  const at = (wps: number[]) => policy.slice(0, 5).map((m, i) => ({ ...m, wp: wps[i]! }));
+  // a and b blunder (natural), c, d, e sound: wrong on Maia's odds, 0.7 against 0.29.
+  const scored = at([20, 20, 55, 55, 55]);
+  const pick = (r: number[]) => guardedChoice(policy, scored, 60, undefined, 0.75, () => r.shift() ?? 0)!;
+  assert.equal(pick([0.69, 0]).wrong, true);
+  assert.equal(pick([0.69, 0]).move.uci, 'a', 'the wrong move at the precision: the likelier');
+  assert.equal(pick([0.71, 0]).wrong, false);
+  assert.equal(pick([0.71, 0]).move.uci, 'c');
+  // Only an unlikely move blunders: never played.
+  const onlyD = at([60, 58, 58, 20, 58]);
+  for (const r of [0, 0.5, 0.999]) assert.equal(guardedChoice(policy, onlyD, 60, undefined, 0.75, () => r)!.move.uci === 'd', false);
+  // The user blundered (the opponent stood at 30 before): moves at 30 are no blunder.
+  const missed = at([90, 30, 30, 30, 30]);
+  assert.equal(guardedChoice(policy, missed, 90, undefined, 0.75, () => 0)!.wrong, true, 'against the best now, all but a fail');
+  assert.equal(guardedChoice(policy, missed, 90, 30, 0.75, () => 0)!.wrong, false, 'against where it stood, none does');
+  // Every move a blunder: a natural one; none natural: the least bad.
+  assert.equal(guardedChoice(policy, at([10, 12, 5, 5, 5]), 60, undefined, 0.75, () => 0.99)!.wrong, true);
+  assert.equal(guardedChoice(policy, at([10, 12, 5, 5, 5]), 60, undefined, 1, () => 0.99)!.move.uci, 'a');
+  const noneNatural = [{ uci: 'c', prob: 0.15, wp: 5 }, { uci: 'd', prob: 0.1, wp: 8 }];
+  assert.deepEqual(guardedChoice(policy, noneNatural, 60, undefined, 0.75, () => 0)!.move.uci, 'd');
+  assert.equal(guardedChoice(policy, [], 60, undefined, 0.75, Math.random), null);
 });

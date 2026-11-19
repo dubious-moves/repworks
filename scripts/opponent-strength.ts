@@ -64,7 +64,7 @@ import { LC0_INPUT, lc0Planes, lc0Policy } from '../src/core/lc0/encode.ts';
 import { createMaiaBatch, type MaiaBatch } from '../src/core/maia/batch.ts';
 import { whiteShare } from '../src/core/engine/winning.ts';
 import { winPct } from '../src/core/games/extract.ts';
-import { guardedPick, guardKeeps } from '../src/core/games/practice.ts';
+import { guardCandidates, guardedChoice, guardNeedsBefore } from '../src/core/games/practice.ts';
 import { candidatesFrom, dumpLines, gamesOf, MIDDLEGAME, pliesOf, replay, rng, speedOf, takeSample } from './maia-eval-lib.ts';
 import type { EvalPosition } from './maia-eval-types.ts';
 import {
@@ -371,32 +371,44 @@ async function match(): Promise<void> {
     const pos = history[history.length - 1]!;
     const before = history.slice(-8, -1).map((p) => makeFen(p.toSetup()));
     const answer = await maia.ask(pos, level.elo, before);
-    const m = level.guard ? (await guardedPick(answer.policy, level.precision, rand, (uci) => guardCheck(history, uci)))?.move : levelMove(answer.policy, level, rand);
+    const m = level.guard ? ((await guardMove(history, answer.policy, level.precision, rand)) ?? levelMove(answer.policy, level, rand)) : levelMove(answer.policy, level, rand);
     if (!m) throw new Error('Maia gave no move');
     return m.uci;
   };
   /**
-   * The app's check on an unlikely pick (`guardCheck` in src/app/practice.ts): the best move's win%
-   * and the pick's at the app's depth (the pick's as the position after it, a ply less), and the
-   * position before the other side's move when the pick looks like a blunder.
+   * The app's check (`guardChoice` in src/app/practice.ts): the best move's win% and each of Maia's
+   * likely moves' (as the position after it, a ply less: this engine has no searchmoves), and the
+   * position before the other side's move when one of them looks like a blunder.
    */
   const guardDepth = num('guard-depth', 14);
   const guardWp = async (p: Position, depth: number): Promise<number | undefined> => {
+    if (p.isEnd()) return p.isCheckmate() ? 0 : 50;
     const s = await scoreOf(engines, makeFen(p.toSetup()), depth);
     return s ? winPct(p.turn === 'white' ? whiteCp(s) : -whiteCp(s)) : undefined;
   };
-  const guardCheck = async (history: readonly Position[], uci: string): Promise<boolean | null> => {
+  const guardMove = async <M extends { uci: string; prob: number }>(history: readonly Position[], policy: readonly M[], precision: number, rand: () => number): Promise<M | undefined> => {
     const pos = history[history.length - 1]!;
-    const after = pos.clone();
-    after.play(parseUciMove(pos, uci)!);
-    const [best, reply] = await Promise.all([guardWp(pos, guardDepth), after.isEnd() ? Promise.resolve(after.isCheckmate() ? 0 : 50) : guardWp(after, guardDepth - 1)]);
-    if (best === undefined || reply === undefined) return null;
+    const cands = guardCandidates(policy);
+    const [best, ...replies] = await Promise.all([
+      guardWp(pos, guardDepth),
+      ...cands.map((m) => {
+        const after = pos.clone();
+        after.play(parseUciMove(pos, m.uci)!);
+        return guardWp(after, guardDepth - 1);
+      }),
+    ]);
+    if (best === undefined || replies.some((r) => r === undefined)) return undefined;
+    const scored = cands.map((m, i) => ({ ...m, wp: 100 - replies[i]! }));
+    const bestWp = Math.max(best, ...scored.map((m) => m.wp));
+    let before: number | undefined;
+    if (history.length > 1 && guardNeedsBefore(bestWp, scored.map((m) => m.wp))) {
+      const prev = await guardWp(history[history.length - 2]!, guardDepth);
+      if (prev !== undefined) before = 100 - prev;
+    }
+    const c = guardedChoice(policy, scored, bestWp, before, precision, rand);
     guards.asked++;
-    if (guardKeeps(best, 100 - reply)) return true;
-    const prev = history.length > 1 ? await guardWp(history[history.length - 2]!, guardDepth) : undefined;
-    const keep = guardKeeps(best, 100 - reply, prev === undefined ? undefined : 100 - prev);
-    if (!keep) guards.redrawn++;
-    return keep;
+    if (c?.wrong) guards.redrawn++;
+    return c?.move;
   };
   const guards = { asked: 0, redrawn: 0 };
 
@@ -456,7 +468,7 @@ async function match(): Promise<void> {
       saved = performance.now();
       save();
       const rate = played / ((performance.now() - started) / 1000);
-      say(`${file.games.length} games, ${rate.toFixed(2)} a second, about ${Math.round((jobs.length - played) / rate / 60)} min to go; ${guards.asked} picks checked, ${guards.redrawn} drawn again`);
+      say(`${file.games.length} games, ${rate.toFixed(2)} a second, about ${Math.round((jobs.length - played) / rate / 60)} min to go; ${guards.asked} moves checked, ${guards.redrawn} gone wrong`);
     }
   });
   save();

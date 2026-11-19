@@ -77,7 +77,7 @@ function OpponentSettings(props: { value: Opponent; onChange(o: Opponent): void 
       <label class="chip">
         <input type="checkbox" checked={o.guard !== false} onChange={(e) => props.onChange({ ...o, guard: (e.target as HTMLInputElement).checked })} /> No nonsense blunders
       </label>
-      <p class="muted">An unlikely Maia move that throws away more than {GUARD.limitWp}% win chance is drawn again; a natural move (at least half as likely as Maia’s first choice) is played even when it blunders.</p>
+      <p class="muted">Stockfish checks Maia’s likely moves (a few seconds a move): a move throwing away more than {GUARD.limitWp}% win chance is played only when it is natural (at least half as likely as Maia’s first choice), and only as often as players at that rating play it.</p>
     </details>
   );
 }

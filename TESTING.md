@@ -1089,9 +1089,10 @@ Training and Learn on the Chessnut Move: see 14 (PLAN.md §5.192).
 - Drill a few checklist lines at Medium and at Hard, playing on well past the opening. Does the
   opponent still miss your tactics and fall for a natural trap, yet never hang a piece for no
   reason? With the Opponent settings open (practice from a position, not silent) the source line
-  reads "Maia (a blunder drawn again)" when it held back a blunder.
-- Is the wait for its reply still fine on the phone? Only its unlikely picks are searched (two
-  short searches, a third for a refused one).
+  reads "Maia (checked)".
+- How long does its reply take on the phone? Every Maia move is searched now (its likely moves
+  together, up to about 7 s); the owner accepts 5–10 s. In a position most players get wrong, does
+  it still go wrong now and then, and less than always?
 - **Checked**: unit tests; Playwright with the real 23M Maia and a fake engine (desktop and
   emulated phone); not on a device.
 

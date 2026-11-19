@@ -27,7 +27,7 @@ import { parseUciMove, standardUci } from '../core/chess/uci.ts';
 import type { FromWorker, ToWorker } from '../core/explorer/service.ts';
 import { winPct } from '../core/games/extract.ts';
 import { judgeMove, moverScore, needsRecheck, RECHECK, recheckMoves, rejudge, type MoverLine } from '../core/games/grade.ts';
-import { advantageGrade, drawAccepted, guardedPick, guardKeeps, historyEntry, maiaPick, pickExplorerMove, PRACTICE, plyOf, repertoireCheck, repertoireVerdict, resultOf, reviewOf, ruleDraw, startTrack, trackAdvantage, type AdvantageOutcome, type AdvantageTrack, type HistoryEntry, type HistorySource, type PlayedMove, type RepertoireVerdict, type Review } from '../core/games/practice.ts';
+import { advantageGrade, drawAccepted, guardCandidates, guardedChoice, guardNeedsBefore, historyEntry, maiaPick, pickExplorerMove, PRACTICE, plyOf, repertoireCheck, repertoireVerdict, resultOf, reviewOf, ruleDraw, startTrack, trackAdvantage, type AdvantageOutcome, type AdvantageTrack, type HistoryEntry, type HistorySource, type PlayedMove, type RepertoireVerdict, type Review } from '../core/games/practice.ts';
 import { readSaved, resumable, type Saved } from '../core/games/resume.ts';
 import { covered, scanCandidate, tacticCandidates, TACTIC, type DetectedTactic, type Pv } from '../core/games/detect.ts';
 import type { Color } from '../core/games/record.ts';
@@ -388,8 +388,8 @@ async function opponentMove(fen: string, o: Opponent, before?: readonly string[]
   } else dbFailed = true;
   const policy = await maiaPolicy(fen, o.maiaElo, before);
   if (policy && o.guard) {
-    const g = await guardedPick(policy, o.precision, Math.random, (uci) => guardCheck(fen, uci, userFen));
-    if (g) return { uci: g.move.uci, source: g.redrawn ? 'Maia (a blunder drawn again)' : 'Maia', dbFailed };
+    const c = await guardChoice(fen, policy, o.precision, userFen);
+    if (c) return { uci: c.move.uci, source: 'Maia (checked)', dbFailed };
   }
   const m = policy && maiaPick(policy, o.precision, Math.random);
   if (m) return { uci: m.uci, source: 'Maia', dbFailed };
@@ -398,26 +398,37 @@ async function opponentMove(fen: string, o: Opponent, before?: readonly string[]
   return best ? { uci: best, source: 'Stockfish', dbFailed } : undefined;
 }
 
-/** The check's searches (§5.205): quick, ahead of the judges', one line each. */
+/** The check's searches (§5.205), ahead of the judges': the best move, Maia's likely moves together, and the position before the user's move when needed. */
 const GUARD_DEPTH = 14;
-const GUARD_MS = 1500;
+const GUARD_MS = 2000;
+const GUARD_LINES_MS = 5000;
 
 /**
- * Whether Maia's unlikely pick `uci` at `fen` is kept (`guardKeeps`): the best move's score and the
- * pick's, and, only when the pick looks like a blunder, the best score before the user's move at
- * `userFen` (missing the user's mistake is no blunder); null when Stockfish can't answer.
+ * The opponent's move by the check (`guardedChoice`): Stockfish's best at `fen`, Maia's likely
+ * moves scored in one search (`searchmoves`), and, when one of them looks like a blunder, the best
+ * score before the user's move at `userFen` (missing the user's mistake is no blunder). Null when
+ * Stockfish can't score them all: Maia's pick is played unchecked.
  */
-async function guardCheck(fen: string, uci: string, userFen?: string): Promise<boolean | null> {
-  const wpOf = async (f: string, moves?: readonly string[]): Promise<number | undefined> => {
-    const p = positionOf(f);
-    const l = p && (await search(f, 1, GUARD_DEPTH, GUARD_MS, moves, true))?.lines[0];
-    return p && l?.pv.length ? winPct(moverScore(l.score, p.turn)) : undefined;
-  };
-  const [best, pick] = await Promise.all([wpOf(fen), wpOf(fen, [uci])]);
-  if (best === undefined || pick === undefined) return null;
-  if (guardKeeps(best, pick)) return true;
-  const user = userFen === undefined ? undefined : await wpOf(userFen);
-  return guardKeeps(best, pick, user === undefined ? undefined : 100 - user);
+async function guardChoice(fen: string, policy: readonly MaiaMove[], precision: number, userFen?: string) {
+  const pos = positionOf(fen);
+  if (!pos) return null;
+  const cands = guardCandidates(policy);
+  const [bestA, candA] = await Promise.all([search(fen, 1, GUARD_DEPTH, GUARD_MS, undefined, true), search(fen, cands.length, GUARD_DEPTH, GUARD_LINES_MS, cands.map((m) => m.uci), true)]);
+  const best = bestA?.lines[0];
+  if (!best?.pv.length) return null;
+  const scored = cands.flatMap((m) => {
+    const l = candA?.lines.find((x) => x.pv[0] === m.uci);
+    return l ? [{ ...m, wp: winPct(moverScore(l.score, pos.turn)) }] : [];
+  });
+  if (scored.length < cands.length) return null;
+  const bestWp = Math.max(winPct(moverScore(best.score, pos.turn)), ...scored.map((m) => m.wp));
+  let before: number | undefined;
+  const up = userFen === undefined ? undefined : positionOf(userFen);
+  if (up && guardNeedsBefore(bestWp, scored.map((m) => m.wp))) {
+    const l = (await search(userFen!, 1, GUARD_DEPTH, GUARD_MS, undefined, true))?.lines[0];
+    if (l?.pv.length) before = 100 - winPct(moverScore(l.score, up.turn));
+  }
+  return guardedChoice(policy, scored, bestWp, before, precision, Math.random);
 }
 
 /** Standard UCI for a move in either castling spelling (the explorer writes e1h1). */
