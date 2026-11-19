@@ -11903,3 +11903,33 @@ off, the unlikely move played unasked. A control (the limit at 1000) fails the f
 device. The script's levels carry the same check (`+guard` on a level, the presets as the app has
 them), so §5.202 and §5.204's measurements can be run again on the checked Medium and Hard; the
 results follow below.
+
+**Measured** (2026-11-19, the script's games on the container's 4 cores; Stockfish depth 12 for the
+scoring, the check at depth 14 as in the app):
+- **Strength.** The checked levels against maia9, dala-2000 and their unchecked selves (200 games
+  a pair, §5.202's 100 openings), beside §5.204's 4,200 games: checked Medium scored **53.0%**
+  against Medium unchecked, checked Hard **54.8%** against Hard unchecked (about 20 and 35 Elo);
+  local Elo 303 against 282, and 470 against 444. On Lichess's rapid scale that is Medium 1818
+  against 1805 by the Maia bots' line, 2044 against 2020 by every bot's. No retune is needed.
+  In the match about one Maia move in seven was an unlikely pick checked, and one in seven of
+  those was drawn again.
+- **Whole games**, against the same 300 starts from 2000-rated people's games (§5.204):
+
+  | | people (1900–2100) | Medium before | Medium checked |
+  | --- | --- | --- | --- |
+  | blunders, % of moves (all / middlegame / endgame) | 4.1 / 4.4 / 3.3 | 3.8 / 3.9 / 3.6 | 3.4 / 3.3 / 3.4 |
+  | win% given up a move | 3.18 | 2.77 | 2.67 |
+  | a lead kept (of games where a side got to 75%) | 74% | 70% | 73% |
+  | decided within 60 plies | 68% | 51% | 48% |
+
+- **The blunders not earned** (a move more than 15 win% below the lower of the best now and the
+  mover's value before the other side's move: a missed chance doesn't count), with Maia 2000's
+  probability of the move: Medium before, 435 in 300 games (2.4% of its moves), 22% of them
+  unlikely moves; checked, 400 (2.1%), **1% unlikely**, 72% Maia's own likeliest move, 28%
+  natural. About 0.7 a side a game, as many as the people's. What is left is what a 2000 most often
+  plays there, the kind the owner kept.
+- **How unlikely a move it plays** (every move of 100 games): a move under 5% of Maia's 0.57% of
+  moves checked (0.93% before), under 1% 0.03%; Maia's list stops at 0.1%, the only floor.
+- **Tighter gates, weighed** (the owner's question): of the 400 blunders left, a pick under 15%
+  being checked would have reached 9 (1.2% more moves checked), not in Maia's top three 5, under
+  20% 35, not the top two 28, anything but the likeliest 111 (about one move in five checked).
