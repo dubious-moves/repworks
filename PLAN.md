@@ -11980,3 +11980,25 @@ people 73%); a lower precision barely helps (92% at 0.65). Now (`guardCandidates
 Playwright with the real 23M Maia and the fake engine (desktop and emulated phone): the likely
 moves searched together and the one sound move played with the dice high; the natural blunder
 played with the dice low; nothing searched with the check off. Not on a device.
+
+**The second version, measured against maia9** (the owner's choice over self-play: "how the current
+version compares against real players and Maia9"). Medium with the check and Medium unchecked each
+played maia9 (the Maia-1 1900 network, Lichess rapid 1710 on 2026-11-19, rated almost wholly
+against people) from the first 150 of the 300 starts of 2000-rated people's games, both colours,
+300 games each; each side's moves scored for its own player (`ScoredGame.side`, the score step
+taking games between two players), Stockfish depth 12; the people are §5.204's 300 games.
+
+| | people (1900–2100) | Medium unchecked, against maia9 | Medium checked, against maia9 | maia9 (both matches) |
+| --- | --- | --- | --- | --- |
+| score against maia9 | | 77.0% (+210 Elo) | 82.0% (+263 Elo) | |
+| blunders, % of moves (all / middlegame / endgame) | 4.1 / 4.4 / 3.3 | 3.5 / 3.5 / 3.5 | 2.5 / 2.1 / 3.1 | 4.3 / 4.0 / 4.7 |
+| blunders not earned, a side a game | 0.67 | 0.65 | 0.44 | 0.87 |
+| win% given up a move | 3.18 | 2.60 | 2.30 | 3.10 |
+| a lead kept (its own, of games where it got to 75%) | 74% | 80% | 85% | 52% |
+| decided within 60 plies | 68% | 54% | 55% | 55% |
+
+The check, against the same opponent from the same starts: about 50 Elo, blunders down by a
+quarter, those not earned by a third, the endgame's a little. Medium is now cleaner than
+2000-rated people (blunders about 60% of theirs, half in the middlegame, the same in the endgame),
+which is what the owner asked. On maia9's rating alone that is about 1970 rapid (1920 unchecked);
+on the line through the Maia bots, which compresses gaps, about 1880.
