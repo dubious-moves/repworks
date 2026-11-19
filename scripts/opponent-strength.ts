@@ -63,6 +63,8 @@ import { parseUciMove } from '../src/core/chess/uci.ts';
 import { LC0_INPUT, lc0Planes, lc0Policy } from '../src/core/lc0/encode.ts';
 import { createMaiaBatch, type MaiaBatch } from '../src/core/maia/batch.ts';
 import { whiteShare } from '../src/core/engine/winning.ts';
+import { winPct } from '../src/core/games/extract.ts';
+import { guardedPick, guardKeeps } from '../src/core/games/practice.ts';
 import { candidatesFrom, dumpLines, gamesOf, MIDDLEGAME, pliesOf, replay, rng, speedOf, takeSample } from './maia-eval-lib.ts';
 import type { EvalPosition } from './maia-eval-types.ts';
 import {
@@ -89,6 +91,7 @@ import {
   phaseOf,
   type ScoredGame,
   wholeGameReport,
+  levelSpec,
   parseLevel,
   movesToScore,
   moverWin,
@@ -335,9 +338,9 @@ async function match(): Promise<void> {
   const anchors = ANCHORS.filter((a) => players.includes(a.id));
   const levels = new Map<string, Level>((file.levels ?? LEVELS).map((l) => [l.id, l]));
   for (const p of players.filter((id) => !anchors.some((a) => a.id === id))) {
-    const l = parseLevel(p.includes('=') ? p : (levels.get(p) ? `${p}=${levels.get(p)!.elo}@${levels.get(p)!.precision}` : p));
+    const l = parseLevel(p.includes('=') ? p : (levels.get(p) ? levelSpec(levels.get(p)!) : p));
     const was = levels.get(l.id);
-    if (was && (was.elo !== l.elo || was.precision !== l.precision)) throw new Error(`${out} played ${l.id} as ${was.elo}@${was.precision}`);
+    if (was && levelSpec(was) !== levelSpec(l)) throw new Error(`${out} played ${l.id} as ${levelSpec(was)}`);
     levels.set(l.id, l);
   }
   file.levels = [...levels.values()];
@@ -368,10 +371,34 @@ async function match(): Promise<void> {
     const pos = history[history.length - 1]!;
     const before = history.slice(-8, -1).map((p) => makeFen(p.toSetup()));
     const answer = await maia.ask(pos, level.elo, before);
-    const m = levelMove(answer.policy, level, rand);
+    const m = level.guard ? (await guardedPick(answer.policy, level.precision, rand, (uci) => guardCheck(history, uci)))?.move : levelMove(answer.policy, level, rand);
     if (!m) throw new Error('Maia gave no move');
     return m.uci;
   };
+  /**
+   * The app's check on an unlikely pick (`guardCheck` in src/app/practice.ts): the best move's win%
+   * and the pick's at the app's depth (the pick's as the position after it, a ply less), and the
+   * position before the other side's move when the pick looks like a blunder.
+   */
+  const guardDepth = num('guard-depth', 14);
+  const guardWp = async (p: Position, depth: number): Promise<number | undefined> => {
+    const s = await scoreOf(engines, makeFen(p.toSetup()), depth);
+    return s ? winPct(p.turn === 'white' ? whiteCp(s) : -whiteCp(s)) : undefined;
+  };
+  const guardCheck = async (history: readonly Position[], uci: string): Promise<boolean | null> => {
+    const pos = history[history.length - 1]!;
+    const after = pos.clone();
+    after.play(parseUciMove(pos, uci)!);
+    const [best, reply] = await Promise.all([guardWp(pos, guardDepth), after.isEnd() ? Promise.resolve(after.isCheckmate() ? 0 : 50) : guardWp(after, guardDepth - 1)]);
+    if (best === undefined || reply === undefined) return null;
+    guards.asked++;
+    if (guardKeeps(best, 100 - reply)) return true;
+    const prev = history.length > 1 ? await guardWp(history[history.length - 2]!, guardDepth) : undefined;
+    const keep = guardKeeps(best, 100 - reply, prev === undefined ? undefined : 100 - prev);
+    if (!keep) guards.redrawn++;
+    return keep;
+  };
+  const guards = { asked: 0, redrawn: 0 };
 
   const done = new Set(file.games.map((g) => gameKey(g.white, g.black, g.opening)));
   const jobs: { white: string; black: string; opening: number }[] = [];
@@ -429,7 +456,7 @@ async function match(): Promise<void> {
       saved = performance.now();
       save();
       const rate = played / ((performance.now() - started) / 1000);
-      say(`${file.games.length} games, ${rate.toFixed(2)} a second, about ${Math.round((jobs.length - played) / rate / 60)} min to go`);
+      say(`${file.games.length} games, ${rate.toFixed(2)} a second, about ${Math.round((jobs.length - played) / rate / 60)} min to go; ${guards.asked} picks checked, ${guards.redrawn} drawn again`);
     }
   });
   save();
@@ -700,7 +727,7 @@ function report(): void {
     for (const g of file.games) reasons.set(g.reason, (reasons.get(g.reason) ?? 0) + 1);
     lines.push(`## 1. The match (${r.games} games; Maia 3 ${file.model}; bots' ratings of ${file.ratingsAt.slice(0, 10)}${file.ratingsAtByBot ? `, ${Object.entries(file.ratingsAtByBot).map(([b, at]) => `${b}'s of ${at.slice(0, 10)}`).join(', ')}` : ''})`, '');
     lines.push(`Ends: ${[...reasons].map(([k, v]) => `${k} ${v}`).join(', ')}`, '');
-    lines.push(`Levels: ${levels.filter((l) => played.has(l.id)).map((l) => `${l.label} (Maia ${l.elo} at ${l.precision})`).join(', ')}`, '');
+    lines.push(`Levels: ${levels.filter((l) => played.has(l.id)).map((l) => `${l.label} (Maia ${l.elo} at ${l.precision}${l.guard ? ', checked' : ''})`).join(', ')}`, '');
     lines.push(`| player | local Elo (${anchorSets[anchorSets.length - 1]![0]}' mean 0) |`, '| --- | --- |');
     for (const [p, e] of Object.entries(r.elo).sort((a, b) => a[1].value - b[1].value)) lines.push(`| ${p} | ${fmt(e)} |`);
     lines.push('', '| pair | games | first player\'s score |', '| --- | --- | --- |');
@@ -712,7 +739,7 @@ function report(): void {
       const placed = Object.keys(Object.values(rr.speeds)[0]?.levels ?? {});
       const head = (id: string) => {
         const l = shown.find((x) => x.id === id);
-        return l ? `${l.label} (${l.elo}@${l.precision})` : id;
+        return l ? `${l.label} (${l.elo}@${l.precision}${l.guard ? ', checked' : ''})` : id;
       };
       lines.push('| speed | the bots on Lichess | slope | ' + placed.map(head).join(' | ') + ' |', '| --- | --- | --- | ' + placed.map(() => '---').join(' | ') + ' |');
       for (const [sp, m] of Object.entries(rr.speeds)) {

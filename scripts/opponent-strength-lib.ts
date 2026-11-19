@@ -12,15 +12,16 @@ import { rng } from './maia-eval-lib.ts';
 
 /* ------------------------------------------------------------------ the players */
 
-/** A practice opponent's level: Maia 3 at a rating, sampled at a precision (`maiaPick`). */
+/** A practice opponent's level: Maia 3 at a rating, sampled at a precision (`maiaPick`), its nonsense blunders drawn again when `guard` (`guardedPick`, §5.205). */
 export interface Level {
   id: string;
   label: string;
   elo: number;
   precision: number;
+  guard?: boolean;
 }
 /** The checklist's three presets, which practice games against the levels play. */
-export const LEVELS: readonly Level[] = PRESET_ORDER.map((p) => ({ id: p, label: PRESETS[p].label, elo: PRESETS[p].maiaElo, precision: PRESETS[p].precision }));
+export const LEVELS: readonly Level[] = PRESET_ORDER.map((p) => ({ id: p, label: PRESETS[p].label, elo: PRESETS[p].maiaElo, precision: PRESETS[p].precision, ...(PRESETS[p].guard ? { guard: true } : {}) }));
 
 /**
  * How a bot plays from its network's policy (no search): the likeliest move, as the CSSLab's Maia
@@ -77,14 +78,16 @@ export function botMove<M extends { prob: number }>(policy: readonly M[], play: 
   return kept[kept.length - 1]!;
 }
 
-/** A level from `id=elo@precision` (`r2300=2300@0.85`), or one of the presets by its id. */
+/** A level from `id=elo@precision`, `+guard` for the check (`r2300=2300@0.85`, `m=2000@0.75+guard`), or one of the presets by its id. */
 export function parseLevel(spec: string): Level {
   const preset = LEVELS.find((l) => l.id === spec);
   if (preset) return preset;
-  const m = /^([\w-]+)=(\d+)@([\d.]+)$/.exec(spec);
-  if (!m) throw new Error(`a level is a preset's id or id=elo@precision, not ${spec}`);
-  return { id: m[1]!, label: m[1]!, elo: Number(m[2]), precision: Number(m[3]) };
+  const m = /^([\w-]+)=(\d+)@([\d.]+)(\+guard)?$/.exec(spec);
+  if (!m) throw new Error(`a level is a preset's id or id=elo@precision[+guard], not ${spec}`);
+  return { id: m[1]!, label: m[1]!, elo: Number(m[2]), precision: Number(m[3]), ...(m[4] ? { guard: true } : {}) };
 }
+/** A level as `parseLevel` reads it. */
+export const levelSpec = (l: Level): string => `${l.id}=${l.elo}@${l.precision}${l.guard ? '+guard' : ''}`;
 export const SPEEDS = ['blitz', 'rapid', 'classical'] as const;
 export type Speed = (typeof SPEEDS)[number];
 /** The bots' ratings by speed, as Lichess gave them (`/api/user/<bot>`), and their deviation. */

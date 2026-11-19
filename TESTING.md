@@ -1085,6 +1085,16 @@ Training and Learn on the Chessnut Move: see 14 (PLAN.md §5.192).
 
 ## 7. Practice and the checklist
 
+### No nonsense blunders from Medium and Hard (§5.205, 2026-11-19)
+- Drill a few checklist lines at Medium and at Hard, playing on well past the opening. Does the
+  opponent still miss your tactics and fall for a natural trap, yet never hang a piece for no
+  reason? With the Opponent settings open (practice from a position, not silent) the source line
+  reads "Maia (a blunder drawn again)" when it held back a blunder.
+- Is the wait for its reply still fine on the phone? Only its unlikely picks are searched (two
+  short searches, a third for a refused one).
+- **Checked**: unit tests; Playwright with the real 23M Maia and a fake engine (desktop and
+  emulated phone); not on a device.
+
 ### A line added to the checklist by hand (§5.142, 2026-10-31)
 - In a repertoire study, go to a move deep in a line the checklist doesn't list (a second-choice
   move of yours, say), ☰ → "Add to the checklist". Also add a whole line from the training

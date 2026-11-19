@@ -25,8 +25,9 @@ import { makeSanAndPlay } from 'chessops/san';
 import { keyFen, type PositionKey } from '../core/chess/positionKey.ts';
 import { parseUciMove, standardUci } from '../core/chess/uci.ts';
 import type { FromWorker, ToWorker } from '../core/explorer/service.ts';
+import { winPct } from '../core/games/extract.ts';
 import { judgeMove, moverScore, needsRecheck, RECHECK, recheckMoves, rejudge, type MoverLine } from '../core/games/grade.ts';
-import { advantageGrade, drawAccepted, historyEntry, maiaPick, pickExplorerMove, PRACTICE, plyOf, repertoireCheck, repertoireVerdict, resultOf, reviewOf, ruleDraw, startTrack, trackAdvantage, type AdvantageOutcome, type AdvantageTrack, type HistoryEntry, type HistorySource, type PlayedMove, type RepertoireVerdict, type Review } from '../core/games/practice.ts';
+import { advantageGrade, drawAccepted, guardedPick, guardKeeps, historyEntry, maiaPick, pickExplorerMove, PRACTICE, plyOf, repertoireCheck, repertoireVerdict, resultOf, reviewOf, ruleDraw, startTrack, trackAdvantage, type AdvantageOutcome, type AdvantageTrack, type HistoryEntry, type HistorySource, type PlayedMove, type RepertoireVerdict, type Review } from '../core/games/practice.ts';
 import { readSaved, resumable, type Saved } from '../core/games/resume.ts';
 import { covered, scanCandidate, tacticCandidates, TACTIC, type DetectedTactic, type Pv } from '../core/games/detect.ts';
 import type { Color } from '../core/games/record.ts';
@@ -55,8 +56,10 @@ export interface Opponent {
   speeds: string[];
   maiaElo: number;
   precision: number;
+  /** Maia's unlikely picks checked by Stockfish, a nonsense blunder drawn again (§5.205): Medium and Hard, and the settings' default. */
+  guard?: boolean;
 }
-export const DEFAULT_OPPONENT: Opponent = { ratings: [...PRACTICE.ratings], speeds: [...PRACTICE.speeds], maiaElo: PRACTICE.maiaElo, precision: PRACTICE.maiaPrecision };
+export const DEFAULT_OPPONENT: Opponent = { ratings: [...PRACTICE.ratings], speeds: [...PRACTICE.speeds], maiaElo: PRACTICE.maiaElo, precision: PRACTICE.maiaPrecision, guard: true };
 
 /** The opponent's settings on this device (mistake-lab's continuation settings). */
 const OPP_KEY = 'repworks-practice';
@@ -373,7 +376,7 @@ async function endgameReply(fen: string, e: Endgame, userMoves: number, seen: Re
 const positionsBefore = (p: PracticeGame, n: number = p.moves.length): string[] => gameBefore(p.setup.lead, p.setup.fen, p.moves.map((m) => m.fen), n);
 
 /** The opponent's move: the database, then Maia, then Stockfish; undefined when none answers. */
-async function opponentMove(fen: string, o: Opponent, before?: readonly string[]): Promise<{ uci: string; source: string; dbFailed: boolean } | undefined> {
+async function opponentMove(fen: string, o: Opponent, before?: readonly string[], userFen?: string): Promise<{ uci: string; source: string; dbFailed: boolean } | undefined> {
   const pos = positionOf(fen);
   if (!pos) return undefined;
   let dbFailed = false;
@@ -384,11 +387,37 @@ async function opponentMove(fen: string, o: Opponent, before?: readonly string[]
     if (picked && move) return { uci: uciOf(fen, picked.uci)!, source: `DB (${picked.white + picked.draws + picked.black})`, dbFailed };
   } else dbFailed = true;
   const policy = await maiaPolicy(fen, o.maiaElo, before);
+  if (policy && o.guard) {
+    const g = await guardedPick(policy, o.precision, Math.random, (uci) => guardCheck(fen, uci, userFen));
+    if (g) return { uci: g.move.uci, source: g.redrawn ? 'Maia (a blunder drawn again)' : 'Maia', dbFailed };
+  }
   const m = policy && maiaPick(policy, o.precision, Math.random);
   if (m) return { uci: m.uci, source: 'Maia', dbFailed };
   const a = await analyseForStorm(fen, 1, 16, 4000);
   const best = a?.lines[0]?.pv[0];
   return best ? { uci: best, source: 'Stockfish', dbFailed } : undefined;
+}
+
+/** The check's searches (§5.205): quick, ahead of the judges', one line each. */
+const GUARD_DEPTH = 14;
+const GUARD_MS = 1500;
+
+/**
+ * Whether Maia's unlikely pick `uci` at `fen` is kept (`guardKeeps`): the best move's score and the
+ * pick's, and, only when the pick looks like a blunder, the best score before the user's move at
+ * `userFen` (missing the user's mistake is no blunder); null when Stockfish can't answer.
+ */
+async function guardCheck(fen: string, uci: string, userFen?: string): Promise<boolean | null> {
+  const wpOf = async (f: string, moves?: readonly string[]): Promise<number | undefined> => {
+    const p = positionOf(f);
+    const l = p && (await search(f, 1, GUARD_DEPTH, GUARD_MS, moves, true))?.lines[0];
+    return p && l?.pv.length ? winPct(moverScore(l.score, p.turn)) : undefined;
+  };
+  const [best, pick] = await Promise.all([wpOf(fen), wpOf(fen, [uci])]);
+  if (best === undefined || pick === undefined) return null;
+  if (guardKeeps(best, pick)) return true;
+  const user = userFen === undefined ? undefined : await wpOf(userFen);
+  return guardKeeps(best, pick, user === undefined ? undefined : 100 - user);
 }
 
 /** Standard UCI for a move in either castling spelling (the explorer writes e1h1). */
@@ -834,7 +863,7 @@ async function opponentTurn(g: number): Promise<void> {
   if (!p || p.gen !== g || p.phase !== 'opponent' || p.slip || p.ending) return;
   const fen = fenAfter(p);
   const at = p.moves.length;
-  const m = p.setup.kind === 'endgame' ? await endgameReply(fen, p.setup.endgame!, p.moves.filter((m) => m.isUser).length, seenKeys(p), positionsBefore(p)) : await opponentMove(fen, p.setup.opponent, positionsBefore(p));
+  const m = p.setup.kind === 'endgame' ? await endgameReply(fen, p.setup.endgame!, p.moves.filter((m) => m.isUser).length, seenKeys(p), positionsBefore(p)) : await opponentMove(fen, p.setup.opponent, positionsBefore(p), p.moves.at(-1)?.isUser ? p.moves.at(-1)!.fenBefore : undefined);
   const q = practice.peek();
   // An endgame stopped on a slip meanwhile lets the answer go; one played on asks again, and the
   // first answer in is the one played.

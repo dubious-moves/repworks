@@ -18,6 +18,7 @@ import {
   botMove,
   courseOf,
   DECIDED,
+  levelSpec,
   parseLevel,
   phaseOf,
   type ScoredGame,
@@ -299,6 +300,12 @@ test('a level is a preset by its id, or a Maia rating at a precision', () => {
   assert.deepEqual(parseLevel('medium'), LEVELS.find((l) => l.id === 'medium'));
   assert.deepEqual(parseLevel('r2300=2300@0.85'), { id: 'r2300', label: 'r2300', elo: 2300, precision: 0.85 });
   assert.throws(() => parseLevel('nonsense'));
+  // The check (§5.205): Medium and Hard carry it, Easy doesn't; `+guard` for a level of its own.
+  assert.deepEqual(LEVELS.map((l) => !!l.guard), [false, true, true]);
+  const g = parseLevel('m=2000@0.75+guard');
+  assert.deepEqual(g, { id: 'm', label: 'm', elo: 2000, precision: 0.75, guard: true });
+  assert.equal(levelSpec(g), 'm=2000@0.75+guard');
+  assert.deepEqual(parseLevel(levelSpec(LEVELS[2]!)), { ...LEVELS[2]!, label: 'hard' });
 });
 
 test("the endgame is Lichess's: six or fewer pieces other than pawns and kings", () => {

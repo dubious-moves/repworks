@@ -2723,3 +2723,16 @@ The technical calls, each with its reason:
 - **Turning it off syncs at once** (pull and push), not on the usual 30 s push delay. Why: the
   user turning it off has just said they are online and wants the work sent.
 - No data format changed; nothing new is synced.
+
+## Revision of 2026-11-19 (no nonsense blunders from Medium and Hard: PLAN.md §5.205)
+- **Medium and Hard check Maia's unlikely picks with Stockfish** and draw again one that gives up
+  more than 10 win% against the better of the best move now and the position before the user's
+  move. Why: the owner, 2026-11-19: practice is for openings, and a win handed over by a random
+  blunder teaches nothing; missing a chance the user gave hands the user nothing, so it stays.
+- **A natural move (at least half as likely as Maia's likeliest) is played unchecked, a blunder
+  included.** Why: the owner's second note: a blunder most players at the rating would make is an
+  earned win (a trap that worked); only nonsense blunders go.
+- **Endgames alike, Easy unchecked, the explorer's moves unchecked.** Why: the owner saw no need to
+  be stricter in endgames; Easy's loose moves are what make it easy; a mistake 5% of rated players
+  make in the opening is one to learn to punish.
+- No data format changed; the Opponent settings on a device gain a field, read as on when absent.

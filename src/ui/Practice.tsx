@@ -20,7 +20,7 @@ import { leadFor, analyse, canOfferDraw, canTakeBack, claimVictory, offerDraw, c
 import { parseUciMove, standardUci } from '../core/chess/uci.ts';
 import { makeFen } from 'chessops/fen';
 import { CLASSIFICATION, moverScore, type Classification } from '../core/games/grade.ts';
-import { positionEvals, PRACTICE, type Review } from '../core/games/practice.ts';
+import { GUARD, positionEvals, PRACTICE, type Review } from '../core/games/practice.ts';
 import { lineFen, lineScore, moveAt } from '../core/games/engineLine.ts';
 import { whiteShare } from '../core/engine/winning.ts';
 import { makeSan } from 'chessops/san';
@@ -74,6 +74,10 @@ function OpponentSettings(props: { value: Opponent; onChange(o: Opponent): void 
         Precision{' '}
         <input type="number" min={0} max={1} step={0.05} value={o.precision} onChange={(e) => props.onChange({ ...o, precision: Math.max(0, Math.min(1, Number((e.target as HTMLInputElement).value))) })} />
       </label>
+      <label class="chip">
+        <input type="checkbox" checked={o.guard !== false} onChange={(e) => props.onChange({ ...o, guard: (e.target as HTMLInputElement).checked })} /> No nonsense blunders
+      </label>
+      <p class="muted">An unlikely Maia move that throws away more than {GUARD.limitWp}% win chance is drawn again; a natural move (at least half as likely as Maia’s first choice) is played even when it blunders.</p>
     </details>
   );
 }

@@ -92,6 +92,47 @@ export function maiaPick<M extends { prob: number }>(policy: readonly M[], preci
   return policy[policy.length - 1]!;
 }
 
+/**
+ * The check on the opponent's move (the owner's request, 2026-11-19, PLAN.md §5.205): a game won by
+ * the opponent's nonsense blunder teaches nothing about the opening. Maia's pick is played at once
+ * when it is a natural move (at least `naturalShare` of the likeliest's probability: people fall for
+ * those, and a trap that works is earned); an unlikely pick is played when Stockfish finds it gives
+ * up at most `limitWp` win% against the better of the best move now and where the opponent stood
+ * before the user's move (missing the user's mistake hands the user nothing), else drawn again
+ * without it, `redraws` times at most, and then the likeliest move is played. Endgames alike.
+ */
+export const GUARD = { limitWp: 10, naturalShare: 0.5, redraws: 3 } as const;
+
+/** Whether `m` is a natural move: at least `naturalShare` of the likeliest move's probability. */
+export function naturalMove<M extends { prob: number }>(policy: readonly M[], m: M): boolean {
+  const top = policy.reduce((a, b) => Math.max(a, b.prob), 0);
+  return m.prob >= GUARD.naturalShare * top;
+}
+
+/**
+ * Whether an unlikely pick is kept, from the win% (for the opponent) of the best move now, of the
+ * pick, and of the position before the user's move (best play there; undefined when not known).
+ */
+export function guardKeeps(bestWp: number, pickWp: number, beforeWp?: number): boolean {
+  const reference = beforeWp === undefined ? bestWp : Math.min(bestWp, beforeWp);
+  return reference - pickWp <= GUARD.limitWp;
+}
+
+/**
+ * Maia's pick under the check: `keeps` asks Stockfish of an unlikely pick (null when it can't
+ * answer: the pick is played). `redrawn` counts the picks drawn again.
+ */
+export async function guardedPick<M extends { uci: string; prob: number }>(policy: readonly M[], precision: number, rnd: () => number, keeps: (uci: string) => Promise<boolean | null>): Promise<{ move: M; redrawn: number } | null> {
+  if (!policy.length) return null;
+  let pool = [...policy];
+  for (let n = 0; n <= GUARD.redraws && pool.length; n++) {
+    const m = maiaPick(pool, precision, rnd)!;
+    if (naturalMove(policy, m) || (await keeps(m.uci)) !== false) return { move: m, redrawn: n };
+    pool = pool.filter((x) => x !== m);
+  }
+  return { move: policy.reduce((a, b) => (b.prob > a.prob ? b : a)), redrawn: GUARD.redraws + 1 };
+}
+
 /* ------------------------------------------------------------------ the advantage drill */
 
 export interface AdvantageTrack {

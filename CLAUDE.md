@@ -93,7 +93,7 @@ humans.json` (2000-vs-2000 games from ply 12), self-play from their starts as a 
 humans.json --pairs medium:medium,dala-2000:dala-2000 --out selfplay.json`, `score --openings
 humans.json --games selfplay.json --out scored.json`, `predict --openings humans.json --nets <dir>
 --net-ids dala-2000 --out predict.json`, and `report --scored scored.json --predict predict.json`.
-dala-2000 is converted with its soft policy head (`node scripts/lc0-onnx.mjs <net.pb.gz> <lc0>
+A level's own settings with the check of §5.205: `--players m=2000@0.75+guard` (the presets carry it as the app does). dala-2000 is converted with its soft policy head (`node scripts/lc0-onnx.mjs <net.pb.gz> <lc0>
 dala-2000.onnx soft`). dala's transformer (174M parameters) and the 23M Maia want `--ort-node <folder>`:
 onnxruntime-node installed there with `npm i --ignore-scripts onnxruntime-node` (not a dependency of this repo).
 

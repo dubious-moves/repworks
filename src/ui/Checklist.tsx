@@ -455,7 +455,7 @@ export function ChecklistDrill(props: { sid: string; side: Color; line: string[]
     if (!inLeadUp) {
       if (resumed && practice.peek()) return;
       const p = PRESETS[props.preset];
-      startPractice({ kind: 'checklist', fen: v.leafFen, color, silent: true, title: lineText(v.lineSan), opponent: { ratings: [...p.ratings], speeds: [...RANK_SPEEDS], maiaElo, precision: p.precision }, preset: props.preset, leaf: v.leafKey, before: v.lineUci.map((_, n) => keyFen(fenAt(n))!.key), lead: v.lineUci.map((_, n) => fenAt(n)).slice(-7) });
+      startPractice({ kind: 'checklist', fen: v.leafFen, color, silent: true, title: lineText(v.lineSan), opponent: { ratings: [...p.ratings], speeds: [...RANK_SPEEDS], maiaElo, precision: p.precision, guard: p.guard }, preset: props.preset, leaf: v.leafKey, before: v.lineUci.map((_, n) => keyFen(fenAt(n))!.key), lead: v.lineUci.map((_, n) => fenAt(n)).slice(-7) });
       const uci = pre && premoveUci(v.leafFen, pre);
       setPre(undefined);
       if (uci) void practiceMove(uci);
