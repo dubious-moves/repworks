@@ -84,6 +84,18 @@ interface OppPosition {
   /** The mover's win% after each candidate, and the best (Stockfish). */
   wp?: Record<string, number>;
   best?: number;
+  /** Thin positions (the `thin` step): the games up to `SPLIT`, and games the explorer names with who chose what. */
+  thin?: Partial<Record<FilterId, ThinCheck>>;
+}
+/** A game the explorer names: its id, the move played here, and the name of whoever played it. */
+interface Named {
+  id: string;
+  uci: string;
+  mover: string;
+}
+interface ThinCheck {
+  old: CompactExplorer;
+  named: Named[];
 }
 interface Walk {
   id: number;
@@ -116,14 +128,23 @@ function explorer(fen: string, ratings: readonly number[]): Promise<CompactExplo
 async function ask(url: string): Promise<CompactExplorer> {
   const hit = cache.get(url);
   if (hit) return hit;
+  const out = compactExplorer(await fetchJson(url));
+  cache.set(url, out);
+  return out;
+}
+/** The explorer's answer as it comes, in the same line of requests. */
+function explorerJson(url: string): Promise<unknown> {
+  const next = line.then(() => fetchJson(url));
+  line = next.catch(() => undefined).then(() => new Promise((r) => setTimeout(r, num('gap', 3750))));
+  return next;
+}
+async function fetchJson(url: string): Promise<unknown> {
   const token = process.env['LICHESS_TOKEN'];
   for (let attempt = 0; ; attempt++) {
     const res = await fetch(url, { headers: token ? { authorization: `Bearer ${token}` } : {} }).catch((e: unknown) => e as Error);
     if (res instanceof Response && res.ok) {
       requests++;
-      const out = compactExplorer(await res.json());
-      cache.set(url, out);
-      return out;
+      return res.json();
     }
     const status = res instanceof Response ? res.status : String(res);
     if (attempt >= 6) throw new Error(`explorer: ${status}`);
@@ -223,6 +244,67 @@ async function walks(): Promise<void> {
     say(`walk ${id}: ${found.length} positions of the opponent, ${end}; ${requests} requests so far`);
   }
   save();
+}
+
+/* ------------------------------------------------------------------ 1b. thin */
+
+/** The games up to the end of this month are the older half (about half of them, 2013–2022), the rest the newer. */
+const SPLIT = '2022-12';
+const THIN = 300;
+const THIN_FILTERS: readonly FilterId[] = ['mNew', 'hard'];
+const eloOf = (f: FilterId): '2000' | '2150' => (f === 'hard' ? '2150' : '2000');
+
+/** Maia's probability of a database move (castling as the explorer writes it, e1h1, or as Maia does). */
+function maiaOf(p: OppPosition, f: FilterId, uci: string): number {
+  const pos = fromFen(p.fen);
+  const mv = parseUciMove(pos, uci);
+  const std = mv ? standardUci(pos, mv) : uci;
+  return p.maia[eloOf(f)].find((m) => m.uci === std)?.prob ?? 0;
+}
+
+/**
+ * A disputed move: a thin sample's move of 3 games or more and a quarter of them or more, which
+ * Maia gives a third of that share or less (the owner's case of 2026-11-19: seven of twelve).
+ */
+function disputed(p: OppPosition, f: FilterId, a: CompactExplorer): CompactExplorer['moves'] {
+  const N = games(a);
+  return a.moves.filter((m) => m.games >= 3 && m.games / N >= 0.25 && maiaOf(p, f, m.uci) <= m.games / N / 3);
+}
+
+/**
+ * For each thin position (fewer than 300 games at Medium's new filter or Hard's): the games up to
+ * `SPLIT` (the newer are the full answer's less these), and the games the explorer names (eight
+ * of the newest, eight of the newest up to the split), each with the move played and its player.
+ */
+async function thin(): Promise<void> {
+  const path = need('walks');
+  const file = JSON.parse(readFileSync(path, 'utf8')) as WalkFile;
+  let lastSave = Date.now();
+  const todo = file.positions.flatMap((p) => THIN_FILTERS.filter((f) => games(p.answers[f]) > 0 && games(p.answers[f]) < THIN && !p.thin?.[f]).map((f) => [p, f] as const));
+  say(`${todo.length} thin positions to ask about (two requests each, at the explorer's pace)`);
+  type RawGame = { id?: string; uci?: string; white?: { name?: string }; black?: { name?: string } };
+  const namedOf = (j: unknown, turn: 'white' | 'black'): Named[] => {
+    const o = j as { recentGames?: RawGame[]; topGames?: RawGame[] };
+    return [...(o.recentGames ?? []), ...(o.topGames ?? [])].flatMap((g) => (g.id && g.uci && g[turn]?.name ? [{ id: g.id, uci: g.uci, mover: g[turn]!.name! }] : []));
+  };
+  let done = 0;
+  for (const [p, f] of todo) {
+    const turn = fromFen(p.fen).turn;
+    const filter = { db: 'lichess' as const, speeds: SPEEDS, ratings: [...FILTERS[f].ratings], games: 8 };
+    const older = await explorerJson(explorerUrl(p.fen, { ...filter, until: SPLIT }));
+    const all = await explorerJson(explorerUrl(p.fen, filter));
+    const named = new Map<string, Named>();
+    for (const g of [...namedOf(all, turn), ...namedOf(older, turn)]) named.set(g.id, g);
+    p.thin = { ...p.thin, [f]: { old: compactExplorer(older), named: [...named.values()] } };
+    done++;
+    if (Date.now() - lastSave > 60000) {
+      lastSave = Date.now();
+      writeFileSync(path, JSON.stringify(file));
+      say(`${done}/${todo.length} thin positions asked; ${requests} requests`);
+    }
+  }
+  writeFileSync(path, JSON.stringify(file));
+  say(`${done} thin positions asked; ${requests} requests`);
 }
 
 /* ------------------------------------------------------------------ 2. score */
@@ -575,11 +657,102 @@ function report(): void {
       out(`    β ${String(beta).padEnd(5)} ${n} positions: the reply's score above the position's ${mean(sc).toFixed(2)} points; the likeliest reply's chance ${pct(mean(tops))}; win% given up ${mean(ls.map((x) => x[0]!)).toFixed(2)}, blunders ${pct(mean(ls.map((x) => x[1]!)))}`);
     }
   }
+  // 6. Thin samples against later players (the owner's question of 2026-11-19: is a thin sample's majority a coincidence?).
+  out(`\n6. Thin positions (under ${THIN} games): the games up to ${SPLIT} as the sample, the games since as the players to predict`);
+  const thinKs = [0, 1, 2, 5, 10, 15, 20, 30, 50, 100, Infinity];
+  const OLD_BUCKETS = [1, 10, 30, 100, THIN];
+  for (const f of THIN_FILTERS) {
+    const rows = ps.filter((p) => p.thin?.[f]);
+    out(`  ${FILTERS[f].label}, Maia ${eloOf(f)}: ${rows.length} thin positions asked`);
+    // a. Which weight for Maia predicts the newer games best: the mean −log p of each newer game's move.
+    const loss = new Map<string, number[]>();
+    const counts = new Map<string, number>();
+    for (const p of rows) {
+      const full = p.answers[f];
+      const old = p.thin![f]!.old;
+      const oldN = games(old);
+      const byUci = new Map<string, { o: number; n: number }>();
+      for (const m of full.moves) byUci.set(m.uci, { o: 0, n: m.games });
+      for (const m of old.moves) byUci.set(m.uci, { o: m.games, n: (byUci.get(m.uci)?.n ?? m.games) });
+      const newN = [...byUci.values()].reduce((s2, x) => s2 + Math.max(0, x.n - x.o), 0);
+      if (!oldN || !newN) continue;
+      const b = OLD_BUCKETS.findIndex((lo, i) => oldN >= lo && oldN < (OLD_BUCKETS[i + 1] ?? Infinity));
+      const key = `${OLD_BUCKETS[b]}–${(OLD_BUCKETS[b + 1] ?? Infinity) - 1}`;
+      const sums = loss.get(key) ?? thinKs.map(() => 0);
+      thinKs.forEach((k, i) => {
+        for (const [uci, x] of byUci) {
+          const nw = Math.max(0, x.n - x.o);
+          if (!nw) continue;
+          const q = maiaOf(p, f, uci);
+          const pr = k === Infinity ? q : (x.o + k * q) / (oldN + k);
+          sums[i]! += -nw * Math.log(Math.max(1e-3, pr));
+        }
+      });
+      loss.set(key, sums);
+      counts.set(key, (counts.get(key) ?? 0) + newN);
+    }
+    const keys = [...loss.keys()].filter((k) => k !== 'all').sort((a, b) => parseInt(a) - parseInt(b));
+    const total = thinKs.map((_, i) => keys.reduce((s2, k) => s2 + loss.get(k)![i]!, 0));
+    const totalN = keys.reduce((s2, k) => s2 + counts.get(k)!, 0);
+    out('    ' + ['games before', 'newer'].map((h) => h.padStart(12)).join('') + thinKs.map((k) => (k === Infinity ? 'Maia' : `k ${k}`).padStart(8)).join(''));
+    const line6 = (label: string, sums: number[], n: number) => {
+      const row = sums.map((x) => x / n);
+      const best = row.reduce((bi, v, i) => (v < row[bi]! ? i : bi), 0);
+      out('    ' + label.padStart(12) + String(n).padStart(12) + row.map((v, i) => (i === best ? `*${v.toFixed(3)}` : v.toFixed(3)).padStart(8)).join(''));
+    };
+    for (const k of keys) line6(k, loss.get(k)!, counts.get(k)!);
+    if (totalN) line6('all', total, totalN);
+    // b. Disputed moves of the older sample: what the newer players did with them.
+    const ds: { oldShare: number; q: number; newShare: number; newN: number; blunder: boolean | undefined; oldGames: number }[] = [];
+    for (const p of rows) {
+      const old = p.thin![f]!.old;
+      const oldN = games(old);
+      if (oldN < 3) continue;
+      for (const m of disputed(p, f, old)) {
+        const fullM = p.answers[f].moves.find((x) => x.uci === m.uci);
+        const newN = games(p.answers[f]) - oldN;
+        if (newN < 3) continue;
+        const newShare = Math.max(0, (fullM?.games ?? m.games) - m.games) / newN;
+        const pos = fromFen(p.fen);
+        const mv = parseUciMove(pos, m.uci);
+        const std = mv ? standardUci(pos, mv) : m.uci;
+        const w = p.wp?.[std] ?? p.wp?.[m.uci];
+        ds.push({ oldShare: m.games / oldN, q: maiaOf(p, f, m.uci), newShare, newN, blunder: w === undefined || p.best === undefined ? undefined : referenceOf(p) - w > MISTAKE, oldGames: m.games });
+      }
+    }
+    const summary = (xs: typeof ds) => `${xs.length} moves: the older share ${pct(mean(xs.map((x) => x.oldShare)))}, Maia ${pct(mean(xs.map((x) => x.q)))}, the newer players' ${pct(mean(xs.map((x) => x.newShare)))} (weighted by their games ${pct(xs.reduce((s2, x) => s2 + x.newShare * x.newN, 0) / Math.max(1, xs.reduce((s2, x) => s2 + x.newN, 0)))})`;
+    out(`    disputed in the older sample (3+ games, a quarter or more, Maia a third of that or less): ${summary(ds)}`);
+    out(`      of them blunders (more than 10 win% below the lower of the best and where it stood): ${summary(ds.filter((x) => x.blunder))}`);
+    out(`      of them majorities (half or more): ${summary(ds.filter((x) => x.oldShare >= 0.5))}`);
+    // c. Who chose them: the games the explorer names (up to 16 a position), the distinct players behind each disputed move.
+    const people = (moves: (p: OppPosition) => CompactExplorer['moves']) => {
+      const xs: { named: number; players: number; games: number }[] = [];
+      for (const p of rows) {
+        const nm = p.thin![f]!.named;
+        for (const m of moves(p)) {
+          const mine = nm.filter((g) => g.uci === m.uci);
+          if (mine.length < 2) continue;
+          xs.push({ named: mine.length, players: new Set(mine.map((g) => g.mover)).size, games: m.games });
+        }
+      }
+      return xs;
+    };
+    const dispNow = people((p) => disputed(p, f, p.answers[f]));
+    const agreed = people((p) => {
+      const a = p.answers[f];
+      const N = games(a);
+      return a.moves.filter((m) => m.games >= 3 && m.games / N >= 0.25 && maiaOf(p, f, m.uci) > m.games / N / 3);
+    });
+    const ppl = (xs: typeof dispNow) => `${xs.length} moves, ${mean(xs.map((x) => x.named)).toFixed(1)} of their games named: one player alone ${pct(xs.filter((x) => x.players === 1).length / Math.max(1, xs.length))}, two ${pct(xs.filter((x) => x.players === 2).length / Math.max(1, xs.length))}, three or more ${pct(xs.filter((x) => x.players >= 3).length / Math.max(1, xs.length))}; players per named game ${(xs.reduce((s2, x) => s2 + x.players, 0) / Math.max(1, xs.reduce((s2, x) => s2 + x.named, 0))).toFixed(2)}`;
+    out(`    who chose a disputed move (the full sample): ${ppl(dispNow)}`);
+    out(`    who chose a move Maia agrees with (3+ games, a quarter or more): ${ppl(agreed)}`);
+  }
   if (json) process.stdout.write(JSON.stringify({ fit: fitJson }, null, 1) + '\n');
   else process.stdout.write(lines.join('\n') + '\n');
 }
 
 if (step === 'walks') await walks();
+else if (step === 'thin') await thin();
 else if (step === 'score') await score();
 else if (step === 'report') report();
-else say('steps: walks, score, report (see the head of this file)');
+else say('steps: walks, thin, score, report (see the head of this file)');
