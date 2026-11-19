@@ -12002,3 +12002,112 @@ quarter, those not earned by a third, the endgame's a little. Medium is now clea
 2000-rated people (blunders about 60% of theirs, half in the middlegame, the same in the endgame),
 which is what the owner asked. On maia9's rating alone that is about 1970 rapid (1920 unchecked);
 on the line through the Maia bots, which compresses gaps, about 1880.
+
+#### 5.206 The database past a line's end: a thin sample weighed with Maia and checked, Medium's from 1800, Hard prepared (the owner's request, 2026-11-19, built)
+
+After §5.205 the owner asked for ideas to make Medium and Hard better for practising whole games
+from an opening's lines. The second of six was that the moves right after the prep were never
+measured (§5.204's whole games started Maia at ply 12, while the app's opponent plays the
+explorer's games until they run out) and that the check skips them: a move drawn from a handful of
+games is played unchecked. The owner: "I agree with 'Hard could play like a prepared opponent' and
+that it could get better at punishing mistakes - but my target is still 2150-2200. Start by
+implementing nr 2." Then, on the first rule (Maia as 50 games, so seven of twelve games choosing a
+blunder Maia gives 1% made it no natural move): "it probably isn't a coincidence that 7 out of 12
+player chose a blunder … if the majority of 12 players chose the move, it should probably be a
+possibility for the practice opponent". Both were measured before the rule was set.
+
+**Measured** (`scripts/db-handover.ts`, a report that writes nothing; 2026-11-19, the explorer as
+the app asks it with a Lichess token, one request at a time at the app's 16 a minute; Maia 3 23M
+with the positions before; native Stockfish 16 at depth 14 for the best move and 13 after each
+candidate; a blunder more than 15 win% (the app's `winPct`), a mistake more than 10, below the lower
+of the best now and where the opponent stood before the user's move, as the check reads it):
+- **The walks.** 40 lines of 10 plies drawn by the games at the checklist's ranking filter
+  (1600–2500, blitz to correspondence), as a checklist's lines are the explorer's likely ones; then
+  the game on, the opponent drawing as Medium did (1600–2499, 5 games and 5%), the user by Maia 2000
+  at 0.75, until Medium's database had nothing: 402 positions of the opponent, each asked at three
+  filters (Medium's old, Medium's from 1800, Hard's). **The database lasts a median of 18 plies** (9
+  of the opponent's moves) after the line, at every filter (quartiles 14–21).
+- **Thin positions** (under 300 games at the filter) are 26–29% of the opponent's database moves.
+  **They don't blunder more than well-sampled ones**; the 5-game floor keeps most of the noise out:
+
+  | the database's draw | under 300 games | 300 or more |
+  | --- | --- | --- |
+  | Medium, 1600–2499 (before) | 4.0% blunders, 6.5% mistakes | 3.6%, 7.1% |
+  | Medium, 1800–2499 | 2.0%, 4.6% | 3.3%, 6.6% |
+  | Hard, 2000+ | 2.6%, 4.0% | 2.5%, 5.4% |
+
+  **The rule built** (below) in those thin positions: Medium (1800) 1.6% blunders, 2.9% mistakes,
+  2.04 win% given up a move against 2.25; Hard 1.3%, 2.2%, 1.66 against 1.99. Over all the
+  opponent's database moves that is about 0.1–0.4% fewer blunders: a small gain, as the problem was
+  smaller than §5.205's ideas supposed.
+- **Maia's weight beside a sample** (the blend's k, cross-entropy against what people play):
+  samples of n games drawn from the 245 positions of 500+ games (Medium's filter) are predicted
+  best at k 10 (n 5), 15 (n 10–20), 20 (n 50–200); thin positions' games up to 2022-12 (about half)
+  predicting the players since (145 positions and 4,318 newer games at Medium's filter, 154 and
+  3,029 at Hard's) best at k 30 (1–9 games before), 50 (10–99), 100 (100–299); overall k 50 at
+  1.310 against k 20's 1.319, the sample alone 1.411, Maia alone 1.342 (Hard alike). The curve is
+  flat from 15 to 100; k = 20.
+- **The owner's case, a thin majority Maia disputes** (3 games or more and a quarter or more of a
+  thin sample, Maia a third of that share or less): rare, 8 moves at Medium's filter and 6 at
+  Hard's in about 300 thin positions, none a blunder. The players since 2023 chose them 29% and 21%
+  of the time, against the older sample's 41% and 37% and Maia's 11% and 8%: between the two, about
+  three times Maia's. **Several people chose them**: of their games the explorer names (up to 16 a
+  position, 4.6 a move), three players or more in 83–88%, never one player alone, one player a named
+  game (1.00, as 0.99 for the moves Maia agrees with). Not one player's habit: the owner was right.
+- **The ratings behind the database's moves** (each move's average, by its chance): Medium's
+  1600–2499 **1923**, from 1800 **2001**; Hard's 2127.
+- **A prepared opponent** (Hard's filter, 233 positions of 300+ games; each reply's games ×
+  e^(β × its score for the mover above the position's, in points), the score drawn toward the
+  position's by 50 games):
+
+  | β | the reply's score above the position's | the likeliest reply's chance | win% given up a move | blunders |
+  | --- | --- | --- | --- | --- |
+  | 0 (by the games) | 0.35 points | 64.6% | 2.19 | 2.5% |
+  | 0.1 | 1.24 | 66.6% | 1.78 | 1.5% |
+  | 0.2 | 1.99 | 70.2% | 1.50 | 0.9% |
+  | 0.3 | 2.45 | 73.2% | 1.38 | 0.7% |
+
+**Built**:
+- **A thin position** (fewer than `BLEND.thin` = 300 games at the opponent's filter): Maia's
+  policy (at the level's rating, the positions before) counts as `BLEND.k` = 20 games beside the
+  explorer's (`blendMoves`): people's odds (games + k × Maia) / (games + k), the opponent's weights
+  games + k × Maia at the level's precision. With the check (Medium, Hard, practice from a position
+  by default) the blend's likely moves are searched together as Maia's are (§5.205): a blunder is
+  played only when natural, on the blend's odds; which move by the weights. **Natural** is §5.205's
+  (half the likeliest's odds or more, in the blend) **or by the games themselves**: 5 games or more
+  and at least half as many as the games' likeliest move. So the owner's seven of twelve stays
+  possible (on the blend's odds: 7.2 of 32 games' worth, with Maia giving it 1%), and a blunder
+  chosen in six games of thirty that Maia gives 1% is never played. With no games the draw is
+  §5.205's exactly. Without the check (Easy, or the box off): the database's own draw as often as
+  its games weigh against Maia's (games / (games + k)), else Maia's. Maia off: the database as
+  before. The source line reads "DB (12) + Maia (checked)".
+- **A well-sampled position** (300 games or more): the database's draw, unchecked, as before (a
+  mistake 5% of rated players make is one to learn to punish, the revision of 2026-11-19); at 300
+  games a reply at the 5% floor has 15 games behind it.
+- **Hard is a prepared opponent** (`PREPARED`, `pickExplorerMove`'s `prepared`): β = 0.1, the
+  score drawn toward the position's by 50 games (q_extension's prepared prior) so a reply of a few
+  games can't stand out on luck: replies scoring about a point better, its blunders in the
+  database's stretch 2.5% → 1.5%, its likeliest reply hardly likelier (variety kept). Its Maia
+  (2150 at 0.85, checked) is unchanged: the target stays 2150–2200.
+- **Medium's database from 1800** (1800–2499; mistake-lab's 1600–2499 before), and practice from a
+  position's default with it (a device's saved Opponent settings keep their own filter): the games
+  behind its moves then average 2001 against Maia's 2000, not 1923.
+- The Opponent settings gain "Prepared", and say where the games and Maia are weighed together.
+
+**As built**: `src/core/games/practice.ts` (`BLEND`, `blendMoves` with `dbNatural`, `temperedOdds`,
+`databaseShare`, `explorerTotal`, `PREPARED`, `pickExplorerMove`'s `prepared`, `guardedChoice`'s
+natural moves by the games and its draw by the blend's weights), `src/core/games/checklist.ts` (the
+presets), `src/app/practice.ts` (`opponentMove`; `DEFAULT_OPPONENT`), `src/ui/Practice.tsx` (the
+box) and `src/ui/Checklist.tsx` (the drill's opponent). **Checked**: unit tests (the blend's odds and
+weights; the check over it playing the owner's seven of twelve on the blend's odds and never a
+minority's blunder that the database alone would play one time in six; the prepared weights and
+their prior; controls: Maia as no games, the score not drawn toward the position's, the weights
+ignored, natural by the games removed, each failing its test); Playwright with the real 23M Maia
+and a fake engine and explorer (desktop and emulated phone, `practiceGuard.spec.ts`): 36 games whose
+minority move loses, searched with Maia's moves and refused; 12 games whose majority loses, played
+when the dice say go wrong; 500 games, the database's draw unchecked as before; a prepared opponent
+drawing the reply that scores best at the same dice (controls: every answer taken as well-sampled
+fails the first, natural by the games removed fails the second). Not on a device (`TESTING.md`).
+
+Files (not in the repo; the cloud scratchpad of the session of 2026-11-19): `walks.json` (the 40
+walks, their answers, scores and thin checks) and the report.

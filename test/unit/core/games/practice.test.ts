@@ -17,7 +17,7 @@ import { readFileSync } from 'node:fs';
 import { Chess } from 'chessops/chess';
 import { makeFen } from 'chessops/fen';
 import { parseSan } from 'chessops/san';
-import { advantageGrade, drawAccepted, GUARD, guardCandidates, guardedChoice, guardNeedsBefore, naturalMove, plyOf, positionEvals, repertoireVerdict, historyEntry, historyOf, maiaPick, pickExplorerMove, readHistoryEntry, resultOf, reviewOf, ruleDraw, startTrack, trackAdvantage, type ExplorerMove, type PlayedMove } from '../../../../src/core/games/practice.ts';
+import { advantageGrade, BLEND, blendMoves, databaseShare, drawAccepted, explorerTotal, GUARD, guardCandidates, guardedChoice, guardNeedsBefore, naturalMove, plyOf, positionEvals, repertoireVerdict, historyEntry, historyOf, maiaPick, pickExplorerMove, PREPARED, readHistoryEntry, temperedOdds, resultOf, reviewOf, ruleDraw, startTrack, trackAdvantage, type ExplorerMove, type PlayedMove } from '../../../../src/core/games/practice.ts';
 import { parseLog } from '../../../../src/core/progress/events.ts';
 import { toDeviceEvents, type DeviceEvent } from '../../../../src/core/progress/replay.ts';
 
@@ -222,4 +222,129 @@ test('the check on the opponent (§5.205): natural blunders on Maia’s odds, no
   const noneNatural = [{ uci: 'c', prob: 0.15, wp: 5 }, { uci: 'd', prob: 0.1, wp: 8 }];
   assert.deepEqual(guardedChoice(policy, noneNatural, 60, undefined, 0.75, () => 0)!.move.uci, 'd');
   assert.equal(guardedChoice(policy, [], 60, undefined, 0.75, Math.random), null);
+});
+
+/** The share of a grid of dice that `pick` turns into each answer. */
+function shares(pick: (r: number) => string | undefined, steps = 2000): Map<string | undefined, number> {
+  const out = new Map<string | undefined, number>();
+  for (let i = 0; i < steps; i++) {
+    const k = pick((i + 0.5) / steps);
+    out.set(k, (out.get(k) ?? 0) + 1 / steps);
+  }
+  return out;
+}
+const near = (a: number | undefined, b: number, eps = 0.002, msg?: string) => assert.ok(a !== undefined && Math.abs(a - b) < eps, `${msg ?? ''} ${a} ≉ ${b}`);
+
+test('the blend (§5.206): a thin sample’s games with Maia as k games; the opponent’s weights at the precision', () => {
+  const db = [
+    { uci: 'x', white: 4, draws: 1, black: 2 },
+    { uci: 'y', white: 2, draws: 1, black: 2 },
+  ];
+  const policy = [
+    { uci: 'y', prob: 0.8 },
+    { uci: 'z', prob: 0.14 },
+    { uci: 'x', prob: 0.01 },
+  ];
+  const b = blendMoves(db, policy, 0.75, 50);
+  assert.deepEqual(b.map((m) => m.uci), ['y', 'x', 'z']);
+  near(b[0]!.prob, 45 / 62);
+  near(b[1]!.prob, 7.5 / 62);
+  near(b[2]!.prob, 7 / 62);
+  // Weights: the games, and Maia's 50 games drawn at 0.75 (its odds squared, normalised).
+  const t = temperedOdds(policy, 0.75);
+  near(t.get('y'), 0.64 / 0.6597, 1e-4);
+  near(b[0]!.weight, 5 + 50 * t.get('y')!, 1e-6);
+  near(b[1]!.weight, 7 + 50 * t.get('x')!, 1e-6);
+  near(b[2]!.weight, 50 * t.get('z')!, 1e-6);
+  // No Maia: the games alone; no games: Maia's odds, its weights maiaPick's.
+  assert.deepEqual(blendMoves(db, [], 0.75).map((m) => [m.uci, m.prob, m.weight]), [['x', 7 / 12, 7], ['y', 5 / 12, 5]]);
+  const alone = blendMoves([], policy, 0.75);
+  assert.deepEqual(alone.map((m) => m.uci), ['y', 'z', 'x']);
+  near(alone[0]!.prob, 0.8, 1e-9);
+  assert.deepEqual(blendMoves([], [], 0.75), []);
+  assert.deepEqual([...temperedOdds(policy, 1)], [['y', 1]]);
+  // The database's own draw, unchecked: its games against Maia's k.
+  assert.equal(databaseShare(0, true), 0);
+  assert.equal(databaseShare(BLEND.k, true), 0.5);
+  assert.equal(databaseShare(0, false), 1);
+  assert.equal(databaseShare(7, false), 1);
+  assert.equal(explorerTotal({ white: 3, draws: 1, black: 2, moves: [] }), 6);
+  assert.equal(explorerTotal({ moves: db.map((m) => ({ ...m, san: m.uci })) }), 12);
+  assert.equal(explorerTotal(null), 0);
+});
+
+test('the check over the blend (§5.206): a thin sample’s strong move stays natural, a minority’s blunder never is; the move drawn by the weights', () => {
+  const policy = [
+    { uci: 'y', prob: 0.8 },
+    { uci: 'z', prob: 0.14 },
+    { uci: 'x', prob: 0.01 },
+  ];
+  const wp: Record<string, number> = { x: 20, y: 55, z: 52 };
+  const scoredOf = (b: ReturnType<typeof blendMoves>) => guardCandidates(b).map((m) => ({ ...m, wp: wp[m.uci]! }));
+  // The owner's case: seven of twelve games chose x, which throws the game away and Maia gives 1%.
+  const twelve = [
+    { uci: 'x', white: 4, draws: 1, black: 2 },
+    { uci: 'y', white: 2, draws: 1, black: 2 },
+  ];
+  const b12 = blendMoves(twelve, policy, 0.75);
+  assert.equal(BLEND.k, 20);
+  near(b12.find((m) => m.uci === 'x')!.prob, 7.2 / 32, 1e-9);
+  assert.deepEqual(b12.map((m) => [m.uci, m.dbNatural]), [['y', true], ['x', true], ['z', false]]);
+  // Natural by the games (a majority of them), so played: as often as the blend's odds say go wrong.
+  // Two dice: whether it goes wrong, then which move.
+  const s12 = new Map<string | undefined, number>();
+  for (let i = 0; i < 200; i++)
+    for (let j = 0; j < 200; j++) {
+      const dice = [(i + 0.5) / 200, (j + 0.5) / 200];
+      const k = guardedChoice(b12, scoredOf(b12), 56, undefined, 0.75, () => dice.shift()!)?.move.uci;
+      s12.set(k, (s12.get(k) ?? 0) + 1 / 40000);
+    }
+  near(s12.get('x'), 7.2 / (21 + 2.8 + 7.2), 0.005, 'x on the blend’s odds');
+  // Which sound move: by the weights, y's 5 games and Maia's share of 20 at the precision against z's.
+  const t = temperedOdds(policy, 0.75);
+  near(s12.get('y'), (1 - 7.2 / 31) * (5 + 20 * t.get('y')!) / (5 + 20 * t.get('y')! + 20 * t.get('z')!), 0.005);
+  // Five of thirty games chose x: a minority of the games, and Maia gives it 1%: never played.
+  const thirty = [
+    { uci: 'x', white: 3, draws: 0, black: 2 },
+    { uci: 'y', white: 10, draws: 5, black: 10 },
+  ];
+  const b30 = blendMoves(thirty, policy, 0.75);
+  assert.equal(b30.find((m) => m.uci === 'x')!.dbNatural, false);
+  assert.equal(shares((r) => guardedChoice(b30, scoredOf(b30), 56, undefined, 0.75, () => r)?.move.uci).get('x'), undefined, 'never played');
+  // The database's own draw would play it one time in six.
+  near(shares((r) => pickExplorerMove({ moves: thirty.map((m) => ({ ...m, san: m.uci })) }, () => r)?.uci).get('x'), 5 / 30, 0.001);
+  // Without weights or the games' mark, the draw is §5.205's: maiaPick's at the precision, as before.
+  const plain = policy.map((m) => ({ ...m, wp: wp[m.uci]! }));
+  for (const r of [0, 0.5, 0.97, 0.999]) assert.equal(guardedChoice(policy, plain, 56, undefined, 0.75, () => r)!.move.uci, maiaPick(plain.filter((m) => m.uci !== 'x'), 0.75, () => r)!.uci);
+});
+
+test('a prepared opponent (§5.206): the replies weighted by how they score for it, a few games’ luck drawn toward the position’s', () => {
+  const data = {
+    white: 600,
+    draws: 100,
+    black: 300,
+    moves: [
+      { uci: 'a', san: 'a', white: 300, draws: 50, black: 250 },
+      { uci: 'b', san: 'b', white: 300, draws: 50, black: 50 },
+    ],
+  };
+  const pick = (prepared: 'white' | 'black' | undefined) => shares((r) => pickExplorerMove(data, () => r, { minGames: 5, minFreq: 0.05, ...(prepared ? { prepared } : {}) })?.uci);
+  near(pick(undefined).get('b'), 0.4, 0.001, 'by the games');
+  // White's score: a 0.55 and b 0.794 once drawn toward the position's 0.65 by 50 games.
+  const wa = 600 * Math.exp(PREPARED.beta * 100 * ((325 + 50 * 0.65) / 650 - 0.65));
+  const wb = 400 * Math.exp(PREPARED.beta * 100 * ((325 + 50 * 0.65) / 450 - 0.65));
+  near(pick('white').get('b'), wb / (wa + wb), 0.001, 'White prefers b');
+  assert.ok(pick('black').get('a')! > 0.9, 'Black prefers a');
+  // A reply of ten games, all won: drawn toward the position, it gains, but doesn't take over.
+  const lucky = {
+    white: 40,
+    draws: 0,
+    black: 30,
+    moves: [
+      { uci: 'd', san: 'd', white: 30, draws: 0, black: 30 },
+      { uci: 'e', san: 'e', white: 10, draws: 0, black: 0 },
+    ],
+  };
+  const e = shares((r) => pickExplorerMove(lucky, () => r, { minGames: 5, minFreq: 0.05, prepared: 'white' })?.uci).get('e')!;
+  assert.ok(e > 10 / 70 && e < 0.5, `e ${e}`);
 });

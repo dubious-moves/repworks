@@ -34,11 +34,16 @@ import type { Color } from './record.ts';
 
 export const RANK_RATINGS = [1600, 1800, 2000, 2200, 2500];
 export const RANK_SPEEDS = ['blitz', 'rapid', 'classical', 'correspondence'];
-/** mistake-lab's `REP_TODO_PRESETS`: they change the opponent only, never the ranking. `guard`: Maia's nonsense blunders drawn again (§5.205). */
+/**
+ * mistake-lab's `REP_TODO_PRESETS`: they change the opponent only, never the ranking. `guard`: no
+ * nonsense blunders from Maia or a thin database (§5.205, §5.206). `prepared`: the database's
+ * replies weighted by how they score for the opponent (§5.206). Medium's database from 1800, not
+ * mistake-lab's 1600: its games' mean rating then near Maia's 2000 (§5.206).
+ */
 export const PRESETS = {
-  easy: { label: 'Easy', ratings: [1600, 1800], maiaElo: 1750, precision: 0.65, guard: false },
-  medium: { label: 'Medium', ratings: [1600, 1800, 2000, 2200], maiaElo: 2000, precision: 0.75, guard: true },
-  hard: { label: 'Hard', ratings: [2000, 2200, 2500], maiaElo: 2150, precision: 0.85, guard: true },
+  easy: { label: 'Easy', ratings: [1600, 1800], maiaElo: 1750, precision: 0.65, guard: false, prepared: false },
+  medium: { label: 'Medium', ratings: [1800, 2000, 2200], maiaElo: 2000, precision: 0.75, guard: true, prepared: false },
+  hard: { label: 'Hard', ratings: [2000, 2200, 2500], maiaElo: 2150, precision: 0.85, guard: true, prepared: true },
 } as const;
 export type Preset = keyof typeof PRESETS;
 export const PRESET_ORDER: readonly Preset[] = ['easy', 'medium', 'hard'];
