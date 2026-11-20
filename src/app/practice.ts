@@ -31,9 +31,10 @@ import { advantageGrade, BLEND, blendMoves, databaseShare, drawAccepted, explore
 import { readSaved, resumable, type Saved } from '../core/games/resume.ts';
 import { drawByWeight, forcedPlies, handledReplies, retryMove, variedWeights, VARIETY } from '../core/games/variety.ts';
 import { PRESETS } from '../core/games/checklist.ts';
+import { lossVerdict } from '../core/games/failedLines.ts';
 import { covered, scanCandidate, tacticCandidates, TACTIC, type DetectedTactic, type Pv } from '../core/games/detect.ts';
 import type { Color } from '../core/games/record.ts';
-import { historyCard, practiceCard } from '../core/progress/cards.ts';
+import { checklistCard, historyCard, practiceCard } from '../core/progress/cards.ts';
 import { ENDGAME_PRESET, firstSlip, goalKept, GOAL_CP, GRADE_SECONDS, gradeOfTime, meanSeconds, type SolveGrade, held, lineOf, MAIA_ELO, maiaCandidates, materialFor, opponentPick, pawnPushes, pushNow, slips, solvedBy, wonAfter, type Endgame, type Goal, type OpponentLine } from '../core/endgames/endgames.ts';
 import { hangs, lc0Vetoed, replyOrder, trustPick } from '../core/endgames/variety.ts';
 import { keepingMoves, tablebaseVerdict, type TablebaseVerdict } from '../core/endgames/tablebase.ts';
@@ -129,6 +130,8 @@ export interface PracticeSetup {
   endgame?: Endgame;
   /** An exact retry (§5.207): the earlier game's moves from `fen` (UCI), the opponent's played again until the user plays a new move. */
   retry?: string[];
+  /** The checklist's failed line this game retries (§5.208): won, it is cleared; else a try at it. */
+  failedLine?: { card: string; g: string };
   /** Told the grade (an advantage card) once the game ends. */
   onEnd?(grade: Grade | undefined): void;
 }
@@ -199,6 +202,12 @@ export interface PracticeGame {
    * stands (the user's own once changed), `t` the try's recorded time.
    */
   solveGrade?: { auto: SolveGrade; g: SolveGrade; secs: number; t: number };
+  /**
+   * A checklist drill's failed line (§5.208), once its end's judges are in: `kept` (by itself or by
+   * hand), `offered` (lost in the endgame, or no single losing move: Keep in the review), `cleared`
+   * (a retry won), `tried` (a retry not won). `g` names the line; `at` the losing move.
+   */
+  lineFailed?: { state: 'kept' | 'offered' | 'cleared' | 'tried'; g: string; at?: number; why?: 'endgame' | 'unclear'; auto?: boolean };
 }
 
 export const practice = signal<PracticeGame | undefined>(undefined);
@@ -1043,12 +1052,17 @@ export async function practiceHint(): Promise<void> {
 export function playAgain(exact = false): void {
   const p = practice.peek();
   if (!p) return;
-  const { retry: _r, ...setup } = p.setup;
-  startPractice(exact && p.moves.length ? { ...setup, retry: p.moves.map((m) => m.uci) } : setup);
+  const { retry: _r, failedLine: _f, ...setup } = p.setup;
+  if (!exact || !p.moves.length) return startPractice(setup);
+  // A failed line kept from this game, or the one it retried, is retried again (§5.208).
+  const failedLine = p.setup.failedLine ?? (p.lineFailed?.state === 'kept' && p.setup.leaf ? { card: checklistCard(p.setup.leaf), g: p.lineFailed.g } : undefined);
+  startPractice({ ...setup, retry: p.moves.map((m) => m.uci), ...(failedLine ? { failedLine } : {}) });
 }
 
-/** Whether a game over can be retried exactly: a game from a position or a checklist's drill, with the opponent's moves to replay. */
-export const canRetryExact = (p: PracticeGame): boolean => (p.setup.kind === 'practice' || p.setup.kind === 'checklist') && p.moves.some((m) => !m.isUser);
+/** Whether a game over can be retried exactly: a game from a position or a checklist's drill (once its judges are in, its failed line decided, §5.208), with the opponent's moves to replay. */
+export const canRetryExact = (p: PracticeGame): boolean => (p.setup.kind === 'practice' || (p.setup.kind === 'checklist' && !failedPending(p))) && p.moves.some((m) => !m.isUser);
+/** A checklist drill lost whose failed line isn't decided yet (its judges still out, §5.208). */
+export const failedPending = (p: PracticeGame): boolean => p.setup.kind === 'checklist' && !p.setup.failedLine && p.end?.result === 'loss' && p.end.reason !== 'interrupted' && !p.lineFailed;
 
 export function stopPractice(): void {
   const p = practice.peek();
@@ -1120,10 +1134,49 @@ function finish(g: number, reason: EndReason): void {
     if (key) void recordEvent({ t, k: 'practice', card: practiceCard(key), res: result, ...(p.setup.preset ? { preset: p.setup.preset } : {}), ...(finalCp !== null ? { cp: Math.round(finalCp) } : {}), mv: userMoves });
   }
   // The history entry, once the judges are in (the review's words final); then the tactic scan.
+  // A failed line's retry (§5.208) is cleared, or tried, now; a loss is judged for one once the judges are in.
+  const f = p.setup.failedLine;
+  if (f && reason !== 'interrupted') {
+    void recordEvent({ t, k: 'failed', card: f.card, g: f.g, on: result !== 'win' });
+    patch(g, () => ({ lineFailed: { state: result === 'win' ? 'cleared' : 'tried', g: f.g } }));
+  }
   void Promise.all([...judging]).then(async () => {
+    if (p.setup.kind === 'checklist' && !f && result === 'loss' && reason !== 'interrupted') failedAfter(g);
     if (userMoves >= PRACTICE.reviewMinMoves) await writeHistory(g, reason, result, finalCp);
     void scanTactics(g);
   });
+}
+
+/* ------------------------------------------------------------------ failed lines (§5.208) */
+
+/**
+ * A checklist drill lost (not a failed line's retry), once its judges are in: kept as a failed
+ * line when a move lost it before the endgame, else offered in the review. Exact retry waits for
+ * this (`canRetryExact`), so a retry of the game kept retries its failed line.
+ */
+function failedAfter(g: number): void {
+  const p = practice.peek();
+  if (!p || p.gen !== g || !p.setup.leaf || !p.setup.preset || !p.moves.length) return;
+  const id = `fl_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const v = lossVerdict(p.setup.fen, p.moves);
+  if (v.keep) {
+    recordFailed(p, id, v.at);
+    patch(g, () => ({ lineFailed: { state: 'kept', g: id, at: v.at, auto: true } }));
+  } else patch(g, () => ({ lineFailed: { state: 'offered', g: id, why: v.why, ...(v.at !== undefined ? { at: v.at } : {}) } }));
+}
+
+function recordFailed(p: PracticeGame, g: string, at: number | undefined): void {
+  void recordEvent({ t: new Date().toISOString(), k: 'failed', card: checklistCard(p.setup.leaf!), g, on: true, m: p.moves.map((m) => m.uci).join(' '), preset: p.setup.preset!, ...(at !== undefined ? { at } : {}) });
+}
+
+/** The review's Keep (a loss offered) or Undo (a loss kept): the game's failed line kept, or let go. */
+export function keepFailedLine(on: boolean): void {
+  const p = practice.peek();
+  const f = p?.lineFailed;
+  if (!p || p.phase !== 'over' || !f || !p.setup.leaf || (on ? f.state !== 'offered' : f.state !== 'kept')) return;
+  if (on) recordFailed(p, f.g, f.at);
+  else void recordEvent({ t: new Date().toISOString(), k: 'failed', card: checklistCard(p.setup.leaf), g: f.g, on: false });
+  patch(p.gen, () => ({ lineFailed: { ...f, state: on ? 'kept' : 'offered' } }));
 }
 
 const OUTCOME: Record<EndReason, 'win' | 'draw' | 'loss' | 'stopped' | 'ended'> = { mate: 'win', claim: 'win', mated: 'loss', collapse: 'loss', stalemate: 'draw', draw: 'draw', repetition: 'draw', fifty: 'draw', agreed: 'draw', stopped: 'stopped', interrupted: 'ended', goal: 'win' };

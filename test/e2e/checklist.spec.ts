@@ -13,6 +13,8 @@
 // the Alapin line paused on another device, hidden here after a sync; a drill's old address.
 // Then a drill drawn by repetition (§5.137): a position of the Alapin's lead-up standing the third
 // time in the game played from its end.
+// §5.208: a drill lost at 4...Na5 kept as a failed line, retried twice (a try lost, then won by
+// Claim victory: cleared, each try counted at Easy), and a loss with no losing move kept by hand.
 // §5.142: lines added by hand, from the study's ☰ menu (2...Nc6 3.d4, which the walk never takes:
 // the study's first move there is 2...d6) and from the line list's ⋯ (the Alapin): shown before
 // any Make, kept by Make and Make again, the Alapin left out of the made list's lines; the Alapin
@@ -404,6 +406,126 @@ test('a game drawn, then Exact retry: the opponent repeats its moves until a new
   await expect(game).toHaveAttribute('data-moves', '1');
   await expect(game).toHaveAttribute('data-last', uci(ALAPIN, 'd4'));
   await expect(game).toHaveAttribute('data-source', /^DB/);
+});
+
+test('a drill lost kept as a failed line; its Retry lost (two tries), then won: cleared; a loss with no losing move kept by hand (§5.208)', async ({ page }) => {
+  test.setTimeout(120_000);
+  const { github, git } = world();
+  const ex = explorer();
+  // The Alapin's end: 3.Na3 always. Lost: 3...Nc6 (level) 4.Nb1 Na5 (−3), then stopped: kept, lost
+  // at 4...Na5. Won: 3...d5 4.Nb1 e5 5.Na3 Nc6, each at +12 for Black: Claim victory.
+  const g = (sans: string[], san: string) => [{ san, uci: uci(sans, san), white: 500, draws: 0, black: 500 }];
+  const at = (sans: string[]) => [...ALAPIN, ...sans];
+  ex.games.set(key(ALAPIN), g(ALAPIN, 'Na3'));
+  ex.games.set(key(at(['Na3', 'Nc6'])), g(at(['Na3', 'Nc6']), 'Nb1'));
+  ex.games.set(key(at(['Na3', 'd5'])), g(at(['Na3', 'd5']), 'Nb1'));
+  ex.games.set(key(at(['Na3', 'd5', 'Nb1', 'e5'])), g(at(['Na3', 'd5', 'Nb1', 'e5']), 'Na3'));
+  const lines: Record<string, [number, number, string][]> = {};
+  const script = (sans: string[], moves: [number, string][]) => (lines[key(at(sans))] = moves.map(([cp, san], i) => [i + 1, cp, uci(at(sans), san)]));
+  script(['Na3'], [[1200, 'd5'], [0, 'Nc6'], [-20, 'h6']]);
+  script(['Na3', 'Nc6', 'Nb1'], [[0, 'Nb8'], [-10, 'h6'], [-300, 'Na5']]);
+  script(['Na3', 'd5', 'Nb1'], [[1200, 'e5'], [900, 'h6'], [800, 'g6']]);
+  script(['Na3', 'd5', 'Nb1', 'e5', 'Na3'], [[1200, 'Nc6'], [900, 'h6'], [800, 'g6']]);
+  const own = await serveSite({ engine: fakeEngine(SLOW, lines) });
+  try {
+    await serveGithub(page, github);
+    await serveExplorer(page, ex);
+    await lichessLogin(page);
+    await page.goto(`${own.url}#setup?repo=${encodeURIComponent(REPO)}&token=${TOKEN}&name=desktop`);
+    await expect(page.locator('button.chip')).toHaveText(/^synced/);
+    await page.evaluate(() => (location.hash = '#/checklist?sid=Rep0Najd&side=black'));
+    let section = await block(page);
+    await section.getByLabel('Plies').selectOption('0');
+    await section.getByRole('button', { name: 'Make' }).click();
+    const alapin = () => section.getByTestId('checklist-line').filter({ hasText: 'Alapin' });
+    await expect(alapin().locator('.checklist-line')).toHaveText(/^1\. e4 c5 2\. c3 Nf6/);
+    await alapin().getByRole('button', { name: 'Easy' }).click();
+    const drill = page.getByTestId('checklist-drill');
+    for (const [from, to, step] of [['c7', 'c5', '1'], ['g8', 'f6', '3']] as const) {
+      await expect(drill).toHaveAttribute('data-step', step);
+      await clickSquare(page, from, 'black');
+      await clickSquare(page, to, 'black');
+    }
+    const game = page.locator('.practice-game');
+    const play = async (n: number, sans: string[], san: string) => {
+      await expect(game).toHaveAttribute('data-moves', String(n));
+      await expect(game).toHaveAttribute('data-phase', 'user');
+      const u = uci(at(sans), san);
+      await clickSquare(page, u.slice(0, 2), 'black');
+      await clickSquare(page, u.slice(2, 4), 'black');
+    };
+    await play(1, ['Na3'], 'Nc6');
+    await play(3, ['Na3', 'Nc6', 'Nb1'], 'Na5');
+    await expect(game).toHaveAttribute('data-moves', '4');
+    await page.getByRole('button', { name: /^Stop/ }).click();
+    await expect(page.getByTestId('practice-end')).toContainText('Stopped. Counted as a loss.');
+    await expect(page.getByTestId('practice-failed')).toHaveAttribute('data-state', 'kept');
+    await expect(page.getByTestId('practice-failed')).toContainText('Kept as a failed line (lost at 4…Na5)');
+
+    // On the checklist, under the Alapin: Easy, lost at 4...Na5, one try.
+    await page.evaluate(() => (location.hash = '#/checklist?sid=Rep0Najd&side=black'));
+    section = await block(page);
+    const failed = () => alapin().getByTestId('checklist-failed-line');
+    await expect(failed()).toHaveCount(1);
+    await expect(failed()).toContainText(/Easy lost at 4…Na5 · 1 try/);
+
+    // Retry: no lead-up, the lost game's 3.Na3 and 4.Nb1 replayed; 4...Nb8 new; stopped: a second try.
+    await failed().getByTestId('checklist-failed-retry').click();
+    await expect(game).toHaveAttribute('data-source', /^the earlier game$/);
+    await play(1, ['Na3'], 'Nc6');
+    await expect(game).toHaveAttribute('data-moves', '3');
+    await expect(game).toHaveAttribute('data-source', /^the earlier game$/);
+    await play(3, ['Na3', 'Nc6', 'Nb1'], 'Nb8');
+    await expect(game).toHaveAttribute('data-moves', '4');
+    await page.getByRole('button', { name: /^Stop/ }).click();
+    await expect(page.getByTestId('practice-failed')).toHaveAttribute('data-state', 'tried');
+    await page.evaluate(() => (location.hash = '#/checklist?sid=Rep0Najd&side=black'));
+    section = await block(page);
+    await expect(failed()).toContainText(/Easy lost at 4…Na5 · 2 tries/);
+    // Each game counted at Easy: 0/2.
+    await expect(alapin().getByRole('button', { name: /^Easy/ })).toHaveText(/Easy 0\/2/);
+
+    // Retry again, won: 3...d5 (new) 4.Nb1 e5 5.Na3 Nc6, Claim victory: cleared, Easy checked off 1/3.
+    await failed().getByTestId('checklist-failed-retry').click();
+    await play(1, ['Na3'], 'd5');
+    await play(3, ['Na3', 'd5', 'Nb1'], 'e5');
+    await play(5, ['Na3', 'd5', 'Nb1', 'e5', 'Na3'], 'Nc6');
+    await page.getByRole('button', { name: 'Claim victory' }).click();
+    await expect(page.getByTestId('practice-end')).toContainText('Victory claimed.');
+    await expect(page.getByTestId('practice-failed')).toHaveAttribute('data-state', 'cleared');
+    await page.evaluate(() => (location.hash = '#/checklist?sid=Rep0Najd&side=black'));
+    section = await block(page);
+    await expect(alapin().getByTestId('checklist-failed')).toHaveCount(0);
+    await expect(alapin().getByRole('button', { name: /^✓ Easy/ })).toHaveText(/Easy 1\/3/);
+
+    // A drill stopped at once, no move of the user's: no losing move, offered; kept by hand.
+    await alapin().getByRole('button', { name: /Easy/ }).click();
+    for (const [from, to, step] of [['c7', 'c5', '1'], ['g8', 'f6', '3']] as const) {
+      await expect(drill).toHaveAttribute('data-step', step);
+      await clickSquare(page, from, 'black');
+      await clickSquare(page, to, 'black');
+    }
+    await expect(game).toHaveAttribute('data-moves', '1');
+    await page.getByRole('button', { name: /^Stop/ }).click();
+    await expect(page.getByTestId('practice-failed')).toHaveAttribute('data-state', 'offered');
+    await expect(page.getByTestId('practice-failed')).toContainText('No single move lost it');
+    await page.getByTestId('practice-failed-keep').click();
+    await expect(page.getByTestId('practice-failed')).toHaveAttribute('data-state', 'kept');
+    await page.evaluate(() => (location.hash = '#/checklist?sid=Rep0Najd&side=black'));
+    section = await block(page);
+    await expect(failed()).toContainText(/Easy lost after 1 move · 1 try/);
+    // Synced: the events in the data repo.
+    await sync(page);
+    const events = progress(git).split('\n').filter((l) => l.includes('"k":"failed"')).map((l) => JSON.parse(l) as Record<string, unknown>);
+    expect(events.map((e) => [e['on'], e['m'] !== undefined])).toEqual([
+      [true, true],
+      [true, false],
+      [false, false],
+      [true, true],
+    ]);
+  } finally {
+    await own.close();
+  }
 });
 
 test('lines added by hand from the study and the line list, kept by Make again, one taken out', async ({ page }) => {

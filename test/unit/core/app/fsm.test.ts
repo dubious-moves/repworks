@@ -56,6 +56,7 @@ test('hashes parse to modes, and modes write back to the same hash', () => {
     ['#/checklist?sid=Rep0Najd', { name: 'checklists', sid: 'Rep0Najd' }],
     ['#/checklist?sid=Rep0Najd&side=black', { name: 'checklists', sid: 'Rep0Najd', side: 'black' }],
     ['#/checklist/Rep0Najd?side=black&line=e2e4,c7c5,g1f3&preset=hard', { name: 'checklist', sid: 'Rep0Najd', side: 'black', line: ['e2e4', 'c7c5', 'g1f3'], preset: 'hard' }],
+    ['#/checklist/Rep0Najd?side=black&line=e2e4,c7c5&preset=medium&retry=fl_1_ab', { name: 'checklist', sid: 'Rep0Najd', side: 'black', line: ['e2e4', 'c7c5'], preset: 'medium', retry: 'fl_1_ab' }],
     ['#/show', { name: 'show' }],
     ['#/show/Rep0Najd', { name: 'show', sid: 'Rep0Najd' }],
     ['#/mistakes', { name: 'mistakes' }],

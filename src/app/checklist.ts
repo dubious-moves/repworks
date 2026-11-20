@@ -19,6 +19,7 @@ import { header, type Chapter } from '../core/study/model.ts';
 import { startPosition } from '../core/study/tree.ts';
 import type { Color } from '../core/games/record.ts';
 import { checklistCard, checklistListCard } from '../core/progress/cards.ts';
+import { failedLinesOf, type FailedLine } from '../core/games/failedLines.ts';
 import type { ChecklistEvent, ChecklistLine, PickEvent } from '../core/progress/events.ts';
 import { onWorker, postToWorker } from './explorer.ts';
 import { practiceResults } from './repertoireCheck.ts';
@@ -234,6 +235,26 @@ export function excludeLine(v: Variation): void {
 /** The lines taken out come back (`clearTodoExclusions`): these, or every one. A kept list shows them again at once. */
 export function restoreExcluded(keys: readonly string[] = [...excludedLeaves.peek()]): void {
   for (const k of keys) void recordEvent({ t: new Date().toISOString(), k: 'drop', card: checklistCard(k as PositionKey), on: false });
+}
+
+/* ------------------------------------------------------------------ failed lines (§5.208) */
+
+/** Each checklist line's open failed lines, by its leaf: drills lost, kept to be won by Exact retry. */
+export const failedLines = computed<Map<string, FailedLine[]>>(() => {
+  const data = trainData.value;
+  const out = new Map<string, FailedLine[]>();
+  if (!data) return out;
+  for (const card of data.states.keys()) {
+    if (!card.startsWith('c|')) continue;
+    const open = failedLinesOf(data.eventsOf(card));
+    if (open.length) out.set(card.slice(2), open);
+  }
+  return out;
+});
+
+/** A failed line taken out (✕) without being won: synced. */
+export function dismissFailed(leafKey: string, g: string): void {
+  void recordEvent({ t: new Date().toISOString(), k: 'failed', card: checklistCard(leafKey as PositionKey), g, on: false });
 }
 
 /* ------------------------------------------------------------------ lines added by hand (§5.142) */

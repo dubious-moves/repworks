@@ -16,7 +16,7 @@ import { makeSanAndPlay } from 'chessops/san';
 import { parseSquare } from 'chessops/util';
 import type { Key } from '@lichess-org/chessground/types';
 import { analyseFrom, entryKey, open } from '../app/mode.ts';
-import { chapterNameAt, checklistMaia, checklistViews, excludeLine, generating, makeChecklist, MAIA_MAX, MAIA_MIN, restoreExcluded, setChecklistMaia, stopChecklist, touch, unpickLine, type ChecklistView } from '../app/checklist.ts';
+import { chapterNameAt, checklistMaia, checklistViews, dismissFailed, excludeLine, failedLines, generating, makeChecklist, MAIA_MAX, MAIA_MIN, restoreExcluded, setChecklistMaia, stopChecklist, touch, unpickLine, type ChecklistView } from '../app/checklist.ts';
 import { openingNameOf } from '../app/games.ts';
 import { lichessToken } from '../app/lichess.ts';
 import { leavePractice, parkPractice, practice, practiceMove, premoveUci, startPractice, takeUpPractice } from '../app/practice.ts';
@@ -26,6 +26,8 @@ import { completedPresets, linesOf, PRESET_ORDER, PRESETS, presetOpen, presetSta
 import type { Color } from '../core/games/record.ts';
 import { parseUciMove } from '../core/chess/uci.ts';
 import { keyFen, positionKeyOf } from '../core/chess/positionKey.ts';
+import { checklistCard } from '../core/progress/cards.ts';
+import { numberedSan, type FailedLine } from '../core/games/failedLines.ts';
 import { positionOf } from '../core/storm/walk.ts';
 import type { BoardProps } from './Board.tsx';
 import { MiniBoard } from './CommentOffer.tsx';
@@ -333,6 +335,7 @@ function Line(props: { line: ShownLine; view: ChecklistView; results: { res: str
           <p class="muted">No longer in the study · Make again</p>
         )
       ) : (
+        <>
         <div class="actions">
           {PRESET_ORDER.map((p) => {
             const st = stats[p];
@@ -370,8 +373,56 @@ function Line(props: { line: ShownLine; view: ChecklistView; results: { res: str
             ✕
           </button>
         </div>
+        <FailedLines view={view} line={props.line} />
+        </>
       )}
     </li>
+  );
+}
+
+/**
+ * A checklist line's failed lines (§5.208): drills lost, each with where it was lost, its level
+ * and tries; Retry plays its game again (Exact retry) at its level, ✕ takes it out unwon.
+ */
+function FailedLines(props: { view: ChecklistView; line: ShownLine }) {
+  const v = props.line.v;
+  const list = failedLines.value.get(v.leafKey);
+  if (!list?.length) return null;
+  const view = props.view;
+  return (
+    <div class="checklist-failed" data-testid="checklist-failed">
+      <span class="muted">Failed lines ({list.length}): win one by Exact retry to clear it.</span>
+      <ul>
+        {list.map((f) => {
+          const preset = (f.preset in PRESETS ? f.preset : 'easy') as Preset;
+          const at = f.at !== undefined ? numberedSan(v.leafFen, f.moves, f.at) : undefined;
+          return (
+            <li key={f.g} data-testid="checklist-failed-line" data-g={f.g}>
+              <span class="checklist-failed-level">{PRESETS[preset].label}</span> {at ? <>lost at <strong>{at}</strong></> : <>lost after {Math.ceil(f.moves.length / 2)} move{Math.ceil(f.moves.length / 2) === 1 ? '' : 's'}</>}
+              <span class="muted">
+                {' '}
+                · {f.tries} {f.tries === 1 ? 'try' : 'tries'} · {isoDay(f.t)}
+              </span>{' '}
+              <button
+                type="button"
+                class="link"
+                data-testid="checklist-failed-retry"
+                title="The lost game again from the line’s end: the opponent repeats its moves until you play a new one"
+                onClick={() => {
+                  touch(view.sid, view.color);
+                  open({ name: 'checklist', sid: view.sid, side: view.color, line: v.lineUci, preset, retry: f.g });
+                }}
+              >
+                Retry
+              </button>{' '}
+              <button type="button" class="link" aria-label="Take this failed line out" title="Take this failed line out without winning it" onClick={() => confirm('Take this failed line out without winning it?') && dismissFailed(v.leafKey, f.g)}>
+                ✕
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 
@@ -420,8 +471,14 @@ function GapRow(props: { gap: ChecklistGap; view: ChecklistView }) {
 /* ------------------------------------------------------------------ the drill */
 
 /** `#/checklist/<sid>?side=…&line=…&preset=…`: the line's lead-up, then the game from its end. */
-export function ChecklistDrill(props: { sid: string; side: Color; line: string[]; preset: Preset }) {
+export function ChecklistDrill(props: { sid: string; side: Color; line: string[]; preset: Preset; retry?: string }) {
   const v = useMemo(() => linesOf([{ m: props.line.join(' '), p: 0 }])[0], [props.line.join(' ')]);
+  // A failed line's retry (§5.208): its game from the line's end, the lead-up skipped; kept once
+  // found, so the review stays when a win clears it.
+  const failedNow = props.retry && v ? failedLines.value.get(v.leafKey)?.find((f) => f.g === props.retry) : undefined;
+  const failedRef = useRef<FailedLine | undefined>(undefined);
+  if (failedNow) failedRef.current = failedNow;
+  const failed = failedRef.current;
   // Come back to from the analysis board (the owner's request, 2026-10-16): the game played on, or
   // the lead-up at the move it was left at.
   const [entry] = useState(entryKey);
@@ -429,7 +486,7 @@ export function ChecklistDrill(props: { sid: string; side: Color; line: string[]
   const [k, setK] = useState(() => {
     const was = leadLeft;
     leadLeft = undefined;
-    return resumed && v ? v.lineUci.length : was?.entry === entry ? was.k : 0;
+    return (resumed || props.retry) && v ? v.lineUci.length : was?.entry === entry ? was.k : 0;
   });
   const [note, setNote] = useState<string | undefined>(undefined);
   const color = props.side;
@@ -454,8 +511,10 @@ export function ChecklistDrill(props: { sid: string; side: Color; line: string[]
     if (!v) return;
     if (!inLeadUp) {
       if (resumed && practice.peek()) return;
+      if (props.retry && !failed) return;
       const p = PRESETS[props.preset];
-      startPractice({ kind: 'checklist', fen: v.leafFen, color, silent: true, title: lineText(v.lineSan), opponent: { ratings: [...p.ratings], speeds: [...RANK_SPEEDS], maiaElo, precision: p.precision, guard: p.guard, prepared: p.prepared }, preset: props.preset, leaf: v.leafKey, before: v.lineUci.map((_, n) => keyFen(fenAt(n))!.key), lead: v.lineUci.map((_, n) => fenAt(n)).slice(-7) });
+      const retry = failed ? { retry: failed.moves, failedLine: { card: checklistCard(v.leafKey), g: failed.g } } : {};
+      startPractice({ kind: 'checklist', fen: v.leafFen, color, silent: true, title: lineText(v.lineSan), opponent: { ratings: [...p.ratings], speeds: [...RANK_SPEEDS], maiaElo, precision: p.precision, guard: p.guard, prepared: p.prepared }, preset: props.preset, leaf: v.leafKey, before: v.lineUci.map((_, n) => keyFen(fenAt(n))!.key), lead: v.lineUci.map((_, n) => fenAt(n)).slice(-7), ...retry });
       const uci = pre && premoveUci(v.leafFen, pre);
       setPre(undefined);
       if (uci) void practiceMove(uci);
@@ -469,7 +528,7 @@ export function ChecklistDrill(props: { sid: string; side: Color; line: string[]
     setPre(undefined);
     if (uci) userMove.current(uci);
     return undefined;
-  }, [k, v]);
+  }, [k, v, !!failed]);
   const leading = useRef({ on: inLeadUp, k });
   leading.current = { on: inLeadUp, k };
   // Left for another page (the analysis board, say): the lead-up's move, or the game, kept for this entry.
@@ -486,7 +545,10 @@ export function ChecklistDrill(props: { sid: string; side: Color; line: string[]
     <div class="chapter-head">
       <Back parent={{ name: 'checklists', sid: props.sid, side: props.side }} />
       <div class="titles">
-        <span class="study-title">Checklist · {PRESETS[props.preset].label}</span>
+        <span class="study-title">
+          Checklist · {PRESETS[props.preset].label}
+          {props.retry ? ' · failed line' : ''}
+        </span>
       </div>
     </div>
   );
@@ -497,6 +559,8 @@ export function ChecklistDrill(props: { sid: string; side: Color; line: string[]
         <PracticeBoard />
       </div>
     );
+  if (props.retry && !failed)
+    return trainData.value ? <Stuck parent={{ name: 'checklists', sid: props.sid, side: props.side }}>That failed line is cleared (or not synced here yet).</Stuck> : <p class="muted">Reading the repertoire…</p>;
   const onMove = (uci: string) => {
     if (turn !== color) return;
     if (uci !== v.lineUci[k]) {

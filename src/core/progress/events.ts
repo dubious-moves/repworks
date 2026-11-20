@@ -274,6 +274,21 @@ export interface CourseGoalEvent extends Base {
   card: string;
   g: Record<string, unknown>;
 }
+/**
+ * A checklist line's failed line (PLAN.md §5.208), card `c|<leaf>`, named by `g` (the lost game's
+ * id): opened with `m` (the game's moves from the line's end, UCI, spaced), `preset` and `at` (the
+ * losing move's index in `m`, when one was found); a try not won is `on` with no `m`; `on: false`
+ * clears it (a try won, or taken out).
+ */
+export interface FailedEvent extends Base {
+  k: 'failed';
+  card: string;
+  g: string;
+  on: boolean;
+  m?: string;
+  preset?: string;
+  at?: number;
+}
 export type KnownEvent =
   | ReviewEvent
   | SuspendEvent
@@ -302,8 +317,9 @@ export type KnownEvent =
   | CourseScoreEvent
   | CourseDrillEvent
   | CourseGoalEvent
-  | GradeEvent;
-export const KNOWN_KINDS = ['review', 'suspend', 'unsuspend', 'forget', 'taught', 'pin', 'unpin', 'drill', 'alt', 'storm', 'snapshot', 'drop', 'relapse', 'plan', 'idea', 'dismiss', 'saved', 'played', 'practice', 'line', 'note', 'checklist', 'pick', 'rank', 'cscore', 'cdrill', 'cgoal', 'grade'] as const;
+  | GradeEvent
+  | FailedEvent;
+export const KNOWN_KINDS = ['review', 'suspend', 'unsuspend', 'forget', 'taught', 'pin', 'unpin', 'drill', 'alt', 'storm', 'snapshot', 'drop', 'relapse', 'plan', 'idea', 'dismiss', 'saved', 'played', 'practice', 'line', 'note', 'checklist', 'pick', 'rank', 'cscore', 'cdrill', 'cgoal', 'grade', 'failed'] as const;
 
 /** A line as read. `event` is set for the kinds this code knows; `raw` is always the line itself. */
 export interface LogLine {
@@ -605,6 +621,28 @@ function knownEvent(o: Record<string, unknown>): KnownEvent | string {
       if (g !== 2 && g !== 3 && g !== 4) return 'g must be 2, 3 or 4';
       return { ...base, k: 'grade', g };
     }
+    case 'failed': {
+      if (!card.startsWith('c|') || card.length < 3) return 'card must be a checklist line (c|<position>)';
+      const g = o['g'];
+      if (typeof g !== 'string' || g === '' || g.length > 80) return 'g must name the failed line';
+      const on = o['on'];
+      if (typeof on !== 'boolean') return 'on must be true or false';
+      const event: FailedEvent = { ...base, k: 'failed', g, on };
+      const m = o['m'];
+      if (m !== undefined) {
+        if (typeof m !== 'string' || !UCI_LINE.test(m)) return 'm must be moves in UCI, spaced';
+        event.m = m;
+        const preset = o['preset'];
+        if (typeof preset !== 'string' || preset === '') return 'preset must name the preset';
+        event.preset = preset;
+        const at = o['at'];
+        if (at !== undefined) {
+          if (!Number.isSafeInteger(at) || (at as number) < 0 || (at as number) >= m.split(' ').length) return 'at must be a move of m';
+          event.at = at as number;
+        }
+      }
+      return event;
+    }
     default:
       return { ...base, k: 'forget' };
   }
@@ -655,6 +693,12 @@ export function formatEvent(event: KnownEvent): string {
     if (event.ms !== undefined) o['ms'] = event.ms;
   }
   if (event.k === 'grade') o['g'] = event.g;
+  if (event.k === 'failed') {
+    Object.assign(o, { g: event.g, on: event.on });
+    if (event.m !== undefined) o['m'] = event.m;
+    if (event.preset !== undefined) o['preset'] = event.preset;
+    if (event.at !== undefined) o['at'] = event.at;
+  }
   if (event.k === 'storm') {
     o['b'] = event.b;
     if (event.u !== undefined) o['u'] = event.u;

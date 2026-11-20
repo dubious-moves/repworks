@@ -235,7 +235,7 @@ function Screen() {
     case 'search':
       return <SearchScreen q={mode.value.q ?? ''} />;
     case 'checklist':
-      return <ChecklistDrill key={`${mode.value.sid}/${mode.value.side}/${mode.value.line.join(',')}/${mode.value.preset}`} sid={mode.value.sid} side={mode.value.side} line={mode.value.line} preset={mode.value.preset} />;
+      return <ChecklistDrill key={`${mode.value.sid}/${mode.value.side}/${mode.value.line.join(',')}/${mode.value.preset}/${mode.value.retry ?? ''}`} sid={mode.value.sid} side={mode.value.side} line={mode.value.line} preset={mode.value.preset} {...(mode.value.retry ? { retry: mode.value.retry } : {})} />;
     case 'checklists':
       return <ChecklistScreen {...(mode.value.sid ? { sid: mode.value.sid } : {})} {...(mode.value.side ? { side: mode.value.side } : {})} />;
     case 'endgames':

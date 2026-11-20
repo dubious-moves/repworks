@@ -2783,3 +2783,15 @@ The technical calls, each with its reason:
   the user plays a new move. Why: the owner's choice, 2026-11-20.
 - **Read from the synced history**; the history entry gains an optional `forced` (the plies a retry
   replayed), which older readers ignore. Nothing else of the owner's data changed.
+
+## Revision of 2026-11-20 (a checklist line's failed lines: PLAN.md §5.208)
+- **A checklist drill lost is kept with its line as a failed line**, to be won by Exact retry at
+  the level it was lost at; won, it is cleared; each try counts on the level's x/5. Why: the
+  owner, 2026-11-20: "a checklist within the checklist".
+- **Kept by itself only when one move lost it before the endgame** (the score at −2 or worse from
+  that move to the end, more than six pieces on the board); otherwise offered in the review to keep
+  by hand. Why: the owner excluded "a sudden endgame blunder", and asked for the choice on the rest.
+- **Played only from its Retry button**; normal drilling is unchanged. Why: the owner's choice.
+- **A new synced event kind, `failed`, on the line's card** (older readers skip it), not read from
+  the history: the history keeps only the newest 150 games, and a failed line lasts until won.
+

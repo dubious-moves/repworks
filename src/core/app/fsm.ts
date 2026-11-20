@@ -37,7 +37,8 @@
 //   #/checklist[?sid=<sid>&side=black]  the variation checklists, every study's (§5.130), one unfolded
 //   #/checklist/<sid>?side=black&line=e2e4,c7c5&preset=easy
 //                                       a checklist line's drill at a difficulty (§5.62), the line by
-//                                       its moves (§5.130); the old #/checklist/<sid>/<n> opens the list
+//                                       its moves (§5.130); the old #/checklist/<sid>/<n> opens the list;
+//                                       &retry=<g> a failed line's Exact retry (§5.208)
 //   #/endgames                          the theoretical endgames, each played for its goal (§5.145)
 //   #/endgames/<id>                     one endgame, played for its goal (a repertoire one: r-<hash>, §5.149)
 //   #/migrate                           the migration from mistake-lab (§5.64)
@@ -104,7 +105,7 @@ export type Mode =
   /** The variation checklists (§5.130): every repertoire study's, with `sid` (and `side`) unfolded. */
   | { name: 'checklists'; sid?: string; side?: 'white' | 'black' }
   /** A checklist line of a study's side, by its moves from the start (UCI), drilled at a preset (§5.62, §5.130). */
-  | { name: 'checklist'; sid: string; side: 'white' | 'black'; line: string[]; preset: 'easy' | 'medium' | 'hard' }
+  | { name: 'checklist'; sid: string; side: 'white' | 'black'; line: string[]; preset: 'easy' | 'medium' | 'hard'; retry?: string }
   /** The theoretical endgames (§5.145); with `id`, one played for its goal. */
   | { name: 'endgames'; id?: string }
   /** Search across the studies (§5.166): names, comments, a position by its moves or FEN. */
@@ -249,7 +250,8 @@ export function parseHash(hash: string): Mode {
     const line = /(?:^|&)line=([a-h1-8qrbn,]+)(?:&|$)/.exec(query)?.[1]?.split(',');
     if (parts.length === 2 && isId(parts[1]) && side && line?.length && line.every((m) => /^[a-h][1-8][a-h][1-8][qrbn]?$/.test(m))) {
       const preset = /(?:^|&)preset=(easy|medium|hard)(?:&|$)/.exec(query)?.[1] as 'easy' | 'medium' | 'hard' | undefined;
-      return { name: 'checklist', sid: parts[1], side, line, preset: preset ?? 'easy' };
+      const retry = /(?:^|&)retry=([A-Za-z0-9_]{1,80})(?:&|$)/.exec(query)?.[1];
+      return { name: 'checklist', sid: parts[1], side, line, preset: preset ?? 'easy', ...(retry ? { retry } : {}) };
     }
     return { name: 'checklists' };
   }
@@ -371,7 +373,7 @@ export function modeHash(mode: Mode): string {
     case 'checklists':
       return mode.sid ? `#/checklist?sid=${mode.sid}${mode.side ? `&side=${mode.side}` : ''}` : '#/checklist';
     case 'checklist':
-      return `#/checklist/${mode.sid}?side=${mode.side}&line=${mode.line.join(',')}&preset=${mode.preset}`;
+      return `#/checklist/${mode.sid}?side=${mode.side}&line=${mode.line.join(',')}&preset=${mode.preset}${mode.retry ? `&retry=${mode.retry}` : ''}`;
     case 'storm':
       return `#/storm${mode.sid ? `/${mode.sid}${mode.cid ? `/${mode.cid}${atQuery(mode.at)}` : ''}` : ''}`;
     case 'analysis': {

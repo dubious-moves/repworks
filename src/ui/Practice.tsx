@@ -16,11 +16,12 @@ import { recordEvent } from '../app/state.ts';
 import { openingNameOf, practiceHistory, recordSaved, savedDeck } from '../app/games.ts';
 import type { CardRank } from '../core/progress/events.ts';
 import { SaveRankSelect } from './Rank.tsx';
-import { leadFor, analyse, canOfferDraw, canRetryExact, playAgain, canTakeBack, claimVictory, offerDraw, clearPremove, detection, setFoundState, type FoundTactic, discardSaved, gameOfHistory, ignoreRepertoire, loadOpponent, practiceFeedback, practiceHint, resumePractice, setPracticeFeedback, showsFeedback, savedPractice, saveOpponent, judge, parkPractice, practice, practiceMove, takeUpPractice, practiceReview, setPremove, startPractice, stopPractice, takeBack, type Opponent, type PracticeGame, type PracticeMove } from '../app/practice.ts';
+import { leadFor, analyse, canOfferDraw, canRetryExact, failedPending, keepFailedLine, playAgain, canTakeBack, claimVictory, offerDraw, clearPremove, detection, setFoundState, type FoundTactic, discardSaved, gameOfHistory, ignoreRepertoire, loadOpponent, practiceFeedback, practiceHint, resumePractice, setPracticeFeedback, showsFeedback, savedPractice, saveOpponent, judge, parkPractice, practice, practiceMove, takeUpPractice, practiceReview, setPremove, startPractice, stopPractice, takeBack, type Opponent, type PracticeGame, type PracticeMove } from '../app/practice.ts';
 import { parseUciMove, standardUci } from '../core/chess/uci.ts';
 import { makeFen } from 'chessops/fen';
 import { CLASSIFICATION, moverScore, type Classification } from '../core/games/grade.ts';
 import { BLEND, GUARD, positionEvals, PRACTICE, type Review } from '../core/games/practice.ts';
+import { numberedSan } from '../core/games/failedLines.ts';
 import { lineFen, lineScore, moveAt } from '../core/games/engineLine.ts';
 import { whiteShare } from '../core/engine/winning.ts';
 import { makeSan } from 'chessops/san';
@@ -918,6 +919,7 @@ export function PracticeReview(props: { game: PracticeGame; onNext?: (() => void
               {end.grade && <span class="muted"> Recorded: {GRADE_WORD[end.grade]}.</span>}
             </p>
           )}
+          <FailedNote game={g} onAt={go} />
           <p class="review-accuracy" data-testid="practice-accuracy">
             {review.judged ? (
               <>
@@ -1025,13 +1027,13 @@ export function PracticeReview(props: { game: PracticeGame; onNext?: (() => void
             </button>
           ) : (
             g.gen >= 0 && (
-              <button type="button" onClick={() => playAgain()}>
+              <button type="button" disabled={failedPending(g)} onClick={() => playAgain()}>
                 Play again
               </button>
             )
           )}
-          {g.gen >= 0 && canRetryExact(g) && (
-            <button type="button" class="secondary" data-testid="practice-exact-retry" title="The same game again: the opponent repeats its moves until you play a new one" onClick={() => playAgain(true)}>
+          {g.gen >= 0 && (canRetryExact(g) || failedPending(g)) && (
+            <button type="button" class="secondary" data-testid="practice-exact-retry" disabled={failedPending(g)} title="The same game again: the opponent repeats its moves until you play a new one" onClick={() => playAgain(true)}>
               Exact retry
             </button>
           )}
@@ -1041,6 +1043,47 @@ export function PracticeReview(props: { game: PracticeGame; onNext?: (() => void
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * A checklist drill's failed line (§5.208) in its review: kept (Undo), offered (Keep: lost in the
+ * endgame, or no single move lost it), cleared by a retry won, or still open after one not won.
+ */
+function FailedNote(props: { game: PracticeGame; onAt(i: number): void }) {
+  const g = props.game;
+  if (g.gen < 0 || g.setup.kind !== 'checklist') return null;
+  if (failedPending(g)) return <p class="muted" data-testid="practice-failed">Looking for the move that lost it…</p>;
+  const f = g.lineFailed;
+  if (!f) return null;
+  const at =
+    f.at !== undefined ? (
+      <button type="button" class="link" onClick={() => props.onAt(f.at!)}>
+        {numberedSan(g.setup.fen, g.moves.map((m) => m.uci), f.at) ?? g.moves[f.at]?.san}
+      </button>
+    ) : undefined;
+  return (
+    <p data-testid="practice-failed" data-state={f.state}>
+      {f.state === 'kept' ? (
+        <>
+          Kept as a failed line{at ? <> (lost at {at})</> : ''}: win it by Exact retry to clear it.{' '}
+          <button type="button" class="link" onClick={() => keepFailedLine(false)}>
+            Undo
+          </button>
+        </>
+      ) : f.state === 'offered' ? (
+        <>
+          <span class="muted">{f.why === 'endgame' ? <>Lost in the endgame{at ? <> ({at})</> : ''}: not kept as a failed line.</> : f.why === 'unclear' ? 'No single move lost it: not kept as a failed line.' : 'Not kept as a failed line.'}</span>{' '}
+          <button type="button" class="link" data-testid="practice-failed-keep" onClick={() => keepFailedLine(true)}>
+            Keep it
+          </button>
+        </>
+      ) : f.state === 'cleared' ? (
+        'Failed line cleared.'
+      ) : (
+        'Failed line still open: win it by Exact retry to clear it.'
+      )}
+    </p>
   );
 }
 

@@ -1085,6 +1085,19 @@ Training and Learn on the Chessnut Move: see 14 (PLAN.md §5.192).
 
 ## 7. Practice and the checklist
 
+### Failed lines (§5.208, 2026-11-20)
+- Lose a checklist drill in the middlegame (or stop it when clearly worse). Does the review say
+  "Kept as a failed line (lost at …)", naming the move you'd call the losing one? Under the line on
+  the checklist page: its level, that move, the tries.
+- **Retry**: does it skip the lead-up and replay the lost game until you play something new, at the
+  same level? Lose it again: one more try, still open. Win it: cleared, and the level's x/5 counts
+  every try.
+- Lose one in the endgame after holding the middlegame, or stop at equality: not kept, **Keep it**
+  in the review. Undo on one kept; ✕ on the checklist.
+- On a second device after a sync: the same failed lines.
+- **Checked**: unit tests; Playwright with a fake explorer and engine (desktop and emulated phone);
+  not on a device.
+
 ### A checklist line drilled again: varied replies and Exact retry (§5.207, 2026-11-20)
 - Drill one checklist line several times in a sitting, winning or drawing. Do the opponent's
   replies after the line's end move on to the other likely ones, and does the main one come back
