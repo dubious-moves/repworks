@@ -9,6 +9,7 @@ import type { Grade } from '../progress/events.ts';
 import type { DeviceEvent } from '../progress/replay.ts';
 import type { Classification } from './grade.ts';
 import type { Color } from './record.ts';
+import { variedWeights } from './variety.ts';
 
 /** mistake-lab's defaults (its continuation settings and constants). */
 export const PRACTICE = {
@@ -68,15 +69,18 @@ export const PREPARED = { beta: 0.1, prior: 50 } as const;
 /**
  * mistake-lab's `pickExplorerMove`: the moves with at least `minGames` games and `minFreq` of the
  * position's, one drawn weighted by its games; null when none passes. `prepared` (the mover's
- * colour): the games weighted by each move's score for the mover (`PREPARED`).
+ * colour): the games weighted by each move's score for the mover (`PREPARED`). `handled` (a
+ * checklist drill, §5.207): how often each move was handled lately, the weights varied by it.
  */
-export function pickExplorerMove<M extends ExplorerMove>(data: { white?: number; draws?: number; black?: number; moves: readonly M[] } | null | undefined, rnd: () => number, o: { minGames: number; minFreq: number; prepared?: Color } = PRACTICE): M | null {
+export function pickExplorerMove<M extends ExplorerMove>(data: { white?: number; draws?: number; black?: number; moves: readonly M[] } | null | undefined, rnd: () => number, o: { minGames: number; minFreq: number; prepared?: Color; handled?: (m: M) => number } = PRACTICE): M | null {
   if (!data || !data.moves.length) return null;
   const total = explorerTotal(data);
   if (total === 0) return null;
   const candidates = data.moves.filter((m) => gamesOf(m) >= o.minGames && gamesOf(m) / total >= o.minFreq);
   if (!candidates.length) return null;
-  const weightOf = o.prepared ? preparedWeight(data, o.prepared) : gamesOf;
+  const base = o.prepared ? preparedWeight(data, o.prepared) : gamesOf;
+  // A checklist drill's variety (§5.207): replies handled lately weigh less.
+  const weightOf = o.handled ? variedWeights(candidates, base, o.handled) : base;
   const weight = candidates.reduce((s, m) => s + weightOf(m), 0);
   let r = rnd() * weight;
   for (const m of candidates) {
@@ -458,13 +462,15 @@ export interface HistoryEntry {
   keyMoveCount: number;
   userMoveCount: number;
   moves: PlayedMove[];
+  /** The plies from the start that replayed an earlier game (an exact retry, PLAN.md §5.207): no variety credit. */
+  forced?: number;
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
 
 /** A history entry for a game of at least five user moves (`buildReviewSnapshot`); else undefined. */
-export function historyEntry(a: { id: string; ts: number; baseFen: string; color: Color; source: HistorySource; outcome: HistoryOutcome; finalCp: number | null; title: string; moves: readonly PlayedMove[]; review: Review }): HistoryEntry | undefined {
+export function historyEntry(a: { id: string; ts: number; baseFen: string; color: Color; source: HistorySource; outcome: HistoryOutcome; finalCp: number | null; title: string; moves: readonly PlayedMove[]; review: Review; forced?: number }): HistoryEntry | undefined {
   const userMoveCount = a.moves.filter((m) => m.isUser).length;
   if (userMoveCount < PRACTICE.reviewMinMoves) return undefined;
   const moves = a.moves.map((m) => {
@@ -473,7 +479,7 @@ export function historyEntry(a: { id: string; ts: number; baseFen: string; color
     if (m.repTried) o.repTried = { san: m.repTried.san, uci: m.repTried.uci };
     return o;
   });
-  return { id: a.id, ts: a.ts, updatedAt: a.ts, baseFen: a.baseFen, playerColor: a.color, source: a.source, outcome: a.outcome, finalCp: a.finalCp === null ? null : Math.round(a.finalCp), openingName: a.title, accuracy: a.review.judged ? a.review.accuracy : null, keyMoveCount: a.review.keyMoves.length, userMoveCount, moves };
+  return { id: a.id, ts: a.ts, updatedAt: a.ts, baseFen: a.baseFen, playerColor: a.color, source: a.source, outcome: a.outcome, finalCp: a.finalCp === null ? null : Math.round(a.finalCp), openingName: a.title, accuracy: a.review.judged ? a.review.accuracy : null, keyMoveCount: a.review.keyMoves.length, userMoveCount, moves, ...(a.forced ? { forced: a.forced } : {}) };
 }
 
 /** A `played` event's game read back (mistake-lab's snapshots too); undefined when it can't be reopened. */
@@ -505,6 +511,7 @@ export function readHistoryEntry(o: unknown): HistoryEntry | undefined {
     keyMoveCount: num(o['keyMoveCount']) ?? 0,
     userMoveCount: num(o['userMoveCount']) ?? moves.filter((m) => m.isUser).length,
     moves,
+    ...(num(o['forced']) ? { forced: num(o['forced'])! } : {}),
   };
 }
 

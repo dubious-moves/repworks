@@ -1085,6 +1085,15 @@ Training and Learn on the Chessnut Move: see 14 (PLAN.md §5.192).
 
 ## 7. Practice and the checklist
 
+### A checklist line drilled again: varied replies and Exact retry (§5.207, 2026-11-20)
+- Drill one checklist line several times in a sitting, winning or drawing. Do the opponent's
+  replies after the line's end move on to the other likely ones, and does the main one come back
+  once you've met the others? A lost game shouldn't change what comes next.
+- After a game, **Exact retry**: does the opponent repeat its moves until you play something new,
+  then play normally? Play again starts a fresh game.
+- **Checked**: unit tests; Playwright with a fake explorer (desktop and emulated phone); not on a
+  device.
+
 ### No nonsense blunders from Medium and Hard (§5.205, 2026-11-19)
 - Drill a few checklist lines at Medium and at Hard, playing on well past the opening. Does the
   opponent still miss your tactics and fall for a natural trap, yet never hang a piece for no

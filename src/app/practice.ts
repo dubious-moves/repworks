@@ -27,8 +27,9 @@ import { parseUciMove, standardUci } from '../core/chess/uci.ts';
 import type { FromWorker, ToWorker } from '../core/explorer/service.ts';
 import { winPct } from '../core/games/extract.ts';
 import { judgeMove, moverScore, needsRecheck, RECHECK, recheckMoves, rejudge, type MoverLine } from '../core/games/grade.ts';
-import { advantageGrade, BLEND, blendMoves, databaseShare, drawAccepted, explorerTotal, guardCandidates, guardedChoice, guardNeedsBefore, historyEntry, maiaPick, pickExplorerMove, PRACTICE, plyOf, repertoireCheck, repertoireVerdict, resultOf, reviewOf, ruleDraw, startTrack, trackAdvantage, type AdvantageOutcome, type AdvantageTrack, type HistoryEntry, type HistorySource, type PlayedMove, type RepertoireVerdict, type Review } from '../core/games/practice.ts';
+import { advantageGrade, BLEND, blendMoves, databaseShare, drawAccepted, explorerTotal, guardCandidates, guardedChoice, guardNeedsBefore, historyEntry, historyOf, maiaPick, temperedOdds, pickExplorerMove, PRACTICE, plyOf, repertoireCheck, repertoireVerdict, resultOf, reviewOf, ruleDraw, startTrack, trackAdvantage, type AdvantageOutcome, type AdvantageTrack, type HistoryEntry, type HistorySource, type PlayedMove, type RepertoireVerdict, type Review } from '../core/games/practice.ts';
 import { readSaved, resumable, type Saved } from '../core/games/resume.ts';
+import { drawByWeight, forcedPlies, handledReplies, retryMove, variedWeights, VARIETY } from '../core/games/variety.ts';
 import { PRESETS } from '../core/games/checklist.ts';
 import { covered, scanCandidate, tacticCandidates, TACTIC, type DetectedTactic, type Pv } from '../core/games/detect.ts';
 import type { Color } from '../core/games/record.ts';
@@ -126,6 +127,8 @@ export interface PracticeSetup {
   lead?: string[];
   /** The endgame drilled (kind `endgame`). */
   endgame?: Endgame;
+  /** An exact retry (§5.207): the earlier game's moves from `fen` (UCI), the opponent's played again until the user plays a new move. */
+  retry?: string[];
   /** Told the grade (an advantage card) once the game ends. */
   onEnd?(grade: Grade | undefined): void;
 }
@@ -386,16 +389,18 @@ const positionsBefore = (p: PracticeGame, n: number = p.moves.length): string[] 
  * Maia's policy as one estimate, checked by Stockfish as Maia's moves are (Medium and Hard); without
  * the check, the database's draw as often as its games weigh against Maia's, else Maia's.
  */
-async function opponentMove(fen: string, o: Opponent, before?: readonly string[], userFen?: string): Promise<{ uci: string; source: string; dbFailed: boolean } | undefined> {
+async function opponentMove(fen: string, o: Opponent, before?: readonly string[], userFen?: string, handled?: ReadonlyMap<string, number>): Promise<{ uci: string; source: string; dbFailed: boolean } | undefined> {
   const pos = positionOf(fen);
   if (!pos) return undefined;
+  // A checklist drill's variety (§5.207): how often each reply here was handled lately (standard UCI).
+  const count = handled?.size ? (uci: string) => handled.get(uciOf(fen, uci) ?? uci) ?? 0 : undefined;
   let dbFailed = false;
   const db = await explorerGames(fen, o);
   const games = db && 'games' in db ? db.games : null;
   if (!games) dbFailed = true;
   const total = explorerTotal(games);
   const fromDb = () => {
-    const picked = pickExplorerMove(games, Math.random, { ...PRACTICE, ...(o.prepared ? { prepared: pos.turn } : {}) });
+    const picked = pickExplorerMove(games, Math.random, { ...PRACTICE, ...(o.prepared ? { prepared: pos.turn } : {}), ...(count ? { handled: (m: { uci: string }) => count(m.uci) } : {}) });
     const move = picked && parseUciMove(pos, picked.uci);
     return picked && move ? { uci: uciOf(fen, picked.uci)!, source: `DB (${picked.white + picked.draws + picked.black})`, dbFailed } : undefined;
   };
@@ -409,14 +414,20 @@ async function opponentMove(fen: string, o: Opponent, before?: readonly string[]
       const uci = uciOf(fen, m.uci);
       return uci ? [{ ...m, uci }] : [];
     });
-    const c = await guardChoice(fen, blendMoves(dbMoves, policy, o.precision), o.precision, userFen);
+    const blend = blendMoves(dbMoves, policy, o.precision);
+    const varied = count ? variedWeights(blend, (m) => m.weight, (m) => count(m.uci)) : undefined;
+    const c = await guardChoice(fen, varied ? blend.map((m) => ({ ...m, weight: varied(m) })) : blend, o.precision, userFen);
     if (c) return { uci: c.move.uci, source: total > 0 ? `DB (${total}) + Maia (checked)` : 'Maia (checked)', dbFailed };
   }
   if (Math.random() < databaseShare(total, !!policy)) {
     const m = fromDb();
     if (m) return m;
   }
-  const m = policy && maiaPick(policy, o.precision, Math.random);
+  let m = policy && maiaPick(policy, o.precision, Math.random);
+  if (policy && count) {
+    const odds = temperedOdds(policy, o.precision);
+    m = drawByWeight(policy, variedWeights(policy, (x) => odds.get(x.uci) ?? 0, (x) => count(x.uci)), Math.random) ?? m;
+  }
   if (m) return { uci: m.uci, source: 'Maia', dbFailed };
   const a = await analyseForStorm(fen, 1, 16, 4000);
   const best = a?.lines[0]?.pv[0];
@@ -899,7 +910,13 @@ async function opponentTurn(g: number): Promise<void> {
   if (!p || p.gen !== g || p.phase !== 'opponent' || p.slip || p.ending) return;
   const fen = fenAfter(p);
   const at = p.moves.length;
-  const m = p.setup.kind === 'endgame' ? await endgameReply(fen, p.setup.endgame!, p.moves.filter((m) => m.isUser).length, seenKeys(p), positionsBefore(p)) : await opponentMove(fen, p.setup.opponent, positionsBefore(p), p.moves.at(-1)?.isUser ? p.moves.at(-1)!.fenBefore : undefined);
+  const again = p.setup.retry && retryMove(p.setup.retry, p.moves.map((m) => m.uci));
+  const m =
+    again && played(fen, again)
+      ? { uci: again, source: RETRY_SOURCE, dbFailed: false }
+      : p.setup.kind === 'endgame'
+        ? await endgameReply(fen, p.setup.endgame!, p.moves.filter((m) => m.isUser).length, seenKeys(p), positionsBefore(p))
+        : await opponentMove(fen, p.setup.opponent, positionsBefore(p), p.moves.at(-1)?.isUser ? p.moves.at(-1)!.fenBefore : undefined, handledAt(p, fen));
   const q = practice.peek();
   // An endgame stopped on a slip meanwhile lets the answer go; one played on asks again, and the
   // first answer in is the one played.
@@ -922,6 +939,21 @@ async function opponentTurn(g: number): Promise<void> {
   if (now) ponder(now);
   const uci = pre && premoveUci(after.fen, pre);
   if (uci) void practiceMove(uci);
+}
+
+/** The source shown for a reply replayed by an exact retry (§5.207). */
+export const RETRY_SOURCE = 'the earlier game';
+
+/**
+ * How often each reply at `fen` was handled lately (§5.207): a checklist drill's, for the
+ * opponent's first `VARIETY.replies` moves; read from the synced history.
+ */
+function handledAt(p: PracticeGame, fen: string): ReadonlyMap<string, number> | undefined {
+  if (p.setup.kind !== 'checklist' || p.moves.filter((m) => !m.isUser).length >= VARIETY.replies) return undefined;
+  const key = keyFen(fen)?.key;
+  const data = trainData.peek();
+  if (!key || !data) return undefined;
+  return handledReplies(historyOf(data.states.keys(), data.eventsOf), Date.now()).get(key);
 }
 
 /** A premove as a move at `fen` (standard UCI), when it is legal there: a pawn reaching the last rank queens (mistake-lab's, and Lichess's by default). */
@@ -1003,6 +1035,21 @@ export async function practiceHint(): Promise<void> {
 }
 
 /** Stop: the game ends where it is, scored by the last judged move. */
+/**
+ * The game over played again from its start: afresh, or as an exact retry (§5.207, the owner's
+ * request of 2026-11-20), the opponent playing its moves of this game again until the user plays a
+ * new move. A game played from the opponent's move or by the database's dice alike.
+ */
+export function playAgain(exact = false): void {
+  const p = practice.peek();
+  if (!p) return;
+  const { retry: _r, ...setup } = p.setup;
+  startPractice(exact && p.moves.length ? { ...setup, retry: p.moves.map((m) => m.uci) } : setup);
+}
+
+/** Whether a game over can be retried exactly: a game from a position or a checklist's drill, with the opponent's moves to replay. */
+export const canRetryExact = (p: PracticeGame): boolean => (p.setup.kind === 'practice' || p.setup.kind === 'checklist') && p.moves.some((m) => !m.isUser);
+
 export function stopPractice(): void {
   const p = practice.peek();
   if (p && p.phase !== 'over') finish(p.gen, 'stopped');
@@ -1087,7 +1134,8 @@ async function writeHistory(g: number, reason: EndReason, result: 'win' | 'draw'
   const source: HistorySource = p.setup.kind === 'advantage' ? 'advantage' : p.setup.kind === 'checklist' ? 'todo' : 'practice';
   const outcome = reason === 'stopped' ? 'stopped' : OUTCOME[reason] === 'ended' ? 'ended' : result;
   const id = `rev_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  const entry = historyEntry({ id, ts: Date.now(), baseFen: p.setup.fen, color: p.setup.color, source, outcome, finalCp, title: p.setup.title, moves: p.moves, review: reviewOf(p.moves, repertoireAt(p.setup.fen, p.moves)) });
+  const forced = p.setup.retry ? forcedPlies(p.setup.retry, p.moves.map((m) => m.uci)) : 0;
+  const entry = historyEntry({ id, ts: Date.now(), baseFen: p.setup.fen, color: p.setup.color, source, outcome, finalCp, title: p.setup.title, moves: p.moves, review: reviewOf(p.moves, repertoireAt(p.setup.fen, p.moves)), ...(forced ? { forced } : {}) });
   if (!entry) return;
   patch(g, () => ({ historyId: id }));
   await recordEvent({ t: new Date().toISOString(), k: 'played', card: historyCard(id), game: { ...entry } });

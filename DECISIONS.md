@@ -2768,3 +2768,18 @@ The technical calls, each with its reason:
   games, the 1600s outvoted the 2200s: the moves' games averaged 1923 against Maia's 2000; from
   1800, 2001.
 - No data format changed; the Opponent settings on a device gain a field, read as off when absent.
+
+## Revision of 2026-11-20 (a checklist drill's replies varied, and Exact retry: PLAN.md §5.207)
+- **A checklist drill's opponent varies its replies over repeated games.** A reply handled in a
+  game won or drawn within the last 24 hours, among the opponent's first 10 moves after the line's
+  end, has its odds halved for each time it was handled more than the position's least-handled
+  likely reply (to 0.15 at the least). Why: the owner, 2026-11-20: repeating a line kept meeting
+  the main continuation; less likely "only after it was dealt with successfully", and back at its
+  usual odds once the other replies have been met.
+- **Handled is judged on the whole game, not a few moves after the reply.** Why: the owner: a
+  setup's difference (Nf3 or Ne2 against a Bg4 pin) may show only much later. A game lost credits
+  nothing, which costs only a slower rotation.
+- **No boost after a miss; Exact retry instead**: the opponent replays the game just played until
+  the user plays a new move. Why: the owner's choice, 2026-11-20.
+- **Read from the synced history**; the history entry gains an optional `forced` (the plies a retry
+  replayed), which older readers ignore. Nothing else of the owner's data changed.

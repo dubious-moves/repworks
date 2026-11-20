@@ -16,7 +16,7 @@ import { recordEvent } from '../app/state.ts';
 import { openingNameOf, practiceHistory, recordSaved, savedDeck } from '../app/games.ts';
 import type { CardRank } from '../core/progress/events.ts';
 import { SaveRankSelect } from './Rank.tsx';
-import { leadFor, analyse, canOfferDraw, canTakeBack, claimVictory, offerDraw, clearPremove, detection, setFoundState, type FoundTactic, discardSaved, gameOfHistory, ignoreRepertoire, loadOpponent, practiceFeedback, practiceHint, resumePractice, setPracticeFeedback, showsFeedback, savedPractice, saveOpponent, judge, parkPractice, practice, practiceMove, takeUpPractice, practiceReview, setPremove, startPractice, stopPractice, takeBack, type Opponent, type PracticeGame, type PracticeMove } from '../app/practice.ts';
+import { leadFor, analyse, canOfferDraw, canRetryExact, playAgain, canTakeBack, claimVictory, offerDraw, clearPremove, detection, setFoundState, type FoundTactic, discardSaved, gameOfHistory, ignoreRepertoire, loadOpponent, practiceFeedback, practiceHint, resumePractice, setPracticeFeedback, showsFeedback, savedPractice, saveOpponent, judge, parkPractice, practice, practiceMove, takeUpPractice, practiceReview, setPremove, startPractice, stopPractice, takeBack, type Opponent, type PracticeGame, type PracticeMove } from '../app/practice.ts';
 import { parseUciMove, standardUci } from '../core/chess/uci.ts';
 import { makeFen } from 'chessops/fen';
 import { CLASSIFICATION, moverScore, type Classification } from '../core/games/grade.ts';
@@ -237,7 +237,7 @@ export function PracticeBoard(props: { onNext?: () => void }) {
   // back red on its two squares while the screen names the study move.
   const boardPlayed = cls && lastUser && last === lastUser ? { uci: lastUser.uci, brush: FEEDBACK_BRUSH[lastUser.classification!] } : p.deviation ? { uci: p.deviation.uci, brush: 'red' } : undefined;
   return (
-    <div class="train-grid practice-game" data-phase={p.phase} data-moves={p.moves.length} data-premove={p.premove ? p.premove.from + p.premove.to : ''}>
+    <div class="train-grid practice-game" data-phase={p.phase} data-moves={p.moves.length} data-last={last?.uci ?? ''} data-source={p.source ?? ''} data-premove={p.premove ? p.premove.from + p.premove.to : ''}>
       <MoveBoard fen={fen} orientation={s.color} movable={p.phase === 'user'} lastUci={last?.uci} arrows={arrows} onMove={(u) => void practiceMove(u)} premove={gamePremove(p)} mirror={{ played: boardPlayed }} />
       <div class="train-panel">
         <p class="train-counters">
@@ -1025,10 +1025,15 @@ export function PracticeReview(props: { game: PracticeGame; onNext?: (() => void
             </button>
           ) : (
             g.gen >= 0 && (
-              <button type="button" onClick={() => startPractice({ ...s })}>
+              <button type="button" onClick={() => playAgain()}>
                 Play again
               </button>
             )
+          )}
+          {g.gen >= 0 && canRetryExact(g) && (
+            <button type="button" class="secondary" data-testid="practice-exact-retry" title="The same game again: the opponent repeats its moves until you play a new one" onClick={() => playAgain(true)}>
+              Exact retry
+            </button>
           )}
           <button type="button" class="secondary" title="The analysis board at this position; ← comes back to the review" onClick={() => analyseFrom({ fen: board, side: s.color })}>
             Analyse

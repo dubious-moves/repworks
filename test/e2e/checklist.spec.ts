@@ -347,6 +347,65 @@ test('a drill drawn by repetition, the lead-up’s positions counted: after 2.c3
   await expect(page.getByTestId('practice-end')).toContainText('Draw by threefold repetition. Counted as a draw.');
 });
 
+test('a game drawn, then Exact retry: the opponent repeats its moves until a new one; then its replies varied (§5.207)', async ({ page }) => {
+  test.setTimeout(90_000);
+  const { github } = world();
+  const ex = explorer();
+  // At the Alapin's end 3.Na3 (600 games) or 3.d4 (400); the dice at 0.5 draw 3.Na3. After it the
+  // knights shuffle, the user's 3...Nc6 4.Nb1 Na5 5.Na3 Nc6 6.Nb1 Nb8 7.Na3 Nc6: the third time, a draw.
+  const g = (sans: string[], san: string, n: number) => ({ san, uci: uci(sans, san), white: n / 2, draws: 0, black: n / 2 });
+  ex.games.set(key(ALAPIN), [g(ALAPIN, 'Na3', 600), g(ALAPIN, 'd4', 400)]);
+  const SHUFFLE = ['Na3', 'Nc6', 'Nb1', 'Na5', 'Na3', 'Nc6', 'Nb1', 'Nb8', 'Na3', 'Nc6'];
+  for (let i = 2; i < SHUFFLE.length; i += 2) {
+    const at = [...ALAPIN, ...SHUFFLE.slice(0, i)];
+    if (key(at) !== key(ALAPIN)) ex.games.set(key(at), [g(at, SHUFFLE[i]!, 1000)]);
+  }
+  await page.addInitScript(() => (Math.random = () => 0.5));
+  await setUp(page, github, 'desktop', ex);
+  await page.evaluate(() => (location.hash = '#/checklist?sid=Rep0Najd&side=black'));
+  const section = await block(page);
+  await section.getByLabel('Plies').selectOption('0');
+  await section.getByRole('button', { name: 'Make' }).click();
+  const alapin = section.getByTestId('checklist-line').filter({ hasText: 'Alapin' });
+  await expect(alapin.locator('.checklist-line')).toHaveText(/^1\. e4 c5 2\. c3 Nf6/);
+  await alapin.getByRole('button', { name: 'Easy' }).click();
+  const drill = page.getByTestId('checklist-drill');
+  for (const [from, to, step] of [['c7', 'c5', '1'], ['g8', 'f6', '3']] as const) {
+    await expect(drill).toHaveAttribute('data-step', step);
+    await clickSquare(page, from, 'black');
+    await clickSquare(page, to, 'black');
+  }
+  const game = page.locator('.practice-game');
+  /** The user's move at ply `n` of the game, after the opponent's `last` from `source`. */
+  const play = async (n: number, sans: string[], san: string, last: string, source: RegExp) => {
+    await expect(game).toHaveAttribute('data-moves', String(n));
+    await expect(game).toHaveAttribute('data-phase', 'user');
+    await expect(game).toHaveAttribute('data-last', uci([...ALAPIN, ...sans.slice(0, -1)], last));
+    await expect(game).toHaveAttribute('data-source', source);
+    const u = uci([...ALAPIN, ...sans], san);
+    await clickSquare(page, u.slice(0, 2), 'black');
+    await clickSquare(page, u.slice(2, 4), 'black');
+  };
+  for (let i = 1; i < SHUFFLE.length; i += 2) await play(i, SHUFFLE.slice(0, i), SHUFFLE[i]!, SHUFFLE[i - 1]!, /^DB/);
+  await expect(page.getByTestId('practice-end')).toContainText('Draw by threefold repetition. Counted as a draw.');
+
+  // Exact retry: 3.Na3 again from the earlier game (the variety would now say 3.d4), 4.Nb1 after
+  // 3...Nc6; then 4...Nb8, a new move, and the opponent draws afresh: 5.d4, as 3.Na3 was handled twice.
+  await page.getByTestId('practice-exact-retry').click();
+  await play(1, ['Na3'], 'Nc6', 'Na3', /^the earlier game$/);
+  await play(3, ['Na3', 'Nc6', 'Nb1'], 'Nb8', 'Nb1', /^the earlier game$/);
+  await expect(game).toHaveAttribute('data-moves', '5');
+  await expect(game).toHaveAttribute('data-last', uci([...ALAPIN, 'Na3', 'Nc6', 'Nb1', 'Nb8'], 'd4'));
+  await expect(game).toHaveAttribute('data-source', /^DB/);
+  await page.getByRole('button', { name: /^Stop/ }).click();
+  await expect(page.getByTestId('practice-end')).toContainText('Stopped. Counted as a loss.');
+  // Play again: a fresh game, its first reply varied: 3.d4.
+  await page.getByRole('button', { name: 'Play again' }).click();
+  await expect(game).toHaveAttribute('data-moves', '1');
+  await expect(game).toHaveAttribute('data-last', uci(ALAPIN, 'd4'));
+  await expect(game).toHaveAttribute('data-source', /^DB/);
+});
+
 test('lines added by hand from the study and the line list, kept by Make again, one taken out', async ({ page }) => {
   test.setTimeout(90_000);
   const { git, github } = world();
