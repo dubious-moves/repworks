@@ -2795,3 +2795,13 @@ The technical calls, each with its reason:
 - **A new synced event kind, `failed`, on the line's card** (older readers skip it), not read from
   the history: the history keeps only the newest 150 games, and a failed line lasts until won.
 
+
+## Revision of 2026-11-20 (a game card's judge within six seconds: PLAN.md §5.209)
+- **A game card's move is judged within about 6 s of being played.** The card's three lines, if
+  still searching, are taken at their depth 3.5 s after the move; a move outside them is searched
+  in what is left (1.5 s at least). Was (§5.55, §5.151): both searches to depth 18 (16 on a phone)
+  or 8 s each, one after the other, up to 16 s. Depth 18 stays the goal for every search that
+  finishes inside the budget; lines cut short are searched on after the verdict, for the next try.
+- Why: the owner, 2026-11-20: "'Stockfish is judging…' is still taking way too long. It often goes
+  10-12+ seconds … Maybe 5-8 seconds is acceptable but not more than that." Measured: on Stockfish
+  19's full net the two searches take 4 s at the median and over 8 s in one card in ten.

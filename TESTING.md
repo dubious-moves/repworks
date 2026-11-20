@@ -970,6 +970,16 @@ Training and Learn on the Chessnut Move: see 14 (PLAN.md §5.192).
 
 ## 6. Game cards and Games
 
+### A game card's move judged within six seconds (§5.209, 2026-11-20)
+- Games → Review on the PC, with your usual engine settings (Stockfish 19 full net too): play a
+  move at once as a card opens, and again after thinking. "Stockfish is judging…" should end
+  within about 6 s every time, usually much sooner. Try again on the same card: judged as quickly.
+- Does a grade ever look wrong after a quick move (the lines are then taken shallower)? Note the
+  card.
+- **Checked**: Playwright with the fake engine (desktop and emulated phone): a card whose lines
+  take 20 s judged in 3 to 6 s. The engines' times on the fixture games' 85 mistakes in Node on a
+  4-core container. Not on your PC.
+
 ### A game's opening where it came without one (§5.181, 2026-11-15)
 - Games → a game that has no opening name (a chess.com game without one, a game from a file):
   its head names it from its moves, from Lichess's list. In the games' explorer, a position your

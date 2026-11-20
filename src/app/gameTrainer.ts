@@ -19,7 +19,7 @@ import { goodEnough, judgeMove, mistakeGrade, moverScore, tacticGrade, type Judg
 import { expected, nextLine, playReply, playUser, repliesDue, startTactic, type TacticRun } from '../core/games/tactic.ts';
 import type { Grade } from '../core/progress/events.ts';
 import { positionOf } from '../core/storm/walk.ts';
-import { analyseForStorm, cancelStormEngine, endStormEngine, type EngineAnswer } from './stormEngine.ts';
+import { analyseForStorm, cancelStormEngine, endStormEngine, finishStormBy, type EngineAnswer } from './stormEngine.ts';
 import { recordEvent } from './state.ts';
 import { gameQueueNow } from './games.ts';
 import { leavePractice, loadOpponent, practice, startPractice } from './practice.ts';
@@ -99,21 +99,42 @@ const setRun = (patch: Partial<CardRun>, phase?: TrainerPhase) => {
 /* ------------------------------------------------------------------ the engine's view of a card */
 
 const searches = new Map<string, Promise<EngineAnswer | null>>();
+/** The depth a card's searches go to. */
+const judgeDepth = (): number => (narrow() ? 16 : 18);
 /**
- * A position's search (depth 18, 16 on a phone), kept for the card. `judge`: the card's own judge
- * (its lines and a move's search), ahead of the line's searches waiting, and of one under way,
- * which starts again after (§5.151).
+ * A position's search (depth 18, 16 on a phone, `movetime` ms at most), kept for the card. `judge`:
+ * the card's own judge (its lines and a move's search), ahead of the line's searches waiting, and
+ * of one under way, which starts again after (§5.151). An answer short of the depth (cut by the
+ * judge's deadline, §5.209) isn't kept: asked again, it searches on over the warm hash.
  */
-function analyse(fen: string, lines: number, judge = false): Promise<EngineAnswer | null> {
+function analyse(fen: string, lines: number, judge = false, movetime = 8000): Promise<EngineAnswer | null> {
   const key = `${fen}|${lines}`;
   let p = searches.get(key);
   if (!p) {
-    p = analyseForStorm(fen, lines, narrow() ? 16 : 18, 8000, undefined, judge);
-    searches.set(key, p);
+    const asked = analyseForStorm(fen, lines, judgeDepth(), movetime, undefined, judge);
+    p = asked;
+    searches.set(key, asked);
+    void asked.then((a) => {
+      if (short(a) && searches.get(key) === asked) searches.delete(key);
+    });
     if (searches.size > 50) searches.delete(searches.keys().next().value!);
   }
   return p;
 }
+
+/** An answer whose lines didn't all reach the depth (or no answer). */
+const short = (a: EngineAnswer | null): boolean => !a?.lines.length || a.lines.some((l) => l.depth < judgeDepth());
+
+/**
+ * How long a move's judge may take, from the move (§5.209; the owner, 2026-11-20: "Maybe 5-8
+ * seconds is acceptable but not more than that"). The position's lines, when still searching at
+ * the move, are taken as they stand with `AFTER_MS` left, for the search after a move outside
+ * them; that one gets what is left, `AFTER_MIN_MS` at least. Depth 18 stays the goal: only a
+ * search that would run past the budget is taken shallower.
+ */
+const JUDGE_MS = 6000;
+const AFTER_MS = 2500;
+const AFTER_MIN_MS = 1500;
 
 function moverLines(fen: string, a: EngineAnswer | null): MoverLine[] {
   const pos = positionOf(fen);
@@ -255,6 +276,8 @@ async function mistakeMove(item: MistakeItem, uci: string): Promise<void> {
   const after = playOn(r.fen, uci);
   if (!after) return;
   setRun({ board: after, lastUci: uci }, 'judging');
+  const deadline = performance.now() + JUDGE_MS;
+  finishStormBy(r.fen, 3, deadline - AFTER_MS);
   const answer = await analyse(r.fen, 3, true);
   const lines = moverLines(r.fen, answer);
   let afterCp: number | undefined;
@@ -265,7 +288,7 @@ async function mistakeMove(item: MistakeItem, uci: string): Promise<void> {
     const pos = positionOf(after);
     if (pos?.isEnd()) afterCp = pos.isCheckmate() ? 10000 : 0;
     else {
-      const a = await analyse(after, 1, true);
+      const a = await analyse(after, 1, true, Math.max(AFTER_MIN_MS, deadline - performance.now()));
       const m = moverLines(after, a)[0];
       if (m) afterCp = -m.cp;
       played = { uci, cont: a?.lines[0]?.pv ?? [], cpWhite: whiteCp(a?.lines[0]) };
@@ -297,6 +320,8 @@ async function mistakeMove(item: MistakeItem, uci: string): Promise<void> {
     if (line) patch.line = line;
   }
   setRun(patch, ok ? 'right' : 'wrong');
+  // The position's lines cut by the deadline: searched on now, for the next try.
+  if (short(answer)) void analyse(r.fen, 3, true);
   if (patch.line) prepareExtension(patch.line);
 }
 

@@ -6,7 +6,8 @@
 // lines (Easy); the reviews synced. The engine's line after a move (PLAN.md §6, item 1): shown after
 // the right move at a press and hidden; after the blunder at once, at the reply, stepped, extended
 // past its end, branched by a move on the board, and stepped back before the move to try again;
-// a move tried again while the line's end is searched, judged ahead of that search (§5.151).
+// a move tried again while the line's end is searched, judged ahead of that search (§5.151); a
+// move played while the card's lines take long, judged within the judge's six seconds (§5.209).
 // The games' own explorer (§6, item 4): the games by position, filtering the list, and the opening
 // name titling a practice game from there. "Hide time trouble" (§6, item 5): the queen's gambit
 // game's mistake was made with 40 s left after 5 s spent. Then (§5.56) a mistake made into a sequence on the analysis
@@ -43,6 +44,7 @@ const G2_BRANCH = after([...G2.slice(0, 6), 'g4', 'Nxg4', 'h3']);
 const TACTIC_FEN = 'r1bqk1nr/pppnppbp/3p2p1/8/2BPP3/5N2/PPP2PPP/RNBQK2R w KQkq - 2 5';
 const SEQ_AT = after([...G1.slice(0, 6), 'Nxd4', 'exd4']);
 const G2_A3 = after([...G2.slice(0, 6), 'a3']);
+const G1_H3 = after([...G1.slice(0, 6), 'h3']);
 
 const ENGINE_LINES: Record<string, [number, number, string][]> = {
   [G1_AT.key]: [
@@ -64,6 +66,7 @@ const ENGINE_LINES: Record<string, [number, number, string][]> = {
     [3, -50, 'c2c3 d4c3'],
   ],
   [G2_A3.key]: [[1, -20, 'f8e7 g1f3']],
+  [G1_H3.key]: [[1, -20, 'g8f6 e1g1']],
 };
 
 let site: SiteServer;
@@ -320,15 +323,62 @@ test('a move tried again is judged ahead of the engine line’s search, which st
     // judges' depth), then the line's end searched again.
     const go = `go depth ${isMobile ? 16 : 18} movetime 8000`;
     const at = (cmds: string[]) => cmds.findIndex((c) => c.startsWith(`position fen ${G2_A3.key} `));
-    await expect.poll(() => commands(slow.requests).slice(at(commands(slow.requests)) - 3)).toEqual([
+    // The move's search has what is left of the judge's six seconds (§5.209): all of it here.
+    const budget = (c: string) => (c.startsWith('go ') && Number(/movetime (\d+)/.exec(c)![1]) < 8000 && Number(/movetime (\d+)/.exec(c)![1]) > 5000 ? 'judge budget' : c);
+    await expect.poll(() => commands(slow.requests).slice(at(commands(slow.requests)) - 3).map(budget)).toEqual([
       `position fen ${G2_LINE_END.fen}`,
       go,
       'stop',
       `position fen ${G2_A3.fen}`,
-      go,
+      'judge budget',
       `position fen ${G2_LINE_END.fen}`,
       go,
     ]);
+  } finally {
+    await slow.close();
+  }
+});
+
+test('a move played while the card’s lines are still searched is judged within six seconds (§5.209)', async ({ page, isMobile }) => {
+  // The first card's lines would take 20 s here: h3, played at once, is judged from them as they
+  // stand 3.5 s after it, and its own position searched in the time left; the lines searched on after.
+  const slow = await serveSite({ engine: fakeEngine(SLOW, ENGINE_LINES, false, undefined, { [G1_AT.key]: 20_000 }) });
+  try {
+    await setUp(page, slow);
+    await page.getByRole('link', { name: 'Games', exact: true }).click();
+    await page.getByRole('button', { name: 'Refresh' }).click();
+    await expect(page.getByTestId('games-status')).toContainText('Gist: 3 games read');
+    await page.getByRole('link', { name: 'Review' }).click();
+    const card = page.locator('.game-card');
+    await expect(card).toHaveAttribute('data-card', 'm|GameOne1_7');
+    await expect.poll(() => commands(slow.requests)).toContain(`position fen ${G1_AT.fen}`);
+    await play(page, 'h2h3');
+    await expect(page.getByTestId('game-feedback')).toHaveText('Stockfish is judging…');
+    const t0 = Date.now();
+    await expect(page.getByTestId('game-feedback')).toHaveText(/ · −\d/, { timeout: 6000 });
+    const took = Date.now() - t0;
+    expect(took).toBeGreaterThan(3000);
+    expect(took).toBeLessThan(6000);
+    const depth = isMobile ? 16 : 18;
+    const at = (cmds: string[]) => cmds.findIndex((c) => c.startsWith(`position fen ${G1_H3.key} `));
+    // The lines' search stopped for h3's position, searched in what is left; then the lines on.
+    const after = () => commands(slow.requests).slice(at(commands(slow.requests)) - 4).map((c) => c.replace(/^(go depth \d+ movetime )\d+$/, (m, go: string) => (c.includes('movetime 8000') ? m : `${go}N`)));
+    await expect.poll(after).toEqual([
+      `position fen ${G1_AT.fen}`,
+      `go depth ${depth} movetime 8000`,
+      'stop',
+      'setoption name MultiPV value 1',
+      `position fen ${G1_H3.fen}`,
+      `go depth ${depth} movetime N`,
+      'setoption name MultiPV value 3',
+      `position fen ${G1_AT.fen}`,
+      `go depth ${depth} movetime 8000`,
+    ]);
+    // The time left for h3's position, from the six seconds: 2.5 s or a little less.
+    const goAfter = commands(slow.requests)[at(commands(slow.requests)) + 1]!;
+    const ms = Number(/movetime (\d+)/.exec(goAfter)![1]);
+    expect(ms).toBeGreaterThanOrEqual(1500);
+    expect(ms).toBeLessThanOrEqual(2500);
   } finally {
     await slow.close();
   }

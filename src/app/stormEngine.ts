@@ -35,6 +35,10 @@ interface Job {
   urgent?: boolean;
   /** Ahead of the background searches, behind the urgent ones, and no search under way is stopped for it (an endgame's judges). */
   ahead?: boolean;
+  /** Taken as it stands at this time (`performance.now`), whatever its depth (`finishStormBy`). */
+  cutAt?: number;
+  /** Sent to its worker. */
+  searching?: boolean;
   resolve(a: EngineAnswer | null): void;
 }
 
@@ -117,6 +121,14 @@ function onUpdate(lane: Lane, a: Analysis): void {
   if (a.done || a.noMove) finish(lane, answerOf(a));
 }
 
+/** The lane's search stopped and taken at the depth it reached (§14.23); nothing when it has no line yet. */
+function cut(lane: Lane, job: Job): void {
+  if (lane.job !== job) return;
+  const now = lane.search?.current();
+  lane.search?.stop();
+  finish(lane, now && now.fen === job.fen && now.lines.length ? answerOf(now) : null);
+}
+
 function finish(lane: Lane, a: EngineAnswer | null): void {
   clearTimeout(lane.timer);
   const j = lane.job;
@@ -143,12 +155,10 @@ async function next(): Promise<void> {
   const moves = job.moves?.length ? job.moves : undefined;
   if (moves) legal = Math.min(legal, moves.length);
   // A search that runs out of time is taken at the depth it reached (§14.23).
-  lane.timer = setTimeout(() => {
-    if (lane.job !== job) return;
-    const now = search.current();
-    search.stop();
-    finish(lane, now && now.fen === job.fen && now.lines.length ? answerOf(now) : null);
-  }, job.movetime + 4000);
+  // Sooner when its caller has a deadline (`finishStormBy`), a second at least once it starts.
+  const limit = job.movetime + 4000;
+  lane.timer = setTimeout(() => cut(lane, job), job.cutAt === undefined ? limit : Math.min(limit, Math.max(1000, job.cutAt - performance.now())));
+  job.searching = true;
   const key = positionKeyOf(pos) + (moves ? `|${moves.join(' ')}` : '');
   search.analyse({ fen: job.fen, key, turn: pos.turn, depth: job.depth, movetime: job.movetime, lines: job.lines, legal, ...(moves ? { moves } : {}) });
 }
@@ -203,11 +213,34 @@ export function analyseForStorm(fen: string, lines: number, depth: number, movet
       if (lane?.search && running && !running.urgent) {
         clearTimeout(lane.timer);
         lane.job = undefined;
+        running.searching = false;
         queue.splice(queue.indexOf(job) + 1, 0, running);
       }
     }
     void next();
   });
+}
+
+/**
+ * A deadline for the search of `fen`'s `lines` (a game card's judge, §5.209): running, it is taken
+ * at `at` (`performance.now`) at the depth it reached, unless it ends sooner; still waiting, it gets
+ * no more time than is left then, a second at least. Nothing when no such search is asked.
+ */
+export function finishStormBy(fen: string, lines: number, at: number): void {
+  const mine = (j: Job | undefined): j is Job => !!j && j.fen === fen && j.lines === lines && !j.moves;
+  const lane = lanes.find((l) => mine(l.job));
+  if (lane) {
+    const job = lane.job!;
+    if (job.cutAt !== undefined && job.cutAt <= at) return;
+    job.cutAt = at;
+    // Its worker still starting: `next` sets the timer with the deadline.
+    if (!job.searching) return;
+    clearTimeout(lane.timer);
+    lane.timer = setTimeout(() => cut(lane, job), Math.max(0, at - performance.now()));
+    return;
+  }
+  const waiting = queue.find(mine);
+  if (waiting) waiting.movetime = Math.min(waiting.movetime, Math.max(1000, at - performance.now()));
 }
 
 /** The searches running and those waiting answered with nothing; the workers stay. */
