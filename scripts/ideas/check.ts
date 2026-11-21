@@ -21,7 +21,8 @@
 // is the only sensible move (unless Maia misses it: then it is the one move that saves us), whose
 // question names the answer's square, or names the piece that moves when that leaves one sensible
 // move or Maia then finds it `GIVEN_AWAY` of the time (decide.ts). It warns on a card Maia finds
-// unprompted, one under `RARE` reach, and a deck over its cards (an error over `MAX_CARDS`).
+// unprompted, one under `RARE` reach (or `rare`), and a deck over its cards (an error over `MAX_CARDS`, or
+// `maxCards` where the owner raised the cap for a repertoire).
 //
 // A card never asks the very next move of another card's line (the owner, 2026-10-25, after
 // 3. Bf4 cxd4 and then 4. cxd4 Qb6 came as two cards): a card at the position after another
@@ -119,7 +120,7 @@ function repertoireMoves(rep: Repertoire | undefined, pos: Position): Map<string
 
 export async function checkDeck(
   text: string,
-  o: { engine?: Engine; policy?: Policy; depth: number; rep?: Repertoire; cards?: number; log?: (line: string) => void },
+  o: { engine?: Engine; policy?: Policy; depth: number; rep?: Repertoire; cards?: number; maxCards?: number; rare?: number; log?: (line: string) => void },
 ): Promise<{ findings: Finding[]; chapters: number; onRepertoire: number; cards: number }> {
   const findings: Finding[] = [];
   let onRepertoire = 0;
@@ -197,7 +198,7 @@ export async function checkDeck(
       if (o.rep?.positions.has(key)) onRepertoire++;
       cards++;
       const at = o.rep?.positions.get(key);
-      if (at && at.reach < RARE) warn(`the card's position is reached in ${(at.reach * 100).toFixed(1)}% of games: too rare to drill; a rule of thumb or a side line can carry it`);
+      if (at && at.reach < (o.rare ?? RARE)) warn(`the card's position is reached in ${(at.reach * 100).toFixed(1)}% of games: too rare to drill; a rule of thumb or a side line can carry it`);
       if (side && start.turn === side) {
         await decision(start);
         const next = new Map<string, string>();
@@ -278,7 +279,9 @@ export async function checkDeck(
     }
   }
   const budget = o.cards ?? CARDS;
-  if (cards > MAX_CARDS) findings.push({ chapter: 'the deck', level: 'error', text: `${cards} cards; a deck has ${budget} or so, never more than ${MAX_CARDS}: keep the decisions worth most (cv.ts decisions)` });
+  // The owner may raise the cap for one repertoire (`--max-cards`: the Jobava deck, 2026-11-21).
+  const cap = o.maxCards ?? MAX_CARDS;
+  if (cards > cap) findings.push({ chapter: 'the deck', level: 'error', text: `${cards} cards; a deck has ${budget} or so, never more than ${cap}: keep the decisions worth most (cv.ts decisions)` });
   else if (cards > budget) findings.push({ chapter: 'the deck', level: 'warning', text: `${cards} cards, more than the ${budget} asked for: keep the decisions worth most (cv.ts decisions)` });
   return { findings, chapters: parsed.length, onRepertoire, cards };
 }

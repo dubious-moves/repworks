@@ -14,7 +14,7 @@
 //   node scripts/ideas/cv.ts develop <repertoire.pgn> [--side black] [--piece f8-bishop]
 //   node scripts/ideas/cv.ts playout <pos> [--n 6] [--plies 24] [--white maia:2000] [--black sf:12[:30]] [--seed 1] [--judge 14]
 //   node scripts/ideas/cv.ts decisions <repertoire.pgn> [--side black] [--min 2] [--depth 14] [--top 40] [--no-engine]
-//   node scripts/ideas/cv.ts check   <deck.pgn> [--rep repertoire.pgn | --games model-games.pgn] [--depth 16] [--cards 12] [--no-engine] [--no-maia] [--verbose]
+//   node scripts/ideas/cv.ts check   <deck.pgn> [--rep repertoire.pgn | --games model-games.pgn] [--depth 16] [--cards 12] [--max-cards 15] [--rare 2] [--no-engine] [--no-maia] [--verbose]
 //   node scripts/ideas/cv.ts games   <model-games.pgn> [--after "10. Ne4 Rad8"] [--with f5] [--window 15] [--depth 4] [--min 2] [--at 10,20,30,40] [--jump 100] [--maia 2000,2200] [--game 7]
 //
 // `tree`, `profile`, `develop` and `decisions` read model games (Lc0 against Maia, from the owner's
@@ -306,7 +306,7 @@ async function main(): Promise<number> {
       const engine = flags.has('no-engine') ? undefined : new Engine();
       const rep = flags.get('rep') ? readRepertoire(readFileSync(flags.get('rep')!, 'utf8')) : flags.get('games') && flags.get('games') !== 'true' ? repertoireOf(flags.get('games')!, flags, true) : undefined;
       const policy = flags.has('no-maia') ? undefined : maiaPolicy();
-      const r = await checkDeck(readFileSync(args[0]!, 'utf8'), { engine, policy, depth: depth(16), rep, cards: Number(flags.get('cards') ?? CARDS), log: flags.has('verbose') ? (l) => console.log(l) : undefined });
+      const r = await checkDeck(readFileSync(args[0]!, 'utf8'), { engine, policy, depth: depth(16), rep, cards: Number(flags.get('cards') ?? CARDS), maxCards: flags.get('max-cards') ? Number(flags.get('max-cards')) : undefined, rare: flags.get('rare') ? Number(flags.get('rare')) / 100 : undefined, log: flags.has('verbose') ? (l) => console.log(l) : undefined });
       engine?.quit();
       for (const f of r.findings) console.log(`${f.level === 'error' ? 'ERROR' : 'warn '} ${f.chapter}: ${f.text}`);
       const errors = r.findings.filter((f) => f.level === 'error').length;

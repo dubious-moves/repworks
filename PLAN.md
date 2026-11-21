@@ -6939,7 +6939,9 @@ skill and its tools, then idea cards in the app.
       - more cards than `--cards` (default 12).
 
       It refuses more than 15 cards. The current Benoni deck now fails with 25 errors, among
-      them all three of the owner's examples.
+      them all three of the owner's examples. (2026-11-21: `--max-cards` raises that cap and
+      `--rare` the reach warned as rare, for a repertoire where the owner asked for a bigger
+      deck: the Jobava deck, about 30 cards, 12 rules, cards from 0.5% reach.)
     - **The skill and the workflow:**
       - Cards are taken from `decisions` by value: about 12 (the workflow's `cards`), never
         more than 15, in at most 8 ideas, at most 8 rules.

@@ -2805,3 +2805,12 @@ The technical calls, each with its reason:
 - Why: the owner, 2026-11-20: "'Stockfish is judging…' is still taking way too long. It often goes
   10-12+ seconds … Maybe 5-8 seconds is acceptable but not more than that." Measured: on Stockfish
   19's full net the two searches take 4 s at the median and over 8 s in one card in ten.
+
+
+## Revision of 2026-11-21 (a bigger idea deck for one repertoire: PLAN.md §5.128)
+- **The Jobava (1. Nc3) deck may have about 30 cards and 12 rules, its cards taken from 0.5% reach
+  and up.** The cap of 15 cards and 8 rules (2026-10-24) stays the default; `check` takes
+  `--max-cards` and `--rare` for a repertoire where the owner raised it. Why: the owner wants to
+  play this repertoire from its idea cards alone ("My dream would be to only have to learn the idea
+  cards and feel safe to play it … I think I'll need a bigger deck size"), and its reach spreads
+  thin: only 35 of its 300 White positions reach 2%, most of them before the lines part.

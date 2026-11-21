@@ -400,10 +400,13 @@ test('a card is a decision: the question names no square, the deck keeps to its 
   assert.equal(over.cards, 13);
   assert.deepEqual(over.findings.map((f) => `${f.level} ${f.text.slice(0, 41)}`), ['warning 13 cards, more than the 12 asked for: kee']);
   assert.ok((await checkDeck(deck(16), { depth: 8 })).findings.some((f) => f.level === 'error' && f.text.startsWith('16 cards; a deck has 12 or so, never more than 15')));
+  // The owner raised the cap for one repertoire: sixteen of thirty is no error, only over the size asked for.
+  assert.deepEqual((await checkDeck(deck(16), { depth: 8, cards: 14, maxCards: 30 })).findings.map((f) => `${f.level} ${f.text.slice(0, 19)}`), ['warning 16 cards, more than']);
   // A card under 2% of the repertoire's games is too rare to drill.
   const rare = readRepertoire('[Orientation "black"]\n\n1. e4 { 1% } (1. d4 { 99% } 1... d5) 1... e5 *');
   const e4 = neutral('1. Rare', 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1', '1... e5 *', 'What do we play?');
   assert.ok((await checkDeck(e4, { depth: 8, rep: rare })).findings.some((f) => f.level === 'warning' && f.text.includes('reached in 1.0% of games: too rare')));
+  assert.ok(!(await checkDeck(e4, { depth: 8, rep: rare, rare: 0.005 })).findings.some((f) => f.text.includes('too rare')));
 });
 
 test('a card is a decision: Maia and Stockfish on what the question leaves to decide', { timeout: 120_000 }, async () => {

@@ -54,7 +54,8 @@ found the answer 85% of the time or more. So:
   Its last list (natural: Maia finds it 80% of the time or more; forced: one sensible move) is
   rules of thumb, not cards.
 - **About 12 cards a deck, never more than 15, and at most 8 rules.** Cut the cards worth least
-  before adding any.
+  before adding any. Only the owner raises this, for one repertoire (the Jobava deck, 2026-11-21:
+  about 30 cards and 12 rules, from 0.5% reach): run `check` with `--max-cards` and `--rare`.
 - **The question is neutral; let the board ask.** It may say what the opponent has just played:
   "White has just played 7. Bg5. What do we play, and why?" It never names the square our answer
   goes to or takes on, and never lists our candidates ("d6 or d5?"). It names the piece that moves
@@ -113,7 +114,7 @@ Knowledge decides what to look for and how to say it; it is never the evidence.
 | `develop <pgn> [--piece f8-bishop]` | the development map: each of our pieces and pawns, in the order they come out, with its first squares by reach, the positions where it goes there, what stands on the board there and not at its other squares ("with"/"without"), and its routes to the line ends; `--piece` lists every position with its FEN and setup |
 | `playout <pos> --n 6 --plies 20 --white maia:2000 --black sf:12:25` | short games from a position, with what each side played: model games where none exist |
 | `decisions <pgn> [--min 2] [--depth 14] [--top 40] [--no-engine]` | our positions at 2% reach or more, past the trunk, ranked by value (reach × Maia's miss × the miss's cost): each with its FEN, how often Maia 2000/2200 finds our move (or the same exchange in another order), Maia's likeliest other move and what it gives up, our sensible moves; then the natural or forced ones. About 2.5 minutes on the lite Stockfish for 90 positions |
-| `check <deck.pgn> --rep <repertoire.pgn> [--depth 18] [--cards 12] [--no-engine] [--no-maia] [--verbose]` | the deck's check (below); `--verbose` prints each card's sensible moves and how often Maia finds its answer |
+| `check <deck.pgn> --rep <repertoire.pgn> [--depth 18] [--cards 12] [--max-cards 15] [--rare 2] [--no-engine] [--no-maia] [--verbose]` | the deck's check (below); `--verbose` prints each card's sensible moves and how often Maia finds its answer; `--max-cards` and `--rare` (a percentage) only where the owner raised the deck's size |
 
 Stockfish is the vendored lite build, single-threaded (depth 18 with 4 lines takes about 10 s).
 On a machine with a native Stockfish, set `STOCKFISH=/path/to/stockfish` (and
