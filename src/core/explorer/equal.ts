@@ -11,7 +11,19 @@
 // was 49.0% at equal ratings; 1.e4 c5 2.d3, played 30 points below, went from 48.2% to 52.5%.
 //
 // Elo's curve is close to straight over the gaps found (tens of points), so the gap of the
-// averages stands in for the average of each game's gap. Pure.
+// averages stands in for the average of each game's gap.
+//
+// Transpositions (2026-11-23): the explorer answers by position, so the replies after a move
+// include every game reaching that position by another order. When those outnumber the move's own
+// games, the replies' ratings are another population's: at 1. Nc3 d5 2. d4 c5 3. Bf4 Nc6, 4.e3's
+// 48,682 games lead to a position with 136,261, mostly from the London's 1. d4 d5 2. Bf4 c5 3. e3
+// Nc6 4. Nc3 (Black near 1980 there, against 4.e3's players' 1875). Then the opponents' rating is
+// taken from the position itself: the players of the move that led here are the opponents of
+// every move here, and a move's opponents follow its players' distance from the position's average
+// by a slope (`followAt`): near 0.8 over a wide filter, where matchmaking pairs similar ratings,
+// near 0 in one band, where the explorer's filing by the players' midpoint pairs a stronger mover
+// with a weaker opponent. Fitted to the moves here whose opponents are known, pulled towards the
+// filter's prior. Pure.
 import type { CompactExplorer } from './providers.ts';
 import type { Side, Split } from './search.ts';
 
@@ -44,6 +56,36 @@ export function shiftSplit(split: Split, turn: Side, delta: number): Split {
   return turn === 'w' ? { w: w2, d: split.d, b: l2 } : { w: l2, d: split.d, b: w2 };
 }
 
+/**
+ * The position after a move may hold this many games per game of the move's own before its replies'
+ * ratings stop standing for the move's opponents: over it, the estimate from the move that led here
+ * is used when there is one (`opponentsBefore`).
+ */
+export const INFLOW = 1.1;
+/** Without the move that led here, the replies after the move still serve up to this. */
+export const INFLOW_MAX = 1.25;
+/**
+ * How far a move's opponents' rating follows its players' distance from the position's average,
+ * before the moves here pull it: by the filter's number of Lichess rating bands. Measured on
+ * 2026-11-23 (blitz, rapid and classical) on the moves whose position after had no other way in:
+ * 0.82 over 1600–2200 (four bands, 27 positions, 72 moves), 0.68 over 2000–2200 (two bands, 18
+ * moves), 0.05 over 2000 alone (20 moves).
+ */
+export const FOLLOW = 0.8;
+export const followPrior = (bands: number): number => (bands <= 1 ? 0 : bands === 2 ? 0.7 : FOLLOW);
+/** The prior's weight in the fit, in squared points: a known move 45 points from the average weighs as much. */
+export const FOLLOW_WEIGHT = 2000;
+
+/** The row's position and the move that led to it, as the answer before it gives that move. */
+export interface EqualBefore {
+  here: CompactExplorer;
+  led: { san: string; games: number; rating?: number | undefined };
+  /** The moves here whose opponents are known (no other way into the position after): their players' rating and their opponents'. */
+  known?: readonly { rating: number; opponent: number }[] | undefined;
+  /** The slope expected under the filter (`followPrior`). */
+  prior: number;
+}
+
 export interface EqualScore {
   /** The average rating of the move's players, and of their opponents. */
   rating: number;
@@ -58,25 +100,98 @@ export interface EqualScore {
   /** The games' split with the gap taken out, draws kept: White, draws, Black. */
   split: Split;
   games: number;
+  /**
+   * Where the opponents' rating comes from: the replies after the move, or, when most games there
+   * came by another order, the players of the move that led here (`led`), plus `follow` of the
+   * players' distance from this position's average (`movers`), fitted to `fitted` known moves.
+   */
+  from: 'after' | 'before';
+  /** The games at the position after the move per game of the move's own (1: no other way in). */
+  inflow: number;
+  led?: { san: string; rating: number };
+  movers?: number;
+  follow?: number;
+  fitted?: number;
+}
+
+/**
+ * Why a row has no score at equal ratings: no games or rating of its own, nothing rated after it,
+ * or most games after it came by another order and the position before can't stand in
+ * (`inflow`), or is still asked (`asking`).
+ */
+export type EqualMissing = 'unrated' | 'none' | 'inflow' | 'asking';
+
+export const isEqual = (x: EqualScore | EqualMissing | undefined): x is EqualScore => typeof x === 'object';
+
+/**
+ * How far the opponents' rating follows the players' distance from the average here: the
+ * least-squares slope through the position's averages over the known moves, with the prior as a
+ * move of weight FOLLOW_WEIGHT; between 0 and 1.
+ */
+export function followAt(known: readonly { rating: number; opponent: number }[], movers: number, led: number, prior: number): number {
+  let xy = FOLLOW_WEIGHT * prior;
+  let xx = FOLLOW_WEIGHT;
+  for (const k of known) {
+    const x = k.rating - movers;
+    xy += x * (k.opponent - led);
+    xx += x * x;
+  }
+  return Math.min(1, Math.max(0, xy / xx));
+}
+
+/**
+ * The opponents' rating from the position itself: the rating of the move that led here (its players
+ * are the opponents in every game here), plus `followAt` of the move's players' distance from the
+ * average of this position's movers. Undefined when the position has other ways in too, or a rating
+ * is missing.
+ */
+export function opponentsBefore(rating: number, before: EqualBefore): { rating: number; movers: number; follow: number; fitted: number } | undefined {
+  const { here, led } = before;
+  const movers = moverRating(here);
+  if (!movers || typeof led.rating !== 'number' || !(led.games > 0) || here.total > INFLOW * led.games) return undefined;
+  const known = before.known ?? [];
+  const follow = followAt(known, movers.rating, led.rating, before.prior);
+  return { rating: led.rating + follow * (rating - movers.rating), movers: movers.rating, follow, fitted: known.length };
 }
 
 /**
  * A move's score at equal ratings: `row` the move's games (with its players' average rating), and
- * `child` the answer at the position after it, under the same filter. Undefined without games, a
- * rating, or rated replies after it.
+ * `child` the answer at the position after it, under the same filter. When the position after holds
+ * over INFLOW times the move's games, `before` (the row's position and the move that led to it;
+ * 'asking' while it is asked) gives the opponents instead; without it the replies still serve up to
+ * INFLOW_MAX.
  */
-export function equalScore(row: { white: number; draws: number; black: number; rating?: number | undefined }, child: CompactExplorer | undefined, turn: Side): EqualScore | undefined {
+export function equalScore(
+  row: { white: number; draws: number; black: number; rating?: number | undefined },
+  child: CompactExplorer | undefined,
+  turn: Side,
+  before?: EqualBefore | 'asking',
+): EqualScore | EqualMissing {
   const games = row.white + row.draws + row.black;
-  if (!(games > 0) || typeof row.rating !== 'number') return undefined;
-  const opp = moverRating(child);
-  if (!opp) return undefined;
+  if (!(games > 0) || typeof row.rating !== 'number') return 'unrated';
+  const replies = moverRating(child);
+  if (!child || !replies) return 'none';
+  const inflow = Math.max(1, child.total / games);
+  let opponent = replies.rating;
+  let from: EqualScore['from'] = 'after';
+  let via: Pick<EqualScore, 'led' | 'movers' | 'follow' | 'fitted'> | undefined;
+  if (inflow > INFLOW) {
+    const known = before === 'asking' ? undefined : before;
+    const est = known && opponentsBefore(row.rating, known);
+    if (known && est) {
+      opponent = est.rating;
+      from = 'before';
+      via = { led: { san: known.led.san, rating: known.led.rating! }, movers: est.movers, follow: est.follow, fitted: est.fitted };
+    } else if (before === 'asking') return 'asking';
+    else if (inflow > INFLOW_MAX) return 'inflow';
+  }
   const split = { w: row.white / games, d: row.draws / games, b: row.black / games };
   const raw = (turn === 'w' ? split.w : split.b) + split.d / 2;
-  const gap = row.rating - opp.rating;
+  const gap = row.rating - opponent;
   const expected = eloExpected(gap);
   const shifted = shiftSplit(split, turn, expected - 0.5);
   const score = (turn === 'w' ? shifted.w : shifted.b) + shifted.d / 2;
-  return { rating: row.rating, opponent: opp.rating, gap, raw, expected, score, split: shifted, games };
+  return { rating: row.rating, opponent, gap, raw, expected, score, split: shifted, games, from, inflow, ...via };
 }
 
 /**
@@ -91,19 +206,34 @@ export function equalPrepared(prep: Split, prior: number, eq: EqualScore, side: 
 const pct = (f: number) => Math.round(f * 100);
 const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '0');
 
-/** A bar's details at equal ratings: the score, the games' own, and the gap behind the difference. */
+/** Where the opponents' rating came from, in a sentence. */
+export function equalSource(eq: EqualScore): string {
+  const through = pct(1 / eq.inflow);
+  if (eq.from === 'before' && eq.led && eq.movers !== undefined && eq.follow !== undefined) {
+    const off = Math.round(eq.rating - eq.movers);
+    const fit = eq.fitted ? `fitted to ${eq.fitted} move${eq.fitted === 1 ? '' : 's'} here whose opponents are known, and the filter` : 'from the filter alone';
+    return (
+      `The opponents’ rating is estimated: only ${through}% of the games after this move came through it, the rest by another move order. ` +
+      `Taken as ${eq.led.san}’s players’ rating here (${Math.round(eq.led.rating)}), plus ${pct(eq.follow)}% of these players’ ${signed(off)} against this position’s average (${Math.round(eq.movers)}): how far opponents follow their players here, ${fit}.`
+    );
+  }
+  return through >= 98 ? 'The opponents’ rating: the replies after this move.' : `The opponents’ rating: the replies after this move (${through}% of the games there came through it).`;
+}
+
+/** A bar's details at equal ratings: the score, the games' own, the gap behind the difference, and where the opponents' rating came from. */
 export function equalDetails(eq: EqualScore, turn: Side): string[] {
   const who = turn === 'w' ? 'White' : 'Black';
   const gap = Math.round(eq.gap);
   return [
     `At equal ratings: ${pct(eq.score)}% for ${who} (the games: ${pct(eq.raw)}%)`,
     `Its players averaged ${Math.round(eq.rating)}, their opponents ${Math.round(eq.opponent)} (${signed(gap)}), which predicts ${pct(eq.expected)}%.`,
+    equalSource(eq),
     `${pct(eq.split.w)} / ${pct(eq.split.d)} / ${pct(eq.split.b)} after taking that out of the wins and losses · ${eq.games.toLocaleString('en-US')} games`,
   ];
 }
 
-/** The line a prepared bar adds at equal ratings: the score before and after, and the row's gap. */
+/** The line a prepared bar adds at equal ratings: the score before and after, the row's gap, and where the opponents' rating came from. */
 export function equalPreparedLine(before: Split, after: Split, prior: number, eq: EqualScore, side: Side): string {
   const score = (s: Split) => pct((side === 'w' ? s.w : s.b) + s.d / 2);
-  return `At equal ratings: ${score(after)}% (${score(before)}% before). The move’s players averaged ${Math.round(eq.rating)}, their opponents ${Math.round(eq.opponent)} (${signed(Math.round(eq.gap))}); ${pct(1 - prior)}% of it rests on games.`;
+  return `At equal ratings: ${score(after)}% (${score(before)}% before). The move’s players averaged ${Math.round(eq.rating)}, their opponents ${Math.round(eq.opponent)} (${signed(Math.round(eq.gap))}); ${pct(1 - prior)}% of it rests on games. ${equalSource(eq)}`;
 }

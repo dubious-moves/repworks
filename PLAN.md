@@ -6667,7 +6667,7 @@ for in all three parts below ("build all three"):
   (draws kept, clamped). The gap of the averages stands in for the average of each game's gap:
   the curve is close to straight over tens of points. Limits, said in the titles and here: only
   the measured gap comes out (strength a rating misses stays in); the position after a move also
-  counts games reaching it by another order.
+  counts games reaching it by another order (handled since 2026-11-23: **Transpositions** below).
 
 **(1) The explorer's Equal Elo view.** The Score header is now a switch of three on every games
 tab: Score (the games' own results) → Equal Elo → Prepared (with the Practical column on) →
@@ -6699,15 +6699,57 @@ through each move against what each game's two ratings predicted, in points (`ex
 10 games. Its title adds the performance: the opponents' average plus `400·log10(s/(1−s))`, ±800 at
 0 and 100%. Games missing a rating are left out of it; with none, "–".
 
+**Transpositions** (the owner's report, 2026-11-23). The explorer answers by position, so the
+replies after a move count every game reaching that position. When most of them came by another
+order, their ratings are another population's, and Equal Elo and Prepared at equal ratings were
+badly wrong. Measured (Lichess, blitz/rapid/classical, 1600–2200): at 1. Nc3 d5 2. d4 c5 3. Bf4 Nc6,
+4.e3 has 48,682 games (players 1875, 55%), the position after it 136,261, most from the London's
+1. d4 d5 2. Bf4 c5 3. e3 Nc6 4. Nc3, Black there 1973: a gap of −98, and 69% at equal ratings
+against 59% for 4.e4 (the owner saw 68% and 57%; Prepared 73% and 66%). Now 56% and 58%.
+
+- **The fix** (`equalScore`'s `before`, `opponentsBefore`, `followAt`): when the position after a
+  move holds over 1.1× the move's games (`INFLOW`), the opponents' rating comes from the row's own
+  position: the players of the move that led here (from the position before, which the panel asks
+  too, a request usually cached since the board came through it) are the opponents in every game
+  here, and a move's opponents follow its players' distance from the position's average of movers
+  by a slope: `opponents = led + slope × (players − movers)`. Only when the row's position itself
+  came by that move (its games at most 1.1× the move's). Otherwise the replies after the move still
+  serve up to 1.25× (`INFLOW_MAX`), and over that the row keeps the games' own bar, faded, titled
+  "most games after this move came by another move order …". 4.e3: 1858 + 0.81 × (1875 − 1846) =
+  1881, a gap of −6, 56%; 4.e4 (1.17×): 2022, 58%.
+- **The slope depends on the filter.** Opponents follow their players over a wide filter
+  (matchmaking pairs similar ratings) but not in one band, where the explorer's filing by the two
+  players' midpoint pairs a stronger mover with a weaker opponent. Measured on the moves whose
+  position after has no other way in (their opponents known), blitz/rapid/classical: 0.82 over
+  1600–2200 (27 positions, 72 moves), 0.68 over 2000–2200 (18 moves), 0.05 over 2000 alone (20
+  moves). So the slope is a least-squares fit, through the position's averages, to the moves here
+  whose opponents are known (the asked rows with at most 1.1× after them), with a prior by the
+  filter's bands (0 for one, 0.7 for two, 0.8 for more; Masters, with no filter, 0.8, not measured)
+  weighing as much as a known move 45 points from the average (`FOLLOW_WEIGHT`), clamped to 0–1.
+  Each known move estimated from the others (leave one out): missed by 2.1, 1.2 and 2.1 points on
+  average in the three filters (at most 10). The led move's rating alone (the first idea) missed by
+  25 over the wide filter (up to 89); a fixed 0.8, by 4 in one band (up to 11). At the reported
+  position, 4.Nb5 (no other way in) has opponents at 1801; the prior alone estimates 1802.
+- **Said**: each bar's details (and the prepared bar's line) end with where the opponents' rating
+  came from: the replies after the move (with the share of games there that came through it), or
+  the estimate with the led move, its rating, the slope and the position's average. The Score
+  header's title says so too.
+- Nothing else reads a child's ratings: the Practical driver and the search don't use them, and the
+  prepared split takes the same `EqualScore`.
+
 Tests: `equal.test.ts` (Elo's curve, the opponents' average, the shift and its clamp, 1.e4 Nf6 as
 measured, a weaker side's score going up, nothing without games, a rating or rated replies, the
-prepared split's games' part, the details), `service.test.ts` (the games after a move: the tab's
-database alone, cached, nothing after a drop), `table.test.ts` (the score order at equal ratings),
+prepared split's games' part, the details; the 4.e3 position as measured, the estimate against
+4.Nb5's known opponents, the slope's prior, fit and clamp, 4.e4's light inflow with and without the
+position before, the position before not standing in when it has other ways in, the details saying
+which ratings were used),
+`service.test.ts` (the games after a move: the tab's database alone, cached, nothing after a drop), `table.test.ts` (the score order at equal ratings),
 `openings.test.ts` (the column over rated games, the performance and its ends, the cell and title),
 `explorer.spec.ts` (desktop and phone: Equal Elo's bars and titles worked out by hand, the faded
 row, the positions asked with the token, the sort, kept after a reload, the switch's order; the
-prepared bar corrected and the one with nothing rated after it), `games.spec.ts` (the column and
-its title). Live: TESTING.md.
+prepared bar corrected and the one with nothing rated after it; a row whose position after came
+mostly by other orders, estimated from the move that led here, and one declined), `games.spec.ts`
+(the column and its title). Live: TESTING.md.
 
 #### 5.127 Show and grade retries its mistakes (the owner's request, 2026-10-19)
 

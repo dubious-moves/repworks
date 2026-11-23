@@ -2814,3 +2814,21 @@ The technical calls, each with its reason:
   play this repertoire from its idea cards alone ("My dream would be to only have to learn the idea
   cards and feel safe to play it … I think I'll need a bigger deck size"), and its reach spreads
   thin: only 35 of its 300 White positions reach 2%, most of them before the lines part.
+
+
+## Revision of 2026-11-23 (Equal Elo through transpositions: PLAN.md §5.126)
+- **A move's opponents' rating comes from its own position when the position after it was reached
+  mostly by other orders** (over 1.1× the move's games): the rating of the move that led here, plus
+  a slope times the move's players' distance from the position's average of movers. Only when the
+  row's position itself came by that move; otherwise the replies after the move serve up to 1.25×,
+  and over that the row has no score at equal ratings and says why. Was: always the replies after
+  the move. Why: the owner, comparing 4.e3 and 4.e4 at 1. Nc3 d5 2. d4 c5 3. Bf4 Nc6, was misled:
+  4.e3's position after is mostly the London's (136,261 games against its 48,682), whose Black
+  players are about 100 points stronger, so 4.e3 showed 68% at equal ratings from 55% in its games.
+  Now 56%, and 4.e4 58%.
+- **The slope is fitted to the moves here whose opponents are known, with a prior by the filter's
+  bands** (0 for one band, 0.7 for two, 0.8 for more). Why: measured, opponents follow their players
+  by 0.82 over 1600–2200, 0.68 over 2000–2200 and 0.05 in one band (the explorer files a game by the
+  players' midpoint). The led move's rating alone missed the true opponents by 25 points on average
+  over the wide filter; the fit misses by about 2 in each filter. Each bar's details say which
+  ratings were used.

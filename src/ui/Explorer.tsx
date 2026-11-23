@@ -13,11 +13,11 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { Position } from 'chessops/chess';
 import { makeFen } from 'chessops/fen';
 import { parseSan } from 'chessops/san';
-import { localAddress } from '../core/explorer/providers.ts';
+import { localAddress, type CompactExplorer } from '../core/explorer/providers.ts';
 import type { ExplorerTab } from '../core/explorer/service.ts';
 import { barLabel, buildTable, evalNote, evalTone, formatCount, formatEval, formatShare, SORT_LABELS, type Eval, type SortMode, type Table, type TableInput, type TableRow } from '../core/explorer/table.ts';
 import { filterLabel, practicalDetails, preparedDetails, previewDetails, type DetailOptions } from '../core/explorer/details.ts';
-import { equalDetails, equalPrepared, equalPreparedLine, equalScore, type EqualScore } from '../core/explorer/equal.ts';
+import { equalDetails, equalPrepared, equalPreparedLine, equalScore, FOLLOW, followPrior, INFLOW, isEqual, moverRating, type EqualBefore, type EqualMissing, type EqualScore } from '../core/explorer/equal.ts';
 import { autoRows, bestOf } from '../core/explorer/rows.ts';
 import { expectedScore, moveKey, type RowResult, type Split } from '../core/explorer/search.ts';
 import { cellOf, computeRow, excludedAt, practicalAt, practicalOff, practicalVersion, practicalView, previewOn, showsMaia, toggleExclude, type CellState } from '../app/practical.ts';
@@ -106,13 +106,18 @@ function fenAfter(pos: Position, fen: string, san: string): string | undefined {
 }
 
 /** Why a row's bar isn't at equal ratings (§5.126): its title over the games' own bar, faded. */
-function equalMissing(r: TableRow, state: 'asking' | 'failed' | 'none' | undefined): string {
+function equalMissing(r: TableRow, state: ChildState | undefined): string {
   if (typeof r.rating !== 'number') return 'Not at equal ratings: this database gives no ratings. The games’ own results.';
   if (state === 'asking') return 'Asking for the games after this move, for its opponents’ ratings… The games’ own results until then.';
   if (state === 'failed') return 'Not at equal ratings: the games after this move didn’t come. The games’ own results.';
-  if (state === 'none') return 'Not at equal ratings: no rated games after this move. The games’ own results.';
+  if (state === 'none' || state === 'unrated') return 'Not at equal ratings: no rated games after this move. The games’ own results.';
+  if (state === 'inflow')
+    return 'Not at equal ratings: most games after this move came by another move order, so their ratings aren’t its opponents’, and the position before this one can’t stand in (not asked, or reached by other orders too). The games’ own results.';
   return `Not at equal ratings: under ${EQUAL_SHARE * 100}% of the games here. The games’ own results.`;
 }
+
+/** A row's games after its move, as far as they have come, or why it has no score at equal ratings. */
+type ChildState = EqualMissing | 'failed';
 
 /** The last position's rows, shown faded while the next position is asked. */
 interface Shown {
@@ -129,6 +134,15 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
   const shown = useRef<Shown | undefined>(undefined);
   const pos = useMemo(() => positionAt(props.chapter, props.path), [props.chapter, props.path]);
   const fen = pos ? makeFen(pos.toSetup()) : undefined;
+  // The position before and the move that led here (numbered), for the opponents' rating when the
+  // position after a move is reached mostly by another order (§5.126).
+  const back = useMemo(() => {
+    if (!props.path.length) return undefined;
+    const prev = positionAt(props.chapter, props.path.slice(0, -1));
+    if (!prev) return undefined;
+    const san = props.path[props.path.length - 1]!;
+    return { fen: makeFen(prev.toSetup()), san, label: `${prev.fullmoves}${prev.turn === 'white' ? '.' : '…'}${san}` };
+  }, [props.chapter, props.path]);
   // The positions that led here along the line the board is on, which the 23M Maia reads (§5.190).
   const before = useMemo(() => beforeOf(positionsTo(props.chapter, props.path)), [props.chapter, props.path]);
   const filter = `${p.speeds.join()}|${p.ratings.join()}|${p.recent}|${p.local}`;
@@ -243,17 +257,41 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
   if (prepEqual) for (const r of rated) if (cells.get(r.san)?.result?.prep) wanted.add(r.san);
   const kids = childAnswers.value;
   const equalOf = new Map<string, EqualScore>();
-  const childState = new Map<string, 'asking' | 'failed' | 'none'>();
+  const childState = new Map<string, ChildState>();
   const wantedFens: string[] = [];
+  const childOf = new Map<string, CompactExplorer | 'failed' | undefined>();
   for (const r of rated) {
     if (!wanted.has(r.san)) continue;
     const at = fenAfter(pos, fen, r.san);
     if (!at) continue;
     wantedFens.push(at);
-    const answer = kids.get(childKey(p.tab, at));
-    const eq = answer && answer !== 'failed' ? equalScore(r, answer, turn) : undefined;
-    if (eq) equalOf.set(r.san, eq);
-    else childState.set(r.san, answer === 'failed' ? 'failed' : answer ? 'none' : 'asking');
+    childOf.set(r.san, kids.get(childKey(p.tab, at)));
+  }
+  // A position after a move reached mostly by other orders: the position before is asked too, for
+  // the move that led here (usually cached: the board came through it).
+  let prevPos: EqualBefore | 'asking' | undefined;
+  const inflowed = [...childOf].some(([san, a]) => a && a !== 'failed' && a.total > INFLOW * (rated.find((r) => r.san === san)?.games ?? Infinity));
+  if (inflowed && back && l?.games) {
+    wantedFens.push(back.fen);
+    const a = kids.get(childKey(p.tab, back.fen));
+    const led = a && a !== 'failed' ? a.moves.find((m) => moveKey(m.san) === moveKey(back.san)) : undefined;
+    // The moves here whose opponents are known fit how far opponents follow their players here;
+    // the filter's bands give the prior (Masters has no filter: a wide one's).
+    const known = rated.flatMap((r) => {
+      const c = childOf.get(r.san);
+      const opp = c && c !== 'failed' && c.total <= INFLOW * r.games ? moverRating(c) : undefined;
+      return opp && typeof r.rating === 'number' ? [{ rating: r.rating, opponent: opp.rating }] : [];
+    });
+    const prior = p.tab === 'lichess' ? followPrior(p.ratings.length) : FOLLOW;
+    if (!a) prevPos = 'asking';
+    else if (led) prevPos = { here: l.games, led: { san: back.label, games: led.games, rating: led.rating }, known, prior };
+  }
+  for (const r of rated) {
+    if (!childOf.has(r.san)) continue;
+    const answer = childOf.get(r.san);
+    const eq = answer && answer !== 'failed' ? equalScore(r, answer, turn, prevPos) : undefined;
+    if (isEqual(eq)) equalOf.set(r.san, eq);
+    else childState.set(r.san, answer === 'failed' ? 'failed' : (eq ?? 'asking'));
   }
   if (equalOn && p.sort === 'score' && equalOf.size) {
     table = buildTable({ ...input, scores: new Map([...equalOf].map(([san, eq]) => [san, eq.score] as const)) });
@@ -441,7 +479,7 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
                 (view === 'prepared'
                   ? `Prepared: the results if you follow the Practical choices at your moves while opponents play their real replies${p.preparedEqual ? ', at equal ratings' : ''}.`
                   : view === 'equal'
-                    ? `Equal Elo: the results with the rating gap between each move’s players and their opponents taken out. The opponents’ ratings come from the position after the move, asked for the moves over ${EQUAL_SHARE * 100}% of the games and the chapter’s own.`
+                    ? `Equal Elo: the results with the rating gap between each move’s players and their opponents taken out. The opponents’ ratings come from the replies in the position after the move, asked for the moves over ${EQUAL_SHARE * 100}% of the games and the chapter’s own. Where most games there came by another move order, from the players of the move that led here instead, moved by how far the move’s players stand from this position’s average; each bar’s details say which.`
                     : 'Score: the games’ own results.') + ` Click for ${NEXT_TEXT[nextView(view, prac)]}.`
               }
               onClick={() => setPrefs({ scoreView: nextView(view, prac) })}

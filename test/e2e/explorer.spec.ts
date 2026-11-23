@@ -384,6 +384,52 @@ test('Equal Elo: each row’s results with its players’ rating gap taken out, 
   await expect(bar('e4')).not.toHaveClass(/equal|prep/);
 });
 
+const AFTER_E4_C5_NF3 = 'rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq -';
+
+test('Equal Elo: a position after a move reached mostly by another order takes the opponents from the move that led here, or says why not', async ({ page }) => {
+  const fake = await setUp(page);
+  // 1.e4's players (1,000 games) averaged 2000; after it, c5 (600 games, 1950) and e5 (400, 2050).
+  // The position after 1...c5 has 3,000 games, most by other orders, their White players 2100: its
+  // opponents are taken as 2000 + 80% × (1950 − 1990) = 1968, not 2100. The 80%: e5's opponents
+  // (known: no other way after it) are 48 above 1.e4's for its players' 60 above the average, and
+  // the filter's prior is 0.8.
+  fake.games.set(START, [
+    { san: 'e4', white: 500, draws: 300, black: 200, averageRating: 2000 },
+    { san: 'd4', white: 120, draws: 120, black: 60, averageRating: 1980 },
+  ]);
+  fake.games.set(AFTER_E4, [
+    { san: 'c5', white: 250, draws: 150, black: 200, averageRating: 1950 },
+    { san: 'e5', white: 150, draws: 100, black: 150, averageRating: 2050 },
+  ]);
+  fake.games.set(AFTER_C5, [{ san: 'Nf3', white: 1500, draws: 900, black: 600, averageRating: 2100 }]);
+  fake.games.set(AFTER_E5, [{ san: 'Nf3', white: 200, draws: 100, black: 100, averageRating: 2048 }]);
+  fake.games.set(AFTER_E4_C5_NF3, [{ san: 'd6', white: 4000, draws: 2000, black: 3000, averageRating: 2000 }]);
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf`);
+  await expect(rows(page)).toHaveText(['e4', 'd4', 'Nf3']);
+  await panel(page).getByRole('button', { name: 'Score' }).click();
+  await expect(panel(page).getByRole('button', { name: 'Equal Elo' })).toBeVisible();
+  await page.locator('.move[data-path="e4"]').click({ position: { x: 6, y: 8 } });
+  await expect(rows(page)).toHaveText(['c5', 'e5']);
+  const bar = (san: string) => panel(page).locator('.ex-row', { has: page.locator('.ex-san', { hasText: new RegExp(`^${san}$`) }) }).locator('.ex-bar');
+  await expect(bar('c5')).toHaveClass(/equal/);
+  await expect(bar('c5')).toHaveAttribute(
+    'title',
+    [
+      'At equal ratings: 48% for Black (the games: 46%)',
+      'Its players averaged 1950, their opponents 1968 (−18), which predicts 47%.',
+      'The opponents’ rating is estimated: only 20% of the games after this move came through it, the rest by another move order. Taken as 1.e4’s players’ rating here (2000), plus 80% of these players’ −40 against this position’s average (1990): how far opponents follow their players here, fitted to 1 move here whose opponents are known, and the filter.',
+      '39 / 25 / 36 after taking that out of the wins and losses · 600 games',
+    ].join('\n'),
+  );
+  await expect(bar('e5')).toHaveAttribute('title', /their opponents 2048 \(\+2\), which predicts 50%\.\nThe opponents’ rating: the replies after this move\.\n/);
+  // After 1...c5 the position itself came mostly by other orders (3,000 games, 600 by 1...c5), so
+  // the move that led here can't stand in either: 2.Nf3 keeps the games' own bar, saying why.
+  await page.locator('.move[data-path="e4 c5"]').click({ position: { x: 6, y: 8 } });
+  await expect(rows(page).first()).toHaveText('Nf3');
+  await expect(bar('Nf3')).toHaveClass(/prep-raw/);
+  await expect(bar('Nf3')).toHaveAttribute('title', /^Not at equal ratings: most games after this move came by another move order/);
+});
+
 test('the local explorer: its address tested, then the Lichess tab answered by it with no login; Masters stays Lichess’s', async ({ page }) => {
   const fake = await setUp(page, { login: false });
   const local = await serveLocalExplorer(fake, new URL(site.url).origin);

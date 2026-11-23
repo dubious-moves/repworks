@@ -321,6 +321,17 @@ led to the one asked about. The first model ignores them, so nothing changes the
   results at equal ratings"). The bar's title has an "At equal ratings" line. Untick it to compare
   with q_extension's prepared bars, which it should then match again.
 - The Games page's "± Elo" column is under 6, Games.
+- **Transpositions (2026-11-23).** Lichess tab at your usual filter, Equal Elo: open 1. Nc3 d5
+  2. d4 c5 3. Bf4 Nc6 by stepping through the moves. 4.e3 should now read about 56% (it read 68%)
+  and 4.e4 about 58%; hover 4.e3: its details should say "The opponents’ rating is estimated: only
+  36% of the games after this move came through it … Taken as 3…Nc6’s players’ rating here (1858),
+  plus 81% …", and 4.Nb5's "the replies after this move". Prepared (at equal ratings): 4.e3's line
+  should say the same, and its score drop from 73% towards its games'. Open the position directly
+  in a new tab (not stepping through it): the bars should still come, after one more request. Does
+  any line you know show a bar you don't believe? Say which.
+  **Checked**: the numbers live against Lichess from a cloud container (the slope on 40 positions
+  in three filters), unit tests and Playwright (desktop and emulated phone, a fake explorer);
+  **not** in the app on a device.
 
 ### Copy branch as PGN (§5.111)
 - In a study, right-click (long-press on the phone) a move with moves after it → Copy branch as
