@@ -2832,3 +2832,18 @@ The technical calls, each with its reason:
   players' midpoint). The led move's rating alone missed the true opponents by 25 points on average
   over the wide filter; the fit misses by about 2 in each filter. Each bar's details say which
   ratings were used.
+
+
+## Revision of 2026-11-23 (Lichess's curve, and which differences are real: PLAN.md §5.126)
+- **A rating gap's predicted score is Lichess's measured curve, not Elo's formula**: Elo's slope
+  times 0.49 to 0.85 by the rating band of the two sides' midpoint (`LICHESS_SLOPES`), on the
+  Lichess tab and for a Lichess game's "± Elo". Was: Elo's formula everywhere. Why: the owner asked
+  whether Equal Elo makes sense; measured on 1.2 million games of Lichess's October 2026 dump, the
+  explorer's own games, results follow a gap at 0.62 of Elo's slope overall, so the view took out
+  1.2 to 2 times the gap's real effect. The Masters tab and Chess.com games keep Elo's (not
+  measured).
+- **Every score bar shows its 95% range, and green marks the best score and those within chance of
+  it**, in Score, Equal Elo and Prepared; Prepared's green covers the tied rows, where it marked the
+  single highest. Rows with a margin over ±10 aren't ranked. Why: the owner, "build both", after
+  reading that most 1–3 point differences the bars show are within their noise (±3 at 1,000 games).
+

@@ -238,7 +238,7 @@ export const openings = computed<OpeningIndex>(() =>
   openingIndex(
     (gameRows.value ?? []).map((r) => {
       const [me, opp] = r.game.color === 'white' ? [r.game.white, r.game.black] : [r.game.black, r.game.white];
-      return { id: r.game.id, color: r.game.color, result: resultFor(r.game), opening: r.game.opening, played: playedOf(r.game), rating: me.rating, opponentRating: opp.rating };
+      return { id: r.game.id, color: r.game.color, result: resultFor(r.game), opening: r.game.opening, played: playedOf(r.game), rating: me.rating, opponentRating: opp.rating, platform: r.game.platform };
     }),
   ),
 );

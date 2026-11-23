@@ -10,8 +10,10 @@
 // players averaged 19 points above their opponents, so its 51.7%, the best of Black's replies,
 // was 49.0% at equal ratings; 1.e4 c5 2.d3, played 30 points below, went from 48.2% to 52.5%.
 //
-// Elo's curve is close to straight over the gaps found (tens of points), so the gap of the
-// averages stands in for the average of each game's gap.
+// The gap's predicted score is Lichess's curve (`LICHESS_SLOPES`, measured 2026-11-23): Lichess's
+// results follow a rating gap at 0.5 to 0.85 of Elo's slope, by rating; Elo's own formula took out
+// 1.2 to 2 times too much. The curve is close to straight over the gaps found (tens of points), so
+// the gap of the averages stands in for the average of each game's gap.
 //
 // Transpositions (2026-11-23): the explorer answers by position, so the replies after a move
 // include every game reaching that position by another order. When those outnumber the move's own
@@ -30,6 +32,46 @@ import type { Side, Split } from './search.ts';
 /** Elo's expected score for a player `gap` points above the opponent. */
 export function eloExpected(gap: number): number {
   return 1 / (1 + 10 ** (-gap / 400));
+}
+
+/**
+ * Lichess's curve: a game's result follows its rating gap at this fraction of Elo's slope, by the
+ * band of the two players' midpoint (the explorer's bands). Measured on 2026-11-23 with
+ * `scripts/elo-curve.ts` over the first 1.2 million games of October 2026's dump, filtered as the
+ * explorer's (finished, both rated, no bot, provisional ratings kept), gaps within 150 points: a
+ * player 100 points above scores 8.9 points above an even game where Elo's curve says 13.9. Speeds
+ * alike within about 0.05; each value ±0.02 (2500: ±0.04).
+ */
+export const LICHESS_SLOPES: readonly (readonly [band: number, slope: number])[] = [
+  [0, 0.73],
+  [1000, 0.53],
+  [1200, 0.52],
+  [1400, 0.49],
+  [1600, 0.6],
+  [1800, 0.66],
+  [2000, 0.72],
+  [2200, 0.76],
+  [2500, 0.85],
+];
+/** The slope's error, in its fraction (the fits' standard error, with room for months that differ). */
+export const LICHESS_SLOPE_SE = 0.03;
+/** Elo's curve where it wasn't measured (the Masters tab's FIDE ratings, Chess.com's): its slope's error, as a guess. */
+export const ELO_SLOPE_SE = 0.2;
+
+/** Which curve turns a gap into a score: Lichess's, measured, or Elo's own. */
+export type Curve = 'lichess' | 'elo';
+
+/** The slope against Elo's at a midpoint of two ratings: the band's (1 on Elo's curve). */
+export function slopeAt(midpoint: number, curve: Curve = 'lichess'): number {
+  if (curve === 'elo') return 1;
+  let k = LICHESS_SLOPES[0]![1];
+  for (const [band, slope] of LICHESS_SLOPES) if (midpoint >= band) k = slope;
+  return k;
+}
+
+/** The expected score of a player rated `rating` against `opponent`, on the curve. */
+export function expectedOn(rating: number, opponent: number, curve: Curve = 'lichess'): number {
+  return eloExpected(slopeAt((rating + opponent) / 2, curve) * (rating - opponent));
 }
 
 /** The average rating of the side to move at a position: its moves' ratings weighted by their games. */
@@ -92,9 +134,12 @@ export interface EqualScore {
   opponent: number;
   /** `rating − opponent`. */
   gap: number;
-  /** The mover's score in the games, 0 to 1, and what the gap predicts. */
+  /** The mover's score in the games, 0 to 1, and what the gap predicts on the curve. */
   raw: number;
   expected: number;
+  /** The curve, and its slope against Elo's at these ratings (`slopeAt`). */
+  curve: Curve;
+  slope: number;
   /** The mover's score with the gap taken out: `raw − (expected − ½)`. */
   score: number;
   /** The games' split with the gap taken out, draws kept: White, draws, Black. */
@@ -166,6 +211,7 @@ export function equalScore(
   child: CompactExplorer | undefined,
   turn: Side,
   before?: EqualBefore | 'asking',
+  curve: Curve = 'lichess',
 ): EqualScore | EqualMissing {
   const games = row.white + row.draws + row.black;
   if (!(games > 0) || typeof row.rating !== 'number') return 'unrated';
@@ -188,10 +234,11 @@ export function equalScore(
   const split = { w: row.white / games, d: row.draws / games, b: row.black / games };
   const raw = (turn === 'w' ? split.w : split.b) + split.d / 2;
   const gap = row.rating - opponent;
-  const expected = eloExpected(gap);
+  const slope = slopeAt((row.rating + opponent) / 2, curve);
+  const expected = eloExpected(slope * gap);
   const shifted = shiftSplit(split, turn, expected - 0.5);
   const score = (turn === 'w' ? shifted.w : shifted.b) + shifted.d / 2;
-  return { rating: row.rating, opponent, gap, raw, expected, score, split: shifted, games, from, inflow, ...via };
+  return { rating: row.rating, opponent, gap, raw, expected, curve, slope, score, split: shifted, games, from, inflow, ...via };
 }
 
 /**
@@ -220,13 +267,18 @@ export function equalSource(eq: EqualScore): string {
   return through >= 98 ? 'The opponents’ rating: the replies after this move.' : `The opponents’ rating: the replies after this move (${through}% of the games there came through it).`;
 }
 
+/** Which curve turned the gap into a score, in a few words. */
+export function curveNote(eq: Pick<EqualScore, 'curve' | 'slope'>): string {
+  return eq.curve === 'elo' ? 'on Elo’s curve' : `on Lichess’s curve (${eq.slope.toFixed(2)} of Elo’s slope at these ratings)`;
+}
+
 /** A bar's details at equal ratings: the score, the games' own, the gap behind the difference, and where the opponents' rating came from. */
 export function equalDetails(eq: EqualScore, turn: Side): string[] {
   const who = turn === 'w' ? 'White' : 'Black';
   const gap = Math.round(eq.gap);
   return [
     `At equal ratings: ${pct(eq.score)}% for ${who} (the games: ${pct(eq.raw)}%)`,
-    `Its players averaged ${Math.round(eq.rating)}, their opponents ${Math.round(eq.opponent)} (${signed(gap)}), which predicts ${pct(eq.expected)}%.`,
+    `Its players averaged ${Math.round(eq.rating)}, their opponents ${Math.round(eq.opponent)} (${signed(gap)}), which predicts ${pct(eq.expected)}% ${curveNote(eq)}.`,
     equalSource(eq),
     `${pct(eq.split.w)} / ${pct(eq.split.d)} / ${pct(eq.split.b)} after taking that out of the wins and losses · ${eq.games.toLocaleString('en-US')} games`,
   ];

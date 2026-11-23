@@ -5,7 +5,7 @@
 // count), and the opening name most games reaching a position carry (to title practice games and
 // saved items). Pure. Each move's score against what the players' ratings predicted (§5.126).
 import type { PositionKey } from '../chess/positionKey.ts';
-import { eloExpected } from '../explorer/equal.ts';
+import { expectedOn } from '../explorer/equal.ts';
 import type { Replayed } from './positions.ts';
 import type { Color } from './record.ts';
 
@@ -28,6 +28,8 @@ export interface MoveGame {
   result: 'win' | 'loss' | 'draw';
   rating?: number;
   opponentRating?: number;
+  /** Where it was played: a Lichess game's ratings predict on Lichess's curve, others on Elo's (§5.126). */
+  platform?: 'lichess' | 'chesscom';
 }
 
 export interface MoveStats {
@@ -104,7 +106,7 @@ export interface Expected {
   performance: number;
 }
 
-/** The user's score against Elo's prediction from each game's two ratings; undefined with no rated game. */
+/** The user's score against what each game's two ratings predicted (Lichess's curve for its games, Elo's for the rest); undefined with no rated game. */
 export function expectedOf(games: readonly MoveGame[]): Expected | undefined {
   let n = 0;
   let score = 0;
@@ -114,7 +116,7 @@ export function expectedOf(games: readonly MoveGame[]): Expected | undefined {
     if (g.rating === undefined || g.opponentRating === undefined) continue;
     n++;
     score += g.result === 'win' ? 1 : g.result === 'draw' ? 0.5 : 0;
-    expected += eloExpected(g.rating - g.opponentRating);
+    expected += expectedOn(g.rating, g.opponentRating, g.platform === 'lichess' ? 'lichess' : 'elo');
     opponents += g.opponentRating;
   }
   if (!n) return undefined;

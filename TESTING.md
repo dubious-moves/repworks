@@ -332,6 +332,18 @@ led to the one asked about. The first model ignores them, so nothing changes the
   **Checked**: the numbers live against Lichess from a cloud container (the slope on 40 positions
   in three filters), unit tests and Playwright (desktop and emulated phone, a fake explorer);
   **not** in the app on a device.
+- **Lichess's curve and which differences are real (2026-11-23).** Equal Elo now takes out about
+  two thirds of what it did (Lichess's results follow a rating gap at 0.5–0.85 of Elo's slope):
+  4.e3 above reads about 56% still, 1.e4 Nf6 at 1800–2000 about 50% (it read 49%). Each bar in
+  all three views has a short amber line along its bottom edge: the score's 95% range. Green
+  outlines: the best score here and those that can't be told from it (Prepared: rows at the same
+  depth; rows of under about 100 games aren't ranked). Hover a bar: "Its margin: ±N points" and
+  "Green: …" or "Below the best here … by more than chance". Is the amber line readable on the
+  phone, and in the Paper theme? Do the green rows match what you'd call a real lead? A line you
+  know well where two moves turn green together, or one you'd call equal that doesn't: say which.
+  **Checked**: the curve on 1.2 million games of Lichess's October 2026 dump (`scripts/elo-curve.ts`,
+  in a cloud container); unit tests and Playwright (desktop and emulated phone, a fake explorer),
+  screenshots in the Forest theme; **not** on a device.
 
 ### Copy branch as PGN (§5.111)
 - In a study, right-click (long-press on the phone) a move with moves after it → Copy branch as
@@ -1042,7 +1054,8 @@ Training and Learn on the Chessnut Move: see 14 (PLAN.md §5.192).
 
 ### The ± Elo column (§5.126, 2026-10-19)
 - Games page → Explorer: the "± Elo" column on your real games. Do the moves it marks red feel like
-  the ones that cost you? Its title has the performance.
+  the ones that cost you? Its title has the performance. Since 2026-11-23 your Lichess games' predictions are on
+  Lichess's curve (Chess.com's still on Elo's), so the column's numbers moved towards 0.
 
 ### A note on a game card (§5.91)
 - On the phone: answer a game card, "✎ Add a note", draw an arrow with ✎ and a colour, play a line

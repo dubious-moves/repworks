@@ -97,4 +97,10 @@ test('a move’s score against the ratings’ prediction (§5.126): over the gam
   assert.equal(expectedOf([{ id: 'a', color: 'black', result: 'win', rating: 1500, opponentRating: 1600 }])!.performance, 2400);
   assert.equal(expectedOf([{ id: 'a', color: 'black', result: 'loss', rating: 1500, opponentRating: 1600 }])!.performance, 800);
   assert.equal(expectedCell({ games: 20, score: 0.6, expected: 0.6, opponents: 1, performance: 1 }), '0');
+  // A Lichess game's ratings predict on Lichess's curve (§5.126): 100 above at 1950, 0.66 of Elo's
+  // slope; a Chess.com game's, and one of unknown origin, on Elo's.
+  const g = { id: 'a', color: 'white' as const, result: 'win' as const, rating: 2000, opponentRating: 1900 };
+  assert.ok(Math.abs(expectedOf([{ ...g, platform: 'lichess' }])!.expected - 1 / (1 + 10 ** (-66 / 400))) < 1e-12);
+  assert.ok(Math.abs(expectedOf([{ ...g, platform: 'chesscom' }])!.expected - 1 / (1 + 10 ** (-100 / 400))) < 1e-12);
+  assert.equal(expectedOf([g])!.expected, expectedOf([{ ...g, platform: 'chesscom' }])!.expected);
 });

@@ -76,6 +76,11 @@ Whether FSRS fitted to the progress log would beat the default weights (PLAN.md 
 that writes nothing: `node scripts/fsrs-fit.ts ../repworks-data --offset-minutes 60` (`--kinds r,m`
 adds the game cards; `--json`).
 
+How a game's result follows its rating gap on Lichess, against Elo's curve (PLAN.md §5.126, the slopes
+`LICHESS_SLOPES` in `src/core/explorer/equal.ts`), a report that writes nothing: `node
+scripts/elo-curve.ts <dump.pgn.zst>` (the dump's first 400 MB, `curl -r 0-400000000`, is 1.2 million
+games, a minute; `--json`).
+
 Whether a Maia model predicts human moves better, measured on a Lichess dump part (PLAN.md §5.190;
 about 40 minutes for every condition on 4 threads; `--list`, `--conditions`, `--memo-stats`):
 `node scripts/maia-eval.ts <dump.pgn.zst> --sample sample.json --out scores.json` (the dump is

@@ -6662,7 +6662,8 @@ for in all three parts below ("build all three"):
   −30). At 1400–1600, 1.d4 Nf6 2.c4 c5 / e5 / g6 score 53.1 / 51.5 / 50.3 and all 49.8 at equal
   ratings. The first moves' spread, 51.2–54.0, is 51.6–52.4.
 - **The arithmetic** (`core/explorer/equal.ts`): the opponents' average is the replies' ratings
-  weighted by games; the gap gives Elo's expected score `1 / (1 + 10^(−gap/400))`; the score at
+  weighted by games; the gap gives Elo's expected score `1 / (1 + 10^(−gap/400))` (since
+  2026-11-23 on Lichess's curve: `k·gap` for the gap, **Lichess's curve** below); the score at
   equal ratings is `raw − (expected − ½)`, taken from the mover's wins and given to its losses
   (draws kept, clamped). The gap of the averages stands in for the average of each game's gap:
   the curve is close to straight over tens of points. Limits, said in the titles and here: only
@@ -6737,6 +6738,60 @@ against 59% for 4.e4 (the owner saw 68% and 57%; Prepared 73% and 66%). Now 56% 
 - Nothing else reads a child's ratings: the Practical driver and the search don't use them, and the
   prepared split takes the same `EqualScore`.
 
+**Lichess's curve** (the owner's question, 2026-11-23: "does Equal Elo make sense?"). Elo's
+formula was taken as how a rating gap turns into a score, and never checked. Measured with
+`scripts/elo-curve.ts` on the first 1.2 million games of Lichess's October 2026 dump, filtered as
+the explorer's own (lila-openingexplorer builds its Lichess database from these dumps and drops only
+unfinished games, bots and games without ratings: provisional ratings are in), each filed under the
+band of its two ratings' midpoint: a game's result follows its gap at `k` of Elo's slope, fitted on
+the logistic curve over gaps within 150 points. A player 100 points above scores 8.9 points above an
+even game, where Elo's curve says 13.9. The same shape on both sides and at every gap to 200.
+
+| band | 400 | 1000 | 1200 | 1400 | 1600 | 1800 | 2000 | 2200 | 2500 |
+|---|---|---|---|---|---|---|---|---|---|
+| `k` | 0.73 | 0.53 | 0.52 | 0.49 | 0.60 | 0.66 | 0.72 | 0.76 | 0.85 |
+
+Each ±0.02 (2500: ±0.04); bullet, blitz and rapid alike within about 0.05 (classical: too few games
+in the part read). Without the provisional players (a rating change over 25 in the game) each is
+higher, by about 0.05 from 1600 up and 0.1–0.15 below: Glicko's uncertain ratings flatten it, but
+most of the flattening is in settled ratings too. So Elo's formula took out 1.2 to 2 times too much: 1.e4 Nf6 at 1800–2000 (+19) reads
+49.9%, not 49.0%.
+
+- **`LICHESS_SLOPES`** (`equal.ts`): the gap's predicted score is `eloExpected(k·gap)`, `k` the band
+  of the move's players' and their opponents' midpoint (`slopeAt`), the same steps as the explorer's
+  filing. The Lichess tab only: the Masters tab's FIDE ratings keep Elo's curve (not measured), and
+  so does the games' own column's for a Chess.com game; a Lichess game there is on Lichess's
+  (`expectedOn`, `MoveGame.platform`). Each bar's details say which curve, and `k`. The prepared
+  split at equal ratings follows (it takes the same `expected`).
+- Measured again with the script on a newer dump when the numbers look off; the table is short
+  enough to paste.
+
+**Which differences are real** (the owner's request, the same day: "build both"). A score over `n`
+games is a mean of `n` results: about ±3 points (95%) at 1,000 games, ±1 at 10,000, the size of the
+differences the bars show and of the correction itself. Neither view said so. Now (`margin.ts`):
+
+- **Each bar's 95% range**, in all three views, an amber line with end ticks along the bar's bottom
+  edge, centred at the score: White's wins and half the draws from the left, which is Black's score
+  from the right, so one line serves both sides (along the bottom: a score always falls mid-draws,
+  where the draws' label is). The games: `1.96 √(var / n)`, `var` one result's (`win + draws/4 −
+  score²`). At equal ratings the correction's error joins it: the slope's (±0.03; ±0.2 for Elo's
+  curve where not measured) times the gap, and, when the opponents are estimated from the move that
+  led here, ±3 points of rating (the estimate missed by 2 on average). Prepared: its games' part
+  alone, `1 − prior` of it over its leaves' games (the Practical part's error, engine evals and
+  Maia, is of another kind and isn't counted; nor is the search's choosing the best of noisy
+  lines, which flatters it).
+- **Green**: the best score and the rows it can't be told from (difference within `√(m₁² + m₂²)`,
+  each margin at 95%), among the rows narrow enough to rank (margin ±10 or less: about 100 games):
+  a 30-game row is "within chance" of anything. Prepared keeps its rule of comparing only rows
+  searched to the same depth, and its green outline now covers the tied rows too, where it took
+  the single highest rounded score. Score and Equal Elo get the same outline (dashed at equal
+  ratings); nothing is marked with fewer than two ranked rows.
+- Each bar's title adds "Its margin: ±N points (95%)" and one of: "Green: the best score here,
+  by more than chance" (or "but N other moves can't be told from it"), "Green: can't be told from
+  the best here (e4, 57%)", "Below the best here (…) by more than chance", "Too few games to rank".
+  The Score view's bars gain a title: the score, the margin, the games and the players' average.
+  The Score header's title says what the line and green mean.
+
 Tests: `equal.test.ts` (Elo's curve, the opponents' average, the shift and its clamp, 1.e4 Nf6 as
 measured, a weaker side's score going up, nothing without games, a rating or rated replies, the
 prepared split's games' part, the details; the 4.e3 position as measured, the estimate against
@@ -6744,9 +6799,16 @@ prepared split's games' part, the details; the 4.e3 position as measured, the es
 position before, the position before not standing in when it has other ways in, the details saying
 which ratings were used),
 `service.test.ts` (the games after a move: the tab's database alone, cached, nothing after a drop), `table.test.ts` (the score order at equal ratings),
-`openings.test.ts` (the column over rated games, the performance and its ends, the cell and title),
+`margin.test.ts` (one result's variance, the games' margin, the correction's at equal ratings and
+the estimate's, the prepared split's games' part, the best and the tied among ranked rows and the
+titles' lines), `eloCurve.test.ts` (the fit finds the slope simulated games were made with; speeds
+and bands filed as the explorer's), Lichess's curve in `equal.test.ts` (the bands, the 1.e4 Nf6
+and 4.e3 numbers on it, Elo's curve for Masters),
+`openings.test.ts` (the column over rated games, the performance and its ends, the cell and title,
+Lichess's curve for a Lichess game and Elo's for the rest),
 `explorer.spec.ts` (desktop and phone: Equal Elo's bars and titles worked out by hand, the faded
 row, the positions asked with the token, the sort, kept after a reload, the switch's order; the
+Score view's margins, green rows and the line's place on the bar, and the green at equal ratings; the
 prepared bar corrected and the one with nothing rated after it; a row whose position after came
 mostly by other orders, estimated from the move that led here, and one declined), `games.spec.ts`
 (the column and its title). Live: TESTING.md.

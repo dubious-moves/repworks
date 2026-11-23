@@ -18,6 +18,7 @@ import type { ExplorerTab } from '../core/explorer/service.ts';
 import { barLabel, buildTable, evalNote, evalTone, formatCount, formatEval, formatShare, SORT_LABELS, type Eval, type SortMode, type Table, type TableInput, type TableRow } from '../core/explorer/table.ts';
 import { filterLabel, practicalDetails, preparedDetails, previewDetails, type DetailOptions } from '../core/explorer/details.ts';
 import { equalDetails, equalPrepared, equalPreparedLine, equalScore, FOLLOW, followPrior, INFLOW, isEqual, moverRating, type EqualBefore, type EqualMissing, type EqualScore } from '../core/explorer/equal.ts';
+import { equalMargin, gamesMargin, marginText, preparedMargin, topLine, topOf, type Scored } from '../core/explorer/margin.ts';
 import { autoRows, bestOf } from '../core/explorer/rows.ts';
 import { expectedScore, moveKey, type RowResult, type Split } from '../core/explorer/search.ts';
 import { cellOf, computeRow, excludedAt, practicalAt, practicalOff, practicalVersion, practicalView, previewOn, showsMaia, toggleExclude, type CellState } from '../app/practical.ts';
@@ -289,7 +290,7 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
   for (const r of rated) {
     if (!childOf.has(r.san)) continue;
     const answer = childOf.get(r.san);
-    const eq = answer && answer !== 'failed' ? equalScore(r, answer, turn, prevPos) : undefined;
+    const eq = answer && answer !== 'failed' ? equalScore(r, answer, turn, prevPos, p.tab === 'lichess' ? 'lichess' : 'elo') : undefined;
     if (isEqual(eq)) equalOf.set(r.san, eq);
     else childState.set(r.san, answer === 'failed' ? 'failed' : (eq ?? 'asking'));
   }
@@ -301,14 +302,40 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
     const eq = prepEqual ? equalOf.get(san) : undefined;
     return eq ? equalPrepared(res.prep!, res.prior ?? 0, eq, turn) : res.prep!;
   };
-  let bestPrep: number | null = null;
-  if (preparedOn) {
-    const scores = table.rows.flatMap((r) => {
-      const res = cells.get(r.san)?.result;
-      return res?.prep && best.cmp.has(res) ? [Math.round(expectedScore(prepSplit(res, r.san), turn)! * 100)] : [];
-    });
-    if (scores.length >= 2) bestPrep = Math.max(...scores);
+  // Each bar's score and its 95% margin in the view shown, and the rows the best can't be told
+  // from (§5.126, "Which differences are real"): green, with the margin drawn across the bar.
+  const usableOf = (r: TableRow) => {
+    const cell = cells.get(r.san);
+    const res = cell?.result;
+    return preparedOn && cell && !cell.excluded && res?.state === 'value' && res.prep ? res : undefined;
+  };
+  const scored = new Map<string, Scored>();
+  for (const r of table.rows) {
+    if (r.novelty || r.maiaOnly || !(r.games > 0)) continue;
+    const usable = usableOf(r);
+    if (usable) {
+      // Prepared: only the rows searched to the same depth compare (the Practical column's rule).
+      if (!best.cmp.has(usable)) continue;
+      const split = prepSplit(usable, r.san);
+      const eq = prepEqual ? equalOf.get(r.san) : undefined;
+      scored.set(r.san, { key: r.san, score: expectedScore(split, turn)!, margin: preparedMargin(split, usable.prior ?? 0, usable.leafGames ?? 0, turn, eq) });
+    } else if (preparedOn) continue;
+    else if (equalOn) {
+      const eq = equalOf.get(r.san);
+      if (eq) scored.set(r.san, { key: r.san, score: eq.score, margin: equalMargin(eq, turn) });
+    } else {
+      const split = { w: r.white, d: r.draws, b: r.black };
+      scored.set(r.san, { key: r.san, score: expectedScore(split, turn)! / r.games, margin: gamesMargin(split, turn, r.games) });
+    }
   }
+  const top = topOf([...scored.values()]);
+  const markOf = (san: string, split: Split): { ci?: Ci; top: boolean; lines: string[] } => {
+    const sc = scored.get(san);
+    if (!sc) return { top: false, lines: [] };
+    const n = split.w + split.d + split.b;
+    const line = topLine(san, top);
+    return { ci: { at: (split.w + split.d / 2) / n, margin: sc.margin }, top: top.tied.has(san), lines: line ? [line] : [] };
+  };
   const paused = pausedUntil.value > Date.now();
   const lichessLabel = localAddress(p.local) ? 'Local' : 'Lichess';
 
@@ -479,8 +506,9 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
                 (view === 'prepared'
                   ? `Prepared: the results if you follow the Practical choices at your moves while opponents play their real replies${p.preparedEqual ? ', at equal ratings' : ''}.`
                   : view === 'equal'
-                    ? `Equal Elo: the results with the rating gap between each move’s players and their opponents taken out. The opponents’ ratings come from the replies in the position after the move, asked for the moves over ${EQUAL_SHARE * 100}% of the games and the chapter’s own. Where most games there came by another move order, from the players of the move that led here instead, moved by how far the move’s players stand from this position’s average; each bar’s details say which.`
-                    : 'Score: the games’ own results.') + ` Click for ${NEXT_TEXT[nextView(view, prac)]}.`
+                    ? `Equal Elo: the results with the rating gap between each move’s players and their opponents taken out${p.tab === 'lichess' ? ', on Lichess’s measured curve' : ''}; for the moves over ${EQUAL_SHARE * 100}% of the games and the chapter’s own. Each bar’s details say where its opponents’ rating came from.`
+                    : 'Score: the games’ own results.') +
+                ` The line across a bar: its score’s 95% range. Green: the best score here and those within chance of it${view === 'prepared' ? ' (rows searched to the same depth)' : ''}; rows of too few games aren’t ranked. Click for ${NEXT_TEXT[nextView(view, prac)]}.`
               }
               onClick={() => setPrefs({ scoreView: nextView(view, prac) })}
             >
@@ -509,7 +537,7 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
           {table.rows.map((r, i) => {
             const cell = cells.get(r.san)!;
             const res = cell.result;
-            const usable = preparedOn && !cell.excluded && res?.state === 'value' && res.prep ? res : undefined;
+            const usable = usableOf(r);
             let bar: BarView | undefined;
             let faded: string | undefined;
             if (usable) {
@@ -518,14 +546,26 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
               const lines = preparedDetails(usable, turn, detail);
               if (eq) lines.splice(2, 0, equalPreparedLine(usable.prep!, split, usable.prior ?? 0, eq, turn));
               else if (preparedOn && p.preparedEqual) lines.splice(2, 0, p.tab === 'lichess' ? equalMissing(r, childState.get(r.san)) : 'Not at equal ratings: the prepared split is Lichess’s, and these ratings are Masters’.');
-              const top = bestPrep != null && best.cmp.has(usable) && Math.round(expectedScore(split, turn)! * 100) === bestPrep;
-              bar = { split, class: `prep${(usable.prior ?? 0) >= 0.5 ? ' prep-muted' : ''}${top ? ' prep-best' : ''}`, title: lines.join('\n') };
+              const mark = markOf(r.san, split);
+              const sc = scored.get(r.san);
+              if (sc) lines.push(`Its margin: ${marginText(sc.margin)}, from the games’ part (the Practical part’s own error isn’t counted).`, ...mark.lines);
+              bar = { split, class: `prep${(usable.prior ?? 0) >= 0.5 ? ' prep-muted' : ''}${mark.top ? ' prep-best' : ''}`, title: lines.join('\n'), ...(mark.ci ? { ci: mark.ci } : {}) };
             } else if (preparedOn && !r.novelty) {
               faded = 'No prepared split for this move: the games’ own results.';
             } else if (equalOn && !r.novelty && !r.maiaOnly) {
               const eq = equalOf.get(r.san);
-              if (eq) bar = { split: eq.split, class: 'equal', title: equalDetails(eq, turn).join('\n') };
-              else faded = equalMissing(r, childState.get(r.san));
+              if (eq) {
+                const mark = markOf(r.san, eq.split);
+                const lines = [...equalDetails(eq, turn), `Its margin: ${marginText(equalMargin(eq, turn))}: the games’ chance and the correction’s.`, ...mark.lines];
+                bar = { split: eq.split, class: `equal${mark.top ? ' ex-top' : ''}`, title: lines.join('\n'), ...(mark.ci ? { ci: mark.ci } : {}) };
+              } else faded = equalMissing(r, childState.get(r.san));
+            } else if (!preparedOn && !r.novelty && !r.maiaOnly && r.games > 0) {
+              const split = { w: r.white, d: r.draws, b: r.black };
+              const mark = markOf(r.san, split);
+              const sc = scored.get(r.san)!;
+              const who = turn === 'w' ? 'White' : 'Black';
+              const lines = [`Score: ${Math.round(sc.score * 100)}% for ${who}, ${marginText(sc.margin)} over ${r.games.toLocaleString('en-US')} games${typeof r.rating === 'number' ? ` · its players averaged ${Math.round(r.rating)}` : ''}`, ...mark.lines];
+              bar = { split: { w: r.white / r.games, d: r.draws / r.games, b: r.black / r.games }, class: mark.top ? 'ex-top' : '', title: lines.join('\n'), ...(mark.ci ? { ci: mark.ci } : {}) };
             }
             return (
               <Row
@@ -800,7 +840,16 @@ function Grip(props: { box: { current: HTMLElement | null } }) {
   );
 }
 
-function Bar(props: { white: number; draws: number; black: number; class?: string; title?: string }) {
+/**
+ * A score's 95% range across its bar (§5.126): `at` the score's place from the left (White's
+ * wins and half the draws: Black's score is the same place from the right), `margin` either way.
+ */
+interface Ci {
+  at: number;
+  margin: number;
+}
+
+function Bar(props: { white: number; draws: number; black: number; class?: string; title?: string; ci?: Ci }) {
   const n = props.white + props.draws + props.black;
   if (!n) return <span class="ex-bar" />;
   const parts = [
@@ -808,6 +857,9 @@ function Bar(props: { white: number; draws: number; black: number; class?: strin
     ['draw', props.draws / n],
     ['black', props.black / n],
   ] as const;
+  const ci = props.ci && Number.isFinite(props.ci.margin) ? props.ci : undefined;
+  const lo = ci ? Math.max(0, ci.at - ci.margin) : 0;
+  const hi = ci ? Math.min(1, ci.at + ci.margin) : 0;
   return (
     <span class={`ex-bar${props.class ? ` ${props.class}` : ''}`} title={props.title}>
       {parts.map(([k, f]) => (
@@ -815,15 +867,17 @@ function Bar(props: { white: number; draws: number; black: number; class?: strin
           {barLabel(f)}
         </span>
       ))}
+      {ci && <span class="ex-ci" aria-hidden="true" style={{ left: `${(lo * 100).toFixed(2)}%`, width: `${((hi - lo) * 100).toFixed(2)}%` }} />}
     </span>
   );
 }
 
-/** A bar in place of the games' own: the prepared split (§5.24) or the split at equal ratings (§5.126). */
+/** A bar in place of the games' own: the games' with its margin, the prepared split (§5.24) or the split at equal ratings (§5.126). */
 interface BarView {
   split: Split;
   class: string;
   title: string;
+  ci?: Ci;
 }
 
 interface MaiaCells {
@@ -905,7 +959,7 @@ function Row(props: { row: TableRow; games: boolean; cols: Cols; others: Occurre
         ) : r.novelty ? (
           <span class="ex-bar ex-novelty">novelty</span>
         ) : props.bar ? (
-          <Bar white={props.bar.split.w} draws={props.bar.split.d} black={props.bar.split.b} class={props.bar.class} title={props.bar.title} />
+          <Bar white={props.bar.split.w} draws={props.bar.split.d} black={props.bar.split.b} class={props.bar.class} title={props.bar.title} {...(props.bar.ci ? { ci: props.bar.ci } : {})} />
         ) : (
           <Bar white={r.white} draws={r.draws} black={r.black} {...(props.faded ? { class: 'prep-raw', title: props.faded } : {})} />
         ))}

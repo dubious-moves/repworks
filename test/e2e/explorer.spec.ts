@@ -347,8 +347,9 @@ const AFTER_D4 = 'rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq -';
 
 test('Equal Elo: each row’s results with its players’ rating gap taken out, from the replies after it; sorted by it; kept', async ({ page }) => {
   const fake = await setUp(page);
-  // e4's players averaged 2101 against 2033 after it: 67% in the games, 57% at equal ratings. d4's,
-  // 1980 against 2030: 60%, then 67%. Nothing rated after c4.
+  // e4's players averaged 2101 against 2033 after it: 67% in the games, 60% at equal ratings on
+  // Lichess's curve (0.72 of Elo's slope at 2000). d4's, 1980 against 2030: 60%, then 65%. Nothing
+  // rated after c4.
   fake.games.set(START, [
     { san: 'e4', white: 300, draws: 200, black: 100, averageRating: 2101 },
     { san: 'd4', white: 120, draws: 120, black: 60, averageRating: 1980 },
@@ -362,12 +363,31 @@ test('Equal Elo: each row’s results with its players’ rating gap taken out, 
   await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf`);
   await expect(rows(page)).toHaveText(['e4', 'd4', 'Nf3', 'c4']);
   const bar = (san: string) => panel(page).locator('.ex-row', { has: page.locator('.ex-san', { hasText: new RegExp(`^${san}$`) }) }).locator('.ex-bar');
+  // The games' own scores, each with its 95% margin across the bar: e4 67% ±3 (600 games) is the
+  // best; d4, 60% ±4, is below it by more than chance; c4, 60% ±7 over 100 games, can't be told
+  // from it, so it is green too.
+  await expect(bar('e4')).toHaveAttribute('title', /^Score: 67% for White, ±3 points \(95%\) over 600 games · its players averaged 2101\nGreen: the best score here, but 1 other move can’t be told from it\.$/);
+  await expect(bar('d4')).toHaveAttribute('title', /\nBelow the best here \(e4, 67%\) by more than chance\.$/);
+  await expect(bar('c4')).toHaveAttribute('title', /^Score: 60% for White, ±7 points \(95%\) over 100 games[^\n]*\nGreen: can’t be told from the best here \(e4, 67%\)/);
+  await expect(panel(page).locator('.ex-bar.ex-top')).toHaveCount(2);
+  await expect(bar('e4')).toHaveClass(/ex-top/);
+  await expect(bar('c4')).toHaveClass(/ex-top/);
+  await expect(bar('d4').locator('.ex-ci')).toHaveCount(1);
+  // The margin is drawn at the score: 60% ± 4.2 from the left, as a share of the bar's width.
+  const [box, ci] = await Promise.all([bar('d4').boundingBox(), bar('d4').locator('.ex-ci').boundingBox()]);
+  expect(Math.abs((ci!.x - box!.x) / box!.width - (0.6 - 0.0423))).toBeLessThan(0.02);
+  expect(Math.abs(ci!.width / box!.width - 2 * 0.0423)).toBeLessThan(0.02);
   await panel(page).getByRole('button', { name: 'Score' }).click();
   await expect(panel(page).getByRole('button', { name: 'Equal Elo' })).toBeVisible();
   await expect(bar('e4')).toHaveClass(/equal/);
-  await expect(bar('e4')).toHaveAttribute('title', /^At equal ratings: 57% for White \(the games: 67%\)\nIts players averaged 2101, their opponents 2033 \(\+68\), which predicts 60%\./);
-  await expect(bar('d4')).toHaveAttribute('title', /^At equal ratings: 67% for White \(the games: 60%\)/);
+  await expect(bar('e4')).toHaveAttribute('title', /^At equal ratings: 60% for White \(the games: 67%\)\nIts players averaged 2101, their opponents 2033 \(\+68\), which predicts 57% on Lichess’s curve \(0\.72 of Elo’s slope at these ratings\)\./);
+  await expect(bar('d4')).toHaveAttribute('title', /^At equal ratings: 65% for White \(the games: 60%\)/);
+  // At equal ratings d4 is the best, e4 5 points below with margins of ±4 and ±3: just beyond chance.
+  await expect(bar('d4')).toHaveClass(/equal.*ex-top|ex-top.*equal/);
+  await expect(bar('e4')).not.toHaveClass(/ex-top/);
+  await expect(bar('e4')).toHaveAttribute('title', /\nIts margin: ±3 points \(95%\): the games’ chance and the correction’s\.\nBelow the best here \(d4, 65%\) by more than chance\.$/);
   await expect(bar('c4')).toHaveClass(/prep-raw/);
+  await expect(bar('c4').locator('.ex-ci')).toHaveCount(0);
   await expect(bar('c4')).toHaveAttribute('title', /no rated games after this move/);
   // The positions after the moves were asked of the explorer, at the filter, with the token.
   for (const fen of [AFTER_E4, AFTER_D4]) expect(fake.requests.some((r) => r.url.startsWith('https://explorer.lichess.org/lichess') && r.url.includes(encodeURIComponent(fen.split(' ')[0]!)) && r.auth === 'Bearer lip_e2e')).toBe(true);
@@ -416,12 +436,14 @@ test('Equal Elo: a position after a move reached mostly by another order takes t
     'title',
     [
       'At equal ratings: 48% for Black (the games: 46%)',
-      'Its players averaged 1950, their opponents 1968 (−18), which predicts 47%.',
+      'Its players averaged 1950, their opponents 1968 (−18), which predicts 48% on Lichess’s curve (0.66 of Elo’s slope at these ratings).',
       'The opponents’ rating is estimated: only 20% of the games after this move came through it, the rest by another move order. Taken as 1.e4’s players’ rating here (2000), plus 80% of these players’ −40 against this position’s average (1990): how far opponents follow their players here, fitted to 1 move here whose opponents are known, and the filter.',
-      '39 / 25 / 36 after taking that out of the wins and losses · 600 games',
+      '40 / 25 / 35 after taking that out of the wins and losses · 600 games',
+      'Its margin: ±4 points (95%): the games’ chance and the correction’s.',
+      'Green: can’t be told from the best here (e5, 50%): the difference is within chance.',
     ].join('\n'),
   );
-  await expect(bar('e5')).toHaveAttribute('title', /their opponents 2048 \(\+2\), which predicts 50%\.\nThe opponents’ rating: the replies after this move\.\n/);
+  await expect(bar('e5')).toHaveAttribute('title', /their opponents 2048 \(\+2\), which predicts 50% on Lichess’s curve \(0\.72 of Elo’s slope at these ratings\)\.\nThe opponents’ rating: the replies after this move\.\n/);
   // After 1...c5 the position itself came mostly by other orders (3,000 games, 600 by 1...c5), so
   // the move that led here can't stand in either: 2.Nf3 keeps the games' own bar, saying why.
   await page.locator('.move[data-path="e4 c5"]').click({ position: { x: 6, y: 8 } });

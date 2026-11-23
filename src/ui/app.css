@@ -3693,6 +3693,7 @@ a.button.primary {
 }
 
 .ex-bar {
+  position: relative;
   display: flex;
   height: 18px;
   border-radius: 3px;
@@ -3926,6 +3927,31 @@ a.button.primary {
 .ex-bar.equal {
   outline: 1px dashed var(--info);
   outline-offset: -1px;
+}
+
+/* Which differences are real (§5.126): the best score and those within chance of it in green
+   (dashed at equal ratings); along each bar's bottom edge its score's 95% range, an amber line
+   with end ticks that reads on the white, grey and black parts alike, under the labels (a score
+   always falls mid-draws, where the draws' label is). */
+.ex-bar.ex-top {
+  outline: 2px solid var(--plus);
+  outline-offset: -1px;
+}
+
+.ex-bar.equal.ex-top {
+  outline-style: dashed;
+}
+
+.ex-bar > .ex-ci {
+  position: absolute;
+  bottom: 0;
+  height: 5px;
+  min-width: 3px;
+  box-sizing: border-box;
+  border-inline: 2px solid #f0b429; /* fixed */
+  background: linear-gradient(#f0b429, #f0b429) bottom / 100% 2px no-repeat; /* fixed */
+  filter: drop-shadow(0 0 1px rgb(0 0 0 / 70%)); /* fixed */
+  pointer-events: none;
 }
 
 .ex-details {

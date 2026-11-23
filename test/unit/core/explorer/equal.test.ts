@@ -1,8 +1,8 @@
 // Scores at equal ratings (PLAN.md §5.126): the opponents' average from the replies after a move,
-// Elo's expected score, and the split with the gap taken out.
+// the score the gap predicts on Lichess's curve, and the split with the gap taken out.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { eloExpected, equalDetails, equalPrepared, equalPreparedLine, equalScore, FOLLOW, followAt, followPrior, isEqual, moverRating, opponentsBefore, shiftSplit, type EqualBefore, type EqualScore } from '../../../../src/core/explorer/equal.ts';
+import { eloExpected, equalDetails, expectedOn, LICHESS_SLOPES, slopeAt, equalPrepared, equalPreparedLine, equalScore, FOLLOW, followAt, followPrior, isEqual, moverRating, opponentsBefore, shiftSplit, type EqualBefore, type EqualScore } from '../../../../src/core/explorer/equal.ts';
 import type { CompactExplorer } from '../../../../src/core/explorer/providers.ts';
 
 const close = (a: number, b: number, eps = 1e-9) => assert.ok(Math.abs(a - b) < eps, `${a} ≉ ${b}`);
@@ -26,6 +26,20 @@ test('Elo’s expected score: ½ at no gap, 10/11 at +400, symmetric', () => {
   close(eloExpected(400), 10 / 11);
   close(eloExpected(-150) + eloExpected(150), 1);
   assert.ok(eloExpected(20) > 0.528 && eloExpected(20) < 0.529);
+});
+
+test('Lichess’s curve: Elo’s slope times the band’s, by the two ratings’ midpoint; Elo’s own where asked', () => {
+  // The bands as measured (scripts/elo-curve.ts, October 2026): flatter than Elo’s everywhere, least so at the top.
+  assert.deepEqual(LICHESS_SLOPES.map(([b]) => b), [0, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2500]);
+  assert.ok(LICHESS_SLOPES.every(([, k]) => k > 0.4 && k < 1));
+  assert.deepEqual([500, 1000, 1499, 1600, 1799, 1800, 2000, 2250, 2700].map((r) => slopeAt(r)), [0.73, 0.53, 0.49, 0.6, 0.6, 0.66, 0.72, 0.76, 0.85]);
+  assert.equal(slopeAt(1800, 'elo'), 1);
+  // A player 100 above at 2000–2100: 0.72 of Elo’s slope, about 60% where Elo’s curve says 64%.
+  close(expectedOn(2100, 2000), eloExpected(72));
+  assert.equal(Math.round(expectedOn(2100, 2000) * 100), 60);
+  assert.equal(Math.round(expectedOn(2100, 2000, 'elo') * 100), 64);
+  close(expectedOn(1850, 1850), 0.5);
+  close(expectedOn(1700, 1800) + expectedOn(1800, 1700), 1);
 });
 
 test('the side to move’s rating: the moves’ ratings weighted by games; unrated or empty moves left out', () => {
@@ -56,8 +70,12 @@ test('a move’s score at equal ratings: 1.e4 Nf6 at 1800–2000, as measured on
   close(eq.opponent, 1973.1);
   close(eq.gap, 18.9);
   close(eq.raw, 0.517);
-  close(eq.score, eq.raw - (eloExpected(18.9) - 0.5));
-  assert.equal(Math.round(eq.score * 1000), 490);
+  // On Lichess's curve at a midpoint of 1983 (0.66 of Elo's slope): 49.9%. Elo's own took it to 49.0%.
+  assert.equal(eq.curve, 'lichess');
+  assert.equal(eq.slope, 0.66);
+  close(eq.score, eq.raw - (eloExpected(0.66 * 18.9) - 0.5));
+  assert.equal(Math.round(eq.score * 1000), 499);
+  assert.equal(Math.round(must(equalScore(row, child, 'b', undefined, 'elo')).score * 1000), 490);
   // The split keeps the draws; Black's wins give up the difference.
   close(eq.split.d, 0.066);
   close(eq.split.b + eq.split.d / 2, eq.score);
@@ -69,7 +87,7 @@ test('players weaker than their opponents: the score goes up; no gap: unchanged'
   const row = { white: 482, draws: 0, black: 518, rating: 1935 };
   const eq = must(equalScore(row, answer([{ san: 'x', games: 900, rating: 1965 }]), 'w'));
   assert.ok(eq.score > eq.raw);
-  assert.equal(Math.round(eq.score * 1000), 525);
+  assert.equal(Math.round(eq.score * 1000), 510);
   const even = must(equalScore({ white: 3, draws: 2, black: 5, rating: 1800 }, answer([{ san: 'x', games: 9, rating: 1800 }]), 'b'));
   close(even.score, even.raw);
   assert.deepEqual(even.split, { w: 0.3, d: 0.2, b: 0.5 });
@@ -111,7 +129,7 @@ test('the position after 4.e3 reached mostly by the London: the opponents from 3
   const wasGap = 1875 - moverRating(afterE3)!.rating;
   assert.equal(Math.round(wasGap), -98);
   assert.equal(Math.round((raw - (eloExpected(wasGap) - 0.5)) * 100), 69);
-  // From the position itself: 1858 + 0.81 × (1875 − 1846) = 1881, a gap of −6, and 55% → 56%. The
+  // From the position itself: 1858 + 0.81 × (1875 − 1846) = 1881, a gap of −6, and 55% → 55.6%. The
   // slope: 4.Nb5's players 70 below the average, their opponents 57 below 3…Nc6's, with the prior 0.8.
   const eq = must(equalScore(e3, afterE3, 'w', before));
   assert.equal(eq.from, 'before');
@@ -124,7 +142,7 @@ test('the position after 4.e3 reached mostly by the London: the opponents from 3
   assert.equal(Math.round(eq.opponent), 1881);
   assert.equal(Math.round(eq.gap), -6);
   assert.equal(Math.round(eq.raw * 1000), 550);
-  assert.equal(Math.round(eq.score * 1000), 559);
+  assert.equal(Math.round(eq.score * 1000), 556);
   assert.deepEqual(eq.led, { san: '3…Nc6', rating: 1858 });
   // Without the position before: no score, rather than a wrong one; while it is asked, wait.
   assert.equal(equalScore(e3, afterE3, 'w'), 'inflow');
@@ -162,11 +180,11 @@ test('a little inflow: the estimate where the position before is known, the repl
   const est = must(equalScore(e4, after, 'w', before));
   assert.equal(est.from, 'before');
   assert.equal(Math.round(est.opponent), 2022);
-  assert.equal(Math.round(est.score * 100), 58);
+  assert.equal(Math.round(est.score * 100), 59);
   const replies = must(equalScore(e4, after, 'w'));
   assert.equal(replies.from, 'after');
   assert.equal(replies.opponent, 2031);
-  assert.equal(Math.round(replies.score * 100), 59);
+  assert.equal(Math.round(replies.score * 100), 60);
   // Over 1.25× with nothing before: none.
   assert.equal(equalScore(e4, at([['x', 4600, 2031]], 4600), 'w'), 'inflow');
 });
@@ -182,9 +200,9 @@ test('the details say where the opponents’ rating came from', () => {
   const eq = must(equalScore(e3, afterE3, 'w', before));
   assert.deepEqual(equalDetails(eq, 'w'), [
     'At equal ratings: 56% for White (the games: 55%)',
-    'Its players averaged 1875, their opponents 1881 (−6), which predicts 49%.',
+    'Its players averaged 1875, their opponents 1881 (−6), which predicts 49% on Lichess’s curve (0.66 of Elo’s slope at these ratings).',
     'The opponents’ rating is estimated: only 36% of the games after this move came through it, the rest by another move order. Taken as 3…Nc6’s players’ rating here (1858), plus 81% of these players’ +29 against this position’s average (1846): how far opponents follow their players here, fitted to 1 move here whose opponents are known, and the filter.',
-    '54 / 4 / 42 after taking that out of the wins and losses · 48,682 games',
+    '54 / 4 / 43 after taking that out of the wins and losses · 48,682 games',
   ]);
   const line = equalPreparedLine({ w: 0.5, d: 0.1, b: 0.4 }, equalPrepared({ w: 0.5, d: 0.1, b: 0.4 }, 0.5, eq, 'w'), 0.5, eq, 'w');
   assert.match(line, /^At equal ratings: 55% \(55% before\)\. The move’s players averaged 1875, their opponents 1881 \(−6\); 50% of it rests on games\. The opponents’ rating is estimated: only 36% /);
@@ -206,9 +224,12 @@ test('the prepared split: only its games’ part moves; resting wholly on the Pr
 test('the details: the score, the games’, the averages and the gap, the split and the games', () => {
   const eq = must(equalScore({ white: 4500, draws: 660, black: 4840, rating: 1992 }, answer([{ san: 'e5', games: 10000, rating: 1973 }]), 'b'));
   assert.deepEqual(equalDetails(eq, 'b'), [
-    'At equal ratings: 49% for Black (the games: 52%)',
-    'Its players averaged 1992, their opponents 1973 (+19), which predicts 53%.',
+    'At equal ratings: 50% for Black (the games: 52%)',
+    'Its players averaged 1992, their opponents 1973 (+19), which predicts 52% on Lichess’s curve (0.66 of Elo’s slope at these ratings).',
     'The opponents’ rating: the replies after this move.',
-    '48 / 7 / 46 after taking that out of the wins and losses · 10,000 games',
+    '47 / 7 / 47 after taking that out of the wins and losses · 10,000 games',
   ]);
+  // The Masters tab’s FIDE ratings: Elo’s own curve.
+  const masters = must(equalScore({ white: 4500, draws: 660, black: 4840, rating: 1992 }, answer([{ san: 'e5', games: 10000, rating: 1973 }]), 'b', undefined, 'elo'));
+  assert.equal(equalDetails(masters, 'b')[1], 'Its players averaged 1992, their opponents 1973 (+19), which predicts 53% on Elo’s curve.');
 });
