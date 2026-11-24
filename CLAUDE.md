@@ -40,6 +40,11 @@ for a robotic board (the Chessnut Move), built only when the owner asks.
   the owner can do goes in `TESTING.md` and doesn't stop the chain; build on the best guess.
   Stop only when nothing useful can be built without the owner, and say exactly what is needed.
   No limit on the number of chained sessions.
+- Choose the model and effort of every session you start (`create_session`'s `model` and
+  `effort`) for its job (owner, 2026-11-24). A session that only runs scripts, waits on them
+  and reports what they printed gets a smaller, cheaper model at low effort. The default model
+  and effort are for building and reviewing. The container's hardware is the same whatever the
+  model.
 - puzzle-explorer, mistake-lab, q_extension and lichessable are read-only references.
 - Qchess (qchess.net) is read live on the owner's test account, user `Testers`, whose password
   is in the environment variable `QCHESS_PASSWORD` (set in the cloud environment, never in this
