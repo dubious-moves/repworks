@@ -12460,3 +12460,20 @@ report's values, means, engine wins and prepared splits equal `evaluateRow`'s wi
 options for the same tree at depth 5 and 7; the app's rows without candidates; the filter and
 token in the requests and the default options; no token; the input; the report's merge and resume;
 the cache read back by a later run.
+
+**As built** (2026-11-24): `scripts/practical.ts` (the command line, Maia over ONNX), `scripts/practical-lib.ts`
+(the input, the settings, the cache on disk, the runner over the service, the report),
+`core/explorer/prefs.ts`. Checked live from a cloud container with a Lichess token:
+- *The owner's spot check*, 1. Nc3 c5 2. d4 cxd4 3. Qxd4 Nc6 4. Qh4 Nf6 5. Nf3 g6 6. e4 d6 7. Bc4
+  Bg7 8. Bh6 O-O, 9. O-O-O against 9. Ng5 (the owner sees about 69% against 60% at d5 in the app):
+  without Maia 65.3% / 64.5%, both complete at d3 (no position below has 50 games, so nothing
+  deepens); with Maia (23M, 2150) 70.5% / 67.5% at d5 and 73.5% / 68.0% at d7; Maia at 1900 or 1700,
+  the first model, the Maia preview, past 6 months, 2000+ only, or bullet added all keep Ng5 between
+  67% and 68%. So the owner's values are Maia's (O-O-O matches), and Ng5's 60% isn't reproduced:
+  most likely the device's cached ChessDB answers (kept a week) at Ng5's main reply 9...Ne5 (65% of
+  its games) differ from today's, or values from another filter or session; not settled.
+- *Timing*, at the app's 16 explorer requests a minute after a burst of 20: a position with two
+  candidates and its subtree mostly cached, seconds; 1. Nc3 d5 2. e4 d4 3. Nce2 e5 with the app's
+  five rows from an empty cache, d5 in 360 s (116 explorer, 203 ChessDB requests), then d7 another
+  345 s (93 and 194): about 70 s a candidate for d5 and 2½ minutes for d7, the explorer's rate
+  being nearly all of it. ChessDB and Maia (on onnxruntime-node) add little.
