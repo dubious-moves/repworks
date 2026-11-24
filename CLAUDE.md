@@ -109,6 +109,15 @@ walks --out walks.json --walks 40` (the explorer at the app's 16 requests a minu
 named players; about 40 minutes), `score --walks walks.json` (`STOCKFISH=<native binary>` for speed:
 `apt-get install stockfish` gives /usr/games/stockfish), and `report --walks walks.json`.
 
+The explorer panel's Practical value and prepared score for chosen candidates (PLAN.md §5.211), a
+report that writes nothing to the repo; the app's own search, filter, options and limiter, a Lichess
+token in `LICHESS_TOKEN`, and a cache on disk outside the repo that later runs reuse:
+`node scripts/practical.ts --moves "1.Nc3 c5 2.d4" --candidates "cxd4,e6" --cache
+~/.cache/repworks-practical --out practical.json --depth 5` (`--positions positions.json` for many,
+`[{ "moves": "...", "candidates": ["..."] }]`, no candidates for the app's own rows; `--depth 7`;
+`--maia --ort-node <folder>` for Maia as the app's Practical has it once Maia is on; `--report
+practical.json` prints the table again; the owner's settings as flags, listed in the script).
+
 The storm's "Gather positions" from a cloud session, as a device named `cloud` (PLAN.md §5.155),
 with the data repo checked out on `main`:
 `node scripts/storm-gather.ts ../repworks-data --minutes 60 --score-minutes 40 --push`; only

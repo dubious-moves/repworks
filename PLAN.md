@@ -12399,3 +12399,64 @@ follows it, a FEN, what isn't a line; three controls in its header);
 `test/e2e/findLine.spec.ts` (desktop and phone: from the menu to the other chapter's last move by
 Enter, `/` and a side line's link, a line the study leaves, an illegal line and Escape; 10 of 10
 repeats pass); `views.spec.ts`'s menu items. Live: TESTING.md.
+
+#### 5.211 The Practical value as a report (a reviewing session's request, 2026-11-24, built)
+
+The owner reviews a 1. Nc3 repertoire chapter by chapter with another Claude session, and what
+convinces them most at a decision is the explorer panel's Practical value at depth 5 (or 7). The
+reviewer lists a chapter's decisions, then runs this report in the background and adds the values
+beside its candidate tables.
+
+- **`scripts/practical.ts`**, a report that writes nothing to the repo: positions as SAN lines from
+  the start (or a FEN), each with the side to move's candidates, from a JSON file or the command
+  line; for each candidate the Practical value and the prepared score at depth N (`--depth`, 5 by
+  default, 7 works), the games and share, ChessDB's eval, and the position's explorer and ChessDB
+  requests. No candidates: the app's own rows (`autoRows`: ChessDB's best within 5 win%, then the
+  moves played in 2% of games or more).
+- **The app's numbers, not a copy of them**: the explorer worker's own service
+  (`core/explorer/service.ts`) runs, its `search` message with the rows and shares the panel sends,
+  so the rounds, the options, the filter, the providers and the limiter are the app's. The config
+  is the app's `configOf` over its default settings, which moved from `src/app/explorer.ts` to
+  `core/explorer/prefs.ts` (`DEFAULT_PREFS`, `configOf`, `sixMonthsAgo`; the app re-exports them)
+  so a Node script can import them: `src/app/explorer.ts` reads `location` on import.
+- **The owner's settings as flags**, each Explorer setting that changes a value (the speeds, the
+  ratings, past 6 months, risk aversion, the reply threshold, minimum games, the reach floor, the
+  own margin and candidates, the prepared prior, ChessDB analysis), and the line of settings used
+  heads the output and is stored with each position.
+- **Decisions** (Claude's):
+  - *No budget by default.* The app's 60 uncached requests a position can stop a search with
+    many rows or a wide tree short of d5 (it goes deeper on a revisit, with its cache warm). The
+    budget decides only how deep a search gets, never a value at a depth, so the report goes to the
+    depth asked (`--budget 60` for the app's).
+  - *Depth is `maxPly` − 1*: the panel's d5 is maxPly 6 (its default), d7 is maxPly 8.
+  - *Maia off unless `--maia`*, as in the app, where Maia is off until it is switched on (and the
+    Practical column then uses it: `practicalMaia` defaults on). With `--maia`: the 23M model at
+    the filter's rating (`maiaEloFor`, 2150 for the default filter), the line's seven positions
+    before as the app sends them, through onnxruntime-node with `--ort-node` (the first model,
+    `--maia-model maia3`, on onnxruntime-web: onnxruntime-node 1.31 crashed loading it).
+    `--maia-only` gives the Maia preview's values (the Prac header switched to Maia).
+  - *No Maia preview beside the search*: it is a second search shown instead of the values when
+    switched to, and changes none of them.
+  - *ChessDB's answer at the root is the search's (cached up to 7 days)*, not the panel's, which
+    asks again until two asks agree (§5.138). The Eval column can differ by ChessDB's drift.
+  - *The prepared score twice*: the search's prepared split as the side to move's score, and at
+    equal ratings (§5.126, `preparedEqual`, the app's default for that bar), from the games after
+    each candidate and, when most of those came by another order, the position before.
+- **The cache on disk**, outside the repo (`--cache`, `~/.cache/repworks-practical` by default; a
+  folder inside the repo is refused): the providers' two stores as append-only JSON lines, read at
+  the start, with the app's TTLs (explorer 30 days, ChessDB 7). Candidates and runs share subtrees.
+  The Lichess bucket is kept there too, so a run right after another doesn't start with a full
+  burst.
+- **The report file** (`--out`): every position's latest result per settings (the depth, the
+  filter, the options, Maia; not the budget), resumed: a candidate already there is skipped unless
+  stopped short or failed (`--force` asks again), new ones are added. `--report <file>` prints its
+  table. Progress lines on stderr: each row's value per round, Lichess's 429 pauses, and the
+  requests so far every 30 s.
+- **The token** is read from `LICHESS_TOKEN` and goes only into the explorer's Authorization
+  header (the providers'); it is never printed or written.
+
+Tests: `test/unit/scripts/practical.test.ts`: over fake HTTP answering from a hashed tree, the
+report's values, means, engine wins and prepared splits equal `evaluateRow`'s with the app's
+options for the same tree at depth 5 and 7; the app's rows without candidates; the filter and
+token in the requests and the default options; no token; the input; the report's merge and resume;
+the cache read back by a later run.
