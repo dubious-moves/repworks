@@ -31,6 +31,7 @@ import { addAlternative, altAdding, AltAdding } from './MoveCard.tsx';
 import { CommentDialog, MoveMenu } from './MoveMenu.tsx';
 import { ContinuationDialog } from './ContinuationDialog.tsx';
 import { exportChapterPgn, StudyMenu, StudyMenuButton } from './StudyMenu.tsx';
+import { FindLineDialog, openFindLine } from './FindLine.tsx';
 import { BranchPicker, branchOpen, chooseBranch, closeBranches, stepOn } from './BranchPicker.tsx';
 import { CommentPanel, Notation } from './Notation.tsx';
 import { endPreviewOnBoard, PreviewBar, previewBoard } from './CommentText.tsx';
@@ -120,7 +121,7 @@ export function ChapterView() {
         End: () => move('end'),
         w: () => setThreat(!threat.peek()),
         // The analysis board turns round, as on Lichess (§5.134).
-        ...(study.peek()?.sid === SCRATCH ? { f: flipBoard } : {}),
+        ...(study.peek()?.sid === SCRATCH ? { f: flipBoard } : { '/': openFindLine }),
       };
       if (ctrl && e.key.toLowerCase() === 'z') (e.shiftKey ? redoEdit : undoEdit)();
       else if (ctrl && e.key.toLowerCase() === 'y') redoEdit();
@@ -324,9 +325,10 @@ export function ChapterView() {
       {c && board && (
         <StudyMenu
           fen={shownLine?.fen ?? board.fen}
-          {...(scratch ? {} : { study: { settings: studySettings, chapterSettings: () => openChapterSettings(s.sid, s.cid), manageChapters: () => openManageChapters(s.sid), exportPgn: exportChapterPgn, newChapter: openNewChapter } })}
+          {...(scratch ? {} : { study: { findLine: openFindLine, settings: studySettings, chapterSettings: () => openChapterSettings(s.sid, s.cid), manageChapters: () => openManageChapters(s.sid), exportPgn: exportChapterPgn, newChapter: openNewChapter } })}
         />
       )}
+      {!scratch && <FindLineDialog />}
       <BranchPicker />
       <TranspositionList />
       <CommentDialog />

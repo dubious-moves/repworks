@@ -2092,3 +2092,14 @@ does. Start with the spike: its log decides what the later parts change (CHESSNU
   it isn't on the device yet?
 - **Checked**: unit tests and Playwright (desktop, emulated phone, a fake GitHub and a fake engine);
   **not** on a device.
+
+### Find a line in the study (PLAN.md §5.210, 2026-11-24)
+
+- In a study, ☰ → "Find a line…" (or `/` on the desktop). Type or paste
+  `1. Nc3 d5 2. d4 Nf6 3. Bf4 c6 4. e3 g6 5. h4`, then `1.Nc3 d5 2.d4 Nf6 3.Bf4 c6 4.e3 g6 5.h4`:
+  is the chapter that plays it listed, and does Enter open it at 5. h4?
+- A line of another chapter of the same study: does it open that chapter at the move? ← comes back?
+- A line that leaves the study: does it go to the last move the study plays?
+- On the phone: the dialog, the keyboard's Go key, and the board behind it.
+- **Checked**: unit tests and Playwright (desktop and emulated phone) on the fixture study; **not**
+  on a device or the real studies.

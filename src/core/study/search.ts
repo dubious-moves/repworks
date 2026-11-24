@@ -4,7 +4,7 @@
 // with the chapters that reach it. Pure: the chapters as read, a query, the hits in order.
 import { Chess, type Position } from 'chessops/chess';
 import { parseFen } from 'chessops/fen';
-import { parseSan } from 'chessops/san';
+import { makeSan, parseSan } from 'chessops/san';
 import { positionKeyOf, type PositionKey } from '../chess/positionKey.ts';
 import { foldText, openingLabel, openingOfLine, openingsNamed, type OpeningBook } from '../openings/names.ts';
 import type { Chapter, MoveNode, RootNode, StudyKind } from './model.ts';
@@ -75,7 +75,7 @@ function moveLabel(start: Position, depth: number, san: string): string {
 }
 
 /** A path as movetext from `start`: "1. e4 c5 2. Nf3"; Black's number only where the line begins. */
-function lineText(start: Position, path: Path): string {
+export function lineText(start: Position, path: Path): string {
   return path.map((san, i) => {
     const ply = i + (start.turn === 'black' ? 1 : 0);
     const n = start.fullmoves + Math.floor(ply / 2);
@@ -122,11 +122,11 @@ export function queryPosition(query: string): { key: PositionKey; fen?: string; 
   const path: string[] = [];
   for (const token of tokens) {
     // As people type them: 0-0 for O-O, a trailing ! or ?.
-    const san = token.replace(/[!?]+$/, '').replace(/^0-0-0/, 'O-O-O').replace(/^0-0/, 'O-O');
-    const move = parseSan(pos, san);
+    const move = parseSan(pos, token.replace(/[!?]+$/, '').replace(/^0-0-0/, 'O-O-O').replace(/^0-0/, 'O-O'));
     if (!move) return undefined;
+    // The chapters' own spelling (canonical SAN, with + and #), whatever was typed: "Nbd2" for "Nd2", "Bb5+" for "Bb5".
+    path.push(makeSan(pos, move));
     pos.play(move);
-    path.push(san);
   }
   return { key: positionKeyOf(pos), sans: path, line: lineText(start, path) };
 }

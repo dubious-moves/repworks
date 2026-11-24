@@ -12363,3 +12363,39 @@ engine, h3 played at once is judged in 3 to 6 s, the commands showing the lines 
 position searched with 1.5 to 2.5 s, then the lines searched on;
 §5.151's test with the move's search given the whole 6 s. The engines' times in Node on the
 container. Not on the owner's PC (`TESTING.md` §6).
+
+#### 5.210 Find a line in the study (the owner's request, 2026-11-24, built)
+
+The owner: "Implement a way to search by moves/line inside a study (hamburger menu). I should be
+able to enter "1. Nc3 d5 2. d4 Nf6 3. Bf4 c6 4. e3 g6 5. h4" with spaces or without "1.Nc3 d5
+2.d4 Nf6 3.Bf4 c6 4.e3 g6 5.h4" and get to the h4 move inside the study."
+
+- **"Find a line…" in the study's ☰ menu**, after Copy FEN, and `/` in a study (not on the
+  analysis board, which has one chapter). A dialog with one box; the places found come as it is
+  typed, and Enter (or Go) goes to the first: the chapter opened at the line's last move.
+- **What it reads**: moves from the start as §5.166's search reads them — numbered or not, a space
+  after the number or not, Black's "3..." taken, 0-0 and a trailing ! or ? taken — or a FEN. The
+  moves are written in the chapters' own SAN whatever was typed ("Nbc3" finds Nc3, "Nxf6" finds
+  Nxf6+); the search page's line now reads them the same way.
+- **What it finds, in order**: the chapters that play the line in its own order (a side line as
+  well as the main line), the open chapter first; then those that reach its position by another
+  order (D10's key), at their first place, the order said. When no chapter reaches it, the
+  chapter that follows it furthest (the open one first among equals), at the last move it
+  follows: "The study follows it as far as 1. e4 c5 2. Nf3 d6 3. d4". Moves that don't read as
+  a line say so, with nothing to go to.
+- **The chapters**: the open one as it stands in the editor (edits not synced yet included); the
+  others as the search page reads them (`readSearchChapters`, parsed once per file text).
+- A hit is a link: followed, the dialog closes and the move is a new history entry (← comes back
+  to where the dialog was opened); a middle click opens it in a new tab.
+- Not built: finding a line across every study (the search page, §5.166, does that by
+  position); the move where a line typed wrong stops being legal named.
+
+**As built** (2026-11-24): `src/core/study/findLine.ts` (`findLine`), `queryPosition`'s SAN in
+`src/core/study/search.ts`, `src/ui/FindLine.tsx`, the menu item in `src/ui/StudyMenu.tsx`, the
+key and the dialog in `src/ui/ChapterView.tsx`, `app.css`. Tests:
+`test/unit/core/study/findLine.test.ts` (the owner's line in its three spellings, the line before
+another order, a side line, the open chapter first, the chapters' spelling, as far as the study
+follows it, a FEN, what isn't a line; three controls in its header);
+`test/e2e/findLine.spec.ts` (desktop and phone: from the menu to the other chapter's last move by
+Enter, `/` and a side line's link, a line the study leaves, an illegal line and Escape; 10 of 10
+repeats pass); `views.spec.ts`'s menu items. Live: TESTING.md.

@@ -7,7 +7,7 @@
 // Export PGN downloads the open chapter as its file in the data repo, edits not yet synced included.
 // The line to the move shown is added to the checklist, or taken off it (§5.142), in a repertoire
 // chapter. An idea deck's cards are made or removed at the end (§5.128). On the analysis board it opens
-// with Flip board (§5.134).
+// with Flip board (§5.134). Find a line (§5.210) goes to a line of the study by its moves.
 import { signal } from '@preact/signals';
 import { makeFen } from 'chessops/fen';
 import { at, chapter, doc, feedback, flipBoard, redoEdit, SCRATCH, side, study, undoEdit } from '../app/editor.ts';
@@ -36,7 +36,7 @@ export function StudyMenuButton() {
       aria-label="More"
       aria-haspopup="menu"
       aria-expanded={Boolean(menu.value)}
-      title={study.value?.sid === SCRATCH ? 'Flip board, the explorer, undo and redo, Copy FEN' : 'The explorer, undo and redo, Copy FEN, from the move shown, the chapter and the study, Export PGN'}
+      title={study.value?.sid === SCRATCH ? 'Flip board, the explorer, undo and redo, Copy FEN' : 'The explorer, undo and redo, Copy FEN, find a line, from the move shown, the chapter and the study, Export PGN'}
       onClick={(e) => {
         if (menu.peek()) return close();
         const r = e.currentTarget.getBoundingClientRect();
@@ -50,6 +50,8 @@ export function StudyMenuButton() {
 
 /** What the menu does for a study (none on the analysis board). */
 export interface StudyActions {
+  /** Find a line in the study by its moves (§5.210). */
+  findLine(): void;
   newChapter(): void;
   chapterSettings(): void;
   manageChapters(): void;
@@ -107,6 +109,12 @@ export function StudyMenu(props: { fen: string; study?: StudyActions }) {
         <span class="menu-check" aria-hidden="true" />
         Copy FEN
       </button>
+      {props.study && (
+        <button type="button" role="menuitem" title="Go to a line of this study by its moves (1. e4 c5 2. Nf3) or a FEN" onClick={run(props.study.findLine)}>
+          <span class="menu-check" aria-hidden="true" />
+          Find a line… <kbd>/</kbd>
+        </button>
+      )}
       {props.study && <FromHere run={run} />}
       {props.study && (
         <>

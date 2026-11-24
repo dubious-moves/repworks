@@ -7203,6 +7203,11 @@ button.course-group.on {
   font-size: 0.92rem;
 }
 
+/* Find a line in the study (§5.210): the search page's box and hits, in a dialog. */
+.find-line-result {
+  margin-top: 10px;
+}
+
 .search mark {
   padding: 0 1px;
   border-radius: 2px;
