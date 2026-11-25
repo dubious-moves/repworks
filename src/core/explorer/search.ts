@@ -345,6 +345,8 @@ interface SearchNode {
   engine?: number;
   own?: Counts | null;
   move?: string;
+  /** How `move` was chosen (a my-node's), see `OwnPick`. */
+  pick?: OwnPick;
   maia?: number;
   replies?: ReplyNode[];
   tailShare?: number;
@@ -366,11 +368,24 @@ interface ReplyNode {
   maiaOnly: boolean;
   cnt: Counts | null;
   move?: string | null;
+  pick?: OwnPick;
   sub?: number;
   prep?: Split;
   prior?: number;
   leafGames?: number;
 }
+
+/*
+ * How my move after a reply was chosen:
+ * - `switched`: compared on practical values, and a move other than ChessDB's best won by more than
+ *   `preferBestWithin`;
+ * - `kept`: compared, and ChessDB's best stood;
+ * - `only`: no other move within `ownMargin` of ChessDB's best, so nothing to compare;
+ * - `rare`: ChessDB's best, not compared: the line is reached less than `compareReachMin` of the time;
+ * - `last`: ChessDB's best, not compared: the line's last move of mine (no shallower depth to compare
+ *   at, and `pickLast` off), or no depth left at all.
+ */
+export type OwnPick = 'switched' | 'kept' | 'only' | 'rare' | 'last';
 
 export interface Switch {
   path: string[];
@@ -618,6 +633,7 @@ function makeSearch(provider: SearchProvider, opts: SearchOptions, rootSide: Sid
           out.vm = n.vm;
           out.expanded = true;
           out.move = n.move || null;
+          if (n.pick) out.pick = n.pick;
           out.sub = n.maia || 0;
           if (n.prep) {
             out.prep = n.prep;
@@ -717,14 +733,13 @@ function makeSearch(provider: SearchProvider, opts: SearchOptions, rootSide: Sid
         }
         const all = Array.from(evals.values()).sort((a, b) => b.win - a.win);
         const best = all[0]!;
-        if (depthLeft <= 1) return { v: best.win, kind: 'leaf', move: best.san };
-        const alts =
-          reach < opts.compareReachMin
-            ? []
-            : all
-                .slice(1)
-                .filter((c) => best.win - c.win <= opts.ownMargin)
-                .slice(0, Math.max(0, opts.ownMaxCandidates - 1));
+        const within = all
+          .slice(1)
+          .filter((c) => best.win - c.win <= opts.ownMargin)
+          .slice(0, Math.max(0, opts.ownMaxCandidates - 1));
+        if (depthLeft <= 1) return { v: best.win, kind: 'leaf', move: best.san, pick: within.length ? 'last' : 'only' };
+        const rare = reach < opts.compareReachMin;
+        const alts = rare ? [] : within;
         const cmpDepth = depthLeft - 3;
 
         const deep = (c: EvalEntry) => opponentNode(provider.child(pos, c.san), depthLeft - 1, reach, c.win, path.concat(c.san), hint, up);
@@ -732,9 +747,9 @@ function makeSearch(provider: SearchProvider, opts: SearchOptions, rootSide: Sid
         // re-chosen by results: picking by the best empirical score would pick whichever move got
         // lucky in a small sample and then report that same luck.
         const done =
-          (c: EvalEntry) =>
+          (c: EvalEntry, pick: OwnPick) =>
           (n: SearchNode): SearchNode => {
-            const r: SearchNode = { v: n.v, vm: n.vm != null ? n.vm : n.v, kind: 'max', move: c.san, maia: n.maia || 0 };
+            const r: SearchNode = { v: n.v, vm: n.vm != null ? n.vm : n.v, kind: 'max', move: c.san, pick, maia: n.maia || 0 };
             if (n.prep) {
               r.prep = n.prep;
               r.prior = n.prior;
@@ -752,12 +767,12 @@ function makeSearch(provider: SearchProvider, opts: SearchOptions, rootSide: Sid
               if (res[i]!.v > res[pick]!.v && res[i]!.v - base > opts.preferBestWithin) pick = i;
             }
             if (pick) stats.switches.push({ path: path.slice(), from: best.san, to: cands[pick]!.san, gain: res[pick]!.v - base, reach });
-            return done(cands[pick]!)(res[pick]!);
+            return done(cands[pick]!, pick ? 'switched' : 'kept')(res[pick]!);
           });
         }
         if (!alts.length || cmpDepth < 1) {
           if (alts.length) stats.frontier++; // the next iteration compares them
-          return deep(best).then(done(best));
+          return deep(best).then(done(best, !within.length ? 'only' : rare ? 'rare' : 'last'));
         }
 
         const cands = [best, ...alts];
@@ -771,7 +786,7 @@ function makeSearch(provider: SearchProvider, opts: SearchOptions, rootSide: Sid
           }
           const chosen = cands[pick]!;
           if (pick) stats.switches.push({ path: path.slice(), from: best.san, to: chosen.san, gain: res[pick]!.v - base, reach });
-          return deep(chosen).then(done(chosen));
+          return deep(chosen).then(done(chosen, pick ? 'switched' : 'kept'));
         });
       });
   }
@@ -785,6 +800,8 @@ export interface ReplyResult {
   v: number;
   expanded: boolean;
   move: string | null;
+  /** How `move` was chosen; absent when there is no move. */
+  pick?: OwnPick;
   maiaOnly: boolean;
   raw?: RawSplit | null;
   prep?: Split | null;
@@ -856,6 +873,7 @@ export function evaluateRow(provider: SearchProvider, rootFen: string, san: stri
       unexplained: n.unexplained || 0,
       replies: (n.replies || []).map((r) => {
         const x: ReplyResult = { san: r.san, share: r.share, v: r.v, expanded: r.expanded, move: r.move || null, maiaOnly: !!r.maiaOnly };
+        if (r.move && r.pick) x.pick = r.pick;
         if (opts.prep) {
           x.raw = rawOf(r.cnt);
           x.prep = r.prep || null;

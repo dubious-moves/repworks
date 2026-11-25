@@ -120,7 +120,7 @@ token in `LICHESS_TOKEN`, and a cache on disk outside the repo that later runs r
 `node scripts/practical.ts --moves "1.Nc3 c5 2.d4" --candidates "cxd4,e6" --cache
 ~/.cache/repworks-practical --out practical.json --depth 5` (`--positions positions.json` for many,
 `[{ "moves": "...", "candidates": ["..."] }]`, no candidates for the app's own rows; `--depth 7`;
-`--maia --ort-node <folder>` for Maia as the app's Practical has it once Maia is on; `--pick-last` makes my last move in a line a practical pick too, a measurement; `--report
+`--maia --ort-node <folder>` for Maia as the app's Practical has it once Maia is on; `--pick-last` makes my last move in a line a practical pick too, a measurement; `--compare-reach-min 3` compares my moves on lines reached 3% of the time or more (the app's 10 by default); `--replies` lists each row's replies with my move after each and how it was chosen (a practical pick or ChessDB's best); `--report
 practical.json` prints the table again; the owner's settings as flags, listed in the script).
 
 The storm's "Gather positions" from a cloud session, as a device named `cloud` (PLAN.md §5.155),

@@ -15,7 +15,7 @@ import type { LimiterSnapshot } from '../src/core/explorer/limiter.ts';
 import { configOf, DEFAULT_PREFS, type ExplorerPrefs } from '../src/core/explorer/prefs.ts';
 import type { CompactExplorer, ExplorerCache, Http, ProviderStats } from '../src/core/explorer/providers.ts';
 import { autoRows } from '../src/core/explorer/rows.ts';
-import { expectedScore, fenKey, moveKey, type ChessdbAnswer, type MaiaMove, type RowResult, type Side, type Split } from '../src/core/explorer/search.ts';
+import { expectedScore, fenKey, moveKey, type ChessdbAnswer, type MaiaMove, type OwnPick, type RowResult, type Side, type Split } from '../src/core/explorer/search.ts';
 import { createExplorerService, type ExplorerConfig, type FromWorker } from '../src/core/explorer/service.ts';
 import { buildTable, type TableRow } from '../src/core/explorer/table.ts';
 import { MAIA_BEFORE } from '../src/core/maia/history.ts';
@@ -98,6 +98,11 @@ export interface Settings {
   maia: { on: boolean; elo: number; model: 'maia3-23m' | 'maia3'; only?: boolean } | null;
   /** My last move in a line a practical pick too (search.ts's `pickLast`, a measurement). */
   pickLast?: boolean;
+  /**
+   * search.ts's `compareReachMin` (a fraction) when not its default: my moves are compared on
+   * practical values only on lines reached this often; below it ChessDB's best stands.
+   */
+  compareReachMin?: number;
 }
 
 /** The worker's config for these settings: the app's `configOf`, with the depth, the budget and no preview. */
@@ -109,7 +114,11 @@ export function configFor(s: Settings, token: string, now: Date): ExplorerConfig
   // `only`: the preview's values instead (Maia's predictions in place of games, no prepared split),
   // what the panel shows when its Prac header is switched to Maia.
   const only = s.maia?.on && s.maia.only ? { maiaOnly: true, prep: false } : {};
-  return { ...rest, budget: s.budget, options: { ...c.options, maxPly: s.depth + 1, ...only, ...(s.pickLast ? { pickLast: true } : {}) } };
+  return {
+    ...rest,
+    budget: s.budget,
+    options: { ...c.options, maxPly: s.depth + 1, ...only, ...(s.pickLast ? { pickLast: true } : {}), ...(s.compareReachMin !== undefined ? { compareReachMin: s.compareReachMin } : {}) },
+  };
 }
 
 /** The settings as a line of text for the report: what was used. */
@@ -129,6 +138,7 @@ export function settingsText(s: Settings): string {
     s.maia?.on ? `Maia ${s.maia.model} at ${s.maia.elo}${s.maia.only ? ' alone (the preview)' : ''}` : 'Maia off',
     p.analyse ? 'ChessDB asked to analyse' : 'no ChessDB analysis requests',
     ...(s.pickLast ? ['last own move picked'] : []),
+    ...(s.compareReachMin !== undefined ? [`own moves compared on lines reached ${+(s.compareReachMin * 100).toFixed(2)}%+`] : []),
   ];
   return parts.join(' · ');
 }
@@ -150,6 +160,7 @@ export function settingsKey(s: Settings): string {
     prepPriorGames: p.prepPriorGames,
     maia: s.maia?.on ? `${s.maia.model}@${s.maia.elo}${s.maia.only ? ' only' : ''}` : null,
     ...(s.pickLast ? { pickLast: true } : {}),
+    ...(s.compareReachMin !== undefined ? { compareReachMin: s.compareReachMin } : {}),
   });
 }
 
@@ -237,8 +248,8 @@ export interface CandidateResult {
   share: number;
   /** ChessDB's eval of the move in centipawns from White's side, as the Eval column. */
   cdb?: number;
-  /** The main replies: share, value, and the Practical choice after each. */
-  replies?: { san: string; share: number; v: number; move: string | null }[];
+  /** The main replies: share, value, and the Practical choice after each, with how it was chosen. */
+  replies?: { san: string; share: number; v: number; move: string | null; pick?: OwnPick }[];
   positions?: number;
   frontier?: number;
 }
@@ -435,7 +446,7 @@ function candidateOf(san: string, r: RowResult | undefined, row: TableRow | unde
     out.prior = r.prior ?? 0;
   }
   if (equal !== undefined) out.prepEqualScore = equal;
-  if (r.replies) out.replies = r.replies.map((x) => ({ san: x.san, share: x.share, v: x.v, move: x.move }));
+  if (r.replies) out.replies = r.replies.map((x) => ({ san: x.san, share: x.share, v: x.v, move: x.move, ...(x.pick ? { pick: x.pick } : {}) }));
   if (r.switches?.length) (out as unknown as Record<string, unknown>).switches = r.switches;
   return out;
 }
@@ -506,4 +517,34 @@ export function reportTable(positions: readonly PositionResult[]): string {
   }
   const widths = head.map((_, j) => Math.max(...lines.map((l) => l[j]!.length)));
   return lines.map((l) => l.map((x, j) => (j >= 2 ? x.padStart(widths[j]!) : x.padEnd(widths[j]!))).join('  ').trimEnd()).join('\n');
+}
+
+/** What each pick label means, for the replies view. */
+export const PICK_TEXT: Record<OwnPick, string> = {
+  switched: 'practical pick over ChessDB’s best',
+  kept: 'ChessDB’s best, compared and kept',
+  only: 'ChessDB’s best, no other move within the own margin',
+  rare: 'ChessDB’s best, not compared: line under the compare floor',
+  last: 'ChessDB’s best, not compared: last move of the line',
+};
+
+/**
+ * Each candidate's replies (share of at least `minShare`, a fraction) with their value and my move
+ * after each, labelled by how the search chose it: whether an answer is a practical pick or
+ * ChessDB's best.
+ */
+export function repliesText(positions: readonly PositionResult[], minShare = 0.02): string {
+  const out: string[] = [];
+  for (const p of positions) {
+    for (const c of p.candidates) {
+      if (!c.replies?.length) continue;
+      out.push(`${p.label}  ${c.san}`);
+      for (const r of c.replies) {
+        if (r.share < minShare) continue;
+        const move = r.move ? `${r.move}  (${r.pick ? `${r.pick}: ${PICK_TEXT[r.pick]}` : 'no label: an older report'})` : '–';
+        out.push(`  ${r.san.padEnd(7)} ${pct(r.share * 100).padStart(6)}  ${pct(r.v).padStart(6)}  ${move}`);
+      }
+    }
+  }
+  return out.join('\n');
 }

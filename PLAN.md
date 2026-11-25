@@ -12493,3 +12493,21 @@ ChessDB's best. At the default d5 only my first move below the row is a practica
   rows) +14 on 108 (13%); every value and prepared score the same to 0.1, and no switch anywhere,
   with or without it. Not in the app until a position deeper in a line, where a move sets a trap,
   shows it changing something (the owner, 2026-11-25).
+- **Measured again at d7** on a review's 16 positions (the 1. Nc3 Jobava's close calls, 36 rows,
+  2026-11-25): +169 explorer requests on 1,082 (16%); 31 rows within 0.2, four 0.25 to 0.45, one +1.8
+  (a row 7 points behind its rival, still 6 behind); no comparison between rows changed side. Its
+  switches are real but deep (a last move worth +9 on a line reached 14% of the time), so the row
+  barely moves: the row value rests on the first replies and my first answer, which were already
+  practical picks. Kept for reviews, where nobody waits.
+- **`--compare-reach-min <percent>`** (the script only; `compareReachMin`, the app's 10% by default):
+  my moves are compared on practical values on lines reached this often from the row, ChessDB's best
+  below it; its own setting in the report and in the settings key, while the default leaves the key
+  as before. Lines under the reach floor (2%) are not searched at all, so values under it change
+  nothing. At 3% on 1. Nc3 d5 2. d4 c6 3. Bf4 Bf5 (d7, `--pick-last`): f3 58.0 as before, e3 55.8 to
+  56.6, 44 explorer requests more for the two rows.
+- **Pick labels**: each reply's move in a row's result (`ReplyResult.pick`, search.ts's `OwnPick`)
+  says how it was chosen: `switched` (a practical pick over ChessDB's best), `kept` (compared, ChessDB's
+  best stood), `only` (no other move within the own margin), `rare` (ChessDB's best, not compared: the
+  line under `compareReachMin`), `last` (ChessDB's best, not compared: the line's last move, or no
+  depth left). The script's records keep it, and `--replies` prints each row's replies of 2% or more
+  with the move and its label, after a run or with `--report`. Not shown in the app.

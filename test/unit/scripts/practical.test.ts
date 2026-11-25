@@ -13,7 +13,7 @@ import { makeUci } from 'chessops/util';
 import { configOf, DEFAULT_PREFS } from '../../../src/core/explorer/prefs.ts';
 import { compactChessdb, compactExplorer, createMemoryCache, type HttpResponse } from '../../../src/core/explorer/providers.ts';
 import { evaluateRow, fenKey, type SearchProvider } from '../../../src/core/explorer/search.ts';
-import { configFor, createFileCache, createRunner, DEFAULT_SETTINGS, mergeReport, reportedSans, reportTable, resolvePosition, sansOf, settingsKey, type Settings } from '../../../scripts/practical-lib.ts';
+import { configFor, createFileCache, createRunner, DEFAULT_SETTINGS, mergeReport, repliesText, reportedSans, reportTable, resolvePosition, sansOf, settingsKey, settingsText, type Settings } from '../../../scripts/practical-lib.ts';
 
 /* A deterministic tree: every position's games and ChessDB scores come from a hash of its FEN. */
 function hash(s: string): number {
@@ -203,6 +203,32 @@ test('the report file: resumed by position and settings, candidates merged, a ta
   const table = reportTable(r.positions);
   assert.match(table, /Nf3\s+60\.0%\s+5/);
   assert.match(table, /Bc4 \(stopped: budget\)/);
+});
+
+test('--compare-reach-min: passed to the search, its own settings key; the default leaves the key as before', () => {
+  assert.equal(configFor(DEFAULT_SETTINGS, 'x', new Date(0)).options.compareReachMin, undefined, 'the search’s own default');
+  const low = { ...DEFAULT_SETTINGS, compareReachMin: 0.03 };
+  assert.equal(configFor(low, 'x', new Date(0)).options.compareReachMin, 0.03);
+  assert.notEqual(settingsKey(low), settingsKey(DEFAULT_SETTINGS));
+  assert.equal(settingsKey({ ...DEFAULT_SETTINGS }), settingsKey(DEFAULT_SETTINGS));
+  assert.match(settingsText(low), /own moves compared on lines reached 3%\+/);
+  assert.doesNotMatch(settingsText(DEFAULT_SETTINGS), /compared on lines/);
+});
+
+test('the replies view: each answer labelled by how the search chose it', () => {
+  const base = { label: 'P', line: '1.e4', fen: 'f w - - 0 1', settings: '', key: '', autoRows: false, seconds: 1, at: '', requests: { explorer: 0, chessdb: 0, explorer429: 0, chessdb429: 0 } };
+  const replies = [
+    { san: 'e5', share: 0.6, v: 55, move: 'Nf3', pick: 'switched' as const },
+    { san: 'c5', share: 0.3, v: 52, move: 'Nc3', pick: 'rare' as const },
+    { san: 'a6', share: 0.05, v: 60, move: 'd4' },
+    { san: 'h5', share: 0.01, v: 70, move: 'd4', pick: 'last' as const },
+  ];
+  const text = repliesText([{ ...base, candidates: [{ san: 'e4', state: 'value' as const, value: 54, games: 9, share: 1, replies }] }]);
+  assert.match(text, /^P {2}e4$/m);
+  assert.match(text, /e5 .*Nf3 {2}\(switched: practical pick over ChessDB’s best\)/);
+  assert.match(text, /c5 .*Nc3 {2}\(rare: ChessDB’s best, not compared: line under the compare floor\)/);
+  assert.match(text, /a6 .*d4 {2}\(no label: an older report\)/);
+  assert.doesNotMatch(text, /h5/, 'replies under 2% are left out');
 });
 
 test('the cache on disk: read back by a later run, TTLs on each record’s time', async () => {

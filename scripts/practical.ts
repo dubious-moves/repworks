@@ -13,8 +13,12 @@
 //       `fen`), with or without move numbers; `candidates` the side to move's (move numbers are
 //       fine), none for the app's own rows (ChessDB's best within 5 win%, then the moves played in
 //       2% of games or more). The Lichess token in LICHESS_TOKEN.
-//   node scripts/practical.ts --report practical.json [--json]
-//       The table from a report file, asking nothing.
+//   node scripts/practical.ts --report practical.json [--json] [--replies]
+//       The table from a report file, asking nothing. --replies (here or with a run) adds each
+//       candidate's replies of 2% or more with my move after each, labelled by how the search chose
+//       it: switched (a practical pick over ChessDB's best), kept (compared, ChessDB's best stood),
+//       only (no other move within the own margin), rare (ChessDB's best, not compared: the line is
+//       under the compare floor), last (ChessDB's best, not compared: the line's last move).
 //
 // Depth: the panel's d1, d3, d5 (`--depth 5`, its default depth limit), d7 (`--depth 7`). The
 // report file is resumed: a candidate already there at these settings is skipped (`--force` asks
@@ -26,7 +30,10 @@
 // score at equal ratings). Maia, off as in the app until it is switched on there: --maia
 // [--maia-elo 1900] [--maia-model maia3-23m|maia3] (--maia-only: the panel's Maia preview, Maia's
 // predictions in place of games) [--ort-node <folder with
-// node_modules/onnxruntime-node>] [--threads 2].
+// node_modules/onnxruntime-node>] [--threads 2]. Measurements (not in the app): --pick-last (my last
+// move in a line a practical pick too), --compare-reach-min 3 (my moves compared on practical values
+// on lines reached 3% of the time or more, in percent; the app's 10 by default: below it ChessDB's
+// best stands; lines under --reach-floor are not searched at all).
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { homedir } from 'node:os';
@@ -36,7 +43,7 @@ import { parseFen } from 'chessops/fen';
 import * as ort from 'onnxruntime-web';
 import { DEFAULT_PREFS } from '../src/core/explorer/prefs.ts';
 import { CHESSDB_URL, EXPLORER_BASE, type Http } from '../src/core/explorer/providers.ts';
-import { moveKey, type MaiaMove, type RowResult } from '../src/core/explorer/search.ts';
+import { moveKey, PE_DEFAULTS, type MaiaMove, type RowResult } from '../src/core/explorer/search.ts';
 import { createMaiaBatch, type MaiaBatch } from '../src/core/maia/batch.ts';
 import { maiaEloFor } from '../src/core/maia/encode.ts';
 import {
@@ -46,6 +53,7 @@ import {
   mergeReport,
   readReport,
   reportedSans,
+  repliesText,
   reportTable,
   resolvePosition,
   settingsKey,
@@ -72,6 +80,16 @@ const num = (name: string, fallback: number): number => {
 };
 const list = (name: string, fallback: readonly (string | number)[]): string[] => flag(name, fallback.join(',')).split(',').map((s) => s.trim()).filter(Boolean);
 
+// --compare-reach-min in percent; the search's default (PE_DEFAULTS) leaves the settings as before, so
+// earlier reports keep resuming.
+function compareReachMinOf(): { compareReachMin?: number } {
+  if (!flags.has('compare-reach-min')) return {};
+  const pct = num('compare-reach-min', 10);
+  if (pct < 0 || pct > 100) throw new Error('--compare-reach-min is a percentage, 0 to 100');
+  const f = pct / 100;
+  return Math.abs(f - PE_DEFAULTS.compareReachMin) < 1e-12 ? {} : { compareReachMin: f };
+}
+
 function settingsOf(): Settings {
   const depth = num('depth', 5);
   if (depth < 1 || depth % 2 !== 1) throw new Error('--depth is odd: 1, 3, 5, 7 (the panel’s d1, d3, d5, d7)');
@@ -97,6 +115,7 @@ function settingsOf(): Settings {
     depth,
     budget: flags.has('budget') ? num('budget', 60) : Infinity,
     ...(flags.has('pick-last') ? { pickLast: true } : {}),
+    ...compareReachMinOf(),
     maia: maiaOn ? { on: true, elo: num('maia-elo', maiaEloFor(ratings)), model: flag('maia-model', 'maia3-23m') === 'maia3' ? 'maia3' : 'maia3-23m', ...(flags.has('maia-only') ? { only: true } : {}) } : null,
   };
 }
@@ -181,7 +200,7 @@ async function main(): Promise<void> {
   if (flags.has('report')) {
     const report = readReport(flags.get('report')!);
     if (flags.has('json')) process.stdout.write(JSON.stringify(report, null, 2) + '\n');
-    else process.stdout.write(reportTable(report.positions) + '\n');
+    else process.stdout.write(reportTable(report.positions) + '\n' + (flags.has('replies') ? `\n${repliesText(report.positions)}\n` : ''));
     return;
   }
   const settings = settingsOf();
@@ -249,7 +268,10 @@ async function main(): Promise<void> {
     clearInterval(ticker);
   }
   if (flags.has('json')) process.stdout.write(JSON.stringify(done, null, 2) + '\n');
-  else process.stdout.write(`${settingsText(settings)}\n\n${reportTable(done.length ? done : report.positions.filter((p) => p.key === key))}\n`);
+  else {
+    const shown = done.length ? done : report.positions.filter((p) => p.key === key);
+    process.stdout.write(`${settingsText(settings)}\n\n${reportTable(shown)}\n${flags.has('replies') ? `\n${repliesText(shown)}\n` : ''}`);
+  }
   if (out && existsSync(out)) say(`Report: ${out}`);
 }
 

@@ -32,6 +32,7 @@ test('off (the default): my last move in a line is ChessDB’s best', async () =
   const r = await evaluateRow(provider, pos('r', 'w'), 'a', 3);
   assert.equal(r.state, 'value');
   assert.equal(r.replies![0]!.move, 'M1');
+  assert.equal(r.replies![0]!.pick, 'last', 'labelled: not compared, the line’s last move');
   assert.ok(Math.abs(r.value! - winFromCp(20)) < 1e-9);
   assert.deepEqual(r.switches, []);
 });
@@ -39,6 +40,7 @@ test('off (the default): my last move in a line is ChessDB’s best', async () =
 test('pickLast: my last move is picked on the human replies below each candidate', async () => {
   const r = await evaluateRow(provider, pos('r', 'w'), 'a', 3, { pickLast: true });
   assert.equal(r.replies![0]!.move, 'M2');
+  assert.equal(r.replies![0]!.pick, 'switched');
   assert.ok(r.value! > winFromCp(20) + 1, `M2's value ${r.value} beats M1's by more than preferBestWithin`);
   assert.equal(r.switches!.length, 1);
   assert.deepEqual({ ...r.switches![0]!, gain: undefined }, { path: ['x'], from: 'M1', to: 'M2', gain: undefined, reach: 1 });
@@ -47,7 +49,18 @@ test('pickLast: my last move is picked on the human replies below each candidate
 test('pickLast keeps ChessDB’s best without a clear gain, and on lines reached under compareReachMin', async () => {
   const close = await evaluateRow(provider, pos('r', 'w'), 'a', 3, { pickLast: true, preferBestWithin: 50 });
   assert.equal(close.replies![0]!.move, 'M1');
+  assert.equal(close.replies![0]!.pick, 'kept');
   assert.deepEqual(close.switches, []);
   const rare = await evaluateRow(provider, pos('r', 'w'), 'a', 3, { pickLast: true, compareReachMin: 1.01 });
   assert.equal(rare.replies![0]!.move, 'M1');
+  assert.equal(rare.replies![0]!.pick, 'rare');
+});
+
+test('the pick label: only, when no other move is within the own margin', async () => {
+  // M2 (0) is about 1.8 win% behind M1 (+20): outside a margin of 1.
+  const r = await evaluateRow(provider, pos('r', 'w'), 'a', 3, { pickLast: true, ownMargin: 1 });
+  assert.equal(r.replies![0]!.move, 'M1');
+  assert.equal(r.replies![0]!.pick, 'only');
+  const deeper = await evaluateRow(provider, pos('r', 'w'), 'a', 3, { ownMargin: 1, compareReachMin: 1.01 });
+  assert.equal(deeper.replies![0]!.pick, 'only', 'only before rare: there was nothing to compare anyway');
 });
