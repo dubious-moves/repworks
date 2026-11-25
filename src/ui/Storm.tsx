@@ -889,8 +889,6 @@ interface CardMirror {
   played?: { uci: string; brush: string } | undefined;
   /** A held card: the position a take-back by hand returns to, and Try again. */
   undo?: { fen: string; run(): void } | undefined;
-  /** Wait this long before driving a new position (the review's stepping). */
-  delayMs?: number | undefined;
   /** The position to set up instead of the one shown (the setup's earlier position, `playArrival`). */
   fen?: string | undefined;
   /** With `fen`: the move lit as the last one there (none for the setup's earlier position). */
@@ -939,7 +937,6 @@ function CardBoard(props: { item: StormItem; asking: boolean; onMove(uci: string
             else props.onMove(u, true);
           },
           undo: m.undo,
-          delayMs: m.delayMs,
         }
       : undefined,
   );
@@ -1473,8 +1470,6 @@ function SaveMistake(props: { item: StormItem }) {
 /** The review list's lines shown (a per-device convenience). */
 const LINES_KEY = 'repworks-storm-review-lines';
 
-/** The review's board on the Chessnut Move: shown only, driven once a row is stayed on (CHESSNUT.md §6 part (f)). */
-const REVIEW_MIRROR: CardMirror = { delayMs: 1000 };
 /** A retry's move once graded, in its band's brush (a puzzle's wrong move too; its right moves go on). */
 function retryPlayed(retry: StormItem): CardMirror['played'] {
   const v = retry.answer;
@@ -1621,8 +1616,8 @@ function Review(props: { s: StormSession; scope: StormScopeData }) {
       {item && (
         <div class="train-grid storm-review-grid">
           {/* The Chessnut Move (CHESSNUT.md §5.2, part (f)): the retry set up at once, its move read and lit
-              in its band's colour once graded; the review's row driven once it has been stayed on
-              a second (stepping through never sends the robot to and fro), its arrows lit. */}
+              in its band's colour once graded. The review's rows are not followed (owner, 2026-11-25):
+              the board stays as it is while the rows are looked through, until Try again. */}
           {retry ? (
             <CardBoard
               item={retry}
@@ -1632,7 +1627,7 @@ function Review(props: { s: StormSession; scope: StormScopeData }) {
               mirror={{ played: retryPlayed(retry) }}
             />
           ) : (
-            <CardBoard item={{ ...item, played: undefined, step: 0 }} asking={false} onMove={() => undefined} arrows={arrows} sketch={`review|${at}`} mirror={REVIEW_MIRROR} />
+            <CardBoard item={{ ...item, played: undefined, step: 0 }} asking={false} onMove={() => undefined} arrows={arrows} sketch={`review|${at}`} />
           )}
           <div class="train-panel storm-panel">
             <div class="storm-nav">

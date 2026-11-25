@@ -348,7 +348,7 @@ and every screen that doesn't opt in.
 | Show the move | the best move's arrow, as now | the played move taken back, the best move lit green |
 | Show and grade | "Think of a move"; `2` shows the moves; Found and Missed by the keys and the ring | the top move lit bright green once shown; a move played on the board names it and is graded as in a set |
 | A puzzle | as now | after the user's right move the robot plays the reply; a wrong move is a held card |
-| The review | as now | the board follows the row chosen, a second after the last step (so stepping through doesn't send the robot to and fro); the played move red and the best green, as the arrows |
+| The review | as now | not followed (the owner, 2026-11-25): the board stays as it is, its lights off, while the rows are looked through; Try again sets the row up. The analysis board (Analyse) isn't followed either. Was: the row stopped on driven a second after the last step |
 | Retry from the review | as now | the card set up; the move read |
 
 ### 5.3 The timed storm (after the set)
@@ -771,7 +771,8 @@ owner can test sets and practice on the board.
 - The timed storm's cards: as part (e); the clock stands still during `setup` (it runs only in
   `solving`); check that `startStorm`'s tick ignores `setup`.
 - The review's `CardBoard` (line 1383): `mirror` with `delayMs: 1000`, not movable, the review's
-  arrows lit.
+  arrows lit. Since 2026-11-25 no `mirror`: the review isn't followed (the owner, after the board
+  came: "the board shouldn't try to follow when I change between the different attempts").
 - The retry from the review (line 1381): `mirror`, movable as it is.
 
 Tests: the clock unchanged across a 2 s setup (`driveMs: 2000`); the review stepped quickly
@@ -2128,6 +2129,6 @@ From the reference codec (checked against Chessnut's app's encoder and the READM
 **(f)**:
 ```
 ## The timed storm and the review on the Chessnut Move (CHESSNUT.md part (f))
-- A timed storm: the clock stands still while the board sets up. The review: the board follows the
-  row you stop on.
+- A timed storm: the clock stands still while the board sets up. The review: the board isn't
+  followed (since 2026-11-25); Try again sets the row up.
 ```

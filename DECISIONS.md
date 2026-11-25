@@ -2847,3 +2847,12 @@ The technical calls, each with its reason:
   single highest. Rows with a margin over ±10 aren't ranked. Why: the owner, "build both", after
   reading that most 1–3 point differences the bars show are within their noise (±3 at 1,000 games).
 
+
+## Revision of 2026-11-25 (the storm's review not followed by the Chessnut Move: CHESSNUT.md §5.2)
+- **The storm's review is not followed by the board**: stepping through its rows and showing their
+  best moves leaves the board as it is, its lights off; Try again still sets the row up and reads
+  the move. Was: the row stopped on driven a second after the last step, its moves lit. Why: the
+  owner, 2026-11-25, after the board came: "After a storm, if I want to analyze a position […] the
+  board shouldn't try to follow when I change between the different attempts." The analysis board
+  was already not followed (CHESSNUT.md §5.5), as the owner asked for too. No setting, no data
+  format changed.

@@ -19,8 +19,8 @@
 // Part (f), the timed storm and the review (CHESSNUT.md §5.3, §6 part (f)):
 // - A timed storm: the clock stands still through each card's setup (a 2 s drive), runs while the
 //   card is asked, stops at the verdict and stays so through the next card's setup.
-// - The review: opened and stepped quickly, only the row stayed on is driven; a row's arrows lit
-//   (the move played red, the best green once shown); a retry by hand graded, lit and said.
+// - The review: not followed (owner, 2026-11-25), the board left as it is, its lights off, while
+//   rows are stepped through; a retry set up, by hand graded, lit and said.
 //
 // Controls (each run once, 2026-11-14, on the desktop project, and each failed the named tests):
 // - `deal` going straight to `solving` with the board linked: "a set …", "a held card …",
@@ -31,8 +31,7 @@
 // - show and grade's next card not scheduled: "show and grade …".
 // Part (f)'s (each run once, 2026-11-14, on the desktop project, and each failed the named test):
 // - `setPhase` starting the timed storm's clock in `setup` as in `solving`: "a timed storm …";
-// - the review's board passing no `mirror`: "the review …";
-// - the review's `delayMs` gone (every row stepped through driven): "the review …";
+// - (2026-11-25) the review's board mirrored again (`mirror={{ delayMs: 1000 }}`): "the review …";
 // - the retry's `onMove` dropping `board` (no verdict said): "the review …";
 // - a puzzle's reply asked at once (`setPhase('solving')` with the board linked): "a puzzle …".
 // The link's own fix for "a held card …" (the same wrong move made again after the robot took it
@@ -524,7 +523,7 @@ test('a timed storm on the board: the clock stands still through each setup, run
   await expect(clock).not.toHaveClass(/stopped/);
 });
 
-test('the review on the board: stepped quickly, only the row stayed on is driven, its arrows lit; a retry by hand graded, lit and said', async ({ page }) => {
+test('the review on the board: not followed, the board left as it is; a retry set up, by hand graded, lit and said', async ({ page }) => {
   test.setTimeout(90_000);
   await setUp(page);
   const b = move(page);
@@ -544,30 +543,28 @@ test('the review on the board: stepped quickly, only the row stayed on is driven
   }
   await expect(page.getByTestId('storm-summary')).toBeVisible({ timeout: 10_000 });
 
-  // The review opens on the first row: driven after its second.
-  await expect.poll(b.position, { timeout: 5000 }).toBe(boardOf(order[0]!.fen));
+  // The review isn't followed (owner, 2026-11-25): the board stays on the last card's answer, its
+  // lights off, while the rows are opened, stepped through and their best moves shown.
+  const last = boardOf(afterUci(order[2]!.fen, order[2]!.list[0]!));
   const before = (await b.drives()).length;
-  // Stepped twice at once: only the third row is driven.
   await page.keyboard.press('ArrowRight');
   await page.keyboard.press('ArrowRight');
   await expect(page.locator('.storm-nav-count')).toContainText('Position 3 of 3');
-  await expect.poll(b.position, { timeout: 5000 }).toBe(boardOf(order[2]!.fen));
-  await page.waitForTimeout(1500);
-  expect((await b.drives()).slice(before)).toEqual([boardOf(order[2]!.fen)]);
-
-  // Back to the second row: the move played lit red, the arrival blue; the best green once shown.
   await page.keyboard.press('ArrowLeft');
+  await expect(page.locator('.storm-nav-count')).toContainText('Position 2 of 3');
   const row = order[1]!;
   const worst = row.list[LADDER.length - 1]!;
   const best = row.list[0]!;
-  await expect.poll(b.position, { timeout: 5000 }).toBe(boardOf(row.fen));
-  await expect.poll(() => litOn(page, worst)).toEqual([LIGHT.red, LIGHT.red]);
   await page.keyboard.press('b');
-  await expect.poll(() => litOn(page, best)).toEqual([LIGHT.green, LIGHT.green]);
+  await page.waitForTimeout(1500);
+  expect((await b.drives()).slice(before)).toEqual([]);
+  expect(await b.position()).toBe(last);
+  expect((await b.lights()).every((l) => l === LIGHT.off)).toBe(true);
 
-  // Try again: the card on the board already; the best by hand, graded, lit bright green and said.
+  // Try again: the card set up on the board; the best by hand, graded, lit bright green and said.
   await page.keyboard.press('t');
   await expect(page.locator('.storm-review .storm-title')).toContainText('Try this one again');
+  await expect.poll(b.position, { timeout: 5000 }).toBe(boardOf(row.fen));
   await expect.poll(() => litOn(page, worst)).toEqual([LIGHT.off, LIGHT.off]);
   const said = (await spoken(page)).length;
   await b.hand(boardOf(afterUci(row.fen, best)));
