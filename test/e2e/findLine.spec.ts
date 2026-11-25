@@ -64,6 +64,19 @@ test('find a line: typed with or without spaces, the study’s place at its last
   await expect(result(page).getByRole('link')).toHaveText(['Main line']);
   await dialog(page).getByRole('button', { name: 'Go' }).click();
   await expect(page).toHaveURL(/#\/study\/Rep0Najd\/Ch1Najdf\?at=e4,c5,Nf3,d6,d4$/);
+  await expect(page.locator('.notation .move.current')).toHaveText(/d4/);
+
+  // A place in the chapter already open, its link followed: the board goes there (it once stayed
+  // where it was, the address alone changed). Then the browser's Back: the place before.
+  await studyMenu(page, 'Find a line');
+  await box(page).fill('1.e4 c5 2.Nf3');
+  await result(page).getByRole('link', { name: 'Main line' }).click();
+  await expect(dialog(page)).toHaveCount(0);
+  await expect(page).toHaveURL(/#\/study\/Rep0Najd\/Ch1Najdf\?at=e4,c5,Nf3$/);
+  await expect(page.locator('.notation .move.current')).toHaveText(/Nf3/);
+  await page.goBack();
+  await expect(page).toHaveURL(/#\/study\/Rep0Najd\/Ch1Najdf\?at=e4,c5,Nf3,d6,d4$/);
+  await expect(page.locator('.notation .move.current')).toHaveText(/d4/);
 
   // Moves that aren't a line from the start: said, and nowhere to go. Escape closes it.
   await studyMenu(page, 'Find a line');

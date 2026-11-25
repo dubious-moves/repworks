@@ -17,7 +17,7 @@ import { nearest, step, type Step } from '../core/study/navigate.ts';
 import { deleteChapter } from '../core/study/manage.ts';
 import { addChapterToStudy, addLine, addMove, linePgn, newChapter, renameChapter, reorderChapters, setOrientation, type Edit } from '../core/study/ops.ts';
 import { parseStudyMeta, reconcileChapterOrder, writeStudyMeta } from '../core/study/studyMeta.ts';
-import type { Path } from '../core/study/tree.ts';
+import { samePath, type Path } from '../core/study/tree.ts';
 import { cryptoRandom } from '../platform/browser.ts';
 import { dispatch, mode } from './mode.ts';
 import { localStore, ready, saveFiles } from './state.ts';
@@ -153,6 +153,17 @@ effect(() => {
   // The address follows the move shown, so a reload comes back to it.
   const path = at.value;
   if (doc.value && mode.peek().name === 'chapter') dispatch({ type: 'at', path });
+});
+
+effect(() => {
+  // The open chapter opened again at another move (Find a line's hit in it, Back or Forward between
+  // such entries): the chapter isn't read again, so its key alone wouldn't move the board there.
+  const m = mode.value;
+  if (m.name !== 'chapter' || !m.at || wanted !== undefined || `${m.sid}/${m.cid ?? ''}` !== openedKey) return;
+  const s = study.peek();
+  const c = doc.peek()?.present;
+  if (!c || s?.sid !== m.sid || s.cid !== m.cid || samePath(m.at, at.peek())) return;
+  at.value = nearest(c, m.at);
 });
 
 const nameOf = (text: string, cid: string): string => {
