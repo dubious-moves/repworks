@@ -12477,3 +12477,19 @@ the cache read back by a later run.
   five rows from an empty cache, d5 in 360 s (116 explorer, 203 ChessDB requests), then d7 another
   345 s (93 and 194): about 70 s a candidate for d5 and 2½ minutes for d7, the explorer's rate
   being nearly all of it. ChessDB and Maia (on onnxruntime-node) add little.
+
+**Later** (2026-11-25, the owner's question whether the pick of my moves is recursive): it is, but
+a my-node compares its candidates one full move shallower than its own depth, so the last one in a
+line (2 plies left: the d3 row's first, the d5 row's second) has no depth to compare at and keeps
+ChessDB's best. At the default d5 only my first move below the row is a practical pick.
+- **`pickLast`**, a search option (`PE_DEFAULTS`, off; not in the app's settings): that last
+  my-node searches each candidate (ChessDB's best and those within the own margin) on the human
+  replies below it and keeps the winner, with the same rules as the others (a switch only for more
+  than `preferBestWithin`, only on lines reached `compareReachMin` of the time). The comparison is
+  the final value, so nothing is searched twice. `scripts/practical.ts --pick-last` runs it as its
+  own setting in the report, and the report lists each row's switches (its heaviest three).
+- **Measured** live at d5, the app's defaults and rows, each with its baseline's cache warm so the
+  count is the extra: 1. Nc3 d5 (five rows) +15 explorer requests on 128 (12%), 1. Nc3 e5 (six
+  rows) +14 on 108 (13%); every value and prepared score the same to 0.1, and no switch anywhere,
+  with or without it. Not in the app until a position deeper in a line, where a move sets a trap,
+  shows it changing something (the owner, 2026-11-25).
