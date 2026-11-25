@@ -96,6 +96,8 @@ export interface Settings {
   budget: number;
   /** Maia in the search (the app's when Maia is switched on: off by default there). */
   maia: { on: boolean; elo: number; model: 'maia3-23m' | 'maia3'; only?: boolean } | null;
+  /** My last move in a line a practical pick too (search.ts's `pickLast`, a measurement). */
+  pickLast?: boolean;
 }
 
 /** The worker's config for these settings: the app's `configOf`, with the depth, the budget and no preview. */
@@ -107,7 +109,7 @@ export function configFor(s: Settings, token: string, now: Date): ExplorerConfig
   // `only`: the preview's values instead (Maia's predictions in place of games, no prepared split),
   // what the panel shows when its Prac header is switched to Maia.
   const only = s.maia?.on && s.maia.only ? { maiaOnly: true, prep: false } : {};
-  return { ...rest, budget: s.budget, options: { ...c.options, maxPly: s.depth + 1, ...only } };
+  return { ...rest, budget: s.budget, options: { ...c.options, maxPly: s.depth + 1, ...only, ...(s.pickLast ? { pickLast: true } : {}) } };
 }
 
 /** The settings as a line of text for the report: what was used. */
@@ -126,6 +128,7 @@ export function settingsText(s: Settings): string {
     `budget ${Number.isFinite(s.budget) ? s.budget : 'none'}`,
     s.maia?.on ? `Maia ${s.maia.model} at ${s.maia.elo}${s.maia.only ? ' alone (the preview)' : ''}` : 'Maia off',
     p.analyse ? 'ChessDB asked to analyse' : 'no ChessDB analysis requests',
+    ...(s.pickLast ? ['last own move picked'] : []),
   ];
   return parts.join(' · ');
 }
@@ -146,6 +149,7 @@ export function settingsKey(s: Settings): string {
     ownMaxCandidates: p.ownMaxCandidates,
     prepPriorGames: p.prepPriorGames,
     maia: s.maia?.on ? `${s.maia.model}@${s.maia.elo}${s.maia.only ? ' only' : ''}` : null,
+    ...(s.pickLast ? { pickLast: true } : {}),
   });
 }
 
@@ -432,6 +436,7 @@ function candidateOf(san: string, r: RowResult | undefined, row: TableRow | unde
   }
   if (equal !== undefined) out.prepEqualScore = equal;
   if (r.replies) out.replies = r.replies.map((x) => ({ san: x.san, share: x.share, v: x.v, move: x.move }));
+  if (r.switches?.length) (out as unknown as Record<string, unknown>).switches = r.switches;
   return out;
 }
 

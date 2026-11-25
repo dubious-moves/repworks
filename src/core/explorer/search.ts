@@ -131,6 +131,8 @@ export const PE_DEFAULTS = {
   ownMaxCandidates: 3,
   compareReachMin: 0.1, // my alternatives are compared only on lines reached this often
   preferBestWithin: 1, // keep the ChessDB best unless another beats it by more
+  pickLast: false, // my last move in a line (no shallower depth to compare at) also a practical
+  // pick: its candidates compared at full depth, on the human replies below each (a measurement)
   prep: true, // compute the prepared split alongside the Practical value
   prepPriorGames: 50, // k: games' worth of trust in the Practical value at a leaf
   riskAversion: 0.05, // lambda of riskMean at opponent nodes; 0: the plain mean
@@ -741,6 +743,18 @@ function makeSearch(provider: SearchProvider, opts: SearchOptions, rootSide: Sid
             return r;
           };
 
+        if (alts.length && cmpDepth < 1 && opts.pickLast) {
+          const cands = [best, ...alts];
+          return Promise.all(cands.map(deep)).then((res) => {
+            const base = res[0]!.v;
+            let pick = 0;
+            for (let i = 1; i < res.length; i++) {
+              if (res[i]!.v > res[pick]!.v && res[i]!.v - base > opts.preferBestWithin) pick = i;
+            }
+            if (pick) stats.switches.push({ path: path.slice(), from: best.san, to: cands[pick]!.san, gain: res[pick]!.v - base, reach });
+            return done(cands[pick]!)(res[pick]!);
+          });
+        }
         if (!alts.length || cmpDepth < 1) {
           if (alts.length) stats.frontier++; // the next iteration compares them
           return deep(best).then(done(best));

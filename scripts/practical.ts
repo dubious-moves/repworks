@@ -96,6 +96,7 @@ function settingsOf(): Settings {
     },
     depth,
     budget: flags.has('budget') ? num('budget', 60) : Infinity,
+    ...(flags.has('pick-last') ? { pickLast: true } : {}),
     maia: maiaOn ? { on: true, elo: num('maia-elo', maiaEloFor(ratings)), model: flag('maia-model', 'maia3-23m') === 'maia3' ? 'maia3' : 'maia3-23m', ...(flags.has('maia-only') ? { only: true } : {}) } : null,
   };
 }
