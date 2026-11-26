@@ -276,7 +276,11 @@ async function main(): Promise<void> {
   const [cmd, ...rest] = process.argv.slice(2);
   const { path, o } = opts(rest);
   if (cmd === 'sample') await sample(path, o.get('out')!, Number(o.get('per') ?? 2500));
-  else if (cmd === 'maia') await maia(o.get('sample')!, o.get('out')!, Number(o.get('before') ?? 7), o.has('mid'));
+  else if (cmd === 'maia') {
+    const only = new Set<string>();
+    for (const file of (o.get('only') ?? '').split(',').filter(Boolean)) for (const id of Object.keys(JSON.parse(readFileSync(file, 'utf8')) as object)) only.add(id);
+    await maia(o.get('sample')!, o.get('out')!, Number(o.get('before') ?? 7), o.has('mid'), only.size ? only : undefined);
+  }
   else if (cmd === 'explorer') await explorer(o.get('sample')!, o.get('out')!, Number(o.get('bucket')), Number(o.get('n') ?? 150), process.env[o.get('token-env') ?? 'LICHESS_TOKEN'] ?? '');
   else if (cmd === 'report') {
     const exs: Record<string, Ex> = {};
