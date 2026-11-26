@@ -378,7 +378,9 @@ test('clickable lines: preview a comment’s line, step through its lines, and b
   // A line replacing 2... d6, a remark, and a line after it.
   await comment(page, 'Or (2... e6 3. d4) (see below), then (3. d4 cxd4 4. Nxd4)');
   const written = page.locator('.notation .comment', { hasText: 'see below' });
-  await expect(written.locator('.line-move')).toHaveText(['e6', 'd4', 'd4', 'cxd4', 'Nxd4']);
+  // Folded to their first moves; a line opens once clicked or stepped into, and stays open.
+  await expect(written.locator('.comment-line')).toHaveText(['(2... e6)', '(3. d4)']);
+  await expect(written.locator('.line-move')).toHaveText(['e6', 'd4']);
 
   const bar = page.getByRole('group', { name: 'Line from the comment' });
   const next = async () => (isMobile ? bar.getByRole('button', { name: 'Next move in the line' }).click() : page.keyboard.press('ArrowRight'));
@@ -386,6 +388,7 @@ test('clickable lines: preview a comment’s line, step through its lines, and b
   await written.locator('.line-move', { hasText: 'e6' }).click();
   await expect(bar).toContainText('From the comment: e6');
   await expect(written.locator('.line-move.current')).toHaveText('e6');
+  await expect(written.locator('.line-move')).toHaveText(['e6', 'd4', 'd4']);
   // The move shown in the notation stays the commented one; the board shows the line.
   await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 d6');
   await expect(page.locator('cg-board square.last-move')).toHaveCount(2);
@@ -395,6 +398,7 @@ test('clickable lines: preview a comment’s line, step through its lines, and b
   await next();
   await expect(bar).toContainText('From the comment: d4');
   await expect(written.locator('.line-move.current')).toHaveText('d4');
+  await expect(written.locator('.line-move')).toHaveText(['e6', 'd4', 'd4', 'cxd4', 'Nxd4']);
   await next();
   await next();
   await expect(bar).toContainText('From the comment: d4 cxd4 Nxd4');
@@ -423,10 +427,12 @@ test('clickable lines: a group opening with Or or Not is a line, and a remark na
   await comment(page, '(Or 2...e6 3.d4 cxd4 4.Nxd4.) (Not 3.d3 since then 3...Nf6 is easy) (this is not 2...e6 at all)');
   const written = page.locator('.notation .comment', { hasText: 'at all' });
   // The first line replaces 2...d6; the second starts at 3.d4's ply, after the commented move, and one is no line.
-  await expect(written.locator('.line-move')).toHaveText(['e6', 'd4', 'cxd4', 'Nxd4', 'd3', 'Nf6']);
+  await expect(written.locator('.comment-line')).toHaveText(['(Or 2...e6)', '(Not 3.d3)']);
   const bar = page.getByRole('group', { name: 'Line from the comment' });
   await written.locator('.line-move', { hasText: 'e6' }).click();
   await expect(bar).toContainText('From the comment: e6');
+  await written.locator('.line-move', { hasText: 'd3' }).click();
+  await expect(written.locator('.line-move')).toHaveText(['e6', 'd4', 'cxd4', 'Nxd4', 'd3', 'Nf6']);
   await written.locator('.line-move', { hasText: 'Nf6' }).click();
   await expect(bar).toContainText('From the comment: d3 Nf6');
   if (isMobile) await bar.getByRole('button', { name: 'Back' }).click();
@@ -441,11 +447,10 @@ test('a line with words and null moves; ↓ enters a move’s lines, ↑ ↓ bet
   await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 d6');
   // 2... d6 has a variation below it (2... Nc6): ↓ takes the comment's line first.
   await comment(page, 'Plan (3. -- Nf6 4. -- g6, then 5. -- Bg7) or (3. d4 cxd4 the main line 4. Nxd4)');
-  const written = page.locator('.notation .comment', { hasText: 'the main line' });
-  await expect(written.locator('.line-move')).toHaveText(['--', 'Nf6', '--', 'g6', '--', 'Bg7', 'd4', 'cxd4', 'Nxd4']);
-  // The words are the comment's own text, not the line's.
-  await expect(written.locator('.comment-line', { hasText: 'main line' })).toHaveCount(0);
-  await expect(written.locator('.comment-line', { hasText: 'then' })).toHaveCount(0);
+  const written = page.locator('.notation .comment', { hasText: 'Plan' });
+  // Folded past the first pass, to the first move played; the words are folded away with the rest.
+  await expect(written.locator('.line-move')).toHaveText(['--', 'Nf6', 'd4']);
+  await expect(written).not.toContainText('main line');
 
   const bar = page.getByRole('group', { name: 'Line from the comment' });
   const shown = bar.locator('strong');
@@ -453,6 +458,7 @@ test('a line with words and null moves; ↓ enters a move’s lines, ↑ ↓ bet
   await page.keyboard.press('ArrowDown');
   await expect(shown).toHaveText('-- Nf6');
   await expect(written.locator('.line-move.current')).toHaveText('Nf6');
+  await expect(written.locator('.line-move')).toHaveText(['--', 'Nf6', '--', 'g6', '--', 'Bg7', 'd4']);
   await expect(page.locator('cg-board square.last-move:visible')).toHaveCount(2);
   await page.keyboard.press('ArrowRight');
   await expect(shown).toHaveText('-- Nf6 -- g6');
@@ -464,6 +470,10 @@ test('a line with words and null moves; ↓ enters a move’s lines, ↑ ↓ bet
   await page.keyboard.press('ArrowDown');
   await expect(shown).toHaveText('d4');
   await expect(written.locator('.line-move.current')).toHaveText('d4');
+  // Both open now; the words are the comment's own text, not the line's.
+  await expect(written).toContainText('the main line');
+  await expect(written.locator('.comment-line', { hasText: 'main line' })).toHaveCount(0);
+  await expect(written.locator('.comment-line', { hasText: 'then' })).toHaveCount(0);
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('ArrowRight');
   await page.keyboard.press('ArrowRight');

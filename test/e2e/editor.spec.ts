@@ -121,8 +121,10 @@ test('branches to comment lines: the lines after a move go into its comment, cli
   await expect(page.locator('.notation .move[data-path="e4 c5 Nf3 d6"]')).toHaveCount(0);
   const lines = page.locator('.notation .comment-line');
   await expect(lines).toHaveCount(2);
+  // Folded to their first moves until clicked.
+  await expect(lines).toHaveText(['(2... d6)', '(2... Nc6)']);
+  await lines.first().locator('.line-move').click();
   await expect(lines.first()).toHaveText(/^\(2\.\.\. d6 3\. d4 cxd4/);
-  await expect(lines.nth(1)).toHaveText(/^\(2\.\.\. Nc6/);
   await sync(page, git, (t) => /2\. Nf3 \{ A made-up comment \(2\.\.\. d6 3\. d4 cxd4[^)]*\) \(2\.\.\. Nc6[^)]*\) \}/.test(t));
   // The menu shows it only on a move with more than one move after it.
   await studyMenu(page, 'Undo');

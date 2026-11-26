@@ -3571,6 +3571,11 @@ a.button.primary {
   outline: none;
 }
 
+/* A comment's line followed on the board: the rows show its position and play nothing. */
+.ex-row.inert {
+  cursor: default;
+}
+
 /* The chapter plays it here: Qchess's lighter band. */
 .ex-row.covered {
   background: rgb(var(--ink) / 13%);

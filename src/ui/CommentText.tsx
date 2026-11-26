@@ -2,7 +2,7 @@
 // link (words written in the group are plain text, `--` a pass) that previews the position on the board; ← → step through the comment's lines, and the bar
 // under the board (◀ ▶ Back) does the same with no keyboard. Used in the chapter view, the Read
 // view and the training screen.
-import { useMemo } from 'preact/hooks';
+import { useEffect, useMemo, useState } from 'preact/hooks';
 import { makeFen } from 'chessops/fen';
 import type { Position } from 'chessops/chess';
 import { parseUci } from 'chessops/util';
@@ -10,7 +10,7 @@ import type { Key } from '@lichess-org/chessground/types';
 import { endPreview, previewOf, previewPosition, sequenceAsked, showLine, stepPreview, type PreviewOwner } from '../app/preview.ts';
 import { analyseFrom } from '../app/mode.ts';
 import { playLine } from '../app/editor.ts';
-import { cursorAt, lineAsSequence, parseCommentLines, playedLines, type PlayedLine } from '../core/repertoire/lines.ts';
+import { cursorAt, foldedTo, lineAsSequence, parseCommentLines, playedLines, type PlayedLine } from '../core/repertoire/lines.ts';
 
 export interface CommentPositions {
   /** The commented move's position (the start, for a comment before the first move). */
@@ -20,8 +20,11 @@ export interface CommentPositions {
 }
 
 type Piece = { text: string } | { text: string; line: number; move: number };
-/** Plain text, or a run of a line group (its moves clickable), or a line left out. Words written in a line are plain. */
-type Segment = { text: string } | { group: Piece[] } | { masked: true };
+/**
+ * Plain text, or a run of a line group (its moves clickable), or a line left out. Words written in
+ * a line are plain; they and the line's runs carry its index (`of`), so a folded line drops them.
+ */
+type Segment = { text: string; of?: number } | { group: Piece[]; of: number } | { masked: true };
 
 /**
  * The comment cut into text and lines. With the lines played (`played`), a line that fits neither
@@ -46,14 +49,14 @@ function segments(text: string, played: readonly PlayedLine[] | undefined, hidde
       if (m.from > g) group.push({ text: text.slice(g, m.from) });
       if (m.move >= 0) group.push({ text: text.slice(m.from, m.to), line: i, move: m.move });
       else {
-        if (group.length) out.push({ group });
+        if (group.length) out.push({ group, of: i });
         group = [];
-        out.push({ text: text.slice(m.from, m.to) });
+        out.push({ text: text.slice(m.from, m.to), of: i });
       }
       g = m.to;
     }
     if (g < line.to) group.push({ text: text.slice(g, line.to) });
-    if (group.length) out.push({ group });
+    if (group.length) out.push({ group, of: i });
     at = line.to;
   });
   if (at < text.length) out.push({ text: text.slice(at) });
@@ -71,6 +74,11 @@ export function CommentText(props: {
   onOpen?: () => void;
   /** A line left out of the text, as `(…)`: training's lines from the comments still to be quizzed (§5.98). */
   hidden?: (line: PlayedLine) => boolean;
+  /**
+   * Each line of more than one move shown to its first, `(8... Qxd4)`, until it is clicked or
+   * previewed (the chapter view's notation, the owner's request, 2026-11-26).
+   */
+  fold?: boolean;
 }) {
   // Played once per comment, so a line that fits neither position is text and the moves past
   // the legal ones are struck through (q_extension's rules). Only for a comment with a group.
@@ -82,6 +90,23 @@ export function CommentText(props: {
   const parts = useMemo(() => segments(props.text, played, props.hidden), [props.text, played, props.hidden]);
   const shown = previewOf(props.owner);
   const mine = shown?.key === props.id ? shown.cursor : undefined;
+  // The lines unfolded: once clicked or previewed (stepped into with the keys), they stay open.
+  const [unfolded, setUnfolded] = useState<ReadonlySet<number>>(new Set());
+  const unfold = (line: number) => setUnfolded((u) => (u.has(line) ? u : new Set([...u, line])));
+  useEffect(() => {
+    if (props.fold && mine) unfold(mine.line);
+  }, [props.fold, mine?.line]);
+  // The last move shown of each folded line, by its index.
+  const folds = useMemo(() => {
+    const out = new Map<number, number>();
+    if (!props.fold || !played) return out;
+    parseCommentLines(props.text).forEach((line, i) => {
+      const to = foldedTo(line);
+      // A line whose first move isn't legal stays whole: it can't be opened by a click.
+      if (to !== undefined && played[i]?.placed && (played[i]?.ucis.length ?? 0) > to && !unfolded.has(i)) out.set(i, to);
+    });
+    return out;
+  }, [props.fold, props.text, played, unfolded]);
   if (!parts.some((p) => 'group' in p || 'masked' in p)) return <>{props.text}</>;
   const open = (line: number, move: number) => (e: Event) => {
     e.stopPropagation();
@@ -92,6 +117,7 @@ export function CommentText(props: {
     if (move >= (lines[line]?.ucis.length ?? 0)) return;
     const cursor = cursorAt(lines, line, move);
     if (!cursor) return;
+    if (props.fold) unfold(line);
     props.onOpen?.();
     showLine(props.owner, props.id, lines, cursor);
   };
@@ -117,10 +143,31 @@ export function CommentText(props: {
       </span>
     );
   };
+  // A folded line: its text (a lead-in word included) up to the last move shown, then its closing bracket.
+  const folded = (line: number, to: number, i: number) => {
+    const pieces = parts.flatMap((p): Piece[] => ('of' in p && p.of === line ? ('group' in p ? p.group : [{ text: p.text }]) : []));
+    const end = pieces.findIndex((x) => 'line' in x && x.move === to);
+    const whole = parseCommentLines(props.text)[line]!;
+    const close = props.text[whole.to - 1] === ')' ? ')' : '';
+    return (
+      <span key={i} class="comment-line folded" title={`Show the line: ${props.text.slice(whole.from, whole.to)}`}>
+        {pieces.slice(0, end + 1).map(piece)}
+        <span>{close}</span>
+      </span>
+    );
+  };
+  const drawn = new Set<number>();
   return (
     <>
-      {parts.map((p, i) =>
-        'masked' in p ? (
+      {parts.map((p, i) => {
+        const of = 'of' in p ? p.of : undefined;
+        if (of !== undefined && folds.has(of)) {
+          // Drawn once, where the line begins; its other runs and words are left out.
+          if (drawn.has(of)) return null;
+          drawn.add(of);
+          return folded(of, folds.get(of)!, i);
+        }
+        return 'masked' in p ? (
           <span key={i} class="comment-line masked" title="A line from the comments, still to be quizzed">
             (…)
           </span>
@@ -130,8 +177,8 @@ export function CommentText(props: {
           </span>
         ) : (
           <span key={i}>{p.text}</span>
-        ),
-      )}
+        );
+      })}
     </>
   );
 }
@@ -156,7 +203,7 @@ export function endPreviewOnBoard(e: MouseEvent): void {
  * Under the board while a line is previewed: where it is, and ◀ ▶ Back for the phone. A comment's
  * line can be made a sequence (§5.201) when `side`, the board's side, has a move in it to ask.
  */
-export function PreviewBar(props: { owner: PreviewOwner; side?: 'white' | 'black' }) {
+export function PreviewBar(props: { owner: PreviewOwner; side?: 'white' | 'black'; board?: string }) {
   const p = previewOf(props.owner);
   if (!p) return null;
   const line = p.lines[p.cursor.line]!;
@@ -175,7 +222,8 @@ export function PreviewBar(props: { owner: PreviewOwner; side?: 'white' | 'black
         <button type="button" aria-label="Next move in the line" onClick={() => stepPreview(1)}>
           ▶
         </button>
-        {engine && props.owner === 'chapter' && (
+        {/* An engine line is added from the board's move: not one from a comment's line followed. */}
+        {engine && props.owner === 'chapter' && (!props.board || (line.positions[0] && makeFen(line.positions[0].toSetup()) === props.board)) && (
           <button type="button" title="Add these moves to the chapter, from the board's move" onClick={() => playLine(shown)}>
             Add
           </button>

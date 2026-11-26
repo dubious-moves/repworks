@@ -2103,3 +2103,16 @@ does. Start with the spike: its log decides what the later parts change (CHESSNU
 - On the phone: the dialog, the keyboard's Go key, and the board behind it.
 - **Checked**: unit tests and Playwright (desktop and emulated phone) on the fixture study; **not**
   on a device or the real studies.
+
+### Clickable lines folded; the engine and explorer follow one (PLAN.md §5.212, 2026-11-26)
+
+- A study with long lines in its comments: does the notation read better with each folded to its
+  first move? Is it clear enough that `(8... Qxd4)` has more behind it (hover shows the whole line
+  on the desktop; there is no other mark)? Say if a mark (`…`, a count) is wanted.
+- Click a folded line: does it open and show its first move on the board? Step through it with ← →
+  (or ◀ ▶ on the phone): does Stockfish's panel follow each move, and the explorer's rows?
+- Escape (or Back): do both come back to the board's move without a flash of the line's?
+- The Practical column and Maia's columns on a line's position: do they fill as they do on the
+  chapter's moves?
+- **Checked**: unit tests and Playwright (desktop and emulated phone, a fake engine and explorer);
+  **not** on a device or the real studies.

@@ -6,10 +6,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseChapterFile } from '../../../../src/core/pgn/parse.ts';
-import { cursorAt, firstCursor, lastCursor, lineAsSequence, lineStart, parseCommentLines, playedLines, playLine, stepComments, stepCursor, switchLine } from '../../../../src/core/repertoire/lines.ts';
+import { cursorAt, firstCursor, foldedTo, lastCursor, lineAsSequence, lineHistory, lineStart, parseCommentLines, playedLines, playLine, stepComments, stepCursor, switchLine } from '../../../../src/core/repertoire/lines.ts';
 import { makeFen } from 'chessops/fen';
 import type { Chapter } from '../../../../src/core/study/model.ts';
-import { nodeAt, positionAt, startPosition } from '../../../../src/core/study/tree.ts';
+import { nodeAt, positionAt, positionsTo, startPosition } from '../../../../src/core/study/tree.ts';
 
 function chapter(movetext: string, headers = ''): Chapter {
   const parsed = parseChapterFile(`[Event "Test"]\n${headers}\n${movetext} *\n`, 'Chapter1');
@@ -347,4 +347,32 @@ test('a comment line as a sequence: its start and moves, cut at a pass, only wit
   assert.equal(lineAsSequence(one!, 'black'), undefined);
   assert.deepEqual(lineAsSequence(one!, 'white'), { fen: afterD6, sans: ['d4'] });
   assert.equal(lineAsSequence(playLine(after!.line, undefined), 'black'), undefined);
+});
+
+test('a line previewed: the positions from the start to its move, through the chapter to where it starts', () => {
+  const c = chapter('1. e4 c5 2. Nf3 { (2... d6 3. d4) (2. Nc3 Nc6) }');
+  const path = ['e4', 'c5', 'Nf3'];
+  const [after, replaces] = linesAt(c, path);
+  const to = positionsTo(c, path);
+  // After the commented move: its four positions, then the line's.
+  const h = lineHistory(after!, 2, to);
+  assert.equal(h.length, 6);
+  assert.deepEqual(h.slice(0, 4).map((p) => makeFen(p.toSetup())), to.map((p) => makeFen(p.toSetup())));
+  assert.equal(makeFen(h[5]!.toSetup()), makeFen(after!.positions[2]!.toSetup()));
+  // Replacing it: the chapter's first three, then the line's start and its move.
+  const r = lineHistory(replaces!, 1, to);
+  assert.equal(r.length, 4);
+  assert.equal(makeFen(r[2]!.toSetup()), makeFen(to[2]!.toSetup()));
+  // A ply past the legal moves is clamped; a line starting nowhere in `to` is its own.
+  assert.equal(lineHistory(after!, 9, to).length, 6);
+  assert.equal(lineHistory(after!, 1, []).length, 2);
+});
+
+test('a folded line shows its first move, past passes; one of one move folds nothing', () => {
+  const [a, b, one, pass] = parseCommentLines('(8... Qxd4 9. Nb5 Qb4+) (Or 3. d4 cxd4) (3. d4) (3. -- Nf6 4. -- g6)');
+  assert.equal(foldedTo(a!), 0);
+  assert.equal(foldedTo(b!), 0);
+  assert.equal(foldedTo(one!), undefined);
+  assert.equal(foldedTo(pass!), 1);
+  assert.equal(foldedTo(parseCommentLines('(3. -- Nf6)')[0]!), undefined);
 });

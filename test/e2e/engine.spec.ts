@@ -3,7 +3,7 @@
 // bar and arrows, a line previewed and added to the chapter, the threat, a new position mid-search
 // stopping the old search first, nothing running in training, and the phone's layout.
 import { test, expect, type Page } from '@playwright/test';
-import { REPO, TOKEN } from '../support/syncWorld.ts';
+import { CH1, REPO, TOKEN } from '../support/syncWorld.ts';
 import { serveGithub, world } from './github.ts';
 import { serveSite, type SiteServer } from './server.ts';
 import { studyMenu } from './board.ts';
@@ -17,8 +17,10 @@ test.afterEach(async () => {
   await site.close();
 });
 
-async function openChapter(page: Page) {
-  await serveGithub(page, world().github);
+async function openChapter(page: Page, edit?: (pgn: string) => string) {
+  const { git, github } = world();
+  if (edit) git.commitIfHead(git.head, 'Edited', new Map([[CH1, edit(git.textsOf().get(CH1)!)]]), []);
+  await serveGithub(page, github);
   await page.goto(`${site.url}#setup?repo=${encodeURIComponent(REPO)}&token=${TOKEN}&name=desktop`);
   await expect(page.locator('.chip')).toHaveText(/^synced/);
   await page.getByRole('link', { name: 'Test repertoire', exact: true }).click();
@@ -148,4 +150,34 @@ test('nothing runs in training; the panel fits the phone', async ({ page }) => {
   await page.waitForTimeout(600);
   expect(commands(site.requests).slice(n).filter((c) => c.startsWith('go'))).toEqual([]);
   await expect(page.getByRole('region', { name: 'Engine' })).toHaveCount(0);
+});
+
+test('a comment’s line previewed: the engine follows its moves, an engine line from there has no Add, and back to the board’s', async ({ page }) => {
+  // On 1. e4, a line replacing it (the owner's request, 2026-11-26).
+  await openChapter(page, (pgn) => pgn.replace('1. e4 c5', '1. e4 { Or (1. d4 d5 2. c4) } 1... c5'));
+  const panel = page.getByRole('region', { name: 'Engine' });
+  await panel.getByRole('switch', { name: 'Engine' }).check();
+  const written = page.locator('.notation .comment', { hasText: 'Or' });
+  await expect(written.locator('.comment-line')).toHaveText('(1. d4)');
+  await written.locator('.line-move', { hasText: 'd4' }).click();
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4');
+  const AFTER_D4 = 'rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq -';
+  await expect.poll(() => positions(site).at(-1)).toBe(AFTER_D4);
+  await written.locator('.line-move', { hasText: 'c4' }).click();
+  const AFTER_C4 = 'rnbqkbnr/ppp1pppp/8/3p4/2PP4/8/PP2PPPP/RNBQKBNR b KQkq -';
+  await expect.poll(() => positions(site).at(-1)).toBe(AFTER_C4);
+  // Back: the board's move again.
+  await page.keyboard.press('Escape');
+  await expect.poll(() => positions(site).at(-1)).toBe(AFTER_E4);
+  await expect(panel.locator('.engine-line')).toHaveCount(3);
+
+  // At the start, the engine's line previewed keeps it where it is, Add included; a comment's
+  // line followed then an engine line from there: no Add, the board's move isn't its start.
+  await page.keyboard.press('Home');
+  await expect.poll(() => positions(site).at(-1)).toBe(START);
+  await panel.locator('.engine-line').nth(1).getByRole('button', { name: 'd5' }).click();
+  const bar = page.getByRole('group', { name: 'Line from the engine' });
+  await expect(bar.getByRole('button', { name: 'Add' })).toBeVisible();
+  await page.waitForTimeout(300);
+  expect(positions(site).at(-1)).toBe(START);
 });

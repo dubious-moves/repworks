@@ -12511,3 +12511,34 @@ ChessDB's best. At the default d5 only my first move below the row is a practica
   line under `compareReachMin`), `last` (ChessDB's best, not compared: the line's last move, or no
   depth left). The script's records keep it, and `--replies` prints each row's replies of 2% or more
   with the move and its label, after a run or with `--report`. Not shown in the app.
+
+#### 5.212 Clickable lines folded, and the engine and explorer following one (the owner's request, 2026-11-26, built)
+
+The owner: the clickable lines make the study look messy, so show `(8... Qxd4 9. Nb5 Qb4+ 10. c3
+Qxb2 11. Rb1)` as `(8... Qxd4)`, opened by a click; and while a line is stepped through, Stockfish
+and the database follow its move. Decided:
+
+- **Folded in the chapter view's notation** (`CommentText`'s `fold`, `foldedTo` in `lines.ts`): a
+  line of more than one move shows its moves up to its first that isn't a pass (`(3. -- Nf6 …)` as
+  `(3. -- Nf6)`), a lead-in word kept (`(Or 2...e6)`), then its closing bracket; the words written
+  in it go with the rest. The whole line is the folded part's title. A click on its move opens it
+  and previews the move; a line stepped into with the keys (→ from the line before, ↓) opens too.
+  Opened, it stays open while the chapter is shown. A line of one move, or one whose first move
+  isn't legal (it couldn't be opened), is shown whole. Not folded: the comment under the board on
+  the stage (the move shown's, read in full there), the Read view, training and the cards' notes.
+- **The engine and the explorer follow a comment's line** (`ChapterView`'s `look`, `lineHistory`
+  in `lines.ts`): Stockfish analyses the position previewed, Lc0 and the 23M Maia read the moves
+  that led there (the chapter's to where the line starts, then the line's), and the explorer's
+  rows are that position's, the engine's arrows on the board with them. There the chapter plays
+  nothing: no row is covered or marked ⇄, and a row's click plays nothing (it would play at the
+  chapter's move). A row's count of other repertoire chapters reaching its position stays. Back (Escape, Back, a click on
+  the board) returns them to the board's move. An engine line previewed still leaves them where
+  they were, so its lines don't change under it; one previewed from a comment's position has no
+  Add, its start not being the board's move.
+
+Tests: `lines.test.ts` (`lineHistory` after and replacing the move, clamped, starting nowhere;
+`foldedTo` past a pass, a lead-in, a line of one move), `views.spec.ts`, `editor.spec.ts` and
+`analysis.spec.ts` (lines folded, opened by a click or the keys), `engine.spec.ts` (the engine
+asked about each move of a line, back to the board's, an engine line's Add only from the board's
+position), `explorer.spec.ts` (the rows of 1. Nf3 c5 from a line replacing 1. e4, none covered,
+a click playing nothing, the chapter's rows again after Escape).

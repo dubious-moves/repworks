@@ -7,7 +7,7 @@
 // "+" sit in the ☰ menu (§5.88). The head's switch goes to training as Qchess's Move Trainer
 // does. Play a move to extend a line or branch from it; a move's other edits are in its menu
 // (right-click or long-press) and the comment dialog.
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { signal } from '@preact/signals';
 import { makeFen } from 'chessops/fen';
 import { makeSan, parseSan } from 'chessops/san';
@@ -20,7 +20,8 @@ import { afterEdits, at, chapter, conflictsHere, doc, edit, feedback, flipBoard,
 import { AnalysisFen, AnalysisHead, AnalysisOpening } from './Analysis.tsx';
 import { open } from '../app/mode.ts';
 import { left, trainingFrom } from '../app/train.ts';
-import { endPreview, enterCommentLines, preview, stepPreview, switchPreviewLine } from '../app/preview.ts';
+import { endPreview, enterCommentLines, preview, previewOf, stepPreview, switchPreviewLine } from '../app/preview.ts';
+import { lineHistory } from '../core/repertoire/lines.ts';
 import { isKeptMarker, parseTextConflict, type OpenConflict } from '../core/merge/markers.ts';
 import type { Brush, Chapter } from '../core/study/model.ts';
 import { setShapes } from '../core/study/ops.ts';
@@ -38,7 +39,7 @@ import { endPreviewOnBoard, PreviewBar, previewBoard } from './CommentText.tsx';
 import { ModeSwitch } from './ModeSwitch.tsx';
 import { openChapterSettings, openManageChapters, openNewChapter, openStudySettings } from './StudyDialogs.tsx';
 import { TranspositionList } from './Transpositions.tsx';
-import { Explorer } from './Explorer.tsx';
+import { Explorer, type Look } from './Explorer.tsx';
 import { EnginePanel, EvalBar, useEngineArrows } from './Engine.tsx';
 import { analysePosition, setThreat, threat } from '../app/engine.ts';
 import { lc0Position } from '../app/lc0.ts';
@@ -139,13 +140,32 @@ export function ChapterView() {
     if (altAdding.peek() && !samePath(altAdding.peek()!, path)) altAdding.value = undefined;
   }, [path]);
   const board = useMemo(() => (c ? boardState(c, adding ? adding.slice(0, -1) : path) : undefined), [c, path, adding]);
-  // The engine looks at the board's position (§5.31), and at nothing once the page is left.
-  useEffect(() => analysePosition(board?.pos), [board]);
+  // What the engine and the explorer look at: the board's position (§5.31), or a comment's line
+  // previewed on it, move by move (the owner's request, 2026-11-26). An engine's own line previewed
+  // leaves them where they were, so its lines don't change under it.
+  const shownPreview = previewOf('chapter');
+  const lastLook = useRef<Look | undefined>(undefined);
+  const look = useMemo((): Look | undefined => {
+    if (!c || !board) return undefined;
+    if (shownPreview?.source === 'engine' && lastLook.current) return lastLook.current;
+    if (shownPreview && shownPreview.source !== 'engine') {
+      const l = shownPreview.lines[shownPreview.cursor.line]!;
+      const positions = lineHistory(l, shownPreview.cursor.ply, positionsTo(c, path));
+      if (positions.length) return { positions, san: l.sans[shownPreview.cursor.ply - 1], line: true };
+    }
+    const to = adding ? adding.slice(0, -1) : path;
+    return { positions: positionsTo(c, to), san: to.at(-1), line: false };
+  }, [c, board, shownPreview]);
+  lastLook.current = look;
+  // The engine, and at nothing once the page is left; Lc0 reads the moves that led there (§5.143).
+  useEffect(() => analysePosition(look?.positions.at(-1)), [look]);
   useEffect(() => () => analysePosition(undefined), []);
-  // Lc0 reads the line that led to the board (§5.143).
-  useEffect(() => lc0Position(c && board ? positionsTo(c, adding ? adding.slice(0, -1) : path) : undefined), [board]);
+  useEffect(() => lc0Position(look?.positions), [look]);
   useEffect(() => () => lc0Position(undefined), []);
   const arrows = useEngineArrows();
+  /** The explorer's position when a line is followed; otherwise it reads the chapter's. */
+  const followed = look?.line ? look : undefined;
+  const analysed = look?.positions.at(-1);
 
   // Another chapter opens at the board, wherever the page was scrolled.
   useEffect(() => scrollTo({ top: 0 }), [s?.sid, s?.cid]);
@@ -251,8 +271,8 @@ export function ChapterView() {
             {/* The stage's left (option B): the engine and the explorer, the notation having the right to itself. */}
             {wide && (
               <div class="cv-side">
-                <EnginePanel board={board.pos} tablebase={scratch} />
-                <Explorer chapter={c} path={path} />
+                <EnginePanel board={analysed} tablebase={scratch} />
+                <Explorer chapter={c} path={path} {...(followed ? { look: followed } : {})} />
               </div>
             )}
             <div class="cv-board" onPointerDown={shownLine ? endPreviewOnBoard : undefined}>
@@ -268,11 +288,11 @@ export function ChapterView() {
                 brush={brush}
                 onMove={onMove}
                 onShapes={(shapes) => edit((ch) => setShapes(ch, at.peek(), shapes))}
-                autoShapes={shownLine || drawMode ? [] : arrows}
+                autoShapes={(shownLine && !followed) || drawMode ? [] : arrows}
                 promotion={promotion && { dest: promotion.dest, onPick: (role) => (role ? promote_(role) : setPromotion(undefined)) }}
               />
               <EvalBar orientation={side.value} />
-              <PreviewBar owner="chapter" side={side.value} />
+              <PreviewBar owner="chapter" side={side.value} board={board.fen} />
               <p class="feedback" role="status">
                 {feedback.value ?? ''}
               </p>
@@ -282,14 +302,14 @@ export function ChapterView() {
               {wide && <CommentPanel />}
             </div>
             <div class="cv-panel">
-              {!wide && <EnginePanel board={board.pos} tablebase={scratch} />}
+              {!wide && <EnginePanel board={analysed} tablebase={scratch} />}
               <Notation chapter={c} />
               {!scratch && (
                 <div class="cv-tools">
                   {doc.value && <Conflicts />}
                 </div>
               )}
-              {!wide && <Explorer chapter={c} path={path} />}
+              {!wide && <Explorer chapter={c} path={path} {...(followed ? { look: followed } : {})} />}
               {drawMode && (
                 <div class="brushes" role="radiogroup" aria-label="Colour">
                   {BRUSH_NAMES.map((b) => (

@@ -230,6 +230,8 @@ test('a comment’s clickable line made a sequence: the board opens on it with t
   await written.locator('.line-move', { hasText: '--' }).click();
   await expect(bar).toContainText('From the comment: --');
   await expect(bar.getByRole('button', { name: 'Sequence…' })).toHaveCount(0);
+  // The first line is folded to (3. d4): opened, then its second move.
+  await written.locator('.line-move', { hasText: 'd4' }).first().click();
   await written.locator('.line-move', { hasText: 'cxd4' }).click();
   await expect(bar).toContainText('From the comment: d4 cxd4');
   await bar.getByRole('button', { name: 'Sequence…' }).click();

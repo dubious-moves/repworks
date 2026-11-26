@@ -11,6 +11,7 @@
 import { signal } from '@preact/signals';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { Position } from 'chessops/chess';
+import { NULL_SAN } from '../core/repertoire/lines.ts';
 import { makeFen } from 'chessops/fen';
 import { parseSan } from 'chessops/san';
 import { localAddress, type CompactExplorer } from '../core/explorer/providers.ts';
@@ -129,23 +130,36 @@ interface Shown {
   maia: boolean;
 }
 
-export function Explorer(props: { chapter: Chapter; path: Path }) {
+/**
+ * A position the explorer follows instead of the chapter's: a comment's line previewed on the
+ * board (the owner's request, 2026-11-26). `positions` from the game's start to it, `san` the move
+ * that reached it. The chapter plays nothing there, so no row is covered, and a row plays nothing.
+ */
+export interface Look {
+  positions: Position[];
+  san: string | undefined;
+  line: boolean;
+}
+
+export function Explorer(props: { chapter: Chapter; path: Path; look?: Look }) {
   const p = prefs.value;
   const box = useRef<HTMLElement>(null);
   const shown = useRef<Shown | undefined>(undefined);
-  const pos = useMemo(() => positionAt(props.chapter, props.path), [props.chapter, props.path]);
+  const look = props.look;
+  const pos = useMemo(() => (look ? look.positions.at(-1) : positionAt(props.chapter, props.path)), [props.chapter, props.path, look]);
   const fen = pos ? makeFen(pos.toSetup()) : undefined;
   // The position before and the move that led here (numbered), for the opponents' rating when the
   // position after a move is reached mostly by another order (§5.126).
   const back = useMemo(() => {
-    if (!props.path.length) return undefined;
-    const prev = positionAt(props.chapter, props.path.slice(0, -1));
-    if (!prev) return undefined;
-    const san = props.path[props.path.length - 1]!;
+    const prev = look ? look.positions.at(-2) : props.path.length ? positionAt(props.chapter, props.path.slice(0, -1)) : undefined;
+    const san = look ? look.san : props.path.at(-1);
+    if (!prev || !san || san === NULL_SAN) return undefined;
     return { fen: makeFen(prev.toSetup()), san, label: `${prev.fullmoves}${prev.turn === 'white' ? '.' : '…'}${san}` };
-  }, [props.chapter, props.path]);
+  }, [props.chapter, props.path, look]);
   // The positions that led here along the line the board is on, which the 23M Maia reads (§5.190).
-  const before = useMemo(() => beforeOf(positionsTo(props.chapter, props.path)), [props.chapter, props.path]);
+  const before = useMemo(() => beforeOf(look ? look.positions : positionsTo(props.chapter, props.path)), [props.chapter, props.path, look]);
+  /** A row's click plays its move in the chapter, at the board's move: not while a line is followed. */
+  const playHere = look ? undefined : play;
   const filter = `${p.speeds.join()}|${p.ratings.join()}|${p.recent}|${p.local}`;
   useEffect(() => lookAt(p.on ? fen : undefined), [fen, p.on, p.tab, filter]);
   useEffect(() => () => lookAt(undefined), []);
@@ -190,14 +204,14 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
   const chapterOrders = useMemo(() => transpositions(props.chapter), [props.chapter]);
   const transposed = useMemo(() => {
     const out = new Map<string, Path[]>();
-    if (!pos) return out;
+    if (!pos || look) return out;
     const played = nodeAt(props.chapter, props.path)?.children.map((c) => c.san) ?? [];
     for (const [san, paths] of transposedFrom(chapterOrders, pos, props.path, played)) out.set(moveKey(san), paths);
     return out;
-  }, [chapterOrders, pos, props.chapter, props.path]);
+  }, [chapterOrders, pos, props.chapter, props.path, look]);
 
   if (!p.on || !pos || !fen) return null;
-  const node = nodeAt(props.chapter, props.path);
+  const node = look ? undefined : nodeAt(props.chapter, props.path);
   const covered = new Set([...(node?.children.map((c) => c.san) ?? []), ...transposed.keys()]);
   const l = lookup.value?.fen === fen && lookup.value.tab === p.tab ? lookup.value : undefined;
   const side = chapterSide.value === 'black' ? 'b' : 'w';
@@ -447,7 +461,7 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
       {p.study &&
         s &&
         (() => {
-          const shared = { chapter: props.chapter, path: props.path, pos, rows: asking ? undefined : table.rows, games, cols: { ...cols, prac: false, ml: false, ms: false }, source: p.tab === 'lichess' ? lichessLabel : 'Masters' };
+          const shared = { chapter: props.chapter, path: props.path, pos, ...(playHere ? { play: playHere } : {}), followed: !!look, rows: asking ? undefined : table.rows, games, cols: { ...cols, prac: false, ml: false, ms: false }, source: p.tab === 'lichess' ? lichessLabel : 'Masters' };
           return scratch ? <RepertoireTab {...shared} /> : <StudyTab sid={s.sid} cid={s.cid} {...shared} />;
         })()}
       {!p.study && prac && <PracticalDriver fen={fen} before={before} mine={mine} rows={table.rows} turn={turn} shares={shares} excludedKey={[...excludedAt(fen)].join()} />}
@@ -576,6 +590,7 @@ export function Explorer(props: { chapter: Chapter; path: Path }) {
                 others={repertoire.get(moveKey(r.san)) ?? []}
                 orders={transposed.get(moveKey(r.san)) ?? []}
                 path={props.path}
+                {...(playHere ? { play: playHere } : {})}
                 {...(prac
                   ? {
                       practical: (
@@ -627,6 +642,10 @@ interface TabProps {
   chapter: Chapter;
   path: Path;
   pos: Position;
+  /** Plays a row's move; none while a comment's line is followed. */
+  play?: (san: string) => void;
+  /** A comment's line is followed: the chapter's moves at the board aren't these. */
+  followed: boolean;
   rows: readonly TableRow[] | undefined;
   games: boolean;
   cols: Cols;
@@ -668,7 +687,8 @@ function StudyMoves(props: TabProps & { chapters: readonly StudyChapterMoves[]; 
   const moves = useMemo(() => studyMovesAt(props.chapters, key), [props.chapters, key]);
   const names = useMemo(() => new Map(props.chapters.map((c) => [c.cid, c.name])), [props.chapters]);
   const byMove = new Map((props.rows ?? []).filter((r) => !r.maiaOnly).map((r) => [moveKey(r.san), r] as const));
-  const here = new Set((nodeAt(props.chapter, props.path)?.children ?? []).map((c) => moveKey(c.san)));
+  const here = new Set((props.followed ? [] : (nodeAt(props.chapter, props.path)?.children ?? [])).map((c) => moveKey(c.san)));
+  const play = props.play;
   const c = props.cols;
   const go = props.go;
   const toggle = (m: StudyMove) => {
@@ -696,7 +716,12 @@ function StudyMoves(props: TabProps & { chapters: readonly StudyChapterMoves[]; 
             const one = m.chapters.length === 1;
             return (
               <div key={m.uci} class="study-tab-move" role="listitem">
-                <div class={`ex-row${here.has(moveKey(m.san)) ? ' covered' : ''}`} tabIndex={0} onClick={() => play(m.san)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), play(m.san))}>
+                <div
+                  class={`ex-row${here.has(moveKey(m.san)) ? ' covered' : ''}${play ? '' : ' inert'}`}
+                  tabIndex={play ? 0 : -1}
+                  onClick={() => play?.(m.san)}
+                  onKeyDown={(e) => play && (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), play(m.san))}
+                >
                   <span class="ex-move">
                     <span class="ex-san">{m.san}</span>
                   </span>
@@ -888,11 +913,12 @@ interface MaiaCells {
 }
 
 /** `faded`: the games' own bar shown faded, with this title (no prepared split, or not at equal ratings). */
-function Row(props: { row: TableRow; games: boolean; cols: Cols; others: Occurrence[]; orders: Path[]; path: Path; practical?: preact.JSX.Element; bar?: BarView; faded?: string; maia?: MaiaCells }) {
+function Row(props: { row: TableRow; games: boolean; cols: Cols; others: Occurrence[]; orders: Path[]; path: Path; play?: (san: string) => void; practical?: preact.JSX.Element; bar?: BarView; faded?: string; maia?: MaiaCells }) {
   const r = props.row;
   const title = r.novelty ? 'Engine suggested move (novelty)' : r.maiaOnly ? 'Maia suggested move' : r.rating ? `Average rating: ${Math.round(r.rating)}` : undefined;
   const m = props.maia;
   const c = props.cols;
+  const play = props.play;
   const maiaCells = m && (
     <>
       {c.ml && (
@@ -909,12 +935,12 @@ function Row(props: { row: TableRow; games: boolean; cols: Cols; others: Occurre
   );
   return (
     <div
-      class={`ex-row${r.covered ? ' covered' : ''}${props.orders.length ? ' transposed' : ''}${r.novelty ? ' novelty' : ''}${r.maiaOnly ? ' maia-only' : ''}`}
+      class={`ex-row${r.covered ? ' covered' : ''}${props.orders.length ? ' transposed' : ''}${r.novelty ? ' novelty' : ''}${r.maiaOnly ? ' maia-only' : ''}${play ? '' : ' inert'}`}
       role="listitem"
       title={title}
-      tabIndex={0}
-      onClick={() => play(r.san)}
-      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), play(r.san))}
+      tabIndex={play ? 0 : -1}
+      onClick={() => play?.(r.san)}
+      onKeyDown={(e) => play && (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), play(r.san))}
     >
       <span class="ex-move">
         <span class="ex-san">{r.san}</span>

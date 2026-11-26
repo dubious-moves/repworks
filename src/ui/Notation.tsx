@@ -113,7 +113,7 @@ function Comment(props: { text: string; path: Path; row?: boolean }) {
       {conflict ? (
         '⚠ conflict: open the move to resolve it'
       ) : (
-        <CommentText text={props.text} owner="chapter" id={commentId(pathKey(props.path), props.text)} positions={() => positionsOf(props.path)} onOpen={() => goTo(props.path)} />
+        <CommentText text={props.text} owner="chapter" id={commentId(pathKey(props.path), props.text)} positions={() => positionsOf(props.path)} onOpen={() => goTo(props.path)} fold />
       )}
     </Tag>
   );

@@ -592,3 +592,29 @@ test('on the analysis board the tab is the repertoire’s: its moves here in eve
   await expect(panel(page).getByRole('tab')).toHaveText(['Lichess', 'Masters', 'Study']);
   await expect(panel(page).getByRole('list', { name: 'The study’s moves here' }).locator('.ex-san')).toHaveText(['Nf6']);
 });
+
+test('a comment’s line previewed: the explorer follows its moves, plays nothing there, and comes back (the owner, 2026-11-26)', async ({ page }) => {
+  await setUp(page, { edit: (pgn) => pgn.replace('1. e4 c5', '1. e4 { Or (1. Nf3 c5 2. c4) } 1... c5') });
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf?at=e4,c5`);
+  await expect(rows(page)).toHaveText(['Nf3', 'c3']);
+  const written = page.locator('.notation .comment', { hasText: 'Or' });
+  await expect(written.locator('.comment-line')).toHaveText('(1. Nf3)');
+  await written.locator('.line-move', { hasText: 'Nf3' }).click();
+  await written.locator('.line-move', { hasText: 'c5' }).click();
+  const bar = page.getByRole('group', { name: 'Line from the comment' });
+  await expect(bar).toContainText('From the comment: Nf3 c5');
+  // After 1. Nf3 c5: its rows, none the chapter's, and a click plays nothing.
+  await expect(rows(page)).toHaveText(['c4', 'e4']);
+  await expect(panel(page).locator('.ex-row.covered')).toHaveCount(0);
+  const moves = await page.locator('.notation .move').count();
+  await panel(page).locator('.ex-row', { hasText: 'c4' }).first().click();
+  await expect(bar).toContainText('From the comment: Nf3 c5');
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4');
+  await expect(page.locator('.notation .move')).toHaveCount(moves);
+  // Back to the board's move, then its start: the chapter's rows again, e4 covered.
+  await page.keyboard.press('Escape');
+  await expect(bar).toHaveCount(0);
+  await page.keyboard.press('Home');
+  await expect(rows(page)).toHaveText(['e4', 'd4', 'Nf3', 'c4']);
+  await expect(panel(page).locator('.ex-row', { hasText: 'e4' }).first()).toHaveClass(/covered/);
+});

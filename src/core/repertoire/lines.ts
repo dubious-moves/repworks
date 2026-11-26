@@ -285,6 +285,30 @@ export function lastCursor(lines: readonly PlayedLine[]): Cursor | undefined {
   return undefined;
 }
 
+/**
+ * The positions from the game's start to a line's move (`ply` moves in), for the engine and the
+ * explorer following a previewed line (the owner's request, 2026-11-26): `to`, the positions up to
+ * the commented move, as far as where the line starts (that move's position, or the one before it
+ * for a line that replaces it), then the line's own. Only the line's when it starts at neither.
+ */
+export function lineHistory(line: PlayedLine, ply: number, to: readonly Position[]): Position[] {
+  const start = line.positions[0];
+  if (!start) return [];
+  const fen = makeFen(start.toSetup());
+  const at = [to.length - 1, to.length - 2].find((i) => i >= 0 && makeFen(to[i]!.toSetup()) === fen);
+  return [...(at === undefined ? [] : to.slice(0, at)), ...line.positions.slice(0, Math.max(0, Math.min(ply, line.ucis.length)) + 1)];
+}
+
+/**
+ * How much of a line a folded comment shows (the owner's request, 2026-11-26: `(8... Qxd4)` for the
+ * whole line): the index of its last move shown, its first that isn't a pass, so `(3. -- Nf6 …)`
+ * folds to `(3. -- Nf6)`. Undefined when folding would hide nothing.
+ */
+export function foldedTo(line: CommentLine): number | undefined {
+  const i = line.moves.findIndex((m) => m.san !== NULL_SAN);
+  return i < 0 || i >= line.moves.length - 1 ? undefined : i;
+}
+
 /** A move of one comment among several: the comment's index and the cursor in its lines. */
 export interface CommentsCursor {
   comment: number;

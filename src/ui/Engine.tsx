@@ -276,6 +276,7 @@ export function EvalBar(props: { orientation: 'white' | 'black' }) {
 export function useEngineArrows(): EngineArrow[] {
   const shown = useShown();
   const p = previewOf('chapter');
-  if (!enginePrefs.value.on || !enginePrefs.value.arrows || !shown || p) return [];
+  // A comment's line previewed is followed (the board's own arrows then); an engine line's moves are on the board.
+  if (!enginePrefs.value.on || !enginePrefs.value.arrows || !shown || p?.source === 'engine') return [];
   return engineArrows(shown.a.lines, shown.start.turn, threat.value);
 }
