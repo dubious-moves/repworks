@@ -12542,3 +12542,137 @@ Tests: `lines.test.ts` (`lineHistory` after and replacing the move, clamped, sta
 asked about each move of a line, back to the board's, an engine line's Add only from the board's
 position), `explorer.spec.ts` (the rows of 1. Nf3 c5 from a line replacing 1. e4, none covered,
 a click playing nothing, the chapter's rows again after Escape).
+
+
+#### 5.213 How well Maia 3's score and likelihoods follow people, measured (the owner's question of 2026-11-26, measured)
+
+The owner asked how accurate Maia 3's "Maia score" is (Ms: the value head's expected score of the
+side to move after a move, win + draw/2, §5.188; the explorer's second column), by phase, against
+Lichess games of the same rating; then whether Ms follows the *differences between moves*; then the
+same for Maia's likelihood of a move (Ml) against how often people play it. Measured with
+`scripts/maia-score.ts` (a report that writes nothing to the repo), on the cloud container, the 23M
+model as the app has it (§5.191). **Nothing in the app changed.**
+
+**The data.** Lichess rapid and classical games of 2026-10, the dump's first 250 MB (766,267
+games). Three rating buckets, the explorer's own (1400 = 1400–1599, 1800 = 1800–1999, 2200 =
+2200–2499), the dump's games being those with both players in the bucket. Per game and phase one
+position, 2,500 a bucket and phase at most (17,162 in all; 2200 has fewer): **opening** moves 5–10
+with 26 pieces or more, **middlegame** moves 14–40 with 14 or more, **endgame** from move 25 with 10
+or fewer. Two references: the explorer (explorer.lichess.org, a Lichess token, the app's 16 requests
+a minute, `speeds=rapid,classical&ratings=<bucket>`: thousands of games a position, but only for
+positions that recur) and the game each position came from (one result or move per position, any
+position). Maia is asked two ways: as the app asks it (seven positions before, the players' real
+ratings), and as a **control** for the explorer (the position alone, both ratings the bucket's
+middle: 1500, 1900, 2300), since the explorer's numbers are over players of the whole bucket.
+
+**Reach of the explorer.** 200 of 450 opening positions had 200 games or more (55, 68, 77 by bucket);
+of the 450 middlegame and 402 endgame positions asked, **none had even 50 games**. So the explorer
+can speak for openings only; the middlegame and endgame rest on the games themselves.
+
+**1. The win chance (Ms).**
+- *Against the explorer* (200 opening positions, the control): Ms averages 0.528, people 0.527; mean
+  absolute error 4.0 points, RMSE 0.052 against 0.066 for guessing the average every time (0.071 for
+  0.5); correlation 0.64 (0.79 at 1400, 0.61 at 1800, 0.39 at 2200: at high ratings the explorer's
+  openings all score 50–55% and Ms can't tell them apart).
+- **Ms carries the rating gap.** Asked with the sampled game's real ratings, the same positions score
+  RMSE 0.085, worse than the average guess: the error correlates 0.77 with the players' rating gap
+  (gap of 100 or more: RMSE 0.152 against the control's 0.046). That is right for that game and wrong
+  for the explorer's average over a bucket. Anything comparing Ms with a bucket's results must ask at
+  equal ratings.
+- *Against the game's result* (17,162 positions, real ratings and history; Brier score over
+  guessing the bucket's average, "skill"): opening 0.04, middlegame 0.27, endgame 0.62, all 0.29
+  (Brier 0.163; 0.154 without games lost on time). Much of the middlegame's and endgame's skill is
+  positions already decided.
+
+| Maia's Ms | positions | people scored |
+| --- | --- | --- |
+| 10–20% | 952 | 10.5% |
+| 20–30% | 925 | 22.5% |
+| 30–40% | 1,402 | 32.2% |
+| 40–50% | 3,102 | 45.9% |
+| 50–60% | 3,970 | 53.2% |
+| 60–70% | 1,951 | 65.0% |
+| 70–80% | 1,108 | 76.8% |
+| 80–90% | 1,015 | 88.7% |
+| 90–100% | 1,427 | 95.9% |
+
+  Well calibrated overall; a mild pull toward the middle in the middlegame and endgame (Ms 10–40%:
+  people score 3–6 points less, 80–90%: 3–5 more).
+
+**2. The differences between moves (Ms after each move, against the explorer's score for each
+move, openings).** Per position, the moves with enough games in the bucket, the explorer's score
+for the player who made it against Maia's Ms after it (the control):
+
+| moves of 200+ games | positions | move pairs | Maia picks the same move as better | Maia's gap ÷ people's | Spearman in a position | people's best = Maia's best |
+| --- | --- | --- | --- | --- | --- | --- |
+| all | 125 | 3,005 | 71% | 0.43 | 0.40 | 43% (chance 26%) |
+| 1400 | 35 | 900 | 70% | 0.51 | 0.42 | 51% |
+| 1800 | 44 | 1,669 | 72% | 0.42 | 0.49 | 43% |
+| 2200 | 46 | 436 | 67% | 0.16 | 0.31 | 37% (chance 31%) |
+
+| people's gap in a pair | pairs | Maia same direction | people's mean gap | Maia's mean gap |
+| --- | --- | --- | --- | --- |
+| under 2 points | 709 | 55% | 1.0 | 1.9 |
+| 2–5 | 948 | 67% | 3.4 | 2.2 |
+| 5–10 | 922 | 78% | 7.2 | 3.1 |
+| over 10 | 426 | 91% | 15.4 | 6.9 |
+
+With 1,000 games a move or more (78 positions, 953 pairs) the same: 69%, slope 0.41, Spearman 0.49,
+best move found 56% (chance 30%), so the explorer's sampling noise isn't what limits it. **Ms follows
+the direction but at about 40% of the size** (16% at 2200), and is a coin flip within 2 points.
+
+**3. The likelihood (Ml) against how often people play a move.**
+- *The explorer's share of games, 200 opening positions:* Maia's likeliest move is the most played
+  in **86%** (87, 84, 87% by bucket); of the three most played, 2.5 are in Maia's top three;
+  Spearman over the moves played 0.90; total variation distance 0.122, KL(people ‖ Maia) 0.075 nats;
+  Maia puts 0.4% on moves nobody played. Of 465 moves people play 10% or more of the time Maia gives
+  one under 2%; of 299 moves Maia gives 20% or more none is played under 2%.
+- *The move each game's player played, all phases* (real ratings, seven positions before):
+
+| phase | positions | played = Maia's likeliest | in Maia's top 3 | mean NLL |
+| --- | --- | --- | --- | --- |
+| opening | 5,950 | 55.3% | 82.4% | 1.356 |
+| middlegame | 5,920 | 58.7% | 84.0% | 1.266 |
+| endgame | 5,292 | 66.8% | 91.4% | 0.928 |
+| all | 17,162 | 60.0% | 85.7% | 1.193 |
+
+  By bucket the opening's likeliest-move hit is 53.5% at 1400, 54.6% at 1800, 61.9% at 2200.
+  **Calibration over every legal move of every position**: a move Maia rates 1–2% is played 1.4% of
+  the time, 20–30% 24%, 50–70% 59%, 90–100% 97%; the same in each phase (the endgame is a little
+  overconfident on rare moves: 1–2% said, 1.2% played). The explorer's calibration is as close
+  (Maia 10–20% → people 15.0%, 30–50% → 39.7%, 70–90% → 79.8%).
+
+**What it says**:
+- **Ml is accurate** (what Practical's Maia rows and the opponent's picks rest on): calibrated across
+  the range, in every phase, and its likeliest move is the most played one in six openings of seven.
+- **Ms is accurate in level and weak in detail**: right on average at a rating, calibrated against
+  results, but flat between openings and compressed between moves. It tells a clearly worse move from
+  a better one (91% of the time when people's score differs by 10 points or more), not one move from
+  another within a few points; a gap of 2–3 points in Ms is noise. At high ratings (2200) it
+  separates moves least.
+- **Rating in, rating out**: Ms reads both players' ratings; ask at equal ratings for a bucket's
+  expectation.
+
+**Not measured**: Ms between moves in the middlegame and endgame (the explorer has no games there; a
+Stockfish comparison would be the way); Stockfish's win chance as a reference beside Ms; the first
+model and the 79M; ratings above 2500 or below 1400; unusual positions (the opening positions are
+from real games, lines Maia's training very likely includes, so the openings are a best case;
+the all-phase calibration is over all of them). The explorer's score for a move also reflects who
+chooses it (a rare move's players), which Maia doesn't model. The 3,005 pairs come from 125
+positions and are not independent.
+
+Run (the dump's first 250 MB: `curl -r 0-250000000`; `LICHESS_TOKEN`; each step writes a file the
+next reads; the explorer steps run one request at a time, about 4 s each, one token a bucket in
+parallel works): `node scripts/maia-score.ts sample <dump.pgn.zst> --out sample.json`, `maia
+--sample sample.json --out maia.json` (as the app; `--before 0 --mid --only ex1400.json,…` is the
+control), `explorer --sample sample.json --out ex1400.json --bucket 1400` (the same for 1800 and
+2200; `--token-env` names another token), `report --sample sample.json --maia maia.json --explorer
+ex1400.json,…`; the differences: `move-rows --sample … --totals ex1400.json --out mv1400.json
+--bucket 1400`, `after-moves --sample … --rows mv1400.json,… --out after.json`, `moves-report
+--sample … --rows … --maia after.json [--min-move-games 1000]`; the likelihoods: `policy --sample
+… --out policy.json` then `policy-report --summary policy.json`, and `popularity --sample … --rows
+mv1400.json,…`. About 12 minutes of Maia on 4 cores for the 17,162 positions, 5 for the explorer's
+per-move rows.
+
+Files (not in the repo; the cloud scratchpad of the session of 2026-11-26): the sample, `maia.json`,
+`maia-ctl.json`, the explorer's `ex*.json` and `mv*.json`, `after.json`, `policy.json`.

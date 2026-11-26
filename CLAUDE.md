@@ -123,6 +123,14 @@ token in `LICHESS_TOKEN`, and a cache on disk outside the repo that later runs r
 `--maia --ort-node <folder>` for Maia as the app's Practical has it once Maia is on; `--pick-last` makes my last move in a line a practical pick too, a measurement; `--compare-reach-min 3` compares my moves on lines reached 3% of the time or more (the app's 10 by default); `--replies` lists each row's replies with my move after each and how it was chosen (a practical pick or ChessDB's best); `--report
 practical.json` prints the table again; the owner's settings as flags, listed in the script).
 
+How well Maia 3's score (Ms) and its move likelihood (Ml) follow people on Lichess: against the explorer's
+results and move shares for a rating bucket and against the games of a dump part (PLAN.md §5.213), a report
+that writes nothing to the repo; each step reads the file the one before wrote, a Lichess token in
+`LICHESS_TOKEN`: `node scripts/maia-score.ts sample <dump.pgn.zst> --out sample.json`, then `maia`, `explorer
+--bucket 1400`, `report` (the win chance); `move-rows`, `after-moves`, `moves-report` (Ms between moves); `policy`,
+`policy-report`, `popularity` (the likelihoods). Ask Maia at equal ratings (`maia --before 0 --mid`) to compare
+with a bucket's results: Ms carries the rating gap.
+
 The storm's "Gather positions" from a cloud session, as a device named `cloud` (PLAN.md §5.155),
 with the data repo checked out on `main`:
 `node scripts/storm-gather.ts ../repworks-data --minutes 60 --score-minutes 40 --push`; only
