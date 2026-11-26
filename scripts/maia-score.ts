@@ -21,7 +21,7 @@ import { Chess } from 'chessops/chess';
 import { makeFen, parseFen } from 'chessops/fen';
 import { parseSan } from 'chessops/san';
 import * as ort from 'onnxruntime-web';
-import { clampElo, expectedScore, maiaHistoryTokens } from '../src/core/maia/encode.ts';
+import { clampElo, expectedScore, legalLogits, MAIA_MOVES, maiaHistoryTokens } from '../src/core/maia/encode.ts';
 import { explorerUrl } from '../src/core/explorer/providers.ts';
 import { fenKey } from '../src/core/explorer/search.ts';
 import { dumpLines, gamesOf, pliesOf, replay, rng, shuffle, speedOf } from './maia-eval-lib.ts';
@@ -44,6 +44,8 @@ export interface Pos {
   /** White's score in the game: 1, 0.5, 0. */
   result: number;
   termination: string;
+  /** The move played in the game from this position (UCI). */
+  played?: string;
 }
 
 function opts(argv: string[]) {
@@ -83,8 +85,8 @@ async function sample(path: string, out: string, per: number): Promise<void> {
     if (res === undefined || !Number.isFinite(wr) || !Number.isFinite(br)) continue;
     const bucket = Object.keys(BUCKETS).map(Number).find((b) => wr >= BUCKETS[b]![0] && wr <= BUCKETS[b]![1] && br >= BUCKETS[b]![0] && br <= BUCKETS[b]![1]);
     if (!bucket) continue;
-    const { fens } = replay(pliesOf(g.moves), { moves: [1, 999], pieces: [0, 32], minClock: -1 });
-    const plies = fens.length;
+    const { fens, ucis } = replay(pliesOf(g.moves), { moves: [1, 999], pieces: [0, 32], minClock: -1 });
+    const plies = ucis.length;
     const id = /\/(\w+)$/.exec(h['Site'] ?? '')?.[1] ?? `g${read}`;
     for (const phase of ['opening', 'middlegame', 'endgame'] as const) {
       const cands: number[] = [];
@@ -98,7 +100,7 @@ async function sample(path: string, out: string, per: number): Promise<void> {
       const key = `${bucket}/${phase}`;
       const list = pool.get(key) ?? [];
       pool.set(key, list);
-      list.push({ id: `${id}:${p}`, game: id, bucket, phase, ply: p, fen: fens[p]!, before: fens.slice(Math.max(0, p - 7), p), pieces, white: wr, black: br, result: res, termination: h['Termination'] ?? '' });
+      list.push({ id: `${id}:${p}`, game: id, bucket, phase, ply: p, fen: fens[p]!, before: fens.slice(Math.max(0, p - 7), p), pieces, white: wr, black: br, result: res, termination: h['Termination'] ?? '', played: ucis[p]! });
     }
   }
   const all: Pos[] = [];
@@ -418,6 +420,165 @@ function movesReport(samplePath: string, rowFiles: string[], maiaFile: string, m
   return out.join('\n');
 }
 
+/* ------------------------------------------------------- likelihood and popularity */
+
+const EDGES = [0, 0.001, 0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.5, 0.7, 0.9, 1.0001];
+const binOf = (p: number) => EDGES.findIndex((e, i) => p >= e && p < EDGES[i + 1]!);
+const softmax = (xs: number[]) => {
+  const m = Math.max(...xs);
+  const e = xs.map((x) => Math.exp(x - m));
+  const z = e.reduce((a, b) => a + b, 0);
+  return e.map((x) => x / z);
+};
+
+/** Every legal move's likelihood for each sampled position, scored against the move the game's player chose. A summary by phase and bucket, calibrated in bins of Ml. */
+async function policyCalibration(samplePath: string, out: string): Promise<void> {
+  const sample = (JSON.parse(readFileSync(samplePath, 'utf8')) as Pos[]).filter((p) => p.played);
+  ort.env.wasm.numThreads = 4;
+  const session = await ort.InferenceSession.create(readFileSync(join(import.meta.dirname, '..', 'vendor', 'maia', 'maia3-23m.onnx')));
+  interface Acc { n: number; top1: number; top3: number; nll: number; topProb: number; bins: { n: number; sumP: number; hit: number }[] }
+  const acc: Record<string, Acc> = {};
+  const fresh = (): Acc => ({ n: 0, top1: 0, top3: 0, nll: 0, topProb: 0, bins: EDGES.slice(0, -1).map(() => ({ n: 0, sumP: 0, hit: 0 })) });
+  const t = Date.now();
+  for (let at = 0; at < sample.length; at += 32) {
+    const chunk = sample.slice(at, at + 32);
+    const tokens = new Float32Array(chunk.length * 64 * 96);
+    const self = new Float32Array(chunk.length);
+    const oppo = new Float32Array(chunk.length);
+    chunk.forEach((p, i) => {
+      tokens.set(maiaHistoryTokens([...p.before, p.fen]), i * 64 * 96);
+      const stm = p.fen.split(' ')[1] === 'w';
+      self[i] = clampElo(stm ? p.white : p.black);
+      oppo[i] = clampElo(stm ? p.black : p.white);
+    });
+    const o = await session.run({ tokens: new ort.Tensor('float32', tokens, [chunk.length, 64, 96]), elo_self: new ort.Tensor('float32', self, [chunk.length]), elo_oppo: new ort.Tensor('float32', oppo, [chunk.length]) });
+    const lg = o['logits_move']!.data as Float32Array;
+    chunk.forEach((p, i) => {
+      const pos = Chess.fromSetup(parseFen(p.fen).unwrap()).unwrap();
+      const moves = legalLogits(pos, lg, i * MAIA_MOVES);
+      const probs = softmax(moves.map((m) => m.logit));
+      const k = moves.findIndex((m) => m.uci === p.played);
+      if (k < 0) return;
+      const rank = probs.filter((x) => x > probs[k]!).length;
+      for (const key of [`${p.phase}`, `${p.phase}/${p.bucket}`, 'all']) {
+        const a = (acc[key] ??= fresh());
+        a.n++;
+        a.top1 += rank === 0 ? 1 : 0;
+        a.top3 += rank < 3 ? 1 : 0;
+        a.nll += -Math.log(Math.max(probs[k]!, 1e-12));
+        a.topProb += Math.max(...probs);
+        probs.forEach((q, j) => {
+          const b = a.bins[binOf(q)]!;
+          b.n++;
+          b.sumP += q;
+          if (j === k) b.hit++;
+        });
+      }
+    });
+    if ((at / 32) % 50 === 0) process.stderr.write(`policy ${Math.min(at + 32, sample.length)}/${sample.length} (${Math.round((Date.now() - t) / 1000)} s)\n`);
+  }
+  writeFileSync(out, JSON.stringify(acc));
+}
+
+function policyReport(file: string): string {
+  const acc = JSON.parse(readFileSync(file, 'utf8')) as Record<string, { n: number; top1: number; top3: number; nll: number; topProb: number; bins: { n: number; sumP: number; hit: number }[] }>;
+  const out: string[] = ['| group | positions | played = Maia\'s likeliest | in Maia\'s top 3 | mean Maia top prob | mean NLL of the played move |', '| --- | --- | --- | --- | --- | --- |'];
+  for (const k of Object.keys(acc).sort()) {
+    const a = acc[k]!;
+    out.push(`| ${k} | ${a.n} | ${f(a.top1 / a.n * 100, 1)}% | ${f(a.top3 / a.n * 100, 1)}% | ${f(a.topProb / a.n * 100, 1)}% | ${f(a.nll / a.n)} |`);
+  }
+  for (const k of ['all', 'opening', 'middlegame', 'endgame']) {
+    const a = acc[k];
+    if (!a) continue;
+    out.push(`\nCalibration of Ml, ${k} (every legal move of every position; how often the move was the one played):\n`);
+    out.push('| Maia says | moves | mean Ml | played in |');
+    out.push('| --- | --- | --- | --- |');
+    a.bins.forEach((b, i) => {
+      if (b.n) out.push(`| ${(EDGES[i]! * 100).toFixed(1)}–${Math.min(100, EDGES[i + 1]! * 100).toFixed(1)}% | ${b.n} | ${f(b.sumP / b.n * 100, 2)}% | ${f(b.hit / b.n * 100, 2)}% |`);
+    });
+  }
+  return out.join('\n');
+}
+
+/** Maia's likelihood against the explorer's share of games for each move (openings, the bucket's middle rating, no history). */
+async function popularity(samplePath: string, rowFiles: string[]): Promise<string> {
+  const sample = new Map((JSON.parse(readFileSync(samplePath, 'utf8')) as Pos[]).map((p) => [p.id, p]));
+  const rows: Record<string, MoveRow[]> = {};
+  for (const f of rowFiles) Object.assign(rows, JSON.parse(readFileSync(f, 'utf8')));
+  ort.env.wasm.numThreads = 4;
+  const session = await ort.InferenceSession.create(readFileSync(join(import.meta.dirname, '..', 'vendor', 'maia', 'maia3-23m.onnx')));
+  const ids = Object.keys(rows);
+  interface P { bucket: number; share: number[]; ml: number[]; unseenMl: number; topMatch: boolean; top3: number; tv: number; kl: number; spearman: number; popularMissed: number; popular: number; maiaLikelyUnplayed: number; maiaLikely: number }
+  const ps: P[] = [];
+  const bins = EDGES.slice(0, -1).map(() => ({ n: 0, sumMl: 0, sumShare: 0 }));
+  for (let at = 0; at < ids.length; at += 32) {
+    const chunk = ids.slice(at, at + 32);
+    const tokens = new Float32Array(chunk.length * 64 * 96);
+    const elo = Float32Array.from(chunk.map((id) => clampElo(BUCKETS[sample.get(id)!.bucket]![2])));
+    chunk.forEach((id, i) => tokens.set(maiaHistoryTokens([sample.get(id)!.fen]), i * 64 * 96));
+    const o = await session.run({ tokens: new ort.Tensor('float32', tokens, [chunk.length, 64, 96]), elo_self: new ort.Tensor('float32', elo, [chunk.length]), elo_oppo: new ort.Tensor('float32', elo, [chunk.length]) });
+    const lg = o['logits_move']!.data as Float32Array;
+    chunk.forEach((id, i) => {
+      const p = sample.get(id)!;
+      const pos = Chess.fromSetup(parseFen(p.fen).unwrap()).unwrap();
+      const moves = legalLogits(pos, lg, i * MAIA_MOVES);
+      const probs = softmax(moves.map((m) => m.logit));
+      const total = rows[id]!.reduce((a, r) => a + r.white + r.draws + r.black, 0);
+      const share = moves.map((m) => {
+        const r = rows[id]!.find((x) => x.san === m.san);
+        return r ? (r.white + r.draws + r.black) / total : 0;
+      });
+      probs.forEach((q, j) => {
+        const b = bins[binOf(q)]!;
+        b.n++;
+        b.sumMl += q;
+        b.sumShare += share[j]!;
+      });
+      const idx = moves.map((_, j) => j);
+      const byShare = [...idx].sort((a, b) => share[b]! - share[a]!);
+      const byMl = [...idx].sort((a, b) => probs[b]! - probs[a]!);
+      const seen = idx.filter((j) => share[j]! > 0);
+      const kl = share.reduce((a, s, j) => (s > 0 ? a + s * Math.log(s / Math.max(probs[j]!, 1e-9)) : a), 0);
+      ps.push({
+        bucket: p.bucket,
+        share,
+        ml: probs,
+        unseenMl: idx.filter((j) => share[j] === 0).reduce((a, j) => a + probs[j]!, 0),
+        topMatch: byShare[0] === byMl[0],
+        top3: byShare.slice(0, 3).filter((j) => byMl.slice(0, 3).includes(j)).length,
+        tv: 0.5 * idx.reduce((a, j) => a + Math.abs(share[j]! - probs[j]!), 0),
+        kl,
+        spearman: spearman(seen.map((j) => share[j]!), seen.map((j) => probs[j]!)),
+        popular: idx.filter((j) => share[j]! >= 0.1).length,
+        popularMissed: idx.filter((j) => share[j]! >= 0.1 && probs[j]! < 0.02).length,
+        maiaLikely: idx.filter((j) => probs[j]! >= 0.2).length,
+        maiaLikelyUnplayed: idx.filter((j) => probs[j]! >= 0.2 && share[j]! < 0.02).length,
+      });
+    });
+  }
+  const out: string[] = [`${ps.length} opening positions with at least 200 games in the bucket (explorer move shares over all its moves).\n`];
+  out.push('| bucket | positions | Maia\'s likeliest = the most played | the 3 most played: how many in Maia\'s top 3 | total variation distance | KL(people ‖ Maia), nats | Spearman over played moves | Maia mass on moves nobody played |');
+  out.push('| --- | --- | --- | --- | --- | --- | --- | --- |');
+  for (const b of [1400, 1800, 2200, 0]) {
+    const g = ps.filter((x) => b === 0 || x.bucket === b);
+    if (!g.length) continue;
+    const sp = g.map((x) => x.spearman).filter(Number.isFinite);
+    out.push(`| ${b || 'all'} | ${g.length} | ${f(mean(g.map((x) => (x.topMatch ? 1 : 0))) * 100, 0)}% | ${f(mean(g.map((x) => x.top3)), 2)} of 3 | ${f(mean(g.map((x) => x.tv)), 3)} | ${f(mean(g.map((x) => x.kl)), 3)} | ${f(mean(sp), 2)} | ${f(mean(g.map((x) => x.unseenMl)) * 100, 1)}% |`);
+  }
+  const pop = ps.reduce((a, x) => a + x.popular, 0);
+  const missed = ps.reduce((a, x) => a + x.popularMissed, 0);
+  const lik = ps.reduce((a, x) => a + x.maiaLikely, 0);
+  const unp = ps.reduce((a, x) => a + x.maiaLikelyUnplayed, 0);
+  out.push(`\nMoves people play 10% or more of the time: ${pop}; of those Maia gives under 2%: ${missed}. Moves Maia gives 20% or more: ${lik}; of those people play under 2% of the time: ${unp}.\n`);
+  out.push('Calibration, over every legal move of the positions: Maia\'s Ml in bins against the share of games that played it.\n');
+  out.push('| Maia says | moves | mean Ml | people play it |');
+  out.push('| --- | --- | --- | --- |');
+  bins.forEach((b, i) => {
+    if (b.n) out.push(`| ${(EDGES[i]! * 100).toFixed(1)}–${Math.min(100, EDGES[i + 1]! * 100).toFixed(1)}% | ${b.n} | ${f(b.sumMl / b.n * 100, 2)}% | ${f(b.sumShare / b.n * 100, 2)}% |`);
+  });
+  return out.join('\n');
+}
+
 async function main(): Promise<void> {
   const [cmd, ...rest] = process.argv.slice(2);
   const { path, o } = opts(rest);
@@ -428,6 +589,9 @@ async function main(): Promise<void> {
     await maia(o.get('sample')!, o.get('out')!, Number(o.get('before') ?? 7), o.has('mid'), only.size ? only : undefined);
   }
   else if (cmd === 'explorer') await explorer(o.get('sample')!, o.get('out')!, Number(o.get('bucket')), Number(o.get('n') ?? 150), process.env[o.get('token-env') ?? 'LICHESS_TOKEN'] ?? '');
+  else if (cmd === 'policy') await policyCalibration(o.get('sample')!, o.get('out')!);
+  else if (cmd === 'policy-report') console.log(policyReport(o.get('summary')!));
+  else if (cmd === 'popularity') console.log(await popularity(o.get('sample')!, (o.get('rows') ?? '').split(',')));
   else if (cmd === 'move-rows') await moveRows(o.get('sample')!, (o.get('totals') ?? '').split(','), o.get('out')!, Number(o.get('bucket')), Number(o.get('min-games') ?? 200), process.env[o.get('token-env') ?? 'LICHESS_TOKEN'] ?? '');
   else if (cmd === 'after-moves') await afterMoves(o.get('sample')!, (o.get('rows') ?? '').split(','), o.get('out')!);
   else if (cmd === 'moves-report') console.log(movesReport(o.get('sample')!, (o.get('rows') ?? '').split(','), o.get('maia')!, Number(o.get('min-move-games') ?? 200)));
