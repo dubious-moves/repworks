@@ -18,7 +18,8 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Chess } from 'chessops/chess';
-import { parseFen } from 'chessops/fen';
+import { makeFen, parseFen } from 'chessops/fen';
+import { parseSan } from 'chessops/san';
 import * as ort from 'onnxruntime-web';
 import { clampElo, expectedScore, maiaHistoryTokens } from '../src/core/maia/encode.ts';
 import { explorerUrl } from '../src/core/explorer/providers.ts';
@@ -272,6 +273,151 @@ function report(sample: Pos[], ms: Record<string, number>, exs: Record<string, E
   return out.join('\n');
 }
 
+/* ------------------------------------------------------------ between moves */
+
+interface MoveRow {
+  san: string;
+  white: number;
+  draws: number;
+  black: number;
+}
+
+/** The explorer's rows for each move at the positions that had `minGames` games, one request each. */
+async function moveRows(samplePath: string, totalsFiles: string[], out: string, bucket: number, minGames: number, token: string): Promise<void> {
+  const totals: Record<string, Ex> = {};
+  for (const f of totalsFiles) Object.assign(totals, JSON.parse(readFileSync(f, 'utf8')));
+  const sample = (JSON.parse(readFileSync(samplePath, 'utf8')) as Pos[]).filter((p) => p.bucket === bucket && totals[p.id] && totals[p.id]!.white + totals[p.id]!.draws + totals[p.id]!.black >= minGames);
+  const res: Record<string, MoveRow[]> = {};
+  const seen = new Set<string>();
+  for (const p of sample) {
+    const key = fenKey(p.fen);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const url = explorerUrl(p.fen, { db: 'lichess', speeds: SPEEDS, ratings: [bucket], games: 0 } as never);
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const r = await fetch(url, { headers: { authorization: `Bearer ${token}` } }).catch(() => null);
+      if (r?.ok) {
+        const j = (await r.json()) as { moves: MoveRow[] };
+        res[p.id] = j.moves.map((m) => ({ san: m.san, white: m.white, draws: m.draws, black: m.black }));
+        break;
+      }
+      await new Promise((x) => setTimeout(x, r?.status === 429 ? 61000 : 3000));
+    }
+    await new Promise((x) => setTimeout(x, 3750));
+  }
+  writeFileSync(out, JSON.stringify(res));
+}
+
+/** Maia's score for the mover after each move: the position after it, asked as the control (no history, the bucket's middle rating for both). */
+async function afterMoves(samplePath: string, rowFiles: string[], out: string): Promise<void> {
+  const sample = new Map((JSON.parse(readFileSync(samplePath, 'utf8')) as Pos[]).map((p) => [p.id, p]));
+  const rows: Record<string, MoveRow[]> = {};
+  for (const f of rowFiles) Object.assign(rows, JSON.parse(readFileSync(f, 'utf8')));
+  const asks: { id: string; san: string; fen: string; elo: number; white: boolean }[] = [];
+  for (const [id, ms] of Object.entries(rows)) {
+    const p = sample.get(id)!;
+    for (const m of ms) {
+      const pos = Chess.fromSetup(parseFen(p.fen).unwrap()).unwrap();
+      const mv = parseSan(pos, m.san);
+      if (!mv) continue;
+      const white = pos.turn === 'white';
+      pos.play(mv);
+      asks.push({ id, san: m.san, fen: makeFen(pos.toSetup()), elo: BUCKETS[p.bucket]![2], white });
+    }
+  }
+  ort.env.wasm.numThreads = 4;
+  const session = await ort.InferenceSession.create(readFileSync(join(import.meta.dirname, '..', 'vendor', 'maia', 'maia3-23m.onnx')));
+  const res: Record<string, Record<string, number>> = {};
+  for (let at = 0; at < asks.length; at += 32) {
+    const chunk = asks.slice(at, at + 32);
+    const tokens = new Float32Array(chunk.length * 64 * 96);
+    chunk.forEach((a, i) => tokens.set(maiaHistoryTokens([a.fen]), i * 64 * 96));
+    const elo = Float32Array.from(chunk.map((a) => clampElo(a.elo)));
+    const o = await session.run({ tokens: new ort.Tensor('float32', tokens, [chunk.length, 64, 96]), elo_self: new ort.Tensor('float32', elo, [chunk.length]), elo_oppo: new ort.Tensor('float32', elo, [chunk.length]) });
+    const v = o['logits_value']!.data as Float32Array;
+    chunk.forEach((a, i) => {
+      // The value is the side to move's, after the move: the other side, the mover's opponent.
+      (res[a.id] ??= {})[a.san] = 1 - expectedScore(v, i * 3);
+    });
+  }
+  writeFileSync(out, JSON.stringify(res));
+}
+
+function spearman(a: number[], b: number[]): number {
+  const rank = (x: number[]) => x.map((v) => x.filter((w) => w < v).length + (x.filter((w) => w === v).length - 1) / 2);
+  const ra = rank(a), rb = rank(b);
+  const ma = mean(ra), mb = mean(rb);
+  const c = ra.reduce((s, x, i) => s + (x - ma) * (rb[i]! - mb), 0);
+  const d = Math.sqrt(ra.reduce((s, x) => s + (x - ma) ** 2, 0) * rb.reduce((s, x) => s + (x - mb) ** 2, 0));
+  return d ? c / d : NaN;
+}
+
+function movesReport(samplePath: string, rowFiles: string[], maiaFile: string, minMove: number): string {
+  const sample = new Map((JSON.parse(readFileSync(samplePath, 'utf8')) as Pos[]).map((p) => [p.id, p]));
+  const rows: Record<string, MoveRow[]> = {};
+  for (const f of rowFiles) Object.assign(rows, JSON.parse(readFileSync(f, 'utf8')));
+  const ms = JSON.parse(readFileSync(maiaFile, 'utf8')) as Record<string, Record<string, number>>;
+  const out: string[] = [];
+  interface M { people: number; maia: number; n: number }
+  const positions: { bucket: number; moves: M[] }[] = [];
+  for (const [id, list] of Object.entries(rows)) {
+    const p = sample.get(id)!;
+    const white = p.fen.split(' ')[1] === 'w';
+    const moves = list
+      .filter((m) => m.white + m.draws + m.black >= minMove && ms[id]?.[m.san] !== undefined)
+      .map((m) => {
+        const n = m.white + m.draws + m.black;
+        return { people: ((white ? m.white : m.black) + m.draws / 2) / n, maia: ms[id]![m.san]!, n };
+      });
+    if (moves.length >= 2) positions.push({ bucket: p.bucket, moves });
+  }
+  out.push(`Moves with at least ${minMove} games in the bucket; positions with two or more such moves: ${positions.length}.\n`);
+  out.push('| bucket | positions | move pairs | people\'s gap in a pair (mean abs) | Maia\'s same-direction share | Maia gap ÷ people gap (slope) | Spearman per position (mean) | people\'s best move is Maia\'s best |');
+  out.push('| --- | --- | --- | --- | --- | --- | --- | --- |');
+  const bins: [number, number][] = [[0, 0.02], [0.02, 0.05], [0.05, 0.1], [0.1, 1]];
+  const binRows: Record<string, { agree: number; n: number; sx: number; sy: number }> = {};
+  for (const b of [1400, 1800, 2200, 0]) {
+    const ps = positions.filter((p) => b === 0 || p.bucket === b);
+    if (!ps.length) continue;
+    let pairs = 0, agree = 0, gap = 0, sxy = 0, sxx = 0;
+    const sp: number[] = [];
+    let topHit = 0;
+    for (const p of ps) {
+      for (let i = 0; i < p.moves.length; i++)
+        for (let j = i + 1; j < p.moves.length; j++) {
+          const dp = p.moves[i]!.people - p.moves[j]!.people;
+          const dm = p.moves[i]!.maia - p.moves[j]!.maia;
+          pairs++;
+          gap += Math.abs(dp);
+          if (Math.sign(dp) === Math.sign(dm)) agree++;
+          sxy += dp * dm;
+          sxx += dp * dp;
+          if (b === 0) {
+            const k = bins.findIndex(([lo, hi]) => Math.abs(dp) >= lo && Math.abs(dp) < hi);
+            const r = (binRows[k] ??= { agree: 0, n: 0, sx: 0, sy: 0 });
+            r.n++;
+            if (Math.sign(dp) === Math.sign(dm)) r.agree++;
+            r.sx += Math.abs(dp);
+            r.sy += Math.abs(dm);
+          }
+        }
+      const s = spearman(p.moves.map((m) => m.people), p.moves.map((m) => m.maia));
+      if (Number.isFinite(s)) sp.push(s);
+      const best = (k: 'people' | 'maia') => p.moves.reduce((x, y) => (y[k] > x[k] ? y : x));
+      if (best('people') === best('maia')) topHit++;
+    }
+    out.push(`| ${b || 'all'} | ${ps.length} | ${pairs} | ${f(gap / pairs * 100, 1)} pts | ${f(agree / pairs * 100, 1)}% | ${f(sxy / sxx, 2)} | ${f(mean(sp), 2)} | ${f(topHit / ps.length * 100, 0)}% (chance ${f(mean(ps.map((p) => 1 / p.moves.length)) * 100, 0)}%) |`);
+  }
+  out.push('\nBy the size of people\'s gap between the two moves (all buckets):\n');
+  out.push('| people\'s gap | pairs | Maia same direction | people\'s mean gap | Maia\'s mean gap |');
+  out.push('| --- | --- | --- | --- | --- |');
+  bins.forEach(([lo, hi], k) => {
+    const r = binRows[k];
+    if (r) out.push(`| ${lo * 100}–${hi >= 1 ? '' : hi * 100}${hi >= 1 ? '+' : ''} pts | ${r.n} | ${f(r.agree / r.n * 100, 1)}% | ${f(r.sx / r.n * 100, 1)} | ${f(r.sy / r.n * 100, 1)} |`);
+  });
+  return out.join('\n');
+}
+
 async function main(): Promise<void> {
   const [cmd, ...rest] = process.argv.slice(2);
   const { path, o } = opts(rest);
@@ -282,6 +428,9 @@ async function main(): Promise<void> {
     await maia(o.get('sample')!, o.get('out')!, Number(o.get('before') ?? 7), o.has('mid'), only.size ? only : undefined);
   }
   else if (cmd === 'explorer') await explorer(o.get('sample')!, o.get('out')!, Number(o.get('bucket')), Number(o.get('n') ?? 150), process.env[o.get('token-env') ?? 'LICHESS_TOKEN'] ?? '');
+  else if (cmd === 'move-rows') await moveRows(o.get('sample')!, (o.get('totals') ?? '').split(','), o.get('out')!, Number(o.get('bucket')), Number(o.get('min-games') ?? 200), process.env[o.get('token-env') ?? 'LICHESS_TOKEN'] ?? '');
+  else if (cmd === 'after-moves') await afterMoves(o.get('sample')!, (o.get('rows') ?? '').split(','), o.get('out')!);
+  else if (cmd === 'moves-report') console.log(movesReport(o.get('sample')!, (o.get('rows') ?? '').split(','), o.get('maia')!, Number(o.get('min-move-games') ?? 200)));
   else if (cmd === 'report') {
     const exs: Record<string, Ex> = {};
     for (const file of (o.get('explorer') ?? '').split(',').filter(Boolean)) Object.assign(exs, JSON.parse(readFileSync(file, 'utf8')));
