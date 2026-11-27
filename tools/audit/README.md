@@ -31,7 +31,9 @@ The rules the audit follows, the ledger of what is audited, and the hand-kept st
   - Per move: Maia's chance (23M model, averaged over the Elos) that a player finds it, and the natural moves (Maia's, up to 90% of its mass) each rated by Stockfish in win% against ours.
   - `expLoss` is the win% a player gives up on average by playing by feel.
   - With `--prefix`, it also gives, per Black reply, the hardest of our next three moves.
-  - `r17/cases.sh` runs it on ten known lines (the calibration).
+  - `r17/cases.sh` runs it on ten known lines (the calibration; output in `r17/cases.txt`).
+  - `r17/compare.mjs <difficulty --prefix output> <chapter file> <inv.json>` puts each Black reply's hardest next move beside whether it's drilled now.
+  - `r17/pre_a6.txt` and `r17/pre_c6.txt` cover batches 4 and 5 before their cuts; `r17/now_c5.txt` covers the batch-6 subtree.
 - `r13/sfscreen.mjs <study> "<prefix>" <ms>`: for every White move under the prefix, Stockfish's top 3 and our move's eval; FLAG when ours is 0.50+ behind.
 - `sf/pv.mjs "<SAN line with numbers>" <ms> [multipv]`: Stockfish's principal variations after the line, White's view.
 - `sf/lineeval.mjs "<SAN line>" <startPly> <ms>`: at each position from startPly, the best 3 moves and the played move's eval.

@@ -1,0 +1,226 @@
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3
+   pFind  69% | expLoss   0.7 | ours 51% | natural: dxc5 9% -5, Nf3 7% -2, e4 6% -0
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5
+   pFind  57% | expLoss   5.0 | ours 62% | natural: Nf3 27% -15, dxc5 4% -14, Bb5 3% -15
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 6.Bxe5
+   pFind  19% | expLoss   0.0 | ours 63% | natural: dxe5 80% -0
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 6.Bxe5 Nxe5 7.dxe5
+   pFind 100% | expLoss   0.0 | ours 71% | natural: 
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 6.Bxe5 Nxe5 7.dxe5 Ne4 8.Qxd5
+   pFind  96% | expLoss   0.0 | ours 83% | natural: 
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 6.Bxe5 Nxe5 7.dxe5 Ne4 8.Qxd5 Qxd5 9.Nc7+
+   pFind 100% | expLoss   0.0 | ours 83% | natural: 
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 6.Bxe5 Nxe5 7.dxe5 Ne4 8.Qxd5 Qxd5 9.Nc7+ Kd8 10.Nxd5
+   pFind 100% | expLoss   0.0 | ours 85% | natural: 
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 6.Bxe5 Nxe5 7.dxe5 Ne4 8.Qxd5 Qxd5 9.Nc7+ Kd7 10.Nxd5
+   pFind 100% | expLoss   0.0 | ours 83% | natural: 
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 6.Bxe5 Nxe5 7.dxe5 Ne4 8.Qxd5 Qa5+ 9.c3
+   pFind  96% | expLoss   0.0 | ours 85% | natural: 
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 6.Bxe5 Nxe5 7.dxe5 Ne4 8.Qxd5 Qa5+ 9.c3 Bf5 10.Qxb7
+   pFind  46% | expLoss   NaN | ours 88% | natural: Bc4 14% -0, Nd6+ 10% -12, f3 9% -3
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 6.Bxe5 Nxe5 7.dxe5 Ne4 8.Qxd5 Qa5+ 9.c3 Bf5 10.Qxb7 Rc8 11.Bc4
+   pFind  16% | expLoss   3.4 | ours 89% | natural: f3 17% -2, Nd6+ 13% -24, Nxa7 11% -0
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 6.Bxe5 Nxe5 7.dxe5 Ne4 8.Qxd5 Qa5+ 9.c3 Bf5 10.Qxb7 Rd8 11.Nc7+
+   pFind  80% | expLoss   0.8 | ours 93% | natural: Qc6+ 5% -8, Bc4 5% -8
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 6.Bxe5 Nxe5 7.dxe5 Ng4 8.Qxd5
+   pFind  92% | expLoss   0.0 | ours 74% | natural: 
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 6.Bxe5 Nxe5 7.dxe5 Ng4 8.Qxd5 Qxd5 9.Nc7+
+   pFind 100% | expLoss   0.0 | ours 72% | natural: 
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 6.Bxe5 Nxe5 7.dxe5 Ng4 8.Qxd5 Qxd5 9.Nc7+ Kd8 10.Nxd5
+   pFind 100% | expLoss   0.0 | ours 74% | natural: 
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 6.Bxe5 Nxe5 7.dxe5 Ng4 8.Qxd5 Qxd5 9.Nc7+ Kd7 10.Nxd5
+   pFind 100% | expLoss   0.0 | ours 74% | natural: 
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 6.Bxe5 Nxe5 7.dxe5 Ng4 8.Qxd5 Qa5+ 9.Nc3
+   pFind  18% | expLoss   5.8 | ours 80% | natural: c3 80% -7
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 6.Bxe5 Nxe5 7.dxe5 Nd7 8.Qxd5
+   pFind  95% | expLoss   0.0 | ours 76% | natural: 
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 6.Bxe5 Nxe5 7.dxe5 Qa5+ 8.Nc3
+   pFind   3% | expLoss   1.3 | ours 71% | natural: c3 88% -1, Qd2 7% -5
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 6.Bxe5 Nxe5 7.dxe5 Qa5+ 8.Nc3 Ne4 9.Bb5+
+   pFind  33% | expLoss  25.1 | ours 86% | natural: Ne2 36% -43, Qxd5 20% -33, Qd3 9% -33
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 6.Bxe5 Nxe5 7.dxe5 a6 8.exf6
+   pFind  62% | expLoss   3.4 | ours 73% | natural: Nc3 32% -11
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 Qa5+ 6.c3
+   pFind  99% | expLoss   0.0 | ours 70% | natural: 
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 Qa5+ 6.c3 e5 7.Bxe5
+   pFind  11% | expLoss   6.6 | ours 69% | natural: dxe5 88% -7
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 Qa5+ 6.c3 e5 7.Bxe5 Nxe5 8.dxe5
+   pFind 100% | expLoss   0.0 | ours 70% | natural: 
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 Qa5+ 6.c3 e5 7.Bxe5 Nxe5 8.dxe5 Nd7 9.Qxd5
+   pFind  93% | expLoss   0.0 | ours 78% | natural: 
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 Qa5+ 6.c3 e5 7.Bxe5 Nxe5 8.dxe5 Ne4 9.Qxd5
+   pFind  96% | expLoss   0.0 | ours 85% | natural: 
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4
+   pFind  91% | expLoss   0.0 | ours 51% | natural: 
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 a6 6.Nf3
+   pFind  62% | expLoss   1.0 | ours 52% | natural: Bd3 21% -4, Qd2 5% -3, h3 3% -3
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 a6 6.Nf3 Nc6 7.Ne5
+   pFind  27% | expLoss   1.5 | ours 51% | natural: Bd3 28% -3, Be2 19% -1, a3 10% -3
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 a6 6.Nf3 Nc6 7.Ne5 Bf5 8.g4
+   pFind  35% | expLoss   4.1 | ours 56% | natural: Nxc6 17% -6, Bd3 13% -8, f3 10% -9
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 a6 6.Nf3 Nc6 7.Ne5 Bf5 8.g4 Bg6 9.h4
+   pFind  91% | expLoss   0.0 | ours 62% | natural: 
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 a6 6.Nf3 Nc6 7.Ne5 Bf5 8.g4 Bg6 9.h4 h5 10.Nxg6
+   pFind  83% | expLoss   2.4 | ours 68% | natural: g5 16% -15
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 a6 6.Nf3 Nc6 7.Ne5 Bf5 8.g4 Bg6 9.h4 h5 10.Nxg6 fxg6 11.g5
+   pFind  50% | expLoss   3.6 | ours 71% | natural: Bd3 29% -8, Qd3 19% -7
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 a6 6.Nf3 Nc6 7.Ne5 Bf5 8.g4 Nxe5 9.dxe5
+   pFind  46% | expLoss   0.1 | ours 56% | natural: gxf5 52% -0
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 a6 6.Nf3 Nc6 7.Ne5 Bd7 8.g4
+   pFind  10% | expLoss   1.3 | ours 52% | natural: Be2 27% -2, Nxd7 15% -2, Qd2 10% -2
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 a6 6.Nf3 Nc6 7.Ne5 Bd7 8.g4 e6 9.g5
+   pFind  79% | expLoss   1.0 | ours 51% | natural: h4 6% -8, Bg2 5% -4, f3 4% -9
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 a6 6.Nf3 Nc6 7.Ne5 Bd7 8.g4 e6 9.g5 Ng8 10.Nxc6
+   pFind   3% | expLoss   3.0 | ours 52% | natural: h4 46% -2, Qh5 16% -6, Qd2 5% -5
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 a6 6.Nf3 Nc6 7.Ne5 Bd7 8.g4 e6 9.g5 Ng8 10.Nxc6 Bxc6 11.Qd2
+   pFind   8% | expLoss   0.6 | ours 51% | natural: Bd3 27% -1, h4 27% -0, Bg2 9% -5
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 a6 6.Nf3 Nc6 7.Ne5 Bd7 8.g4 e6 9.g5 Ng8 10.Nxc6 Bxc6 11.Qd2 Bd6 12.O-O-O
+   pFind  50% | expLoss   NaN | ours NaN% | natural: h4 17% -NaN, Bd3 11% -NaN, Bxd6 8% -NaN
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 a6 6.Nf3 Nc6 7.Ne5 Bd7 8.g4 h6 9.Nxc6
+   pFind   0% | expLoss   2.2 | ours 50% | natural: h4 59% -2, Bg2 11% -3, g5 6% -9
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 a6 6.Nf3 Nc6 7.Ne5 Bd7 8.g4 h6 9.Nxc6 Bxc6 10.Qf3
+   pFind   5% | expLoss   7.5 | ours 50% | natural: Bg2 20% -5, h4 17% -6, Bd3 16% -13
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 a6 6.Nf3 Nc6 7.Ne5 Bd7 8.g4 h6 9.Nxc6 Bxc6 10.Qf3 e6 11.O-O-O
+   pFind  51% | expLoss   NaN | ours NaN% | natural: Bd3 17% -NaN, h4 16% -NaN, g5 4% -NaN
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 a6 6.Nf3 Nc6 7.Ne5 e6 8.g4
+   pFind  12% | expLoss   0.7 | ours 47% (best is 5 better) | natural: Nxc6 28% -0, Be2 24% -0, Bd3 10% -7
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 a6 6.Nf3 Bg4 7.Be2
+   pFind  56% | expLoss   0.3 | ours 51% | natural: h3 32% -0, Bd3 9% -3
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Bg4 6.Be2
+   pFind  20% | expLoss   0.2 | ours 50% | natural: f3 64% -0, Nf3 11% -2
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Bg4 6.Be2 Bxe2 7.Qxe2
+   pFind  51% | expLoss   0.3 | ours 49% | natural: Ngxe2 48% -1
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Bg4 6.Be2 Bxe2 7.Qxe2 e6 8.Nb5
+   pFind  13% | expLoss   NaN | ours 56% | natural: Nf3 52% -7, Qb5+ 12% -8, O-O-O 11% -NaN
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Bg4 6.Be2 Bxe2 7.Qxe2 e6 8.Nb5 Na6 9.Nf3
+   pFind  67% | expLoss   NaN | ours 55% | natural: c3 14% -1, O-O-O 6% -NaN, a4 3% -4
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Bg4 6.Be2 Bxe2 7.Qxe2 e6 8.Nb5 Na6 9.Nf3 Be7 10.c3
+   pFind   6% | expLoss   NaN | ours 55% | natural: O-O 68% -NaN, Ne5 13% -4, O-O-O 2% -NaN
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Bg4 6.Be2 Bxe2 7.Qxe2 e6 8.Nb5 Na6 9.Nf3 Be7 10.c3 O-O 11.h4
+   pFind   6% | expLoss   NaN | ours 56% | natural: O-O 65% -NaN, Ne5 12% -5, a4 8% -4
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Bg4 6.Be2 Bxe2 7.Qxe2 e6 8.Nb5 Na6 9.Nf3 Be7 10.c3 O-O 11.h4 Ne4 12.a4
+   pFind   4% | expLoss   3.8 | ours 57% | natural: h5 42% -3, Ng5 18% -4, g4 10% -5
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Bg4 6.Be2 Bxe2 7.Qxe2 e6 8.Nb5 Qa5+ 9.c3
+   pFind  93% | expLoss   0.0 | ours 57% | natural: 
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Bg4 6.Be2 Bxe2 7.Qxe2 Nc6 8.Nb5
+   pFind   8% | expLoss   NaN | ours 62% | natural: Nf3 65% -12, O-O-O 21% -NaN
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Nc6 6.Nb5
+   pFind  71% | expLoss   2.2 | ours 60% | natural: Nf3 20% -11
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Nc6 6.Nb5 e5 7.Bxe5
+   pFind  17% | expLoss   1.9 | ours 59% | natural: dxe5 83% -2
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Nc6 6.Nb5 e5 7.Bxe5 Nxe5 8.dxe5
+   pFind 100% | expLoss   0.0 | ours 61% | natural: 
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Nc6 6.Nb5 e5 7.Bxe5 Nxe5 8.dxe5 Ne4 9.Qxd5
+   pFind  94% | expLoss   0.0 | ours 64% | natural: 
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Nc6 6.Nb5 Qa5+ 7.c3
+   pFind  99% | expLoss   0.0 | ours 75% | natural: 
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Nc6 6.Nb5 Qa5+ 7.c3 e5 8.Bxe5
+   pFind  19% | expLoss   8.4 | ours 77% | natural: dxe5 77% -11
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Nc6 6.Nb5 Qa5+ 7.c3 e5 8.Bxe5 Nxe5 9.dxe5
+   pFind  99% | expLoss   0.0 | ours 78% | natural: 
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Bf5 6.Nb5
+   pFind  23% | expLoss   6.8 | ours 60% | natural: Nf3 39% -9, Bd3 18% -11, f3 13% -11
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Bf5 6.Nb5 Na6 7.c3
+   pFind  60% | expLoss   1.7 | ours 61% | natural: Nf3 25% -5, Bd3 5% -6, a3 3% -5
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Bf5 6.Nb5 Na6 7.c3 e6 8.Qa4
+   pFind  46% | expLoss   1.6 | ours 60% | natural: Nf3 41% -4, Bd3 4% -4
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Bf5 6.Nb5 Qa5+ 7.b4
+   pFind   4% | expLoss   9.5 | ours 72% | natural: c3 95% -10
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Bf5 6.Nb5 Qa5+ 7.b4 Qxb4+ 8.c3
+   pFind  86% | expLoss   0.0 | ours 60% (best is 12 better) | natural: Bd2 12% -0
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Bf5 6.Nb5 Qa5+ 7.b4 Qxb4+ 8.c3 Qa5 9.Nc7+
+   pFind  83% | expLoss   2.0 | ours 67% | natural: Bc7 10% -20
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Bf5 6.Nb5 Qa5+ 7.b4 Qxb4+ 8.c3 Qa5 9.Nc7+ Kd8 10.Nxa8
+   pFind  86% | expLoss   1.4 | ours 68% | natural: Qb3 8% -18
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Bf5 6.Nb5 Qa5+ 7.b4 Qxb4+ 8.c3 Qa5 9.Nc7+ Kd7 10.Nxa8
+   pFind  70% | expLoss   1.3 | ours 72% | natural: Bb5+ 13% -10, Qb3 11% -0
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Bf5 6.Nb5 Qa5+ 7.b4 Qxb4+ 8.c3 Qb2 9.Nc7+
+   pFind  77% | expLoss   2.3 | ours 62% | natural: Rc1 6% -1, Nf3 5% -12, Bc1 4% -46
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 e6 6.Nb5
+   pFind  36% | expLoss   3.3 | ours 59% | natural: Nf3 42% -6, Bd3 9% -6, a3 4% -8
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Bf5 5.dxc5
+   pFind   7% | expLoss   6.2 | ours 59% | natural: Nf3 29% -9, Nb5 28% -2, f3 16% -11
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Bf5 5.dxc5 Nc6 6.Bb5
+   pFind  27% | expLoss   7.1 | ours 59% | natural: a3 23% -9, Nf3 21% -3, Nb5 17% -22
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Bf5 5.dxc5 Nc6 6.Bb5 e6 7.b4
+   pFind  61% | expLoss   3.2 | ours 60% | natural: Nf3 16% -11, Bxc6+ 15% -9
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Bf5 5.dxc5 e6 6.b4
+   pFind  41% | expLoss   1.3 | ours 58% | natural: Nb5 20% -1, Nf3 10% -7, Bb5+ 6% -0
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Qb6 5.Nb5
+   pFind  19% | expLoss   4.1 | ours 57% | natural: Rb1 23% -7, a3 16% -6, Na4 13% -10
+
+== per Black reply: the hardest of our next 3 moves
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 | hardest: 7.Bxe5 expLoss 6.6, pFind 11%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 | hardest: 8.exf6 expLoss 3.4, pFind 62%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 6.Bxe5 Nxe5 | hardest: 9.Bb5+ expLoss 25.1, pFind 33%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 6.Bxe5 Nxe5 7.dxe5 Ne4 | hardest: 8.Qxd5 expLoss 0.0, pFind 96%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 6.Bxe5 Nxe5 7.dxe5 Ne4 8.Qxd5 Qxd5 | hardest: 9.Nc7+ expLoss 0.0, pFind 100%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 6.Bxe5 Nxe5 7.dxe5 Ne4 8.Qxd5 Qxd5 9.Nc7+ Kd8 | hardest: 10.Nxd5 expLoss 0.0, pFind 100%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 6.Bxe5 Nxe5 7.dxe5 Ne4 8.Qxd5 Qxd5 9.Nc7+ Kd7 | hardest: 10.Nxd5 expLoss 0.0, pFind 100%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 6.Bxe5 Nxe5 7.dxe5 Ne4 8.Qxd5 Qa5+ | hardest: 11.Bc4 expLoss 3.4, pFind 16%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 6.Bxe5 Nxe5 7.dxe5 Ne4 8.Qxd5 Qa5+ 9.c3 Bf5 | hardest: 10.Qxb7 expLoss NaN, pFind 46%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 6.Bxe5 Nxe5 7.dxe5 Ne4 8.Qxd5 Qa5+ 9.c3 Bf5 10.Qxb7 Rc8 | hardest: 11.Bc4 expLoss 3.4, pFind 16%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 6.Bxe5 Nxe5 7.dxe5 Ne4 8.Qxd5 Qa5+ 9.c3 Bf5 10.Qxb7 Rd8 | hardest: 11.Nc7+ expLoss 0.8, pFind 80%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 6.Bxe5 Nxe5 7.dxe5 Ng4 | hardest: 9.Nc3 expLoss 5.8, pFind 18%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 6.Bxe5 Nxe5 7.dxe5 Ng4 8.Qxd5 Qxd5 | hardest: 9.Nc7+ expLoss 0.0, pFind 100%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 6.Bxe5 Nxe5 7.dxe5 Ng4 8.Qxd5 Qxd5 9.Nc7+ Kd8 | hardest: 10.Nxd5 expLoss 0.0, pFind 100%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 6.Bxe5 Nxe5 7.dxe5 Ng4 8.Qxd5 Qxd5 9.Nc7+ Kd7 | hardest: 10.Nxd5 expLoss 0.0, pFind 100%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 6.Bxe5 Nxe5 7.dxe5 Ng4 8.Qxd5 Qa5+ | hardest: 9.Nc3 expLoss 5.8, pFind 18%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 6.Bxe5 Nxe5 7.dxe5 Nd7 | hardest: 8.Qxd5 expLoss 0.0, pFind 95%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 6.Bxe5 Nxe5 7.dxe5 Qa5+ | hardest: 9.Bb5+ expLoss 25.1, pFind 33%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 6.Bxe5 Nxe5 7.dxe5 Qa5+ 8.Nc3 Ne4 | hardest: 9.Bb5+ expLoss 25.1, pFind 33%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 e5 6.Bxe5 Nxe5 7.dxe5 a6 | hardest: 8.exf6 expLoss 3.4, pFind 62%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 Qa5+ | hardest: 7.Bxe5 expLoss 6.6, pFind 11%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 Qa5+ 6.c3 e5 | hardest: 7.Bxe5 expLoss 6.6, pFind 11%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 Qa5+ 6.c3 e5 7.Bxe5 Nxe5 | hardest: 8.dxe5 expLoss 0.0, pFind 100%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 Qa5+ 6.c3 e5 7.Bxe5 Nxe5 8.dxe5 Nd7 | hardest: 9.Qxd5 expLoss 0.0, pFind 93%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Nc6 5.Nb5 Qa5+ 6.c3 e5 7.Bxe5 Nxe5 8.dxe5 Ne4 | hardest: 9.Qxd5 expLoss 0.0, pFind 96%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 | hardest: 7.b4 expLoss 9.5, pFind 4%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 a6 | hardest: 8.g4 expLoss 4.1, pFind 35%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 a6 6.Nf3 Nc6 | hardest: 8.g4 expLoss 4.1, pFind 35%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 a6 6.Nf3 Nc6 7.Ne5 Bf5 | hardest: 8.g4 expLoss 4.1, pFind 35%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 a6 6.Nf3 Nc6 7.Ne5 Bf5 8.g4 Bg6 | hardest: 11.g5 expLoss 3.6, pFind 50%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 a6 6.Nf3 Nc6 7.Ne5 Bf5 8.g4 Bg6 9.h4 h5 | hardest: 11.g5 expLoss 3.6, pFind 50%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 a6 6.Nf3 Nc6 7.Ne5 Bf5 8.g4 Bg6 9.h4 h5 10.Nxg6 fxg6 | hardest: 11.g5 expLoss 3.6, pFind 50%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 a6 6.Nf3 Nc6 7.Ne5 Bf5 8.g4 Nxe5 | hardest: 9.dxe5 expLoss 0.1, pFind 46%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 a6 6.Nf3 Nc6 7.Ne5 Bd7 | hardest: 10.Qf3 expLoss 7.5, pFind 5%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 a6 6.Nf3 Nc6 7.Ne5 Bd7 8.g4 e6 | hardest: 10.Nxc6 expLoss 3.0, pFind 3%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 a6 6.Nf3 Nc6 7.Ne5 Bd7 8.g4 e6 9.g5 Ng8 | hardest: 10.Nxc6 expLoss 3.0, pFind 3%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 a6 6.Nf3 Nc6 7.Ne5 Bd7 8.g4 e6 9.g5 Ng8 10.Nxc6 Bxc6 | hardest: 11.Qd2 expLoss 0.6, pFind 8%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 a6 6.Nf3 Nc6 7.Ne5 Bd7 8.g4 e6 9.g5 Ng8 10.Nxc6 Bxc6 11.Qd2 Bd6 | hardest: 12.O-O-O expLoss NaN, pFind 50%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 a6 6.Nf3 Nc6 7.Ne5 Bd7 8.g4 h6 | hardest: 10.Qf3 expLoss 7.5, pFind 5%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 a6 6.Nf3 Nc6 7.Ne5 Bd7 8.g4 h6 9.Nxc6 Bxc6 | hardest: 10.Qf3 expLoss 7.5, pFind 5%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 a6 6.Nf3 Nc6 7.Ne5 Bd7 8.g4 h6 9.Nxc6 Bxc6 10.Qf3 e6 | hardest: 11.O-O-O expLoss NaN, pFind 51%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 a6 6.Nf3 Nc6 7.Ne5 e6 | hardest: 8.g4 expLoss 0.7, pFind 12%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 a6 6.Nf3 Bg4 | hardest: 7.Be2 expLoss 0.3, pFind 56%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Bg4 | hardest: 7.Qxe2 expLoss 0.3, pFind 51%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Bg4 6.Be2 Bxe2 | hardest: 7.Qxe2 expLoss 0.3, pFind 51%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Bg4 6.Be2 Bxe2 7.Qxe2 e6 | hardest: 8.Nb5 expLoss NaN, pFind 13%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Bg4 6.Be2 Bxe2 7.Qxe2 e6 8.Nb5 Na6 | hardest: 9.Nf3 expLoss NaN, pFind 67%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Bg4 6.Be2 Bxe2 7.Qxe2 e6 8.Nb5 Na6 9.Nf3 Be7 | hardest: 10.c3 expLoss NaN, pFind 6%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Bg4 6.Be2 Bxe2 7.Qxe2 e6 8.Nb5 Na6 9.Nf3 Be7 10.c3 O-O | hardest: 11.h4 expLoss NaN, pFind 6%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Bg4 6.Be2 Bxe2 7.Qxe2 e6 8.Nb5 Na6 9.Nf3 Be7 10.c3 O-O 11.h4 Ne4 | hardest: 12.a4 expLoss 3.8, pFind 4%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Bg4 6.Be2 Bxe2 7.Qxe2 e6 8.Nb5 Qa5+ | hardest: 9.c3 expLoss 0.0, pFind 93%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Bg4 6.Be2 Bxe2 7.Qxe2 Nc6 | hardest: 8.Nb5 expLoss NaN, pFind 8%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Nc6 | hardest: 8.Bxe5 expLoss 8.4, pFind 19%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Nc6 6.Nb5 e5 | hardest: 7.Bxe5 expLoss 1.9, pFind 17%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Nc6 6.Nb5 e5 7.Bxe5 Nxe5 | hardest: 8.dxe5 expLoss 0.0, pFind 100%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Nc6 6.Nb5 e5 7.Bxe5 Nxe5 8.dxe5 Ne4 | hardest: 9.Qxd5 expLoss 0.0, pFind 94%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Nc6 6.Nb5 Qa5+ | hardest: 8.Bxe5 expLoss 8.4, pFind 19%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Nc6 6.Nb5 Qa5+ 7.c3 e5 | hardest: 8.Bxe5 expLoss 8.4, pFind 19%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Nc6 6.Nb5 Qa5+ 7.c3 e5 8.Bxe5 Nxe5 | hardest: 9.dxe5 expLoss 0.0, pFind 99%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Bf5 | hardest: 7.b4 expLoss 9.5, pFind 4%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Bf5 6.Nb5 Na6 | hardest: 7.c3 expLoss 1.7, pFind 60%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Bf5 6.Nb5 Na6 7.c3 e6 | hardest: 8.Qa4 expLoss 1.6, pFind 46%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Bf5 6.Nb5 Qa5+ | hardest: 7.b4 expLoss 9.5, pFind 4%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Bf5 6.Nb5 Qa5+ 7.b4 Qxb4+ | hardest: 9.Nc7+ expLoss 2.3, pFind 77%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Bf5 6.Nb5 Qa5+ 7.b4 Qxb4+ 8.c3 Qa5 | hardest: 9.Nc7+ expLoss 2.0, pFind 83%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Bf5 6.Nb5 Qa5+ 7.b4 Qxb4+ 8.c3 Qa5 9.Nc7+ Kd8 | hardest: 10.Nxa8 expLoss 1.4, pFind 86%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Bf5 6.Nb5 Qa5+ 7.b4 Qxb4+ 8.c3 Qa5 9.Nc7+ Kd7 | hardest: 10.Nxa8 expLoss 1.3, pFind 70%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Bf5 6.Nb5 Qa5+ 7.b4 Qxb4+ 8.c3 Qb2 | hardest: 9.Nc7+ expLoss 2.3, pFind 77%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 e6 | hardest: 6.Nb5 expLoss 3.3, pFind 36%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Bf5 | hardest: 6.Bb5 expLoss 7.1, pFind 27%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Bf5 5.dxc5 Nc6 | hardest: 6.Bb5 expLoss 7.1, pFind 27%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Bf5 5.dxc5 Nc6 6.Bb5 e6 | hardest: 7.b4 expLoss 3.2, pFind 61%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Bf5 5.dxc5 e6 | hardest: 6.b4 expLoss 1.3, pFind 41%
+1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 Qb6 | hardest: 5.Nb5 expLoss 4.1, pFind 19%
