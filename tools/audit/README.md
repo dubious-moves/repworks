@@ -23,6 +23,7 @@ The rules the audit follows, the ledger of what is audited, and the hand-kept st
 - `audit/owntag.mjs <inv.json> "<prefix>" <owner pgn>...`: the inventory's replies tagged C (common: reach 1 in 2,000+ and 10%+ share), O (the node is in an owner file), S (single-move branch).
 - `r12/tree.mjs <pgn> "<chapter>"|- "<path>" <depth>`: prints a subtree with comments.
 - `r13/comdump.mjs <study> "<prefix>"`: every comment under the prefix, with its full line.
+- `r16/ledger.mjs <chapter file> <depth>`: per subtree (the move at that ply), positions with drilled replies, replies, single-move branches and White moves, for the ledger.
 - `r12/getcom_json.mjs <study> <paths.json>`: `{path: comment}` for each path ("" if none, null if the path is missing).
 
 **Screens**
