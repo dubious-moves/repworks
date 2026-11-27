@@ -12,6 +12,8 @@
 //   games/<YYYY-MM>.jsonl              the analyzer's games played that UTC month (§5.163), one
 //                                      compact game a line, written only by the converter
 //                                      (scripts/games-to-data.mjs): never by a device, never merged
+//   review/<sid>/<name>.json           a reviewing session's list for a study (§5.216): written only
+//                                      by the session (scripts/chapter-diff.ts), never by a device
 import { isId } from '../study/ids.ts';
 
 export const FORMAT_FILE = 'repworks.json';
@@ -25,6 +27,9 @@ export const progressMonthPath = (dev: string, month: string) => `progress/${dev
 export const devicePath = (dev: string) => `devices/${dev}.json`;
 export const stormFilePath = (dev: string, day: string, k: number) => `storm/${dev}/${day}.${k}.jsonl`;
 export const gamesPath = (month: string) => `games/${month}.jsonl`;
+export const reviewListPath = (sid: string, name: string) => `review/${sid}/${name}.json`;
+/** Where a study's review lists are. */
+export const reviewDir = (sid: string) => `review/${sid}/`;
 /** Where a device's storm files are. */
 export const stormDir = (dev: string) => `storm/${dev}/`;
 
@@ -39,6 +44,7 @@ export type DataPath =
   | { kind: 'device'; dev: string }
   | { kind: 'storm'; dev: string; day: string; k: number }
   | { kind: 'games'; month: string }
+  | { kind: 'review'; sid: string; name: string }
   | { kind: 'other' };
 
 const DAY = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
@@ -72,6 +78,10 @@ export function classifyPath(path: string): DataPath {
   if (parts.length === 2 && top === 'games' && a !== undefined) {
     const m = /^(\d{4}-\d{2})\.jsonl$/.exec(a);
     if (m && MONTH.test(m[1]!)) return { kind: 'games', month: m[1]! };
+  }
+  if (parts.length === 3 && top === 'review' && isId(a) && b !== undefined) {
+    const m = /^([a-z0-9][a-z0-9-]{0,39})\.json$/.exec(b);
+    if (m) return { kind: 'review', sid: a, name: m[1]! };
   }
   return { kind: 'other' };
 }

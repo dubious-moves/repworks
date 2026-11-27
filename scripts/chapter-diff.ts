@@ -17,6 +17,15 @@
 //   --site URL     the site the links open (default https://dubious-moves.github.io/repworks/)
 //   --no-links     no links
 //   --json         the report as JSON, every line of every part in it
+//   --review NAME  also write the changes as a review list for the study page (PLAN.md §5.216):
+//                  review/<study id>/NAME.json in the new side's checkout, an item a change, which
+//                  the owner answers in the app. NAME: lower-case letters, digits, dashes. The
+//                  file is yours to commit with the study; made again, its items keep their
+//                  answers. Read the answers with scripts/review-answers.ts.
+//   --title TEXT   what the panel calls the list (default: NAME)
+//   --notes FILE   your words for the list: [{ "moves": "1. Nc3 d5 2. d4", "text": "…",
+//                  "chapter"?: "name or id" }]. A note on a changed move is shown with that
+//                  change; any other is a question at its move.
 //   --out FILE     write the list there instead of printing it
 //
 // Examples:
@@ -24,14 +33,16 @@
 //   node scripts/chapter-diff.ts ../repworks-data@4f2a91c ../repworks-data --study "1. Nc3 + Jobava"
 // Exit code 0 whatever changed; 1 when a side can't be read.
 import { execFileSync } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
+import { reviewListPath } from '../src/core/data/layout.ts';
+import { writeReviewList } from '../src/core/study/reviewList.ts';
 import { parseChapterFile, parseGames } from '../src/core/pgn/parse.ts';
 import type { Chapter } from '../src/core/study/model.ts';
 import { parseStudyMeta, reconcileChapterOrder } from '../src/core/study/studyMeta.ts';
-import { markdown, report, SITE, versionChapters, type Version } from './chapter-diff-lib.ts';
+import { markdown, report, reviewList, SITE, versionChapters, type Note, type Version } from './chapter-diff-lib.ts';
 
-const USAGE = 'usage: node scripts/chapter-diff.ts <old> <new> [--study S] [--old-study S] [--chapter C] [--mark TEXT] [--wraps] [--max-lines N] [--site URL] [--no-links] [--json] [--out FILE]\n  each side a PGN file, a data repo checkout <dir>, or <dir>@<rev>';
+const USAGE = 'usage: node scripts/chapter-diff.ts <old> <new> [--study S] [--old-study S] [--chapter C] [--mark TEXT] [--wraps] [--max-lines N] [--site URL] [--no-links] [--json] [--out FILE] [--review NAME [--title TEXT] [--notes FILE]]\n  each side a PGN file, a data repo checkout <dir>, or <dir>@<rev>';
 const BOOLEAN = new Set(['wraps', 'no-links', 'json', 'help']);
 const args = process.argv.slice(2);
 const flags = new Map<string, string>();
@@ -150,6 +161,26 @@ if (only !== undefined) {
 const maxLines = Number(flags.get('max-lines') ?? 8);
 if (!Number.isInteger(maxLines) || maxLines < 0) fail('--max-lines takes a whole number');
 const r = report(old, now, { site: flags.has('no-links') ? '' : (flags.get('site') ?? SITE).replace(/\/?$/, '/'), wraps: flags.has('wraps'), ...(flags.has('mark') ? { mark: flags.get('mark')! } : {}) });
+if (flags.has('review')) {
+  // The checkout the new side is in (as checked out, or at a commit of it): the list goes beside its studies.
+  const arg = sides[1]!;
+  const dir = existsSync(arg) && statSync(arg).isDirectory() ? arg : arg.slice(0, arg.lastIndexOf('@'));
+  let notes: Note[] = [];
+  if (flags.has('notes')) {
+    try {
+      notes = JSON.parse(readFileSync(flags.get('notes')!, 'utf8')) as Note[];
+    } catch (e) {
+      fail(`--notes ${flags.get('notes')}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    if (!Array.isArray(notes) || !notes.every((n) => n && typeof n.moves === 'string' && typeof n.text === 'string' && n.text.trim() !== '')) fail('--notes takes a list of { "moves": "...", "text": "..." }');
+  }
+  const made = reviewList(r, now, { name: flags.get('review')!, ...(flags.has('title') ? { title: flags.get('title')! } : {}), created: new Date().toISOString(), notes });
+  if (!made.ok) fail(made.error);
+  const path = join(dir, reviewListPath(made.list.sid, made.list.name));
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, writeReviewList(made.list));
+  process.stderr.write(`wrote ${path}: ${made.list.items.length} item(s), ${made.list.items.filter((i) => i.text).length} with your words. Commit it with the study.\n`);
+}
 const text = flags.has('json') ? `${JSON.stringify(r, null, 1)}\n` : markdown(r, { maxLines });
 if (flags.has('out')) writeFileSync(flags.get('out')!, text);
 else process.stdout.write(text);

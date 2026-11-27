@@ -138,7 +138,13 @@ side is a study in a data repo. Each side is a PGN file, a data repo checkout, o
 Jobava" --chapter "Jobava simplified"` (what the owner changed in the app since); `delivered.pgn
 ../repworks-data --study …` (a file against the study); `--old-study` (a review copy against the
 study it came from), `--mark TEXT` (comments holding TEXT, as open questions), `--json`,
-`--max-lines 0`, `--wraps`.
+`--max-lines 0`, `--wraps`. The same changes as a list the owner answers on the study page (PLAN.md
+§5.216, its Review panel): add `--review batch-4 --title "Jobava batch 4" [--notes notes.json]`
+(`[{ "moves": "1. Nc3 d5 2. d4", "text": "…" }]`: your words on a changed move, or a question at any
+move), which writes `review/<study id>/batch-4.json` into the checkout to commit with the study
+(`node scripts/validate-data.ts ../repworks-data` first). His answers, after his device synced and
+you pulled: `node scripts/review-answers.ts ../repworks-data --study "1. Nc3 + Jobava"` (`--list
+batch-4`, `--json`).
 
 The storm's "Gather positions" from a cloud session, as a device named `cloud` (PLAN.md §5.155),
 with the data repo checked out on `main`:

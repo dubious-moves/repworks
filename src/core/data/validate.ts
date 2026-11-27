@@ -8,6 +8,7 @@ import { chapterFileText } from '../pgn/write.ts';
 import { parseSettings } from '../train/settings.ts';
 import { parseSharedFile } from '../storm/shared.ts';
 import { gameMonth, parseGamesFile } from '../games/dataFile.ts';
+import { parseReviewList } from '../study/reviewList.ts';
 import { classifyPath, DATA_FORMAT, FORMAT_FILE, utcDay, utcMonth } from './layout.ts';
 
 export interface Issue {
@@ -145,6 +146,12 @@ export function validateDataRepo(files: ReadonlyMap<string, string>, options: Va
         if (unread) warn(path, `${unread} line(s) this version can't read as a game: they are left out, and the file is never rewritten`);
         const off = games.filter((g) => gameMonth(g.createdAt) !== where.month).length;
         if (off) warn(path, `${off} game(s) played in another month`);
+        break;
+      }
+      case 'review': {
+        const read = parseReviewList(text);
+        if (!read.ok) warn(path, `this version can't read it as a review list (${read.error}): the app doesn't show it`);
+        else if (read.list.sid !== where.sid || read.list.name !== where.name) warn(path, `says it is ${read.list.sid}/${read.list.name}: the app doesn't show it`);
         break;
       }
       case 'other':

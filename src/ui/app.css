@@ -7220,6 +7220,177 @@ button.course-group.on {
   color: var(--on-select);
 }
 
+/* The study page's Review panel (§5.216): a session's lists, folded until opened. */
+.review-panel {
+  margin-top: 8px;
+  padding: 6px 10px;
+  border: 1px solid rgb(var(--ink) / 12%);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+
+.review-panel > summary,
+.review-list > summary {
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.review-title {
+  font-weight: 600;
+}
+
+.review-count {
+  font-weight: 600;
+}
+
+.review-next {
+  margin: 4px 0;
+}
+
+.review-list {
+  margin-top: 4px;
+  border-top: 1px solid rgb(var(--ink) / 10%);
+}
+
+.review-chapter {
+  margin: 8px 0 2px;
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+
+.review-group ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.review-item {
+  padding: 6px 0 6px 8px;
+  border-left: 3px solid transparent;
+  border-top: 1px solid rgb(var(--ink) / 6%);
+}
+
+.review-item.here {
+  border-left-color: var(--accent);
+}
+
+.review-item:is(.is-ok, .is-no, .is-noted, .is-moved) .review-go {
+  opacity: 0.6;
+}
+
+.review-go {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.review-kind {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: rgb(var(--ink) / 10%);
+  font-size: 0.8rem;
+}
+
+.review-item[data-kind='move'] .review-kind,
+.review-item[data-kind='question'] .review-kind {
+  background: var(--select-bg);
+  color: var(--on-select);
+}
+
+.review-lead {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.review-state {
+  margin-left: 6px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.review-state.state-ok {
+  color: var(--win);
+}
+
+.review-state.state-no {
+  color: var(--loss);
+}
+
+.review-text,
+.review-note,
+.review-detail p {
+  margin: 4px 0 0;
+  font-size: 0.92rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.review-note {
+  font-style: italic;
+}
+
+.review-detail {
+  margin-top: 2px;
+  color: var(--text-soft);
+  font-size: 0.9rem;
+}
+
+.review-detail > summary {
+  cursor: pointer;
+}
+
+.review-answer {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+/* Quiet until chosen: the answer given is the one filled button of its row. */
+.review-answer button {
+  min-width: 52px;
+  min-height: 36px;
+  background: transparent;
+  color: var(--text);
+}
+
+.review-answer button[aria-pressed='true'] {
+  background: var(--select-bg);
+  border-color: var(--info);
+  color: var(--on-select);
+}
+
+.review-next button,
+.review-noting button {
+  min-height: 36px;
+}
+
+.review-noting {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.review-noting input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* On the stage the panel is one column of fixed height: the list scrolls inside its share. */
+@media (min-width: 900px) {
+  .has-frame .cv-panel > .review-panel {
+    flex: 0 1 auto;
+    max-height: 55%;
+    margin: 0;
+    overflow-y: auto;
+    border: 0;
+    border-top: 1px solid rgb(var(--ink) / 10%);
+    border-radius: 0;
+  }
+}
+
 /* A phone held sideways, or a window as short (PLAN.md §5.164). The wide layouts size the board
    by the window's height less the page's frame and the phone's by its width, so here the board
    came out at 80 to 170px, or at its least (260px) over the panel's buttons and past the screen's

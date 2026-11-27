@@ -227,6 +227,17 @@ export interface NoteEvent extends Base {
   text: string;
 }
 /**
+ * The owner's answer to an item of a review list (§5.216): `card` names the item
+ * (`v|<sid>|<list>|<item>`); `ok` accepted, `no` not, `open` taken back (or a note alone). The
+ * latest per item decides.
+ */
+export interface AnswerEvent extends Base {
+  k: 'answer';
+  card: string;
+  a: 'ok' | 'no' | 'open';
+  note?: string;
+}
+/**
  * A line added to a study side's checklist by hand (§5.142): its UCI moves from the start. It is
  * shown whatever Make again lists, until taken off (`on: false`); the latest per side and moves
  * decides.
@@ -318,8 +329,9 @@ export type KnownEvent =
   | CourseDrillEvent
   | CourseGoalEvent
   | GradeEvent
-  | FailedEvent;
-export const KNOWN_KINDS = ['review', 'suspend', 'unsuspend', 'forget', 'taught', 'pin', 'unpin', 'drill', 'alt', 'storm', 'snapshot', 'drop', 'relapse', 'plan', 'idea', 'dismiss', 'saved', 'played', 'practice', 'line', 'note', 'checklist', 'pick', 'rank', 'cscore', 'cdrill', 'cgoal', 'grade', 'failed'] as const;
+  | FailedEvent
+  | AnswerEvent;
+export const KNOWN_KINDS = ['review', 'suspend', 'unsuspend', 'forget', 'taught', 'pin', 'unpin', 'drill', 'alt', 'storm', 'snapshot', 'drop', 'relapse', 'plan', 'idea', 'dismiss', 'saved', 'played', 'practice', 'line', 'note', 'checklist', 'pick', 'rank', 'cscore', 'cdrill', 'cgoal', 'grade', 'failed', 'answer'] as const;
 
 /** A line as read. `event` is set for the kinds this code knows; `raw` is always the line itself. */
 export interface LogLine {
@@ -549,6 +561,14 @@ function knownEvent(o: Record<string, unknown>): KnownEvent | string {
       if (mark !== 'paused' && mark !== 'must' && mark !== 'none') return 'mark must be paused, must or none';
       return { ...base, k: 'line', mark };
     }
+    case 'answer': {
+      if (!/^v\|[^|]+\|[a-z0-9][a-z0-9-]{0,39}\|[A-Za-z0-9.,+#=-]{1,400}$/.test(card)) return 'card must be a review item (v|<sid>|<list>|<item>)';
+      const a = o['a'];
+      if (a !== 'ok' && a !== 'no' && a !== 'open') return 'a must be ok, no or open';
+      const note = o['note'];
+      if (note !== undefined && typeof note !== 'string') return 'note must be a string';
+      return { ...base, k: 'answer', a, ...(note ? { note } : {}) };
+    }
     case 'note': {
       if (!card.startsWith('m|') || card.length < 3) return 'card must be a game card (m|…)';
       const text = o['text'];
@@ -672,6 +692,10 @@ export function formatEvent(event: KnownEvent): string {
   if (event.k === 'dismiss' || event.k === 'idea') o['on'] = event.on;
   if (event.k === 'line') o['mark'] = event.mark;
   if (event.k === 'note') o['text'] = event.text;
+  if (event.k === 'answer') {
+    o['a'] = event.a;
+    if (event.note) o['note'] = event.note;
+  }
   if (event.k === 'checklist') {
     Object.assign(o, { color: event.color, ply: event.ply, count: event.count, lines: event.lines, reserve: event.reserve, gaps: event.gaps });
     if (event.calls !== undefined) o['calls'] = event.calls;

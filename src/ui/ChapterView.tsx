@@ -39,6 +39,7 @@ import { endPreviewOnBoard, PreviewBar, previewBoard } from './CommentText.tsx';
 import { ModeSwitch } from './ModeSwitch.tsx';
 import { openChapterSettings, openManageChapters, openNewChapter, openStudySettings } from './StudyDialogs.tsx';
 import { TranspositionList } from './Transpositions.tsx';
+import { ReviewPanel } from './ReviewPanel.tsx';
 import { Explorer, type Look } from './Explorer.tsx';
 import { EnginePanel, EvalBar, useEngineArrows } from './Engine.tsx';
 import { analysePosition, setThreat, threat } from '../app/engine.ts';
@@ -309,6 +310,7 @@ export function ChapterView() {
                   {doc.value && <Conflicts />}
                 </div>
               )}
+              {!scratch && <ReviewPanel />}
               {!wide && <Explorer chapter={c} path={path} {...(followed ? { look: followed } : {})} />}
               {drawMode && (
                 <div class="brushes" role="radiogroup" aria-label="Colour">

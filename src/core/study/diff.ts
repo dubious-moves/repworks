@@ -183,20 +183,25 @@ export function countChanges(d: ChapterDiff): DiffCounts {
 }
 
 /**
- * A line as movetext with the part from move `from` (an index into the path) on between `open`
- * and `close`: "1. Nc3 d5 2. d4 **Bf5 3. f3**". Always from the chapter's start, never cut.
+ * A line as movetext in two parts, cut before move `from` (an index into the path): what leads to
+ * the change, and the change, numbered from its own position ("1. Nc3 d5 2. d4", "Bf5 3. f3").
+ * Always from the chapter's start, never cut short.
  */
-export function markedLine(start: Position, path: Path, from: number, open = '**', close = '**'): string {
-  if (from >= path.length) return lineText(start, path);
-  if (from <= 0) return `${open}${lineText(start, path)}${close}`;
-  const head = lineText(start, path.slice(0, from));
+export function splitLine(start: Position, path: Path, from: number): [lead: string, part: string] {
+  if (from >= path.length) return [lineText(start, path), ''];
+  if (from <= 0) return ['', lineText(start, path)];
   const pos = start.clone();
   for (const san of path.slice(0, from)) {
     const m = parseSan(pos, san);
-    if (!m) return lineText(start, path);
+    if (!m) return [lineText(start, path), ''];
     pos.play(m);
   }
   // The rest numbered from its own position, without Black's "3..." after White's move just before it.
-  const tail = lineText(pos, path.slice(from)).replace(/^\d+\.\.\. /, '');
-  return `${head} ${open}${tail}${close}`;
+  return [lineText(start, path.slice(0, from)), lineText(pos, path.slice(from)).replace(/^\d+\.\.\. /, '')];
+}
+
+/** `splitLine` as one text, the change between `open` and `close`: "1. Nc3 d5 2. d4 **Bf5 3. f3**". */
+export function markedLine(start: Position, path: Path, from: number, open = '**', close = '**'): string {
+  const [lead, part] = splitLine(start, path, from);
+  return part ? `${lead}${lead ? ' ' : ''}${open}${part}${close}` : lead;
 }

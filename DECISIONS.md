@@ -2856,3 +2856,15 @@ The technical calls, each with its reason:
   board shouldn't try to follow when I change between the different attempts." The analysis board
   was already not followed (CHESSNUT.md §5.5), as the owner asked for too. No setting, no data
   format changed.
+
+## Revision of 2026-11-27 (review lists on the study page: PLAN.md §5.216)
+- **A new file kind, `review/<sid>/<name>.json`** (format 1 gains a path kind, no version change): a
+  reviewing session's list for a study, written only by the session (`scripts/chapter-diff.ts
+  --review`), never by a device, never merged; read strictly, and one the app can't read is not
+  shown. Why: the owner, 2026-11-27, wants to go through a session's changes and questions inside
+  the app, not in the chat.
+- **A new event kind, `answer`** (card `v|<sid>|<list>|<item>`, `a` ok, no or open, an optional
+  `note`): the owner's answer to an item, in his device's log; the latest per item decides. Why
+  events and not the list's file: no file then has two writers. It touches no card's schedule.
+- **Named by the owner**: the panel is "Review", folded when the page opens, and every item is
+  tied to a move.

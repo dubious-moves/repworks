@@ -372,6 +372,10 @@ progress/<dev>/<YYYY-MM>.jsonl     a closed month, compacted by <dev>
 devices/<dev>.json                 { "name": "phone", "created": "…" }, written once by <dev>
 ```
 
+Later sections added path kinds to format 1, each written by one writer only (the list is in
+`src/core/data/layout.ts`): `storm/<dev>/…` (§5.102), `games/<YYYY-MM>.jsonl` (§5.163),
+`review/<sid>/<name>.json` (§5.216).
+
 - IDs (studies, chapters and devices): 8 random characters `[A-Za-z0-9]`, like Lichess's.
   Provenance goes in `source`, so re-importing a study never clashes with an old one.
 - Chapter-level facts live in the chapter's PGN headers (`ChapterName`, `Orientation`,
@@ -12781,3 +12785,72 @@ Back, a launch with no link and one elsewhere). Controls are named in both.
 **Taken from the platform's documentation, not seen**: that Chrome and Edge hand `targetURL` to the
 consumer under `focus-existing` (the Launch Handler API), and what Android does with a link when the
 app is open. No headless browser installs an app, so the owner's devices decide (TESTING.md).
+
+#### 5.216 Review lists: a session's changes and questions on the study page, answered in place (the owner's request, 2026-11-27, built)
+
+§5.214's change list lives in the chat, with links into the app. The owner: "Maybe we can implement
+a expandable/collapsible TODO list feature inside repworks that Claude can write to, this way I can
+stay inside repworks." Asked where and what: "build it now, as a panel on the study page (collapsed
+by default)", called **Review**, every item tied to a move (no free-text to-do).
+
+- **A list is one file the session writes**, `review/<sid>/<name>.json` (`core/study/reviewList.ts`,
+  `v: 1`; a new path kind of format 1, `classifyPath`'s `review`). No device ever writes it, as with
+  the analyzer's `games/` files (§5.163), so the tree merge has nothing to merge. It holds a title,
+  when it was made, what was compared, the chapters' names, and the items, an item a line.
+- **An item is a change at a move**, or a question at one: its chapter, its kind (`move` my move
+  changed, `reply` the opponent's main reply, `added`, `removed`, `comment`, `arrows`, `glyphs`,
+  `order`, `question`), the move the app opens at, the line in two parts (what leads to the change,
+  and the change), more to read (the old and new line, a part's other lines and comments), and the
+  session's own words. Its id names the change (`<cid>.<kind>.<moves>`), so a list made again keeps
+  its answers.
+- **The session never types the items.** `scripts/chapter-diff.ts --review <name>` writes the list
+  from the same report as the chat's list (`reviewList` in `chapter-diff-lib.ts`). Its own words
+  come in with `--notes <file>` (`[{ moves, text, chapter? }]`): a note on a changed move is that
+  change's text, any other is a `question` item at its move (which the new version must play).
+- **The owner's answers are events in his device's log**: kind `answer`, card
+  `v|<sid>|<list>|<item>`, `a` `ok`, `no` or `open` (taken back, or a note alone), an optional
+  `note`. The latest per item decides, on any device (`answerOf`). Nothing else reads the kind: a
+  version before this one skips it, as any kind it doesn't know (§4.4).
+- **The panel** (`ui/ReviewPanel.tsx`, `app/reviewLists.ts`) sits in the study page's panel, under
+  the notation, only when the study has a list. Folded when the page opens; its head says how many
+  items wait. Open, each list folds too (open while it has something to answer), its items under
+  their chapters. An item clicked puts the board on its move, in whichever chapter; **Next open**
+  goes to the next one still waiting. Under each item: **OK**, **No** (the same again takes it
+  back), **Note** (a line of text, kept with whatever is chosen).
+- **An edit is an answer too.** An item whose move the chapter no longer has as the item says is
+  marked "Changed since" and stops waiting (`movedOn`): its move is gone, my move at that position
+  is another now, or a removed part's first move is back. The open chapter is read as the editor
+  has it, so the mark comes with the edit; an answer given wins over it.
+- **Read back** with `scripts/review-answers.ts <checkout> --study S`: each list's items by what
+  the owner said (No and notes first, then those he changed in the chapter, those not answered,
+  then OK), from every device's log. `--json` for the same as data.
+
+Decisions (Claude's):
+- **Two writers, two places.** The owner's answers could have gone into the list's file; then the
+  session and a device would both write it, and a merge rule would be needed. Events in the log
+  are how every other answer in the app is kept, and the sync already carries them.
+- **Strict reading.** A list this version can't read in full isn't shown in part (validation
+  warns); fields a later version adds are read past.
+- **The list is not removed by the app.** When the session has taken the answers in, it deletes
+  the file (or leaves it: an answered list is folded). The answers' events stay in the log,
+  naming a list that is gone, and are read by nothing.
+- **The line's lead is shown small and grey, the change in bold**: the owner's rule is full lines,
+  never "…", and on a phone a list of whole lines at one weight is hard to scan.
+- **Kept out for now**: a count on the home or the study list, an answer that picks one of several
+  moves, hiding a list on one device. The owner said a free-text to-do isn't wanted.
+
+Tests: `test/unit/core/study/reviewList.test.ts` (the file written and read, what is refused, its
+place in the repo and validation, the answer event, the latest answer, moved on, states),
+`test/unit/scripts/chapterDiff.test.ts` (a list from the changes with notes and questions, what is
+refused, the answers read back, both scripts over a scratch repo), `test/e2e/review.spec.ts`
+(desktop and emulated phone: no panel without a list; folded; an item to its move, in another
+chapter; Next open; OK, No, taken back, a note typed; a move deleted; the answers in the pushed
+log; a reload). Controls are named in the unit files; in the browser test, the panel unfolded at
+first fails it.
+
+Run on a scratch copy of the owner's data repo (a cloud container): the afternoon's edits of the
+review copy became a list of 4 items (two with a session's words, one of them a question at a move
+that hadn't changed), which validates, and `review-answers.ts` listed them as not answered.
+
+**Not checked**: the panel on the owner's devices, and a list arriving there by a sync from a
+session's push (TESTING.md). The app can't read the data repo from a cloud container (CLAUDE.md).

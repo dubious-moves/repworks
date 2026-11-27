@@ -102,6 +102,24 @@ later change replaced are folded into the later item; items already reported wor
 
 ## 2. Studies and the study page
 
+### The Review panel: a session's list answered on the study page (PLAN.md §5.216, 2026-11-27)
+
+- After a reviewing session pushed a list (`scripts/chapter-diff.ts --review`) and the device
+  synced: does the study page show "Review · N open" under the notation, folded? Is that the right
+  place on the phone (it is above the explorer) and on the desktop (under the notation, in the
+  right column)?
+- Open it, tap an item: does the board go to that move, in another chapter too? Does "Next open"
+  walk through the items in a sensible order?
+- OK, No, a note: are the buttons easy to hit on the phone? Is the line readable (grey lead, bold
+  change), and is "More" (the old and new line, a part's other lines) where you want it?
+- Change a move an item is about: does the item say "Changed since" and stop counting?
+- Sync, then ask the session to read the answers (`scripts/review-answers.ts`): did they arrive?
+- Say what is missing: a count on the home, an answer that picks one of several moves, hiding a
+  finished list.
+- **Checked**: unit tests, Playwright (desktop and emulated phone, a list seeded in the fake repo,
+  the answers found in the pushed log) and screenshots of both; the scripts on a scratch copy of
+  the real data repo; **not** on a device, and no session has pushed a list to the real repo yet.
+
 ### A change list's links open the app at the move (PLAN.md §5.214, §5.215, 2026-11-27)
 
 - A reviewing session gives a change list made by `scripts/chapter-diff.ts` for a study in the data

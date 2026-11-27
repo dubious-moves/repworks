@@ -8,10 +8,13 @@ import { modeHash } from '../src/core/app/fsm.ts';
 import { chapterName } from '../src/core/import/plan.ts';
 import { GLYPHS } from '../src/core/pgn/nags.ts';
 import { sameShape } from '../src/core/pgn/comment.ts';
-import { countChanges, diffChapters, markedLine, type Change, type DiffCounts, type Part } from '../src/core/study/diff.ts';
+import { readProgress } from '../src/core/progress/files.ts';
+import type { DeviceEvent } from '../src/core/progress/replay.ts';
+import { countChanges, diffChapters, markedLine, splitLine, type Change, type DiffCounts, type Part } from '../src/core/study/diff.ts';
 import type { Chapter, MoveNode, Shape } from '../src/core/study/model.ts';
-import { lineText } from '../src/core/study/search.ts';
-import { startPosition, type Path } from '../src/core/study/tree.ts';
+import { answerOf, itemId, itemState, LIST_NAME, REVIEW_FORMAT, reviewCard, type Answer, type ItemKind, type ItemState, type ReviewItem, type ReviewList } from '../src/core/study/reviewList.ts';
+import { lineText, queryPosition } from '../src/core/study/search.ts';
+import { nodeAt, startPosition, type Path } from '../src/core/study/tree.ts';
 
 export const SITE = 'https://dubious-moves.github.io/repworks/';
 
@@ -71,6 +74,9 @@ export interface Item {
   kind: Change['kind'];
   /** The move the item is at, as a full line; for a part, its main line with the part marked. */
   line: string;
+  /** `line` in two: what leads to the change, and the change. */
+  lead: string;
+  part: string;
   /** The app's address of the item: the move itself, or for a removed part the last move still there. */
   link?: string;
   /** What `link` opens at, when it isn't the item's own move. */
@@ -172,7 +178,7 @@ export function report(old: Version, now: Version, options: ReportOptions = {}):
     const items: Item[] = [];
     for (const change of d.changes) {
       if (change.kind === 'header') {
-        items.push({ kind: 'header', line: change.name, change });
+        items.push({ kind: 'header', line: change.name, lead: '', part: change.name, change });
         continue;
       }
       if (change.kind === 'added' || change.kind === 'removed') {
@@ -180,9 +186,12 @@ export function report(old: Version, now: Version, options: ReportOptions = {}):
         const mark = (line: Path) => (from ? markedLine(from, line, change.path.length - 1) : line.join(' '));
         const open = change.kind === 'added' ? change.path : change.path.slice(0, -1);
         const url = link(open);
+        const [lead, part] = from ? splitLine(from, change.lines[0]!, change.path.length - 1) : ['', change.lines[0]!.join(' ')];
         items.push({
           kind: change.kind,
           line: mark(change.lines[0]!),
+          lead,
+          part,
           ...(url ? { link: url } : {}),
           ...(change.kind === 'removed' ? { linkAt: open.length && start ? lastMove(start, open) : 'the start' } : {}),
           change,
@@ -197,9 +206,12 @@ export function report(old: Version, now: Version, options: ReportOptions = {}):
         const was = toEnd(pair.old.chapter, [...change.path, change.from]);
         const next = toEnd(pair.now.chapter, to);
         const url = link(to);
+        const [lead, part] = start ? splitLine(start, to, change.path.length) : ['', to.join(' ')];
         items.push({
           kind: 'main',
           line: start ? markedLine(start, to, change.path.length) : to.join(' '),
+          lead,
+          part,
           ...(url ? { link: url } : {}),
           change,
           was: oldStart ? markedLine(oldStart, was, change.path.length) : was.join(' '),
@@ -209,7 +221,8 @@ export function report(old: Version, now: Version, options: ReportOptions = {}):
       }
       const url = link(change.path);
       const more = change.kind === 'comment' && change.from.length ? appended(change.from.join('\n'), change.to.join('\n')) : undefined;
-      items.push({ kind: change.kind, line: change.path.length ? text(change.path) : 'the start', ...(url ? { link: url } : {}), change, ...(more !== undefined ? { appended: more } : {}) });
+      const [lead, part] = start && change.path.length ? splitLine(start, change.path, change.path.length - 1) : ['', change.path.length ? change.path.join(' ') : 'the start'];
+      items.push({ kind: change.kind, line: change.path.length ? text(change.path) : 'the start', lead, part, ...(url ? { link: url } : {}), change, ...(more !== undefined ? { appended: more } : {}) });
     }
     const marked: ChapterReport['marked'] = [];
     if (options.mark) {
@@ -341,5 +354,178 @@ export function markdown(r: Report, options: MarkdownOptions = {}): string {
     }
   }
   if (same.length) out.push(`Unchanged: ${same.map(esc).join(', ')}.`, '');
+  return out.join('\n').replace(/\n+$/, '\n');
+}
+
+// ---- The review list (§5.216): the same changes as items the study page shows ----
+
+/** A session's own words for the list: on a change (by the line of its move), or a question at a move. */
+export interface Note {
+  /** The chapter, by name or id; needed only when the line is in several. */
+  chapter?: string;
+  /** The move, as a line from the start: "1. Nc3 d5 2. d4 Bf5 3. f3". */
+  moves: string;
+  text: string;
+}
+
+const plain = (marked: string) => marked.replaceAll('**', '');
+const shapeWords = (from: readonly Shape[], to: readonly Shape[]) => {
+  const plus = to.filter((s) => !from.some((t) => sameShape(s, t))).map(shapeText);
+  const minus = from.filter((s) => !to.some((t) => sameShape(s, t))).map(shapeText);
+  return [plus.length ? `added ${plus.join(' ')}` : '', minus.length ? `removed ${minus.join(' ')}` : ''].filter(Boolean).join(', ');
+};
+
+/** The move an item is about: its own, or for a removed part the move taken away. */
+const ownPath = (i: ReviewItem): string[] => (i.kind === 'removed' && i.san ? [...i.at, i.san] : i.at);
+
+export type MadeList = { ok: true; list: ReviewList } | { ok: false; error: string };
+
+/**
+ * A report as a review list for the study page: an item per change, in the report's order, with
+ * the session's notes on the changes they name and the rest of them as questions at their moves.
+ * The new version must be a study of a data repo (the items name its chapters by id).
+ */
+export function reviewList(r: Report, now: Version, options: { name: string; title?: string; created: string; notes?: readonly Note[] }): MadeList {
+  if (now.sid === undefined) return { ok: false, error: 'a review list is for a study in a data repo: the new side is a file' };
+  if (!LIST_NAME.test(options.name)) return { ok: false, error: `the list's name must be lower-case letters, digits and dashes (at most 40): ${options.name}` };
+  const items: ReviewItem[] = [];
+  const chapters: Record<string, string> = {};
+  for (const c of r.chapters) {
+    const cid = c.cid;
+    if (cid === undefined || c.state === 'gone') continue;
+    if (c.state === 'new') {
+      chapters[cid] = c.name;
+      items.push({ id: itemId(cid, 'added', []), cid, kind: 'added', at: [], lead: '', part: `A new chapter (${plural(c.moves ?? 0, 'move')})` });
+      continue;
+    }
+    const mine = c.mine ?? 'white';
+    for (const i of c.items) {
+      const ch = i.change;
+      if (ch.kind === 'header') continue;
+      chapters[cid] = c.name;
+      const detail: string[] = [];
+      let kind: ItemKind;
+      let at: string[];
+      let san: string | undefined;
+      if (ch.kind === 'main') {
+        kind = ch.side === mine ? 'move' : 'reply';
+        at = [...ch.path, ch.to];
+        san = ch.to;
+        detail.push(`was: ${plain(i.was ?? '')}`, `now: ${plain(i.now ?? '')}`, ch.fromKept ? 'the old move stays as a side line' : 'the old move is gone');
+      } else if (ch.kind === 'added' || ch.kind === 'removed') {
+        kind = ch.kind;
+        at = ch.kind === 'added' ? [...ch.path] : ch.path.slice(0, -1);
+        if (ch.kind === 'removed') san = ch.path[ch.path.length - 1];
+        for (const l of i.lines ?? []) detail.push(`also: ${plain(l)}`);
+        for (const cm of i.comments ?? []) detail.push(`comment at ${cm.at}: ${cm.text}`);
+        for (const e of i.elsewhere ?? []) detail.push(ch.kind === 'added' ? `the old version already reached this position by: ${e}` : `the position is still reached by: ${e}`);
+      } else {
+        at = [...ch.path];
+        if (ch.kind === 'comment') {
+          kind = 'comment';
+          if (i.appended !== undefined) detail.push(`added after the old text: ${i.appended}`);
+          else detail.push(...(ch.from.length ? [`was: ${ch.from.join('\n')}`] : []), `now: ${ch.to.join('\n') || '(none)'}`);
+        } else if (ch.kind === 'shapes') {
+          kind = 'arrows';
+          detail.push(shapeWords(ch.from, ch.to));
+        } else if (ch.kind === 'glyphs') {
+          kind = 'glyphs';
+          detail.push(`${ch.from.map(glyphText).join(' ') || 'none'} → ${ch.to.map(glyphText).join(' ') || 'none'}`);
+        } else {
+          kind = 'order';
+          detail.push(`${ch.from.join(', ')} → ${ch.to.join(', ')}`);
+        }
+      }
+      items.push({ id: itemId(cid, kind, san !== undefined && kind === 'removed' ? [...at, san] : at), cid, kind, at, lead: i.lead, part: i.part, ...(detail.length ? { detail } : {}), ...(san !== undefined ? { san } : {}) });
+    }
+  }
+  for (const note of options.notes ?? []) {
+    const asked = queryPosition(note.moves);
+    if (!asked?.sans?.length) return { ok: false, error: `a note's moves don't read as a line from the start: ${note.moves}` };
+    const sans = asked.sans;
+    const named = note.chapter?.trim().toLowerCase();
+    const holding = now.chapters.filter((c) => c.cid !== undefined && (named === undefined ? true : c.cid === note.chapter || c.name.trim().toLowerCase() === named));
+    const about = items.filter((i) => holding.some((c) => c.cid === i.cid) && samePathList(ownPath(i), sans));
+    if (about.length) {
+      // The change at that move: the note is its text (the first, when a move has several changes).
+      const first = about[0]!;
+      first.text = first.text ? `${first.text}\n${note.text}` : note.text;
+      continue;
+    }
+    const inChapters = holding.filter((c) => nodeAt(c.chapter, sans));
+    if (inChapters.length !== 1) return { ok: false, error: `${inChapters.length ? 'several chapters play' : 'no chapter plays'} ${asked.line}${note.chapter ? ` (chapter ${note.chapter})` : ''}: ${inChapters.length ? 'name the chapter' : 'a question needs a move of the new version'}` };
+    const c = inChapters[0]!;
+    const start = startPosition(c.chapter);
+    const [lead, part] = start ? splitLine(start, sans, sans.length - 1) : ['', sans.join(' ')];
+    const id = itemId(c.cid!, 'question', sans);
+    const same = items.find((i) => i.id === id);
+    if (same) same.text = `${same.text ?? ''}\n${note.text}`;
+    else items.push({ id, cid: c.cid!, kind: 'question', at: [...sans], lead, part, text: note.text });
+    chapters[c.cid!] = c.name;
+  }
+  return { ok: true, list: { v: REVIEW_FORMAT, sid: now.sid, name: options.name, title: options.title?.trim() || options.name, created: options.created, from: r.old, to: r.now, chapters, items } };
+}
+
+const samePathList = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
+
+// ---- The owner's answers, read back (§5.216) ----
+
+export interface AnsweredItem {
+  item: ReviewItem;
+  state: ItemState;
+  answer?: Answer;
+  /** The item's line in full. */
+  line: string;
+}
+export interface AnsweredList {
+  list: ReviewList;
+  items: AnsweredItem[];
+  counts: Record<ItemState, number>;
+}
+
+/**
+ * Each list with the owner's answers from every device's log, and whether the chapter has moved on
+ * from an item (the owner edited it there: the edit is his answer). `files` are a data repo
+ * checkout's (path → text), `lists` the lists as read, `chapters` the study's chapters by id.
+ */
+export function answered(lists: readonly ReviewList[], files: ReadonlyMap<string, string>, chapters: ReadonlyMap<string, Chapter>): AnsweredList[] {
+  const byCard = new Map<string, DeviceEvent[]>();
+  for (const e of readProgress(files).events) {
+    if (e.event?.k !== 'answer') continue;
+    const card = e.event.card;
+    byCard.set(card, [...(byCard.get(card) ?? []), e]);
+  }
+  for (const list of byCard.values()) list.sort((a, b) => a.t - b.t || a.n - b.n);
+  return lists.map((list) => {
+    const counts: Record<ItemState, number> = { open: 0, ok: 0, no: 0, noted: 0, moved: 0 };
+    const items = list.items.map((item) => {
+      const answer = answerOf(byCard.get(reviewCard(list.sid, list.name, item.id)) ?? []);
+      const state = itemState(item, answer, chapters.get(item.cid));
+      counts[state]++;
+      return { item, state, ...(answer ? { answer } : {}), line: `${item.lead}${item.lead && item.part ? ' ' : ''}${item.part}` };
+    });
+    return { list, items, counts };
+  });
+}
+
+const STATE_WORDS: Record<ItemState, string> = { open: 'not answered', ok: 'OK', no: 'No', noted: 'a note', moved: 'changed in the chapter since' };
+
+export function answersMarkdown(lists: readonly AnsweredList[]): string {
+  const out: string[] = ['# Review answers', ''];
+  if (!lists.length) out.push('No review list for this study.', '');
+  for (const l of lists) {
+    const c = l.counts;
+    out.push(`## ${esc(l.list.title)} (${l.list.name})`, '', `${l.items.length} items: ${c.ok} OK, ${c.no} No, ${c.noted} with a note only, ${c.moved} changed in the chapter since, ${c.open} not answered.`, '');
+    for (const state of ['no', 'noted', 'moved', 'open', 'ok'] as const) {
+      const of = l.items.filter((i) => i.state === state);
+      if (!of.length) continue;
+      out.push(`### ${STATE_WORDS[state][0]!.toUpperCase()}${STATE_WORDS[state].slice(1)} (${of.length})`, '');
+      for (const i of of) {
+        out.push(`- ${esc(l.list.chapters[i.item.cid] ?? i.item.cid)}, ${i.item.kind}: ${i.line}`);
+        if (i.answer?.note) out.push(...quote('note', [i.answer.note]));
+      }
+      out.push('');
+    }
+  }
   return out.join('\n').replace(/\n+$/, '\n');
 }
