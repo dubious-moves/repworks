@@ -2868,3 +2868,22 @@ The technical calls, each with its reason:
   events and not the list's file: no file then has two writers. It touches no card's schedule.
 - **Named by the owner**: the panel is "Review", folded when the page opens, and every item is
   tied to a move.
+
+## Revision of 2026-11-27 (clickable lines written from the board, branches inside a line: PLAN.md §5.217)
+- **A group in parentheses inside a clickable line is read on its own, and is the line's branch**
+  when its number and side are those of a position the line has reached by where it is written
+  (the owner's choice: nested, as a book writes them; the other way was each branch written out
+  from the commented move). This leaves q_extension's rule that only innermost groups are lines
+  (§5.12, the revision of 2026-10-06): a line with a branch or a remark in it was plain text.
+  Nothing syncs back to Qchess (D3), so its reader no longer has to read what is written here.
+  Placing is still by number and side alone, and a line that was clickable still is.
+- **A move on the board while a comment's line is shown is written into the comment's text** (at
+  the line's end, or as a nested branch), in a chapter that can be edited. Comment text stays raw
+  and is parsed at render time, as decided at the start; the writer edits that text and reads
+  every result back before saving. This changes "a line preview changes nothing but the
+  board" (2026-10-06) for an editable chapter's own view only.
+- **Given up, with the owner's OK:** a press on the board no longer ends a line's preview in a
+  chapter that can be edited; Escape, Back and the notation's moves do.
+- **"Branches to clickable lines" (§5.109) writes branches nested** inside the line of the move
+  they follow, not one line per end (the owner's OK). Lines written before stay as they are.
+- **Named, the owner agreeing:** the menu item is "Start a clickable line".

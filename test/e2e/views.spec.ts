@@ -413,11 +413,57 @@ test('clickable lines: preview a comment’s line, step through its lines, and b
   await expect(bar).toHaveCount(0);
   await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 d6');
 
-  // A click on the board goes back too.
+  // A press on the board doesn't go back in a chapter that can be edited: a move there is written
+  // into the line (§5.217). Another move of the chapter does.
   await written.locator('.line-move', { hasText: 'Nxd4' }).click();
   await expect(bar).toContainText('From the comment: d4 cxd4 Nxd4');
   await clickSquare(page, 'a4', 'black');
+  await expect(bar).toBeVisible();
+  await page.locator('.notation .move[data-path="e4 c5 Nf3"]').click();
   await expect(bar).toHaveCount(0);
+});
+
+test('clickable lines: a branch written inside a line is clickable, folds with its line, and is stepped into (§5.217)', async ({ page, isMobile }) => {
+  await setUp(page);
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf?at=e4,c5,Nf3,d6`);
+  await expect(page.locator('.move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 d6');
+  await comment(page, 'Or (2... e6 3. d4 (3. c3 d5 (a remark)) 3... cxd4), see below');
+  const written = page.locator('.notation .comment', { hasText: 'see below' });
+  // Folded to the line's first move, its branch with it.
+  await expect(written.locator('.comment-line')).toHaveText(['(2... e6)']);
+  const bar = page.getByRole('group', { name: 'Line from the comment' });
+  const next = async () => (isMobile ? bar.getByRole('button', { name: 'Next move in the line' }).click() : page.keyboard.press('ArrowRight'));
+  const prev = async () => (isMobile ? bar.getByRole('button', { name: 'Previous move in the line' }).click() : page.keyboard.press('ArrowLeft'));
+  await written.locator('.line-move', { hasText: 'e6' }).click();
+  // Opened: the line's moves and the branch's are moves to click; the remark is text.
+  await expect(written.locator('.line-move')).toHaveText(['e6', 'd4', 'c3', 'd5', 'cxd4']);
+  await expect(written).toHaveText('Or (2... e6 3. d4 (3. c3 d5 (a remark)) 3... cxd4), see below');
+  // → follows the line past its branch, then runs on into the branch, shown from the line's start.
+  await next();
+  await next();
+  await expect(bar).toContainText('From the comment: e6 d4 cxd4');
+  await next();
+  await expect(bar).toContainText('From the comment: e6 c3');
+  await expect(written.locator('.line-move.current')).toHaveText('c3');
+  await next();
+  await expect(bar).toContainText('From the comment: e6 c3 d5');
+  // ← from the branch's first move is the move it left.
+  await prev();
+  await prev();
+  await expect(bar).toContainText('From the comment: e6');
+  await expect(written.locator('.line-move.current')).toHaveText('e6');
+  if (!isMobile) {
+    // ↓ on the move a branch replaces enters the branch, ↑ comes back.
+    await next();
+    await expect(bar).toContainText('From the comment: e6 d4');
+    await page.keyboard.press('ArrowDown');
+    await expect(bar).toContainText('From the comment: e6 c3');
+    await page.keyboard.press('ArrowUp');
+    await expect(bar).toContainText('From the comment: e6 d4');
+  }
+  // A click on a move of the branch shows it.
+  await written.locator('.line-move', { hasText: 'd5' }).click();
+  await expect(bar).toContainText('From the comment: e6 c3 d5');
 });
 
 test('clickable lines: a group opening with Or or Not is a line, and a remark naming a move is not (§5.175)', async ({ page, isMobile }) => {

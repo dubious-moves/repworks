@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseChapterFile } from '../../../../src/core/pgn/parse.ts';
-import { cursorAt, firstCursor, foldedTo, lastCursor, lineAsSequence, lineHistory, lineStart, parseCommentLines, playedLines, playLine, stepComments, stepCursor, switchLine } from '../../../../src/core/repertoire/lines.ts';
+import { cursorAt, firstCursor, foldedTo, lastCursor, lineAsSequence, lineHistory, lineStart, parseCommentLines, playedLines, playLine, sansFromStart, stepComments, stepCursor, switchLine } from '../../../../src/core/repertoire/lines.ts';
 import { makeFen } from 'chessops/fen';
 import type { Chapter } from '../../../../src/core/study/model.ts';
 import { nodeAt, positionAt, positionsTo, startPosition } from '../../../../src/core/study/tree.ts';
@@ -58,7 +58,8 @@ test('where each move is written, and what a line is made of', () => {
 test('remarks in parentheses stay text', () => {
   for (const text of ['(with braces typed as parens)', '(see 5. Nf3)', '(2)', '(10...)', '(1. is best)', '(1. a4x)', '()', 'no group 1. e4 at all', '(5. Nf3 (6. Nc3))']) {
     const lines = parseCommentLines(text);
-    if (text === '(5. Nf3 (6. Nc3))') assert.deepEqual(lines.map((l) => l.moves.map((m) => m.san)), [['Nc3']], text);
+    // A group inside a line is read on its own (§5.217): the line, then the one written in it.
+    if (text === '(5. Nf3 (6. Nc3))') assert.deepEqual(lines.map((l) => l.moves.map((m) => m.san)), [['Nf3'], ['Nc3']], text);
     else assert.deepEqual(lines, [], text);
   }
 });
@@ -375,4 +376,95 @@ test('a folded line shows its first move, past passes; one of one move folds not
   assert.equal(foldedTo(one!), undefined);
   assert.equal(foldedTo(pass!), 1);
   assert.equal(foldedTo(parseCommentLines('(3. -- Nf6)')[0]!), undefined);
+});
+
+// Branches written inside a line (PLAN.md §5.217, the owner's choice of 2026-11-27).
+test('a group inside a line is its branch: read on its own, placed where the line has its number and side', () => {
+  const text = 'Main idea (2... Nc6 3. Bb5 (3. Bc4 Bc5 4. c3) 3... a6 (3... Nf6 4. O-O) 4. Ba4) end';
+  const parsed = parseCommentLines(text);
+  assert.deepEqual(parsed.map((l) => l.moves.map((m) => m.san)), [['Nc6', 'Bb5', 'a6', 'Ba4'], ['Bc4', 'Bc5', 'c3'], ['Nf6', 'O-O']]);
+  // Each branch knows the line it is written in and how many of its moves come before it.
+  assert.deepEqual(parsed.map((l) => l.parent), [undefined, { line: 0, after: 2 }, { line: 0, after: 3 }]);
+  assert.equal(text.slice(parsed[0]!.from, parsed[0]!.to), '(2... Nc6 3. Bb5 (3. Bc4 Bc5 4. c3) 3... a6 (3... Nf6 4. O-O) 4. Ba4)');
+  assert.deepEqual(parsed[0]!.groups.map((g) => text.slice(g.from, g.to)), ['(3. Bc4 Bc5 4. c3)', '(3... Nf6 4. O-O)']);
+  // A move's text starts at its printed number.
+  assert.deepEqual(parsed[0]!.moves.map((m) => text.slice(m.start, m.to)), ['2... Nc6', '3. Bb5', '3... a6', '4. Ba4']);
+  const c = chapter(`1. e4 e5 2. Nf3 { ${text} }`);
+  const lines = linesAt(c, ['e4', 'e5', 'Nf3']);
+  assert.deepEqual(lines.map((l) => [l.placed, l.sans]), [[true, ['Nc6', 'Bb5', 'a6', 'Ba4']], [true, ['Bc4', 'Bc5', 'c3']], [true, ['Nf6', 'O-O']]]);
+  // 3. Bc4 replaces 3. Bb5 (the position after one move of the line), 3... Nf6 replaces 3... a6.
+  assert.deepEqual(lines.map((l) => l.parent), [undefined, { line: 0, ply: 1 }, { line: 0, ply: 2 }]);
+  assert.deepEqual(lines.map(sansFromStart), [['Nc6', 'Bb5', 'a6', 'Ba4'], ['Nc6', 'Bc4', 'Bc5', 'c3'], ['Nc6', 'Bb5', 'Nf6', 'O-O']]);
+  assert.equal(makeFen(lines[2]!.positions[0]!.toSetup()), makeFen(lines[0]!.positions[2]!.toSetup()));
+  assert.equal(lines[2]!.lead!.positions.length, 2);
+});
+
+test('branches: a remark inside a line is text, a branch of a branch, a continuation, and one that fits nowhere', () => {
+  // The remark doesn't end the line, and isn't a line.
+  const remark = parseCommentLines('(2... Nc6 (the main move) 3. Bb5 a6)');
+  assert.deepEqual(remark.map((l) => l.moves.map((m) => m.san)), [['Nc6', 'Bb5', 'a6']]);
+  assert.equal(remark[0]!.groups.length, 1);
+  const c = chapter('1. e4 e5 2. Nf3 { (2... Nc6 3. Bb5 (3. Bc4 Bc5 (3... Nf6 4. Ng5) 4. c3) (3... a6 is the main line) (7. Qh5)) }');
+  const lines = linesAt(c, ['e4', 'e5', 'Nf3']);
+  assert.deepEqual(lines.map((l) => [l.placed, l.sans]), [[true, ['Nc6', 'Bb5']], [true, ['Bc4', 'Bc5', 'c3']], [true, ['Nf6', 'Ng5']], [true, ['a6']], [false, []]]);
+  // A branch of a branch leads through both; a group numbered for the move after the line's last goes on from it.
+  assert.deepEqual(lines[2]!.parent, { line: 1, ply: 1 });
+  assert.deepEqual(sansFromStart(lines[2]!), ['Nc6', 'Bc4', 'Nf6', 'Ng5']);
+  assert.deepEqual(lines[3]!.parent, { line: 0, ply: 2 });
+  // A branch numbered for a position the line hasn't reached where it is written is no branch;
+  // it is then placed as a line of the comment, here at the commented move's position.
+  const early = chapter('1. e4 e5 2. Nf3 { (2... Nc6 (3... a6) 3. Bb5) and (2... d6 (2... Nf6 3. Nxe5) 3. d4) }');
+  const el = linesAt(early, ['e4', 'e5', 'Nf3']);
+  assert.deepEqual(el.map((l) => [l.placed, l.parent, l.sans]), [
+    [true, undefined, ['Nc6', 'Bb5']],
+    [false, undefined, []],
+    [true, undefined, ['d6', 'd4']],
+    [true, { line: 2, ply: 0 }, ['Nf6', 'Nxe5']],
+  ]);
+  // A line in a remark is a line of the comment, as before; unbalanced brackets make no group.
+  assert.deepEqual(parseCommentLines('(see also (2... d6 3. d4) here) and (2... Nc6').map((l) => [l.moves.map((m) => m.san), l.parent]), [[['d6', 'd4'], undefined]]);
+  assert.deepEqual(parseCommentLines(':) (2... d6) :)').map((l) => l.moves.length), [1]);
+});
+
+test('branches: → runs on through them as written, ← from a branch’s first move is the move it left, ↓ ↑ into and out of one', () => {
+  const c = chapter('1. e4 e5 2. Nf3 { (2... Nc6 3. Bb5 (3. Bc4 Bc5) (3. d4) 3... a6) (2... d6) }');
+  const lines = linesAt(c, ['e4', 'e5', 'Nf3']);
+  const walk = [firstCursor(lines)!];
+  for (let i = 0; i < 6; i++) walk.push(stepCursor(lines, walk.at(-1)!, 1)!);
+  assert.deepEqual(walk.map((x) => `${x.line}:${x.ply}`), ['0:1', '0:2', '0:3', '1:1', '1:2', '2:1', '3:1']);
+  // Back from a branch's first move: the move before it in the line it left.
+  assert.deepEqual(stepCursor(lines, { line: 1, ply: 1 }, -1), { line: 0, ply: 1 });
+  assert.deepEqual(stepCursor(lines, { line: 2, ply: 1 }, -1), { line: 0, ply: 1 });
+  // A line of the comment still runs back into the line written before it.
+  assert.deepEqual(stepCursor(lines, { line: 3, ply: 1 }, -1), { line: 2, ply: 1 });
+  // A branch from a line's start goes back as the line's first move does: out.
+  const first = linesAt(chapter('1. e4 e5 2. Nf3 { (2... Nc6 (2... d6 3. d4) 3. Bb5) }'), ['e4', 'e5', 'Nf3']);
+  assert.deepEqual(first[1]!.parent, { line: 0, ply: 0 });
+  assert.equal(stepCursor(first, { line: 1, ply: 1 }, -1), undefined);
+  // ↓ on the move a branch replaces enters it, then the next at the same move; past them, the next line.
+  assert.deepEqual(switchLine(lines, { line: 0, ply: 2 }, 1), { line: 1, ply: 1 });
+  assert.deepEqual(switchLine(lines, { line: 1, ply: 2 }, 1), { line: 2, ply: 1 });
+  assert.deepEqual(switchLine(lines, { line: 0, ply: 3 }, 1), { line: 3, ply: 1 });
+  assert.equal(switchLine(lines, { line: 3, ply: 1 }, 1), undefined);
+  // ↑ from a branch: the branch before it at the same move, then the move they replace.
+  assert.deepEqual(switchLine(lines, { line: 2, ply: 1 }, -1), { line: 1, ply: 1 });
+  assert.deepEqual(switchLine(lines, { line: 1, ply: 2 }, -1), { line: 0, ply: 2 });
+  // ↑ from a line of the comment: the line before it, not a branch of that one.
+  assert.deepEqual(switchLine(lines, { line: 3, ply: 1 }, -1), { line: 0, ply: 1 });
+  assert.equal(switchLine(lines, { line: 0, ply: 3 }, -1), undefined);
+});
+
+test('branches: the history and the sequence go from the outermost line’s start, and a branch folds with its line', () => {
+  const c = chapter('1. e4 e5 2. Nf3 { (2... Nc6 3. Bb5 (3. Bc4 Bc5) 3... a6) (2... d6 (2... Nf6)) (2... f5) }');
+  const path = ['e4', 'e5', 'Nf3'];
+  const lines = linesAt(c, path);
+  const history = lineHistory(lines[1]!, 2, positionsTo(c, path));
+  // Start, e4, e5, Nf3, then Nc6, Bc4, Bc5.
+  assert.equal(history.length, 7);
+  assert.equal(makeFen(history.at(-1)!.toSetup()), makeFen(lines[1]!.positions[2]!.toSetup()));
+  assert.equal(makeFen(history[4]!.toSetup()), makeFen(lines[0]!.positions[1]!.toSetup()));
+  assert.deepEqual(lineAsSequence(lines[1]!, 'white'), { fen: makeFen(positionAt(c, path)!.toSetup()), sans: ['Nc6', 'Bc4', 'Bc5'] });
+  // A line of one move folds when a branch is written after it; one with nothing after it doesn't.
+  const parsed = parseCommentLines(nodeAt(c, path)!.comments[0]!);
+  assert.deepEqual([foldedTo(parsed[0]!), foldedTo(parsed[2]!), foldedTo(parsed[4]!)], [0, 0, undefined]);
 });

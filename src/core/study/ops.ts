@@ -121,6 +121,28 @@ export function setComment(chapter: Chapter, path: Path, text: string): Edit {
   return next ? done(next) : notFound(path);
 }
 
+/**
+ * One comment's text replaced where it stands (a line written into it from the board, PLAN.md
+ * §5.217): the comment of the node, before or after its move, whose text is `old`. Sanitized as
+ * Lichess would; an empty text removes the comment.
+ */
+export function replaceComment(chapter: Chapter, path: Path, old: string, text: string): Edit {
+  const clean = sanitizeComment(text).text;
+  let found = false;
+  const next = updateAt(chapter, path, (node) => {
+    const swap = (list: readonly string[]) => {
+      const i = found ? -1 : list.indexOf(old);
+      if (i < 0) return list.slice();
+      found = true;
+      return clean === '' ? [...list.slice(0, i), ...list.slice(i + 1)] : [...list.slice(0, i), clean, ...list.slice(i + 1)];
+    };
+    const comments = swap(node.comments);
+    return { ...node, comments, startingComments: swap(node.startingComments) };
+  });
+  if (!next) return notFound(path);
+  return found ? done(next) : fail('the comment has changed');
+}
+
 /** Glyphs in Lichess's order: the move assessment, the position assessment, observations, others. */
 function orderGlyphs(nags: readonly number[]): number[] {
   const of = (g: ReturnType<typeof glyphGroup>) => nags.filter((n) => glyphGroup(n) === g);
@@ -267,25 +289,36 @@ export function continuation(chapter: Chapter, path: Path): string {
 
 /**
  * Branches to clickable lines (the owner's request, 2026-10-14): every line after the move at
- * `path` (one per end, the first child's first) is written into its comment as a clickable line
- * (PLAN.md §5.12), numbered from the move's position with each move's glyph, and the moves after
- * it are deleted. Comments, shapes and other glyphs on those moves are not kept: `dropped` counts
- * the moves that had any.
+ * `path` is written into its comment as a clickable line (PLAN.md §5.12), numbered from the
+ * move's position with each move's glyph, and the moves after it are deleted. One line for each
+ * move after it; where a line branches further on, the branches are written inside it as PGN
+ * writes variations, `(17. f3 b5 18. e4 (18. a4 b4) 18... e6)` (the owner's choice, 2026-11-27,
+ * §5.217; before that, one line per end, each from the move's position). Comments, shapes and
+ * other glyphs on those moves are not kept: `dropped` counts the moves that had any.
  */
 export function branchesToComment(chapter: Chapter, path: Path): Edit<{ chapter: Chapter; dropped: number }> {
   const node = nodeAt(chapter, path);
   if (path.length === 0 || !node) return notFound(path);
   if (node.children.length === 0) return fail('no moves after this one');
-  const lines: MoveNode[][] = [];
   let dropped = 0;
-  const walk = (n: MoveNode, line: MoveNode[]) => {
-    if (n.comments.length || n.shapes.length || n.startingComments.length || n.nags.some((g) => !MOVE_GLYPH[g])) dropped++;
-    const through = [...line, n];
-    if (!n.children.length) lines.push(through);
-    for (const child of n.children) walk(child, through);
+  // A line from `pos`: `first`, then the first move after each move, the others there in
+  // parentheses after the move they replace; a move after a branch, or a line's first, is numbered.
+  const line = (pos: Position, first: MoveNode): string => {
+    const parts: string[] = [];
+    let numbered = true;
+    for (let n: MoveNode | undefined = first, others: readonly MoveNode[] = []; n; ) {
+      if (n.comments.length || n.shapes.length || n.startingComments.length || n.nags.some((g) => !MOVE_GLYPH[g])) dropped++;
+      const written = n.san + glyphOf(n);
+      parts.push(pos.turn === 'white' ? `${pos.fullmoves}. ${written}` : numbered ? `${pos.fullmoves}... ${written}` : written);
+      for (const other of others) parts.push(`(${line(pos.clone(), other)})`);
+      numbered = others.length > 0;
+      pos.play(parseSan(pos, n.san)!);
+      others = n.children.slice(1);
+      n = n.children[0];
+    }
+    return parts.join(' ');
   };
-  for (const child of node.children) walk(child, []);
-  const text = lines.map((line) => `(${numberedMoves(positionAt(chapter, path)!, line.map((n) => n.san), line.map(glyphOf))})`).join(' ');
+  const text = node.children.map((child) => `(${line(positionAt(chapter, path)!, child)})`).join(' ');
   const own = ownComment(node);
   const comment = own ? `${own} ${text}` : text;
   if (sanitizeComment(comment).tooLong) return fail(`the lines are over ${LICHESS_COMMENT_LIMIT.toLocaleString('en')} characters for one comment`);

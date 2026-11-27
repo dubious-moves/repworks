@@ -7,6 +7,7 @@ import type { ComponentChildren } from 'preact';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { chapter, doc, edit, feedback, goTo, SCRATCH, side, study } from '../app/editor.ts';
 import { openContinuation } from '../app/continuation.ts';
+import { startDraft } from '../app/lineWrite.ts';
 import { open } from '../app/mode.ts';
 import { moveCard } from './MoveCard.tsx';
 import { LICHESS_COMMENT_LIMIT, sanitizeComment } from '../core/pgn/comment.ts';
@@ -87,6 +88,8 @@ export function MoveMenu() {
   const first = parent?.children[0]?.san === m.path[m.path.length - 1];
   const items: { label: string; class?: string; run: () => void }[] = [];
   if (editable) items.push({ label: 'Comment', class: 'comment', run: () => (commenting.value = m.path) });
+  // A line in the move's comment, started with nothing typed: its moves are played on the board (§5.217).
+  if (editable) items.push({ label: 'Start a clickable line', run: () => startDraft(m.path) });
   if (editable && isMove && !first) items.push({ label: 'Promote', class: 'promote', run: () => edit((ch) => promote(ch, m.path)) });
   if (editable && variationStart(c, m.path)) items.push({ label: 'Make main line', class: 'promote', run: () => edit((ch) => makeMainline(ch, m.path)) });
   // A move with branches: its lines into its comment, clickable there (the owner's request, 2026-10-14).

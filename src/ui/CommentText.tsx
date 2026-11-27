@@ -10,7 +10,7 @@ import type { Key } from '@lichess-org/chessground/types';
 import { endPreview, previewOf, previewPosition, sequenceAsked, showLine, stepPreview, type PreviewOwner } from '../app/preview.ts';
 import { analyseFrom } from '../app/mode.ts';
 import { playLine } from '../app/editor.ts';
-import { cursorAt, foldedTo, lineAsSequence, parseCommentLines, playedLines, type PlayedLine } from '../core/repertoire/lines.ts';
+import { cursorAt, foldedTo, lineAsSequence, parseCommentLines, playedLines, sansFromStart, type PlayedLine } from '../core/repertoire/lines.ts';
 
 export interface CommentPositions {
   /** The commented move's position (the start, for a comment before the first move). */
@@ -22,45 +22,63 @@ export interface CommentPositions {
 type Piece = { text: string } | { text: string; line: number; move: number };
 /**
  * Plain text, or a run of a line group (its moves clickable), or a line left out. Words written in
- * a line are plain; they and the line's runs carry its index (`of`), so a folded line drops them.
+ * a line are plain; they and the line's runs carry the index of the outermost line drawn around
+ * them (`of`), so a folded line drops them, its branches with it.
  */
 type Segment = { text: string; of?: number } | { group: Piece[]; of: number } | { masked: true };
 
 /**
  * The comment cut into text and lines. With the lines played (`played`), a line that fits neither
  * position stays text, as in q_extension; without them every group is drawn as a line. A line's
- * words are plain text between runs of the line, so they read as the comment around it.
+ * words are plain text between runs of the line, so they read as the comment around it, and so is
+ * a remark in parentheses inside it; a branch written inside it is a line of its own (§5.217).
+ * `top[i]` is the outermost line drawn around line i (itself for a line of the comment).
  */
-function segments(text: string, played: readonly PlayedLine[] | undefined, hidden?: (line: PlayedLine) => boolean): Segment[] {
-  const out: Segment[] = [];
-  let at = 0;
-  parseCommentLines(text).forEach((line, i) => {
+function segments(text: string, played: readonly PlayedLine[] | undefined, hidden?: (line: PlayedLine) => boolean): { parts: Segment[]; top: number[] } {
+  const lines = parseCommentLines(text);
+  // What each character is: the outermost and the innermost line drawn around it, the move it is
+  // part of, whether it is left out. Lines come outermost first, so an inner one overwrites.
+  const outer = new Int32Array(text.length).fill(-1);
+  const own = new Int32Array(text.length).fill(-1);
+  const move = new Int32Array(text.length).fill(-1);
+  const mask = new Int32Array(text.length).fill(-1);
+  const top: number[] = [];
+  lines.forEach((line, i) => {
+    top[i] = i;
     if (played && !played[i]?.placed) return;
-    if (line.from > at) out.push({ text: text.slice(at, line.from) });
-    if (played && hidden?.(played[i]!)) {
-      out.push({ masked: true });
-      at = line.to;
-      return;
+    if (mask[line.from] !== -1) return;
+    top[i] = outer[line.from] === -1 ? i : outer[line.from]!;
+    for (let c = line.from; c < line.to; c++) {
+      if (outer[c] === -1) outer[c] = i;
+      own[c] = i;
+      move[c] = -1;
     }
-    const marks = [...line.moves.map((m, j) => ({ ...m, move: j })), ...line.words.map((w) => ({ ...w, move: -1 }))].sort((a, b) => a.from - b.from);
-    let group: Piece[] = [];
-    let g = line.from;
-    for (const m of marks) {
-      if (m.from > g) group.push({ text: text.slice(g, m.from) });
-      if (m.move >= 0) group.push({ text: text.slice(m.from, m.to), line: i, move: m.move });
-      else {
-        if (group.length) out.push({ group, of: i });
-        group = [];
-        out.push({ text: text.slice(m.from, m.to), of: i });
-      }
-      g = m.to;
-    }
-    if (g < line.to) group.push({ text: text.slice(g, line.to) });
-    if (group.length) out.push({ group, of: i });
-    at = line.to;
+    if (played && hidden?.(played[i]!)) return void mask.fill(i, line.from, line.to);
+    for (const plain of [...line.words, ...line.groups]) own.fill(-1, plain.from, plain.to);
+    line.moves.forEach((m, j) => move.fill(j, m.from, m.to));
   });
-  if (at < text.length) out.push({ text: text.slice(at) });
-  return out;
+  const parts: Segment[] = [];
+  let group: Piece[] = [];
+  let groupOf = -1;
+  const flush = (of: number) => {
+    if (group.length) parts.push({ group, of });
+    group = [];
+  };
+  for (let c = 0; c < text.length; ) {
+    let e = c + 1;
+    while (e < text.length && outer[e] === outer[c] && own[e] === own[c] && move[e] === move[c] && mask[e] === mask[c]) e++;
+    // A run of one line goes on over its moves; anything else ends it.
+    if (group.length && (own[c] !== groupOf || mask[c] !== -1)) flush(top[groupOf]!);
+    if (mask[c] !== -1) parts.push({ masked: true });
+    else if (own[c] === -1) parts.push(outer[c] === -1 ? { text: text.slice(c, e) } : { text: text.slice(c, e), of: outer[c]! });
+    else {
+      groupOf = own[c]!;
+      group.push(move[c] === -1 ? { text: text.slice(c, e) } : { text: text.slice(c, e), line: groupOf, move: move[c]! });
+    }
+    c = e;
+  }
+  if (group.length) flush(top[groupOf]!);
+  return { parts, top };
 }
 
 export function CommentText(props: {
@@ -87,26 +105,31 @@ export function CommentText(props: {
     const at = props.positions();
     return at ? playedLines(props.text, at.after, at.before) : undefined;
   }, [props.text, props.id]);
-  const parts = useMemo(() => segments(props.text, played, props.hidden), [props.text, played, props.hidden]);
+  const { parts, top } = useMemo(() => segments(props.text, played, props.hidden), [props.text, played, props.hidden]);
   const shown = previewOf(props.owner);
   const mine = shown?.key === props.id ? shown.cursor : undefined;
   // The lines unfolded: once clicked or previewed (stepped into with the keys), they stay open.
+  // Kept by their place among the comment's outermost lines, which a branch written into one
+  // (§5.217) doesn't change.
   const [unfolded, setUnfolded] = useState<ReadonlySet<number>>(new Set());
-  const unfold = (line: number) => setUnfolded((u) => (u.has(line) ? u : new Set([...u, line])));
+  const place = (line: number) => top.slice(0, top[line] ?? line).filter((t, i) => t === i).length;
+  const unfold = (line: number) => setUnfolded((u) => (u.has(place(line)) ? u : new Set([...u, place(line)])));
   useEffect(() => {
     if (props.fold && mine) unfold(mine.line);
-  }, [props.fold, mine?.line]);
+  }, [props.fold, mine?.line, top]);
   // The last move shown of each folded line, by its index.
   const folds = useMemo(() => {
     const out = new Map<number, number>();
     if (!props.fold || !played) return out;
     parseCommentLines(props.text).forEach((line, i) => {
+      // A branch folds with the line it is written in.
+      if (top[i] !== i) return;
       const to = foldedTo(line);
       // A line whose first move isn't legal stays whole: it can't be opened by a click.
-      if (to !== undefined && played[i]?.placed && (played[i]?.ucis.length ?? 0) > to && !unfolded.has(i)) out.set(i, to);
+      if (to !== undefined && played[i]?.placed && (played[i]?.ucis.length ?? 0) > to && !unfolded.has(place(i))) out.set(i, to);
     });
     return out;
-  }, [props.fold, props.text, played, unfolded]);
+  }, [props.fold, props.text, played, unfolded, top]);
   if (!parts.some((p) => 'group' in p || 'masked' in p)) return <>{props.text}</>;
   const open = (line: number, move: number) => (e: Event) => {
     e.stopPropagation();
@@ -146,7 +169,7 @@ export function CommentText(props: {
   // A folded line: its text (a lead-in word included) up to the last move shown, then its closing bracket.
   const folded = (line: number, to: number, i: number) => {
     const pieces = parts.flatMap((p): Piece[] => ('of' in p && p.of === line ? ('group' in p ? p.group : [{ text: p.text }]) : []));
-    const end = pieces.findIndex((x) => 'line' in x && x.move === to);
+    const end = pieces.findIndex((x) => 'line' in x && x.line === line && x.move === to);
     const whole = parseCommentLines(props.text)[line]!;
     const close = props.text[whole.to - 1] === ')' ? ')' : '';
     return (
@@ -202,13 +225,16 @@ export function endPreviewOnBoard(e: MouseEvent): void {
 /**
  * Under the board while a line is previewed: where it is, and ◀ ▶ Back for the phone. A comment's
  * line can be made a sequence (§5.201) when `side`, the board's side, has a move in it to ask.
+ * A branch is shown from the start of the line it is written in. Where the line is written from
+ * the board (`onDelete`, §5.217), the move shown can be deleted with the rest of its line.
  */
-export function PreviewBar(props: { owner: PreviewOwner; side?: 'white' | 'black'; board?: string }) {
+export function PreviewBar(props: { owner: PreviewOwner; side?: 'white' | 'black'; board?: string; onDelete?: () => void }) {
   const p = previewOf(props.owner);
   if (!p) return null;
   const line = p.lines[p.cursor.line]!;
   const engine = p.source === 'engine';
-  const shown = line.sans.slice(0, p.cursor.ply);
+  const lead = line.lead?.sans.length ?? 0;
+  const shown = sansFromStart(line).slice(0, lead + p.cursor.ply);
   const seq = !engine && props.side ? lineAsSequence(line, props.side) : undefined;
   return (
     <div class="preview-bar" role="group" aria-label={engine ? 'Line from the engine' : 'Line from the comment'}>
@@ -234,13 +260,37 @@ export function PreviewBar(props: { owner: PreviewOwner; side?: 'white' | 'black
             title={`Save the whole line (${seq.sans.join(' ')}) as a sequence to drill, as ${props.side}: it opens on the analysis board, checked by Stockfish`}
             onClick={() => {
               sequenceAsked.value = true;
-              analyseFrom({ fen: seq.fen, line: seq.sans, show: Math.min(p.cursor.ply, seq.sans.length), side: props.side });
+              analyseFrom({ fen: seq.fen, line: seq.sans, show: Math.min(lead + p.cursor.ply, seq.sans.length), side: props.side });
             }}
           >
             Sequence…
           </button>
         )}
+        {props.onDelete && (
+          <button type="button" class="secondary" title="Delete this move and the rest of its line from the comment (undo brings it back)" onClick={props.onDelete}>
+            Delete from here
+          </button>
+        )}
         <button type="button" class="secondary" onClick={endPreview}>
+          Back
+        </button>
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Under the board while a line is being started on a move (§5.217): its first move, played on the
+ * board, writes the line into the move's comment.
+ */
+export function DraftBar(props: { after: string | undefined; onBack: () => void }) {
+  return (
+    <div class="preview-bar" role="group" aria-label="New line in the comment">
+      <span class="preview-moves">
+        New line {props.after ? <>after <strong>{props.after}</strong></> : 'from the start'}: play its first move on the board
+      </span>
+      <span class="preview-buttons">
+        <button type="button" class="secondary" onClick={props.onBack}>
           Back
         </button>
       </span>

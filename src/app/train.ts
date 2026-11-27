@@ -17,7 +17,7 @@ import { combineIndex, indexChapter, type ChapterIndexing, type Line, type Reper
 import { header, type Chapter, type StudyKind } from '../core/study/model.ts';
 import { parseStudyMeta, reconcileChapterOrder } from '../core/study/studyMeta.ts';
 import { lineThrough, startPosition } from '../core/study/tree.ts';
-import type { PlayedLine } from '../core/repertoire/lines.ts';
+import { outerStart, ucisFromStart, type PlayedLine } from '../core/repertoire/lines.ts';
 import { positionKeyOf } from '../core/chess/positionKey.ts';
 import { cardLine, drillLines, retryLines, todaysMistakes, type Mistake } from '../core/train/mistakes.ts';
 import { pinsOf, type PinState } from '../core/train/pins.ts';
@@ -664,10 +664,12 @@ export const linesMode = signal<'armed' | 'on' | 'browse' | undefined>(undefined
 export function quizzedLater(s: SessionView): (l: PlayedLine) => boolean {
   const toQuiz = (s.comments ?? []).filter((c) => c.on && !c.done).map((c) => c.line);
   return (l) => {
-    const start = l.positions[0];
-    if (!start || !toQuiz.length) return false;
+    // A branch is quizzed from the start of the line it is written in (§5.217).
+    const start = outerStart(l);
+    if (!start || !l.positions.length || !toQuiz.length) return false;
     const key = positionKeyOf(start);
-    return toQuiz.some((q) => q.key.startsWith(`${key}|`) && q.ucis.every((u, i) => l.ucis[i] === u));
+    const ucis = ucisFromStart(l);
+    return toQuiz.some((q) => q.key.startsWith(`${key}|`) && q.ucis.every((u, i) => ucis[i] === u));
   };
 }
 

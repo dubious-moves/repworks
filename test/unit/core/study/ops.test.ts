@@ -11,7 +11,7 @@ import { mulberry32 } from '../../../support/random.ts';
 import { pick, randomChapter } from '../../../support/randomTree.ts';
 import { makeSan } from 'chessops/san';
 import { positionAt } from '../../../../src/core/study/tree.ts';
-import { playedLines } from '../../../../src/core/repertoire/lines.ts';
+import { playedLines, sansFromStart } from '../../../../src/core/repertoire/lines.ts';
 
 const HEAD = '[Event "Test"]\n[Result "*"]\n\n';
 function chapter(movetext: string, head = HEAD): Chapter {
@@ -249,21 +249,39 @@ test('toggleShape draws as chessground does: the same shape goes, another colour
 test('branchesToComment: every line after a move becomes a clickable line in its comment', () => {
   const c = chapter('1. e4 e5 2. Nf3 { Main } (2. Bc4 Nf6 3. d3 (3. Nc3!? Bb4) c6) (2. f4 exf4?) 2... Nc6 *');
   const out = value(ops.branchesToComment(c, ['e4', 'e5']));
-  // One line per end, the first child's first, numbered from the move's position; the comment on
-  // Nf3 is not kept, and counted.
-  assert.equal(movetext(out.chapter), '1. e4 e5 { (2. Nf3 Nc6) (2. Bc4 Nf6 3. d3 c6) (2. Bc4 Nf6 3. Nc3!? Bb4) (2. f4 exf4?) } *');
+  // One line for each move after it, the first child's first, numbered from the move's position;
+  // a branch further on is written inside its line, after the move it replaces, and the line's
+  // next move is numbered again (§5.217). The comment on Nf3 is not kept, and counted.
+  assert.equal(movetext(out.chapter), '1. e4 e5 { (2. Nf3 Nc6) (2. Bc4 Nf6 3. d3 (3. Nc3!? Bb4) 3... c6) (2. f4 exf4?) } *');
   assert.equal(out.dropped, 1);
   valid(out.chapter);
   // The lines are read back as the comment renderer reads them, from the move's position.
   const comment = ops.ownComment(nodeAt(out.chapter, ['e4', 'e5'])!)!;
   const played = playedLines(comment, positionAt(out.chapter, ['e4', 'e5'])!, positionAt(out.chapter, ['e4']));
   assert.deepEqual(
-    played.map((l) => l.sans),
+    played.map(sansFromStart),
     [['Nf3', 'Nc6'], ['Bc4', 'Nf6', 'd3', 'c6'], ['Bc4', 'Nf6', 'Nc3', 'Bb4'], ['f4', 'exf4']],
+  );
+  // Branches two deep, and two at one move.
+  const deep = value(ops.branchesToComment(chapter('1. e4 e5 2. Nf3 (2. Bc4 Nf6 (2... Bc5 3. c3 (3. b4)) (2... Nc6) 3. d3) 2... Nc6 *'), ['e4', 'e5']));
+  assert.equal(movetext(deep.chapter), '1. e4 e5 { (2. Nf3 Nc6) (2. Bc4 Nf6 (2... Bc5 3. c3 (3. b4)) (2... Nc6) 3. d3) } *');
+  const deepText = ops.ownComment(nodeAt(deep.chapter, ['e4', 'e5'])!)!;
+  assert.deepEqual(
+    playedLines(deepText, positionAt(deep.chapter, ['e4', 'e5'])!, positionAt(deep.chapter, ['e4'])).map(sansFromStart),
+    [['Nf3', 'Nc6'], ['Bc4', 'Nf6', 'd3'], ['Bc4', 'Bc5', 'c3'], ['Bc4', 'Bc5', 'b4'], ['Bc4', 'Nc6']],
   );
   // Added after an own comment; a black first move is numbered `n...`.
   const black = value(ops.branchesToComment(chapter('1. e4 { Best } e5 (1... c5) *'), ['e4']));
   assert.equal(movetext(black.chapter), '1. e4 { Best (1... e5) (1... c5) } *');
   assert.equal(black.dropped, 0);
   assert.equal(ops.branchesToComment(c, ['e4', 'e5', 'Nf3', 'Nc6']).ok, false);
+});
+
+test('replaceComment: one comment’s text where it stands, removed when empty, refused when it has changed', () => {
+  const c = chapter('1. e4 { First } { Second (1... e5) } e5 *');
+  const out = value(ops.replaceComment(c, ['e4'], 'Second (1... e5)', 'Second (1... e5 2. Nf3)'));
+  assert.equal(movetext(out), '1. e4 { First } { Second (1... e5 2. Nf3) } 1... e5 *');
+  assert.equal(movetext(value(ops.replaceComment(c, ['e4'], 'First', ''))), '1. e4 { Second (1... e5) } 1... e5 *');
+  assert.equal(ops.replaceComment(c, ['e4'], 'Gone', 'x').ok, false);
+  assert.equal(ops.replaceComment(c, ['d4'], 'First', 'x').ok, false);
 });

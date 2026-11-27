@@ -2158,3 +2158,27 @@ does. Start with the spike: its log decides what the later parts change (CHESSNU
   chapter's moves?
 - **Checked**: unit tests and Playwright (desktop and emulated phone, a fake engine and explorer);
   **not** on a device or the real studies.
+
+### Clickable lines written from the board; branches inside a line (PLAN.md §5.217, 2026-11-27)
+
+- On a move, right-click (long-press on the phone) → **Start a clickable line**, or press **L**:
+  does the bar under the board say a new line is waiting, and does the first move you play write
+  `(3. Bb5+)` at the end of the move's comment? Play on: does each move go on the line's end?
+- Step back into the middle of the line (← or ◀) and play another move: is it a branch in
+  brackets after the move it replaces, `(3. Bb5+ Bd7 (3... Nc6) 4. Bxd7+)`? Play the line's own
+  next move instead: is it only stepped to?
+- ← from a branch's first move: does it go to the move the branch left? ↓ on the move a branch
+  replaces: into the branch? ↑ back?
+- **Delete from here** in the bar: do the move shown and the rest of its line go, and Ctrl+Z (or ☰
+  → Undo) bring them back?
+- A press on the board no longer leaves a line in the study (Escape, Back or a move of the
+  notation do): is that all right in use, on the phone too?
+- The bar's buttons on the phone take two rows (◀ ▶ Sequence… / Delete from here, Back): too tall?
+- A real comment of yours with a branch or a remark in brackets inside a line: is it clickable
+  now, and placed right? Any line that was clickable before and isn't now?
+- **Branches to clickable lines** on a move whose lines branch further on: one line per move after
+  it, the later branches inside it?
+- In review, a comment line with a branch: is the branch quizzed as a line of its own from the
+  line's start, and is that wanted?
+- **Checked**: unit tests and Playwright (desktop and emulated phone) on the fixture study; **not**
+  on a device or the real studies.

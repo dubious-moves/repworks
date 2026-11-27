@@ -6221,6 +6221,8 @@ right-click menu (two screenshots: 16... Bd3 with 17. f3 and 17. b3 after it, th
   "comment" would also match the tests' search for Comment.) It converts **every** move after it, the first one
   (the line it continues) included, as the screenshots show; on a main-line move that cuts the
   main line there. Undo brings everything back.
+- *Since §5.217 (2026-11-27) a branch further on is written inside its line, in parentheses; the
+  rule below is how it was.*
 - **One line per end** (`branchesToComment` in `core/study/ops.ts`): a branch with variations of
   its own gives one line for each, each written from the move's position, since a comment line is
   placed by its first move number and side (§5.12, §5.20) and nested groups are not lines. The
@@ -12854,3 +12856,98 @@ that hadn't changed), which validates, and `review-answers.ts` listed them as no
 
 **Not checked**: the panel on the owner's devices, and a list arriving there by a sync from a
 session's push (TESTING.md). The app can't read the data repo from a cloud container (CLAUDE.md).
+
+#### 5.217 Clickable lines written from the board, and branches inside a line (the owner's request, 2026-11-27, built)
+
+The owner: "When the user is inside a clickable line and they make a move on the board - this
+should write to the clickable line. If they are on the last move, it should extend the line. If
+they are in the middle of a clickable line, it should create a branch. Also - I'm not sure that
+branching clickable lines are working fully, so make sure they are. There also needs to be a way to
+start a clickable line without writing it as a comment." A plan went to him first; his answers:
+branches are **nested**, as a book writes them; a press on the board no longer leaving a line is
+fine; "Branches to clickable lines" writes nested lines from now on.
+
+**What was wrong.** A line with a branch inside it, `(2... Nc6 3. Bb5 (3. Bc4 Bc5) 3... a6)`, was
+not clickable at all: the reader took groups with no brackets inside only, so the outer group was
+text, and the inner one too unless its number happened to fit the commented move. Several lines
+from one position, `(2... Nc6 3. Bb5 a6) (2... Nc6 3. Bc4 Bc5)`, worked and still do.
+
+**1. Branches are read** (`parseCommentLines`, `playedLines` in `src/core/repertoire/lines.ts`).
+- Every pair of brackets is a group, read without the groups inside it; each of those is read on
+  its own. So a line goes on past a branch or a remark written in it, and `(12. Ng5 Ndf6 (a typical
+  idea) 13. Nxe6)` is a line of three moves with a remark in it, where it was text.
+- **A branch is placed by its number and side, as every line is** (§5.12): it starts at the
+  position of the line around it that has them, among those the line has reached by where the
+  group is written (and by legal moves). Written PGN's way, after the move it replaces, that is the
+  position before that move; a group numbered for the next move goes on from it. One that fits no
+  such position is placed as a line of the comment (the commented move's position, or the one
+  before it), or stays text: nothing that was clickable stopped being so.
+- A line in a remark, `(see also (2... d6 3. d4))`, is a line of the comment as before. Brackets
+  that don't pair make no group.
+- **Stepping** (`stepCursor`, `switchLine`): → follows a line past its branches, and from its last
+  move runs on into the next line written, a branch included, so → still reaches every move. ← from
+  a branch's first move is the move it left (a move taken back), not the end of the line before.
+  ↓ is the next line written after the move shown: on the move a branch replaces, that branch; ↑
+  from a branch is the branch before it at the same move, or the move they replace; from a line
+  of the comment, the line of the comment before it.
+- **Shown** (`CommentText`): a branch's moves are moves to click, a remark inside a line is text; a
+  line folds with its branches (§5.212), and a line of one move folds when a branch follows it.
+  The bar under the board shows a branch from the start of the line it is written in (`Qxd4 Nb5`
+  then the branch's moves), and "Sequence…" (§5.201), the engine and the explorer (§5.212) take it
+  from there too.
+- **The review quiz** (§5.98, `quizLinesOf`) asks a branch as a line of its own from the start of
+  the line it is written in: one quiz per end, as when each was written out. Its rules are read
+  over the whole of it; its label and its `!` are its own first move's.
+
+**2. A move on the board is written into the line** (`src/core/repertoire/lineEdit.ts`,
+`src/app/lineWrite.ts`), in the chapter view of a chapter that can be edited, the analysis board
+included, while a comment's line is on the board (not an engine's: that has Add).
+- On the line's last move: written at its end, `(8... Qxd4 9. Nb5)` + Qb4+ is `(8... Qxd4 9. Nb5
+  Qb4+)`. After words or a branch, the move carries its number so the line goes on (§5.96).
+- In the middle: the line's own next move is stepped to, and a branch that starts with the move
+  is entered; nothing is written. Any other move is a new branch, in brackets after the move it
+  replaces, its glyph and the branches already there, and the line's next move gets its number:
+  `(8... Qxd4 9. Nb5 (9. Nc3) 9... Qb4+)`.
+- A written line that stops at a move that isn't legal: a move played from its last legal one is a
+  branch after the bad move.
+- Each move is one edit: one undo. Undo leaves the line (the board back on the chapter's move).
+- **Refused**, with the reason under the board: a comment that would pass Lichess's 4,000
+  characters, one with a conflict to resolve, and a result that doesn't read back to the position
+  played (every edit is read back with the reader before it is saved).
+- **Delete from here**, a button in the bar: the move shown and the rest of its line; the branches
+  written there that start before it stay (the other choices to it). From a line's first move the
+  whole group goes, its branches with it, and the comment with it when nothing else is in it.
+- **Given up** (the owner's OK): a press on the board no longer leaves a line there; Escape, Back
+  and any move of the notation do. In the Read view, training, the cards, a chapter that can't be
+  edited and an engine's line, it leaves as before, and nothing is written.
+
+**3. A line started with nothing typed.** "Start a clickable line" in a move's menu (the start's
+too), or **L** on the move shown: the bar under the board says "New line after d6: play its first
+move on the board", and that move writes `(3. Bb5+)` at the end of the move's own comment (a new
+comment when it has none). Nothing is written before it; Escape, Back or another move gives it up.
+A line of the comment that already starts there with the move is entered instead. The line starts
+after the move; for one that replaces a move, start it on the move before.
+
+**4. Branches to clickable lines** (§5.109) writes one line for each move after the move, and the
+branches further on inside it: `(2. Bc4 Nf6 3. d3 (3. Nc3!? Bb4) 3... c6)`, where it wrote `(2. Bc4
+Nf6 3. d3 c6) (2. Bc4 Nf6 3. Nc3!? Bb4)`. Lines written the old way stay as they are and work.
+
+Decisions (Claude's): a branch's place is by number and side, not by "the move before the group",
+so a comment written loosely still reads; ← from a branch goes to the move it left, since that is
+what a move taken back means while writing; no hint in the bar that the board writes (the Delete
+button is the sign, and the phone's bar has no room); the bar's buttons take a second row on the
+phone. Not built: a row of the explorer or an engine's move clicked into a line (a row's click
+still plays nothing there, §5.212), a glyph or words put on a line's move from the board (the
+comment dialog), a line started as one that replaces the move.
+
+Tests: `test/unit/core/repertoire/lines.test.ts` (branches read, placed, two deep, a remark, one
+that fits nowhere, stepping both ways, ↓ ↑, the history, the sequence, the fold),
+`lineEdit.test.ts` (the end, numbering after words, a glyph and a branch; a step; a branch, a
+second at the same move, of a branch, after an illegal move, before words; a line started, one
+entered; a line built move by move and read back; delete), `ops.test.ts` (nested branches two
+deep, `replaceComment`), `commentQuiz.test.ts` (a branch quizzed from the line's start);
+`test/e2e/lineWrite.spec.ts` (desktop and emulated phone: started from the menu and with L, the
+end, a branch, a step, a press on the board, the synced file, Delete from here, undo, given up, a
+line entered), `views.spec.ts` (a typed branch clickable, folded, stepped, ↓ ↑).
+
+**Not checked**: on the owner's devices and real studies (TESTING.md).

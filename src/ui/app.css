@@ -3372,11 +3372,14 @@ a.button.primary {
 
 .preview-buttons {
   display: flex;
+  /* On the phone the buttons of a line written from the board (§5.217) take a second row. */
+  flex-wrap: wrap;
   gap: 6px;
 }
 
 .preview-buttons button {
   min-width: 44px;
+  white-space: nowrap;
 }
 
 /* The explorer panel (PLAN.md §5.23, D21), as Qchess's: tabs, a header row, a row per move with

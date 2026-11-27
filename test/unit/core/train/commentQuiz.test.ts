@@ -82,3 +82,21 @@ test('the first move as written labels the line, numbered', () => {
   assert.deepEqual(lines.map((q) => q.own), [[false, true], [false, true]]);
   assert.deepEqual(lines[0]!.ucis, ['c2c3', 'g8f6']);
 });
+
+test('a branch written inside a line is quizzed from the line’s start, labelled by its own first move (§5.217)', () => {
+  // 2. c3 with White's other third move written inside it: two lines, each from 2. c3.
+  const moves = '1. e4 c5 2. Nf3 { (2. c3 Nf6 3. e5 (3. d3! Nc6 4. Be2) 3... Nd5) } 2... d6 3. d4 cxd4';
+  assert.deepEqual(quizzed(moves), ['2: c3 Nf6 e5 Nd5', '*2: c3 Nf6 d3 Nc6 Be2']);
+  const c = chapter('Chapter1', 'black', moves);
+  const ix = indexStudies([{ sid: 'Study001', kind: 'repertoire', chapters: [c] }]);
+  const lines = quizLinesOf(c, ix.lines[0]!.path, 'black', ix);
+  assert.deepEqual(lines.map((q) => [q.label, q.important]), [['2. c3', false], ['3. d3!', true]]);
+  // An own move marked ? before the branch leaves both out; one in the branch, the branch only.
+  const at = (comment: string) => quizzed(`1. e4 c5 2. Nf3 { ${comment} } 2... d6`);
+  assert.deepEqual(at('(2. c3 Nf6? 3. e5 (3. d3 Nc6))'), []);
+  assert.deepEqual(at('(2. c3 Nf6 3. e5 (3. d3 Nc6?) 3... Nd5)'), ['2: c3 Nf6 e5 Nd5']);
+  // A branch the moves before it don't reach (an illegal move in the line) is not quizzed.
+  assert.deepEqual(at('(2. c3 Nf6 3. Qxh7 Nd5 (4. d4 e6))'), ['2: c3 Nf6']);
+  // A group inside a line that fits the commented move instead is a line of the comment.
+  assert.deepEqual(at('(2. c3 Nf6 (2. Nc3 Nc6) 3. e5 Nd5)'), ['2: c3 Nf6 e5 Nd5', '2: Nc3 Nc6']);
+});

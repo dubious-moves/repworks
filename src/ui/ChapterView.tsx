@@ -20,7 +20,8 @@ import { afterEdits, at, chapter, conflictsHere, doc, edit, feedback, flipBoard,
 import { AnalysisFen, AnalysisHead, AnalysisOpening } from './Analysis.tsx';
 import { open } from '../app/mode.ts';
 import { left, trainingFrom } from '../app/train.ts';
-import { endPreview, enterCommentLines, preview, previewOf, stepPreview, switchPreviewLine } from '../app/preview.ts';
+import { endPreview, enterCommentLines, preview, previewOf, previewPosition, stepPreview, switchPreviewLine } from '../app/preview.ts';
+import { deleteWritten, draft, endDraft, playWritten, startDraft, writingLine } from '../app/lineWrite.ts';
 import { lineHistory } from '../core/repertoire/lines.ts';
 import { isKeptMarker, parseTextConflict, type OpenConflict } from '../core/merge/markers.ts';
 import type { Brush, Chapter } from '../core/study/model.ts';
@@ -35,7 +36,7 @@ import { exportChapterPgn, StudyMenu, StudyMenuButton } from './StudyMenu.tsx';
 import { FindLineDialog, openFindLine } from './FindLine.tsx';
 import { BranchPicker, branchOpen, chooseBranch, closeBranches, stepOn } from './BranchPicker.tsx';
 import { CommentPanel, Notation } from './Notation.tsx';
-import { endPreviewOnBoard, PreviewBar, previewBoard } from './CommentText.tsx';
+import { DraftBar, endPreviewOnBoard, PreviewBar, previewBoard } from './CommentText.tsx';
 import { ModeSwitch } from './ModeSwitch.tsx';
 import { openChapterSettings, openManageChapters, openNewChapter, openStudySettings } from './StudyDialogs.tsx';
 import { TranspositionList } from './Transpositions.tsx';
@@ -119,6 +120,9 @@ export function ChapterView() {
         ArrowDown: () => void (chooseBranch(1) || enterLinesHere() || move('down')),
         ...(picking ? { Enter: () => void stepOn(), Escape: closeBranches } : {}),
         ...(altAdding.peek() ? { Escape: () => (altAdding.value = undefined) } : {}),
+        // A line being started (§5.217) is given up; L starts one on the move shown.
+        ...(draft.peek() ? { Escape: endDraft } : {}),
+        ...(doc.peek() ? { l: () => startDraft(at.peek()) } : {}),
         Home: () => move('start'),
         End: () => move('end'),
         w: () => setThreat(!threat.peek()),
@@ -175,17 +179,25 @@ export function ChapterView() {
   const node = c ? nodeAt(c, path) : undefined;
   const shownLine = previewBoard('chapter');
 
+  // A comment's line on the board of a chapter that can be edited, or one being started: a move
+  // played goes into the comment (§5.217), from the line's position rather than the chapter's.
+  const writing = writingLine();
+  const starting = !!draft.value;
+  const linePos = writing && shownPreview ? previewPosition(shownPreview).position : undefined;
+  const lineDests = linePos ? (chessgroundDests(linePos) as Map<Key, Key[]>) : undefined;
   const onMove = (orig: Key, dest: Key) => {
     if (!board) return;
+    const pos = linePos ?? board.pos;
     const from = parseSquare(orig)!;
     const to = parseSquare(dest)!;
-    const piece = board.pos.board.get(from);
+    const piece = pos.board.get(from);
     if (piece?.role === 'pawn' && (dest[1] === '8' || dest[1] === '1')) return setPromotion({ orig, dest });
-    submit(normalizeMove(board.pos, { from, to }));
+    submit(normalizeMove(pos, { from, to }));
   };
   const submit = (m: Move) => {
     if (!board) return;
-    if (adding) addAlternative(adding, m);
+    if (writing) playWritten(makeSan(linePos ?? board.pos, m));
+    else if (adding) addAlternative(adding, m);
     else play(makeSan(board.pos, m));
   };
   const promote_ = (role: Role) => {
@@ -276,15 +288,16 @@ export function ChapterView() {
                 <Explorer chapter={c} path={path} {...(followed ? { look: followed } : {})} />
               </div>
             )}
-            <div class="cv-board" onPointerDown={shownLine ? endPreviewOnBoard : undefined}>
+            {/* A press on the board ends a preview, except where its moves are written (§5.217). */}
+            <div class="cv-board" onPointerDown={shownLine && !writing ? endPreviewOnBoard : undefined}>
               <Board
                 fen={shownLine?.fen ?? board.fen}
                 orientation={side.value}
                 turn={shownLine?.turn ?? board.pos.turn}
-                dests={doc.value && !shownLine ? board.dests : new Map()}
+                dests={!doc.value ? new Map() : shownLine ? (lineDests ?? new Map()) : board.dests}
                 lastMove={shownLine ? shownLine.lastMove : board.lastMove}
                 check={shownLine?.check ?? board.check}
-                shapes={shownLine || adding ? [] : (node?.shapes ?? [])}
+                shapes={shownLine || adding || starting ? [] : (node?.shapes ?? [])}
                 drawMode={drawMode}
                 brush={brush}
                 onMove={onMove}
@@ -293,7 +306,8 @@ export function ChapterView() {
                 promotion={promotion && { dest: promotion.dest, onPick: (role) => (role ? promote_(role) : setPromotion(undefined)) }}
               />
               <EvalBar orientation={side.value} />
-              <PreviewBar owner="chapter" side={side.value} board={board.fen} />
+              <PreviewBar owner="chapter" side={side.value} board={board.fen} {...(writing && shownLine ? { onDelete: deleteWritten } : {})} />
+              {starting && !shownLine && <DraftBar after={path.length ? path[path.length - 1]! : undefined} onBack={endDraft} />}
               <p class="feedback" role="status">
                 {feedback.value ?? ''}
               </p>
