@@ -27,6 +27,11 @@ The rules the audit follows, the ledger of what is audited, and the hand-kept st
 - `r12/getcom_json.mjs <study> <paths.json>`: `{path: comment}` for each path ("" if none, null if the path is missing).
 
 **Screens**
+- `r17/difficulty.ts <pgn> --line "<SAN line>" | --prefix "<SAN path>" [--chapter C] [--elo 2000,2200] [--ms 1500]` (from the repworks root): how hard each of our moves is to find and what missing it costs.
+  - Per move: Maia's chance (23M model, averaged over the Elos) that a player finds it, and the natural moves (Maia's, up to 90% of its mass) each rated by Stockfish in win% against ours.
+  - `expLoss` is the win% a player gives up on average by playing by feel.
+  - With `--prefix`, it also gives, per Black reply, the hardest of our next three moves.
+  - `r17/cases.sh` runs it on ten known lines (the calibration).
 - `r13/sfscreen.mjs <study> "<prefix>" <ms>`: for every White move under the prefix, Stockfish's top 3 and our move's eval; FLAG when ours is 0.50+ behind.
 - `sf/pv.mjs "<SAN line with numbers>" <ms> [multipv]`: Stockfish's principal variations after the line, White's view.
 - `sf/lineeval.mjs "<SAN line>" <startPly> <ms>`: at each position from startPly, the best 3 moves and the played move's eval.
