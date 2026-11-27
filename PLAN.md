@@ -12676,3 +12676,78 @@ per-move rows.
 
 Files (not in the repo; the cloud scratchpad of the session of 2026-11-26): the sample, `maia.json`,
 `maia-ctl.json`, the explorer's `ex*.json` and `mv*.json`, `after.json`, `policy.json`.
+
+#### 5.214 What changed between two versions of a chapter, as a list with links (the owner's request, 2026-11-27, built)
+
+The owner builds a 1. Nc3 repertoire with a reviewing Claude session, one subtree at a time: the
+session delivers a chapter as a PGN, the owner imports it, checks the choices in the app, edits,
+exports the chapter and sends it back, and the session diffs and merges. Asked what would speed that
+up, a session found that the owner's edits are already commits in the data repo (one a save, by
+device), so neither the export nor the download has to exist once both sides read and write the
+study there; what was missing was a diff by move and a change list that opens the app where a
+change is. The owner: "yes, build the diff and the change list with links". **Nothing in the app
+changed.**
+
+- **`core/study/diff.ts`** (`diffChapters`), pure: two chapters as read, walked together from their
+  roots, a move being its path of SANs (§4.4). What it reports:
+  - a **part added** or **removed**: once, at the part's first move, with its count of moves, every
+    line below it (the main one first), its comments and how many of its moves carry arrows;
+  - the **first move at a position changed** (`main`): in a repertoire, at my position, my move.
+    Whether the new move was a side line before and whether the old one stays as one; a move that
+    came or went is also a part of its own;
+  - side lines reordered below the same first move; a **comment** changed (the texts before and
+    after); **arrows** and **glyphs**, each compared as a set; the chapter's name, side and start
+    (`ChapterName`, `Orientation`, `FEN`), not a writer's own tags.
+- **`scripts/chapter-diff.ts`** (its rendering in `chapter-diff-lib.ts`), a report that writes
+  nothing: `<old> <new>`, each a PGN file or a data repo checkout (`<dir>` as checked out,
+  `<dir>@<rev>` at a commit, read with `git show`), with `--study` (name or id; `--old-study` for a
+  review copy against the study it came from) and `--chapter`. Markdown by default, `--json` with
+  every line of every part.
+- **Every line in full** from the chapter's start, the changed part in bold (`markedLine`): the
+  owner's rule for anything a session shows him, never "…". A part's lines beyond `--max-lines` (8)
+  are counted, not dropped silently; `--max-lines 0` lists all.
+- **Links.** When the new version is a study in a data repo, each item ends in a link to
+  `https://dubious-moves.github.io/repworks/#/study/<sid>/<cid>?at=…`, the address the router
+  itself writes (`modeHash`), so it opens the app at that move on a device that has synced the
+  study. A removed part opens at the last move still there ("open at 3. Bf4"). A PGN file has no
+  ids, so a list whose new side is a file has no links and says so.
+
+Decisions (Claude's):
+- **By path, with positions as a second look.** A line moved to another move order is a removed
+  part and an added one by path. Each says so: an added part lists where the old version already
+  reached the position after its first move, a removed one where the new version still does
+  (`transpositions().reach`, D10's key).
+- **A comment's line wraps are no change** (deeprep's writer wraps at 80 columns, the app doesn't):
+  texts are compared with their white space collapsed; `--wraps` compares them as written.
+- **A comment that kept its text and got more** is shown as what was added after it (`appended`),
+  since the reviewing session's rule is the owner's text first, its own after.
+- **Chapters are paired** by id within one study (an id is the chapter there: a renamed chapter is a
+  header change, a new id a new chapter), else by name in any case; between two different sources
+  the one chapter left on each side is paired too, so a file's single game stands for the chapter
+  asked for whatever the file calls it.
+- **`--mark TEXT`** lists the new version's comments holding the text, as open questions with their
+  links. No marker is fixed: what a session writes into the owner's study as a question is theirs
+  to agree.
+
+The hand-off this is for (a proposal to the owner and the reviewing session, not built into
+anything): the session writes a version into the study in the data repo (`validate-data.ts` before
+it pushes), runs the script from its last commit to the new one and gives the owner that list; the
+owner reviews in the app, every edit a commit; the session pulls and runs the script from its own
+commit to the checkout to read what the owner changed. One side writes at a time.
+
+Run on the owner's data repo (2026-11-27, a cloud container, read only): the review copy of the
+Jobava chapter from its first commit of the afternoon to the checkout gave the owner's two added
+lines (18 moves) and the arrows at one move, each with its link; the same chapter against the one
+in the repertoire study it was imported beside (`--old-study`) gave 5 of my moves changed, 216
+parts added (1,198 moves), 11 removed (107 moves) and 50 comments, in 0.3 s.
+
+Tests: `test/unit/core/study/diff.test.ts` (each kind of change, a line that only moved, a chapter
+written and read again, the marked line from either side's move and from a Black start) and
+`test/unit/scripts/chapterDiff.test.ts` (pairing; every link read back by `parseHash` to the move
+it names, a check and castling in the line; the Markdown; the script over a scratch data repo: a
+commit against the checkout, a file against a study, JSON, and what it refuses). Controls are named
+in both files.
+
+**Not checked**: a link followed on the owner's devices (the app can't read the data repo from a
+cloud container, CLAUDE.md), and the hand-off itself, which the owner and the reviewing session
+have yet to try (TESTING.md).

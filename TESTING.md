@@ -102,6 +102,22 @@ later change replaced are folded into the later item; items already reported wor
 
 ## 2. Studies and the study page
 
+### A change list's links open the app at the move (PLAN.md §5.214, 2026-11-27)
+
+- A reviewing session gives a change list made by `scripts/chapter-diff.ts` for a study in the data
+  repo. On the phone, with the study synced: does a link ("open") open Repworks at that move of
+  that chapter? Does it open the installed app or the browser? Say if the browser, and whether
+  that is a problem.
+- A removed line's link ("open at 3. Bf4"): does it land on the last move still there?
+- Is the list readable on the phone: the full lines with the new part in bold, a part's other
+  lines, a comment shown as "added after the old text"? Say what to cut or move.
+- The hand-off itself (the session writes the chapter into the data repo, you review and edit in
+  the app, the session reads your commits): does a version the session pushed arrive on the phone
+  and the desktop without a conflict while you weren't editing?
+- **Checked**: unit tests (every link read back by the app's router to its move), and the script
+  run read-only on the real data repo in a cloud container; **not** a link followed on a device,
+  and no session has written a study into the data repo yet.
+
 ### Stockfish 19's full net (§5.186, 2026-11-15)
 - On the desktop: ⚙ → Version → "Stockfish 19, full net" → Save, then switch Stockfish on. It
   downloads 99 MB once: how long does it take, and does the bar (`SF19F`) start searching after

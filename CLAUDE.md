@@ -131,6 +131,15 @@ that writes nothing to the repo; each step reads the file the one before wrote, 
 `policy-report`, `popularity` (the likelihoods). Ask Maia at equal ratings (`maia --before 0 --mid`) to compare
 with a bucket's results: Ms carries the rating gap.
 
+What changed between two versions of a study's chapters (PLAN.md §5.214), a change list that writes
+nothing: every line in full, and a link at each item that opens the app at that move when the new
+side is a study in a data repo. Each side is a PGN file, a data repo checkout, or `<checkout>@<rev>`:
+`node scripts/chapter-diff.ts ../repworks-data@<my last commit> ../repworks-data --study "1. Nc3 +
+Jobava" --chapter "Jobava simplified"` (what the owner changed in the app since); `delivered.pgn
+../repworks-data --study …` (a file against the study); `--old-study` (a review copy against the
+study it came from), `--mark TEXT` (comments holding TEXT, as open questions), `--json`,
+`--max-lines 0`, `--wraps`.
+
 The storm's "Gather positions" from a cloud session, as a device named `cloud` (PLAN.md §5.155),
 with the data repo checked out on `main`:
 `node scripts/storm-gather.ts ../repworks-data --minutes 60 --score-minutes 40 --push`; only
