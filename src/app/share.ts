@@ -1,7 +1,10 @@
 // What reaches Import from outside (PLAN.md §5.159): a share from another app, which the service
 // worker keeps in `repworks-share` (src/sw/sw.ts), and a .pgn file the desktop opened with the
-// installed app (the manifest's file_handlers, through `window.launchQueue`).
+// installed app (the manifest's file_handlers, through `window.launchQueue`). The same queue
+// brings a link followed into the app while it is open (§5.215): the window is focused, not
+// navigated, so the app goes to the link's address itself.
 import { signal } from '@preact/signals';
+import { launchHash } from '../core/app/launch.ts';
 import type { SharedInput } from '../core/import/shared.ts';
 import { open } from './mode.ts';
 
@@ -24,18 +27,27 @@ export async function takeShared(): Promise<void> {
 }
 
 interface LaunchParams {
-  files: readonly FileSystemFileHandle[];
+  files?: readonly FileSystemFileHandle[];
+  /** The address the app was launched with: a link in its scope, or its own start. */
+  targetURL?: string;
 }
 interface LaunchQueue {
   setConsumer(consume: (p: LaunchParams) => void): void;
 }
 
-/** A .pgn opened with the installed app (Chrome and Edge on the desktop): read, then Import. */
+/**
+ * A .pgn opened with the installed app (Chrome and Edge on the desktop): read, then Import. A link
+ * followed into the app while it is open: its address, which the browser left to the app.
+ */
 export function startFileLaunch(): void {
   const queue = (window as unknown as { launchQueue?: LaunchQueue }).launchQueue;
   queue?.setConsumer((p) => {
-    const handle = p.files[0];
-    if (!handle) return;
+    const handle = p.files?.[0];
+    if (!handle) {
+      const hash = launchHash(p.targetURL, location);
+      if (hash !== undefined) location.hash = hash;
+      return;
+    }
     void handle
       .getFile()
       .then(async (f) => {

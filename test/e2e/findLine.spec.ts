@@ -87,3 +87,35 @@ test('find a line: typed with or without spaces, the study’s place at its last
   await expect(dialog(page)).toHaveCount(0);
   await expect(page).toHaveURL(/#\/study\/Rep0Najd\/Ch1Najdf\?at=e4,c5,Nf3,d6,d4$/);
 });
+
+// A link followed into the installed app while it is open (PLAN.md §5.215): the browser focuses the
+// window and hands the link to `launchQueue`, as `focus-existing` has it; the app goes there. The
+// queue is a stand-in here (no browser test can install the app): the consumer the app set is
+// called as the browser calls it.
+test('a link followed into the open app goes to its move; a launch with no link, or one elsewhere, changes nothing', async ({ page }) => {
+  await page.addInitScript(() => {
+    // Chromium has a queue of its own, read-only on window: defined over, not assigned.
+    Object.defineProperty(window, 'launchQueue', {
+      value: { setConsumer: (consume: unknown) => ((window as unknown as { launched: unknown }).launched = consume) },
+    });
+  });
+  await setUp(page);
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf`);
+  await expect(page.locator('.notation .move').first()).toBeVisible();
+  const launch = (params: { files?: unknown[]; targetURL?: string }) =>
+    page.evaluate((p) => (window as unknown as { launched: (p: unknown) => void }).launched(p), params);
+
+  await launch({ files: [], targetURL: `${site.url}#/study/Rep0Najd/Ch2Alapn?at=e4,c5,c3,Nf6` });
+  await expect(page).toHaveURL(/#\/study\/Rep0Najd\/Ch2Alapn\?at=e4,c5,c3,Nf6$/);
+  await expect(page.locator('.notation .move.current')).toHaveText(/Nf6/);
+  // A move of the chapter already open.
+  await launch({ files: [], targetURL: `${site.url}#/study/Rep0Najd/Ch2Alapn?at=e4,c5` });
+  await expect(page.locator('.notation .move.current')).toHaveText(/c5/);
+  // Back comes back to the move before, as from any link.
+  await page.goBack();
+  await expect(page.locator('.notation .move.current')).toHaveText(/Nf6/);
+  // The app's icon clicked again (no link), and a link that isn't the app's: the page stays.
+  await launch({ files: [] });
+  await launch({ targetURL: 'https://example.org/repworks/#/train' });
+  await expect(page).toHaveURL(/#\/study\/Rep0Najd\/Ch2Alapn\?at=e4,c5,c3,Nf6$/);
+});

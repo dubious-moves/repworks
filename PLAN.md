@@ -12751,3 +12751,33 @@ in both files.
 **Not checked**: a link followed on the owner's devices (the app can't read the data repo from a
 cloud container, CLAUDE.md), and the hand-off itself, which the owner and the reviewing session
 have yet to try (TESTING.md).
+
+#### 5.215 A link followed into the installed app while it is open (the owner's question, 2026-11-27, built)
+
+§5.214's change list carries links to moves, and the owner uses only the installed app: "how do I
+make that work?". What a link does there, by case:
+
+- **The app's data is the browser's.** An installed app keeps its storage with the browser it was
+  installed from (the site's origin, that browser's profile). So a link that opens in a tab of that
+  same browser shows the same studies, synced the same way; it just isn't the app's own window. A
+  link opened in another browser (or an in-app browser with its own storage) has none of it.
+- **The link opening the app's window** is the browser's setting, not the site's: on the desktop
+  the installed app's "Open supported links" (Chrome and Edge, per app, in its app settings); on
+  Android an app installed from Chrome takes the links of its scope from other apps.
+- **The app already open** was the gap, and is what was built. The manifest's `launch_handler` is
+  `focus-existing` (§5.159, so a .pgn opened with the app doesn't reload it), and with it the
+  browser focuses the open window **without navigating it**: the link arrives as the launch's
+  `targetURL` on `window.launchQueue`, whose consumer only read files. A link followed while the app
+  was open would have brought it to the front where it stood. Now `startFileLaunch` goes to the
+  link's hash (`core/app/launch.ts`, `launchHash`: an address of this app, by origin and path, other
+  than the page shown; the app's own start is home). It is one history entry, so Back returns.
+  `focus-existing` stays: `navigate-existing` would reload the app at every link, and drop a
+  board's unsaved place.
+
+Tests: `test/unit/core/app/launch.test.ts`; `test/e2e/findLine.spec.ts` (the queue stood in for,
+its consumer called as the browser calls it: another chapter's move, a move of the open chapter,
+Back, a launch with no link and one elsewhere). Controls are named in both.
+
+**Taken from the platform's documentation, not seen**: that Chrome and Edge hand `targetURL` to the
+consumer under `focus-existing` (the Launch Handler API), and what Android does with a link when the
+app is open. No headless browser installs an app, so the owner's devices decide (TESTING.md).
