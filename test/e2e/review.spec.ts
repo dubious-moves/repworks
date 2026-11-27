@@ -33,9 +33,12 @@ const LIST: ReviewList = {
   ],
 };
 
-async function setUp(page: Page, withList: boolean) {
+/** A chapter as long as a real one: the Main line, then the kings stepping aside and back 150 times. */
+const LONG = `[Event "Test repertoire: Main line"]\n[Result "*"]\n[StudyName "Test repertoire"]\n[ChapterName "Main line"]\n[Orientation "black"]\n\n1. e4 c5 2. Nf3 d6 (2... Nc6 3. d4) 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 6. Be2 e5 7. Nb3 Be7 8. O-O O-O ${Array.from({ length: 150 }, (_, i) => `${9 + 2 * i}. Kh1 Kh8 ${10 + 2 * i}. Kg1 Kg8`).join(' ')} *\n`;
+
+async function setUp(page: Page, withList: boolean, long = false) {
   const w = world();
-  if (withList) w.git.commitIfHead(w.git.head, 'session: Sicilian batch 1', new Map([['review/Rep0Najd/batch-1.json', writeReviewList(LIST)]]), []);
+  if (withList) w.git.commitIfHead(w.git.head, 'session: Sicilian batch 1', new Map([['review/Rep0Najd/batch-1.json', writeReviewList(LIST)], ...(long ? [['studies/Rep0Najd/Ch1Najdf.pgn', LONG] as [string, string]] : [])]), []);
   await serveGithub(page, w.github);
   await page.goto(`${site.url}#setup?repo=${encodeURIComponent(REPO)}&token=${TOKEN}&name=desktop`);
   await expect(page.locator('.chip')).toHaveText(/^synced/);
@@ -51,6 +54,23 @@ test('no list for the study: no panel', async ({ page }) => {
   await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf`);
   await expect(page.locator('.notation .move').first()).toBeVisible();
   await expect(panel(page)).toHaveCount(0);
+});
+
+test('a long chapter: the folded panel keeps its row under the notation, and opened its items can be reached (the owner’s report, 2026-11-27)', async ({ page }) => {
+  await setUp(page, true, true);
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf`);
+  await expect(page.locator('.notation .move').nth(600)).toBeAttached();
+  const head = panel(page).locator('> summary');
+  await head.scrollIntoViewIfNeeded();
+  await expect(head).toBeInViewport({ ratio: 1 });
+  expect((await panel(page).boundingBox())!.height).toBeGreaterThanOrEqual(28);
+  await head.click();
+  await item(page, 0).locator('.review-go').click();
+  await expect(page.locator('.notation .move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 d6');
+  await item(page, 2).getByRole('button', { name: 'OK', exact: true }).scrollIntoViewIfNeeded();
+  await expect(item(page, 2).getByRole('button', { name: 'OK', exact: true })).toBeInViewport({ ratio: 1 });
+  // The notation keeps room of its own beside the open panel.
+  expect((await page.locator('.cv-panel .notation').boundingBox())!.height).toBeGreaterThanOrEqual(120);
 });
 
 test('a session’s list: folded at first; an item goes to its move; answered in place, and the answers reach the log', async ({ page }) => {

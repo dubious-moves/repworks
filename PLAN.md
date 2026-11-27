@@ -12857,6 +12857,17 @@ that hadn't changed), which validates, and `review-answers.ts` listed them as no
 **Not checked**: the panel on the owner's devices, and a list arriving there by a sync from a
 session's push (TESTING.md). The app can't read the data repo from a cloud container (CLAUDE.md).
 
+**The owner's first look (2026-11-27, the desktop, the session's three lists pushed and synced):
+no panel.** It was there, a few pixels high. On the stage the panel column has a fixed height and
+its parts are flex items; the folded panel could shrink (`flex: 0 1 auto`), and beside a real
+chapter's notation, thousands of pixels tall, the shrink took nearly all of its 40. The fixture
+chapter's notation fits its column, so nothing shrank in the tests. Now the panel never shrinks
+(`flex: 0 0 auto`); open, it still takes at most 55% and scrolls inside. `review.spec.ts` has a
+chapter of 600 moves: the folded head whole in view and at least 28px high, an item's buttons
+reachable when open, the notation keeping at least 120px (it fails on the desktop with the old
+rule). Seen after the fix with the owner's chapter and the three lists (119 items) served from the
+fake repo at his window's size: the head under the notation, the lists opening above the buttons.
+
 #### 5.217 Clickable lines written from the board, and branches inside a line (the owner's request, 2026-11-27, built)
 
 The owner: "When the user is inside a clickable line and they make a move on the board - this

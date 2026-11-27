@@ -7381,10 +7381,13 @@ button.course-group.on {
   min-width: 0;
 }
 
-/* On the stage the panel is one column of fixed height: the list scrolls inside its share. */
+/* On the stage the panel is one column of fixed height: the list scrolls inside its share. It
+   never gives up its height to the notation: a long chapter's notation has thousands of pixels to
+   shrink from, and a panel that shrank with it was left a few pixels high (the owner's report,
+   2026-11-27: no panel to be seen on a real chapter). */
 @media (min-width: 900px) {
   .has-frame .cv-panel > .review-panel {
-    flex: 0 1 auto;
+    flex: 0 0 auto;
     max-height: 55%;
     margin: 0;
     overflow-y: auto;
