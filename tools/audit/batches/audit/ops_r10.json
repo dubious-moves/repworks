@@ -1,0 +1,78 @@
+{
+ "chapter": "Jobava simplified",
+ "cut": [
+  {
+   "at": "1. Nc3 d5 2. d4 c6 3. Bf4 e6 4. e3 Bd6 5. Qg4 g6 6. Qf3",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 Nf6 4. g4 Bg6 5. g5 Nh5 6. e4 dxe4 7. fxe4 e6 8. Be2",
+   "mode": "children"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 Nf6 4. g4 Bg6 5. g5 Nh5 6. e4 e6 7. f4 dxe4 8. Be2",
+   "mode": "children"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 Nc6 4. e4 dxe4 5. fxe4 Bg6 6. d5 Ne5 7. Bf4 f6 8. Bxe5 fxe5 9. Bb5+ c6",
+   "mode": "node"
+  }
+ ],
+ "lines": [
+  "/tmp/claude-0/-home-user-repworks/c3c91cac-f0c9-5e7b-af69-21d816dac207/scratchpad/r10/nc3_jobava_rev1o_lines_final.pgn"
+ ],
+ "comments": [
+  {
+   "at": "1. Nc3 d5 2. d4 c6 3. Bf4 Bf5 4. f3 e6 5. h4 h6 6. e4 Bh7 7. Bd3",
+   "comment": "Taking on d5 is equally strong."
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 e6 4. e4 Bg6 5. h4 h6 6. exd5 exd5 7. Qe2+ Be7 8. Bf4 c6 9. O-O-O",
+   "comment": "With plan of g4 -> g5. [%cal Gg2g4,Gg4g5]"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 Nf6 4. g4 Bg6 5. g5 Nh5 6. e4 dxe4 7. fxe4 e6 8. Be2",
+   "comment": "And black's knight is lost.\nThey can try to get some compensation: (8... Bb4 9. Bxh5 Bxh5 10. Qxh5 Qxd4 11. Qf3) (8... Bb4 9. Bxh5 Bxc3+ 10. bxc3 Bxe4 11. Bf3) (8... Bb4 9. Bxh5 Bxe4 10. Bf3) (8... Nc6 9. Bxh5 Bxh5 10. Qxh5 Nxd4 11. Qd1) [%csl Gh5,Rg7,Rf6,Rf4,Rg3][%cal Ge2h5]"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 Nf6 4. g4 Bg6 5. g5 Nh5 6. e4 e6 7. f4",
+   "comment": "Important move. Prepares Be2 while threatening f5. [%cal Gf1e2,Ge2h5,Gf4f5]"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 Nf6 4. g4 Bg6 5. g5 Nh5 6. e4 e6 7. f4 dxe4 8. Be2",
+   "comment": "And black's knight is lost.\nBlack can try get some compensation: (8... Bb4 9. Bxh5 Bxh5 10. Qxh5 Qxd4 11. Ne2) (8... Nc6 9. Bxh5 Bxh5 10. Qxh5 Nxd4 11. Qd1) [%csl Rf6,Re5,Rf4,Rg3,Gh5][%cal Ge2h5]"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 Nf6 4. g4 Bg6 5. g5 Nfd7 6. h4 h5 7. Nxd5 e6 8. Nf4",
+   "comment": "We take the bishop if black doesn't address the threat: (8... Nc6 9. Nxg6)\nOtherwise we'll claim the center completely with e4: (8... Bd6 9. e4) (8... Bf5 9. e4) (8... Bh7 9. e4 c5 10. d5)\nNote that in case of Bd6, we don't take the bishop due to: (8... Bd6 9. Nxg6?! Bg3+ 10. Kd2) which is unnecessary. [%csl Gg6,Be4][%cal Gb8c6,Gf4g6,Bg6h7,Bg6f5,Be2e4,Bf8d6]"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 Nf6 4. g4 Bg6 5. g5 Ng8 6. h4 h6",
+   "comment": "[%cal Ge2e4]"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 Nc6 4. e4 dxe4 5. fxe4 Bg6 6. d5 Ne5 7. Bf4 f6 8. Bxe5 fxe5 9. Bb5+",
+   "comment": "Black should not survive this without heavy losses. (9... Kf7 10. Nf3) (9... c6 10. dxc6)"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 Nc6 4. e4 dxe4 5. fxe4 Bg6 6. d5 Ne5 7. Bf4 f6 8. Bxe5 fxe5 9. Bb5+ Kf7",
+   "comment": "Blocking with c6 does black no good: (9... c6 10. dxc6 Qxd1+ 11. Rxd1 Kf7 12. cxb7 Rb8 13. Nf3)"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 Nc6 4. e4 dxe4 5. fxe4 Bg6 6. d5 Ne5 7. Bf4 Nd7 8. Nf3",
+   "comment": "Black is out of good options -\nThe most natural move walks into trouble: (8... Ngf6 9. e5 Nh5 10. Be3 e6 11. g4) (8... Ngf6 9. e5 Ne4 10. Nxe4 Bxe4 11. Ng5 Bg6 12. e6)\nWe don't mind opening up the center: (8... e6 9. dxe6 fxe6 10. Nb5)"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 Nc6 4. e4 dxe4 5. fxe4 Bg6 6. d5 Ne5 7. Bf4 Qd6 8. Qd4",
+   "comment": "Most likely continuation: (8... f6 9. Nb5 Qd7 10. Qa4 c6 11. O-O-O)\nBut black also has some discoveries: (8... Nf3+ 9. Nxf3 Qxf4 10. Bb5+)"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nc6 3. Bf4 Bf5 4. e4 dxe4 5. d5 Nb8 6. g4 Bg6 7. Qd4",
+   "comment": "Next we can castle, or go for the attack right away: (7... Nf6 8. Nb5 Na6 9. Qa4 Qd7 10. Nd6+ exd6 11. Bb5 c6 12. dxc6) [%csl Gb5,Ba4][%cal Gc3b5,Bd4a4]"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 Bd6 5. Qf3 Bxf4 6. Qxf4 O-O 7. g4 Qd6 8. Qxd6 cxd6 9. f3",
+   "comment": "Prevents Ne4 - we can go g5 next.\nOne plan is to keep grabbing space with h4, a4, f4.\nInstead of castling, the king will probably belong on d2, defending e3."
+  }
+ ]
+}

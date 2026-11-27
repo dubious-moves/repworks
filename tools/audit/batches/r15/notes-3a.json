@@ -1,0 +1,30 @@
+[
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 Bf5 4. e3 e6 5. Nf3",
+  "text": "The ...Nbd7 part is dropped: your 6.Nb5 Bb4+ line is drilled now."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 Bf5 4. e3 e6 5. Nf3 Bd6 6. Ne5 Nbd7 7. Be2",
+  "text": "Your \"O-O transposes...\" text removed, as you asked."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 Bf5 4. e3 e6 5. Nf3 c5 6. Nb5 Na6 7. c3",
+  "text": "Rewritten after your answer: the exact point of c3 is that the c2-pawn blocks the queen's way to a4 (7.Qa4 is illegal before c3). Your arrows here are kept. The idea is also the new deck card 5e."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 Bf5 4. e3 e6 5. Nf3 c5 6. Nb5 Na6 7. c3 c4 8. Qa4",
+  "text": "Why Black has to block: 8...Be7 9.Nc7+ is a double check."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 Bf5 4. e3 e6 5. Nf3 c5 6. Nb5 Na6 7. c3 c4 8. Qa4 Nd7 9. b3",
+  "text": "As you said, only the most likely reply is drilled: 9...cxb3 (Maia 58%). 9...Be7 is this clickable."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 Bf5 4. e3 e6 5. Nf3 c5 6. Nb5 Na6 7. c3 c4 8. Qa4 Qd7",
+  "text": "The other way to block the diagonal. 9.Ne5 hits the queen, and once it leaves, Nc7+ or Nd6+ is a double check (Practical 93.2%)."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 Bf5 4. e3 e6 5. Nf3 Nbd7 6. Nb5 Bb4+ 7. c3 Ba5 8. Qa4 Bb6 9. c4",
+  "text": "Your text kept; I added (9... c6 10. Nd6+): +4.0, because nothing can take the knight on d6."
+ }
+]

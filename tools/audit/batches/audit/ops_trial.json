@@ -1,0 +1,132 @@
+{
+ "chapter": "Jobava simplified",
+ "cut": [
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 e6 4. e4 dxe4 5. fxe4 Bg4",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 e6 4. e4 dxe4 5. fxe4 Bg6 6. Nf3 Nc6",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 e6 4. e4 dxe4 5. fxe4 Bg6 6. Nf3 c6",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 e6 4. e4 dxe4 5. fxe4 Bg6 6. Nf3 h6",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 e6 4. e4 dxe4 5. fxe4 Bg6 6. Nf3 Be7",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 e6 4. e4 dxe4 5. fxe4 Bg6 6. Nf3 Nd7",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 e6 4. e4 dxe4 5. fxe4 Bg6 6. Nf3 Bh5",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 e6 4. e4 dxe4 5. fxe4 Bg6 6. Nf3 a6",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 e6 4. e4 dxe4 5. fxe4 Bg6 6. Nf3 Bb4 7. Bd3 Bh5",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 e6 4. e4 dxe4 5. fxe4 Bg6 6. Nf3 Bb4 7. Bd3 Nf6 8. Bg5 h6",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 e6 4. e4 dxe4 5. fxe4 Bg6 6. Nf3 Bb4 7. Bd3 Nf6 8. Bg5 Be7",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 e6 4. e4 dxe4 5. fxe4 Bg6 6. Nf3 Bb4 7. Bd3 Nf6 8. Bg5 Nbd7",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 e6 4. e4 dxe4 5. fxe4 Bg6 6. Nf3 Bb4 7. Bd3 Ne7 8. O-O O-O",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 e6 4. e4 dxe4 5. fxe4 Bg6 6. Nf3 Nf6 7. Bd3 c6",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 e6 4. e4 dxe4 5. fxe4 Bg6 6. Nf3 c5 7. d5 Nf6",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 e6 4. e4 dxe4 5. fxe4 Bg6 6. Nf3 c5 7. d5 exd5 8. Bb5+ Nc6",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 e6 4. e4 Bg6 5. h4 h6 6. exd5 exd5 7. Qe2+ Be7 8. Bf4 Nf6",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 e6 4. e4 Bg6 5. h4 h5 6. Bg5 f6 7. Be3 Bd6",
+   "mode": "node"
+  }
+ ],
+ "lines": [],
+ "comments": [
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 e6 4. e4 dxe4 5. fxe4",
+   "comment": "If the bishop goes to g4, it simply hangs: (5... Bg4? 6. Qxg4)"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 e6 4. e4 dxe4 5. fxe4 Bg6 6. Nf3",
+   "comment": "Against the rarer moves we develop with Bd3 and castle: (6... c6 7. Bd3 Nd7 8. O-O) (6... h6 7. Bd3 Nd7 8. O-O) (6... Be7 7. Bd3) (6... Nd7 7. Bd3) (6... Bh5 7. Bd3) (6... a6 7. Bd3)\nWith a knight on c6, Bb5 pins it instead: (6... Nc6 7. Bb5)"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 e6 4. e4 dxe4 5. fxe4 Bg6 6. Nf3 Bb4 7. Bd3",
+   "comment": "Against ...Bh5 we castle as usual: (7... Bh5 8. O-O)"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 e6 4. e4 dxe4 5. fxe4 Bg6 6. Nf3 Bb4 7. Bd3 Nf6 8. Bg5",
+   "comment": "The f6-knight is pinned, so e5 is coming. After ...h6 the bishop keeps the pin; after ...Be7, which breaks it, h4 goes for the g6-bishop: (8... h6 9. Bh4) (8... Be7 9. h4) (8... Nbd7 9. e5 h6 10. exf6)"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 e6 4. e4 dxe4 5. fxe4 Bg6 6. Nf3 Nf6 7. Bd3",
+   "comment": "Bb4 transposes\ninto 6... Bb4 7. Bd3 Nf6\nAgainst ...c6, e5 drives the knight away: (7... c6 8. e5)"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 e6 4. e4 dxe4 5. fxe4 Bg6 6. Nf3 c5 7. d5",
+   "comment": "If Black doesn't take, Bb5+ all the same: (7... Nf6 8. Bb5+)"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 e6 4. e4 dxe4 5. fxe4 Bg6 6. Nf3 c5 7. d5 exd5 8. Bb5+",
+   "comment": "After ...Nc6, take back on d5: the c6-knight is pinned. (8... Nc6 9. exd5)"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 e6 4. e4 dxe4 5. fxe4 Bg6 6. Nf3 c5 7. d5 exd5 8. Bb5+ Nd7 9. Ne5",
+   "comment": "The d7-knight is pinned, and the d5-pawn falls: (9... Nf6 10. Nxd5) (9... Bd6 10. Qxd5)"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 e6 4. e4 Bg6 5. h4 h6 6. exd5 exd5 7. Qe2+ Be7 8. Bf4",
+   "comment": "Against ...Nf6 too, castle long, then g4 and g5: (8... Nf6 9. O-O-O)"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 e6 4. e4 Bg6 5. h4 h5 6. Bg5 f6 7. Be3",
+   "comment": "Against ...Bd6, Qd2 and castle long, as against 6...Be7: (7... Bd6 8. Qd2)"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 e6 4. e4 dxe4 5. fxe4 Bg6 6. Nf3 Bb4 7. Bd3 Bxc3+ 8. bxc3",
+   "comment": "Black has given up the bishop pair. We castle, and if the knight comes to f6 we pin it with Bg5, as in the main line: (8... Ne7 9. O-O) (8... Nf6 9. Bg5) (8... Nc6 9. O-O)"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 e6 4. e4 dxe4 5. fxe4 Bg6 6. Nf3 Bb4 7. Bd3 Nc6 8. a3",
+   "comment": "a3 asks the bishop to decide. After ...Ba5, b4 chases it again: (8... Ba5 9. b4 Bb6 10. Ne2) After ...Bxc3+, take back with the pawn: (8... Bxc3+ 9. bxc3)"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Bf5 3. f3 e6 4. e4 dxe4 5. fxe4 Bg6 6. Nf3 Bb4 7. Bd3 Ne7 8. O-O",
+   "comment": "Next the c3-knight steps out of the pin to e2, and c3 hits the bishop: (8... O-O 9. Ne2 c5 10. c3) (8... O-O 9. Ne2 c6 10. c3)\nAgainst ...Nbc6, c4 is stronger: a3, then b4 or c5, traps the bishop. (8... O-O 9. Ne2 Nbc6 10. c4)"
+  }
+ ]
+}

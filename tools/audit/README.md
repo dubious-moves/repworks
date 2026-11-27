@@ -1,6 +1,6 @@
 # Repertoire audit tools (hand-over from the reviewing session)
 
-These are the scripts a reviewing session ran to audit the owner's 1.Nc3 repertoire (PLAN.md §5.214 and §5.216 describe the data-repo hand-off they feed). They are copied as they were, in the folder layout they ran in. Nothing from the owner's studies is in this folder.
+These are the scripts a reviewing session ran to audit the owner's 1.Nc3 repertoire (PLAN.md §5.214 and §5.216 describe the data-repo hand-off they feed). They are copied as they were, in the folder layout they ran in. The owner agreed (2026-11-27) that his repertoire may be public here, so the per-batch builders, the session's journal and the caches are included too.
 
 The rules the audit follows, the ledger of what is audited, and the hand-kept study live in the private data repo, under `notes/<study id>/` (`rules.md`, `ledger.md`).
 
@@ -93,3 +93,15 @@ Settings used: `scripts/practical.ts --depth 5 --maia --ort-node <folder> --repl
 - risk aversion 0.05, reply threshold 3%, minimum 50 games, reach floor 2%;
 - own margin 5, own candidates 3, prepared prior 50;
 - Maia maia3-23m at 2150.
+
+## Also here
+
+- **`batches/`**: each batch's ops builder (`mk_*.py`, `cuts6.py`, `fixes.ts`, `restore.ts`, `fix2.ts`), the ops they wrote (`ops*.json`), the lines they added (`lines*.pgn`), and the review-list notes (`notes*.json`, `mknotes.py`; the priority split `priority.py`).
+  - They hold the owner's lines and the session's comments, and they hardcode the old scratchpad path.
+  - Read them as worked examples of the ops format and the comment style.
+- **`journal/REVIEW_STATE.md`**: the session's working journal, dated blocks from 2026-11-24 to the hand-over. The binding rules are condensed in the data repo's `notes/<study id>/rules.md`.
+- **`caches.tgz`** (6.7 MB). Unpack it here with `tar xzf caches.tgz`. It holds:
+  - `review/cache.json`: explorer (`x16|` at 1600–2500, `x|`) and ChessDB (`c|`, `pv|`) answers, used by `sub_inv`, `shares` and `review`;
+  - `pe/cache_jobava` and `pe/cache_jobava_b`: `scripts/practical.ts --cache` folders;
+  - `deck/cache`: `IDEAS_CACHE` for `scripts/ideas/cv.ts`.
+- **Tokens.** The cloud environment has `LICHESS_TOKEN`, `LICHESS_TOKEN2` and `LICHESS_TOKEN3`. Each is its own explorer bucket (about 16 requests a minute each), so independent runs can use one each.

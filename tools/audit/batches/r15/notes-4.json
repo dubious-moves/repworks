@@ -1,0 +1,194 @@
+[
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 Bf5 4. e3 e6 5. Nf3 Bb4 6. Bd3 Ne4 7. O-O Nxc3 8. bxc3 Bxc3 9. Rb1 b6",
+  "text": "Restored from batch 3 because the follow-up is a tactic: Bxf5 exf5 Qd3 forks f5 and the c3-bishop and wins the gambit pawn back (Practical 72.0; Stockfish +1.6 vs +0.9 for anything else)."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 Bf5 4. e3 e6 5. Nf3 c5 6. Nb5 Qa5+ 7. b4 cxb4 8. Nc7+ Kd8",
+  "text": "Restored from batch 3 because 9.Bd3 is hard to find: 9.Nxa8? runs into ...b3+, uncovering a check from the a5-queen. Practical 85.6 vs 48.6 for Nxa8."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 Bf5 4. e3 Nc6 5. Nb5 e5 6. dxe5 Ne4 7. e6 Bd6",
+  "text": "Restored from batch 3: 8.exf7+ Kxf7 (98%) 9.Qxd5+, and the check also hits the e4-knight."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 Bf5 5. Nf3 e6 6. Ne5 Nbd7 7. g4 Bg6 8. h4 h5 9. Nxg6 fxg6 10. g5 Ng8",
+  "text": "The line now ends on 10.g5: after 8...h5, the most common reply, Nxg6 and g5 give +3, so it's kept that far. 10...Ng8 11.Bh3 (1 in 8,866) is a clickable on 10.g5."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 Bf5 5. Nf3 e6 6. Ne5 Nbd7 7. g4 Bg6 8. h4 h5 9. Nxg6 fxg6 10. g5 Ne4",
+  "text": "A clickable on 10.g5, now with 11.Qd3, which hits the knight a second time (Stockfish +3.7 vs +3.4 for 11.Nxe4; Practical agrees)."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 Bf5 5. Nf3 e6 6. Ne5 Nbd7 7. g4 Bg6 8. h4 Nxe5",
+  "text": "Your clickables on 8.h4 already show this line, so the drilled copy goes."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 Bf5 5. Nf3 e6 6. Ne5 Nbd7 7. g4 Bg6 8. h4 h6",
+  "text": "Your clickables on 8.h4 already show this line, so the drilled copy goes."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 Bf5 5. Nf3 e6 6. Ne5 Nbd7 7. g4 Nxe5 8. gxf5",
+  "text": "Kept drilled below the guide (22%, 1 in 5,562) because it's hard to find: the natural 8.dxe5 is -0.8 after 8...Nxg4."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 Bf5 5. Nf3 e6 6. Ne5 Nbd7 7. g4 Be4",
+  "text": "14% at this position, about 1 in 8,585 games over all move orders: under the guide (1 in 2,000 and 10%), and not sharp or hard to find. Now a clickable on 7.g4."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 Bf5 5. Nf3 e6 6. Ne5 Bd6 7. g4 Bg6",
+  "text": "1 in 3,546, and the same idea as the ...Nbd7 line (h4, then Nxg6 and g5 against ...h5): a clickable on 7.g4."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 Bf5 5. Nf3 e6 6. Ne5 Bd6 7. g4 Bxe5",
+  "text": "34% at this position, about 1 in 5,169 games over all move orders: under the guide (1 in 2,000 and 10%), and not sharp or hard to find. Now a clickable on 7.g4."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 Bf5 5. Nf3 e6 6. Ne5 Bd6 7. g4 Be4",
+  "text": "15% at this position, about 1 in 11,760 games over all move orders: under the guide (1 in 2,000 and 10%), and not sharp or hard to find. Now a clickable on 7.g4."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 Bf5 5. Nf3 e6 6. Ne5 c5 7. g4 Bg6 8. h4 h5 9. Nxg6 fxg6 10. g5 Nfd7",
+  "text": "The line now ends on 10.g5 (+2.7). 10...Nfd7 11.Bd3 Kf7 12.Qf3 (1 in 9,887) is a clickable there."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 Bf5 5. Nf3 e6 6. Ne5 c5 7. g4 Bg6 8. h4 h6",
+  "text": "29% at this position, about 1 in 8,276 games over all move orders: under the guide (1 in 2,000 and 10%), and not sharp or hard to find. Now a clickable on 8.h4."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 Bf5 5. Nf3 e6 6. Ne5 c5 7. g4 Bg6 8. h4 cxd4",
+  "text": "22% at this position, about 1 in 10,979 games over all move orders: under the guide (1 in 2,000 and 10%), and not sharp or hard to find. Now a clickable on 8.h4."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 Bf5 5. Nf3 e6 6. Ne5 c5 7. g4 Be4",
+  "text": "20% at this position, about 1 in 9,014 games over all move orders: under the guide (1 in 2,000 and 10%), and not sharp or hard to find. Now a clickable on 7.g4."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 Bf5 5. Nf3 e6 6. Ne5 Bb4",
+  "text": "10% at this position, about 1 in 3,678 games over all move orders: under the guide (1 in 2,000 and 10%), and not sharp or hard to find. Now a clickable on 6.Ne5."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 Bf5 5. Nf3 e6 6. Ne5 h6",
+  "text": "9% at this position, about 1 in 3,939 games over all move orders: under the guide (1 in 2,000 and 10%), and not sharp or hard to find. Now a clickable on 6.Ne5."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 Bf5 5. Nf3 e6 6. Ne5 Be7",
+  "text": "5% at this position, about 1 in 7,142 games over all move orders: under the guide (1 in 2,000 and 10%), and not sharp or hard to find. Now a clickable on 6.Ne5."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 Bf5 5. Nf3 Nc6 6. Ne5 Nxe5",
+  "text": "A plain recapture (1 in 3,651). The clickables on 6.Ne5 show dxe5 and the trap after ...Nd7: nothing guards d5, so Qxd5."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 Bf5 5. Nf3 Nc6 6. Ne5 e6",
+  "text": "34% at this position, about 1 in 4,462 games over all move orders: under the guide (1 in 2,000 and 10%), and not sharp or hard to find. Now a clickable on 6.Ne5."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 Bf5 5. Nf3 Nc6 6. Ne5 Nb4",
+  "text": "18% at this position, about 1 in 8,260 games over all move orders: under the guide (1 in 2,000 and 10%), and not sharp or hard to find. Now a clickable on 6.Ne5."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 Bf5 5. Nf3 h6 6. Bd3 Bxd3",
+  "text": "A plain recapture (cxd3, 1 in 3,531): a clickable on 6.Bd3, with Qb3 next."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 Bf5 5. Nf3 h6 6. Bd3 Ne4",
+  "text": "14% at this position, about 1 in 13,195 games over all move orders: under the guide (1 in 2,000 and 10%), and not sharp or hard to find. Now a clickable on 6.Bd3."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 Bf5 5. Nf3 Nbd7",
+  "text": "4% at this position, about 1 in 5,944 games over all move orders: under the guide (1 in 2,000 and 10%), and not sharp or hard to find. Now a clickable on 5.Nf3."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 c5 5. dxc5 Nc6 6. a3 e5 7. Bg5 Be6 8. b4 Be7 9. Be2 O-O 10. Nf3 d4",
+  "text": "33% at this position, about 1 in 14,359 games over all move orders: under the guide (1 in 2,000 and 10%), and not sharp or hard to find. Now a clickable on 10.Nf3."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 c5 5. dxc5 Nc6 6. a3 e5 7. Bg5 Be6 8. b4 Be7 9. Be2 h6",
+  "text": "21% at this position, about 1 in 11,692 games over all move orders: under the guide (1 in 2,000 and 10%), and not sharp or hard to find. Now a clickable on 9.Be2."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 c5 5. dxc5 Nc6 6. a3 e5 7. Bg5 Be6 8. b4 Be7 9. Be2 d4",
+  "text": "A clickable on 9.Be2, now with 10.exd4 (Practical 61.8 vs 57.4 for 10.Na4; Stockfish +0.46 vs +0.14)."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 c5 5. dxc5 Nc6 6. a3 e5 7. Bg5 Be6 8. b4 h6",
+  "text": "11% at this position, about 1 in 14,276 games over all move orders: under the guide (1 in 2,000 and 10%), and not sharp or hard to find. Now a clickable on 8.b4."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 c5 5. dxc5 Nc6 6. a3 e5 7. Bg5 Be6 8. b4 d4",
+  "text": "11% at this position, about 1 in 14,588 games over all move orders: under the guide (1 in 2,000 and 10%), and not sharp or hard to find. Now a clickable on 8.b4."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 c5 5. dxc5 Nc6 6. a3 e5 7. Bg5 d4 8. Na4 Qa5+ 9. c3 dxc3 10. b4",
+  "text": "Kept drilled: 9.c3 and 10.b4 are only moves (9.Nc3 -3.2; 10.Nxc3 -1.5, 10.bxc3 -2.0)."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 c5 5. dxc5 Nc6 6. a3 e5 7. Bg5 d4 8. Na4 Qa5+ 9. c3 Ne4",
+  "text": "21% at this position, about 1 in 13,398 games over all move orders: under the guide (1 in 2,000 and 10%), and not sharp or hard to find. Now a clickable on 9.c3."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 c5 5. dxc5 Nc6 6. a3 e5 7. Bg5 Bxc5 8. Bxf6",
+  "text": "Kept drilled (23%, 1 in 2,691): Bxf6 and Qxd5 win a pawn (Practical 75.6%, Stockfish +1.4)."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 c5 5. dxc5 Nc6 6. a3 e5 7. Bg5 Bxc5 8. Bxf6 Qxf6",
+  "text": "The same idea as 8...gxf6 9.Qxd5, so a clickable on 8.Bxf6, as you asked for the Qa4 line."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 c5 5. dxc5 e6 6. Na4",
+  "text": "Kept drilled below the guide (19%, 1 in 2,102) because Na4 is hard to find. Practical prefers 7.Bxb8 against ...Bxc5 (55.9 vs 51.5), but 7.Bxb8 has 1 game in the database and 7.Nxc5 2,339, and Stockfish prefers 7.Nxc5 (+0.35 vs 0.00). I used 7.Nxc5 and recommend keeping it."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 c5 5. dxc5 Qa5",
+  "text": "A clickable on 5.dxc5, now with 6.Nf3 (Practical 59.3 vs 54.9 for 6.a3)."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 Nc6 5. Bd3 e6 6. Nf3 Bb4",
+  "text": "26% at this position, about 1 in 4,610 games over all move orders: under the guide (1 in 2,000 and 10%), and not sharp or hard to find. Now a clickable on 6.Nf3."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 Nc6 5. Bd3 e6 6. Nf3 h6",
+  "text": "13% at this position, about 1 in 9,324 games over all move orders: under the guide (1 in 2,000 and 10%), and not sharp or hard to find. Now a clickable on 6.Nf3."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 Nc6 5. Bd3 Bg4 6. f3 Bh5 7. h4 h6",
+  "text": "7...h6 (28%) is a mistake: after 8.g4 Bg6 9.Bxg6 fxg6 10.Qd3, Qd3 hits g6 and White is about +1.9 (Practical 78.1). 7...Bg6 (46%) is level after 8.g4, so it's a clickable on 7.h4, the same pattern as your 6.Nb5 Bb4+."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 Nc6 5. Bd3 Bg4 6. f3 Bh5 7. h4 h6 8. g4 Bg6 9. Bxg6 fxg6 10. Qd3 Kf7",
+  "text": "The line now ends on 10.Qd3; castling long after ...Kf7 is a clickable there."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 Nc6 5. Bd3 Bg4 6. f3 Bh5 7. h4 Bg6",
+  "text": "46% but level after 8.g4 (Stockfish +0.03), while 7...h6 is a mistake (+1.9): so 7...h6 is drilled and this is a clickable on 7.h4."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 Nc6 5. Bd3 Bg4 6. f3 Bh5 7. h4 e6",
+  "text": "20% at this position, about 1 in 8,387 games over all move orders: under the guide (1 in 2,000 and 10%), and not sharp or hard to find. Now a clickable on 7.h4."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 Nc6 5. Bd3 h6",
+  "text": "14% at this position, about 1 in 3,049 games over all move orders: under the guide (1 in 2,000 and 10%), and not sharp or hard to find. Now a clickable on 5.Bd3."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 Nc6 5. Bd3 g6",
+  "text": "7% at this position, about 1 in 5,750 games over all move orders: under the guide (1 in 2,000 and 10%), and not sharp or hard to find. Now a clickable on 5.Bd3."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 Bg4",
+  "text": "5% (1 in 1,245). f3, then h4 or g4, is rule 10, drilled in the ...Nc6 ...Bg4 line: a clickable on 4.e3."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 b5",
+  "text": "4% at this position, about 1 in 1,593 games over all move orders: under the guide (1 in 2,000 and 10%), and not sharp or hard to find. Now a clickable on 4.e3."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 g6",
+  "text": "4% at this position, about 1 in 1,598 games over all move orders: under the guide (1 in 2,000 and 10%), and not sharp or hard to find. Now a clickable on 4.e3."
+ },
+ {
+  "moves": "1. Nc3 d5 2. d4 Nf6 3. Bf4 a6 4. e3 h6",
+  "text": "3% at this position, about 1 in 1,867 games over all move orders: under the guide (1 in 2,000 and 10%), and not sharp or hard to find. Now a clickable on 4.e3."
+ }
+]

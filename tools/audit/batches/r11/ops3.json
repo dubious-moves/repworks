@@ -1,0 +1,37 @@
+{
+ "chapter": "Jobava simplified",
+ "cut": [],
+ "lines": [
+  "/tmp/claude-0/-home-user-repworks/c3c91cac-f0c9-5e7b-af69-21d816dac207/scratchpad/r11/c4_lines.pgn"
+ ],
+ "comments": [
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 c5 5. Nb5 Na6 6. c3 Bd7 7. a4 Be7 8. Bd3",
+   "comment": ""
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 c5 5. Nb5 Na6 6. c3 Bd7 7. a4 Be7 8. Bd3 c4 9. Bb1",
+   "comment": "On b1 rather than c2: here the bishop shuts the first rank, and that decides the a-file fight after ...Bxb5 (see 11.b6). It has one downside: it also cuts our a1-rook off from the queen. So against ...Qa5 the bishop goes back to c2, and ...Bxb5 axb5 then opens the a-file against the black queen: (9... Qa5 10. Bc2 Bxb5 11. axb5)\nAgainst ...Qb6, develop with Nf3: (9... Qb6 10. Nf3)"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 c5 5. Nb5 Na6 6. c3 Bd7 7. a4 Be7 8. Bd3 c4 9. Bb1 Bxb5 10. axb5",
+   "comment": "If the knight goes back to b8 instead, just develop: (10... Nb8 11. Nf3)"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 c5 5. Nb5 Na6 6. c3 Bd7 7. a4 Be7 8. Bd3 c4 9. Bb1 Bxb5 10. axb5 Nc7 11. b6",
+   "comment": "The point of Bb1: if Black takes, Bxc7 wins, because ...Rxa1 no longer hits our queen. Against ...Na6, take on a7: (11... Na6 12. bxa7)"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 c5 5. Nb5 Na6 6. c3 Bd7 7. a4 Be7 8. Bd3 c4 9. Bb1 Bxb5 10. axb5 Nc7 11. b6 axb6 12. Bxc7",
+   "comment": "Black loses material whatever he does: (12... Qc8 13. Rxa8 Qxa8) (12... Rxa1 13. Bxd8) (12... Qxc7 13. Rxa8+)"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 c5 5. Nb5 Na6 6. c3 Bd7 7. a4 Be7 8. Bd3 c4 9. Bb1 Bxb5 10. axb5 Nc7 11. b6 Nb5 12. bxa7 Nxa7 13. Nf3",
+   "comment": "Black's best defence, and the game is level. Trade on a8 if the knight comes back to c6, and castle; against ...O-O, Qc2 lines up with the bishop: (13... Nc6 14. Rxa8 Qxa8 15. O-O) (13... O-O 14. Qc2)"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 c5 5. Nb5 Na6 6. c3 Bd7 7. a4 Be7 8. Bd3 c4 9. Bb1 O-O 10. h4",
+   "comment": "Next Qc2, lining up with the bishop on h7, then g4 and g5: (10... Bxb5 11. axb5 Nc7 12. Qc2) (10... Bxb5 11. axb5 Nb8 12. Qc2)"
+  }
+ ]
+}

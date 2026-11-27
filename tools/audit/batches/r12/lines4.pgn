@@ -1,0 +1,15 @@
+[Event "l1"]
+
+1. Nc3 d5 2. d4 Nf6 3. Bf4 Bf5 4. e3 e6 5. Nf3 c5 6. Nb5 Na6 7. c3 c4 8. Qa4 Nd7 9. b3 Be7 10. Nd6+ Bxd6 11. Bxd6 *
+
+[Event "l2"]
+
+1. Nc3 d5 2. d4 Nf6 3. Bf4 Bf5 4. e3 e6 5. Nf3 c5 6. Nb5 Na6 7. c3 c4 8. Qa4 Nd7 9. b3 cxb3 10. axb3 Be7 11. Nd6+ Bxd6 12. Bxd6 *
+
+[Event "l3"]
+
+1. Nc3 d5 2. d4 Nf6 3. Bf4 Bf5 4. e3 e6 5. Nf3 c5 6. Nb5 Na6 7. c3 c4 8. Qa4 Qd7 9. Ne5 *
+
+[Event "l4"]
+
+1. Nc3 d5 2. d4 Nf6 3. Bf4 Bf5 4. e3 e6 5. Nf3 Nbd7 6. Nb5 Bb4+ 7. c3 Ba5 8. Qa4 Bb6 9. c4 *

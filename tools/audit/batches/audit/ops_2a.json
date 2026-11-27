@@ -1,0 +1,144 @@
+{
+ "chapter": "Jobava simplified",
+ "cut": [
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 Bd6 5. Qf3 a6",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 Bd6 5. Qf3 c6",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 Bd6 5. Qf3 c5",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 Bd6 5. Qf3 Bxf4 6. Qxf4 a6",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 Bd6 5. Qf3 Bxf4 6. Qxf4 Nbd7",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 Bd6 5. Qf3 Bxf4 6. Qxf4 c6",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 Bd6 5. Qf3 Bxf4 6. Qxf4 c5",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 Bd6 5. Qf3 Bxf4 6. Qxf4 O-O 7. g4 Nc6",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 Bd6 5. Qf3 Bxf4 6. Qxf4 O-O 7. g4 Nbd7",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 Bd6 5. Qf3 Bxf4 6. Qxf4 O-O 7. g4 e5",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 Bd6 5. Qf3 Bxf4 6. Qxf4 Nc6 7. Nb5 O-O",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 Bd6 5. Qf3 Bxf4 6. Qxf4 Nc6 7. Nb5 Kd7",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 Bd6 5. Qf3 Bxf4 6. Qxf4 Nc6 7. Nb5 a6",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 Bd6 5. Qf3 Bxf4 6. Qxf4 Nc6 7. Nb5 Nb4",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 Bd6 5. Qf3 Bxf4 6. Qxf4 Nc6 7. Nb5 Nh5",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 Bd6 5. Qf3 Bxf4 6. Qxf4 Nc6 7. Nb5 Bd7",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 Bd6 5. Qf3 Bxf4 6. Qxf4 Nc6 7. Nb5 e5 8. dxe5 Nh5",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 Bd6 5. Qf3 Bxf4 6. Qxf4 Nc6 7. Nb5 e5 8. dxe5 Nd7",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 Bd6 5. Qf3 Bxf4 6. Qxf4 Qd6 7. Qxd6 cxd6 8. Nb5 Kd7",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 Bd6 5. Qf3 O-O 6. g4 Nc6",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 Bd6 5. Qf3 O-O 6. g4 b6",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 Bd6 5. Qf3 O-O 6. g4 Bb4",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 Bd6 5. Qf3 O-O 6. g4 e5",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 Bd6 5. Qf3 O-O 6. g4 Nbd7",
+   "mode": "node"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 Bd6 5. Qf3 O-O 6. g4 h6",
+   "mode": "node"
+  }
+ ],
+ "lines": [],
+ "comments": [
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 Bd6 5. Qf3",
+   "comment": "Nc6 transposes into 2... Nc6 3. Bf4\ne6 4. e3 Bd6\n5. Qf3 Nf6\nAgainst the rarer moves, g4 as usual: (5... a6 6. g4) (5... c6 6. g4) (5... c5 6. g4 cxd4 7. exd4)"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 Bd6 5. Qf3 Bxf4 6. Qxf4",
+   "comment": "Against the rarer moves, g4 as usual: (6... a6 7. g4) (6... c6 7. g4 O-O 8. Nf3) (6... c5 7. g4)\nAgainst ...Nbd7, Nb5 hits c7, which only the queen guards: (6... Nbd7 7. Nb5 O-O 8. Qxc7) (6... Nbd7 7. Nb5 e5 8. dxe5)"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 Bd6 5. Qf3 Bxf4 6. Qxf4 O-O 7. g4",
+   "comment": "g5 drives the f6-knight away: (7... Nc6 8. g5) (7... Nbd7 8. g5)\nAgainst ...e5, take: after ...Nxg4, Be2 hits the knight. (7... e5 8. dxe5 Nxg4 9. Be2)"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 Bd6 5. Qf3 Bxf4 6. Qxf4 Nc6 7. Nb5",
+   "comment": "\nSets up a trap, but it's not a bad move even if\nblack responds correctly. Remember to take with the queen: (7... O-O 8. Qxc7 Qxc7 9. Nxc7 Rb8 10. Nb5)\nThe other replies also cost Black the c7-pawn, except ...Kd7, which guards it: (7... a6 8. Nxc7+) (7... Nb4 8. Qxc7) (7... Nh5 8. Qxc7) (7... Bd7 8. Nxc7+) (7... Kd7 8. Nf3)"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 Bd6 5. Qf3 Bxf4 6. Qxf4 Nc6 7. Nb5 e5 8. dxe5",
+   "comment": "Other knight moves: (8... Nh5 9. Qf3 g6 10. Qxd5) (8... Nd7 9. e6)"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 Bd6 5. Qf3 Bxf4 6. Qxf4 Qd6 7. Qxd6 cxd6 8. Nb5",
+   "comment": "The knight eyes c7 and d6. After ...Kd7, a3, and the knight drops back once ...a6 comes: (8... Kd7 9. a3 a6 10. Nc3)\nIf c7 or d6 is left unguarded, the knight takes: (8... Na6 9. Nxd6+) (8... Ke7 9. Nc7)"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 Bd6 5. Qf3 O-O 6. g4",
+   "comment": "Bxf4 likely transposes\nOtherwise g5 drives the f6-knight away: (6... Nc6 7. g5) (6... Nbd7 7. g5) (6... h6 7. g5)\nAgainst ...b6, take on d6 first: (6... b6 7. Bxd6)\nAgainst ...Bb4, Ne2 keeps our pawns intact: (6... Bb4 7. Ne2)\nAgainst ...e5, take: (6... e5 7. dxe5)"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 c6 4. e3 e6 5. g4 Bd6 6. Qf3 Bxf4 7. Qxf4",
+   "comment": "Next Nf3 and g5. Against ...h6, h4 first: (7... O-O 8. Nf3) (7... Nbd7 8. Nf3) (7... h6 8. h4 Nbd7 9. Nf3)"
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 c6 4. e3 e6 5. g4 Bd6 6. Qf3 h6 7. h4 Bxf4 8. Qxf4",
+   "comment": "Next Nf3 and g5: (8... Nbd7 9. Nf3)"
+  }
+ ]
+}

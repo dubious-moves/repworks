@@ -1,0 +1,15 @@
+{
+ "chapter": "Jobava simplified",
+ "cut": [],
+ "lines": [],
+ "comments": [
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 c5 5. Nb5",
+   "comment": "After ...c5 the c-pawn can never come to c6 to chase a knight on b5, so Nb5 lands with a threat: the knight and the f4-bishop both hit c7, which only the queen guards, so Nc7+ is coming. After ...Na6, ...a6 is impossible too, so the knight stays on b5 for good: c3 and a4 support it, and we carry on with Bd3, then g4 or h4 against the castled king."
+  },
+  {
+   "at": "1. Nc3 d5 2. d4 Nf6 3. Bf4 e6 4. e3 Bb4 5. Bd3 c5 6. dxc5 Bxc5 7. Nb5",
+   "comment": "The same idea as after 4...c5: Black's c-pawn has left, so ...c6 can't chase a knight on b5, and Nb5 with the f4-bishop threatens Nc7+ (only the queen guards c7). After ...Na6, ...a6 is out too. We develop with Nf3 and castle, then c3 and b4 chase the c5-bishop.\nAgainst ...Bb6, Nd6+ (the f4-bishop covers d6); against ...Qa5+, c3, since the c5-bishop could take on b4: (7... Bb6 8. Nd6+) (7... Qa5+ 8. c3)"
+  }
+ ]
+}

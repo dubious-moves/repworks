@@ -1,4 +1,1 @@
 review/cache.json
-review/*.json
-*.json
-!package.json
