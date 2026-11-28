@@ -2217,19 +2217,11 @@ does. Start with the spike: its log decides what the later parts change (CHESSNU
   note says, your own edit wins)?
 - The ledger in the data repo (`notes/JX3v8kXM/ledger.md`): are its tables what you expect, and
   the questions under "Open" the ones you still want asked?
-- **Your choice: where the caches are kept between sessions.** A session's explorer and ChessDB
-  answers are gone with its container, and a cold cache costs time (an inventory 3 minutes, the
-  deck check's shares 40, Practical on a subtree more). The old session's are a tarball on branch
-  `claude/audit-tools`. Options: the testing data repo (private, made for sessions; my
-  recommendation), a folder in the data repo's `notes/` (it grows the repo your devices sync), or
-  nowhere (each session warms its own).
-- **Your choice: the difficulty limits on Stockfish 19.** The measure runs on the engine whose
-  numbers your limits (hard at 5, mid at 3) were set on. Stockfish 19 sees the tactics deeper and
-  scores the same moves higher: 6.Nb5, 9.c3, 8.Qa4 and 11.Nd6+ (mid, at about 4) come out at about 6,
-  9.b3 at 16 for 8 to 10, and 6.Na4 falls from 3.8 to 2.7 (the table is in PLAN.md §5.219). Moving
-  to 19 means new limits, set on your reading of those lines; with the old limits it would drill
-  more. My recommendation: stay as it is through the Jobava, and set the limits again on 19 when the
-  next chapter starts.
+- The caches are in the testing data repo, `audit-cache/` (your choice): about 31 MB of text in 32
+  files there now. Say if that repo should not grow this way.
+- The difficulty measure stays on the engine your limits were set for (your "you decide"); a move
+  near a limit gets Stockfish 19's number beside it. If a class ever looks wrong to you on a line
+  you know, that is the sign to set the limits again.
 - **Checked**: unit tests (made-up studies, a scratch data repo), and live from a cloud container
   against the data repo and Lichess as PLAN.md §5.219 lists; **not** a whole batch, and nothing on
   your devices (the tools write no file the app reads but chapters and review lists, in the forms

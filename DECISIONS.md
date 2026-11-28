@@ -2934,6 +2934,12 @@ The technical calls, each with its reason:
   builder, then Practical and the system test), then the branch audit. The owner's PC builder is
   no part of the audit any more. Decided by the session, since the old one could not say; the
   owner may change it.
-- **Open, the owner's:** the difficulty limits on Stockfish 19; where the explorer's and ChessDB's
-  answers are kept between sessions (TESTING.md).
+- **The explorer's and ChessDB's answers are kept between sessions in the testing data repo**,
+  `audit-cache/` (the owner's choice, 2026-11-28, over a folder of the data repo's notes, which his
+  devices sync, and over nothing kept). One record a key, in sorted shards, written only by
+  `audit.ts cache-push`. The testing repo's purpose widens by this: it is for sessions' live checks
+  and now their caches.
+- **The difficulty measure stays on the engine its limits were set for** (the owner, 2026-11-28:
+  "you decide"), for the whole 1.Nc3 repertoire. Stockfish 19 is a second opinion on a move within
+  about 1 of a limit, never the class.
 

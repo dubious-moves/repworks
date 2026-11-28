@@ -13181,11 +13181,27 @@ diff, the notes and Stockfish's scores of the new comments' lines, which checks 
 that shows it, Stockfish agreeing), the format rules and the changed moves against the rules, before
 anything is pushed.
 
-**Left open.** The difficulty limits on Stockfish 19 (above). Where the explorer's and ChessDB's answers are kept between sessions: the old
-session's are a tarball on `claude/audit-tools`; what a session adds is lost with its container (the
-owner's choice: TESTING.md has the options). (The old session's two other proposals, one review
-item a position and "OK all", were built the same day as §5.218; the ledger counts positions as
-the panel does.)
+**The caches between sessions** (the owner's choice, 2026-11-28: the testing data repo). A
+session's cache folder is gone with its container; the old session's were a tarball on a branch.
+`cachestore.ts`: the store is `audit-cache/<explorer|chessdb>/<0-f>.jsonl` in the testing data repo,
+Practical's own `{k, t, v}` records, one a key (the newest), sorted by key in sixteen files by the
+key's hash: two sessions' additions merge as a union, a file stays far under GitHub's limit, and a
+commit carries only what is new. `cache-pull` appends to a cache folder what it lacks or has older;
+`cache-push` adds folders' records to the store and drops an explorer answer after 90 days and a
+ChessDB answer after 7. Seeded with every answer the old session's tarball and this session held:
+11,642 explorer and 27,520 ChessDB answers, 31 MB. A folder pulled from it alone answers the
+inventory of 1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 and the deck check's shares with no request. Not kept:
+Stockfish's answers: the deck check from a cold engine cache, with its shares from the store,
+took 4 minutes (native Stockfish, three threads) and passed.
+
+**Decided after the owner's answers** (2026-11-28). The difficulty limits on Stockfish 19: his
+"you decide". The measure stays on the vendored Stockfish 18 lite for this repertoire, not only for
+the Jobava: the limits are cut points he set on that scale and reviewed examples against, the
+audited subtrees and the ones to come are then judged alike, and the stronger engine already does
+the work where strength matters. A move within about 1 of a limit gets Stockfish 19's number beside
+it as a second opinion (`difficulty --moves … --engine sf19`), and the judgement says both. (The
+old session's two other proposals, one review item a position and "OK all", were built the same day
+as §5.218; the ledger counts positions as the panel does.)
 
 Tests: `test/unit/scripts/audit.test.ts` (made-up studies: each check; ops and what they refuse;
 the three-way merge; the base that is behind; the ledger's parts; the inventory's shares, reach over

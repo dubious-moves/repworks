@@ -11,11 +11,12 @@
 // - behind() returning nothing → "the commands" (apply went through on a base behind the session's own commit);
 // - the inventory reading a missing answer as no games (unknown left empty) → "a position it can't see";
 // - writeRegions leaving an unknown region silently → "the ledger's generated parts";
-// - scanText printing the whole token → "what must not be pushed".
+// - scanText printing the whole token → "what must not be pushed";
+// - the cache store keeping the older of two answers for a key → "the caches between sessions".
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Chess } from 'chessops/chess';
@@ -25,6 +26,7 @@ import type { CompactExplorer } from '../../../src/core/explorer/providers.ts';
 import { parseChapterFile } from '../../../src/core/pgn/parse.ts';
 import { chapterFileText } from '../../../src/core/pgn/write.ts';
 import type { Chapter } from '../../../src/core/study/model.ts';
+import { pull, push } from '../../../scripts/audit/cachestore.ts';
 import { closeCalls, decisionFlags } from '../../../scripts/audit/closecalls.ts';
 import { inventory, inventoryText, oneIn, positionsNeeded } from '../../../scripts/audit/inventory.ts';
 import { ledgerRows, listsTable, regionsIn, subtreeTable, suggestedOrder, writeRegions } from '../../../scripts/audit/ledger.ts';
@@ -378,6 +380,40 @@ test('offline, the lookups answer from the cache alone and list what it lacks', 
     assert.equal(await look.chessdb(fen), undefined);
     assert.deepEqual(look.missing(), { explorer: [fenAfter('1. e4')], chessdb: [fen] });
     assert.equal(asked, 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('the caches between sessions: a union by key, the newest kept, the old dropped, a pull readable by the clients', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'repworks-audit-store-'));
+  try {
+    const day = 24 * 3600 * 1000;
+    const now = Date.UTC(2026, 10, 28);
+    const rec = (k: string, t: number, v: unknown) => JSON.stringify({ k, t, v });
+    const [a, b, store, fresh] = ['a', 'b', 'store', 'fresh'].map((d) => join(dir, d)) as [string, string, string, string];
+    mkdirSync(a);
+    mkdirSync(b);
+    const key = 'rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq -#blitz,classical,rapid|1600,1800,2000,2200,2500|';
+    const answer: CompactExplorer = { total: 10, white: 5, draws: 1, black: 4, moves: [] };
+    // Session a: an answer, asked twice (the file is appended to), and one too old to keep. A line cut short is skipped.
+    writeFileSync(join(a, 'explorer.jsonl'), [rec(key, now - 3 * day, { total: 1 }), rec(key, now - 2 * day, answer), rec('old#f', now - 91 * day, {}), '{"k":"cut'].join('\n') + '\n');
+    writeFileSync(join(a, 'chessdb.jsonl'), [rec('pos1', now - day, { status: 'ok' }), rec('pos2', now - 8 * day, { status: 'ok' })].join('\n') + '\n');
+    // Session b: another position, and an older answer for the same one.
+    writeFileSync(join(b, 'explorer.jsonl'), [rec('other#f', now - day, { total: 2 }), rec(key, now - 5 * day, { total: 0 })].join('\n') + '\n');
+    assert.deepEqual(push(store, [a], now), { explorer: { kept: 1, added: 1, dropped: 1 }, chessdb: { kept: 1, added: 1, dropped: 1 } });
+    assert.deepEqual(push(store, [b], now).explorer, { kept: 2, added: 1, dropped: 0 }, 'b adds its own position; its older answer for the shared one loses');
+    const files = () => ['explorer', 'chessdb'].flatMap((s) => readdirSync(join(store, s)).sort().map((f) => `${s}/${f}:${readFileSync(join(store, s, f), 'utf8')}`));
+    const once = files();
+    assert.equal(once.filter((f) => f.startsWith('explorer/')).join('').match(/"k":/g)!.length, 2);
+    assert.ok(once.some((f) => f.includes(JSON.stringify(answer))), 'the newest answer for the shared key');
+    assert.ok(once.every((f) => /^(explorer|chessdb)\/[0-9a-f]\.jsonl:/.test(f)));
+    push(store, [a, b], now);
+    assert.deepEqual(files(), once, 'pushed again, the store is byte for byte the same');
+    // A new container: the store pulled into an empty folder, and read by Practical's own cache.
+    assert.deepEqual(pull(store, fresh), { explorer: 2, chessdb: 1 });
+    assert.deepEqual(pull(store, fresh), { explorer: 0, chessdb: 0 }, 'nothing it lacks any more');
+    assert.deepEqual(await createFileCache(fresh, () => now).get('explorer', key, 30 * day), answer);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

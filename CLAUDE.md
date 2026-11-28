@@ -170,7 +170,9 @@ data repo checkout: `node scripts/audit/audit.ts <command> ../repworks-data --st
 (`--offline`), `screen`, `difficulty` (`--moves "<a full line>"` without a study), `judge`, `lines
 --since <rev> --sf`, `apply --ops ops.json --base <rev>` (`--dry-run`), `lint`, `scan` (before every
 push to the data repo), `rep`, `close-calls`, `add-chapters`. `--cache` is a `scripts/practical.ts`
-cache folder. Stockfish runs at a fixed node count on one thread: for `screen` and `lines` the repo's
+cache folder; the answers are kept between sessions in the testing data repo's `audit-cache/`
+(`cache-pull --store <that folder> --cache <dir>` at the start, `cache-push` and a push of that repo
+at the end). Stockfish runs at a fixed node count on one thread: for `screen` and `lines` the repo's
 Stockfish 19 (`node_modules`), for `difficulty` the vendored Stockfish 18 lite its class limits were
 set for (`--engine` asks another). `STOCKFISH` (`apt-get update` before `apt-get install -y
 stockfish`) is for `scripts/ideas/cv.ts`, which the deck check runs.

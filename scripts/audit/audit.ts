@@ -24,6 +24,8 @@
 //   rep          --out rep.pgn --cache DIR [--offline]
 //   close-calls  --chapter C --cache DIR [--offline] [--out cc.json] [--practical positions.json]
 //   add-chapters --from study.pgn [--names "A,B"]
+//   cache-pull   --store DIR --cache DIR          (no checkout: the store is a folder of a repo for sessions)
+//   cache-push   --store DIR --cache DIR[,DIR…]
 //
 // --cache is a scripts/practical.ts cache folder (the explorer's and ChessDB's answers, shared with
 // Practical); the Lichess token is read from LICHESS_TOKEN; --offline asks nothing and lists what
@@ -57,6 +59,7 @@ import { startPosition } from '../../src/core/study/tree.ts';
 import { answered } from '../chapter-diff-lib.ts';
 import { git, openSide, readStudy, revParse, worktree, type Side, type StudyAt } from '../data-repo.ts';
 import { readTree } from '../read-tree.ts';
+import { KEEP_DAYS, pull, push, STORES } from './cachestore.ts';
 import { closeCallPositions, closeCalls } from './closecalls.ts';
 import { createMeasure, ENGINE, hardestAfter, NODES, ratedText, rateLine, rateSubtree, verdict, type MoveRow } from './difficulty.ts';
 import { cpOf, createEngines, pawns, type EngineKind } from './engine.ts';
@@ -583,7 +586,13 @@ function lint(): number {
     }
   };
   if (flags.has('notes')) {
-    const notes = JSON.parse(readFileSync(flags.get('notes')!, 'utf8')) as { moves: string; text: string }[];
+    let notes: { moves: string; text: string }[];
+    try {
+      notes = JSON.parse(readFileSync(flags.get('notes')!, 'utf8')) as { moves: string; text: string }[];
+      if (!Array.isArray(notes) || !notes.every((n) => n && typeof n.moves === 'string' && typeof n.text === 'string')) throw new Error('not a list of { "moves", "text" }');
+    } catch (e) {
+      fail(`--notes ${flags.get('notes')}: ${e instanceof Error ? e.message : String(e)}`);
+    }
     for (const n of notes) {
       if (!/^\s*1\.\s*[A-Za-z]/.test(n.moves)) show(`the note at ${n.moves}`, [{ kind: 'partial line', text: `"moves" must be the full line from move 1: ${n.moves}` }]);
       show(`the note at ${n.moves}`, lintWords(n.text));
@@ -782,7 +791,21 @@ function addChapters(): number {
   return 0;
 }
 
-const COMMANDS: Record<string, () => number | Promise<number>> = { check, ledger, base, inventory: inventoryCommand, screen, difficulty, judge, practical, lines: linesCommand, apply, lint, scan, rep, 'close-calls': closeCallsCommand, 'add-chapters': addChapters };
+/** The caches between sessions: the store's records into a cache folder, or cache folders' records into the store. */
+function cachePull(): number {
+  const got = pull(need('store'), need('cache'));
+  say(`pulled into ${flags.get('cache')}: ${got.explorer} explorer answer(s), ${got.chessdb} ChessDB answer(s) it lacked or had older.`);
+  return 0;
+}
+
+function cachePush(): number {
+  const got = push(need('store'), need('cache').split(',').map((d) => d.trim()).filter(Boolean), Date.now());
+  for (const store of STORES) say(`${store}: ${got[store].kept} in the store (${got[store].added} new or newer, ${got[store].dropped} dropped as older than ${KEEP_DAYS[store]} days).`);
+  say(`Commit and push the store's repo (git add ${flags.get('store')}; a session's commit: "session: audit cache"). Rejected: fetch, reset to origin, cache-push again: the store is a union, nothing is lost.`);
+  return 0;
+}
+
+const COMMANDS: Record<string, () => number | Promise<number>> = { check, ledger, base, inventory: inventoryCommand, screen, difficulty, judge, practical, lines: linesCommand, apply, lint, scan, rep, 'close-calls': closeCallsCommand, 'add-chapters': addChapters, 'cache-pull': cachePull, 'cache-push': cachePush };
 const run = command === undefined || flags.has('help') ? undefined : COMMANDS[command];
 if (!run) fail(`usage: node scripts/audit/audit.ts <command> <checkout>[@rev] --study S [options]\n${USAGE}`);
 // A MoveNode import kept for the types above when a build strips unused ones.

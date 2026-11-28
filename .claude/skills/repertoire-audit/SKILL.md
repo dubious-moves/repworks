@@ -47,10 +47,12 @@ Where `rules.md` and this skill disagree, `rules.md` holds.
   then `--ort-node ~/ort`.
 - Tokens: `LICHESS_TOKEN`, `LICHESS_TOKEN2`, `LICHESS_TOKEN3` are in the environment, each its own
   explorer bucket (about 16 requests a minute). Never print one, never write one to a file.
-- A cache folder outside both repos (`--cache ~/cache/<name>`), shared by Practical, the inventory,
-  the close calls and the deck check. The ledger says where earlier sessions' caches are, if any.
-  A cold cache is slow, not wrong: an inventory asks about 50 positions, the deck check's shares
-  about 600, once.
+- A cache folder outside every repo (`--cache ~/cache/a`), shared by Practical, the inventory, the
+  close calls and the deck check. Fill it from the store earlier sessions left: attach the testing
+  data repo (its name is in `REPWORKS_TESTING_DATA`) with `add_repo` (push access), clone it beside
+  repworks, and `node scripts/audit/audit.ts cache-pull --store ../<testing repo>/audit-cache --cache
+  ~/cache/a`. What the store lacks is fetched as you go (the explorer answers 16 requests a
+  minute); a missing answer is slow, never wrong.
 
 ## The rules that matter most
 
@@ -122,8 +124,9 @@ $A lines     $D --study <sid> --chapter <cid> --line "<moves>"            # the 
   cost; per reply, the hardest of our next three moves. It runs the engine its class limits were
   set for, at a fixed node count, so its numbers are the same on every run; give them in notes as
   "found by x% of 2000 players, the natural move y costs z win%". A number within about 1 of a
-  class limit is a judgement. Don't pass `--engine` here: another engine's numbers are not the
-  classes'.
+  class limit is a judgement: for such a move run the line again with `--moves "<the full line>"
+  --engine sf19` as a second opinion, and give both numbers in the note. Never use another
+  engine's number for the class itself: the limits belong to the measure's own engine.
 - **judge**: the guide and the measure side by side for every reply. A suggestion, not a verdict.
 
 ### 4. Settle the moves
@@ -246,6 +249,11 @@ $A lint $D --study <sid> --list <name>
   `git -C $D push`. No force push. Rejected: he pushed meanwhile; `git pull`, and if a chapter file
   conflicts, take his (`git checkout --theirs`, or reset your commit) and run `apply` again with the
   same `--base`: it merges his new edits.
+- Leave your answers for the next session: `$A cache-push --store ../<testing repo>/audit-cache
+  --cache ~/cache/a` (every cache folder you used, comma-separated), then commit and push that repo
+  (`session: audit cache`). Rejected: `git fetch`, `git reset --hard origin/main`, `cache-push`
+  again; the store is a union by key, so nothing is lost. Do it after a long warm-up too, not only
+  at the end.
 
 ### 10. Report, and stop
 
@@ -266,8 +274,8 @@ answered. Stop earlier, and say exactly what is needed, when:
 Reading is free of the one-writer rule. While one session writes a batch, others (or background
 commands of the same session) may run `inventory`, `screen`, `difficulty` and Practical warm-ups
 for the next subtrees, each on its own Lichess token with **its own cache folder** (a folder holds
-its limiter's state; two runs on one folder or one token trip the rate limit). Copy the folders'
-`explorer.jsonl` and `chessdb.jsonl` lines together afterwards. Their output is evidence for the
+its limiter's state; two runs on one folder or one token trip the rate limit). `cache-push` takes
+all the folders at once, and `cache-pull` brings the union into each. Their output is evidence for the
 later batch, not a decision: inventories are run again after any batch that changes the chapter.
 
 ## A chapter that has had no review
