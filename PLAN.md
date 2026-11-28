@@ -13330,7 +13330,11 @@ done; a scheduled task now starts a fresh session every three hours.
   no session's), the lock, and what is next with each subtree's exploration. **Work means**: the
   checkout is not behind the remote; no other session holds the lock; no list has a position
   still waiting; the owner has been quiet for 30 minutes; there is a list to merge or a subtree
-  left; and the next subtree's exploration is not still running (up to 24 hours). `--json`.
+  left; and the next subtree's exploration is not still running (up to 24 hours). `--json`. Exit
+  code 0 for work and 3 for nothing to do: the schedule's dispatcher, a small standing session
+  that a scheduled task wakes every three hours, reads it and starts the worker (a session the
+  schedule started itself has no `add_repo`, so it could not reach the data repo; the hand-over
+  session's finding, 2026-11-28). The worker sends the owner's notification itself.
 - **The lock**, `notes/<sid>/lock.json` (`{ v, session, at, for }`): `audit.ts lock --session ID
   --for WHAT` writes it, commits it (`session: <study>, lock for …`) and pushes it; `unlock`
   removes it. A lock younger than 6 hours stops every other session (`REFUSED`); an older one is

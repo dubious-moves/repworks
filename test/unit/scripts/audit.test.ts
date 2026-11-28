@@ -881,6 +881,7 @@ test('the commands: the lock between two checkouts, status, a list by its holder
     spawnSync('git', ['clone', '-q', origin, b], { env });
     const idle = run('status', a, '--study', sid);
     assert.equal(line1(idle), 'Test: work: audit 1. d4 d5 2. c4 c6', idle.stdout + idle.stderr);
+    assert.equal(idle.status, 0, 'work: exit 0');
     assert.ok(idle.stdout.includes('The owner: last commit 90 min ago ("desktop: 1 study file")\nThe lock: none\n'), idle.stdout);
     assert.equal((JSON.parse(run('status', a, '--study', sid, '--json').stdout) as { work: boolean }).work, true);
 
@@ -892,6 +893,7 @@ test('the commands: the lock between two checkouts, status, a list by its holder
     assert.equal(git(origin, 'log', '-1', '--format=%s', 'main'), 'session: Test, lock for batch-2');
     assert.ok(line1(run('status', a, '--study', sid)).startsWith('Test: work:'), 'its own lock stops no session');
     assert.equal(line1(run('status', b, '--study', sid)), 'Test: nothing done: this checkout is 1 commit(s) behind the remote: git pull, then status again');
+    assert.equal(run('status', b, '--study', sid).status, 3, 'nothing to do: exit 3, not a failure\'s 1 or 2');
     const early = run('lock', b, '--study', sid, '--session', 'session_b', '--for', 'batch-2');
     assert.equal(early.status, 2);
     assert.ok(early.stderr.includes('REFUSED: this checkout is behind the remote'), early.stderr);

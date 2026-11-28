@@ -27,6 +27,7 @@
 //   cache-pull   --store DIR --cache DIR          (no checkout: the store is a folder of a repo for sessions)
 //   cache-push   --store DIR --cache DIR[,DIR…]
 //   status       [--json] [--no-fetch]: is there work? the open lists, the owner's last commit, the lock, what is next
+//                  its first line says "work" or "nothing done" and why; exit 0: work, 3: nothing to do
 //   lock         --session ID --for WHAT [--no-push]: take the study's lock (committed and pushed); again to renew it
 //   unlock       [--no-push]: release it
 //   tally        --list NAME [--note TEXT]: a list's answers counted into audit.json's batches, before the list is removed
@@ -1065,7 +1066,8 @@ function statusCommand(): number {
     now,
   });
   say(flags.has('json') ? JSON.stringify(s, null, 1) : statusText(s).trimEnd());
-  return 0;
+  // Read by a small model too: 0 is work, 3 is nothing to do (the first line says why); anything else is a failure.
+  return s.work ? 0 : 3;
 }
 
 function lockCommand(): number {

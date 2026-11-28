@@ -430,13 +430,18 @@ ones back from the store, and they are dropped again at the next command.
 
 ## An unattended run
 
-A scheduled task starts a fresh session every few hours, with nobody there. Such a run is the batch
-as written above, with these differences:
+Nobody starts these by hand. A scheduled task wakes a small standing session every three hours,
+the dispatcher: it pulls both repos, runs `audit.ts status`, and when there is work (and no
+worker of its own is still running) starts the worker with `create_session`. (A session the
+schedule started directly would have no `add_repo` and could not reach the private data repo.)
+The worker is the session this section is for. Its run is the batch as written above, with these
+differences:
 
 1. **`status` first, before reading anything else** (after the data repo is cloned and pulled):
    `node scripts/audit/audit.ts status ../repworks-data --study <sid>`. Its first line starts with
-   `<study>: nothing done:` → reply with that line alone, and stop. No lock is taken, nothing is
-   read or written. This is the usual outcome, and it costs a minute.
+   `<study>: nothing done:` (exit code 3; work is 0) → reply with that line alone, and stop. No
+   lock is taken, nothing is read or written. The dispatcher has asked the same already, so this
+   is rare for a worker: the owner synced meanwhile, or another session took the lock.
 2. Otherwise it says what the work is (`merge the answers of …, then audit …`). Read the rules,
    the ledger and the corrections as always, take the lock (step 0), and run the batch: steps 1
    to 10.
@@ -456,9 +461,12 @@ as written above, with these differences:
    24 hours after its start; after that the batch goes on with what there is and says so.
 6. Start the exploring session for the next two subtrees as an attended run does. Start no other
    session, and create, change or fire no scheduled task.
-7. **The last message's first line is his notification**: `<study>: <batch> is ready: N
-   positions, M to look at first`, or the reason nothing was done. Nothing before it: no greeting,
-   no summary of the steps. The rest of the report follows as in step 10.
+7. **The notification is yours to send**: the schedule gives none. When the batch is pushed and
+   the lock released, send the owner one line with the `PushNotification` tool: `<study>: <batch>
+   is ready: N positions, M to look at first`; when the run stopped for something he must do, that,
+   in one line. **Your last message starts with the same line.** Nothing before it: no greeting,
+   no summary of the steps. The rest of the report follows as in step 10. A run with nothing to do
+   sends no notification.
 
 ## Preparing later subtrees in parallel
 
