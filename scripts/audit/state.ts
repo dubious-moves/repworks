@@ -35,11 +35,20 @@ export interface AuditState {
   targets: { parenProse?: number; continuedTwice?: number };
   /** The idea deck checked against the study after every batch. */
   deck?: { study: string; cards: number; rare: number; depth: number; known?: string };
+  /**
+   * The flags every run of scripts/practical.ts for this study carries (the owner's settings for
+   * choosing moves, from rules.md), beyond the positions, the cache, the output and the depth:
+   * `audit.ts practical` passes them, so a run can't be made without one.
+   */
+  practical?: string[];
   /** Replies the owner decided not to drill, as full lines: a gap scan skips them. */
   exceptions: string[];
   /** Lines to examine when their subtree is audited, each with why. */
   flags: { line: string; note: string }[];
 }
+
+/** What `audit.ts practical` gives itself: not to be fixed in audit.json. */
+const PRACTICAL_OWN = ['--positions', '--cache', '--out', '--depth', '--ort-node', '--moves', '--candidates', '--report'];
 
 export type ReadState = { ok: true; state: AuditState } | { ok: false; errors: string[] };
 
@@ -78,9 +87,20 @@ export function parseAuditState(text: string): ReadState {
   if (!isMap(o.targets)) errors.push('targets must be an object');
   if (!Array.isArray(o.exceptions) || !o.exceptions.every((x) => typeof x === 'string')) errors.push('exceptions must be a list of lines');
   if (!Array.isArray(o.flags) || !o.flags.every((x) => isMap(x) && typeof x['line'] === 'string' && typeof x['note'] === 'string')) errors.push('flags must be a list of { line, note }');
+  if (o.practical !== undefined && (!Array.isArray(o.practical) || !o.practical.every((x) => typeof x === 'string') || o.practical.some((x) => PRACTICAL_OWN.includes(x)))) errors.push(`practical must be a list of flags for scripts/practical.ts, without ${PRACTICAL_OWN.join(', ')} (the command gives those)`);
   if (o.deck !== undefined && (!isMap(o.deck) || typeof o.deck.study !== 'string' || !Number.isInteger(o.deck.cards))) errors.push('deck needs study and cards');
   return errors.length ? { ok: false, errors } : { ok: true, state: o as AuditState };
 }
 
 export const auditStatePath = (sid: string) => `notes/${sid}/audit.json`;
 export const ledgerPath = (sid: string) => `notes/${sid}/ledger.md`;
+
+/**
+ * The arguments of one Practical run for the study: what the run names (its positions, cache,
+ * output, depth and the onnxruntime folder) and then the study's own flags, all of them.
+ * Undefined when the study's audit.json fixes none: then there is nothing to hold a run to.
+ */
+export function practicalArgs(state: AuditState, run: { positions: string; cache: string; out: string; depth?: number; ortNode?: string }): string[] | undefined {
+  if (!state.practical?.length) return undefined;
+  return ['--positions', run.positions, '--cache', run.cache, '--out', run.out, '--depth', String(run.depth ?? 5), ...(run.ortNode ? ['--ort-node', run.ortNode] : []), ...state.practical];
+}

@@ -13106,6 +13106,12 @@ and written in a data repo checkout by study and chapter id, through `scripts/da
   answers from the cache and lists what it lacks: a position that could not be seen is `NOT
   COMPLETE`, never "no games" (the old session's cache-only scan skipped them and reported "only 1
   left").
+- `practical`: `scripts/practical.ts` with the flags the study's `audit.json` fixes (for the 1.Nc3
+  study `--maia --replies --pick-last --compare-reach-min 3`), every one of them. The old session's
+  saved reports show that every run of its branch audit (the trial, batches 2 to 5) missed the last
+  two; the hand-over audit session re-ran those 21 inputs with them and found no move in the
+  chapters that would change (its measurement; one of its two close positions re-run here at depth
+  7 gives 10.Bc2 69.8 against 10.Bb1 66.6, as it reported).
 - `screen` (Stockfish on every move of ours, a flag at 0.50 behind), `difficulty` and `judge` (below),
   `lines` (every comment's clickable lines, new or changed since a commit, with Stockfish before and
   after and our moves against its best), `lint` (a partial line or one cut with dots in words to the

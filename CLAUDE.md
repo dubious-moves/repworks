@@ -165,7 +165,8 @@ walked and scored: `--study "Scandi Gambit" --chapter "Accepted - Main lines"`.
 The repertoire audit's tools (PLAN.md §5.219; the skill says when each is used), on a study of a
 data repo checkout: `node scripts/audit/audit.ts <command> ../repworks-data --study <id>`. `check`
 (every check against the study's targets; `--deck --cache <dir>` for the idea deck's too), `ledger`
-(the ledger's tables; `--check`), `base`, `inventory --chapter C --line "<moves>" --cache <dir>`
+(the ledger's tables; `--check`), `base`, `practical --positions P.json --cache <dir> --out X.json`
+(Practical with the study's own flags, all of them), `inventory --chapter C --line "<moves>" --cache <dir>`
 (`--offline`), `screen`, `difficulty` (`--moves "<a full line>"` without a study), `judge`, `lines
 --since <rev> --sf`, `apply --ops ops.json --base <rev>` (`--dry-run`), `lint`, `scan` (before every
 push to the data repo), `rep`, `close-calls`, `add-chapters`. `--cache` is a `scripts/practical.ts`

@@ -16,6 +16,8 @@
 //                  --moves "<a full line>": our moves along one line, no chapter needed
 //   judge        --chapter C --inventory inv.json --difficulty d.json
 //   lines        [--chapter C] [--line "<moves>"] [--since REV] [--sf [--nodes N]]
+//   practical    --positions P.json --cache DIR --out X.json [--depth 7] [--ort-node DIR]
+//                  scripts/practical.ts with the study's own flags (audit.json's "practical"), all of them
 //   apply        --ops ops.json [--base REV] [--dry-run]
 //   lint         --notes notes.json | --list NAME | --since REV
 //   scan         [--since REV]
@@ -64,7 +66,7 @@ import { lintComment, lintWords } from './lint.ts';
 import { createLookups, type Lookups } from './lookups.ts';
 import { applyOps, behind, isSessionCommit, merge3, type CommitInfo, type Ops } from './ops.ts';
 import { scanText, stops } from './scan.ts';
-import { auditStatePath, ledgerPath, parseAuditState, type AuditState } from './state.ts';
+import { auditStatePath, ledgerPath, parseAuditState, practicalArgs, type AuditState } from './state.ts';
 import { chapterName, clickableLines, continuedTwice, findChapter, lineOf, nodeAtSans, ownerCheck, readingNotes, sansOf, sideOf, theirLeaves, transposeNotes, twoMoves, visits, type TreeNode } from './study.ts';
 
 const USAGE = readFileSync(new URL(import.meta.url), 'utf8').split('\n').filter((l) => l.startsWith('//   ')).map((l) => l.slice(3)).join('\n');
@@ -490,6 +492,16 @@ function judge(): number {
   return inv.unknown.length ? 1 : 0;
 }
 
+/** Practical for this study: scripts/practical.ts with the flags audit.json fixes, so none is left out (every run of the first five batches missed two). */
+function practical(): number {
+  const o = open();
+  const state = stateOf(o);
+  const args = practicalArgs(state, { positions: need('positions'), cache: need('cache'), out: need('out'), depth: num('depth', 5), ...(flags.has('ort-node') ? { ortNode: flags.get('ort-node')! } : {}) });
+  if (!args) fail(`${auditStatePath(o.sid)} has no "practical": the flags every Practical run for this study carries (its rules.md gives them)`);
+  note(`node scripts/practical.ts ${args.join(' ')}`);
+  return spawnSync(process.execPath, [join(import.meta.dirname, '..', 'practical.ts'), ...args], { stdio: 'inherit' }).status ?? 1;
+}
+
 /* ------------------------------------------------------------------ comments: lines, lint */
 
 /** The comments of the study as it is, with the ones that are new or changed since a commit marked. */
@@ -770,7 +782,7 @@ function addChapters(): number {
   return 0;
 }
 
-const COMMANDS: Record<string, () => number | Promise<number>> = { check, ledger, base, inventory: inventoryCommand, screen, difficulty, judge, lines: linesCommand, apply, lint, scan, rep, 'close-calls': closeCallsCommand, 'add-chapters': addChapters };
+const COMMANDS: Record<string, () => number | Promise<number>> = { check, ledger, base, inventory: inventoryCommand, screen, difficulty, judge, practical, lines: linesCommand, apply, lint, scan, rep, 'close-calls': closeCallsCommand, 'add-chapters': addChapters };
 const run = command === undefined || flags.has('help') ? undefined : COMMANDS[command];
 if (!run) fail(`usage: node scripts/audit/audit.ts <command> <checkout>[@rev] --study S [options]\n${USAGE}`);
 // A MoveNode import kept for the types above when a build strips unused ones.

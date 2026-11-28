@@ -128,10 +128,16 @@ $A lines     $D --study <sid> --chapter <cid> --line "<moves>"            # the 
 
 ### 4. Settle the moves
 
-Every flagged move, every move you would change, and every line end goes to Practical with Maia,
-with the command line `rules.md` gives (all of its flags; depth 5, then 7 when candidates are
-close). The positions file is `[{ "moves": "<the full line>", "candidates": ["ours", "other"] }]`;
-keep it and the report in `practical/`. A flag is settled by Practical, then by the repertoire's
+Every flagged move, every move you would change, and every line end goes to Practical with Maia:
+
+```sh
+$A practical $D --study <sid> --positions $B/practical/p1.json --cache ~/cache/a --out $B/practical/p1_out.json --ort-node ~/ort   # --depth 7 when candidates are close
+```
+
+It runs `scripts/practical.ts` with the study's own flags from `audit.json` ("practical"), all of
+them: don't call the script bare for a decision. The positions file is `[{ "moves": "<the full
+line>", "candidates": ["ours", "other"] }]`; keep it and the report in `practical/` (a report names
+its settings). A flag is settled by Practical, then by the repertoire's
 own tests in `rules.md` (for the 1.Nc3 study: the system test, and no pure engine moves outside
 sharp only-move lines). A Practical edge that rests on no games is said to be so.
 
@@ -271,7 +277,7 @@ Its moves were never judged, so the close calls come before the branch audit:
 ```sh
 $A add-chapters $D --study <sid> --from <file.pgn> --names "<chapter>"    # if it is in no study yet; then add it to audit.json
 $A close-calls  $D --study <sid> --chapter <cid> --cache ~/cache/a --out cc.json --practical positions.json
-node scripts/practical.ts --positions positions.json … (rules.md's command)
+$A practical $D --study <sid> --positions positions.json --cache ~/cache/a --out cc_practical.json --ort-node ~/ort
 ```
 
 `close-calls` lists the moves the agreed triggers flag (ChessDB clearly higher with the win rate
@@ -289,6 +295,8 @@ subtree.
 - An explanation that sounded right and was wrong (what ...c5 does to c7; which knight moves are
   double checks). Each is in `corrections.md`.
 - Moves chosen by ChessDB or Stockfish alone in thin positions. Practical with Maia decides.
+- Practical run without two of the study's flags, in every batch of one audit. `audit.ts practical`
+  passes them all.
 - Prose inside a line's parentheses, and moves in a comment outside any: neither is clickable.
 - A list of 119 items. A batch is about 25 positions.
 - A PC's path, with the owner's user name in it, nearly copied into a file. `scan` before every push.

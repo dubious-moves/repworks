@@ -32,7 +32,7 @@ import { lintComment, lintWords, linesIn } from '../../../scripts/audit/lint.ts'
 import { createLookups } from '../../../scripts/audit/lookups.ts';
 import { applyOps, behind, isSessionCommit, merge3 } from '../../../scripts/audit/ops.ts';
 import { scanText, stops } from '../../../scripts/audit/scan.ts';
-import { parseAuditState, type AuditState } from '../../../scripts/audit/state.ts';
+import { parseAuditState, practicalArgs, type AuditState } from '../../../scripts/audit/state.ts';
 import { clickableLines, continuedTwice, lineOf, nodeAtSans, ownerCheck, sansOf, subtreeCounts, theirLeaves, transposeNotes, twoMoves } from '../../../scripts/audit/study.ts';
 import { createFileCache } from '../../../scripts/practical-lib.ts';
 
@@ -290,6 +290,18 @@ test('audit.json is read strictly', () => {
   const bad = parseAuditState(JSON.stringify({ ...good, v: 2, chapters: { chMain01: { depth: -1 } }, subtrees: { chMain01: { '1. d4': { state: 'done' } } }, flags: [{ line: 'x' }] }));
   assert.deepEqual(bad, { ok: false, errors: ['v must be 1, found 2', 'chapters.chMain01.depth must be a whole number of plies', 'subtrees.chMain01["1. d4"].state must be closed, open or todo', 'flags must be a list of { line, note }'] });
   assert.equal(parseAuditState('{').ok, false);
+});
+
+test("a Practical run for a study carries the study's own flags, all of them", () => {
+  const base = { v: 1, study: 'Study001', chapters: {}, subtrees: {}, targets: {}, exceptions: [], flags: [] };
+  const read = parseAuditState(JSON.stringify({ ...base, practical: ['--maia', '--replies', '--pick-last', '--compare-reach-min', '3'] }));
+  assert.ok(read.ok);
+  assert.deepEqual(practicalArgs(read.state, { positions: 'p.json', cache: 'c', out: 'x.json' }), ['--positions', 'p.json', '--cache', 'c', '--out', 'x.json', '--depth', '5', '--maia', '--replies', '--pick-last', '--compare-reach-min', '3']);
+  assert.deepEqual(practicalArgs(read.state, { positions: 'p.json', cache: 'c', out: 'x.json', depth: 7, ortNode: '/ort' })!.slice(6), ['--depth', '7', '--ort-node', '/ort', '--maia', '--replies', '--pick-last', '--compare-reach-min', '3']);
+  // No flags fixed: nothing to hold a run to, and the command says so instead of running bare.
+  assert.equal(practicalArgs({ ...base, v: 1 } as AuditState, { positions: 'p', cache: 'c', out: 'x' }), undefined);
+  // The depth and the files are the run's, not the study's.
+  assert.deepEqual(parseAuditState(JSON.stringify({ ...base, practical: ['--maia', '--depth', '7'] })), { ok: false, errors: ['practical must be a list of flags for scripts/practical.ts, without --positions, --cache, --out, --depth, --ort-node, --moves, --candidates, --report (the command gives those)'] });
 });
 
 // ---- The inventory ----
