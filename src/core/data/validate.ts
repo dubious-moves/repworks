@@ -9,7 +9,7 @@ import { parseSettings } from '../train/settings.ts';
 import { parseSharedFile } from '../storm/shared.ts';
 import { gameMonth, parseGamesFile } from '../games/dataFile.ts';
 import { parseReviewList } from '../study/reviewList.ts';
-import { classifyPath, DATA_FORMAT, FORMAT_FILE, utcDay, utcMonth } from './layout.ts';
+import { classifyPath, DATA_FORMAT, FORMAT_FILE, isNotesPath, utcDay, utcMonth } from './layout.ts';
 
 export interface Issue {
   path: string;
@@ -155,7 +155,8 @@ export function validateDataRepo(files: ReadonlyMap<string, string>, options: Va
         break;
       }
       case 'other':
-        if (!ROOT_FILES_ALLOWED.has(path)) warn(path, 'not part of format 1: the app ignores it');
+        // A session's notes on a study (notes/<sid>/…, §5.219) are meant to be there, and are nothing to the app.
+        if (!ROOT_FILES_ALLOWED.has(path) && !isNotesPath(path)) warn(path, 'not part of format 1: the app ignores it');
         break;
     }
   }

@@ -32,14 +32,13 @@
 //   node scripts/chapter-diff.ts delivered.pgn ../repworks-data --study "1. Nc3 + Jobava" --chapter "Jobava simplified"
 //   node scripts/chapter-diff.ts ../repworks-data@4f2a91c ../repworks-data --study "1. Nc3 + Jobava"
 // Exit code 0 whatever changed; 1 when a side can't be read.
-import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { reviewListPath } from '../src/core/data/layout.ts';
 import { positionKey, writeReviewList } from '../src/core/study/reviewList.ts';
-import { parseChapterFile, parseGames } from '../src/core/pgn/parse.ts';
+import { parseGames } from '../src/core/pgn/parse.ts';
 import type { Chapter } from '../src/core/study/model.ts';
-import { parseStudyMeta, reconcileChapterOrder } from '../src/core/study/studyMeta.ts';
+import { openSide, readStudy, type Tree } from './data-repo.ts';
 import { markdown, report, reviewList, SITE, versionChapters, type Note, type Version } from './chapter-diff-lib.ts';
 
 const USAGE = 'usage: node scripts/chapter-diff.ts <old> <new> [--study S] [--old-study S] [--chapter C] [--mark TEXT] [--wraps] [--max-lines N] [--site URL] [--no-links] [--json] [--out FILE] [--review NAME [--title TEXT] [--notes FILE]]\n  each side a PGN file, a data repo checkout <dir>, or <dir>@<rev>';
@@ -60,71 +59,14 @@ function fail(message: string): never {
   process.exit(1);
 }
 
-/** A data repo's files at a commit, or as checked out. */
-interface Tree {
-  list(dir: string): string[];
-  read(path: string): string | undefined;
-}
-
-function worktree(dir: string): Tree {
-  return {
-    list: (d) => (existsSync(join(dir, d)) ? readdirSync(join(dir, d)) : []),
-    read: (p) => (existsSync(join(dir, p)) ? readFileSync(join(dir, p), 'utf8') : undefined),
-  };
-}
-
-function commit(dir: string, rev: string): Tree {
-  const git = (...a: string[]) => execFileSync('git', ['-C', dir, ...a], { encoding: 'utf8', maxBuffer: 1 << 28, stdio: ['ignore', 'pipe', 'pipe'] });
-  try {
-    git('rev-parse', '--verify', '--quiet', `${rev}^{commit}`);
-  } catch {
-    fail(`${dir}: no commit ${rev} (a shallow clone holds only its latest commits: git fetch --depth=500)`);
-  }
-  return {
-    list: (d) => {
-      try {
-        return git('ls-tree', '--name-only', `${rev}:${d}`).split('\n').filter(Boolean);
-      } catch {
-        return [];
-      }
-    },
-    read: (p) => {
-      try {
-        return git('show', `${rev}:${p}`);
-      } catch {
-        return undefined;
-      }
-    },
-  };
-}
-
 function study(tree: Tree, where: string, wanted: string | undefined, hint?: string): Version {
-  const metas = tree.list('studies').flatMap((sid) => {
-    const text = tree.read(`studies/${sid}/study.json`);
-    const meta = text === undefined ? undefined : parseStudyMeta(text, sid);
-    return meta?.ok ? [meta.value] : [];
-  });
-  if (!metas.length) fail(`${where}: no studies there (a data repo checkout has studies/<id>/study.json)`);
-  const fold = (t: string) => t.trim().toLowerCase();
-  const list = () => metas.map((m) => `${m.name} (${m.id})`).join(', ');
-  // The same study as the other side's first (by its id, whatever it was named at that commit), then the id asked for, then the name.
-  const same = hint === undefined ? [] : metas.filter((m) => m.id === hint);
-  const byId = metas.filter((m) => m.id === wanted);
-  const byName = wanted === undefined ? [] : metas.filter((m) => fold(m.name) === fold(wanted));
-  const found = same.length ? same : byId.length ? byId : byName;
-  if (!found.length) fail(wanted === undefined ? `${where}: --study is needed, one of: ${list()}` : `${where}: no study "${wanted}"; there are: ${list()}`);
-  if (found.length > 1) fail(`${where}: ${found.length} studies are named "${wanted}", give the id: ${found.map((m) => m.id).join(', ')}`);
-  const meta = found[0]!;
-  const present = tree.list(`studies/${meta.id}`).filter((f) => f.endsWith('.pgn')).map((f) => f.slice(0, -4));
-  const chapters: Chapter[] = [];
-  for (const cid of reconcileChapterOrder(meta.chapters, present)) {
-    const text = tree.read(`studies/${meta.id}/${cid}.pgn`);
-    if (text === undefined) continue;
-    const parsed = parseChapterFile(text, cid);
-    if (!parsed.ok) fail(`${where}: studies/${meta.id}/${cid}.pgn can't be read: ${parsed.reason}`);
-    chapters.push(parsed.chapter);
+  let at: ReturnType<typeof readStudy>;
+  try {
+    at = readStudy(tree, where, wanted, hint);
+  } catch (e) {
+    fail(e instanceof Error ? e.message : String(e));
   }
-  return { label: `${where}, study ${meta.name}`, sid: meta.id, study: meta.name, chapters: versionChapters(chapters, true) };
+  return { label: `${where}, study ${at.meta.name}`, sid: at.meta.id, study: at.meta.name, chapters: versionChapters(at.chapters, true) };
 }
 
 function side(arg: string, wanted: string | undefined, hint?: string): Version {
@@ -138,10 +80,13 @@ function side(arg: string, wanted: string | undefined, hint?: string): Version {
     if (!chapters.length) fail(`${arg}: no game in the file`);
     return { label: basename(arg), chapters: versionChapters(chapters, false) };
   }
-  if (existsSync(arg) && statSync(arg).isDirectory()) return study(worktree(arg), basename(arg), wanted, hint);
-  const at = arg.lastIndexOf('@');
-  const dir = at > 0 ? arg.slice(0, at) : '';
-  if (dir && existsSync(dir) && statSync(dir).isDirectory()) return study(commit(dir, arg.slice(at + 1)), `${basename(dir)}@${arg.slice(at + 1)}`, wanted, hint);
+  let opened: ReturnType<typeof openSide>;
+  try {
+    opened = openSide(arg);
+  } catch (e) {
+    fail(e instanceof Error ? e.message : String(e));
+  }
+  if (opened) return study(opened.tree, opened.where, wanted, hint);
   return fail(`${arg}: not a PGN file, a data repo checkout, or <checkout>@<rev>`);
 }
 

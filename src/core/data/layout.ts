@@ -14,6 +14,10 @@
 //                                      (scripts/games-to-data.mjs): never by a device, never merged
 //   review/<sid>/<name>.json           a reviewing session's list for a study (§5.216): written only
 //                                      by the session (scripts/chapter-diff.ts), never by a device
+//   notes/<sid>/…                      a reviewing session's own notes on a study (§5.219: its
+//                                      rules, ledger, audit state and each batch's evidence), in
+//                                      any form and depth: never read or written by the app, which
+//                                      treats them as any path it doesn't know (`other`)
 import { isId } from '../study/ids.ts';
 
 export const FORMAT_FILE = 'repworks.json';
@@ -30,6 +34,13 @@ export const gamesPath = (month: string) => `games/${month}.jsonl`;
 export const reviewListPath = (sid: string, name: string) => `review/${sid}/${name}.json`;
 /** Where a study's review lists are. */
 export const reviewDir = (sid: string) => `review/${sid}/`;
+/** Where a reviewing session's notes on a study are (§5.219). */
+export const notesDir = (sid: string) => `notes/${sid}/`;
+/** A file of a session's notes on a study: not the app's, and not a stray file either. */
+export function isNotesPath(path: string): boolean {
+  const [top, sid, ...rest] = path.split('/');
+  return top === 'notes' && isId(sid) && rest.length > 0 && rest.every((p) => p !== '');
+}
 /** Where a device's storm files are. */
 export const stormDir = (dev: string) => `storm/${dev}/`;
 

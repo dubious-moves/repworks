@@ -54,6 +54,12 @@ for a robotic board (the Chessnut Move), built only when the owner asks.
   `/api/auth/me`, then remove `[id^=tour]` and `.study-modal-overlay.active` on a study page
   before clicking.
 
+- The review of the owner's opening repertoire (the "repertoire audit") is the skill
+  `.claude/skills/repertoire-audit`: one batch from his answers to the push. The repertoire's own
+  rules and state are in the data repo, `notes/<study id>/` (`rules.md`, `ledger.md`, `audit.json`,
+  `corrections.md`, `batches/`): read them first. Only one session writes to a study at a time, and
+  none while the owner is reviewing its lists. PLAN.md §5.219.
+
 - A testing data repo, only for Claude sessions' live checks, is named in the environment
   variable `REPWORKS_TESTING_DATA` (owner/repo) with a fine-grained token in
   `REPWORKS_TESTING_PAT` (never in this repo). The Claude GitHub App has access to it (since
@@ -156,6 +162,18 @@ Stockfish over the cloud's positions not yet scored: `--score-only --score-minut
 every device's positions scored, not only the cloud's: `--all-devices`; one study or chapter,
 walked and scored: `--study "Scandi Gambit" --chapter "Accepted - Main lines"`.
 
+The repertoire audit's tools (PLAN.md §5.219; the skill says when each is used), on a study of a
+data repo checkout: `node scripts/audit/audit.ts <command> ../repworks-data --study <id>`. `check`
+(every check against the study's targets; `--deck --cache <dir>` for the idea deck's too), `ledger`
+(the ledger's tables; `--check`), `base`, `inventory --chapter C --line "<moves>" --cache <dir>`
+(`--offline`), `screen`, `difficulty` (`--moves "<a full line>"` without a study), `judge`, `lines
+--since <rev> --sf`, `apply --ops ops.json --base <rev>` (`--dry-run`), `lint`, `scan` (before every
+push to the data repo), `rep`, `close-calls`, `add-chapters`. `--cache` is a `scripts/practical.ts`
+cache folder. Stockfish runs at a fixed node count on one thread: for `screen` and `lines` the repo's
+Stockfish 19 (`node_modules`), for `difficulty` the vendored Stockfish 18 lite its class limits were
+set for (`--engine` asks another). `STOCKFISH` (`apt-get update` before `apt-get install -y
+stockfish`) is for `scripts/ideas/cv.ts`, which the deck check runs.
+
 ## Rules the code keeps
 
 - `src/core` is pure: no DOM, fetch, storage, clock or randomness. Time and random sources are
@@ -178,5 +196,7 @@ walked and scored: `--study "Scandi Gambit" --chapter "Accepted - Main lines"`.
 
 - No tokens in any repo, ever. GitHub revokes a token pushed to a public repo.
 - No Chessable course content in this public repo. The owner's real studies and course exports
-  stay in the private data repo; tests read them from `REPWORKS_FIXTURES=<path>` when set.
+  stay in the private data repo; tests read them from `REPWORKS_FIXTURES=<path>` when set. One
+  exception, by his word (DECISIONS.md, 2026-11-28): lines of his own 1.Nc3 repertoire may be quoted
+  here. Its files and a batch's material still live in the data repo.
 - No code loaded from a CDN at runtime: everything is bundled and self-hosted.

@@ -2900,3 +2900,40 @@ The technical calls, each with its reason:
 - **"OK all open" on a list**, after a confirmation, writes OK for every item still waiting under
   it; items answered, noted or edited stay.
 - `chapter-diff.ts --review` writes a position's items next to each other in the file.
+
+## Revision of 2026-11-28 (the repertoire audit as a skill and tools: PLAN.md §5.219)
+- **The owner's own 1.Nc3 repertoire may be quoted in this public repo.** His words to the
+  reviewing session, 2026-11-27: "I don't mind my repertoire being public on repworks. It's not
+  connected to any course either." This narrows "the owner's real studies stay in the private data
+  repo" (Constraints; PLAN.md §4, §5.128): lines of that repertoire may appear here (the skill, the
+  difficulty measure's calibration test, PLAN.md). Unchanged: no Chessable course content here, ever
+  (D14), and his other studies and course exports stay private. The repertoire's files, and each
+  batch's ops, notes and evidence, are still kept in the data repo: not because they are secret, but
+  so that its state is in one place and this repo holds code only.
+- **A reviewing session's notes on a study live in the data repo, `notes/<sid>/`**: its rules, its
+  ledger, the state its scripts read (`audit.json`), the owner's corrections, each batch's folder.
+  Not a path kind of format 1 (no version change): the app treats it as any path it doesn't know,
+  neither reading nor writing it, and the validator expects it. Why there and not on a branch of
+  this repo: the old session's rules lived in its context and its scripts on a branch, and neither
+  could be continued by another session. Written only by sessions; safe to push while the owner
+  reviews in the app, which `studies/` and `review/` are not.
+- **A session's commits to the data repo start with `session:`.** The tools tell them from a
+  device's sync by that (and by a session's trailers): the base of a merge is the session's last
+  commit to the study's chapters, and `audit.ts apply` refuses a base with such a commit after it.
+- **The difficulty measure's reference is the vendored Stockfish 18 lite at 1,500,000 nodes a move
+  on one thread**, not the machine's native Stockfish by time: a number that is the same on every
+  run and machine, which class limits at 3 and 5 need. The owner's limits are unchanged, and the
+  ten lines they were set on are a test. Not Stockfish 19, though it is in `node_modules` and
+  stronger: on it the same moves score higher (those at about 4 at about 6), so the limits, set on
+  Stockfish 16's numbers, would mean something else. Resetting them on 19 is the owner's call.
+- **The audit's screens and checks of comment lines run on Stockfish 19** (the npm package's
+  full-net single-threaded build), at fixed nodes on one thread: the strongest engine here, the
+  same on every machine, and nothing to install. The container's `apt-get install stockfish`
+  (version 16) is only for `scripts/ideas/cv.ts`, which reads `STOCKFISH`.
+- **A chapter that has had no review** gets its close calls first (the agreed triggers that need no
+  builder, then Practical and the system test), then the branch audit. The owner's PC builder is
+  no part of the audit any more. Decided by the session, since the old one could not say; the
+  owner may change it.
+- **Open, the owner's:** the difficulty limits on Stockfish 19; where the explorer's and ChessDB's
+  answers are kept between sessions (TESTING.md).
+

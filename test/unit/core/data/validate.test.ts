@@ -63,11 +63,16 @@ test('other problems: unknown format, unlisted chapter, missing device, a clashi
   files.delete('devices/Phone001.json');
   files.set('progress/Desktop1/2026-10-06.jsonl', '{"v":1,"n":2,"t":"2026-10-06T08:00:00.000Z","k":"forget","card":"r|x|e2e4"}\n');
   files.set('notes.txt', 'hello');
+  // A session's notes on a study are no stray files (PLAN.md §5.219); notes outside a study's folder are.
+  files.set('notes/Rep0Najd/rules.md', '# Rules');
+  files.set('notes/Rep0Najd/batches/batch-6/ops.json', '{}');
+  files.set('notes/readme.md', 'stray');
   files.set('studies/Rep0Najd/Ch1Najdf.conflict-Phone001.pgn', '[Event "x"]\n\n1. e4 *\n');
   const report = validateDataRepo(files);
   assert.deepEqual(messages(report.errors), ['repworks.json: format 2: this code reads format 1']);
   assert.deepEqual(messages(report.warnings), [
     'notes.txt: not part of format 1: the app ignores it',
+    'notes/readme.md: not part of format 1: the app ignores it',
     "studies/Rep0Najd/Ch1Najdf.conflict-Phone001.pgn: a copy of chapter Ch1Najdf kept from device Phone001 when it couldn't be merged: resolve it, then delete it",
     "studies/Rep0Najd/Ch3Extra.pgn: not in study.json's chapter list: it is shown after the listed ones",
     'progress/Desktop1/2026-10-06.jsonl: n 2 also appears, different, in progress/Desktop1/2026-10-05.jsonl',

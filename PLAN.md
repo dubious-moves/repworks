@@ -374,7 +374,9 @@ devices/<dev>.json                 { "name": "phone", "created": "…" }, writte
 
 Later sections added path kinds to format 1, each written by one writer only (the list is in
 `src/core/data/layout.ts`): `storm/<dev>/…` (§5.102), `games/<YYYY-MM>.jsonl` (§5.163),
-`review/<sid>/<name>.json` (§5.216).
+`review/<sid>/<name>.json` (§5.216). A reviewing session's own notes on a study live in
+`notes/<sid>/…` (§5.219): no path kind of the format, nothing to the app, and expected there by the
+validator.
 
 - IDs (studies, chapters and devices): 8 random characters `[A-Za-z0-9]`, like Lichess's.
   Provenance goes in `source`, so re-importing a study never clashes with an old one.
@@ -6970,6 +6972,8 @@ skill and its tools, then idea cards in the app.
   5. Write the deck, and check it against the repertoire to zero errors.
   6. Review as a critic, fix, and check again.
   7. Deliver the deck as a file. Decks and repertoires never go in this public repository.
+     (Since 2026-11-28 lines of the owner's own 1.Nc3 repertoire may be quoted here, by his word:
+     DECISIONS.md. Its files and decks are still kept in the data repo.)
 
   With workflows opted into, steps 2–6 run as the saved workflow `opening-ideas-deck`
   (`.claude/workflows/opening-ideas-deck.js`).
@@ -13049,3 +13053,152 @@ lists), 54 open, and his answers so far (OK, a No with its note) are read on the
 the panel with those lists and his chapter served from the fake repo, desktop and phone size.
 
 **Not checked**: on the owner's devices (TESTING.md).
+
+#### 5.219 The repertoire audit as a skill and tools (the owner's request, 2026-11-28, built)
+
+One long cloud session held the whole process for reviewing the owner's 1.Nc3 repertoire: its
+rules in its context, its scripts in its scratchpad (later on branch `claude/audit-tools`, with
+absolute paths, one chapter's name written into several, and no test), its state in a hand-kept PGN
+and a ledger typed by hand. A hand-over audit from a fresh container found that what was in the
+repos could be re-run but not continued: the ledger named a merge base two commits old, the
+difficulty measure gave 1.2 to 2.2 for one move across runs against class limits at 3 and 5, and
+the answers to "what happens with a chapter that has had no review" were not written anywhere. The
+owner: make the audit runnable by any fresh session from what is in the repos.
+
+**Where things live** (D, 2026-11-28). Code in this repo: the skill
+`.claude/skills/repertoire-audit/SKILL.md` (one batch, from "read the rules and the ledger" to "push
+the chapter, one review list and the updated ledger"), and `scripts/audit/`. The repertoire's own
+rules and state in the data repo, `notes/<sid>/`: `rules.md` (the owner's word), `ledger.md`,
+`audit.json` (what the scripts read: each chapter's depth and owner file, each subtree's state, the
+checks' targets, his exceptions, flags), `corrections.md` (each No, note and edit of his, by type),
+and `batches/<name>/` (a batch's ops, notes and evidence). So the state is in one place and this
+repo holds code only. `notes/` is no path kind of format 1: the app ignores it as any path it
+doesn't know, and `validateDataRepo` no longer warns about it (`isNotesPath`).
+
+**The tools** (`node scripts/audit/audit.ts <command> <checkout>[@rev] --study S`; chapters are read
+and written in a data repo checkout by study and chapter id, through `scripts/data-repo.ts`, which
+`chapter-diff.ts` now shares; no hand-kept copy, no absolute path):
+
+- `check`: every check against the targets in `audit.json`, exit 1 on a miss: one move of ours a
+  position over every chapter and move order; no illegal move, every chapter file in the app's own
+  form; every clickable line plays in full; groups in parentheses that are no line (at most the
+  target); no line ending on the opponent's move without a "transposes to" note; no such note
+  pointing to the wrong place or to nowhere; no position continuing in two places by different
+  orders; the owner's own file's moves and comments still there (missing at most what he accepted);
+  and with `--deck` the idea deck's check against the study (`scripts/ideas/cv.ts check`, the
+  repertoire file made from the chapters with the explorer's shares).
+- `ledger`: the ledger's tables (per subtree: positions with drilled replies, replies, single-move
+  branches, state), the order of what is left, the open review lists with the owner's answers so
+  far, and the base, written between `<!-- audit:NAME -->` markers; `--check` fails on a stale file.
+- `base`: the session's last commit to the study's chapters, from which the owner's edits are counted.
+- `apply`: a batch's ops (cuts, lines, comments set, appended or reworded, glyphs, the first move at
+  a position) applied to the chapter at the base, the owner's edits since carried onto the result
+  three-way (move by move and field by field; his field wins, a conflict is printed), the
+  transposition notes rewritten, the files written in the app's form. An op that can't be applied
+  is an error and nothing is written. **A base behind the session's own later commit to the study
+  is refused**, naming the commit to use: that was the stale base of the ledger (04e139e, with
+  114ab23 after it).
+- `inventory`: a subtree's positions with each reply's share, games, reach by its own order and
+  over every order the study has (any chapter; an order that ends in a "transposes to" note counts,
+  which the old inventory missed), our answer, tags (common, the owner's, single-move) and the
+  replies of 2% or more not drilled. The explorer through the app's own client and
+  `scripts/practical.ts`'s cache folder, so Practical and the audit share every answer. `--offline`
+  answers from the cache and lists what it lacks: a position that could not be seen is `NOT
+  COMPLETE`, never "no games" (the old session's cache-only scan skipped them and reported "only 1
+  left").
+- `screen` (Stockfish on every move of ours, a flag at 0.50 behind), `difficulty` and `judge` (below),
+  `lines` (every comment's clickable lines, new or changed since a commit, with Stockfish before and
+  after and our moves against its best), `lint` (a partial line or one cut with dots in words to the
+  owner; moves outside parentheses or prose inside a line in a comment), `scan` (a token, an email
+  address or a personal computer's path in what a push would carry: exit 1; a token is never
+  printed), `rep`, `close-calls` (below), `add-chapters`.
+
+**The difficulty measure, repeatable.** Per move of ours: Maia's chance of it (the 23M model reading
+the line, 2000 and 2200 averaged), Maia's natural moves up to 90% of its mass, each scored by
+Stockfish as our win chance, and expLoss, the chance-weighted win% the natural moves give up. The
+old script searched all of them at once for 1.5 s on four threads; `engine.ts` searches each move
+alone at a fixed number of nodes on one thread with the hash cleared before each search, several
+such engines side by side, every answer kept on disk. Measured 2026-11-28 on the ten lines the
+owner's limits were set on, the labelled moves:
+
+| Move | old, 1.5 s x 4 | SF 18 lite, 400k | SF 18 lite, 1.5M | SF 16, 400k | SF 16, 1.5M | SF 19, 1.5M |
+|---|---|---|---|---|---|---|
+| 9.Bd3 (not Nxa8) | 21.1 | 18.2 | 20.1 | 21.2 | 22.0 | 35.1 |
+| 10.b4 | 15.3 | 13.5 | 14.8 | 14.8 | 17.0 | 22.0 |
+| 9.b3 | 10.4 | 6.1 | 7.7 | 9.7 | 10.7 | 16.4 |
+| 6.Nb5 | 4.0, 4.5 | 4.2 | 4.1 | 3.9 | 4.1 | 5.8 |
+| 9.c3 | 4.3 | 3.6 | 3.8 | 4.0 | 4.5 | 6.2 |
+| 8.Qa4 | 4.4 | 3.6 | 3.1 | 3.6 | 4.2 | 6.2 |
+| 11.Nd6+ | 4.2 | 3.7 | 3.9 | 3.8 | 4.2 | 6.2 |
+| 6.Na4 | 4.3 | 3.7 | 3.8 | 4.0 | 3.7 | 2.7 |
+| 8.Bxf6 | 2.7 | 3.0 | 3.0 | 2.6 | 2.7 | 3.5 |
+| 7.c3 | 2.5 | 3.3 | 2.5 | 2.4 | 2.4 | 3.2 |
+| 7.b4 (against ...Qa5+) | 2.0 | 1.0 | 0.0 | 0.3 | 2.6 | 4.6 |
+| 8.gxf5 | 1.2 to 2.2 | 2.3 | 2.1 | 1.7 | 2.1 | 2.1 |
+
+(The easy ones, 0 to 1.6 everywhere, are left out. SF 16 is the container's `apt-get install
+stockfish`; SF 18 lite the vendored build; SF 19 the full-net single-threaded build of the
+`stockfish` npm package this repo pins.) On Stockfish 16 and 18 lite every move further than half a
+point from a limit keeps its class in all four settings; the two at the limit of 3 (8.Bxf6, 7.c3)
+move across it with the engine, which is what "within about 1 of a limit is a judgement" is for.
+
+**The limits belong to an engine.** The owner asked, on seeing the setup script, why Stockfish 16:
+only because that is what the container's package gives. Stockfish 19 with its full net is already
+in `node_modules` (a million nodes in 3 s on one thread, depth 21 where 16 reaches 18), pinned by
+the lock file and so the same on every machine. But on it the same lines score higher: the four
+"mid" moves at about 4 come out at about 6, above the limit for hard, 6.Na4 drops from mid to easy,
+and 7.b4 rises from easy to mid. The limits of 3 and 5 were set by the owner on Stockfish 16's
+numbers ("Thresholds are fine"), so moving the measure to 19 would change what is drilled without
+his having seen it. **Chosen: the measure stays on the vendored Stockfish 18 lite at 1,500,000
+nodes a move** (`ENGINE`, `NODES`): the same file on every machine, so a number in a note means the
+same in the next session and the calibration runs in CI, and it keeps Stockfish 16's classes; 1.5M
+because the deep tactic (9.b3) sits nearest the limits' own runs there. **The screens and the
+checks of a comment's lines use Stockfish 19**, where stronger is simply better and a flag is only
+a prompt for Practical. `--engine sf19|lite18|native` asks another; `difficulty` then says its
+classes are not the measure's. Setting the limits again on Stockfish 19 is the owner's (TESTING.md).
+Cost: lite 18 0.7 s a search on one core (the ten lines' 165 searches 89 s on four), Stockfish 19
+about 3 s (237 s).
+
+**A chapter that has had no review** (decided; the old session could not say, and it changes
+nothing the owner is asked to review that he was not asked for the Jobava). Into the study first
+(`add-chapters`), then its close calls: `close-calls` reads every move of ours against the explorer
+and ChessDB and flags by the agreed triggers that need no builder (ChessDB 3 win% or more higher
+with the win rate at most a point lower; the win rate 3 points or more higher over 100+ games each
+with ChessDB at most 3 win% lower; a reply of 10% or more after which we score under 45% or ChessDB
+gives us 0.00 or less; the most reached line ends), `check` the positions met with two moves;
+Practical on the flags and the system test; then the branch audit subtree by subtree. No PC builder.
+The win rates are the games' own, with the ratings shown, not at equal ratings: Practical's prepared
+score settles a flag.
+
+**The second reader** is a step of the skill: a fresh subagent given only `rules.md`, the batch's
+diff, the notes and Stockfish's scores of the new comments' lines, which checks every claim (a line
+that shows it, Stockfish agreeing), the format rules and the changed moves against the rules, before
+anything is pushed.
+
+**Left open.** The difficulty limits on Stockfish 19 (above). Where the explorer's and ChessDB's answers are kept between sessions: the old
+session's are a tarball on `claude/audit-tools`; what a session adds is lost with its container (the
+owner's choice: TESTING.md has the options). (The old session's two other proposals, one review
+item a position and "OK all", were built the same day as §5.218; the ledger counts positions as
+the panel does.)
+
+Tests: `test/unit/scripts/audit.test.ts` (made-up studies: each check; ops and what they refuse;
+the three-way merge; the base that is behind; the ledger's parts; the inventory's shares, reach over
+orders, and a position it can't see; offline lookups; the close-call triggers; the scan; the lint;
+the commands over a scratch data repo with a session's and a device's commits),
+`auditDifficulty.test.ts` (the arithmetic; the engine giving the same answer twice; the calibration:
+the ten lines' labelled moves in their classes, the engine's answers read from
+`test/fixtures/audit/sf`, searched again when the measure changes or with `AUDIT_LIVE=1`),
+`validate.test.ts` (`notes/<sid>/…` no stray file). Controls are listed in the test files.
+
+**Checked live** (2026-11-28, a cloud container, the owner's data repo): `check` on the four Jobava
+chapters gives the hand-over's numbers (0 positions with two moves, 0 illegal, 407 of 407 lines, 0
+ending on Black's move, 72 moves and 1 comment of his missing); `ledger` reproduces the old table's
+counts where the chapter has not changed and shows 105 items not answered in four lists; `base`
+gives 114ab23; `apply` on a copy refuses the base 04e139e naming 114ab23, and applies a cut and a
+comment from HEAD with every check passing after; `inventory` of 1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 gives
+44 positions, 76 replies, 31 single-move, with shares and reach equal to the old cache's along a
+line (45 explorer requests, 3 minutes); `close-calls` on the ...g6 chapter (48 positions, explorer
+and ChessDB, 96 s) flags among four moves the 5.h4 against 5.Nb5 decision the old review had found;
+`screen`, `lines --sf`, `lint` and `difficulty` on real lines. **Not checked:** a whole batch by a
+fresh session with the skill, and the owner's reading of its review list (TESTING.md).
+
