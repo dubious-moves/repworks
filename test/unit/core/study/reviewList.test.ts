@@ -7,6 +7,12 @@
 // - `movedOn` not comparing the first move at the position → "my move is another now";
 // - `movedOn` ignoring a removed move that is back → "a removed part's first move is back";
 // - an answer not winning over the chapter's state → "an answer wins over the chapter's change".
+// Positions (§5.218), controls run 2026-11-28:
+// - `byPosition` keyed by the move alone, not the chapter → "items at one move are one position";
+// - `positionsOf` placing a position under the last list that has an item of it → "a position whose
+//   items are in two lists";
+// - `answerTargets` taking every item → "a position's answer goes to its items";
+// - `sharedAnswer` taking the first item's answer → "a position's answer goes to its items".
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { classifyPath, reviewDir, reviewListPath } from '../../../../src/core/data/layout.ts';
@@ -14,7 +20,7 @@ import { validateDataRepo } from '../../../../src/core/data/validate.ts';
 import { parseChapterFile } from '../../../../src/core/pgn/parse.ts';
 import { formatEvent, parseLog } from '../../../../src/core/progress/events.ts';
 import { toDeviceEvents } from '../../../../src/core/progress/replay.ts';
-import { answerOf, itemId, itemState, movedOn, parseReviewList, reviewCard, REVIEW_CARD, writeReviewList, type ReviewItem, type ReviewList } from '../../../../src/core/study/reviewList.ts';
+import { answerOf, answerTargets, byPosition, itemId, itemState, movedOn, newestFirst, orderedByPosition, parseReviewList, positionHead, positionKey, positionsOf, positionState, reviewCard, REVIEW_CARD, sharedAnswer, writeReviewList, type Answer, type ItemState, type ReviewItem, type ReviewList } from '../../../../src/core/study/reviewList.ts';
 
 function chapter(movetext: string) {
   const parsed = parseChapterFile(`[Event "Test"]\n[ChapterName "Jobava"]\n[Orientation "white"]\n\n${movetext} *\n`, 'Ch1Jobav');
@@ -125,4 +131,89 @@ test('an item\'s state: open, answered, a note alone; an answer wins over the ch
   assert.equal(itemState(ADDED, said('open', 'later'), now), 'noted');
   assert.equal(itemState(ADDED, undefined, cut), 'moved');
   assert.equal(itemState(ADDED, said('no'), cut), 'no');
+});
+
+// ---- Positions (§5.218) ----
+
+// A reply taken out of the drilled moves and written as a line in the comment of my move before it:
+// two items at 3. Bf4. In another chapter the same moves are another position.
+const AT_BF4 = ['Nc3', 'd5', 'd4', 'g6', 'Bf4'];
+const COMMENT: ReviewItem = { id: itemId('Ch1Jobav', 'comment', AT_BF4), cid: 'Ch1Jobav', kind: 'comment', at: AT_BF4, lead: '1. Nc3 d5 2. d4 g6', part: '3. Bf4', detail: ['added after the old text: (3... a6 4. e3)'] };
+const ARROWS: ReviewItem = { id: itemId('Ch1Jobav', 'arrows', AT_BF4), cid: 'Ch1Jobav', kind: 'arrows', at: AT_BF4, lead: '1. Nc3 d5 2. d4 g6', part: '3. Bf4', detail: ['added Ge2e4'] };
+const REMOVED_H6: ReviewItem = { id: itemId('Ch1Jobav', 'removed', [...AT_BF4, 'h6']), cid: 'Ch1Jobav', kind: 'removed', at: AT_BF4, lead: '1. Nc3 d5 2. d4 g6 3. Bf4', part: 'h6 4. e3', san: 'h6' };
+const ELSEWHERE: ReviewItem = { ...COMMENT, id: itemId('Ch2Other', 'comment', AT_BF4), cid: 'Ch2Other' };
+
+test('items at one move are one position: in the order their first item comes, a position\'s items by kind; another chapter\'s move is another', () => {
+  const entries = [REMOVED, ADDED, ARROWS, ELSEWHERE, REMOVED_H6, COMMENT, QUESTION].map((item) => ({ item }));
+  const groups = byPosition(entries).map((g) => g.map((e) => `${e.item.cid.slice(2, 3)}.${e.item.kind}${e.item.san ? ` ${e.item.san}` : ''}`));
+  assert.deepEqual(groups, [['1.comment', '1.removed a6', '1.removed h6', '1.arrows'], ['1.added'], ['2.comment'], ['1.question']]);
+  assert.equal(positionKey(REMOVED), positionKey(COMMENT));
+  assert.notEqual(positionKey(COMMENT), positionKey(ELSEWHERE));
+  // The list's file with a position's items next to each other: the same items, every one once.
+  const ordered = orderedByPosition(entries.map((e) => e.item));
+  assert.deepEqual(ordered.map((i) => i.id), [COMMENT, REMOVED, REMOVED_H6, ARROWS, ADDED, ELSEWHERE, QUESTION].map((i) => i.id));
+  assert.deepEqual(orderedByPosition(ordered), ordered, 'ordered again it is the same');
+});
+
+test('a position\'s head: the move its items share, from an item about the move, else from a removed part\'s lead', () => {
+  assert.deepEqual(positionHead([COMMENT, REMOVED]), { lead: '1. Nc3 d5 2. d4 g6', part: '3. Bf4' });
+  assert.deepEqual(positionHead([REMOVED, REMOVED_H6]), { lead: '1. Nc3 d5 2. d4 g6', part: '3. Bf4' });
+  // Black's move, the first move, and a part removed at the start.
+  assert.deepEqual(positionHead([{ ...REMOVED, lead: '1. Nc3 d5 2. d4 g6' }]), { lead: '1. Nc3 d5 2. d4', part: 'g6' });
+  assert.deepEqual(positionHead([{ ...REMOVED, lead: '1. Nc3' }]), { lead: '', part: '1. Nc3' });
+  assert.deepEqual(positionHead([{ ...REMOVED, lead: '' }]), { lead: '', part: 'the start' });
+  assert.deepEqual(positionHead([ADDED]), { lead: ADDED.lead, part: ADDED.part });
+});
+
+const said = (a: 'ok' | 'no' | 'open', note?: string): Answer => ({ a, ...(note ? { note } : {}), t: 0, device: 'Phone001' });
+
+test('a position whose items are in two lists is one position, under the first list shown; counted once', () => {
+  // A batch split by priority: the removed lines in one list, their comment in another.
+  const low: ReviewList = { ...LIST, name: 'batch-4-low', created: '2026-11-27T18:00:00.000Z', items: [REMOVED, REMOVED_H6, QUESTION] };
+  const high: ReviewList = { ...LIST, name: 'batch-4-high', created: '2026-11-27T18:00:01.000Z', items: [MOVE, COMMENT] };
+  const lists = [low, high].sort(newestFirst);
+  assert.deepEqual(lists.map((l) => l.name), ['batch-4-high', 'batch-4-low'], 'the newest first');
+  assert.deepEqual([{ ...low, created: high.created }, high].sort(newestFirst).map((l) => l.name), ['batch-4-high', 'batch-4-low'], 'then by name');
+  const states = new Map<string, { state: ItemState; answer?: Answer }>([[REMOVED_H6.id, { state: 'ok', answer: said('ok') }]]);
+  const shown = positionsOf(lists, (_list, item) => states.get(item.id) ?? { state: 'open' });
+  assert.deepEqual(
+    shown.map((l) => [l.list.name, l.open, l.positions.map((p) => p.items.map((i) => `${i.list.name.slice(8)}.${i.item.kind}`).join(' + '))]),
+    [
+      ['batch-4-high', 2, ['high.move', 'high.comment + low.removed + low.removed']],
+      ['batch-4-low', 1, ['low.question']],
+    ],
+  );
+  const at = shown[0]!.positions[1]!;
+  assert.deepEqual({ key: at.key, cid: at.cid, at: at.at, lead: at.lead, part: at.part, state: at.state, common: at.common, waiting: at.waiting }, { key: 'Ch1Jobav|Nc3,d5,d4,g6,Bf4', cid: 'Ch1Jobav', at: AT_BF4, lead: '1. Nc3 d5 2. d4 g6', part: '3. Bf4', state: 'open', common: undefined, waiting: true });
+  // Every item is shown once, whatever the lists' order.
+  const other = positionsOf([low, high], () => ({ state: 'ok' }));
+  assert.deepEqual(other.map((l) => [l.list.name, l.open, l.positions.map((p) => p.items.length)]), [['batch-4-low', 0, [3, 1]], ['batch-4-high', 0, [1]]]);
+  assert.equal(other[0]!.positions[0]!.common, 'ok');
+});
+
+test('a position\'s state: waiting while an item is open; for a report the first of No, a note, changed, open, OK', () => {
+  assert.equal(positionState(['ok', 'ok']), 'ok');
+  assert.equal(positionState(['ok', 'open']), 'open');
+  assert.equal(positionState(['open', 'moved']), 'moved');
+  assert.equal(positionState(['moved', 'noted', 'ok']), 'noted');
+  assert.equal(positionState(['ok', 'no', 'open', 'noted']), 'no');
+  const [l] = positionsOf([{ ...LIST, items: [COMMENT, REMOVED] }], (_l, item) => (item === REMOVED ? { state: 'moved' } : { state: 'open' }));
+  assert.deepEqual([l!.positions[0]!.state, l!.positions[0]!.waiting, l!.open], ['moved', true, 1], 'an edit of one item leaves the other waiting');
+  const [done] = positionsOf([{ ...LIST, items: [COMMENT, REMOVED] }], (_l, item) => (item === REMOVED ? { state: 'moved' } : { state: 'ok', answer: said('ok') }));
+  assert.deepEqual([done!.positions[0]!.state, done!.positions[0]!.waiting, done!.open], ['moved', false, 0]);
+});
+
+test('a position\'s answer goes to its items, but not to one the chapter moved on from; the buttons show what they share', () => {
+  type Entry = { item: ReviewItem; state: ItemState; answer?: Answer };
+  const open: Entry = { item: COMMENT, state: 'open' };
+  const moved: Entry = { item: REMOVED, state: 'moved' };
+  const no = { item: REMOVED_H6, state: 'no' as ItemState, answer: said('no', 'keep it') };
+  assert.deepEqual(answerTargets([open, moved, no]), [open, no], 'the edit stays the answer of its item');
+  assert.deepEqual(answerTargets([moved]), [moved], 'all moved on: an answer can still be given');
+  assert.deepEqual(sharedAnswer([open, no]), { a: 'open' });
+  assert.deepEqual(sharedAnswer([no, { answer: said('no', 'keep it') }]), { a: 'no', note: 'keep it' });
+  assert.deepEqual(sharedAnswer([{ answer: said('ok', 'fine') }, { answer: said('ok') }]), { a: 'ok' }, 'a note only one has is its own');
+  assert.deepEqual(sharedAnswer([{ answer: said('ok') }, { answer: said('ok') }]), { a: 'ok' });
+  assert.deepEqual(sharedAnswer([{ answer: said('open', 'later') }, { answer: said('open', 'later') }]), { a: 'open', note: 'later' });
+  assert.deepEqual(sharedAnswer([]), { a: 'open' });
 });

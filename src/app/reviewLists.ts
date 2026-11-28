@@ -2,32 +2,29 @@
 // (`review/<sid>/<name>.json`, which only the session writes), each item with the owner's answer
 // from the log and whether the chapter has moved on from it. Read when the study opens and when
 // the data changes (a sync brought a list, or took one away); the open chapter is the editor's,
-// edits included, so an item whose move was just changed says so at once.
+// edits included, so an item whose move was just changed says so at once. Items at one move are a
+// position (§5.218): shown under one head, counted once, answered once.
 import { computed, effect, signal } from '@preact/signals';
 import { chapterPath, classifyPath, reviewDir } from '../core/data/layout.ts';
 import { parseChapterFile } from '../core/pgn/parse.ts';
 import type { Chapter } from '../core/study/model.ts';
-import { answerOf, itemState, parseReviewList, reviewCard, type Answer, type ItemState, type ReviewItem, type ReviewList } from '../core/study/reviewList.ts';
+import { answerOf, itemState, newestFirst, parseReviewList, positionsOf, reviewCard, type Placed, type ReviewPosition, type ReviewList } from '../core/study/reviewList.ts';
 import { chapter, SCRATCH, study } from './editor.ts';
-import { localStore, recordEvent } from './state.ts';
+import { localStore, recordEvents } from './state.ts';
 import { dataVersion } from './sync.ts';
 import { trainData } from './train.ts';
 
-export interface ShownItem {
-  item: ReviewItem;
-  state: ItemState;
-  answer?: Answer;
-}
-export interface ShownGroup {
+export interface ShownChapter {
   cid: string;
   /** The chapter's name now, or as the list has it when the chapter is gone. */
   name: string;
-  items: ShownItem[];
+  positions: ReviewPosition[];
 }
 export interface ShownList {
   list: ReviewList;
-  groups: ShownGroup[];
-  /** Items still waiting for the owner: no answer, and the chapter as the item says. */
+  /** The positions shown under this list (one whose items are in several lists is under the first), by chapter. */
+  chapters: ShownChapter[];
+  /** Positions still waiting for the owner: an item with no answer, and the chapter as the item says. */
   open: number;
   total: number;
 }
@@ -51,7 +48,7 @@ async function load(sid: string): Promise<void> {
     // A list this version can't read, or one filed under another study or name, isn't shown.
     if (r.ok && r.list.sid === sid && r.list.name === where.name) lists.push(r.list);
   }
-  lists.sort((a, b) => (a.created < b.created ? 1 : a.created > b.created ? -1 : a.name < b.name ? -1 : 1));
+  lists.sort(newestFirst);
   const wanted = new Set(lists.flatMap((l) => l.items.map((i) => chapterPath(sid, i.cid))));
   const texts = wanted.size ? await store.read((p) => wanted.has(p)) : new Map<string, string>();
   if (ticket !== reading) return;
@@ -76,7 +73,7 @@ effect(() => {
   void load(sid);
 });
 
-/** The open study's lists, the newest first, each item with its answer and state. */
+/** The open study's lists, the newest first, as positions: each item with its answer and state. */
 export const reviewLists = computed<ShownList[]>(() => {
   const s = study.value;
   const r = read.value;
@@ -84,23 +81,32 @@ export const reviewLists = computed<ShownList[]>(() => {
   const data = trainData.value;
   const open = chapter.value;
   const names = new Map(s.chapters.map((c) => [c.id, c.name] as const));
-  return r.lists.map((list) => {
-    const groups: ShownGroup[] = [];
-    let waiting = 0;
-    for (const item of list.items) {
-      const answer = data ? answerOf(data.eventsOf(reviewCard(list.sid, list.name, item.id))) : undefined;
-      const state = itemState(item, answer, item.cid === s.cid && open ? open : r.chapters.get(item.cid));
-      if (state === 'open') waiting++;
-      let group = groups.find((g) => g.cid === item.cid);
-      if (!group) groups.push((group = { cid: item.cid, name: names.get(item.cid) ?? list.chapters[item.cid] ?? item.cid, items: [] }));
-      group.items.push({ item, state, ...(answer ? { answer } : {}) });
+  const shown = positionsOf(r.lists, (list, item) => {
+    const answer = data ? answerOf(data.eventsOf(reviewCard(list.sid, list.name, item.id))) : undefined;
+    return { state: itemState(item, answer, item.cid === s.cid && open ? open : r.chapters.get(item.cid)), ...(answer ? { answer } : {}) };
+  });
+  return shown.map(({ list, positions, open: waiting }) => {
+    const chapters: ShownChapter[] = [];
+    for (const p of positions) {
+      let of = chapters.find((c) => c.cid === p.cid);
+      if (!of) chapters.push((of = { cid: p.cid, name: names.get(p.cid) ?? p.items.map((i) => i.list.chapters[p.cid]).find(Boolean) ?? p.cid, positions: [] }));
+      of.positions.push(p);
     }
-    return { list, groups, open: waiting, total: list.items.length };
+    return { list, chapters, open: waiting, total: positions.length };
   });
 });
 
-/** The owner's answer to an item, logged; `open` with no note takes an answer back. */
-export function answerItem(list: ReviewList, item: ReviewItem, a: 'ok' | 'no' | 'open', note?: string): void {
-  const text = note?.trim();
-  void recordEvent({ t: new Date().toISOString(), k: 'answer', card: reviewCard(list.sid, list.name, item.id), a, ...(text ? { note: text } : {}) });
+/**
+ * The owner's answer to items, logged, an event per item under its own list's card; `open` with no
+ * note takes an answer back. A position's answer and "OK all open" are several items at once.
+ */
+export function answerItems(items: readonly Placed[], to: (item: Placed) => { a: 'ok' | 'no' | 'open'; note?: string | undefined }): void {
+  const t = new Date().toISOString();
+  void recordEvents(
+    items.map((i) => {
+      const { a, note } = to(i);
+      const text = note?.trim();
+      return { t, k: 'answer' as const, card: reviewCard(i.list.sid, i.list.name, i.item.id), a, ...(text ? { note: text } : {}) };
+    }),
+  );
 }

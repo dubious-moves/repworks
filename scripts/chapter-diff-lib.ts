@@ -12,7 +12,7 @@ import { readProgress } from '../src/core/progress/files.ts';
 import type { DeviceEvent } from '../src/core/progress/replay.ts';
 import { countChanges, diffChapters, markedLine, splitLine, type Change, type DiffCounts, type Part } from '../src/core/study/diff.ts';
 import type { Chapter, MoveNode, Shape } from '../src/core/study/model.ts';
-import { answerOf, itemId, itemState, LIST_NAME, REVIEW_FORMAT, reviewCard, type Answer, type ItemKind, type ItemState, type ReviewItem, type ReviewList } from '../src/core/study/reviewList.ts';
+import { answerOf, itemId, itemState, LIST_NAME, orderedByPosition, positionsOf, REVIEW_FORMAT, reviewCard, sharedAnswer, type Answer, type ItemKind, type ItemState, type ReviewItem, type ReviewList, type ReviewPosition } from '../src/core/study/reviewList.ts';
 import { lineText, queryPosition } from '../src/core/study/search.ts';
 import { nodeAt, startPosition, type Path } from '../src/core/study/tree.ts';
 
@@ -381,9 +381,11 @@ const ownPath = (i: ReviewItem): string[] => (i.kind === 'removed' && i.san ? [.
 export type MadeList = { ok: true; list: ReviewList } | { ok: false; error: string };
 
 /**
- * A report as a review list for the study page: an item per change, in the report's order, with
- * the session's notes on the changes they name and the rest of them as questions at their moves.
- * The new version must be a study of a data repo (the items name its chapters by id).
+ * A report as a review list for the study page: an item per change, with the session's notes on
+ * the changes they name and the rest of them as questions at their moves. In the report's order
+ * by position: the items at one move (a removed reply and the comment it was written into) are
+ * next to each other, as the panel shows them (§5.218), so a list cut in two by hand keeps a
+ * decision whole. The new version must be a study of a data repo (the items name its chapters by id).
  */
 export function reviewList(r: Report, now: Version, options: { name: string; title?: string; created: string; notes?: readonly Note[] }): MadeList {
   if (now.sid === undefined) return { ok: false, error: 'a review list is for a study in a data repo: the new side is a file' };
@@ -463,7 +465,7 @@ export function reviewList(r: Report, now: Version, options: { name: string; tit
     else items.push({ id, cid: c.cid!, kind: 'question', at: [...sans], lead, part, text: note.text });
     chapters[c.cid!] = c.name;
   }
-  return { ok: true, list: { v: REVIEW_FORMAT, sid: now.sid, name: options.name, title: options.title?.trim() || options.name, created: options.created, from: r.old, to: r.now, chapters, items } };
+  return { ok: true, list: { v: REVIEW_FORMAT, sid: now.sid, name: options.name, title: options.title?.trim() || options.name, created: options.created, from: r.old, to: r.now, chapters, items: orderedByPosition(items) } };
 }
 
 const samePathList = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
@@ -477,16 +479,41 @@ export interface AnsweredItem {
   /** The item's line in full. */
   line: string;
 }
+/** The items at one move, as the panel shows and counts them (§5.218). */
+export interface AnsweredPosition {
+  cid: string;
+  at: string[];
+  /** The position's own line in full. */
+  line: string;
+  /** What its items say together: the first of no, noted, moved, open, ok that any of them has. */
+  state: ItemState;
+  /** An item still waits for the owner. */
+  waiting: boolean;
+  /** The note every item answered carries, when it is one note (a position answered as one). */
+  note?: string;
+  /** Its items; `list` names the list of one that is in another list than the position is under. */
+  items: (AnsweredItem & { list?: string })[];
+}
 export interface AnsweredList {
   list: ReviewList;
+  /** The list's own items. */
   items: AnsweredItem[];
   counts: Record<ItemState, number>;
+  /** The positions under this list: one whose items are in several lists is under the first of them (the newest), and under no other. */
+  positions: AnsweredPosition[];
+  positionCounts: Record<ItemState, number>;
+  /** Positions with an item still not answered: the panel's "open". */
+  waiting: number;
 }
+
+const fullLine = (i: { lead: string; part: string }) => `${i.lead}${i.lead && i.part ? ' ' : ''}${i.part}`;
+const noCounts = (): Record<ItemState, number> => ({ open: 0, ok: 0, no: 0, noted: 0, moved: 0 });
 
 /**
  * Each list with the owner's answers from every device's log, and whether the chapter has moved on
  * from an item (the owner edited it there: the edit is his answer). `files` are a data repo
- * checkout's (path → text), `lists` the lists as read, `chapters` the study's chapters by id.
+ * checkout's (path → text), `lists` the lists as read, in the order the app shows them
+ * (`newestFirst`), `chapters` the study's chapters by id.
  */
 export function answered(lists: readonly ReviewList[], files: ReadonlyMap<string, string>, chapters: ReadonlyMap<string, Chapter>): AnsweredList[] {
   const byCard = new Map<string, DeviceEvent[]>();
@@ -496,33 +523,73 @@ export function answered(lists: readonly ReviewList[], files: ReadonlyMap<string
     byCard.set(card, [...(byCard.get(card) ?? []), e]);
   }
   for (const list of byCard.values()) list.sort((a, b) => a.t - b.t || a.n - b.n);
-  return lists.map((list) => {
-    const counts: Record<ItemState, number> = { open: 0, ok: 0, no: 0, noted: 0, moved: 0 };
+  const stand = (list: ReviewList, item: ReviewItem) => {
+    const answer = answerOf(byCard.get(reviewCard(list.sid, list.name, item.id)) ?? []);
+    return { state: itemState(item, answer, chapters.get(item.cid)), ...(answer ? { answer } : {}) };
+  };
+  return positionsOf(lists, stand).map(({ list, positions, open }) => {
+    const counts = noCounts();
     const items = list.items.map((item) => {
-      const answer = answerOf(byCard.get(reviewCard(list.sid, list.name, item.id)) ?? []);
-      const state = itemState(item, answer, chapters.get(item.cid));
-      counts[state]++;
-      return { item, state, ...(answer ? { answer } : {}), line: `${item.lead}${item.lead && item.part ? ' ' : ''}${item.part}` };
+      const s = stand(list, item);
+      counts[s.state]++;
+      return { item, ...s, line: fullLine(item) };
     });
-    return { list, items, counts };
+    const positionCounts = noCounts();
+    const placed = positions.map((p: ReviewPosition): AnsweredPosition => {
+      positionCounts[p.state]++;
+      const { note } = sharedAnswer(p.items.filter((i) => i.answer));
+      return {
+        cid: p.cid,
+        at: p.at,
+        line: fullLine(p),
+        state: p.state,
+        waiting: p.waiting,
+        ...(note ? { note } : {}),
+        items: p.items.map((i) => ({ item: i.item, state: i.state, ...(i.answer ? { answer: i.answer } : {}), line: fullLine(i.item), ...(i.list !== list ? { list: i.list.name } : {}) })),
+      };
+    });
+    return { list, items, counts, positions: placed, positionCounts, waiting: open };
   });
 }
 
 const STATE_WORDS: Record<ItemState, string> = { open: 'not answered', ok: 'OK', no: 'No', noted: 'a note', moved: 'changed in the chapter since' };
 
+/** The answers by position (§5.218): what needs the session first, a position's items under it when it has several. */
 export function answersMarkdown(lists: readonly AnsweredList[]): string {
   const out: string[] = ['# Review answers', ''];
   if (!lists.length) out.push('No review list for this study.', '');
+  const plurals = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
   for (const l of lists) {
-    const c = l.counts;
-    out.push(`## ${esc(l.list.title)} (${l.list.name})`, '', `${l.items.length} items: ${c.ok} OK, ${c.no} No, ${c.noted} with a note only, ${c.moved} changed in the chapter since, ${c.open} not answered.`, '');
+    const c = l.positionCounts;
+    const shown = l.positions.reduce((n, p) => n + p.items.length, 0);
+    const partly = l.waiting - c.open;
+    out.push(
+      `## ${esc(l.list.title)} (${l.list.name})`,
+      '',
+      `${plurals(l.positions.length, 'position')} (${plurals(shown, 'item')}): ${c.ok} OK, ${c.no} No, ${c.noted} with a note only, ${c.moved} changed in the chapter since, ${c.open} not answered.${partly > 0 ? ` ${plurals(partly, 'more position')} answered in part: ${plurals(l.waiting, 'position')} still open in the app.` : ''}`,
+      '',
+    );
     for (const state of ['no', 'noted', 'moved', 'open', 'ok'] as const) {
-      const of = l.items.filter((i) => i.state === state);
+      const of = l.positions.filter((p) => p.state === state);
       if (!of.length) continue;
       out.push(`### ${STATE_WORDS[state][0]!.toUpperCase()}${STATE_WORDS[state].slice(1)} (${of.length})`, '');
-      for (const i of of) {
-        out.push(`- ${esc(l.list.chapters[i.item.cid] ?? i.item.cid)}, ${i.item.kind}: ${i.line}`);
-        if (i.answer?.note) out.push(...quote('note', [i.answer.note]));
+      for (const p of of) {
+        const chapter = esc(l.list.chapters[p.cid] ?? p.cid);
+        const one = p.items.length === 1 ? p.items[0]! : undefined;
+        if (one) {
+          out.push(`- ${chapter}, ${one.item.kind}: ${one.line}`);
+          if (one.answer?.note) out.push(...quote('note', [one.answer.note]));
+          continue;
+        }
+        out.push(`- ${chapter}: ${p.line}`);
+        // Each item's own word where they differ; one note given to the position is said once.
+        const same = p.items.every((i) => i.state === p.state);
+        for (const i of p.items) {
+          const what = i.item.kind === 'removed' || i.item.kind === 'added' ? `: ${i.item.part}` : '';
+          out.push(`  - ${i.item.kind}${what}${same ? '' : `, ${STATE_WORDS[i.state]}`}${i.list ? ` (list ${i.list})` : ''}`);
+          if (i.answer?.note && i.answer.note !== p.note) out.push(...quote('note', [i.answer.note], '    '));
+        }
+        if (p.note) out.push(...quote('note', [p.note]));
       }
       out.push('');
     }

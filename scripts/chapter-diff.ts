@@ -36,7 +36,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { reviewListPath } from '../src/core/data/layout.ts';
-import { writeReviewList } from '../src/core/study/reviewList.ts';
+import { positionKey, writeReviewList } from '../src/core/study/reviewList.ts';
 import { parseChapterFile, parseGames } from '../src/core/pgn/parse.ts';
 import type { Chapter } from '../src/core/study/model.ts';
 import { parseStudyMeta, reconcileChapterOrder } from '../src/core/study/studyMeta.ts';
@@ -179,7 +179,9 @@ if (flags.has('review')) {
   const path = join(dir, reviewListPath(made.list.sid, made.list.name));
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, writeReviewList(made.list));
-  process.stderr.write(`wrote ${path}: ${made.list.items.length} item(s), ${made.list.items.filter((i) => i.text).length} with your words. Commit it with the study.\n`);
+  // The app shows and counts positions (the items at one move, §5.218).
+  const places = new Set(made.list.items.map(positionKey)).size;
+  process.stderr.write(`wrote ${path}: ${made.list.items.length} item(s) at ${places} position(s), ${made.list.items.filter((i) => i.text).length} with your words. Commit it with the study.\n`);
 }
 const text = flags.has('json') ? `${JSON.stringify(r, null, 1)}\n` : markdown(r, { maxLines });
 if (flags.has('out')) writeFileSync(flags.get('out')!, text);

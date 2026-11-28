@@ -2887,3 +2887,16 @@ The technical calls, each with its reason:
 - **"Branches to clickable lines" (§5.109) writes branches nested** inside the line of the move
   they follow, not one line per end (the owner's OK). Lines written before stay as they are.
 - **Named, the owner agreeing:** the menu item is "Start a clickable line".
+
+## Revision of 2026-11-28 (review lists answered by position: PLAN.md §5.218)
+- **The Review panel shows, counts and answers positions**: the items of one chapter at the same
+  move are one entry with one row of buttons, where the revision of 2026-11-27 had an item an
+  entry. Why: the owner, 2026-11-28, on the first batch: "119 items is simply too much"; a reply
+  moved into a comment was two items for one decision. **No file or event changed**: an answer
+  is still one `answer` event per item under its own card, so the lists in the data repo and
+  `review-answers.ts` read as before.
+- **A position whose items are in several lists is shown once, under the newest list** that has
+  one of its items.
+- **"OK all open" on a list**, after a confirmation, writes OK for every item still waiting under
+  it; items answered, noted or edited stay.
+- `chapter-diff.ts --review` writes a position's items next to each other in the file.

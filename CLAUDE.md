@@ -142,9 +142,12 @@ study it came from), `--mark TEXT` (comments holding TEXT, as open questions), `
 §5.216, its Review panel): add `--review batch-4 --title "Jobava batch 4" [--notes notes.json]`
 (`[{ "moves": "1. Nc3 d5 2. d4", "text": "…" }]`: your words on a changed move, or a question at any
 move), which writes `review/<study id>/batch-4.json` into the checkout to commit with the study
-(`node scripts/validate-data.ts ../repworks-data` first). His answers, after his device synced and
-you pulled: `node scripts/review-answers.ts ../repworks-data --study "1. Nc3 + Jobava"` (`--list
-batch-4`, `--json`).
+(`node scripts/validate-data.ts ../repworks-data` first). The app shows the items at one move as one
+position, answered once (PLAN.md §5.218), and a position whose items are in two lists under the
+newer list: split a batch into lists by position, not by item, and make the list that should hold
+a shared position last. His answers, after his device synced and you pulled, by position:
+`node scripts/review-answers.ts ../repworks-data --study "1. Nc3 + Jobava"` (`--list batch-4`,
+`--json`).
 
 The storm's "Gather positions" from a cloud session, as a device named `cloud` (PLAN.md §5.155),
 with the data repo checked out on `main`:

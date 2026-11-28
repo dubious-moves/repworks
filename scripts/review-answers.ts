@@ -2,16 +2,18 @@
 // The owner's answers to a study's review lists (PLAN.md §5.216), read from a data repo checkout:
 // each item of each list (review/<study id>/<name>.json, made by chapter-diff.ts --review) with
 // what the owner said in the app (OK, No, a note), from every device's log, and the items whose
-// move he changed in the chapter since, where the edit is the answer. A report that writes nothing.
+// move he changed in the chapter since, where the edit is the answer. By position, as the app
+// shows them (§5.218): the items at one move together, a position whose items are in several
+// lists under the newest of them. A report that writes nothing.
 //
 // Usage: node scripts/review-answers.ts <data-repo checkout> --study S [--list NAME] [--json]
 //   --study S    the study: its name (any case) or its id
-//   --list NAME  one list only
+//   --list NAME  one list only (its items alone: one at a move another list also has an item at isn't joined with it)
 // Pull the checkout first: an answer is in the repo once the owner's device has synced.
 import { classifyPath, reviewDir } from '../src/core/data/layout.ts';
 import { parseChapterFile } from '../src/core/pgn/parse.ts';
 import type { Chapter } from '../src/core/study/model.ts';
-import { parseReviewList, type ReviewList } from '../src/core/study/reviewList.ts';
+import { newestFirst, parseReviewList, type ReviewList } from '../src/core/study/reviewList.ts';
 import { parseStudyMeta } from '../src/core/study/studyMeta.ts';
 import { answered, answersMarkdown } from './chapter-diff-lib.ts';
 import { readTree } from './read-tree.ts';
@@ -60,6 +62,7 @@ for (const [path, text] of files) {
   }
 }
 if (flag('list') !== undefined && !lists.length) fail(`no list "${flag('list')}" for that study`);
-lists.sort((a, b) => (a.created < b.created ? -1 : a.created > b.created ? 1 : 0));
+// The app's order (the newest first): a position whose items are in several lists is under the same list here as there.
+lists.sort(newestFirst);
 const out = answered(lists, files, chapters);
 process.stdout.write(args.includes('--json') ? `${JSON.stringify(out, null, 1)}\n` : answersMarkdown(out));

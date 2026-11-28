@@ -171,3 +171,132 @@ export function itemState(item: ReviewItem, answer: Answer | undefined, chapter:
   if (answer) return answer.a === 'open' ? 'noted' : answer.a;
   return movedOn(item, chapter) ? 'moved' : 'open';
 }
+
+// ---- Positions: the items at one move, answered as one (§5.218) ----
+
+/**
+ * One decision is often several items: a reply taken out of the drilled moves and written as a
+ * line in the comment of the move before it is a `removed` item and a `comment` item at the same
+ * move. Items of one chapter with the same `at` are a position: shown under one head, counted
+ * once, answered once (an answer event per item, so the file and the log are as before).
+ */
+export const positionKey = (item: Pick<ReviewItem, 'cid' | 'at'>) => `${item.cid}|${item.at.join(',')}`;
+
+/** The order of a position's items: what happened to the move itself, its comment, the lines that went and came, the rest, the session's question. */
+const IN_POSITION: readonly ItemKind[] = ['move', 'reply', 'comment', 'removed', 'added', 'arrows', 'glyphs', 'order', 'question'];
+
+/**
+ * Entries (an item, with whatever is known of it) by position: the positions in the order their
+ * first entry comes, a position's entries by kind and then as they came.
+ */
+export function byPosition<T extends { item: ReviewItem }>(entries: readonly T[]): T[][] {
+  const groups = new Map<string, T[]>();
+  for (const e of entries) {
+    const key = positionKey(e.item);
+    const group = groups.get(key);
+    if (group) group.push(e);
+    else groups.set(key, [e]);
+  }
+  // Array.prototype.sort is stable: entries of one kind stay as they came.
+  return [...groups.values()].map((g) => g.sort((a, b) => IN_POSITION.indexOf(a.item.kind) - IN_POSITION.indexOf(b.item.kind)));
+}
+
+/** A list's items with each position's next to each other, as `chapter-diff.ts --review` writes them. */
+export const orderedByPosition = (items: readonly ReviewItem[]): ReviewItem[] =>
+  byPosition(items.map((item) => ({ item }))).flatMap((g) => g.map((e) => e.item));
+
+/**
+ * A position's own line, in two parts as an item's: what leads to its move, and the move. From an
+ * item that is about the move itself; else from a removed part, whose lead ends with the move;
+ * else the first item as it is (a part added there).
+ */
+export function positionHead(items: readonly ReviewItem[]): { lead: string; part: string } {
+  const own = items.find((i) => i.kind !== 'added' && i.kind !== 'removed');
+  if (own) return { lead: own.lead, part: own.part };
+  const removed = items.find((i) => i.kind === 'removed');
+  if (removed) {
+    // "1. Nc3 d5 2. d4 g6 3. Bf4": the last move, with its number when it has one.
+    const m = /^(.*?)\s*((?:\d+\.(?:\.\.)?\s+)?\S+)$/.exec(removed.lead.trim());
+    return m ? { lead: m[1]!, part: m[2]! } : { lead: '', part: 'the start' };
+  }
+  const first = items[0];
+  return { lead: first?.lead ?? '', part: first?.part ?? '' };
+}
+
+/** What a position's items say together, for a report: the first of No, a note, changed, open, OK that any of them has. */
+const URGENCY: readonly ItemState[] = ['no', 'noted', 'moved', 'open', 'ok'];
+export function positionState(states: readonly ItemState[]): ItemState {
+  return URGENCY.find((s) => states.includes(s)) ?? 'open';
+}
+
+/** An item as it stands: its list (a position's items can be in several), its state, the owner's answer. */
+export interface Placed {
+  list: ReviewList;
+  item: ReviewItem;
+  state: ItemState;
+  answer?: Answer;
+}
+
+export interface ReviewPosition {
+  key: string;
+  cid: string;
+  at: string[];
+  lead: string;
+  part: string;
+  /** Its items, from whichever list. */
+  items: Placed[];
+  /** `positionState` of its items. */
+  state: ItemState;
+  /** The state every item has, when they have the same. */
+  common?: ItemState;
+  /** An item still waits for the owner. */
+  waiting: boolean;
+}
+
+export interface ListPositions {
+  list: ReviewList;
+  positions: ReviewPosition[];
+  /** Positions still waiting. */
+  open: number;
+}
+
+/** The order lists are shown in: the newest first, then by name. */
+export const newestFirst = (a: ReviewList, b: ReviewList) => (a.created < b.created ? 1 : a.created > b.created ? -1 : a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+
+/**
+ * A study's lists as positions. `lists` in the order shown; `stand` gives an item's state and
+ * answer. A position whose items are in several lists (a batch split by priority puts a removed
+ * line in one and its comment in another) is one position, under the first list that has one of
+ * its items, and under no other: every item is shown once.
+ */
+export function positionsOf(lists: readonly ReviewList[], stand: (list: ReviewList, item: ReviewItem) => { state: ItemState; answer?: Answer }): ListPositions[] {
+  const placed: Placed[] = lists.flatMap((list) => list.items.map((item) => ({ list, item, ...stand(list, item) })));
+  const out = new Map(lists.map((list) => [list, { list, positions: [] as ReviewPosition[], open: 0 }]));
+  for (const items of byPosition(placed)) {
+    const first = items.reduce((a, b) => (lists.indexOf(b.list) < lists.indexOf(a.list) ? b : a));
+    const states = items.map((i) => i.state);
+    const waiting = states.includes('open');
+    const common = states.every((s) => s === states[0]) ? states[0] : undefined;
+    const of = out.get(first.list)!;
+    of.positions.push({ key: positionKey(first.item), cid: first.item.cid, at: first.item.at, ...positionHead(items.map((i) => i.item)), items, state: positionState(states), ...(common ? { common } : {}), waiting });
+    if (waiting) of.open++;
+  }
+  return [...out.values()];
+}
+
+/**
+ * The items a position's answer goes to: all but those the chapter has moved on from with no
+ * answer given (the edit is their answer, and stays readable as one); all of them when it has
+ * moved on from every one.
+ */
+export function answerTargets<T extends { state: ItemState }>(items: readonly T[]): T[] {
+  const live = items.filter((i) => i.state !== 'moved');
+  return live.length ? live : [...items];
+}
+
+/** What a position's buttons show: the answer its items share (`open` when they differ or have none), and the note they share. */
+export function sharedAnswer(items: readonly { answer?: Answer }[]): { a: 'ok' | 'no' | 'open'; note?: string } {
+  const a = items[0]?.answer?.a ?? 'open';
+  const note = items[0]?.answer?.note;
+  return { a: items.every((i) => (i.answer?.a ?? 'open') === a) ? a : 'open', ...(note && items.every((i) => i.answer?.note === note) ? { note } : {}) };
+}

@@ -11,6 +11,9 @@
 // - `appended` given only an exact prefix → "a comment added to";
 // - a note never matched to a change (always a question) → "a review list from the changes";
 // - a removed part's item keyed by the move it opens at → the same test (its id).
+// Positions (§5.218), controls run 2026-11-28:
+// - the list written in the report's order → "a position's items are written next to each other";
+// - `answered` giving each list its own items only → "the answers by position".
 // (A link written by hand, the SANs joined unencoded, reads back the same: the links are the
 // router's own `modeHash` so that they stay its addresses, not because a test would catch it.)
 import { test } from 'node:test';
@@ -21,7 +24,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseHash } from '../../../src/core/app/fsm.ts';
 import { parseChapterFile } from '../../../src/core/pgn/parse.ts';
-import { parseReviewList, reviewCard, writeReviewList } from '../../../src/core/study/reviewList.ts';
+import { newestFirst, parseReviewList, reviewCard, writeReviewList, type ReviewList } from '../../../src/core/study/reviewList.ts';
 import { answered, answersMarkdown, appended, markdown, pairChapters, report, reviewList, SITE, type Version } from '../../../scripts/chapter-diff-lib.ts';
 
 const pgn = (name: string, movetext: string) => `[Event "Test"]\n[ChapterName "${name}"]\n[Orientation "white"]\n\n${movetext} *\n`;
@@ -187,11 +190,80 @@ test('the owner\'s answers read back: from every device\'s log, the latest of ea
   const [got] = answered([list], files, chapters);
   assert.deepEqual(got!.items.map((i) => [i.item.kind, i.state, i.answer?.note ?? '']), [['move', 'ok', ''], ['added', 'moved', ''], ['removed', 'no', 'keep 3... a6, I meet it a lot'], ['added', 'noted', 'which line is this?'], ['added', 'open', '']]);
   assert.deepEqual(got!.counts, { open: 1, ok: 1, no: 1, noted: 1, moved: 1 });
+  // By position: my move and the line added at it are one, changed since in part; the list's own items are still there.
+  assert.deepEqual(got!.positions.map((p) => [p.line, p.state, p.waiting, p.items.map((i) => i.item.kind).join('+')]), [
+    ['1. Nc3 d5 2. d4 Bf5 3. f3', 'moved', false, 'move+added'],
+    ['1. Nc3 d5 2. d4 g6 3. Bf4', 'no', false, 'removed'],
+    ['1. Nc3 e5 2. Nf3 Nc6', 'noted', false, 'added'],
+    ['A new chapter (3 moves)', 'open', true, 'added'],
+  ]);
+  assert.deepEqual([got!.positionCounts, got!.waiting], [{ open: 1, ok: 0, no: 1, noted: 1, moved: 1 }, 1]);
   const md = answersMarkdown([got!]);
-  assert.ok(md.includes('## Jobava batch 4 (batch-4)\n\n5 items: 1 OK, 1 No, 1 with a note only, 1 changed in the chapter since, 1 not answered.\n'), md);
+  assert.ok(md.includes('## Jobava batch 4 (batch-4)\n\n4 positions (5 items): 0 OK, 1 No, 1 with a note only, 1 changed in the chapter since, 1 not answered.\n'), md);
   assert.ok(md.includes('### No (1)\n\n- Jobava, removed: 1. Nc3 d5 2. d4 g6 3. Bf4 a6 4. e3\n  - note:\n    > keep 3... a6, I meet it a lot\n'), md);
-  assert.ok(md.includes('### Changed in the chapter since (1)\n\n- Jobava, added: 1. Nc3 d5 2. d4 Bf5 3. f3 e6 4. e4 Bg6 5. h4\n'), md);
-  assert.ok(md.indexOf('### No') < md.indexOf('### OK'), 'what needs the session first');
+  assert.ok(md.includes('### Changed in the chapter since (1)\n\n- Jobava: 1. Nc3 d5 2. d4 Bf5 3. f3\n  - move, OK\n  - added: 3. f3 e6 4. e4 Bg6 5. h4, changed in the chapter since\n'), md);
+  assert.ok(md.indexOf('### No') < md.indexOf('### Not answered'), 'what needs the session first');
+});
+
+// A reply taken out of the drilled moves and written as a line in the comment of my move before it.
+const LINES_OLD = '1. Nc3 d5 2. d4 g6 (2... Bf5 3. f3 { Old. } 3... e6 (3... h6 4. e4) 4. e4) 3. Bf4 a6 (3... h6 4. e3) 4. e3';
+const LINES_NEW = '1. Nc3 d5 2. d4 g6 (2... Bf5 3. f3 { Old. (3... h6 4. e4) } 3... e6 4. e4 Bg6) 3. Bf4 { Rare: (3... a6 4. e3) (3... h6 4. e3) } 3... Bg7';
+const linesList = (name = 'batch-5', created = '2026-11-28T09:00:00.000Z') => {
+  const [old, now] = [version('data@before, study Nc3', [['chapt001', 'Jobava', LINES_OLD]], 'study001'), version('data@after, study Nc3', [['chapt001', 'Jobava', LINES_NEW]], 'study001')];
+  const made = reviewList(report(old, now), now, { name, title: name, created, notes: [{ moves: '1. Nc3 d5 2. d4 g6 3. Bf4 a6', text: 'You never met it.' }] });
+  assert.ok(made.ok, made.ok ? '' : made.error);
+  return { list: made.list, now };
+};
+
+test('a position\'s items are written next to each other: the comment, then the lines taken out at its move', () => {
+  const { list } = linesList();
+  assert.deepEqual(
+    list.items.map((i) => [i.kind, i.at.join(' '), i.san ?? '', i.text ?? '']),
+    [
+      ['comment', 'Nc3 d5 d4 g6 Bf4', '', ''],
+      ['removed', 'Nc3 d5 d4 g6 Bf4', 'a6', 'You never met it.'],
+      ['removed', 'Nc3 d5 d4 g6 Bf4', 'h6', ''],
+      ['reply', 'Nc3 d5 d4 g6 Bf4 Bg7', 'Bg7', ''],
+      ['added', 'Nc3 d5 d4 g6 Bf4 Bg7', '', ''],
+      ['comment', 'Nc3 d5 d4 Bf5 f3', '', ''],
+      ['removed', 'Nc3 d5 d4 Bf5 f3', 'h6', ''],
+      ['added', 'Nc3 d5 d4 Bf5 f3 e6 e4 Bg6', '', ''],
+    ],
+  );
+  // The ids are as they were: a list in the owner's repo keeps its answers.
+  assert.deepEqual(list.items.slice(0, 2).map((i) => i.id), ['chapt001.comment.Nc3,d5,d4,g6,Bf4', 'chapt001.removed.Nc3,d5,d4,g6,Bf4,a6']);
+});
+
+test('the answers by position: one answer given to the items at a move, an item answered on its own, and a position whose items are in two lists', () => {
+  const { list, now } = linesList();
+  // The batch split by priority, as a session did by hand: the removed lines in one list, the rest in another.
+  const high: ReviewList = { ...list, name: 'batch-5-high', title: 'Batch 5', items: list.items.filter((i) => i.kind !== 'removed') };
+  const low: ReviewList = { ...list, name: 'batch-5-low', title: 'Batch 5, low priority', created: '2026-11-28T08:59:00.000Z', items: list.items.filter((i) => i.kind === 'removed') };
+  const id = (kind: string, san?: string) => list.items.find((i) => i.kind === kind && (san === undefined || i.san === san) && (kind !== 'comment' || i.at.includes('Bf4')))!.id;
+  const say = (n: number, l: ReviewList, item: string, a: string, note?: string) => JSON.stringify({ v: 1, n, t: `2026-11-28T10:00:0${n}.000Z`, k: 'answer', card: reviewCard(l.sid, l.name, item), a, ...(note ? { note } : {}) });
+  const files = new Map([
+    // 3. Bf4 answered as one (an event per item, each under its own list), then the line 3... h6 said No to alone.
+    ['progress/Phone001/2026-11-28.jsonl', [say(1, high, id('comment'), 'ok', 'fine as lines'), say(2, low, id('removed', 'a6'), 'ok', 'fine as lines'), say(3, low, list.items[2]!.id, 'ok', 'fine as lines'), say(4, low, list.items[2]!.id, 'no', 'h6 I do meet')].join('\n') + '\n'],
+  ]);
+  const chapters = new Map(now.chapters.map((c) => [c.cid!, c.chapter] as const));
+  const got = answered([low, high].sort(newestFirst), files, chapters);
+  assert.deepEqual(got.map((l) => [l.list.name, l.items.length, l.positions.length, l.waiting]), [['batch-5-high', 5, 4, 3], ['batch-5-low', 3, 0, 0]]);
+  const bf4 = got[0]!.positions[0]!;
+  assert.deepEqual([bf4.line, bf4.state, bf4.waiting, bf4.note], ['1. Nc3 d5 2. d4 g6 3. Bf4', 'no', false, undefined]);
+  assert.deepEqual(bf4.items.map((i) => [i.item.kind, i.state, i.answer?.note, i.list]), [['comment', 'ok', 'fine as lines', undefined], ['removed', 'ok', 'fine as lines', 'batch-5-low'], ['removed', 'no', 'h6 I do meet', 'batch-5-low']]);
+  // The other list's removed line joins its comment: 3. f3 waits, in part answered by nobody.
+  assert.deepEqual(got[0]!.positions[2]!.items.map((i) => [i.item.kind, i.list]), [['comment', undefined], ['removed', 'batch-5-low']]);
+  const md = answersMarkdown(got);
+  assert.ok(md.includes('## Batch 5 (batch-5-high)\n\n4 positions (8 items): 0 OK, 1 No, 0 with a note only, 0 changed in the chapter since, 3 not answered.\n'), md);
+  assert.ok(md.includes('### No (1)\n\n- Jobava: 1. Nc3 d5 2. d4 g6 3. Bf4\n  - comment, OK\n    - note:\n      > fine as lines\n  - removed: a6 4. e3, OK (list batch-5-low)\n    - note:\n      > fine as lines\n  - removed: h6 4. e3, No (list batch-5-low)\n    - note:\n      > h6 I do meet\n'), md);
+  assert.ok(md.includes('## Batch 5, low priority (batch-5-low)\n\n0 positions (0 items)'), md);
+  // One note on every item of a position is said once.
+  files.set('progress/Phone001/2026-11-29.jsonl', JSON.stringify({ v: 1, n: 5, t: '2026-11-29T10:00:00.000Z', k: 'answer', card: reviewCard(low.sid, low.name, list.items[2]!.id), a: 'ok', note: 'fine as lines' }) + '\n');
+  const again = answersMarkdown(answered([high, low], files, chapters));
+  assert.ok(again.includes('### OK (1)\n\n- Jobava: 1. Nc3 d5 2. d4 g6 3. Bf4\n  - comment\n  - removed: a6 4. e3 (list batch-5-low)\n  - removed: h6 4. e3 (list batch-5-low)\n  - note:\n    > fine as lines\n'), again);
+  // A position answered in part is said to be still open in the app.
+  files.set('progress/Phone001/2026-11-30.jsonl', JSON.stringify({ v: 1, n: 6, t: '2026-11-30T10:00:00.000Z', k: 'answer', card: reviewCard(low.sid, low.name, list.items[6]!.id), a: 'no' }) + '\n');
+  assert.ok(answersMarkdown(answered([high, low], files, chapters)).includes('1 OK, 1 No, 0 with a note only, 0 changed in the chapter since, 2 not answered. 1 more position answered in part: 3 positions still open in the app.'));
 });
 
 // ---- The script, over a scratch data repo ----
@@ -288,7 +360,7 @@ test('the scripts: --review writes the list into the checkout, which validates; 
 
     const made = run(`${repo}@HEAD~1`, `${repo}@HEAD`, '--study', 'Nc3Jobav', '--review', 'batch-4', '--title', 'Jobava batch 4', '--notes', notes);
     assert.equal(made.status, 0, made.stderr);
-    assert.match(made.stderr, /wrote .*review\/Nc3Jobav\/batch-4\.json: 3 item\(s\), 1 with your words\. Commit it with the study\./);
+    assert.match(made.stderr, /wrote .*review\/Nc3Jobav\/batch-4\.json: 3 item\(s\) at 2 position\(s\), 1 with your words\. Commit it with the study\./);
     assert.match(made.stdout, /^# What changed/, 'the list for the chat is still printed');
     const file = join(repo, 'review', 'Nc3Jobav', 'batch-4.json');
     const read = parseReviewList(readFileSync(file, 'utf8'));
@@ -304,10 +376,11 @@ test('the scripts: --review writes the list into the checkout, which validates; 
     writeFileSync(join(repo, 'progress', 'Phone001', '2026-11-27.jsonl'), `${JSON.stringify({ v: 1, n: 1, t: '2026-11-27T19:00:00.000Z', k: 'answer', card: reviewCard('Nc3Jobav', 'batch-4', read.list.items[0]!.id), a: 'no', note: 'e3 stays my move' })}\n`);
     const got = spawnSync(process.execPath, [answers, repo, '--study', 'nc3 + jobava'], { encoding: 'utf8' });
     assert.equal(got.status, 0, got.stderr);
-    assert.ok(got.stdout.includes('3 items: 0 OK, 1 No, 0 with a note only, 0 changed in the chapter since, 2 not answered.'), got.stdout);
-    assert.ok(got.stdout.includes('- Jobava, move: 1. Nc3 d5 2. d4 Bf5 3. f3\n  - note:\n    > e3 stays my move\n'), got.stdout);
-    const json = JSON.parse(spawnSync(process.execPath, [answers, repo, '--study', 'Nc3Jobav', '--list', 'batch-4', '--json'], { encoding: 'utf8' }).stdout) as { counts: { no: number } }[];
-    assert.equal(json[0]!.counts.no, 1);
+    assert.ok(got.stdout.includes('2 positions (3 items): 0 OK, 1 No, 0 with a note only, 0 changed in the chapter since, 1 not answered. 1 more position answered in part: 2 positions still open in the app.'), got.stdout);
+    assert.ok(got.stdout.includes('- Jobava: 1. Nc3 d5 2. d4 Bf5 3. f3\n  - move, No\n  - added: 3. f3 e6 4. e4 Bg6 5. h4, not answered\n  - note:\n    > e3 stays my move\n'), got.stdout);
+    const json = JSON.parse(spawnSync(process.execPath, [answers, repo, '--study', 'Nc3Jobav', '--list', 'batch-4', '--json'], { encoding: 'utf8' }).stdout) as { counts: { no: number }; positionCounts: { no: number; open: number }; positions: { items: unknown[] }[] }[];
+    assert.equal(json[0]!.counts.no, 1, 'the items as before');
+    assert.deepEqual([json[0]!.positionCounts.no, json[0]!.positionCounts.open, json[0]!.positions.map((p) => p.items.length)], [1, 1, [2, 1]]);
 
     // Refused: a file as the new side, a name the repo can't carry, a list that isn't there.
     const next = join(dir, 'next.pgn');

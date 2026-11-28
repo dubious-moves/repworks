@@ -12857,6 +12857,9 @@ that hadn't changed), which validates, and `review-answers.ts` listed them as no
 **Not checked**: the panel on the owner's devices, and a list arriving there by a sync from a
 session's push (TESTING.md). The app can't read the data repo from a cloud container (CLAUDE.md).
 
+**Since 2026-11-28 the panel shows, counts and answers positions, not items** (§5.218): the items
+at one move are one entry with one row of buttons, and a list has "OK all open".
+
 **The owner's first look (2026-11-27, the desktop, the session's three lists pushed and synced):
 no panel.** It was there, a few pixels high. On the stage the panel column has a fixed height and
 its parts are flex items; the folded panel could shrink (`flex: 0 1 auto`), and beside a real
@@ -12962,3 +12965,87 @@ end, a branch, a step, a press on the board, the synced file, Delete from here, 
 line entered), `views.spec.ts` (a typed branch clickable, folded, stepped, ↓ ↑).
 
 **Not checked**: on the owner's devices and real studies (TESTING.md).
+
+#### 5.218 Review lists: the items at one move are one position, answered once; "OK all open" (the owner: "119 items is simply too much", 2026-11-28, built)
+
+A reviewing session's batch usually turns a drilled reply into a clickable line in the comment of
+my move before it. §5.216's list showed that one decision as two items at the same move, the line
+"removed" and the "comment" changed, each with its own buttons. The owner's four open lists on
+2026-11-28 held 115 items; a session that split a batch into lists by priority had put the two
+halves of a decision in different lists.
+
+- **A position is the items of one chapter with the same `at`** (`positionKey`, `byPosition`,
+  `positionsOf` in `core/study/reviewList.ts`). The panel shows it as one entry: the move as its
+  head (lead grey, move bold, clicked it goes there), under it its changes in a fixed order (my
+  move or the main reply, the comment, the lines removed, the lines added, arrows, glyph, order, a
+  question), each with the session's words. A comment's change (was, now, or what was added after
+  the old text) is read there without a click; a part's other lines stay under "More". A position
+  of one item looks as before.
+- **Answered once.** The position's OK, No and Note go to every item in it, written as **one
+  `answer` event per item** under that item's own card. So the file format, the item ids, the log
+  and `review-answers.ts` are as they were, and the lists already in the owner's repo are grouped
+  at once. The same button again takes all back; a note is kept with each item's answer and is
+  shown once when they share it.
+- **One item on its own**: "One by one" in the position's row of buttons gives every item of it
+  its own OK, No and Note (shown from the start where the items already have different answers).
+  The position then shows each item's state on its row.
+- **An edit is still an answer** (§5.216): an item the chapter has moved on from says "Changed
+  since" on its row while the position's other items wait. The position's answer **does not go to
+  such an item** (`answerTargets`): its edit stays readable as its answer. When the chapter has
+  moved on from every item of a position, the buttons answer them all, as an item's did.
+- **A position whose items are in several lists is one position, under the first list shown that
+  has one of its items** (the newest; `newestFirst`), and under no other list: every item is
+  shown once. A row that comes from another list says "from <its title>". Each event still goes
+  under its own list's card.
+- **The counts are positions**: "Review 54 positions open of 55", a list "14 positions open of
+  14"; a position is open while an item of it waits. "Next open" walks positions.
+- **"OK all open…"** at the top of a list with something open: it asks first ("OK for the 25
+  positions still open in this list? Each can be taken back." with "OK all 25" and Cancel), then
+  writes OK for every item still waiting under that list, whichever list the item is in. What has
+  an answer, a note or an edit stays as it is. Any of them is taken back with its own OK button.
+- **`scripts/review-answers.ts` groups the same way** (`answered`, `answersMarkdown`): each list's
+  positions by what the owner said, a position under the first of No, a note, changed, not
+  answered, OK that any of its items has, its items under it with their own word where they
+  differ, a note they share said once, an item of another list named. The summary counts
+  positions and says how many are answered in part ("still open in the app"). `--json` keeps each
+  list's `items` and `counts` and adds `positions`, `positionCounts` and `waiting`.
+- **`chapter-diff.ts --review` writes a position's items next to each other** (`orderedByPosition`:
+  the report's order by position, the fixed order inside one), and says how many positions the
+  items are at.
+
+Decisions (Claude's):
+- **Grouping is the app's, not the file's.** No field ties items together: the same chapter and
+  `at` is the rule, so old lists, lists made again and lists a session cut by hand all group.
+- **Across lists, the newest list holds the position.** The other choices were a position shown in
+  each list (the two halves of a decision apart again, and counted twice) or a rule by kind (the
+  comment's list). The newest first is the order the lists are already shown in, so it needs no
+  new rule to explain. A session that splits a batch decides where a shared position lands by
+  which list it makes last.
+- **The position's answer overwrites its items' own answers** (No on one item, then OK on the
+  position: all OK). The other way, the buttons would do different things on different rows; "One
+  by one" is there for the exception.
+- **"OK all open" is on every list**, not only one a session marked: a mark would be a new field
+  of the file, and the owner may have read any list through. It leaves answered and noted items
+  alone, so it can't undo a No.
+- **No bulk "take back"** after "OK all open": the confirmation names the count, and each position
+  has its button.
+- **The file's order by position** costs a list made again one reordered diff, and gives a
+  version of the app before this one the items of a move next to each other.
+
+Tests: `test/unit/core/study/reviewList.test.ts` (positions by chapter and move, their order, the
+head from a comment and from a removed part, two lists, the states, whom an answer goes to, what
+the buttons show), `test/unit/scripts/chapterDiff.test.ts` (the list written by position with its
+ids as before; the answers by position: one answer for a move's items, one item alone, two lists,
+a shared note, answered in part; both scripts), `test/e2e/review.spec.ts` (desktop and emulated
+phone: a removed line and a comment at one move as one position; answered once and taken back;
+one item alone; a note on all; a position in two lists; "Changed since" on one item while the
+other waits, and OK leaving it; the events in the pushed log; "OK all open" cancelled, confirmed,
+one taken back, an earlier No kept). Controls are named in the unit files; in the browser test,
+an answer that also went to the edited item fails it.
+
+Run read-only on the owner's data repo (a cloud container, 2026-11-28): his four lists' 115 items
+are 55 positions (10, 5, 14 and 26 under the lists, newest first; 21 of them with items from two
+lists), 54 open, and his answers so far (OK, a No with its note) are read on their items. Seen in
+the panel with those lists and his chapter served from the fake repo, desktop and phone size.
+
+**Not checked**: on the owner's devices (TESTING.md).

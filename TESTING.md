@@ -102,6 +102,32 @@ later change replaced are folded into the later item; items already reported wor
 
 ## 2. Studies and the study page
 
+### The Review panel by position: one answer for the items at a move, "OK all open" (PLAN.md §5.218, 2026-11-28)
+
+- Open the Jobava study's Review panel after a sync. Does the head say about "54 positions open of
+  55" where it said 115 items? Under "Jobava: drill by difficulty", is 7. Bd3 one entry with its
+  comment (was, now), the removed lines and the session's words under it, and one row of buttons?
+- Is that entry readable on the phone, or too long: should the comment's old text be folded, or
+  the session's words come before the lines?
+- OK on a position: does it say OK and the count drop by one? The same button again: is it open
+  again? A note: is it shown once?
+- "One by one": No to one removed line, OK to the rest. Does each row show its own answer, and is
+  the button easy to find and to hit?
+- A row that says "from Jobava review: low priority (73)": is it right that the position sits
+  under the newer list and is gone from the low list, whose count is now 26 positions?
+- Put a removed reply back on the board: does its row say "Changed since" while the comment still
+  waits, and does OK then leave "Changed since" on that row?
+- "OK all open…" on the low list: does it ask with the count first, and after "OK all" is the list
+  "all answered" with every position still able to be taken back? Would you want one "take back
+  all" too?
+- Your earlier answers (the OKs, the No with its note): are they still on their items?
+- Sync, then ask the session for `scripts/review-answers.ts`: does its list by position read as
+  you answered?
+- **Checked**: unit tests, Playwright (desktop and emulated phone, the events found in the pushed
+  log), the scripts read-only on the real data repo in a cloud container (115 items, 55
+  positions) and the real lists seen in the panel from a fake repo at desktop and phone size;
+  **not** on a device.
+
 ### The Review panel: a session's list answered on the study page (PLAN.md §5.216, 2026-11-27)
 
 - After a reviewing session pushed a list (`scripts/chapter-diff.ts --review`) and the device

@@ -7277,8 +7277,46 @@ button.course-group.on {
   border-left-color: var(--accent);
 }
 
-.review-item:is(.is-ok, .is-no, .is-noted, .is-moved) .review-go {
+.review-item:not(.is-waiting) > .review-go {
   opacity: 0.6;
+}
+
+/* A position's changes (§5.218): the items at one move, under it. */
+.review-changes {
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 0 0 0 10px;
+  border-left: 2px solid rgb(var(--ink) / 10%);
+}
+
+.review-change {
+  padding: 3px 0;
+  overflow-wrap: anywhere;
+}
+
+.review-change:is(.is-ok, .is-no, .is-noted, .is-moved) > .review-part {
+  opacity: 0.6;
+}
+
+.review-from {
+  font-size: 0.8rem;
+}
+
+.review-from::before {
+  content: '· ';
+}
+
+.review-all {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0;
+  font-size: 0.92rem;
+}
+
+.review-all button {
+  min-height: 36px;
 }
 
 .review-go {
@@ -7324,6 +7362,7 @@ button.course-group.on {
 
 .review-text,
 .review-note,
+.review-said,
 .review-detail p {
   margin: 4px 0 0;
   font-size: 0.92rem;
@@ -7333,6 +7372,10 @@ button.course-group.on {
 
 .review-note {
   font-style: italic;
+}
+
+.review-said {
+  color: var(--text-soft);
 }
 
 .review-detail {
