@@ -7281,6 +7281,27 @@ button.course-group.on {
   opacity: 0.6;
 }
 
+/* "Look first" (§5.220): what the session wants read before the rest. */
+.review-first {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 6px;
+  border: 1px solid var(--warn);
+  border-radius: 8px;
+  color: var(--warn);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.review-item.is-first.is-waiting:not(.here) {
+  border-left-color: var(--warn);
+}
+
+.review-first-count {
+  color: var(--warn);
+  font-size: 0.92rem;
+}
+
 /* A position's changes (§5.218): the items at one move, under it. */
 .review-changes {
   list-style: none;

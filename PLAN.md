@@ -12862,7 +12862,8 @@ that hadn't changed), which validates, and `review-answers.ts` listed them as no
 session's push (TESTING.md). The app can't read the data repo from a cloud container (CLAUDE.md).
 
 **Since 2026-11-28 the panel shows, counts and answers positions, not items** (§5.218): the items
-at one move are one entry with one row of buttons, and a list has "OK all open".
+at one move are one entry with one row of buttons, and a list has "OK all open". An item may carry
+the session's "look first" mark (§5.220): its position comes first and "OK all open" leaves it.
 
 **The owner's first look (2026-11-27, the desktop, the session's three lists pushed and synced):
 no panel.** It was there, a few pixels high. On the stage the panel column has a fixed height and
@@ -13224,3 +13225,153 @@ and ChessDB, 96 s) flags among four moves the 5.h4 against 5.Nb5 decision the ol
 `screen`, `lines --sf`, `lint` and `difficulty` on real lines. **Not checked:** a whole batch by a
 fresh session with the skill, and the owner's reading of its review list (TESTING.md).
 
+#### 5.220 The audit's workflow: "look first" on a list, a tally per batch, cdbexplore, unattended runs (the owner: "Make all the improvements", 2026-11-28, built)
+
+A review of the workflow around §5.219's audit found five gaps; the owner's word on them: "Ok on
+the cost. I have upgraded my Claude subscription for this", "cdbexplore needs to be included, not
+sure why it was dropped. It should run a head, but can also be used in situations where the
+chessdb eval is shallow and it makes it hard to decide the continuation", "Make all the
+improvements". Four are built here (the fifth, a replay of a reviewed batch, ran in another
+session).
+
+**1. "Look first".** Since a batch has one list (§5.218) the split by priority is gone, and what
+the owner should read first was said only in the worker's chat report, which he does not see in
+the app.
+- **A note may say `"first": true`** (`scripts/chapter-diff.ts --notes`); the item it goes to, a
+  change or a question, carries `"first": true` in the list's file (`ReviewItem.first`, a new
+  optional field of format 1; a list without it is the same text as before, and a version of the
+  app before this one reads past it). `false` is no mark; anything else is refused.
+- **The panel**: a position with a marked item says "Look first" before its line and has a
+  coloured edge while it waits; marked positions come first in their list (`positionsOf`, stable:
+  each kind in the file's order; under each chapter when a list has several); the list's head and
+  the panel's folded head say "· N to look at first" for those still waiting; **"Next open" goes
+  to a marked position first**. **"OK all open" leaves marked positions waiting** (`okAllTargets`:
+  a marked position's unmarked items too, since it is answered as one), its confirmation says
+  "The N marked “Look first” stay open", and the button is gone when only marked ones wait.
+- **`scripts/review-answers.ts`** shows `[look first]` on a position and says, per list, how many
+  were marked and how many of those he corrected (a No, a note, his own edit: `corrected`);
+  `--json` has `first` on a position and on a list. **`audit.ts lint --list`** warns on a list with
+  no marked position, with more than about a third marked (four positions or more), and on a
+  question without the mark (`lintMarks`).
+- **What gets the mark** is the skill's (step 9): a move of his changed or questioned; a decision
+  the tools left to judgement; a claim the second reader questioned; a kind of change he has
+  corrected before; every question. The report names the same positions.
+- Decisions (Claude's): the mark is the item's, the position inherits it (grouping stays the
+  app's, §5.218); marked first within a chapter, not lifted out of their chapters into a group of
+  their own (a batch is one subtree, and a chapter's heading stays over its positions); no mark
+  can be set or cleared by the owner (it is the session's word, like its text).
+
+**2. A tally per batch, and rules from repeated corrections.** Nothing showed whether the worker
+was getting closer to what he wants.
+- **`audit.ts tally --list NAME`**, when a list's answers are merged and before the list is
+  removed: the batch into `audit.json`'s `batches` (the day, positions, OK, No, notes, positions he
+  edited himself, not answered, marked "look first" and those of them he corrected), positions as
+  the panel counts them. **`audit.ts ledger` writes the "Batches" table** (region `batches`) with
+  the share he corrected. The trial and batches 2 to 5 are seeded from the old session's journal
+  and the ledger, marked `"source": "journal"`: their numbers are items or his words in the chat,
+  and a number nobody counted is "?", never 0.
+- **A second correction of one kind proposes a rule** (the skill's step 1): every entry of
+  `corrections.md` ends with its kind; the second of a kind that no rule covers becomes the rule's
+  wording, asked in the next list as a question marked "look first"; accepted, it goes into
+  `rules.md` with the date. By hand: the judgement of "the same reason" is the worker's.
+
+**3. cdbexplore.** `rules.md` §2 said to use it where ChessDB is shallow; the skill had no step
+and nothing started it. q_extension's `tools/cdbexplore.mjs` (a read-only reference) builds
+ChessDB's own tree below a PGN's line ends and the close decisions of the repertoire's side.
+- **Ahead.** After a batch is pushed the worker starts one session for the next two subtrees of
+  the ledger's order (for a chapter with no review: the whole chapter), unless one was explored in
+  the last 7 days. `audit.ts explore-start` writes the file cdbexplore wants into the data repo,
+  `notes/<sid>/cdbexplore/<name>.pgn` (`explorePgn`: `[White "Repertoire"]`, the opponent's moves
+  with their share, `{ 27.3% }`, the lines that end in a "transposes to" note left out, the moves
+  that lead to a subtree kept), and the start into `audit.json`'s `explored`. The session (a
+  smaller model at low effort: the skill has its prompt) only runs **`audit.ts explore-run --names
+  a,b --hours 1.9 --push`** as a background command until it prints `NOTHING LEFT`: cdbexplore on
+  each file in turn (`--rate 450 --concurrency 3`, q_extension at a396b4d, the commit that logs
+  refusals), and after each **`explore-report`**: `notes/<sid>/cdbexplore/<name>.md` and `.json`,
+  scanned, committed and pushed (only those files; rejected, the remote's commits are taken under
+  and the push made again). The tool's own record and log live beside the PGN in the data repo, so
+  a replaced container goes on where the last push stood.
+- **The report**: positions explored and left; every position where ChessDB's best move changed
+  or its eval moved by 0.30 or more; every move of ours now 0.30 or more behind ChessDB's best,
+  from a sweep that asks ChessDB afresh at every position of the file where we move; all as full
+  lines from move 1, from White's side. The worker reads it in step 3 and treats a move it lists
+  like a screen flag. The ledger's "ChessDB explored" table (region `explored`) is written from
+  `audit.json`'s starts and the sessions' `.json` files.
+- **On demand** (step 4). The tools say when a ChessDB eval they used is shallow by `rules.md`'s
+  test (a stored line under 10 plies; Stockfish disagreeing by 0.5 or more): `audit.ts practical`
+  prints each candidate's ChessDB score and depth after its run, `close-calls` on a flag that
+  rests on ChessDB, and **`audit.ts chessdb --moves … --candidates … [--fresh] [--sf]`** for one
+  position (`--fresh` asks past the cache). The worker then writes a file that ends at the
+  position (`explore-pgn --moves … --candidates …`), runs `explore-run` on it for minutes, asks
+  again, and settles; still shallow, Stockfish decides and the note says so.
+- **Stale answers.** After an exploration, a ChessDB answer cached before its last explored
+  position is stale. `practical`, `close-calls` and `chessdb` drop those from the cache folder
+  before they ask (`chessdbFloor`, `freshRecords`: the latest `updated` over the study's
+  exploration files), so a batch cannot decide on one; the store may hand them back on a pull,
+  and they are dropped again.
+- Decisions (Claude's): **the staleness is a time, not a set of positions.** An exploration below
+  a line's end changes ChessDB's scores all the way up the line and down every decision's tree, so
+  "the positions it touched" is most of the subtree and Practical's search below it; a ChessDB
+  lookup costs a third of a second and is not rate-limited as the explorer is. **The exploring
+  session writes its own files only** (`cdbexplore/<name>.*`); the worker writes `audit.json`. Two
+  sessions pushing the same file would conflict, and the lock is not for notes. **A batch waits
+  for the exploration of its own subtree**, up to 24 hours from its start (`status`): running
+  ahead is the point, and an unattended run that comes back three hours later costs a minute.
+  **The lookups' clock is the real one** (a fix): the audit's tools read an explorer answer for 90
+  days by stretching what they accept, where they had set the clock back 60 days, which stamped
+  every answer they fetched as two months old (Practical asked for it again) and let a ChessDB
+  answer live 67 days instead of 7.
+
+**4. Unattended runs.** The owner still had to start a session for every batch and say he was
+done; a scheduled task now starts a fresh session every three hours.
+- **`audit.ts status`**: is there work? Its first line says `<study>: work: …` or `<study>:
+  nothing done: <the reason>`; then the open lists with their positions answered and open (and
+  those marked), the minutes since the owner's last commit to the data repo (the newest that is
+  no session's), the lock, and what is next with each subtree's exploration. **Work means**: the
+  checkout is not behind the remote; no other session holds the lock; no list has a position
+  still waiting; the owner has been quiet for 30 minutes; there is a list to merge or a subtree
+  left; and the next subtree's exploration is not still running (up to 24 hours). `--json`.
+- **The lock**, `notes/<sid>/lock.json` (`{ v, session, at, for }`): `audit.ts lock --session ID
+  --for WHAT` writes it, commits it (`session: <study>, lock for …`) and pushes it; `unlock`
+  removes it. A lock younger than 6 hours stops every other session (`REFUSED`); an older one is
+  said to be stale and is taken over; the holder renews by locking again. A push rejected while
+  the lock is taken is undone and refused, never rebased: what the remote now holds may be
+  another session's lock. **The checkout that took the lock remembers it** in its `.git` folder,
+  and **`apply` and `chapter-diff.ts --review` (for a study with an `audit.json`) refuse** unless
+  the lock's file is there, young, and the one this checkout took: a lock that merely exists is
+  another session's.
+- **The skill's "An unattended run"**: `status` first, before reading anything else; nothing to
+  do: its line, and stop; otherwise the batch as written, with nobody to ask: a question that can
+  wait goes into the list as a question marked "look first", one that cannot stops the run with
+  exactly what is needed. The last message's first line is his notification: `<study>: <batch> is
+  ready: N positions, M to look at first`, or the reason nothing was done.
+
+Tests: `test/unit/core/study/reviewList.test.ts` (the mark written and read, refused, positions
+ordered and counted, what "OK all open" answers), `test/unit/scripts/chapterDiff.test.ts` (a
+note's mark to its item, the answers' marks and their corrected count, the scripts),
+`test/unit/scripts/audit.test.ts` (the marks' lint; the tally and its table; the PGN with shares,
+joins left out, a subtree, Black's side, one line with candidates; the tool's record and log read,
+what is left, the report; the sweep of our moves; stale records and the shallow test; the
+explorations' table; the lock's states; every reason `status` gives; and the commands over two
+checkouts of one remote: the lock taken, refused, stale and taken over, `apply` and a review list
+refused in the other checkout, the tally, an exploration's start, report and wait, the ledger's
+tables, a stale ChessDB answer dropped), `test/e2e/review.spec.ts` (desktop and emulated phone:
+the mark shown, the order, both heads' counts, "Next open", "OK all open" with its sentence, the
+events). Controls are named in the test files.
+
+**Checked live** (2026-11-28, a cloud container, the owner's data repo read-only but for its
+notes): `status` (four lists open, 54 positions: "the owner is reviewing"; his last commit told
+from a session's merge commit); `explore-pgn` on 1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 (31 line ends, 47
+positions with shares, 3 joins left out, the shares the old session's file had); cdbexplore
+`--list` on it (155 positions, 5 to explore: the old runs had deepened the rest); `chessdb --sf`
+on 1.Nc3 d5 2.d4 Nf6 3.Bf4 c5 4.e3 cxd4 5.exd4 Bf5 6.Nb5 Qa5+ 7.b4 Qxb4+ 8.c3 Qb2 with 9.Nc7+
+and 9.Rc1 (both SHALLOW, 5 and 3 plies; the cache said +1.78 for Nc7+ where ChessDB itself said
++1.32 by then: the stale answer the floor is for); one on-demand `explore-run` on that position
+on a scratch copy (12 minutes, 283 requests, no refusal: 9.Rc1's stored line 2 to 13 plies,
+9.Nc7+'s 4 to 7), its report, then `chessdb --fresh`, which dropped the 27,524 cached answers
+older than the run and asked again (Nc7+ +1.68 at 8 plies, still SHALLOW, so Stockfish decides
+there: +1.70 against +1.24 for Rc1); the panel's mark seen at desktop and phone size from the
+fake repo; and the first ahead session started from the skill's template for the next two
+subtrees. **Not checked**: the panel's mark on the owner's devices, a whole unattended batch, a
+lock contested by two real sessions (TESTING.md), and `practical`'s depth table after a real
+Practical run (its parts are `chessdb`'s).

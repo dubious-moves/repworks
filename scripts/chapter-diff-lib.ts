@@ -366,6 +366,8 @@ export interface Note {
   /** The move, as a line from the start: "1. Nc3 d5 2. d4 Bf5 3. f3". */
   moves: string;
   text: string;
+  /** "Look first" (§5.220): the item the note goes to carries the mark, and its position is shown before the others. */
+  first?: boolean;
 }
 
 const plain = (marked: string) => marked.replaceAll('**', '');
@@ -450,8 +452,9 @@ export function reviewList(r: Report, now: Version, options: { name: string; tit
     const about = items.filter((i) => holding.some((c) => c.cid === i.cid) && samePathList(ownPath(i), sans));
     if (about.length) {
       // The change at that move: the note is its text (the first, when a move has several changes).
-      const first = about[0]!;
-      first.text = first.text ? `${first.text}\n${note.text}` : note.text;
+      const item = about[0]!;
+      item.text = item.text ? `${item.text}\n${note.text}` : note.text;
+      if (note.first) item.first = true;
       continue;
     }
     const inChapters = holding.filter((c) => nodeAt(c.chapter, sans));
@@ -461,8 +464,10 @@ export function reviewList(r: Report, now: Version, options: { name: string; tit
     const [lead, part] = start ? splitLine(start, sans, sans.length - 1) : ['', sans.join(' ')];
     const id = itemId(c.cid!, 'question', sans);
     const same = items.find((i) => i.id === id);
-    if (same) same.text = `${same.text ?? ''}\n${note.text}`;
-    else items.push({ id, cid: c.cid!, kind: 'question', at: [...sans], lead, part, text: note.text });
+    if (same) {
+      same.text = `${same.text ?? ''}\n${note.text}`;
+      if (note.first) same.first = true;
+    } else items.push({ id, cid: c.cid!, kind: 'question', at: [...sans], lead, part, text: note.text, ...(note.first ? { first: true as const } : {}) });
     chapters[c.cid!] = c.name;
   }
   return { ok: true, list: { v: REVIEW_FORMAT, sid: now.sid, name: options.name, title: options.title?.trim() || options.name, created: options.created, from: r.old, to: r.now, chapters, items: orderedByPosition(items) } };
@@ -489,6 +494,8 @@ export interface AnsweredPosition {
   state: ItemState;
   /** An item still waits for the owner. */
   waiting: boolean;
+  /** The session marked it "look first" (§5.220). */
+  first: boolean;
   /** The note every item answered carries, when it is one note (a position answered as one). */
   note?: string;
   /** Its items; `list` names the list of one that is in another list than the position is under. */
@@ -504,6 +511,11 @@ export interface AnsweredList {
   positionCounts: Record<ItemState, number>;
   /** Positions with an item still not answered: the panel's "open". */
   waiting: number;
+  /**
+   * The positions marked "look first" (§5.220): how many, and how many of them the owner corrected
+   * (a No, a note, or his own edit in the chapter) or left unanswered.
+   */
+  first: { positions: number; corrected: number; open: number };
 }
 
 const fullLine = (i: { lead: string; part: string }) => `${i.lead}${i.lead && i.part ? ' ' : ''}${i.part}`;
@@ -544,13 +556,18 @@ export function answered(lists: readonly ReviewList[], files: ReadonlyMap<string
         line: fullLine(p),
         state: p.state,
         waiting: p.waiting,
+        first: p.first,
         ...(note ? { note } : {}),
         items: p.items.map((i) => ({ item: i.item, state: i.state, ...(i.answer ? { answer: i.answer } : {}), line: fullLine(i.item), ...(i.list !== list ? { list: i.list.name } : {}) })),
       };
     });
-    return { list, items, counts, positions: placed, positionCounts, waiting: open };
+    const marked = placed.filter((p) => p.first);
+    return { list, items, counts, positions: placed, positionCounts, waiting: open, first: { positions: marked.length, corrected: marked.filter((p) => corrected(p.state)).length, open: marked.filter((p) => p.state === 'open').length } };
   });
 }
+
+/** A position the owner did not simply accept: a No, a note, or his own edit of it in the chapter. */
+export const corrected = (state: ItemState): boolean => state === 'no' || state === 'noted' || state === 'moved';
 
 const STATE_WORDS: Record<ItemState, string> = { open: 'not answered', ok: 'OK', no: 'No', noted: 'a note', moved: 'changed in the chapter since' };
 
@@ -569,6 +586,7 @@ export function answersMarkdown(lists: readonly AnsweredList[]): string {
       `${plurals(l.positions.length, 'position')} (${plurals(shown, 'item')}): ${c.ok} OK, ${c.no} No, ${c.noted} with a note only, ${c.moved} changed in the chapter since, ${c.open} not answered.${partly > 0 ? ` ${plurals(partly, 'more position')} answered in part: ${plurals(l.waiting, 'position')} still open in the app.` : ''}`,
       '',
     );
+    if (l.first.positions) out.push(`Marked "look first": ${plurals(l.first.positions, 'position')}, ${l.first.corrected} of them corrected (a No, a note or his own edit)${l.first.open ? `, ${l.first.open} not answered` : ''}.`, '');
     for (const state of ['no', 'noted', 'moved', 'open', 'ok'] as const) {
       const of = l.positions.filter((p) => p.state === state);
       if (!of.length) continue;
@@ -577,11 +595,11 @@ export function answersMarkdown(lists: readonly AnsweredList[]): string {
         const chapter = esc(l.list.chapters[p.cid] ?? p.cid);
         const one = p.items.length === 1 ? p.items[0]! : undefined;
         if (one) {
-          out.push(`- ${chapter}, ${one.item.kind}: ${one.line}`);
+          out.push(`- ${p.first ? '[look first] ' : ''}${chapter}, ${one.item.kind}: ${one.line}`);
           if (one.answer?.note) out.push(...quote('note', [one.answer.note]));
           continue;
         }
-        out.push(`- ${chapter}: ${p.line}`);
+        out.push(`- ${p.first ? '[look first] ' : ''}${chapter}: ${p.line}`);
         // Each item's own word where they differ; one note given to the position is said once.
         const same = p.items.every((i) => i.state === p.state);
         for (const i of p.items) {

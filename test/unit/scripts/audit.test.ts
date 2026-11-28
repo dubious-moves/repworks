@@ -13,28 +13,41 @@
 // - writeRegions leaving an unknown region silently → "the ledger's generated parts";
 // - scanText printing the whole token → "what must not be pushed";
 // - the cache store keeping the older of two answers for a key → "the caches between sessions".
+// The workflow around a batch (§5.220), controls run 2026-11-28:
+// - lintMarks never warning → "a list's look-first marks";
+// - correctedOf counting an OK → "a batch's tally";
+// - explorePgn keeping a line that ends in a "transposes to" note → "the PGN cdbexplore wants";
+// - leftOf ignoring the positions a run finished → "an exploration's record and log";
+// - changed() comparing the best moves only → the same test;
+// - freshRecords keeping everything → "after an exploration";
+// - lockStand calling every lock held → "the lock";
+// - statusOf not looking at the lists → "is there work";
+// - heldHere accepting any lock that is there → "the commands: the lock" (apply went through in the other checkout).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Chess } from 'chessops/chess';
 import { makeFen } from 'chessops/fen';
 import { parseSan } from 'chessops/san';
 import type { CompactExplorer } from '../../../src/core/explorer/providers.ts';
-import { parseChapterFile } from '../../../src/core/pgn/parse.ts';
+import { parseChapterFile, parseGames } from '../../../src/core/pgn/parse.ts';
 import { chapterFileText } from '../../../src/core/pgn/write.ts';
 import type { Chapter } from '../../../src/core/study/model.ts';
 import { pull, push } from '../../../scripts/audit/cachestore.ts';
 import { closeCalls, decisionFlags } from '../../../scripts/audit/closecalls.ts';
 import { inventory, inventoryText, oneIn, positionsNeeded } from '../../../scripts/audit/inventory.ts';
-import { ledgerRows, listsTable, regionsIn, subtreeTable, suggestedOrder, writeRegions } from '../../../scripts/audit/ledger.ts';
-import { lintComment, lintWords, linesIn } from '../../../scripts/audit/lint.ts';
+import { behindRows, changed, chessdbFloor, depthRow, depthText, exploredLately, exploredTable, exploreName, explorePgn, exploreReport, explorations, freshRecords, fullLine, leftOf, linePgn, ourPositions, parseExploreState, parseLog, parseRecord, type ExploreState, type Target } from '../../../scripts/audit/explore.ts';
+import { batchesTable, correctedOf, ledgerRows, listsTable, regionsIn, subtreeTable, suggestedOrder, todoOrder, writeRegions } from '../../../scripts/audit/ledger.ts';
+import { lintComment, lintMarks, lintWords, linesIn } from '../../../scripts/audit/lint.ts';
+import { lockStand, lockText, lockWords, parseLock } from '../../../scripts/audit/lock.ts';
 import { createLookups } from '../../../scripts/audit/lookups.ts';
 import { applyOps, behind, isSessionCommit, merge3 } from '../../../scripts/audit/ops.ts';
 import { scanText, stops } from '../../../scripts/audit/scan.ts';
-import { parseAuditState, practicalArgs, type AuditState } from '../../../scripts/audit/state.ts';
+import { auditStateText, parseAuditState, practicalArgs, type AuditState } from '../../../scripts/audit/state.ts';
+import { statusOf, statusText, type ListStand, type StatusIn } from '../../../scripts/audit/status.ts';
 import { clickableLines, continuedTwice, lineOf, nodeAtSans, ownerCheck, sansOf, subtreeCounts, theirLeaves, transposeNotes, twoMoves } from '../../../scripts/audit/study.ts';
 import { createFileCache } from '../../../scripts/practical-lib.ts';
 
@@ -468,6 +481,251 @@ test('the format rules: full lines in words to the owner, moves in parentheses i
   assert.deepEqual(lintComment('(9. Nxa8 because the knight is trapped after that anyway)').map((l) => l.kind), ['prose inside a line']);
 });
 
+// ---- The workflow around a batch (§5.220) ----
+
+test("a list's look-first marks: none, most of them, a question without one", () => {
+  const item = (at: string, kind = 'comment', first = false) => ({ cid: 'chMain01', at: at.split(' '), kind, lead: '1. d4', part: at, ...(first ? { first: true as const } : {}) });
+  const six = ['d5', 'Nf6', 'f5', 'e6', 'c5', 'g6'];
+  assert.deepEqual(lintMarks(six.map((m) => item(`d4 ${m}`))).map((l) => l.text), ['no position of 6 is marked "look first" ("first": true on a note): mark what he should read before the rest']);
+  assert.deepEqual(lintMarks(six.map((m, i) => item(`d4 ${m}`, 'comment', i < 2))), [], 'two of six');
+  assert.match(lintMarks(six.map((m, i) => item(`d4 ${m}`, 'comment', i < 3)))[0]!.text, /^3 of 6 positions are marked "look first", more than about a third/);
+  // Two items at one move are one position; a small list may mark all it has.
+  assert.deepEqual(lintMarks([item('d4 d5', 'comment', true), item('d4 d5', 'removed')]), []);
+  assert.deepEqual(lintMarks([item('d4 d5', 'comment', true), item('d4 Nf6', 'question')]).map((l) => l.text), ['the question at 1. d4 d4 Nf6 is not marked: every question is']);
+  assert.deepEqual(lintMarks([]), []);
+});
+
+test("a batch's tally: the share he corrected, a number that is not known, audit.json read strictly", () => {
+  const counted = { name: 'batch-6', title: 'Jobava: batch 6', date: '2026-11-29', positions: 25, ok: 19, no: 2, notes: 1, edited: 2, open: 1, first: 5, firstCorrected: 3 };
+  const old = { name: 'batch 3', date: '2026-11-27', positions: 11, ok: 11, source: 'journal' as const, note: 'Counted in items: all 11 OK.' };
+  assert.equal(correctedOf(counted), 5);
+  assert.equal(correctedOf(old), undefined, 'not known is not zero');
+  assert.equal(
+    batchesTable([old, counted]),
+    [
+      '| Batch | Merged | Positions | OK | No | A note only | Edited by him | Not answered | Corrected | “Look first”: marked, corrected |',
+      '|---|---|---|---|---|---|---|---|---|---|',
+      '| batch 3 *(from the journal)* | 2026-11-27 | 11 | 11 | ? | ? | ? | ? | ? | ? |',
+      '| batch-6 (Jobava: batch 6) | 2026-11-29 | 25 | 19 | 2 | 1 | 2 | 1 | 5 of 25 (20%) | 5, 3 |',
+      '',
+      '- batch 3: Counted in items: all 11 OK.',
+    ].join('\n'),
+  );
+  assert.match(batchesTable([]), /^No batch has been tallied yet/);
+  // A batch nobody counted is told in words, not as a row of question marks.
+  assert.equal(batchesTable([{ name: 'the trial batch', date: '2026-11-27', source: 'journal', note: 'Answered in the chat.' }]), 'No batch has been tallied yet (`audit.ts tally` when a list’s answers are merged).\n\nNot counted by position:\n- **the trial batch** (2026-11-27, from the journal): Answered in the chat.');
+  assert.ok(batchesTable([{ name: 'the trial batch', date: '2026-11-27', source: 'journal' }, counted]).endsWith('| 5, 3 |\n\nNot counted by position:\n- **the trial batch** (2026-11-27, from the journal): nothing is known of it.'));
+  const base = { v: 1, study: 'Study001', chapters: {}, subtrees: {}, targets: {}, exceptions: [], flags: [] };
+  const read = parseAuditState(JSON.stringify({ ...base, batches: [old, counted], explored: [{ name: 'd4-f5', chapter: 'chRare01', line: '', started: '2026-11-28T12:00:00.000Z' }] }));
+  assert.ok(read.ok);
+  assert.equal(auditStateText(read.state), `${JSON.stringify(read.state, null, 2)}\n`);
+  assert.deepEqual(parseAuditState(JSON.stringify({ ...base, batches: [{ name: 'x', date: 'yesterday' }], explored: [{ name: 'x', chapter: 'c', line: '', started: 'soon' }] })), { ok: false, errors: ['batches must be a list of { name, date (YYYY-MM-DD), and whole numbers for positions, ok, no, notes, edited, open, first, firstCorrected where known }', 'explored must be a list of { name, chapter, line, started (a time) }'] });
+});
+
+const EXPLORE_GAMES: Record<string, [number, Record<string, number>]> = { ...GAMES, '1. d4 d5 2. c4 c6 3. Nf3': [80, { Nf6: 60, e6: 20 }] };
+
+test('the PGN cdbexplore wants: the repertoire\'s side named, the opponent\'s shares, a line that ends in a "transposes to" note left out, a subtree with the moves that lead to it', () => {
+  const a = chapter('chMain01', 'Main', '1. d4 d5 2. c4 e6 { The main line. } (2... c6 3. Nf3 Nf6 4. Nc3) 3. Nc3 Nf6 $1 (3... c5 { transposes to somewhere } ) 4. Bg5 { [%cal Gg5f6] } 4... Be7 5. e3');
+  const whole = explorePgn({ study: 'Test', chapter: a, prefix: [], games: gamesOf(EXPLORE_GAMES) });
+  assert.equal(
+    whole.text,
+    '[Event "Test: Main"]\n[White "Repertoire"]\n[Black "?"]\n[Result "*"]\n[Orientation "white"]\n[RepworksChapter "chMain01"]\n[RepworksLine ""]\n\n1. d4 d5 { 40.0% } 2. c4 e6 { 50.0% } ( 2... c6 { 25.0% } 3. Nf3 Nf6 { 75.0% } 4. Nc3 ) 3. Nc3 Nf6 { 50.0% } 4. Bg5 Be7 { 70.0% } 5. e3 *\n',
+  );
+  assert.deepEqual([whole.shared, whole.missing, whole.dropped, whole.ends], [5, [], 1, 2]);
+  // The subtree after 2...c6: the moves that lead to it with their shares, and nothing of the main line.
+  const sub = explorePgn({ study: 'Test', chapter: a, prefix: sansOf('1. d4 d5 2. c4 c6'), games: gamesOf(EXPLORE_GAMES) });
+  assert.ok(sub.text.endsWith('[RepworksLine "1. d4 d5 2. c4 c6"]\n\n1. d4 d5 { 40.0% } 2. c4 c6 { 25.0% } 3. Nf3 Nf6 { 75.0% } 4. Nc3 *\n'), sub.text);
+  assert.ok(sub.text.includes('[Event "Test: Main, 1. d4 d5 2. c4 c6"]'));
+  // A position whose games are not known is said: its moves carry no share.
+  const { '1. d4 d5 2. c4 c6 3. Nf3': _gone, ...partial } = EXPLORE_GAMES;
+  const lacking = explorePgn({ study: 'Test', chapter: a, prefix: sansOf('1. d4 d5 2. c4 c6'), games: gamesOf(partial) });
+  assert.deepEqual(lacking.missing, [fenAfter('1. d4 d5 2. c4 c6 3. Nf3')]);
+  assert.ok(lacking.text.includes('3. Nf3 Nf6 4. Nc3 *'));
+  // Black's repertoire names Black.
+  const black = explorePgn({ study: 'Test', chapter: chapter('chBlack1', 'Slav', '1. d4 d5 2. c4 c6', 'black'), prefix: [], games: gamesOf({ '': [100, { d4: 50 }], '1. d4 d5': [50, { c4: 40 }] }) });
+  assert.ok(black.text.includes('[White "?"]\n[Black "Repertoire"]') && black.text.includes('1. d4 { 50.0% } d5 2. c4 { 80.0% } c6 *'), black.text);
+  // The file reads back as a game of ours, its headers kept: the report is written from it.
+  const back = parseGames(whole.text, () => 'explore0')[0]!;
+  assert.ok(back.ok && back.chapter.headers.some(([k, v]) => k === 'RepworksChapter' && v === 'chMain01'));
+
+  // One position, on demand: the line to it, and the candidates as moves from it.
+  assert.equal(linePgn({ moves: sansOf('1. d4 d5 2. c4 e6'), candidates: ['Nc3', 'Nf3'], side: 'white', event: 'On demand' })!.split('\n\n')[1], '1. d4 d5 2. c4 e6 3. Nc3 ( 3. Nf3 ) *\n');
+  assert.equal(linePgn({ moves: sansOf('1. d4 d5 2. c4 e6'), side: 'white', event: 'x' })!.split('\n\n')[1], '1. d4 d5 2. c4 e6 *\n');
+  assert.equal(linePgn({ moves: sansOf('1. d4 d5 2. Ke2 e6'), side: 'white', event: 'x' }), undefined);
+  assert.equal(linePgn({ moves: sansOf('1. d4 d5'), candidates: ['Qh5'], side: 'white', event: 'x' }), undefined);
+  assert.equal(exploreName(a, '1. Nc3 d5 2. d4 Nf6 3. Bf4 c5'), 'nc3-d5-d4-nf6-bf4-c5');
+  assert.equal(exploreName(chapter('chRare01', 'Jobava: rare replies', '1. d4 f5'), ''), 'jobava-rare-replies');
+});
+
+// cdbexplore's own files, as its a396b4d writes them: a first run stopped by its time, a second that finished.
+const seen = (best: [string, number], line: number, mine?: [string, number], rival?: [string, number]) => ({ best: { san: best[0], score: best[1] }, mine: mine ? { san: mine[0], score: mine[1] } : null, rival: rival ? { san: rival[0], score: rival[1] } : null, line });
+const target = (line: string, fenOf: string, reason: string, before: ReturnType<typeof seen>, after: ReturnType<typeof seen> | null, at: string, reach = 0.01): Target => ({ fen: fenAfter(fenOf), line, reason, reach, before, after, stopped: 'stable', requests: 100, ms: 60000, at });
+const RECORD: Record<string, Target> = {
+  // Black to move after 5. e3: ChessDB's eval for Black went from -0.30 to -0.62, the same move.
+  a: target('[20.00%] 1.d4 d5 2.c4 e6 3.Nc3 Nf6 4.Bg5 Be7 5.e3', '1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Bg5 Be7 5. e3', 'line end', seen(['O-O', -30], 4), seen(['O-O', -62], 16), '2026-11-28T13:10:00.000Z', 0.2),
+  // A decision of ours: the best move changed, and ours is now 0.35 behind.
+  b: target('[10.00%] 1.d4 d5 2.c4 c6', '1. d4 d5 2. c4 c6', 'decision', seen(['Nf3', 40], 5, ['Nf3', 40], ['Nc3', 35]), seen(['Nc3', 60], 14, ['Nf3', 25], ['Nc3', 60]), '2026-11-28T14:05:00.000Z', 0.1),
+  // Explored, nothing moved.
+  c: target('[10.00%] 1.d4 d5 2.c4 c6 3.Nf3 Nf6 4.Nc3', '1. d4 d5 2. c4 c6 3. Nf3 Nf6 4. Nc3', 'line end', seen(['e6', -20], 6), seen(['e6', -25], 12), '2026-11-28T12:40:00.000Z', 0.1),
+};
+const LOG_ONE = ['12:30:00 cdbexplore: d4.pgn, 9 positions, White\'s repertoire. Asking ChessDB about each.', '12:30:09 Survey: 4 positions to explore (3 line ends, 1 decisions); 13 requests in 0m09s. Scores from White\'s side.', '12:30:09   [20.00%] 1.d4 d5 2.c4 e6 3.Nc3 Nf6 4.Bg5 Be7 5.e3 (line end): best O-O -0.30, stored line 4', '12:30:09 Exploring 1/4: [10.00%] 1.d4 d5 2.c4 c6 3.Nf3 Nf6 4.Nc3 (line end)', '12:35:00   depth 6: e6 -0.20', '12:40:00   stable after 9m51s, 100 requests, 14 queued. ChessDB now: best e6 -0.25 (was best e6 -0.20), stored line 6 -> 12', '12:40:00 Exploring 2/4: [20.00%] 1.d4 d5 2.c4 e6 3.Nc3 Nf6 4.Bg5 Be7 5.e3 (line end)', '12:41:00 ChessDB refused a request for its rate limit (HTTP 429), 1 this run: pausing ChessDB requests for 30 s, then asking again. If it repeats, lower --rate.', '13:10:00   time after 30m00s, 300 requests, 20 queued. ChessDB now: best O-O -0.62 (was best O-O -0.30), stored line 4 -> 16', '13:10:00 Time is up with 2 positions left.', '13:10:00 Done: 2 explored, 1 changed; 413 ChessDB requests in 40m00s (10.3 a minute); rate-limited 1; answers ok 400, unknown 13.'].join('\n');
+const LOG_TWO = `${LOG_ONE}\n${['14:00:00 cdbexplore: d4.pgn, 9 positions, White\'s repertoire. Asking ChessDB about each.', '14:00:09 Survey: 3 positions to explore (2 line ends, 1 decisions), 2 of them explored recently; 13 requests in 0m09s. Scores from White\'s side.', '14:00:09 Exploring 1/1: [10.00%] 1.d4 d5 2.c4 c6 (decision)', '14:05:00   stable after 4m51s, 80 requests, 2 queued. ChessDB now: best Nc3 +0.60; mine Nf3 +0.25 vs Nc3 +0.60 (was best Nf3 +0.40; mine Nf3 +0.40 vs Nc3 +0.35), stored line 5 -> 14', '14:05:00 Done: 1 explored, 1 changed; 93 ChessDB requests in 5m00s (18.6 a minute); rate-limited 0; answers ok 93.'].join('\n')}\n`;
+
+test("an exploration's record and log: what is left, what ChessDB changed, the report with full lines", () => {
+  // The first run stopped by its time: two of the four left.
+  const one = parseLog(LOG_ONE);
+  assert.deepEqual([one.runs, one.survey, one.finished, one.timeUp, one.refused], [1, { targets: 4, ends: 3, decisions: 1, recent: 0 }, 2, 2, 1]);
+  assert.equal(leftOf(one), 2);
+  // Stopped in the middle (no "Time is up"): the survey's count less what was finished.
+  assert.equal(leftOf(parseLog(LOG_ONE.split('\n').slice(0, 6).join('\n'))), 3);
+  // Only listed: everything picked is left. No survey yet: not known.
+  assert.equal(leftOf(parseLog(LOG_ONE.split('\n').slice(0, 3).join('\n'))), 4);
+  assert.equal(leftOf(parseLog('')), undefined);
+  const two = parseLog(LOG_TWO);
+  assert.deepEqual([two.runs, two.survey, two.finished, leftOf(two), two.refused], [2, { targets: 3, ends: 2, decisions: 1, recent: 2 }, 1, 0, 1]);
+
+  const record = parseRecord(JSON.stringify({ targets: RECORD }));
+  assert.equal(record.length, 3);
+  assert.deepEqual(parseRecord('not json'), []);
+  assert.deepEqual(parseRecord(undefined), []);
+  assert.deepEqual(record.map(changed), [true, true, false], 'an eval moved by 0.32; another best move; 0.05 is nothing');
+  assert.equal(fullLine('[20.00%] 1.d4 d5 2.c4 e6 3.Nc3'), '1. d4 d5 2. c4 e6 3. Nc3');
+  assert.equal(fullLine('1...e5 2.Nf3'), '1... e5 2. Nf3');
+
+  const made = exploreReport({ name: 'd4-d5', what: 'The chapter "Main" (Test).', chapter: 'chMain01', line: '', record, log: two });
+  assert.deepEqual(made.state, { v: 1, name: 'd4-d5', chapter: 'chMain01', line: '', updated: '2026-11-28T14:05:00.000Z', runs: 2, targets: 3, explored: 3, left: 0, done: true, changed: 2, behind: 1, refused: 1 });
+  assert.deepEqual(parseExploreState(JSON.stringify(made.state)), made.state);
+  const md = made.markdown;
+  assert.ok(md.includes('- **Stands:** finished: nothing is left to explore.'), md);
+  assert.ok(md.includes("## ChessDB's best move changed, or its eval moved by 0.30 or more (2)\n\n- 1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Bg5 Be7 5. e3 (line end, reached 20.00%): best O-O +0.30 → O-O +0.62; stored line 4 → 16 plies\n- 1. d4 d5 2. c4 c6 (decision, reached 10.00%): best Nf3 +0.40 → Nc3 +0.60; ours Nf3 +0.40 → Nf3 +0.25; stored line 5 → 14 plies\n"), md);
+  assert.ok(md.includes("## Moves of ours 0.30 or more behind ChessDB's best (1)\n\nFrom the explored decisions only"), md);
+  assert.ok(md.includes("- 1. d4 d5 2. c4 c6: ours Nf3 +0.25, ChessDB's best Nc3 +0.60 (0.35 behind)\n"), md);
+  assert.ok(md.includes('## Explored (3)\n\n- 1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Bg5 Be7 5. e3 (line end, reached 20.00%): best O-O +0.62, stored line 4 → 16 plies; stable\n'), md);
+  assert.ok(!/\d\.[A-Za-z]/.test(md.replace(/`[^`]*`/g, '')), 'no line in the tool\'s own spelling is left');
+  // Not finished, and nothing explored yet.
+  const first = exploreReport({ name: 'd4-d5', what: 'x', record: record.slice(0, 1), log: one });
+  assert.deepEqual([first.state.left, first.state.done, first.state.refused], [2, false, 1]);
+  assert.ok(first.markdown.includes('- **Stands:** not finished: 2 position(s) left.'));
+  const none = exploreReport({ name: 'd4-d5', what: 'x', record: [], log: parseLog('') });
+  assert.deepEqual([none.state.done, none.state.updated, none.state.left], [false, undefined, 0]);
+  assert.ok(none.markdown.includes('no survey has run yet'));
+});
+
+test("our moves behind ChessDB's best, asked over every position of the explored file where we move", () => {
+  const made = explorePgn({ study: 'Test', chapter: chapter('chMain01', 'Main', '1. d4 d5 2. c4 e6 (2... c6 3. Nf3) 3. Nc3'), prefix: [], games: () => undefined });
+  const pgn = parseGames(made.text, () => 'explore0')[0]!;
+  assert.ok(pgn.ok);
+  assert.deepEqual(new Set(ourPositions(pgn.chapter)), new Set(['', '1. d4 d5', '1. d4 d5 2. c4 e6', '1. d4 d5 2. c4 c6'].map(fenAfter)));
+  const cdb = (moves: [string, number][]) => ({ status: 'ok', moves: moves.map(([san, score]) => ({ uci: '', san, score })) });
+  const answers = new Map([
+    [fenAfter(''), cdb([['e4', 30], ['d4', 25]])],
+    [fenAfter('1. d4 d5'), cdb([['c4', 40], ['Nf3', 20]])],
+    [fenAfter('1. d4 d5 2. c4 c6'), cdb([['Nc3', 70], ['Nf3', 35]])],
+  ]);
+  const got = behindRows(pgn.chapter, (f) => answers.get(f));
+  assert.deepEqual(got.rows, [{ line: '1. d4 d5 2. c4 c6', ours: 'Nf3', best: 'Nc3', oursCp: 35, bestCp: 70, gap: 35 }], '0.05 behind at the start is nothing; ours best after 1...d5');
+  assert.deepEqual([got.asked, got.unknown], [4, 1], 'the position ChessDB has nothing for is counted, not read as fine');
+  const md = exploreReport({ name: 'x', what: 'x', record: [], log: parseLog(LOG_TWO), sweep: got }).markdown;
+  assert.ok(md.includes('ChessDB asked afresh at the 4 position(s) of the explored file where we move (1 it has no eval for).'), md);
+  assert.ok(md.includes("- 1. d4 d5 2. c4 c6: ours Nf3 +0.35, ChessDB's best Nc3 +0.70 (0.35 behind)"), md);
+});
+
+test('after an exploration: a ChessDB answer cached before it is dropped; a shallow eval is said to be one', () => {
+  const state = (name: string, updated?: string): ExploreState => ({ v: 1, name, ...(updated ? { updated } : {}), runs: 1, targets: 0, explored: 0, left: 0, done: true, changed: 0, behind: 0, refused: 0 });
+  assert.equal(chessdbFloor([state('a', '2026-11-28T10:00:00.000Z'), state('b', '2026-11-28T14:05:00.000Z'), state('c')]), Date.parse('2026-11-28T14:05:00.000Z'));
+  assert.equal(chessdbFloor([state('c')]), undefined, 'an exploration that explored nothing makes nothing stale');
+  const floor = Date.parse('2026-11-28T14:05:00.000Z');
+  const rec = (k: string, t: number) => JSON.stringify({ k, t, v: { status: 'ok' } });
+  const made = freshRecords([rec('old', floor - 1), rec('at', floor), rec('new', floor + 60000), rec('pv|old', floor - 5000), '{"k":"cut'].join('\n') + '\n', floor);
+  assert.deepEqual([made.dropped, made.text], [2, `${rec('at', floor)}\n${rec('new', floor + 60000)}\n`]);
+  assert.deepEqual(freshRecords('', floor), { text: '', dropped: 0 });
+
+  // rules.md §2: a stored line under 10 plies, or Stockfish disagreeing by 0.5 or more.
+  assert.deepEqual(depthRow('Nc7+', 178, 5, 170), { san: 'Nc7+', cp: 178, plies: 5, sfCp: 170, shallow: true, why: ['its stored line is 5 plies, under 10'] });
+  assert.equal(depthRow('Rc1', 102, 12, 124).shallow, false);
+  assert.deepEqual(depthRow('Rc1', 102, 12, 40).why, ['Stockfish disagrees by 0.62']);
+  assert.deepEqual(depthRow('a4', undefined, 0).why, ['ChessDB has no score for it']);
+  assert.equal(depthRow('Qh5', 29990, 3, 500).why.length, 1, 'a mate score is not compared with Stockfish');
+  assert.equal(depthText(depthRow('Nc7+', 178, 5, 170)), 'Nc7+     ChessDB  +1.78, stored line  5 plies, Stockfish +1.70  SHALLOW: its stored line is 5 plies, under 10');
+});
+
+test("the explorations of a study: what was asked for with what was reported; explored in the last 7 days or not", () => {
+  const now = Date.parse('2026-11-29T00:00:00.000Z');
+  const starts = [{ name: 'd4-d5', chapter: 'chMain01', line: '1. d4 d5', started: '2026-11-28T12:00:00.000Z', session: 'session_x' }, { name: 'rare', chapter: 'chRare01', line: '', started: '2026-11-20T12:00:00.000Z' }];
+  const done: ExploreState = { v: 1, name: 'd4-d5', chapter: 'chMain01', line: '1. d4 d5', updated: '2026-11-28T14:05:00.000Z', runs: 2, targets: 3, explored: 3, left: 0, done: true, changed: 2, behind: 1, refused: 0 };
+  const onDemand: ExploreState = { v: 1, name: 'od-1', updated: '2026-11-28T15:00:00.000Z', runs: 1, targets: 2, explored: 1, left: 1, done: false, changed: 0, behind: 0, refused: 0 };
+  const all = explorations(starts, [done, onDemand]);
+  assert.deepEqual(all.map((e) => [e.name, e.start !== undefined, e.state?.done]), [['d4-d5', true, true], ['rare', true, undefined], ['od-1', false, false]]);
+  assert.equal(exploredLately(all, 'chMain01', '1. d4 d5', now)?.name, 'd4-d5');
+  assert.equal(exploredLately(all, 'chRare01', '', now), undefined, 'started nine days ago: no longer');
+  assert.equal(exploredLately(all, 'chMain01', '1. d4 Nf6', now), undefined);
+  assert.equal(
+    exploredTable(all, new Map([['chRare01', 'Rare replies']])),
+    [
+      '| Name | What | Started | Last position explored | Stands | ChessDB changed / ours behind | Report |',
+      '|---|---|---|---|---|---|---|',
+      '| rare | the chapter "Rare replies" | 2026-11-20 12:00 | none | started 2026-11-20 12:00 UTC, no report yet |  |  |',
+      '| d4-d5 | 1. d4 d5 | 2026-11-28 12:00 (session_x) | 2026-11-28 14:05 | finished: 3 explored, 0 left | 2 / 1 | `cdbexplore/d4-d5.md` |',
+      '| od-1 | a position, on demand | by its own session | 2026-11-28 15:00 | not finished: 1 explored, 1 left | 0 / 0 | `cdbexplore/od-1.md` |',
+    ].join('\n'),
+  );
+  assert.equal(exploredTable([], new Map()), 'No exploration yet.');
+});
+
+test('the lock: none, held for six hours, then stale; a file that can\'t be read stops everyone', () => {
+  const now = Date.parse('2026-11-28T18:00:00.000Z');
+  const lock = { v: 1 as const, session: 'session_a', at: '2026-11-28T12:30:00.000Z', for: 'batch-6' };
+  assert.deepEqual(parseLock(lockText(lock)), lock);
+  assert.deepEqual(lockStand(undefined, now), { state: 'none' });
+  assert.deepEqual(lockStand(lockText(lock), now), { state: 'held', lock, minutes: 330 });
+  assert.equal(lockStand(lockText({ ...lock, at: '2026-11-28T12:00:00.000Z' }), now).state, 'stale', 'six hours to the minute is stale');
+  assert.equal(lockStand(lockText({ ...lock, at: '2026-11-28T12:00:01.000Z' }), now).state, 'held');
+  assert.deepEqual(lockStand('{ "session": "", "at": "x" }', now), { state: 'unreadable' });
+  assert.deepEqual(lockStand('', now), { state: 'unreadable' });
+  assert.equal(lockWords(lockStand(lockText(lock), now)), 'held by session_a for batch-6, taken 5.5 h ago');
+  assert.match(lockWords(lockStand(lockText({ ...lock, at: '2026-11-28T10:00:00.000Z' }), now)), /^STALE \(older than 6 h: .* by session_a for batch-6, taken 8\.0 h ago$/);
+  assert.equal(lockWords({ state: 'none' }), 'none');
+});
+
+test('is there work: no list waiting for the owner, he has been quiet, nobody else holds the lock, something to do, the exploration done', () => {
+  const now = Date.parse('2026-11-28T18:00:00.000Z');
+  const list = (open: number, firstOpen = 0): ListStand => ({ name: 'batch-6', title: 'Jobava: batch 6', positions: 25, answered: 25 - open, open, first: 4, firstOpen });
+  const next = { cid: 'chMain01', chapter: 'Main', line: '1. d4 d5 2. c4 c6', single: 3 };
+  const base: StatusIn = { study: 'Test', sid: 'Study001', lists: [list(0)], owner: { minutes: 95, subject: 'desktop: 1 study file' }, lock: { state: 'none' }, lockMine: false, next: [next], behind: 0, now };
+  const work = statusOf(base);
+  assert.deepEqual([work.work, work.line], [true, 'Test: work: merge the answers of batch-6 (25 position(s)), then audit 1. d4 d5 2. c4 c6']);
+  // Each reason nothing is done, and its sentence.
+  const stop = (change: Partial<StatusIn>) => {
+    const s = statusOf({ ...base, ...change });
+    assert.equal(s.work, false);
+    return s.line;
+  };
+  assert.equal(stop({ lists: [list(3, 2)] }), 'Test: nothing done: the owner is reviewing: batch-6 has 3 of 25 position(s) open, 2 of them marked "look first"');
+  assert.equal(stop({ owner: { minutes: 12, subject: 'phone: 2 logs' } }), 'Test: nothing done: the owner\'s device synced 12 min ago ("phone: 2 logs"): he may still be at it (quiet for 30 min first)');
+  const held = lockStand(lockText({ v: 1, session: 'session_b', at: '2026-11-28T17:00:00.000Z', for: 'batch-6' }), now);
+  assert.equal(stop({ lock: held }), 'Test: nothing done: another session is writing (the lock is held by session_b for batch-6, taken 60 min ago)');
+  assert.equal(statusOf({ ...base, lock: held, lockMine: true }).work, true, 'its own lock stops no session');
+  assert.equal(statusOf({ ...base, lock: lockStand(lockText({ v: 1, session: 'session_b', at: '2026-11-28T08:00:00.000Z', for: 'batch-6' }), now) }).work, true, 'a stale lock is taken over');
+  assert.match(stop({ lock: { state: 'unreadable' } }), /lock\.json is there and can’t be read/);
+  assert.equal(stop({ behind: 2 }), 'Test: nothing done: this checkout is 2 commit(s) behind the remote: git pull, then status again');
+  assert.equal(stop({ lists: [], next: [] }), 'Test: nothing done: no review list to merge and nothing left to audit');
+  // The next subtree's exploration: waited for while it runs, for a day; then the batch goes on with what there is.
+  const running = { name: 'c6', chapter: 'chMain01', line: next.line, start: { name: 'c6', chapter: 'chMain01', line: next.line, started: '2026-11-28T15:00:00.000Z' } };
+  assert.equal(stop({ next: [{ ...next, exploration: running }] }), "Test: nothing done: ChessDB's exploration of the next subtree, 1. d4 d5 2. c4 c6, is still running (c6: started 2026-11-28 15:00 UTC, no report yet); a batch waits for it up to 24 h");
+  assert.equal(statusOf({ ...base, next: [{ ...next, exploration: { ...running, start: { ...running.start, started: '2026-11-27T15:00:00.000Z' } } }] }).work, true);
+  const done: ExploreState = { v: 1, name: 'c6', runs: 1, targets: 2, explored: 2, left: 0, done: true, changed: 0, behind: 0, refused: 0 };
+  assert.equal(statusOf({ ...base, next: [{ ...next, exploration: { ...running, state: done } }] }).work, true);
+  // No list, a subtree left: the next batch. No owner commit in the history held: quiet.
+  const { owner: _none, ...quiet } = base;
+  assert.equal(statusOf({ ...quiet, lists: [] }).line, 'Test: work: audit 1. d4 d5 2. c4 c6');
+  assert.equal(statusOf({ ...base, next: [{ ...next, line: '' }], lists: [] }).line, 'Test: work: audit the chapter "Main"');
+  const text = statusText(statusOf({ ...base, lists: [list(3, 2)], next: [{ ...next, exploration: { ...running, state: done } }] }));
+  assert.ok(text.startsWith('Test: nothing done: the owner is reviewing'), text);
+  assert.ok(text.includes('  batch-6 (Jobava: batch 6): 25 position(s), 22 answered, 3 open; "look first": 4, 2 of them open\n'), text);
+  assert.ok(text.includes('The owner: last commit 95 min ago ("desktop: 1 study file")\nThe lock: none\n'), text);
+  assert.ok(text.includes('  1. 1. d4 d5 2. c4 c6 (3 single-move): ChessDB c6, finished: 2 explored, 0 left\n'), text);
+});
+
 // ---- The commands, over a scratch data repo ----
 
 const script = new URL('../../../scripts/audit/audit.ts', import.meta.url).pathname;
@@ -532,6 +790,12 @@ test('the commands: check, ledger, base, apply (and the base it refuses), scan',
     const dry = run('apply', repo, '--study', sid, '--ops', ops, '--base', first, '--dry-run');
     assert.equal(dry.status, 0, dry.stdout + dry.stderr);
     assert.equal(git(repo, 'status', '--porcelain'), '', 'a dry run writes nothing');
+    // Writing needs the lock (§5.220): without it nothing is written.
+    const unlocked = run('apply', repo, '--study', sid, '--ops', ops, '--base', first);
+    assert.equal(unlocked.status, 2);
+    assert.ok(unlocked.stderr.includes(`REFUSED: no lock: notes/${sid}/lock.json is not there.`), unlocked.stderr);
+    assert.equal(git(repo, 'status', '--porcelain'), '');
+    assert.equal(run('lock', repo, '--study', sid, '--session', 'session_test', '--for', 'batch 2', '--no-push').status, 0);
     const applied = run('apply', repo, '--study', sid, '--ops', ops, '--base', first);
     assert.equal(applied.status, 0, applied.stdout + applied.stderr);
     assert.ok(applied.stdout.includes('carried: his arrows at 1. d4 d5 2. c4 e6'), applied.stdout);
@@ -570,6 +834,179 @@ test('the commands: check, ledger, base, apply (and the base it refuses), scan',
     // An unknown command and a missing study say what there is.
     assert.equal(run('nonsense', repo).status, 2);
     assert.ok(run('check', repo, '--study', 'Nope').stderr.includes('no study "Nope"; there are: Test (Study001)'));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('the commands: the lock between two checkouts, status, a list by its holder only, the tally, an exploration\'s files and what it makes stale', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'repworks-audit-flow-'));
+  try {
+    const sid = 'Study001';
+    const origin = join(dir, 'origin.git');
+    const a = join(dir, 'a');
+    const b = join(dir, 'b');
+    const cache = join(dir, 'cache');
+    const file = (repo: string, path: string, text: string) => {
+      mkdirSync(join(repo, path, '..'), { recursive: true });
+      writeFileSync(join(repo, path), text);
+    };
+    // A commit made some time ago: the owner's sync must be half an hour old before a session works.
+    const commit = (repo: string, message: string, minutesAgo = 0) => {
+      const date = new Date(Date.now() - minutesAgo * 60000).toISOString();
+      spawnSync('git', ['-C', repo, 'add', '-A'], { env });
+      spawnSync('git', ['-C', repo, 'commit', '-q', '-m', message], { env: { ...env, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date } });
+      return git(repo, 'rev-parse', '--short', 'HEAD');
+    };
+    const line1 = (r: { stdout: string }): string => r.stdout.split('\n')[0] ?? '';
+    spawnSync('git', ['init', '-q', '--bare', '-b', 'main', origin], { env });
+    spawnSync('git', ['init', '-q', '-b', 'main', a], { env });
+    file(a, 'repworks.json', '{ "format": 1 }\n');
+    file(a, `studies/${sid}/study.json`, `${JSON.stringify({ format: 1, id: sid, name: 'Test', kind: 'repertoire', chapters: ['chMain01', 'chRare01'] })}\n`);
+    file(a, `studies/${sid}/chMain01.pgn`, chapterFileText(chapter('chMain01', 'Main', BASE)));
+    file(a, `studies/${sid}/chRare01.pgn`, chapterFileText(chapter('chRare01', 'Rare', '1. d4 f5 2. Bg5')));
+    const state: AuditState = { v: 1, study: sid, chapters: { chMain01: { depth: 4 }, chRare01: { depth: 0 } }, subtrees: { chMain01: { '1. d4 d5 2. c4 e6': { state: 'closed', batch: 'batch 1' } } }, targets: {}, exceptions: [], flags: [] };
+    file(a, `notes/${sid}/audit.json`, auditStateText(state));
+    file(a, `notes/${sid}/ledger.md`, '# Ledger\n\n<!-- audit:batches -->\n<!-- /audit:batches -->\n\n<!-- audit:explored -->\n<!-- /audit:explored -->\n');
+    const first = commit(a, 'session: the study', 600);
+    file(a, `studies/${sid}/chRare01.pgn`, chapterFileText(chapter('chRare01', 'Rare', '1. d4 f5 2. Bg5 h6')));
+    commit(a, 'desktop: 1 study file', 2);
+    git(a, 'remote', 'add', 'origin', origin);
+    git(a, 'push', '-q', '-u', 'origin', 'main');
+
+    // status: he synced two minutes ago. Half an hour later there is work: the next subtree.
+    assert.equal(line1(run('status', a, '--study', sid)), 'Test: nothing done: the owner\'s device synced 2 min ago ("desktop: 1 study file"): he may still be at it (quiet for 30 min first)');
+    spawnSync('git', ['-C', a, 'commit', '-q', '--amend', '--no-edit', '--date', new Date(Date.now() - 90 * 60000).toISOString()], { env: { ...env, GIT_COMMITTER_DATE: new Date(Date.now() - 90 * 60000).toISOString() } });
+    git(a, 'push', '-q', '-f', 'origin', 'main');
+    spawnSync('git', ['clone', '-q', origin, b], { env });
+    const idle = run('status', a, '--study', sid);
+    assert.equal(line1(idle), 'Test: work: audit 1. d4 d5 2. c4 c6', idle.stdout + idle.stderr);
+    assert.ok(idle.stdout.includes('The owner: last commit 90 min ago ("desktop: 1 study file")\nThe lock: none\n'), idle.stdout);
+    assert.equal((JSON.parse(run('status', a, '--study', sid, '--json').stdout) as { work: boolean }).work, true);
+
+    // The lock: taken and pushed by a; b is behind until it pulls, then sees it held, and can take or write nothing.
+    const locked = run('lock', a, '--study', sid, '--session', 'session_a', '--for', 'batch-2');
+    assert.equal(locked.status, 0, locked.stdout + locked.stderr);
+    assert.ok(locked.stdout.startsWith('Locked: Test (Study001) by session_a for batch-2, pushed.'), locked.stdout);
+    assert.equal(git(a, 'log', '-1', '--format=%s'), 'session: Test, lock for batch-2');
+    assert.equal(git(origin, 'log', '-1', '--format=%s', 'main'), 'session: Test, lock for batch-2');
+    assert.ok(line1(run('status', a, '--study', sid)).startsWith('Test: work:'), 'its own lock stops no session');
+    assert.equal(line1(run('status', b, '--study', sid)), 'Test: nothing done: this checkout is 1 commit(s) behind the remote: git pull, then status again');
+    const early = run('lock', b, '--study', sid, '--session', 'session_b', '--for', 'batch-2');
+    assert.equal(early.status, 2);
+    assert.ok(early.stderr.includes('REFUSED: this checkout is behind the remote'), early.stderr);
+    git(b, 'pull', '-q');
+    assert.match(line1(run('status', b, '--study', sid)) ?? '', /^Test: nothing done: another session is writing \(the lock is held by session_a for batch-2, taken 0 min ago\)$/);
+    const second = run('lock', b, '--study', sid, '--session', 'session_b', '--for', 'batch-2');
+    assert.equal(second.status, 1);
+    assert.ok(second.stdout.startsWith('REFUSED: the lock is held by session_a for batch-2'), second.stdout);
+    const ops = join(dir, 'ops.json');
+    writeFileSync(ops, JSON.stringify({ chapter: 'chMain01', comments: [{ at: '1. d4 d5 2. c4 e6 3. Nc3', set: 'Against ...dxc4, e4: (2... dxc4 3. e4)' }], cut: [{ at: '1. d4 d5 2. c4 dxc4', mode: 'node' }] }));
+    const foreign = run('apply', b, '--study', sid, '--ops', ops);
+    assert.equal(foreign.status, 2);
+    assert.ok(foreign.stderr.includes("REFUSED: the lock is not this checkout's: held by session_a for batch-2") && foreign.stderr.includes('Another session is writing: stop.'), foreign.stderr);
+    assert.equal(git(b, 'status', '--porcelain'), '');
+    assert.equal(run('unlock', b, '--study', sid).status, 2, 'nor release it');
+
+    // a applies its batch and writes the review list; b may not write one.
+    const applied = run('apply', a, '--study', sid, '--ops', ops);
+    assert.equal(applied.status, 0, applied.stdout + applied.stderr);
+    const batch = commit(a, 'session: Test, batch-2');
+    const notes = join(dir, 'notes.json');
+    writeFileSync(notes, JSON.stringify([{ moves: '1. d4 d5 2. c4 e6 3. Nc3', text: 'Your 2... dxc4 line is a clickable now.', first: true }]));
+    const diff = new URL('../../../scripts/chapter-diff.ts', import.meta.url).pathname;
+    const listed = spawnSync(process.execPath, [diff, `${a}@${batch}~1`, a, '--study', sid, '--review', 'batch-2', '--title', 'Test: batch 2', '--notes', notes], { encoding: 'utf8', env });
+    assert.equal(listed.status, 0, listed.stderr);
+    assert.ok(listed.stderr.includes('2 item(s) at 2 position(s), 1 with your words, 1 position(s) marked "look first"'), listed.stderr);
+    const refusedList = spawnSync(process.execPath, [diff, `${a}@${batch}~1`, a, '--study', sid, '--review', 'batch-2'], { encoding: 'utf8', env, cwd: b });
+    assert.equal(refusedList.status, 0, 'the same checkout again is fine');
+    git(b, 'pull', '-q');
+    const foreignList = spawnSync(process.execPath, [diff, `${b}@${first}`, b, '--study', sid, '--review', 'batch-9'], { encoding: 'utf8', env });
+    assert.equal(foreignList.status, 1);
+    assert.ok(foreignList.stderr.includes("REFUSED: the lock is not this checkout's"), foreignList.stderr);
+    assert.ok(!existsSync(join(b, `review/${sid}/batch-9.json`)));
+    spawnSync(process.execPath, [diff, `${a}@${batch}~1`, a, '--study', sid, '--review', 'batch-2', '--title', 'Test: batch 2', '--notes', notes], { encoding: 'utf8', env });
+    assert.equal(run('lint', a, '--study', sid, '--list', 'batch-2').status, 0, 'one of the two positions marked');
+    commit(a, 'session: Test, batch-2, review list');
+    const released = run('unlock', a, '--study', sid);
+    assert.equal(released.status, 0, released.stdout + released.stderr);
+    assert.ok(released.stdout.includes('Lock released: committed and pushed'), released.stdout);
+    assert.ok(!existsSync(join(a, `notes/${sid}/lock.json`)));
+
+    // He has not answered: no work. Answered (a No to the comment, his device's log synced an hour ago): work, and the tally.
+    assert.equal(line1(run('status', a, '--study', sid)), 'Test: nothing done: the owner is reviewing: batch-2 has 2 of 2 position(s) open, 1 of them marked "look first"');
+    const items = (JSON.parse(readFileSync(join(a, `review/${sid}/batch-2.json`), 'utf8')) as { items: { id: string; kind: string }[] }).items;
+    file(a, 'progress/Phone001/2026-11-28.jsonl', items.map((i, n) => JSON.stringify({ v: 1, n: n + 1, t: `2026-11-28T10:00:0${n}.000Z`, k: 'answer', card: `v|${sid}|batch-2|${i.id}`, a: i.kind === 'comment' ? 'no' : 'ok', ...(i.kind === 'comment' ? { note: 'keep it drilled' } : {}) })).join('\n') + '\n');
+    commit(a, 'phone: 1 log', 60);
+    assert.equal(line1(run('status', a, '--study', sid, '--no-fetch')), 'Test: work: merge the answers of batch-2 (2 position(s)), then audit 1. d4 d5 2. c4 c6');
+    const tallied = run('tally', a, '--study', sid, '--list', 'batch-2');
+    assert.equal(tallied.status, 0, tallied.stdout + tallied.stderr);
+    assert.ok(tallied.stdout.startsWith('batch-2: 2 position(s): 1 OK, 1 No, 0 with a note only, 0 he edited himself, 0 not answered. Corrected: 1 of 2 (50%). "Look first": 1 marked, 1 of them corrected.'), tallied.stdout);
+    const after = parseAuditState(readFileSync(join(a, `notes/${sid}/audit.json`), 'utf8'));
+    assert.ok(after.ok);
+    assert.deepEqual(after.state.batches, [{ name: 'batch-2', title: 'Test: batch 2', date: new Date().toISOString().slice(0, 10), positions: 2, ok: 1, no: 1, notes: 0, edited: 0, open: 0, first: 1, firstCorrected: 1 }]);
+    assert.equal(run('tally', a, '--study', sid, '--list', 'nope').status, 2);
+
+    // An exploration asked for: its PGN and its start. Asked again within 7 days: not started.
+    const key = (l: string) => `${fenAfter(l).split(' ').slice(0, 4).join(' ')}#blitz,classical,rapid|1600,1800,2000,2200,2500|`;
+    const games = gamesOf(EXPLORE_GAMES);
+    const store = createFileCache(cache, Date.now);
+    for (const l of ['1. d4', '1. d4 d5 2. c4', '1. d4 d5 2. c4 c6 3. Nf3']) void store.put('explorer', key(l), games(fenAfter(l)));
+    const started = run('explore-start', a, '--study', sid, '--chapter', 'chMain01', '--line', '1. d4 d5 2. c4 c6', '--cache', cache, '--offline', '--session', 'session_x');
+    assert.equal(started.status, 0, started.stdout + started.stderr);
+    assert.ok(started.stdout.startsWith(`d4-d5-c4-c6: wrote notes/${sid}/cdbexplore/d4-d5-c4-c6.pgn (1 line end(s), 3 position(s) with the opponent's shares, 0 line(s)`), started.stdout);
+    assert.ok(readFileSync(join(a, `notes/${sid}/cdbexplore/d4-d5-c4-c6.pgn`), 'utf8').endsWith('1. d4 d5 { 40.0% } 2. c4 c6 { 25.0% } 3. Nf3 Nf6 { 75.0% } 4. Nc3 *\n'));
+    assert.ok(run('explore-start', a, '--study', sid, '--chapter', 'chMain01', '--line', '1. d4 d5 2. c4 c6', '--cache', cache, '--offline').stdout.startsWith('Not started: 1. d4 d5 2. c4 c6 was explored in the last 7 days (d4-d5-c4-c6: started '));
+    // A subtree whose games the cache lacks: nothing written.
+    const lacking = run('explore-start', a, '--study', sid, '--chapter', 'chRare01', '--cache', join(dir, 'empty'), '--offline');
+    assert.equal(lacking.status, 2);
+    assert.ok(lacking.stderr.includes('NOT COMPLETE: the games of 2 position(s) are not known'), lacking.stderr);
+    assert.ok(!existsSync(join(a, `notes/${sid}/cdbexplore/rare.pgn`)));
+
+    // While it runs, the batch for that subtree waits; its report written, the batch goes on.
+    assert.match(line1(run('status', a, '--study', sid, '--no-fetch')) ?? '', /^Test: nothing done: ChessDB's exploration of the next subtree, 1\. d4 d5 2\. c4 c6, is still running \(d4-d5-c4-c6: started .* UTC, no report yet\); a batch waits for it up to 24 h$/);
+    const recent = new Date(Date.now() - 60000).toISOString();
+    file(a, `notes/${sid}/cdbexplore/d4-d5-c4-c6.explore.json`, JSON.stringify({ targets: { b: { ...RECORD['b']!, at: recent } } }));
+    file(a, `notes/${sid}/cdbexplore/d4-d5-c4-c6.explore.log`, LOG_TWO.split('\n').slice(11).join('\n').replace('Survey: 3 positions to explore (2 line ends, 1 decisions), 2 of them explored recently', 'Survey: 1 positions to explore (0 line ends, 1 decisions)'));
+    const report = run('explore-report', a, '--study', sid, '--name', 'd4-d5-c4-c6', '--no-sweep');
+    assert.equal(report.status, 0, report.stdout + report.stderr);
+    assert.ok(report.stdout.startsWith(`d4-d5-c4-c6: finished (1 explored, 0 left); ChessDB changed at 1 position(s), 1 move(s) of ours 0.30 or more behind. Report: notes/${sid}/cdbexplore/d4-d5-c4-c6.md.`), report.stdout);
+    const md = readFileSync(join(a, `notes/${sid}/cdbexplore/d4-d5-c4-c6.md`), 'utf8');
+    assert.ok(md.includes('The subtree 1. d4 d5 2. c4 c6 of the chapter "Main" (Test).') && md.includes("- 1. d4 d5 2. c4 c6: ours Nf3 +0.25, ChessDB's best Nc3 +0.60 (0.35 behind)"), md);
+    assert.ok(line1(run('status', a, '--study', sid, '--no-fetch'))!.startsWith('Test: work:'));
+    assert.equal(run('explore-report', a, '--study', sid, '--name', 'nope', '--no-sweep').status, 2);
+    // explore-run without the tool says where it comes from.
+    const noTool = run('explore-run', a, '--study', sid, '--names', 'd4-d5-c4-c6', '--q', join(dir, 'no-q'));
+    assert.equal(noTool.status, 2);
+    assert.ok(noTool.stderr.includes('git clone --branch claude/gifted-cori-2whjds https://github.com/skAeglund/q_extension') && noTool.stderr.includes('a396b4d'), noTool.stderr);
+
+    // The ledger's tables of batches and explorations.
+    assert.equal(run('ledger', a, '--study', sid).status, 0);
+    const ledger = readFileSync(join(a, `notes/${sid}/ledger.md`), 'utf8');
+    assert.ok(ledger.includes('| batch-2 (Test: batch 2) | '), ledger);
+    assert.ok(ledger.includes('| 2 | 1 | 1 | 0 | 0 | 0 | 1 of 2 (50%) | 1, 1 |'), ledger);
+    assert.ok(/\| d4-d5-c4-c6 \| 1\. d4 d5 2\. c4 c6 \| [\d-]+ [\d:]+ \(session_x\) \| [\d-]+ [\d:]+ \| finished: 1 explored, 0 left \| 1 \/ 1 \| `cdbexplore\/d4-d5-c4-c6\.md` \|/.test(ledger), ledger);
+
+    // A ChessDB answer cached before the exploration's last position is dropped by the command that would decide on it.
+    const old = JSON.stringify({ k: 'old', t: Date.now() - 3600000, v: { status: 'ok', moves: [] } });
+    const fresh = JSON.stringify({ k: 'fresh', t: Date.now(), v: { status: 'ok', moves: [] } });
+    writeFileSync(join(cache, 'chessdb.jsonl'), `${old}\n${fresh}\n`);
+    const calls = run('close-calls', a, '--study', sid, '--chapter', 'chMain01', '--cache', cache, '--offline');
+    assert.ok(calls.stderr.includes('ChessDB: 1 cached answer(s) in') && calls.stderr.includes('are older than the last exploration'), calls.stderr);
+    assert.equal(readFileSync(join(cache, 'chessdb.jsonl'), 'utf8'), `${fresh}\n`);
+
+    // A lock left by a session that died: stale after six hours, and taken over.
+    file(a, `notes/${sid}/lock.json`, lockText({ v: 1, session: 'session_dead', at: new Date(Date.now() - 7 * 3600000).toISOString(), for: 'batch-3' }));
+    commit(a, 'session: Test, lock for batch-3');
+    assert.ok(run('status', a, '--study', sid, '--no-fetch').stdout.includes('The lock: STALE (older than 6 h'));
+    assert.ok(line1(run('status', a, '--study', sid, '--no-fetch'))!.startsWith('Test: work:'));
+    const stale = run('apply', a, '--study', sid, '--ops', ops);
+    assert.equal(stale.status, 2);
+    const taken = run('lock', a, '--study', sid, '--session', 'session_c', '--for', 'batch-3', '--no-push');
+    assert.equal(taken.status, 0, taken.stdout + taken.stderr);
+    assert.ok(taken.stdout.startsWith('A stale lock is taken over: it was STALE') && taken.stdout.includes('Locked: Test (Study001) by session_c for batch-3, committed, not pushed.'), taken.stdout);
+    assert.equal(run('unlock', a, '--study', sid, '--no-push').status, 0);
+    assert.equal(run('unlock', a, '--study', sid, '--no-push').stdout.trim(), 'No lock to release.');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

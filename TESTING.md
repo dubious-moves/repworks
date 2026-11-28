@@ -102,6 +102,32 @@ later change replaced are folded into the later item; items already reported wor
 
 ## 2. Studies and the study page
 
+### "Look first" on a review list, and the audit running by itself (PLAN.md §5.220, 2026-11-28)
+
+- The next batch's list (batch 6) after a sync, on the desktop and on the phone: does the panel's
+  folded head say "· N to look at first"? Open: are the marked positions at the top of the list,
+  each with "Look first" before its line and a coloured edge, and readable on the phone (the mark
+  not pushing the line off the row)?
+- "Next open" from anywhere: does it go to a marked position while one waits?
+- "OK all open…": does it say "The N marked “Look first” stay open", answer the others only, and
+  is the button gone when only marked positions wait? Is leaving them right, or would you rather
+  OK them too with a second press?
+- Were the marked positions the ones worth your time, and was anything unmarked that you had to
+  correct? (The ledger's "Batches" table counts both from your answers; say if a kind of change
+  should always be marked.)
+- A rule proposed as a question in a list ("A rule for rules.md …"): is the wording yours?
+- The scheduled sessions: does a run that finds you reviewing stop with one line? After you
+  answered everything and left the app for half an hour, does the next run start the batch, and
+  is its last message's first line "<study>: <batch> is ready: N positions, M to look at first" in
+  the notification? 30 minutes of quiet and a wait of up to 24 hours for ChessDB's exploration:
+  right, or too careful?
+- Two sessions at once (a scheduled one while you started one by hand): does the second stop on
+  the lock?
+- **Checked**: unit tests (the lock between two checkouts of one remote, every reason `status`
+  gives), Playwright for the panel (desktop and emulated phone), `status`, `explore-pgn`,
+  cdbexplore `--list`, `chessdb` and one on-demand run on the real data repo in a cloud container;
+  **not** on a device, not a whole unattended batch, not two real sessions contesting the lock.
+
 ### The Review panel by position: one answer for the items at a move, "OK all open" (PLAN.md §5.218, 2026-11-28)
 
 - Open the Jobava study's Review panel after a sync. Does the head say about "54 positions open of

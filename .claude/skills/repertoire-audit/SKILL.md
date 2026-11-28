@@ -1,6 +1,6 @@
 ---
 name: repertoire-audit
-description: Audit one part of the owner's opening repertoire (a study in his data repo) and hand it to him for review - merge his answers and edits from the last round first, then take one subtree, decide what is drilled and what becomes a clickable line in a comment, check every move and every claim with the explorer, Practical with Maia, Stockfish and the difficulty measure, have a second reader go over the result, and push the chapter, one review list and the updated ledger. The repertoire's own rules and state are in the data repo, notes/<study id>/ (rules.md, ledger.md, audit.json); the tools are scripts/audit/audit.ts. Use when the owner asks to audit, review or continue the repertoire review, to merge his review answers, to run "the next batch", or to review a chapter that has had none. PLAN.md section 5.219.
+description: Audit one part of the owner's opening repertoire (a study in his data repo) and hand it to him for review - merge his answers and edits from the last round first, then take one subtree, decide what is drilled and what becomes a clickable line in a comment, check every move and every claim with the explorer, Practical with Maia, Stockfish and the difficulty measure, have a second reader go over the result, and push the chapter, one review list (with what he should look at first marked) and the updated ledger, then start ChessDB's exploration of the subtrees to come. The repertoire's own rules and state are in the data repo, notes/<study id>/ (rules.md, ledger.md, audit.json); the tools are scripts/audit/audit.ts. Use when the owner asks to audit, review or continue the repertoire review, to merge his review answers, to run "the next batch", or to review a chapter that has had none, and when a scheduled task starts a session for an unattended run (its section says what to do when nobody is there to ask). PLAN.md sections 5.219 and 5.220.
 ---
 
 # Repertoire audit: one batch, from the rules to the push
@@ -22,6 +22,9 @@ state, his corrections) is in the data repo and is read first, every time.
 | **The state** | `notes/<sid>/ledger.md` and `notes/<sid>/audit.json` | `audit.json` by hand; the ledger's tables by `audit.ts ledger` |
 | His corrections, by type | `notes/<sid>/corrections.md` | by hand, when his answers are merged |
 | A batch's ops, notes and evidence | `notes/<sid>/batches/<name>/` | the batch |
+| The lock: who is writing to the study now | `notes/<sid>/lock.json` | `audit.ts lock` and `unlock` |
+| ChessDB explored: the files, records and reports | `notes/<sid>/cdbexplore/<name>.pgn`, `.explore.json`, `.md`, `.json` | `audit.ts explore-start`, and the exploring session with `explore-run` |
+| How each batch's review came out | `audit.json`'s `batches`, the ledger's "Batches" table | `audit.ts tally`, `audit.ts ledger` |
 
 `audit.json` holds what the scripts need: each chapter's depth (how many plies name a subtree) and
 the owner's own file to compare with, each subtree's state (`todo`, `open`, `closed`), the checks'
@@ -53,6 +56,10 @@ Where `rules.md` and this skill disagree, `rules.md` holds.
   repworks, and `node scripts/audit/audit.ts cache-pull --store ../<testing repo>/audit-cache --cache
   ~/cache/a`. What the store lacks is fetched as you go (the explorer answers 16 requests a
   minute); a missing answer is slow, never wrong.
+- For a run of cdbexplore on demand (step 4): q_extension beside repworks, at the commit that logs
+  ChessDB's refusals, read-only (change and push nothing there): `git clone --branch
+  claude/gifted-cori-2whjds https://github.com/skAeglund/q_extension ../q_extension && git -C
+  ../q_extension checkout -q a396b4d`. It is a public repo and needs no install.
 
 ## The rules that matter most
 
@@ -70,14 +77,37 @@ Where `rules.md` and this skill disagree, `rules.md` holds.
 5. **Full lines.** In everything he reads (notes, lists, messages), a line is written in full from
    move 1. Inside a chapter's comment, a clickable line in parentheses continues from the commented
    move.
-6. **One session writes to the study at a time**, and never while he is reviewing.
+6. **One session writes to the study at a time**, and never while he is reviewing. `audit.ts
+   status` says whether both hold; the lock (`audit.ts lock`) is taken and pushed before anything
+   under `studies/` or `review/` is written, and released at the end. `apply` and `chapter-diff.ts
+   --review` refuse without it.
 
 ## One batch
+
+### 0. Is there work, and the lock
+
+```sh
+git -C ../repworks-data pull
+node scripts/audit/audit.ts status ../repworks-data --study <sid>
+node scripts/audit/audit.ts lock ../repworks-data --study <sid> --session <this session's id> --for <the batch's name>
+```
+
+- `status` first, before reading anything else: its first line says whether there is work (no
+  list with a position still open, the owner quiet for 30 minutes, nobody else holding the lock,
+  ChessDB's exploration of the next subtree finished) or why not. He asked you by hand and it says
+  there is none: tell him its line; if he says he is done although positions are open, go on
+  (those are counted as not answered).
+- `lock` writes `notes/<sid>/lock.json`, commits it and pushes it. `REFUSED`: another session
+  holds it (younger than 6 hours): stop, and say so. A stale lock (older) is a session that died:
+  the command takes it over and says so. A batch that takes longer than 6 hours renews it with the
+  same command. The session's id: `get_session` with no id (claude-code-remote), or the
+  environment variable `CLAUDE_CODE_REMOTE_SESSION_ID`.
+- Release it at the very end, whatever happened (`audit.ts unlock`, step 9), also when the run
+  stops early.
 
 ### 1. Merge his answers and edits
 
 ```sh
-git -C ../repworks-data pull
 node scripts/audit/audit.ts base ../repworks-data --study <sid>          # the commit his edits are counted from
 node scripts/review-answers.ts ../repworks-data --study <sid>            # No and notes first
 node scripts/chapter-diff.ts ../repworks-data@<base> ../repworks-data --study <sid> --max-lines 0
@@ -93,9 +123,24 @@ node scripts/chapter-diff.ts ../repworks-data@<base> ../repworks-data --study <s
   in step 6, with the same checks. A change he asked for that needs a decision goes through steps
   3 to 5 like any other.
 - Write every No, note and edit into `corrections.md` under its type (move, drilled or clickable,
-  wording, format), with the full line and his words. `git rm` each list whose answers are merged,
-  update `audit.json` (a subtree he accepted is `closed`), and commit: `session: <study>, answers
-  merged`.
+  wording, format), with the full line, his words, and its **kind** at the end: the reason in a
+  few words, the same words as an earlier entry when the reason is the same (`Kind: an equal eval
+  given as a reason`). The file's head lists the kinds so far.
+- **A second correction of one kind is a rule to propose.** When the kind you just wrote is in the
+  file for the second time and no rule of `rules.md` already says it, write the rule's wording as
+  you would put it into `rules.md`, and ask him in the next list: a note with `"first": true` at a
+  move of that batch where the rule applies ("A rule for `rules.md` §3: … Your corrections of
+  <date> and <date> both say it. Accept?"). Note the proposal under "Rules proposed" in
+  `corrections.md`, so it is asked once. His OK: the rule goes into `rules.md` with the date, and
+  the entry says so; his No or his wording: as he says.
+- **The tally, before a list is removed:** `node scripts/audit/audit.ts tally ../repworks-data
+  --study <sid> --list <name>` for each list. It writes into `audit.json` how the review came out
+  (positions, OK, No, notes, positions he edited himself, how many were marked "look first" and
+  how many of those he corrected); `audit.ts ledger` writes the "Batches" table from it. Read the
+  table: a share of corrections that does not fall, or marks he mostly waves through, says the
+  judgement or the marks are off, and the report says so.
+- Then `git rm` each list whose answers are merged, update `audit.json` (a subtree he accepted is
+  `closed`), and commit: `session: <study>, answers merged`.
 
 ### 2. Choose the subtree
 
@@ -128,6 +173,12 @@ $A lines     $D --study <sid> --chapter <cid> --line "<moves>"            # the 
   --engine sf19` as a second opinion, and give both numbers in the note. Never use another
   engine's number for the class itself: the limits belong to the measure's own engine.
 - **judge**: the guide and the measure side by side for every reply. A suggestion, not a verdict.
+- **ChessDB explored ahead**: the ledger's "ChessDB explored" table names the exploration of this
+  subtree; read its report, `notes/<sid>/cdbexplore/<name>.md` (the exploring session wrote and
+  pushed it). A move of ours it lists as 0.30 or more behind ChessDB's best is treated like a
+  `FLAG` of the screen: to Practical. A position where ChessDB's best move changed tells you an
+  earlier decision there may have rested on a shallow eval. Not finished (positions left), or
+  none started: say so in the report; an attended run goes on with what there is.
 
 ### 4. Settle the moves
 
@@ -143,6 +194,25 @@ line>", "candidates": ["ours", "other"] }]`; keep it and the report in `practica
 its settings). A flag is settled by Practical, then by the repertoire's
 own tests in `rules.md` (for the 1.Nc3 study: the system test, and no pure engine moves outside
 sharp only-move lines). A Practical edge that rests on no games is said to be so.
+
+**A decision that hangs on a shallow ChessDB eval is explored first.** After its run, `practical`
+prints ChessDB's depth for every candidate it was asked about, `SHALLOW` where the stored line is
+under 10 plies (`--sf` adds Stockfish, and its disagreement by 0.5 or more); `close-calls` says it
+on a flag that rests on ChessDB; `audit.ts chessdb --moves "<the full line>" --candidates "a,b"
+--cache ~/cache/a --sf` asks about one position. When the candidates are close and the choice
+would turn on such an eval:
+
+```sh
+$A explore-pgn --moves "<the full line to the position>" --candidates "ours,other" --out $D/notes/<sid>/cdbexplore/od-<batch>-1.pgn
+$A explore-run $D --study <sid> --names od-<batch>-1 --hours 0.3 --minutes 8 --again     # a background command: about 15 minutes
+$A chessdb $D --study <sid> --moves "<the full line>" --candidates "ours,other" --cache ~/cache/a --fresh --sf
+```
+
+then Practical again: the commands drop every ChessDB answer cached before the exploration, so
+the new run decides on the deeper evals (the same holds after an exploration ahead: you need do
+nothing). `--short-line 99` on `explore-run` when the stored line is long and only Stockfish
+disagrees. Still `SHALLOW` afterwards: Stockfish decides, and the note to the owner says that
+ChessDB had no deep line there. The files stay in `cdbexplore/` as the batch's evidence.
 
 ### 5. Judge each reply
 
@@ -236,13 +306,30 @@ node scripts/chapter-diff.ts $D@$(cat $B/base.txt) $D --study <sid> --review <na
 $A lint $D --study <sid> --list <name>
 ```
 
-- One review list a batch. The app shows the items at one move as one position, answered once
+- One review list a batch, the lock held (step 0). The app shows the items at one move as one position, answered once
   (PLAN.md §5.218), so never split a position's items over two lists. A note attaches to a change by the change's own move (a reply: the new
   move; an added part: its first move; a removed part: the first removed move; a comment: the
   commented move); any other note becomes a question at its move. Reasons, numbers and open
   questions go in the notes, each question with your recommendation, not in the chat.
+- **Mark what he should look at first**: `"first": true` on the note (PLAN.md §5.220). The panel
+  shows a marked position first with "Look first", counts them in the list's head, and "OK all
+  open" leaves them waiting, so the mark decides what he reads and what he may wave through. It
+  goes on:
+  - a move of his changed or questioned;
+  - a decision the tools left to judgement: a difficulty number within about 1 of a class limit,
+    the guide and the measure disagreeing, Practical within 3 points, a ChessDB eval still shallow;
+  - a claim the second reader questioned, whether you changed it or kept it;
+  - a kind of change he has corrected before (`corrections.md`);
+  - every question, a proposed rule among them.
+
+  Nothing else. `lint --list` warns on a list with no marked position, with more than about a
+  third marked, and on a question without the mark: a mark on everything points to nothing.
 - Update `audit.json` (the subtree is `open`, with the batch's name; new flags; flags dealt with
   removed), then `$A ledger $D --study <sid>` and `$A ledger $D --study <sid> --check`.
+- **Start ChessDB's exploration of the next two subtrees** (the section "ChessDB explored ahead"):
+  `explore-start` for each of the ledger's first two under "What is next" writes their files into
+  the notes, which go out with this push; the exploring session is started after it.
+- `$A unlock $D --study <sid>` as the last thing: it removes the lock, commits and pushes.
 - `$A scan $D` before **every** push: a token, an email address or a path of a personal computer
   stops the push (exit 1). A container's path only warns, but doesn't belong in a new file either.
 - `node scripts/validate-data.ts $D`, commit the list, the notes and the ledger (`session: …`), and
@@ -257,17 +344,121 @@ $A lint $D --study <sid> --list <name>
 
 ### 10. Report, and stop
 
-To the owner, short: the subtree in full, what changed in numbers (positions, replies and
-single-move branches before and after), the few changes he should look at first and why, every
-question (they are in the list too), what each check gave, what the second reader found, and what
-was checked live, by tests, or taken from a document. Then stop: the next batch starts when he has
-answered. Stop earlier, and say exactly what is needed, when:
+To the owner, short. **Its first line is what he sees as a notification**: `<study>: <batch> is
+ready: N positions, M to look at first` (or, when nothing was done, the reason: `status`'s first
+line). Then: the subtree in full, what changed in numbers (positions, replies and single-move
+branches before and after), the positions marked "look first", each in full with why (the same
+ones the list marks: nothing is named here that is not marked there), every question (they are in
+the list too), what each check gave, what the second reader found, what ChessDB's exploration
+showed and whether one was started for the next subtrees (with its session's link), the
+"Batches" table's last rows when a list was merged, and what was checked live, by tests, or taken
+from a document. Then stop: the next batch starts when he has answered. Stop earlier, and say
+exactly what is needed, when:
 
 - his lists are open and he has not said he is done (step 1);
 - a finding changes the shape of the plan (a rule that can't be applied, a chapter that should be
   split, a move of his the data questions strongly): to him before anything is built on it;
 - a check misses its target for a reason you can't remove;
 - the explorer or ChessDB can't be reached, so numbers would be guesses.
+
+## ChessDB explored ahead
+
+ChessDB's eval far into a line is often one search with a few plies behind it. q_extension's
+cdbexplore builds ChessDB's own tree below a file's line ends and the close decisions of our side,
+so every later lookup there is deeper. It runs ahead of the review, in a session of its own, since
+a subtree takes hours.
+
+**After a batch is pushed**, for each of the first two subtrees of the ledger's "What is next"
+(for a chapter with no review: the whole chapter, before its close calls):
+
+```sh
+$A explore-start $D --study <sid> --chapter <cid> --line "<the subtree's moves>" --cache ~/cache/a --session <the new session's id, once known; or leave it out>
+```
+
+It writes `notes/<sid>/cdbexplore/<name>.pgn` (the subtree with the moves that lead to it, the
+opponent's moves carrying their share, the lines that end in a "transposes to" note left out) and
+the start into `audit.json`; it says "Not started" for a subtree explored in the last 7 days, and
+then there is nothing to do for that one. Run `$A ledger`, commit and push the notes (they are
+part of the batch's push), then start **one** session for the names it wrote, with
+`create_session` (claude-code-remote): `model: "sonnet"`, `effort: "low"` (it only runs commands
+and waits on them; CLAUDE.md), the repworks repo as its source, a title like `cdbexplore: <names>`,
+and this prompt with the three values filled in:
+
+> You run one tool for the owner's chess repertoire: cdbexplore, which makes ChessDB's analysis
+> deeper for the part of the repertoire that is reviewed next. You only run the commands below,
+> wait for them and say what they printed. Change no file by hand, and push nothing but what the
+> commands push.
+>
+> **Set up** (once, and again whenever the container was replaced and a folder is gone):
+> 1. `add_repo` (claude-code-remote) for `<owner>/<data repo>` with push access, and clone it
+>    beside repworks as the tool's result says; then `git -C ../<data repo> fetch --depth=500
+>    origin main`.
+> 2. `git clone --branch claude/gifted-cori-2whjds https://github.com/skAeglund/q_extension
+>    ../q_extension && git -C ../q_extension checkout -q a396b4d` (a public repo; read-only for
+>    you: change, commit and push nothing there).
+> 3. In repworks, if `node_modules` is missing: `npm ci`.
+>
+> **Run**, from the repworks folder, as a background command (it takes up to two hours; you are
+> woken when it ends):
+>
+> `git -C ../<data repo> pull -q --rebase --autostash; node scripts/audit/audit.ts explore-run ../<data repo>
+> --study <sid> --names <names, comma-separated> --hours 1.9 --push`
+>
+> It explores each file in turn, writes the report of each into the data repo
+> (`notes/<sid>/cdbexplore/<name>.md`) and pushes it. When it ends, read its last lines:
+> - `LEFT: run the same command again.` Run it again, the same way. Positions already explored
+>   are skipped, so each run goes on where the last stopped.
+> - `NOTHING LEFT`: you are done. Reply with the lines it printed for each name, and stop.
+> - A line saying ChessDB refused requests: add `--rate 240` to every later run.
+> - `NOT PUSHED`, or any error: run `git -C ../<data repo> status` and `git -C ../<data repo>
+>   pull --rebase`, then the command again. If the same error comes three times, reply with it
+>   word for word and stop.
+>
+> Stop after 30 hours in all, whatever is left, and say what the last run printed. Don't ask
+> questions: nobody reads your replies until the end. Never print a token or write one to a file.
+
+Then put the new session's id into `audit.json`'s entry if you left it out, and name its link in
+the report. `status` shows each of the next subtrees with its exploration: finished, how many
+positions are left, or started with no report yet. A session that has reported nothing six hours
+after its start has probably died: look at it (`get_session`, `list_events`), and start another
+with the same prompt (the tool's record is in the data repo, so nothing explored is lost).
+
+What an exploration changes for a batch: ChessDB answers cached before its last explored position
+are stale. `practical`, `close-calls` and `chessdb` drop those from the cache folder themselves
+before they ask (they say how many), so a batch cannot decide on them; `cache-pull` may bring old
+ones back from the store, and they are dropped again at the next command.
+
+## An unattended run
+
+A scheduled task starts a fresh session every few hours, with nobody there. Such a run is the batch
+as written above, with these differences:
+
+1. **`status` first, before reading anything else** (after the data repo is cloned and pulled):
+   `node scripts/audit/audit.ts status ../repworks-data --study <sid>`. Its first line starts with
+   `<study>: nothing done:` → reply with that line alone, and stop. No lock is taken, nothing is
+   read or written. This is the usual outcome, and it costs a minute.
+2. Otherwise it says what the work is (`merge the answers of …, then audit …`). Read the rules,
+   the ledger and the corrections as always, take the lock (step 0), and run the batch: steps 1
+   to 10.
+3. **Nobody can be asked.** Wherever a step says "ask" or "stop and say":
+   - a question that can wait (an unclear note of his, a judgement between two fair options, a
+     proposed rule, a target a check misses by his own edit): decide on the best guess, say in
+     the note what you assumed, and put it into the list as a question marked "look first";
+   - one that cannot (the data repo can't be pushed, the explorer or ChessDB can't be reached, a
+     finding that changes the shape of the plan, his lists and the chapters contradicting each
+     other so that a merge would lose his work, a `REFUSED` you can't explain): stop the run.
+     Undo what is not pushed (`git reset --hard origin/main` in the data repo, after making sure
+     no commit of yours is worth keeping), release the lock, and make the last message say
+     exactly what is needed from him, in words he can act on from his phone.
+4. A list he left partly unanswered never starts a run (`status` says he is reviewing), so an
+   unattended merge always has every position answered or edited.
+5. The exploration of this batch's own subtree still running: `status` reports no work for up to
+   24 hours after its start; after that the batch goes on with what there is and says so.
+6. Start the exploring session for the next two subtrees as an attended run does. Start no other
+   session, and create, change or fire no scheduled task.
+7. **The last message's first line is his notification**: `<study>: <batch> is ready: N
+   positions, M to look at first`, or the reason nothing was done. Nothing before it: no greeting,
+   no summary of the steps. The rest of the report follows as in step 10.
 
 ## Preparing later subtrees in parallel
 
@@ -280,7 +471,10 @@ later batch, not a decision: inventories are run again after any batch that chan
 
 ## A chapter that has had no review
 
-Its moves were never judged, so the close calls come before the branch audit:
+Its moves were never judged, so the close calls come before the branch audit, and ChessDB's
+exploration of the whole chapter before the close calls (`explore-start` with `--chapter` and no
+`--line`, then its session as in "ChessDB explored ahead"; the close calls read ChessDB at every
+move of ours, and wait for the exploration as a batch does):
 
 ```sh
 $A add-chapters $D --study <sid> --from <file.pgn> --names "<chapter>"    # if it is in no study yet; then add it to audit.json
@@ -308,3 +502,8 @@ subtree.
 - Prose inside a line's parentheses, and moves in a comment outside any: neither is clickable.
 - A list of 119 items. A batch is about 25 positions.
 - A PC's path, with the owner's user name in it, nearly copied into a file. `scan` before every push.
+- What to look at first said only in the chat, which he does not see in the app. It is a mark on
+  the list's notes now, and the report names the same positions.
+- cdbexplore named in the rules and run by nothing, for five batches. It runs ahead from step 9,
+  and on demand in step 4.
+- A decision on a ChessDB answer cached before the position was explored. The commands drop those.

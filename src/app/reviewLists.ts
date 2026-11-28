@@ -27,6 +27,8 @@ export interface ShownList {
   /** Positions still waiting for the owner: an item with no answer, and the chapter as the item says. */
   open: number;
   total: number;
+  /** Positions marked "look first" (§5.220) that still wait. */
+  firstOpen: number;
 }
 
 /** The lists as read, with the study's other chapters (those the lists name) parsed. */
@@ -85,14 +87,14 @@ export const reviewLists = computed<ShownList[]>(() => {
     const answer = data ? answerOf(data.eventsOf(reviewCard(list.sid, list.name, item.id))) : undefined;
     return { state: itemState(item, answer, item.cid === s.cid && open ? open : r.chapters.get(item.cid)), ...(answer ? { answer } : {}) };
   });
-  return shown.map(({ list, positions, open: waiting }) => {
+  return shown.map(({ list, positions, open: waiting, firstOpen }) => {
     const chapters: ShownChapter[] = [];
     for (const p of positions) {
       let of = chapters.find((c) => c.cid === p.cid);
       if (!of) chapters.push((of = { cid: p.cid, name: names.get(p.cid) ?? p.items.map((i) => i.list.chapters[p.cid]).find(Boolean) ?? p.cid, positions: [] }));
       of.positions.push(p);
     }
-    return { list, chapters, open: waiting, total: positions.length };
+    return { list, chapters, open: waiting, total: positions.length, firstOpen };
   });
 });
 

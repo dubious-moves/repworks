@@ -8,6 +8,9 @@
 // position, counted once; answered once (an event per item), taken back, one item answered on its
 // own, a note on all; a position whose items are in two lists, under the first; "Changed since" on
 // one item of a position while the other waits; "OK all open" after a confirmation, one taken back.
+// "Look first" (§5.220): a marked position says so and comes first in its list; the heads count
+// those still waiting; "Next open" goes to them first; "OK all open" leaves them waiting and says
+// how many stay; answered, the mark stays on the row and leaves the counts.
 import { test, expect, type Page } from '@playwright/test';
 import { writeReviewList, type ReviewList } from '../../src/core/study/reviewList.ts';
 import { REPO, TOKEN } from '../support/syncWorld.ts';
@@ -321,4 +324,73 @@ test('"OK all open" on a list: asked first, every item still waiting under it an
   expect(log(w)).toContain('"card":"v|Rep0Najd|batch-2-low|Ch2Alapn.removed.e4,c5,c3,d5","a":"ok"');
   expect(log(w)).toContain('"card":"v|Rep0Najd|batch-2|Ch2Alapn.question.e4,c5,c3,Nf6","a":"no"');
   expect((log(w).match(/"card":"v\|Rep0Najd\|batch-2\|Ch2Alapn.question[^\n]*"a":"ok"/g) ?? []).length).toBe(0);
+});
+
+// A batch as the audit writes it: one list, the session's marks on what to read first. The marked
+// positions are the third and the fourth in the file.
+const MARKED: ReviewList = {
+  v: 1,
+  sid: 'Rep0Najd',
+  name: 'batch-6',
+  title: 'Sicilian batch 6',
+  created: '2026-11-28T12:00:00.000Z',
+  chapters: { Ch1Najdf: 'Main line', Ch2Alapn: 'Alapin' },
+  items: [
+    { id: 'Ch1Najdf.glyphs.e4,c5,Nf3,d6', cid: 'Ch1Najdf', kind: 'glyphs', at: ['e4', 'c5', 'Nf3', 'd6'], lead: '1. e4 c5 2. Nf3', part: 'd6', detail: ['none → !'] },
+    { id: 'Ch1Najdf.arrows.e4,c5,Nf3,d6,d4', cid: 'Ch1Najdf', kind: 'arrows', at: ['e4', 'c5', 'Nf3', 'd6', 'd4'], lead: '1. e4 c5 2. Nf3 d6', part: '3. d4', detail: ['added Gd4d5'] },
+    { id: 'Ch1Najdf.comment.e4,c5,Nf3', cid: 'Ch1Najdf', kind: 'comment', at: ['e4', 'c5', 'Nf3'], lead: '1. e4 c5', part: '2. Nf3', detail: ['added after the old text: (2... e6 3. d4)'] },
+    { id: 'Ch1Najdf.removed.e4,c5,Nf3,e6', cid: 'Ch1Najdf', kind: 'removed', at: ['e4', 'c5', 'Nf3'], lead: '1. e4 c5 2. Nf3', part: 'e6 3. d4', san: 'e6', text: 'Your line: found by 81% of 2000 players, so a clickable. A judgement.', first: true },
+    { id: 'Ch1Najdf.question.e4,c5,Nf3,d6,d4,cxd4', cid: 'Ch1Najdf', kind: 'question', at: ['e4', 'c5', 'Nf3', 'd6', 'd4', 'cxd4'], lead: '1. e4 c5 2. Nf3 d6 3. d4', part: 'cxd4', text: 'A rule for the next batches: "a recapture gets a sentence, not a line". Accept?', first: true },
+  ],
+};
+
+test('"look first": marked positions say so and come first; the heads count them; "Next open" goes to them first; "OK all open" leaves them waiting', async ({ page }) => {
+  const w = await setUp(page, [MARKED]);
+  await page.goto(`${site.url}#/study/Rep0Najd/Ch1Najdf`);
+  await expect(page.locator('.notation .move').first()).toBeVisible();
+  // Folded, the panel's head already says how many to look at first.
+  await expect(panel(page).locator('> summary')).toHaveText(/Review\s+4 positions open\s+of 4\s+· 2 to look at first/);
+  await panel(page).locator('> summary').click();
+  await expect(list(page, 0).locator('> summary')).toHaveText(/Sicilian batch 6\s+4 positions open of 4\s+· 2 to look at first/);
+
+  // The two marked positions first, each saying so; the others after them, in the file's order.
+  await expect(panel(page).locator('.review-item > .review-go .review-part')).toHaveText(['2. Nf3', 'cxd4', 'd6', '3. d4']);
+  await expect(panel(page).locator('.review-item.is-first')).toHaveCount(2);
+  await expect(item(page, 0).locator('> .review-go .review-first')).toHaveText('Look first');
+  await expect(item(page, 1).locator('> .review-go .review-first')).toHaveText('Look first');
+  await expect(item(page, 2).locator('.review-first')).toHaveCount(0);
+  // The mark is inside the row on the phone too, not pushed off it.
+  await expect(item(page, 0).locator('.review-first')).toBeInViewport({ ratio: 1 });
+
+  // "Next open" from an unmarked position still goes to the marked ones first.
+  await item(page, 3).locator('> .review-go').click();
+  await expect(page.locator('.notation .move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 d6 d4');
+  await panel(page).getByRole('button', { name: 'Next open' }).click();
+  await expect(page.locator('.notation .move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3');
+  await panel(page).getByRole('button', { name: 'Next open' }).click();
+  await expect(page.locator('.notation .move.current')).toHaveAttribute('data-path', 'e4 c5 Nf3 d6 d4 cxd4');
+
+  // "OK all open" answers the two unmarked positions only, and says so before it does.
+  await list(page, 0).getByRole('button', { name: 'OK all open…' }).click();
+  await expect(list(page, 0).getByRole('group', { name: 'OK all open' })).toContainText('OK for the 2 positions still open in this list? The 2 marked “Look first” stay open. Each can be taken back.');
+  await list(page, 0).getByRole('button', { name: 'OK all 2' }).click();
+  await expect(count(page)).toHaveText('2 positions open');
+  await expect(panel(page).locator('.review-item.is-waiting > .review-go .review-part')).toHaveText(['2. Nf3', 'cxd4']);
+  await expect(list(page, 0).locator('> summary')).toHaveText(/2 positions open of 4\s+· 2 to look at first/);
+  // Only marked positions wait: nothing is left for the button to answer.
+  await expect(list(page, 0).getByRole('button', { name: 'OK all open…' })).toHaveCount(0);
+
+  // A marked position answered: its mark stays on the row, the counts drop. Both answered: no count of them is left.
+  await answer(page, 0).getByRole('button', { name: 'No', exact: true }).click();
+  await expect(list(page, 0).locator('> summary')).toHaveText(/1 position open of 4\s+· 1 to look at first/);
+  await expect(item(page, 0).locator('.review-first')).toHaveText('Look first');
+  await answer(page, 1).getByRole('button', { name: 'OK', exact: true }).click();
+  await expect(count(page)).toHaveText('all answered');
+  await expect(panel(page).locator('.review-first-count')).toHaveCount(0);
+
+  // Synced: the two "OK all" answers, the No for both items at 2. Nf3, the OK for the question.
+  await page.locator('.chip').click();
+  await expect.poll(() => (log(w).match(/"k":"answer"/g) ?? []).length, { timeout: 15_000 }).toBe(5);
+  expect(log(w)).toContain('"card":"v|Rep0Najd|batch-6|Ch1Najdf.removed.e4,c5,Nf3,e6","a":"no"');
+  expect(log(w)).toContain('"card":"v|Rep0Najd|batch-6|Ch1Najdf.glyphs.e4,c5,Nf3,d6","a":"ok"');
 });

@@ -24,8 +24,10 @@
 //                  answers. Read the answers with scripts/review-answers.ts.
 //   --title TEXT   what the panel calls the list (default: NAME)
 //   --notes FILE   your words for the list: [{ "moves": "1. Nc3 d5 2. d4", "text": "…",
-//                  "chapter"?: "name or id" }]. A note on a changed move is shown with that
-//                  change; any other is a question at its move.
+//                  "chapter"?: "name or id", "first"?: true }]. A note on a changed move is shown
+//                  with that change; any other is a question at its move. "first": true marks
+//                  the item "look first" (PLAN.md §5.220): its position comes first in the
+//                  list and "OK all open" leaves it waiting.
 //   --out FILE     write the list there instead of printing it
 //
 // Examples:
@@ -38,6 +40,8 @@ import { reviewListPath } from '../src/core/data/layout.ts';
 import { positionKey, writeReviewList } from '../src/core/study/reviewList.ts';
 import { parseGames } from '../src/core/pgn/parse.ts';
 import type { Chapter } from '../src/core/study/model.ts';
+import { heldHere } from './audit/lock.ts';
+import { auditStatePath } from './audit/state.ts';
 import { openSide, readStudy, type Tree } from './data-repo.ts';
 import { markdown, report, reviewList, SITE, versionChapters, type Note, type Version } from './chapter-diff-lib.ts';
 
@@ -117,16 +121,22 @@ if (flags.has('review')) {
     } catch (e) {
       fail(`--notes ${flags.get('notes')}: ${e instanceof Error ? e.message : String(e)}`);
     }
-    if (!Array.isArray(notes) || !notes.every((n) => n && typeof n.moves === 'string' && typeof n.text === 'string' && n.text.trim() !== '')) fail('--notes takes a list of { "moves": "...", "text": "..." }');
+    if (!Array.isArray(notes) || !notes.every((n) => n && typeof n.moves === 'string' && typeof n.text === 'string' && n.text.trim() !== '' && (n.first === undefined || typeof n.first === 'boolean'))) fail('--notes takes a list of { "moves": "...", "text": "...", "first"?: true }');
   }
   const made = reviewList(r, now, { name: flags.get('review')!, ...(flags.has('title') ? { title: flags.get('title')! } : {}), created: new Date().toISOString(), notes });
   if (!made.ok) fail(made.error);
+  // A study under the repertoire audit (its notes hold an audit.json) has one writer at a time: the list is written by the session that holds its lock (PLAN.md §5.220).
+  if (existsSync(join(dir, auditStatePath(made.list.sid)))) {
+    const held = heldHere(dir, made.list.sid, Date.now());
+    if (!held.ok) fail(`REFUSED: ${held.why}`);
+  }
   const path = join(dir, reviewListPath(made.list.sid, made.list.name));
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, writeReviewList(made.list));
   // The app shows and counts positions (the items at one move, §5.218).
   const places = new Set(made.list.items.map(positionKey)).size;
-  process.stderr.write(`wrote ${path}: ${made.list.items.length} item(s) at ${places} position(s), ${made.list.items.filter((i) => i.text).length} with your words. Commit it with the study.\n`);
+  const marked = new Set(made.list.items.filter((i) => i.first).map(positionKey)).size;
+  process.stderr.write(`wrote ${path}: ${made.list.items.length} item(s) at ${places} position(s), ${made.list.items.filter((i) => i.text).length} with your words, ${marked} position(s) marked "look first". Commit it with the study.\n`);
 }
 const text = flags.has('json') ? `${JSON.stringify(r, null, 1)}\n` : markdown(r, { maxLines });
 if (flags.has('out')) writeFileSync(flags.get('out')!, text);

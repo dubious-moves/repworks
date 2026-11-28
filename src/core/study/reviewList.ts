@@ -34,6 +34,12 @@ export interface ReviewItem {
   text?: string;
   /** For `move` and `reply` the move now first at the position; for `removed` the move taken away. */
   san?: string;
+  /**
+   * "Look first" (§5.220): the session's mark on what the owner should read before the rest (a move
+   * of his changed, a judgement call, a question). Its position is shown first in its list and is
+   * left waiting by "OK all open". Only ever `true`; a version before this one reads past it.
+   */
+  first?: true;
 }
 
 export interface ReviewList {
@@ -103,6 +109,10 @@ export function parseReviewList(text: string): ReadList {
       if (!isText(it['san']) || !SAN.test(it['san'])) return { ok: false, error: `${where}: san must be a move` };
       item.san = it['san'];
     }
+    if (it['first'] !== undefined) {
+      if (typeof it['first'] !== 'boolean') return { ok: false, error: `${where}: first must be true or false` };
+      if (it['first']) item.first = true;
+    }
     items.push(item);
   }
   const list: ReviewList = { v: REVIEW_FORMAT, sid: o['sid'] as string, name: o['name'] as string, title: o['title'] as string, created: o['created'] as string, chapters: chapters as Record<string, string>, items };
@@ -114,7 +124,7 @@ export function parseReviewList(text: string): ReadList {
 /** The file's text: one stable form, an item a line, so a list made again differs only where it changed. */
 export function writeReviewList(list: ReviewList): string {
   const head = { v: list.v, sid: list.sid, name: list.name, title: list.title, created: list.created, ...(list.from !== undefined ? { from: list.from } : {}), ...(list.to !== undefined ? { to: list.to } : {}), chapters: list.chapters };
-  const items = list.items.map((i) => `  ${JSON.stringify({ id: i.id, cid: i.cid, kind: i.kind, at: i.at, lead: i.lead, part: i.part, ...(i.detail?.length ? { detail: i.detail } : {}), ...(i.text ? { text: i.text } : {}), ...(i.san ? { san: i.san } : {}) })}`);
+  const items = list.items.map((i) => `  ${JSON.stringify({ id: i.id, cid: i.cid, kind: i.kind, at: i.at, lead: i.lead, part: i.part, ...(i.detail?.length ? { detail: i.detail } : {}), ...(i.text ? { text: i.text } : {}), ...(i.san ? { san: i.san } : {}), ...(i.first ? { first: true } : {}) })}`);
   return `${JSON.stringify(head).slice(0, -1)},"items":[\n${items.join(',\n')}${items.length ? '\n' : ''}]}\n`;
 }
 
@@ -251,13 +261,19 @@ export interface ReviewPosition {
   common?: ItemState;
   /** An item still waits for the owner. */
   waiting: boolean;
+  /** An item of it is marked "look first". */
+  first: boolean;
 }
 
 export interface ListPositions {
   list: ReviewList;
+  /** The marked positions ("look first") before the others, each kind in the file's order. */
   positions: ReviewPosition[];
   /** Positions still waiting. */
   open: number;
+  /** Positions marked "look first", and those of them still waiting. */
+  first: number;
+  firstOpen: number;
 }
 
 /** The order lists are shown in: the newest first, then by name. */
@@ -271,17 +287,33 @@ export const newestFirst = (a: ReviewList, b: ReviewList) => (a.created < b.crea
  */
 export function positionsOf(lists: readonly ReviewList[], stand: (list: ReviewList, item: ReviewItem) => { state: ItemState; answer?: Answer }): ListPositions[] {
   const placed: Placed[] = lists.flatMap((list) => list.items.map((item) => ({ list, item, ...stand(list, item) })));
-  const out = new Map(lists.map((list) => [list, { list, positions: [] as ReviewPosition[], open: 0 }]));
+  const out = new Map(lists.map((list) => [list, { list, positions: [] as ReviewPosition[], open: 0, first: 0, firstOpen: 0 }]));
   for (const items of byPosition(placed)) {
     const first = items.reduce((a, b) => (lists.indexOf(b.list) < lists.indexOf(a.list) ? b : a));
     const states = items.map((i) => i.state);
     const waiting = states.includes('open');
     const common = states.every((s) => s === states[0]) ? states[0] : undefined;
     const of = out.get(first.list)!;
-    of.positions.push({ key: positionKey(first.item), cid: first.item.cid, at: first.item.at, ...positionHead(items.map((i) => i.item)), items, state: positionState(states), ...(common ? { common } : {}), waiting });
+    const marked = items.some((i) => i.item.first === true);
+    of.positions.push({ key: positionKey(first.item), cid: first.item.cid, at: first.item.at, ...positionHead(items.map((i) => i.item)), items, state: positionState(states), ...(common ? { common } : {}), waiting, first: marked });
     if (waiting) of.open++;
+    if (marked) of.first++;
+    if (marked && waiting) of.firstOpen++;
   }
+  // Array.prototype.sort is stable: the marked ones first, each kind as the file has them.
+  for (const of of out.values()) of.positions.sort((a, b) => Number(b.first) - Number(a.first));
   return [...out.values()];
+}
+
+/**
+ * What "OK all open" on a list answers (§5.220): the items still waiting of the positions under it
+ * that carry no "look first" mark. A marked position stays open for the owner to read, its
+ * unmarked items too: it is answered as one.
+ */
+export function okAllTargets(positions: readonly ReviewPosition[]): { items: Placed[]; positions: number; kept: number } {
+  const waiting = positions.filter((p) => p.waiting);
+  const plain = waiting.filter((p) => !p.first);
+  return { items: plain.flatMap((p) => p.items.filter((i) => i.state === 'open')), positions: plain.length, kept: waiting.length - plain.length };
 }
 
 /**

@@ -21,7 +21,7 @@ export function linesIn(text: string): LineSeen[] {
 }
 
 export interface Lint {
-  kind: 'partial line' | 'cut with dots' | 'moves outside parentheses' | 'prose inside a line';
+  kind: 'partial line' | 'cut with dots' | 'moves outside parentheses' | 'prose inside a line' | 'look first';
   text: string;
 }
 
@@ -58,5 +58,25 @@ export function lintComment(text: string): Lint[] {
     const words = inner.replace(RUN, ' ').split(/\s+/).filter((w) => /^[A-Za-z’'-]{3,}$/.test(w)).length;
     if (moves >= 1 && words >= 4) out.push({ kind: 'prose inside a line', text: m[0] });
   }
+  return out;
+}
+
+/**
+ * A review list's "look first" marks (PLAN.md §5.220): the owner reads the marked positions first
+ * and may wave the rest through, so a list with none tells him nothing, one with most of them
+ * marked tells him as little, and a question he is not pointed to may never be answered. `items`
+ * are the list's; a position is the items of one chapter at one move.
+ */
+export function lintMarks(items: readonly { cid: string; at: readonly string[]; kind: string; lead: string; part: string; first?: true }[]): Lint[] {
+  const out: Lint[] = [];
+  const positions = new Map<string, boolean>();
+  for (const i of items) {
+    const key = `${i.cid}|${i.at.join(',')}`;
+    positions.set(key, (positions.get(key) ?? false) || i.first === true);
+  }
+  const marked = [...positions.values()].filter(Boolean).length;
+  if (positions.size && !marked) out.push({ kind: 'look first', text: `no position of ${positions.size} is marked "look first" ("first": true on a note): mark what he should read before the rest` });
+  if (positions.size >= 4 && marked > Math.ceil(positions.size / 3)) out.push({ kind: 'look first', text: `${marked} of ${positions.size} positions are marked "look first", more than about a third: a mark on most of them points to none` });
+  for (const i of items) if (i.kind === 'question' && !i.first) out.push({ kind: 'look first', text: `the question at ${i.lead} ${i.part} is not marked: every question is` });
   return out;
 }

@@ -6,7 +6,7 @@
 import { DEFAULT_PREFS } from '../../src/core/explorer/prefs.ts';
 import { CHESSDB_URL, createProviders, EXPLORER_BASE, filterHash, TTL, type CompactExplorer, type ExplorerFilter, type Http, type ProviderStats } from '../../src/core/explorer/providers.ts';
 import { LICHESS_RATE, OWN_BURST } from '../../src/core/explorer/limiter.ts';
-import { fenKey, type ChessdbAnswer } from '../../src/core/explorer/search.ts';
+import { fenKey, type ChessdbAnswer, type ChessdbLine } from '../../src/core/explorer/search.ts';
 import { createFileCache, limiterFile } from '../practical-lib.ts';
 
 /** The owner's filter: the app's default (blitz, rapid and classical; ratings 1600 to 2500). */
@@ -15,8 +15,10 @@ export const FILTER: ExplorerFilter = { speeds: [...DEFAULT_PREFS.speeds], ratin
 export interface Lookups {
   /** The games at a position; undefined when it is not in the cache and nothing may be asked. */
   explorer(fen: string): Promise<CompactExplorer | undefined>;
-  /** ChessDB's moves at a position; undefined as for the explorer. */
-  chessdb(fen: string): Promise<ChessdbAnswer | undefined>;
+  /** ChessDB's moves at a position; undefined as for the explorer. `fresh`: asked again whatever the cache holds (after an exploration, §5.220). */
+  chessdb(fen: string, fresh?: boolean): Promise<ChessdbAnswer | undefined>;
+  /** ChessDB's stored line from a position: its length in plies is how deep the best move's score is backed up from. */
+  chessdbLine(fen: string, fresh?: boolean): Promise<ChessdbLine | undefined>;
   /** The positions that could not be read, by lookup. */
   missing(): { explorer: string[]; chessdb: string[] };
   stats(): ProviderStats;
@@ -30,13 +32,20 @@ const nodeHttp: Http = (url, init) => {
   return fetch(url, timed ? { ...init, signal: AbortSignal.timeout(TIMEOUT_MS) } : init) as unknown as ReturnType<Http>;
 };
 
+const DAY = 24 * 3600 * 1000;
+
 /**
  * `cacheDir`: a scripts/practical.ts cache folder. `token`: the Lichess token, '' for none.
- * `offline`: ask nothing, answer from the cache alone. `http`: a fake, in tests.
+ * `offline`: ask nothing, answer from the cache alone. `http`: a fake, in tests. `explorerDays`:
+ * how old an explorer answer may be for the audit's counts (the clients' own 30 days when not
+ * given). Only reading is stretched: an answer is stamped with the time it was fetched, so
+ * Practical reads it by its own rule and a ChessDB answer is never older than its seven days.
  */
-export function createLookups(o: { cacheDir: string; token: string; offline?: boolean; http?: Http; now?: () => number; sleep?: (ms: number) => Promise<void> }): Lookups {
+export function createLookups(o: { cacheDir: string; token: string; offline?: boolean; http?: Http; now?: () => number; sleep?: (ms: number) => Promise<void>; explorerDays?: number }): Lookups {
   const now = o.now ?? Date.now;
-  const cache = createFileCache(o.cacheDir, now);
+  const file = createFileCache(o.cacheDir, now);
+  const stretch = Math.max(0, (o.explorerDays ?? 0) * DAY - TTL.explorer);
+  const cache: typeof file = { ...file, get: (store, key, ttl) => file.get(store, key, store === 'explorer' ? ttl + stretch : ttl) };
   const limiter = limiterFile(o.cacheDir);
   const stats: ProviderStats = {};
   const providers = createProviders({
@@ -70,13 +79,22 @@ export function createLookups(o: { cacheDir: string; token: string; offline?: bo
         throw e;
       }
     },
-    async chessdb(fen) {
+    async chessdb(fen, fresh) {
       if (o.offline) {
         const hit = (await cache.get('chessdb', fenKey(fen), TTL.chessdb)) as ChessdbAnswer | undefined;
         if (!hit) missing.chessdb.add(fen);
         return hit;
       }
-      return providers.chessdb(fen);
+      // maxAge 0: no cached answer is young enough, and the new one takes its place.
+      return providers.chessdb(fen, undefined, undefined, fresh ? 0 : undefined);
+    },
+    async chessdbLine(fen, fresh) {
+      if (o.offline) {
+        const hit = (await cache.get('chessdb', `pv|${fenKey(fen)}`, TTL.chessdb)) as ChessdbLine | undefined;
+        if (!hit) missing.chessdb.add(fen);
+        return hit;
+      }
+      return providers.chessdbLine(fen, undefined, undefined, fresh ? 0 : undefined);
     },
     missing: () => ({ explorer: [...missing.explorer], chessdb: [...missing.chessdb] }),
     stats: () => stats,

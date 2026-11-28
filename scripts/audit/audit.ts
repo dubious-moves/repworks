@@ -26,6 +26,19 @@
 //   add-chapters --from study.pgn [--names "A,B"]
 //   cache-pull   --store DIR --cache DIR          (no checkout: the store is a folder of a repo for sessions)
 //   cache-push   --store DIR --cache DIR[,DIR…]
+//   status       [--json] [--no-fetch]: is there work? the open lists, the owner's last commit, the lock, what is next
+//   lock         --session ID --for WHAT [--no-push]: take the study's lock (committed and pushed); again to renew it
+//   unlock       [--no-push]: release it
+//   tally        --list NAME [--note TEXT]: a list's answers counted into audit.json's batches, before the list is removed
+//   explore-pgn  --chapter C [--line "<moves>"] --cache DIR --out x.pgn: the PGN cdbexplore wants
+//                  --moves "<a full line>" [--candidates "a,b"] --out x.pgn: one position, for a run on demand
+//   explore-start --chapter C [--line "<moves>"] --cache DIR [--session ID] [--again]: that PGN into
+//                  notes/<sid>/cdbexplore/<name>.pgn and the start into audit.json (refused when explored in the last 7 days)
+//   explore-run  --names a,b [--q DIR] [--hours 1.9] [--rate 450] [--concurrency 3] [--minutes N] [--short-line N]
+//                  [--again] [--push]: cdbexplore on each file in turn, its report after each, until the time is up
+//   explore-report --name N [--no-sweep] [--push]: notes/<sid>/cdbexplore/N.md and N.json from the tool's record and log
+//   chessdb      --moves "<a full line>" [--candidates "a,b"] --cache DIR [--fresh] [--sf [--nodes N]]
+//                  ChessDB at one position (no checkout needed): its scores, how deep each is, SHALLOW when not deep enough
 //
 // --cache is a scripts/practical.ts cache folder (the explorer's and ChessDB's answers, shared with
 // Practical); the Lichess token is read from LICHESS_TOKEN; --offline asks nothing and lists what
@@ -35,12 +48,17 @@
 // difficulty the vendored Stockfish 18 lite, whose scores the owner's class limits were set for.
 // --engine sf19|lite18|native asks another (native: the binary STOCKFISH names); --sf-cache DIR
 // keeps the answers.
+//
+// One session writes to a study at a time: `apply` (and chapter-diff.ts --review) refuse without
+// the lock this checkout took. After an exploration of ChessDB (cdbexplore, q_extension), a cached
+// ChessDB answer older than it is stale: `practical`, `close-calls` and `chessdb` drop those from
+// the cache folder before they ask. (PLAN.md §5.220.)
 import { spawnSync } from 'node:child_process';
 import { randomInt } from 'node:crypto';
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Chess } from 'chessops/chess';
+import { Chess, type Position } from 'chessops/chess';
 import { makeFen } from 'chessops/fen';
 import { makeSan, parseSan } from 'chessops/san';
 import { isNormal } from 'chessops/types';
@@ -56,7 +74,7 @@ import { header, type Chapter, type MoveNode, type RootNode } from '../../src/co
 import { newestFirst, parseReviewList, type ReviewList } from '../../src/core/study/reviewList.ts';
 import { writeStudyMeta } from '../../src/core/study/studyMeta.ts';
 import { startPosition } from '../../src/core/study/tree.ts';
-import { answered } from '../chapter-diff-lib.ts';
+import { answered, type AnsweredList } from '../chapter-diff-lib.ts';
 import { git, openSide, readStudy, revParse, worktree, type Side, type StudyAt } from '../data-repo.ts';
 import { readTree } from '../read-tree.ts';
 import { KEEP_DAYS, pull, push, STORES } from './cachestore.ts';
@@ -64,16 +82,19 @@ import { closeCallPositions, closeCalls } from './closecalls.ts';
 import { createMeasure, ENGINE, hardestAfter, NODES, ratedText, rateLine, rateSubtree, verdict, type MoveRow } from './difficulty.ts';
 import { cpOf, createEngines, pawns, type EngineKind } from './engine.ts';
 import { inventory, inventoryText, oneIn, positionsNeeded, type Inventory } from './inventory.ts';
-import { flagsText, ledgerRows, listsTable, regionsIn, subtreeTable, suggestedOrder, writeRegions } from './ledger.ts';
-import { lintComment, lintWords } from './lint.ts';
+import { behindRows, chessdbFloor, depthRow, depthText, EXPLORE_NAME, EXPLORED_DAYS, exploreDir, exploredLately, exploredTable, exploreName, explorePgn, exploreReport, explorations, freshRecords, linePgn, ourPositions, parseExploreState, parseLog, parseRecord, SHALLOW_PLIES, type DepthRow, type ExploreState } from './explore.ts';
+import { batchesTable, correctedOf, flagsText, ledgerRows, listsTable, regionsIn, subtreeTable, suggestedOrder, tallyOf, todoOrder, writeRegions } from './ledger.ts';
+import { lintComment, lintMarks, lintWords } from './lint.ts';
 import { createLookups, type Lookups } from './lookups.ts';
+import { forgetLock, heldHere, LOCK_HOURS, lockPath, lockStand, lockText, lockWords, rememberedLock, rememberLock, type Lock } from './lock.ts';
 import { applyOps, behind, isSessionCommit, merge3, type CommitInfo, type Ops } from './ops.ts';
 import { scanText, stops } from './scan.ts';
-import { auditStatePath, ledgerPath, parseAuditState, practicalArgs, type AuditState } from './state.ts';
+import { auditStatePath, auditStateText, ledgerPath, parseAuditState, practicalArgs, type AuditState } from './state.ts';
+import { listStand, statusOf, statusText, type Next } from './status.ts';
 import { chapterName, clickableLines, continuedTwice, findChapter, lineOf, nodeAtSans, ownerCheck, readingNotes, sansOf, sideOf, theirLeaves, transposeNotes, twoMoves, visits, type TreeNode } from './study.ts';
 
 const USAGE = readFileSync(new URL(import.meta.url), 'utf8').split('\n').filter((l) => l.startsWith('//   ')).map((l) => l.slice(3)).join('\n');
-const BOOLEAN = new Set(['deck', 'offline', 'check', 'dry-run', 'sf', 'help', 'json', 'all']);
+const BOOLEAN = new Set(['deck', 'offline', 'check', 'dry-run', 'sf', 'help', 'json', 'all', 'fresh', 'again', 'push', 'no-push', 'no-fetch', 'no-sweep', 'no-depth']);
 const [command, ...args] = process.argv.slice(2);
 const flags = new Map<string, string>();
 const plain: string[] = [];
@@ -149,9 +170,8 @@ function lookups(): Lookups {
   const token = process.env['LICHESS_TOKEN'] ?? '';
   const offline = flags.has('offline');
   if (!offline && !token) fail('LICHESS_TOKEN is not set: set it, or pass --offline to answer from the cache alone');
-  // An explorer answer is good for the audit's counts for longer than the app keeps it: its clock is set back by the difference.
-  const stretch = Math.max(0, days - 30) * 24 * 3600 * 1000;
-  return createLookups({ cacheDir: need('cache'), token, offline, now: () => Date.now() - stretch });
+  // An explorer answer is good for the audit's counts for longer than the app keeps it.
+  return createLookups({ cacheDir: need('cache'), token, offline, explorerDays: days });
 }
 
 /** The answers for a list of positions, asked side by side (the clients keep to their own limits). */
@@ -346,22 +366,57 @@ function base(): number {
   return 0;
 }
 
-function ledgerParts(o: Opened, state: AuditState): { parts: Map<string, string>; problems: string[] } {
-  const { rows, problems } = ledgerRows(state, o.study.chapters);
-  const parts = new Map<string, string>();
-  for (const c of o.study.chapters) parts.set(`subtrees ${c.id}`, subtreeTable(rows.filter((r) => r.cid === c.id)));
-  parts.set('order', suggestedOrder(rows));
-  parts.set('flags', flagsText(state));
+/** The study's open review lists with the owner's answers so far, as the panel and review-answers.ts order them: a position whose items are in several lists is under the newest. */
+function listsOf(o: Opened): { lists: AnsweredList[]; problems: string[] } {
   const files = readTree(o.side.dir);
   const lists: ReviewList[] = [];
+  const problems: string[] = [];
   for (const [path, text] of files) {
     if (classifyPath(path).kind !== 'review' || !path.startsWith(reviewDir(o.sid))) continue;
     const r = parseReviewList(text);
     if (r.ok) lists.push(r.list);
     else problems.push(`${path} can't be read: ${r.error}`);
   }
-  // As the panel and review-answers.ts order them: a position whose items are in several lists is under the newest.
-  parts.set('lists', listsTable(answered([...lists].sort(newestFirst), files, new Map(o.study.chapters.map((c) => [c.id, c])))));
+  return { lists: answered([...lists].sort(newestFirst), files, new Map(o.study.chapters.map((c) => [c.id, c]))), problems };
+}
+
+/** What each exploration of ChessDB reported: notes/<sid>/cdbexplore/<name>.json, written by its session. */
+function exploreStates(o: Opened): ExploreState[] {
+  const tree = notesOf(o);
+  return tree
+    .list(exploreDir(o.sid).slice(0, -1))
+    .filter((f) => f.endsWith('.json') && !f.endsWith('.explore.json'))
+    .flatMap((f) => {
+      const s = parseExploreState(tree.read(`${exploreDir(o.sid)}${f}`) ?? '');
+      return s ? [s] : [];
+    });
+}
+
+/**
+ * After an exploration, a ChessDB answer cached before it is stale (§5.220): those are taken out
+ * of the cache folder, so the run that follows asks again and decides on the deeper evals.
+ */
+function dropStale(o: Opened, cacheDir: string): void {
+  const floor = chessdbFloor(exploreStates(o));
+  const file = join(cacheDir, 'chessdb.jsonl');
+  if (floor === undefined || !existsSync(file)) return;
+  const made = freshRecords(readFileSync(file, 'utf8'), floor);
+  if (!made.dropped) return;
+  writeFileSync(file, made.text);
+  note(`ChessDB: ${made.dropped} cached answer(s) in ${cacheDir} are older than the last exploration (${new Date(floor).toISOString()}): dropped, and asked again.`);
+}
+
+function ledgerParts(o: Opened, state: AuditState): { parts: Map<string, string>; problems: string[] } {
+  const { rows, problems } = ledgerRows(state, o.study.chapters);
+  const parts = new Map<string, string>();
+  for (const c of o.study.chapters) parts.set(`subtrees ${c.id}`, subtreeTable(rows.filter((r) => r.cid === c.id)));
+  parts.set('order', suggestedOrder(rows));
+  parts.set('flags', flagsText(state));
+  const read = listsOf(o);
+  problems.push(...read.problems);
+  parts.set('lists', listsTable(read.lists));
+  parts.set('batches', batchesTable(state.batches ?? []));
+  parts.set('explored', exploredTable(explorations(state.explored ?? [], exploreStates(o)), new Map(o.study.chapters.map((c) => [c.id, chapterName(c)]))));
   const b = baseOf(o.side.dir, o.sid);
   const two = twoMoves(o.study.chapters);
   parts.set('base', b ? `The session's last commit to the study's chapters is **${b.hash.slice(0, 7)}** ("${b.subject}"): the owner's edits are counted from it (\`audit.ts base\`). The study has ${two.positions} positions with a move of ours.` : 'No session commit to the study in the history this checkout holds.');
@@ -496,13 +551,115 @@ function judge(): number {
 }
 
 /** Practical for this study: scripts/practical.ts with the flags audit.json fixes, so none is left out (every run of the first five batches missed two). */
-function practical(): number {
+function practical(): number | Promise<number> {
   const o = open();
   const state = stateOf(o);
   const args = practicalArgs(state, { positions: need('positions'), cache: need('cache'), out: need('out'), depth: num('depth', 5), ...(flags.has('ort-node') ? { ortNode: flags.get('ort-node')! } : {}) });
   if (!args) fail(`${auditStatePath(o.sid)} has no "practical": the flags every Practical run for this study carries (its rules.md gives them)`);
+  dropStale(o, flags.get('cache')!);
   note(`node scripts/practical.ts ${args.join(' ')}`);
-  return spawnSync(process.execPath, [join(import.meta.dirname, '..', 'practical.ts'), ...args], { stdio: 'inherit' }).status ?? 1;
+  const status = spawnSync(process.execPath, [join(import.meta.dirname, '..', 'practical.ts'), ...args], { stdio: 'inherit' }).status ?? 1;
+  if (status !== 0 || flags.has('no-depth')) return status;
+  return practicalDepth();
+}
+
+/**
+ * After a Practical run: how deep ChessDB's score is for each candidate it was asked about, since
+ * a decision between close candidates often hangs on that score. SHALLOW is rules.md's test (a
+ * stored line under 10 plies; with --sf, Stockfish disagreeing by 0.5 or more).
+ */
+async function practicalDepth(): Promise<number> {
+  let positions: { moves: string; candidates?: string[] }[];
+  try {
+    positions = JSON.parse(readFileSync(flags.get('positions')!, 'utf8')) as { moves: string; candidates?: string[] }[];
+  } catch {
+    return 0;
+  }
+  const look = createLookups({ cacheDir: flags.get('cache')!, token: '' });
+  const E = flags.has('sf') ? engines() : undefined;
+  say('\n== ChessDB\'s depth for the candidates (rules.md §2: a stored line under 10 plies is a shallow eval)');
+  let shallow = 0;
+  for (const p of positions.filter((x) => x.candidates?.length)) {
+    const pos = positionAfter(p.moves);
+    if (!pos) continue;
+    const rows = await depthRows(look, pos, p.candidates!, false, E);
+    say(p.moves);
+    for (const r of rows.filter((x) => x.san)) say(`   ${depthText(r)}`);
+    shallow += rows.filter((x) => x.san && x.shallow).length;
+  }
+  look.close();
+  E?.quit();
+  if (shallow) say(`\n${shallow} candidate(s) with a SHALLOW ChessDB eval. Where the decision hangs on it: explore on demand (the skill, step 4), then run this again; if it stays shallow, Stockfish decides and the note says so.`);
+  return 0;
+}
+
+function positionAfter(moves: string): Position | undefined {
+  const pos = Chess.default();
+  for (const san of sansOf(moves)) {
+    const move = parseSan(pos, san);
+    if (!move) return undefined;
+    pos.play(move);
+  }
+  return pos;
+}
+
+/**
+ * ChessDB at a position: the best move's score and how deep it is (the stored line from the
+ * position), then each candidate's score and the stored line after it. With an engine, Stockfish's
+ * score beside each. The first row (san '') is the position's own.
+ */
+async function depthRows(look: Lookups, pos: Position, candidates: readonly string[], fresh: boolean, E?: ReturnType<typeof engines>): Promise<DepthRow[]> {
+  const nodes = num('nodes', 1_000_000);
+  const fen = makeFen(pos.toSetup());
+  const sign = pos.turn === 'white' ? 1 : -1;
+  const [ans, own] = await Promise.all([look.chessdb(fen, fresh), look.chessdbLine(fen, fresh)]);
+  const scored = (ans?.moves ?? []).filter((m) => Number.isFinite(m.score));
+  const best = scored.length ? scored.reduce((a, b) => (b.score > a.score ? b : a)) : undefined;
+  const sfBest = E && !pos.isEnd() ? (await E.search({ fen, nodes }))[0] : undefined;
+  const rows: DepthRow[] = [depthRow('', best ? sign * best.score : undefined, own?.depth ?? 0, sfBest ? cpOf(sfBest.score) : undefined)];
+  const bare = (s: string) => s.replace(/[+#]/g, '');
+  for (const cand of candidates) {
+    const move = parseSan(pos, cand);
+    if (!move || !isNormal(move)) {
+      rows.push(depthRow(cand, undefined, 0));
+      continue;
+    }
+    const san = makeSan(pos, move);
+    const m = scored.find((x) => bare(x.san) === bare(san));
+    const after = pos.clone();
+    after.play(move);
+    const line = after.isEnd() ? undefined : await look.chessdbLine(makeFen(after.toSetup()), fresh);
+    const sf = E ? (await E.search({ fen, nodes, moves: [standardUci(pos, move)] }))[0] : undefined;
+    rows.push(depthRow(san, m ? sign * m.score : undefined, m ? 1 + (line?.depth ?? 0) : 0, sf ? cpOf(sf.score) : undefined));
+  }
+  return rows;
+}
+
+/** ChessDB at one position, and whether its eval is deep enough to decide on. */
+async function chessdbCommand(): Promise<number> {
+  const line = need('moves');
+  const pos = positionAfter(line) ?? fail(`not a line from the start position: ${line}`);
+  const cache = need('cache');
+  // With a study's checkout, what an exploration made stale goes first.
+  if (plain[0] !== undefined && flags.has('study')) dropStale(open(), cache);
+  const look = createLookups({ cacheDir: cache, token: '' });
+  const E = flags.has('sf') ? engines() : undefined;
+  const candidates = (flags.get('candidates') ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+  const fresh = flags.has('fresh');
+  const rows = await depthRows(look, pos, candidates, fresh, E);
+  const ans = await look.chessdb(makeFen(pos.toSetup()));
+  look.close();
+  const sign = pos.turn === 'white' ? 1 : -1;
+  const top = [...(ans?.moves ?? [])].filter((m) => Number.isFinite(m.score)).sort((a, b) => b.score - a.score);
+  say(`ChessDB at ${line} (${pos.turn} to move)${fresh ? ', asked afresh' : ''}. Scores from White's side${E ? `; Stockfish: ${await E.name()}, ${num('nodes', 1_000_000).toLocaleString('en')} nodes` : ''}.`);
+  if (!top.length) say(`   ChessDB has no scored move here (status ${ans?.status ?? 'none'}).`);
+  else say(`   its moves: ${top.slice(0, 6).map((m) => `${m.san} ${(sign * m.score >= 0 ? '+' : '') + ((sign * m.score) / 100).toFixed(2)}`).join(', ')}`);
+  say(`   ${depthText({ ...rows[0]!, san: top[0]?.san ?? '' })}  (the position's own stored line)`);
+  for (const r of rows.slice(1)) say(`   ${depthText(r)}`);
+  E?.quit();
+  const shallow = rows.filter((r) => r.shallow);
+  say(shallow.length ? `\nSHALLOW by rules.md §2 (a stored line under ${SHALLOW_PLIES} plies, or Stockfish disagreeing by 0.5 or more). When a decision hangs on this eval: explore on demand (explore-pgn --moves, explore-run), ask again with --fresh, then settle; if it is still shallow, Stockfish decides and the note says so.` : '\nDeep enough by rules.md §2.');
+  return 0;
 }
 
 /* ------------------------------------------------------------------ comments: lines, lint */
@@ -586,10 +743,10 @@ function lint(): number {
     }
   };
   if (flags.has('notes')) {
-    let notes: { moves: string; text: string }[];
+    let notes: { moves: string; text: string; first?: boolean }[];
     try {
-      notes = JSON.parse(readFileSync(flags.get('notes')!, 'utf8')) as { moves: string; text: string }[];
-      if (!Array.isArray(notes) || !notes.every((n) => n && typeof n.moves === 'string' && typeof n.text === 'string')) throw new Error('not a list of { "moves", "text" }');
+      notes = JSON.parse(readFileSync(flags.get('notes')!, 'utf8')) as { moves: string; text: string; first?: boolean }[];
+      if (!Array.isArray(notes) || !notes.every((n) => n && typeof n.moves === 'string' && typeof n.text === 'string' && (n.first === undefined || typeof n.first === 'boolean'))) throw new Error('not a list of { "moves", "text", "first"?: true }');
     } catch (e) {
       fail(`--notes ${flags.get('notes')}: ${e instanceof Error ? e.message : String(e)}`);
     }
@@ -605,6 +762,7 @@ function lint(): number {
       const r = parseReviewList(text);
       if (!r.ok) fail(r.error);
       for (const item of r.list.items) if (item.text) show(`the list's item at ${item.lead} ${item.part}`, lintWords(item.text));
+      show(`the list ${r.list.name}`, lintMarks(r.list.items));
     }
     if (flags.has('since')) {
       for (const c of comments(o)) {
@@ -623,6 +781,11 @@ function apply(): number {
   const o = open();
   if (o.side.rev) fail('apply writes into the checkout: give the folder, and the commit the ops were written against as --base');
   const dir = o.side.dir;
+  // One session writes to a study at a time: a dry run reads, the real one needs this checkout's lock.
+  if (!flags.has('dry-run')) {
+    const held = heldHere(dir, o.sid, Date.now());
+    if (!held.ok) fail(`REFUSED: ${held.why}`);
+  }
   const raw = JSON.parse(readFileSync(need('ops'), 'utf8')) as Ops | Ops[];
   const batches = Array.isArray(raw) ? raw : [raw];
   const head = revParse(dir, 'HEAD') ?? fail(`${dir} is not a git checkout`);
@@ -734,6 +897,7 @@ async function rep(): Promise<number> {
 async function closeCallsCommand(): Promise<number> {
   const o = open();
   const chapter = chapterOf(o);
+  dropStale(o, need('cache'));
   const look = lookups();
   const want = closeCallPositions(chapter);
   note(`close calls: ${want.explorer.length} positions' games and ChessDB moves`);
@@ -741,10 +905,18 @@ async function closeCallsCommand(): Promise<number> {
   const side = sideOf(chapter);
   const oursFens = want.chessdb.filter((fen) => fen.split(' ')[1] === (side === 'white' ? 'w' : 'b') || true);
   const cdb = await fetchAll<ChessdbAnswer>(oursFens, (f) => look.chessdb(f), 'ChessDB');
-  look.close();
   const cc = closeCalls(chapter, (f) => ex.get(f), (f) => cdb.get(f));
-  if (flags.has('out')) writeFileSync(flags.get('out')!, `${JSON.stringify(cc, null, 1)}\n`);
   const flagged = cc.decisions.filter((d) => d.flags.length).sort((a, b) => b.reach - a.reach);
+  // A flag that rests on ChessDB's eval says when that eval is shallow (rules.md §2): its stored line there.
+  if (!flags.has('offline')) {
+    for (const d of flagged.filter((x) => x.flags.some((f) => /ChessDB/.test(f)))) {
+      const at = nodeAtSans(chapter, d.path.slice(0, -1));
+      const stored = at && (await look.chessdbLine(makeFen(at.pos.toSetup())));
+      if (stored && stored.depth < SHALLOW_PLIES) d.flags.push(`ChessDB's stored line here is ${stored.depth} plies: SHALLOW. Explore on demand before deciding on its eval (audit.ts chessdb --moves "${lineOf(chapter, d.path.slice(0, -1))}").`);
+    }
+  }
+  look.close();
+  if (flags.has('out')) writeFileSync(flags.get('out')!, `${JSON.stringify(cc, null, 1)}\n`);
   say(`${chapterName(chapter)}: ${cc.decisions.length} moves of ours, ${flagged.length} flagged. Win rates are the games' own (ratings shown); Practical settles each flag.`);
   for (const d of flagged) say(`\n${d.line}  [reached ${oneIn(d.reach)}, ${d.total} games]\n   ${d.flags.join('\n   ')}`);
   say(`\nCritical replies (10%+ of the games, and we score under 45% or ChessDB gives us 0.00 or less): ${cc.critical.length}`);
@@ -805,7 +977,326 @@ function cachePush(): number {
   return 0;
 }
 
-const COMMANDS: Record<string, () => number | Promise<number>> = { check, ledger, base, inventory: inventoryCommand, screen, difficulty, judge, practical, lines: linesCommand, apply, lint, scan, rep, 'close-calls': closeCallsCommand, 'add-chapters': addChapters, 'cache-pull': cachePull, 'cache-push': cachePush };
+/* ------------------------------------------------------------------ git, for the notes a command commits itself */
+
+const tryGit = (dir: string, ...a: string[]): { ok: boolean; out: string } => {
+  try {
+    return { ok: true, out: git(dir, ...a) };
+  } catch (e) {
+    return { ok: false, out: e instanceof Error ? e.message : String(e) };
+  }
+};
+const branchOf = (dir: string) => git(dir, 'rev-parse', '--abbrev-ref', 'HEAD').trim();
+const hasRemote = (dir: string) => tryGit(dir, 'remote', 'get-url', 'origin').ok;
+
+/** The remote's commits fetched (a shallow clone keeps the depth the skill asks for); how many this checkout lacks. */
+function behindRemote(dir: string): number {
+  if (!hasRemote(dir)) return 0;
+  const branch = branchOf(dir);
+  const shallow = git(dir, 'rev-parse', '--is-shallow-repository').trim() === 'true';
+  const fetched = tryGit(dir, 'fetch', '-q', ...(shallow ? ['--depth=500'] : []), 'origin', branch);
+  if (!fetched.ok) fail(`git fetch failed, so what the remote holds is not known: ${fetched.out.split('\n')[0]}`);
+  return Number(tryGit(dir, 'rev-list', '--count', 'HEAD..FETCH_HEAD').out.trim() || 0);
+}
+
+/**
+ * The paths committed and pushed. Rejected (the owner's device or another session pushed
+ * meanwhile): the remote's commits are taken under ours (a rebase, other files in the folder
+ * stashed aside) and the push made once more.
+ */
+function commitPush(dir: string, paths: readonly string[], message: string, push: boolean): { ok: boolean; words: string } {
+  git(dir, 'add', '-A', '--', ...paths);
+  if (tryGit(dir, 'diff', '--cached', '--quiet', '--', ...paths).ok) return { ok: true, words: 'nothing new to commit' };
+  git(dir, 'commit', '-q', '-m', message, '--', ...paths);
+  if (!push || !hasRemote(dir)) return { ok: true, words: 'committed (not pushed)' };
+  const branch = branchOf(dir);
+  const send = () => tryGit(dir, '-c', 'push.negotiate=true', 'push', '-q', 'origin', `HEAD:${branch}`);
+  if (send().ok) return { ok: true, words: 'committed and pushed' };
+  const shallow = git(dir, 'rev-parse', '--is-shallow-repository').trim() === 'true';
+  const pulled = tryGit(dir, 'pull', '-q', '--rebase', '--autostash', ...(shallow ? ['--depth=500'] : []), 'origin', branch);
+  if (!pulled.ok) {
+    tryGit(dir, 'rebase', '--abort');
+    return { ok: false, words: `committed, NOT PUSHED: the remote moved and its commits could not be taken under ours (${pulled.out.split('\n')[0]}). git pull --rebase, then git push.` };
+  }
+  const again = send();
+  return again.ok ? { ok: true, words: 'committed and pushed (after taking in the remote\'s commits)' } : { ok: false, words: `committed, NOT PUSHED: ${again.out.split('\n')[0]}` };
+}
+
+/* ------------------------------------------------------------------ status, the lock */
+
+/** The owner's last commit: the newest that is no session's. */
+function ownerCommit(dir: string): { minutes: number; subject: string } | undefined {
+  const out = tryGit(dir, 'log', '-200', '--format=%x01%ct%x00%s%x00%b%x00%an');
+  if (!out.ok) return undefined;
+  for (const rec of out.out.split('\x01').filter(Boolean)) {
+    const [ct, subject, body, author] = rec.split('\x00');
+    // A session's commit by its subject or its trailers; its merge of the remote by its author.
+    if (isSessionCommit({ subject: subject ?? '', body: body ?? '' }) || (author ?? '').trim() === 'Claude') continue;
+    return { minutes: Math.max(0, Math.round((Date.now() - Number(ct) * 1000) / 60000)), subject: (subject ?? '').trim() };
+  }
+  return undefined;
+}
+
+function statusCommand(): number {
+  const o = open();
+  if (o.side.rev) fail('status reads the checkout as it stands');
+  const dir = o.side.dir;
+  const state = stateOf(o);
+  const now = Date.now();
+  const lockFile = join(dir, lockPath(o.sid));
+  const lock = lockStand(existsSync(lockFile) ? readFileSync(lockFile, 'utf8') : undefined, now);
+  const mine = rememberedLock(dir, o.sid);
+  const all = explorations(state.explored ?? [], exploreStates(o));
+  const next: Next[] = todoOrder(ledgerRows(state, o.study.chapters).rows).map((r) => {
+    const line = r.path.length ? r.line : '';
+    const exploration = exploredLately(all, r.cid, line, now);
+    return { cid: r.cid, chapter: r.chapter, line, single: r.single, ...(exploration ? { exploration } : {}) };
+  });
+  const owner = ownerCommit(dir);
+  const s = statusOf({
+    study: o.study.meta.name,
+    sid: o.sid,
+    lists: listsOf(o).lists.map(listStand),
+    ...(owner ? { owner } : {}),
+    lock,
+    lockMine: lock.state !== 'none' && lock.state !== 'unreadable' && mine !== undefined && mine.session === lock.lock.session && mine.at === lock.lock.at,
+    next,
+    behind: flags.has('no-fetch') ? 0 : behindRemote(dir),
+    now,
+  });
+  say(flags.has('json') ? JSON.stringify(s, null, 1) : statusText(s).trimEnd());
+  return 0;
+}
+
+function lockCommand(): number {
+  const o = open();
+  if (o.side.rev) fail('the lock is taken in the checkout: give the folder');
+  const dir = o.side.dir;
+  const session = need('session').trim();
+  const what = (flags.get('for') ?? '').trim();
+  const push = !flags.has('no-push') && hasRemote(dir);
+  if (push && behindRemote(dir) > 0) fail('REFUSED: this checkout is behind the remote, so the lock there is not known. git pull, then audit.ts status, then lock again.');
+  const path = join(dir, lockPath(o.sid));
+  const was = existsSync(path) ? readFileSync(path, 'utf8') : undefined;
+  const stand = lockStand(was, Date.now());
+  if (stand.state === 'unreadable') fail(`REFUSED: ${lockWords(stand)}`);
+  if (stand.state === 'held' && stand.lock.session !== session) {
+    say(`REFUSED: the lock is ${lockWords(stand)}. Another session is writing to this study: stop, and say so.`);
+    return 1;
+  }
+  if (stand.state === 'stale' && stand.lock.session !== session) say(`A stale lock is taken over: it was ${lockWords(stand)}.`);
+  const lock: Lock = { v: 1, session, at: new Date().toISOString(), for: what };
+  mkdirSync(join(path, '..'), { recursive: true });
+  writeFileSync(path, lockText(lock));
+  const done = commitPush(dir, [lockPath(o.sid)], `session: ${o.study.meta.name}, lock${what ? ` for ${what}` : ''}`, false);
+  if (push) {
+    const sent = tryGit(dir, '-c', 'push.negotiate=true', 'push', '-q', 'origin', `HEAD:${branchOf(dir)}`);
+    if (!sent.ok) {
+      // Nothing is taken under ours here: what the remote now holds may be another session's lock.
+      if (done.words !== 'nothing new to commit') git(dir, 'reset', '-q', '--soft', 'HEAD~1');
+      tryGit(dir, 'reset', '-q', '--', lockPath(o.sid));
+      if (was === undefined) rmSync(path, { force: true });
+      else writeFileSync(path, was);
+      say('REFUSED: the push was rejected, so the remote moved while the lock was being taken. git pull, then audit.ts status, then lock again.');
+      return 1;
+    }
+  }
+  rememberLock(dir, o.sid, lock);
+  say(`Locked: ${o.study.meta.name} (${o.sid}) by ${session}${what ? ` for ${what}` : ''}, ${push ? 'pushed' : 'committed, not pushed'}. It holds for ${LOCK_HOURS} hours (lock again to renew); release it at the end with audit.ts unlock.`);
+  return 0;
+}
+
+function unlockCommand(): number {
+  const o = open();
+  if (o.side.rev) fail('the lock is released in the checkout: give the folder');
+  const dir = o.side.dir;
+  const path = join(dir, lockPath(o.sid));
+  if (!existsSync(path)) {
+    forgetLock(dir, o.sid);
+    say('No lock to release.');
+    return 0;
+  }
+  const stand = lockStand(readFileSync(path, 'utf8'), Date.now());
+  const mine = rememberedLock(dir, o.sid);
+  const own = stand.state !== 'none' && stand.state !== 'unreadable' && ((mine !== undefined && mine.session === stand.lock.session) || flags.get('session') === stand.lock.session);
+  if (!own) fail(`REFUSED: the lock is not this checkout's (${lockWords(stand)}). Only its own session releases it (--session <its id> from a new container of that session); a stale one is taken over with audit.ts lock.`);
+  rmSync(path);
+  const done = commitPush(dir, [lockPath(o.sid)], `session: ${o.study.meta.name}, lock released`, !flags.has('no-push'));
+  forgetLock(dir, o.sid);
+  say(`Lock released: ${done.words}.`);
+  return done.ok ? 0 : 1;
+}
+
+/* ------------------------------------------------------------------ a batch's tally */
+
+function tally(): number {
+  const o = open();
+  if (o.side.rev) fail('tally writes audit.json in the checkout: give the folder');
+  const state = stateOf(o);
+  const name = need('list');
+  const l = listsOf(o).lists.find((x) => x.list.name === name) ?? fail(`no list ${name} in ${reviewDir(o.sid)} (tally comes before the list is removed)`);
+  const t = { ...tallyOf(l, new Date().toISOString().slice(0, 10)), ...(flags.has('note') ? { note: flags.get('note')! } : {}) };
+  state.batches = [...(state.batches ?? []).filter((b) => b.name !== t.name), t];
+  writeFileSync(join(o.side.dir, auditStatePath(o.sid)), auditStateText(state));
+  const corrected = correctedOf(t)!;
+  say(`${t.name}: ${t.positions} position(s): ${t.ok} OK, ${t.no} No, ${t.notes} with a note only, ${t.edited} he edited himself, ${t.open} not answered. Corrected: ${corrected} of ${t.positions}${t.positions ? ` (${Math.round((100 * corrected) / t.positions)}%)` : ''}. "Look first": ${t.first} marked, ${t.firstCorrected} of them corrected.`);
+  say(`Recorded in ${auditStatePath(o.sid)}; audit.ts ledger writes the "Batches" table. The list can be removed now (git rm).`);
+  return 0;
+}
+
+/* ------------------------------------------------------------------ cdbexplore */
+
+async function explorePgnOf(o: Opened, chapter: Chapter, prefix: readonly string[]): Promise<ReturnType<typeof explorePgn>> {
+  const look = lookups();
+  // The positions where the opponent moves, on the way to the subtree and below it.
+  const dry = explorePgn({ study: o.study.meta.name, chapter, prefix, games: () => undefined });
+  note(`explore-pgn: ${dry.missing.length} positions' games`);
+  const games = await fetchAll(dry.missing, (f) => look.explorer(f), 'explorer');
+  look.close();
+  return explorePgn({ study: o.study.meta.name, chapter, prefix, games: (f) => games.get(f) });
+}
+
+const pgnWords = (made: ReturnType<typeof explorePgn>) => `${made.ends} line end(s), ${made.shared} position(s) with the opponent's shares, ${made.dropped} line(s) that end in a "transposes to" note left out${made.missing.length ? `; NOT COMPLETE: the games of ${made.missing.length} position(s) are not known (run without --offline), so their moves carry no share` : ''}`;
+
+async function explorePgnCommand(): Promise<number> {
+  const out = need('out');
+  if (flags.has('moves')) {
+    const moves = sansOf(flags.get('moves')!);
+    const candidates = (flags.get('candidates') ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+    const text = linePgn({ moves, candidates, side: flags.get('side') === 'black' ? 'black' : 'white', event: `On demand: ${flags.get('moves')}` }) ?? fail(`not a line from the start position, or a candidate that is no move there: ${flags.get('moves')}${candidates.length ? ` / ${candidates.join(', ')}` : ''}`);
+    mkdirSync(join(out, '..'), { recursive: true });
+    writeFileSync(out, text);
+    say(`wrote ${out}: one line${candidates.length ? ` with ${candidates.length} candidate move(s) at its end` : ''}. Run cdbexplore on it with a limit of minutes (explore-run --names … --hours 0.3 --minutes 8 --again).`);
+    return 0;
+  }
+  const o = open();
+  const chapter = chapterOf(o);
+  const made = await explorePgnOf(o, chapter, prefixOf(chapter));
+  mkdirSync(join(out, '..'), { recursive: true });
+  writeFileSync(out, made.text);
+  say(`wrote ${out}: ${pgnWords(made)}.`);
+  return made.missing.length ? 1 : 0;
+}
+
+/** An exploration asked for: its PGN into the notes, its start into audit.json. The session for it is started next. */
+async function exploreStart(): Promise<number> {
+  const o = open();
+  if (o.side.rev) fail('explore-start writes into the checkout: give the folder');
+  const state = stateOf(o);
+  const chapter = chapterOf(o);
+  const prefix = prefixOf(chapter);
+  const line = lineOf(chapter, prefix);
+  const name = flags.get('name') ?? exploreName(chapter, line);
+  if (!EXPLORE_NAME.test(name)) fail(`--name must be lower-case letters, digits and dashes: ${name}`);
+  const lately = exploredLately(explorations(state.explored ?? [], exploreStates(o)), chapter.id, line, Date.now());
+  if (lately && !flags.has('again')) {
+    say(`Not started: ${line || `the chapter "${chapterName(chapter)}"`} was explored in the last ${EXPLORED_DAYS} days (${lately.name}: ${lately.state ? `${lately.state.explored} explored, ${lately.state.left} left` : `started ${lately.start?.started}, no report yet`}). --again to explore it anyway.`);
+    return 0;
+  }
+  const made = await explorePgnOf(o, chapter, prefix);
+  if (made.missing.length) fail(`NOT COMPLETE: the games of ${made.missing.length} position(s) are not known, so the file would have no shares there. Nothing written.`);
+  const dir = join(o.side.dir, exploreDir(o.sid));
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, `${name}.pgn`), made.text);
+  state.explored = [...(state.explored ?? []).filter((e) => e.name !== name), { name, chapter: chapter.id, line, started: new Date().toISOString(), ...(flags.has('session') ? { session: flags.get('session')! } : {}) }];
+  writeFileSync(join(o.side.dir, auditStatePath(o.sid)), auditStateText(state));
+  say(`${name}: wrote ${exploreDir(o.sid)}${name}.pgn (${pgnWords(made)}) and its start into ${auditStatePath(o.sid)}. Commit and push the notes, then start its session (the skill: "ChessDB explored ahead").`);
+  return 0;
+}
+
+/** One exploration's report and state, written into the notes from the tool's record and log beside its PGN. */
+async function writeExploreReport(o: Opened, name: string): Promise<ExploreState> {
+  const dir = join(o.side.dir, exploreDir(o.sid));
+  const read = (file: string) => (existsSync(join(dir, file)) ? readFileSync(join(dir, file), 'utf8') : undefined);
+  const pgnText = read(`${name}.pgn`) ?? fail(`${exploreDir(o.sid)}${name}.pgn is not there (explore-start, or explore-pgn --out, writes it)`);
+  let k = 0;
+  const game = parseGames(pgnText, () => `explore${k++}`)[0];
+  if (!game?.ok) fail(`${name}.pgn can't be read`);
+  const cid = header(game.chapter, 'RepworksChapter');
+  const line = header(game.chapter, 'RepworksLine');
+  const named = cid ? o.study.chapters.find((c) => c.id === cid) : undefined;
+  const what = cid ? (line ? `The subtree ${line} of the chapter "${named ? chapterName(named) : cid}" (${o.study.meta.name}).` : `The chapter "${named ? chapterName(named) : cid}" (${o.study.meta.name}).`) : `One position, explored on demand: ${line ?? '?'}.`;
+  let sweep: ReturnType<typeof behindRows> | undefined;
+  // A file made for one position on demand holds the candidates as moves of ours: nothing to sweep there.
+  if (!flags.has('no-sweep') && cid) {
+    const look = createLookups({ cacheDir: flags.get('cache') ?? mkdtempSync(join(tmpdir(), 'repworks-explore-')), token: '' });
+    const fens = ourPositions(game.chapter);
+    note(`explore-report ${name}: asking ChessDB afresh at ${fens.length} position(s) of ours`);
+    const answers = await fetchAll<ChessdbAnswer>(fens, (f) => look.chessdb(f, true), 'ChessDB');
+    look.close();
+    sweep = behindRows(game.chapter, (f) => answers.get(f));
+  }
+  const made = exploreReport({ name, what, ...(cid ? { chapter: cid, line: line ?? '' } : {}), record: parseRecord(read(`${name}.explore.json`)), log: parseLog(read(`${name}.explore.log`)), ...(sweep ? { sweep } : {}) });
+  writeFileSync(join(dir, `${name}.md`), made.markdown);
+  writeFileSync(join(dir, `${name}.json`), `${JSON.stringify(made.state, null, 2)}\n`);
+  return made.state;
+}
+
+/** The exploration's files scanned, committed and pushed: nothing else of the checkout goes with them. */
+function pushExplore(o: Opened, name: string, run: string): string {
+  const dir = o.side.dir;
+  const files = ['pgn', 'explore.json', 'explore.log', 'md', 'json'].map((ext) => `${exploreDir(o.sid)}${name}.${ext}`).filter((f) => existsSync(join(dir, f)));
+  for (const f of files) {
+    const bad = scanText(readFileSync(join(dir, f), 'utf8')).filter(stops);
+    if (bad.length) fail(`NOT PUSHED: ${f}:${bad[0]!.line} holds ${bad[0]!.kind} (audit.ts scan): take it out first`);
+  }
+  return commitPush(dir, files, `session: cdbexplore ${name}${run ? `, ${run}` : ''}`, true).words;
+}
+
+const stateWords = (s: ExploreState) => (s.done ? `finished (${s.explored} explored, 0 left)` : `${s.left} left (${s.explored} explored)`);
+
+async function exploreReportCommand(): Promise<number> {
+  const o = open();
+  if (o.side.rev) fail('explore-report writes into the checkout: give the folder');
+  const name = need('name');
+  const s = await writeExploreReport(o, name);
+  say(`${name}: ${stateWords(s)}; ChessDB changed at ${s.changed} position(s), ${s.behind} move(s) of ours 0.30 or more behind. Report: ${exploreDir(o.sid)}${name}.md${flags.has('push') ? `; ${pushExplore(o, name, '')}` : ''}.`);
+  return 0;
+}
+
+/** cdbexplore on each named file in turn until the time is up, its report written (and pushed) after each. */
+async function exploreRun(): Promise<number> {
+  const o = open();
+  if (o.side.rev) fail('explore-run writes into the checkout: give the folder');
+  const names = need('names').split(',').map((x) => x.trim()).filter(Boolean);
+  const q = flags.get('q') ?? join(import.meta.dirname, '..', '..', '..', 'q_extension');
+  const tool = join(q, 'tools', 'cdbexplore.mjs');
+  if (!existsSync(tool)) fail(`cdbexplore is not at ${tool}. It is q_extension's, at the commit that logs ChessDB's refusals (read-only: change and push nothing there):\n  git clone --branch claude/gifted-cori-2whjds https://github.com/skAeglund/q_extension ${q} && git -C ${q} checkout -q a396b4d`);
+  const deadline = Date.now() + num('hours', 1.9) * 3600 * 1000;
+  const dir = join(o.side.dir, exploreDir(o.sid));
+  const stands: string[] = [];
+  let left = false;
+  let refused = 0;
+  for (const name of names) {
+    if (!existsSync(join(dir, `${name}.pgn`))) fail(`${exploreDir(o.sid)}${name}.pgn is not there`);
+    const before = exploreStates(o).find((s) => s.name === name);
+    const hours = (deadline - Date.now()) / 3600 / 1000;
+    if (before?.done && !flags.has('again')) {
+      stands.push(`${name}: ${stateWords(before)}`);
+      continue;
+    }
+    if (hours < 0.05) {
+      stands.push(`${name}: ${before ? stateWords(before) : 'not started'}`);
+      left = true;
+      continue;
+    }
+    const args = [tool, join(dir, `${name}.pgn`), '--rate', flags.get('rate') ?? '450', '--concurrency', flags.get('concurrency') ?? '3', '--hours', hours.toFixed(2), ...(flags.has('minutes') ? ['--minutes', flags.get('minutes')!] : []), ...(flags.has('short-line') ? ['--short-line', flags.get('short-line')!] : []), ...(flags.has('again') ? ['--again'] : [])];
+    note(`node ${args.join(' ')}`);
+    const ran = spawnSync(process.execPath, args, { stdio: ['ignore', 'inherit', 'inherit'] });
+    if (ran.status !== 0) note(`cdbexplore ended with status ${ran.status}`);
+    const s = await writeExploreReport(o, name);
+    refused += s.refused;
+    const pushed = flags.has('push') ? `; ${pushExplore(o, name, `run ${s.runs}`)}` : '';
+    stands.push(`${name}: ${stateWords(s)}; ChessDB changed at ${s.changed}, ${s.behind} of ours behind${pushed}`);
+    if (!s.done) left = true;
+  }
+  for (const s of stands) say(s);
+  if (refused) say(`ChessDB refused ${refused} request(s) for its rate limit (over every run in the logs): the next run with --rate 240.`);
+  say(left ? 'LEFT: run the same command again.' : 'NOTHING LEFT: every exploration named is finished.');
+  return 0;
+}
+
+const COMMANDS: Record<string, () => number | Promise<number>> = { check, ledger, base, inventory: inventoryCommand, screen, difficulty, judge, practical, lines: linesCommand, apply, lint, scan, rep, 'close-calls': closeCallsCommand, 'add-chapters': addChapters, 'cache-pull': cachePull, 'cache-push': cachePush, status: statusCommand, lock: lockCommand, unlock: unlockCommand, tally, 'explore-pgn': explorePgnCommand, 'explore-start': exploreStart, 'explore-run': exploreRun, 'explore-report': exploreReportCommand, chessdb: chessdbCommand };
 const run = command === undefined || flags.has('help') ? undefined : COMMANDS[command];
 if (!run) fail(`usage: node scripts/audit/audit.ts <command> <checkout>[@rev] --study S [options]\n${USAGE}`);
 // A MoveNode import kept for the types above when a build strips unused ones.

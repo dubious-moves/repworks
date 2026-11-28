@@ -13,6 +13,10 @@
 //   items are in two lists";
 // - `answerTargets` taking every item → "a position's answer goes to its items";
 // - `sharedAnswer` taking the first item's answer → "a position's answer goes to its items".
+// "Look first" (§5.220), controls run 2026-11-28:
+// - `writeReviewList` leaving the mark out → "the mark is written and read back";
+// - `positionsOf` not sorting → "marked positions come first in their list";
+// - `okAllTargets` taking every waiting item → "OK all open leaves the marked positions waiting".
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { classifyPath, reviewDir, reviewListPath } from '../../../../src/core/data/layout.ts';
@@ -20,7 +24,7 @@ import { validateDataRepo } from '../../../../src/core/data/validate.ts';
 import { parseChapterFile } from '../../../../src/core/pgn/parse.ts';
 import { formatEvent, parseLog } from '../../../../src/core/progress/events.ts';
 import { toDeviceEvents } from '../../../../src/core/progress/replay.ts';
-import { answerOf, answerTargets, byPosition, itemId, itemState, movedOn, newestFirst, orderedByPosition, parseReviewList, positionHead, positionKey, positionsOf, positionState, reviewCard, REVIEW_CARD, sharedAnswer, writeReviewList, type Answer, type ItemState, type ReviewItem, type ReviewList } from '../../../../src/core/study/reviewList.ts';
+import { answerOf, answerTargets, byPosition, okAllTargets, itemId, itemState, movedOn, newestFirst, orderedByPosition, parseReviewList, positionHead, positionKey, positionsOf, positionState, reviewCard, REVIEW_CARD, sharedAnswer, writeReviewList, type Answer, type ItemState, type ReviewItem, type ReviewList } from '../../../../src/core/study/reviewList.ts';
 
 function chapter(movetext: string) {
   const parsed = parseChapterFile(`[Event "Test"]\n[ChapterName "Jobava"]\n[Orientation "white"]\n\n${movetext} *\n`, 'Ch1Jobav');
@@ -216,4 +220,51 @@ test('a position\'s answer goes to its items, but not to one the chapter moved o
   assert.deepEqual(sharedAnswer([{ answer: said('ok') }, { answer: said('ok') }]), { a: 'ok' });
   assert.deepEqual(sharedAnswer([{ answer: said('open', 'later') }, { answer: said('open', 'later') }]), { a: 'open', note: 'later' });
   assert.deepEqual(sharedAnswer([]), { a: 'open' });
+});
+
+test('"look first": the mark is written and read back, and a file without it reads as before; anything but true or false is refused', () => {
+  const marked: ReviewList = { ...LIST, items: [MOVE, { ...ADDED, first: true }, REMOVED, { ...QUESTION, first: true }] };
+  const text = writeReviewList(marked);
+  assert.equal((text.match(/"first":true/g) ?? []).length, 2);
+  const read = parseReviewList(text);
+  assert.ok(read.ok);
+  assert.deepEqual(read.list, marked);
+  assert.equal(writeReviewList(read.list), text);
+  // No mark, no field: a list made before the mark existed is the same text.
+  assert.ok(!writeReviewList(LIST).includes('first'));
+  const with_ = (value: unknown) => {
+    const o = JSON.parse(writeReviewList(LIST)) as { items: Record<string, unknown>[] };
+    o.items[0]!['first'] = value;
+    return parseReviewList(JSON.stringify(o));
+  };
+  const off = with_(false);
+  assert.ok(off.ok && off.list.items[0]!.first === undefined, 'false is no mark');
+  const bad = with_('yes');
+  assert.ok(!bad.ok && /item 1: first must be true or false/.test(bad.error));
+});
+
+test('"look first": marked positions come first in their list, counted with those still waiting; a position is marked when an item of it is', () => {
+  const list: ReviewList = { ...LIST, items: [MOVE, COMMENT, { ...REMOVED, first: true }, ADDED, { ...QUESTION, first: true }] };
+  const [shown] = positionsOf([list], (_l, item) => (item.kind === 'question' ? { state: 'ok', answer: said('ok') } : { state: 'open' }));
+  assert.deepEqual(shown!.positions.map((p) => [p.part, p.first, p.waiting]), [
+    ['3. Bf4', true, true],
+    ['Bxc3+', true, false],
+    ['3. f3', false, true],
+    [ADDED.part, false, true],
+  ]);
+  assert.deepEqual([shown!.open, shown!.first, shown!.firstOpen], [3, 2, 1]);
+  // Unmarked, the file's order stands.
+  const [plain] = positionsOf([{ ...LIST, items: [MOVE, COMMENT, REMOVED, ADDED, QUESTION] }], () => ({ state: 'open' }));
+  assert.deepEqual(plain!.positions.map((p) => p.part), ['3. f3', '3. Bf4', ADDED.part, 'Bxc3+']);
+  assert.deepEqual([plain!.first, plain!.firstOpen], [0, 0]);
+});
+
+test('"OK all open" leaves the marked positions waiting, their unmarked items too, and says how many stay', () => {
+  const list: ReviewList = { ...LIST, items: [MOVE, COMMENT, { ...REMOVED, first: true }, ADDED, QUESTION] };
+  const [shown] = positionsOf([list], (_l, item) => (item === ADDED ? { state: 'no', answer: said('no') } : { state: 'open' }));
+  const all = okAllTargets(shown!.positions);
+  assert.deepEqual(all.items.map((i) => i.item.kind), ['move', 'question']);
+  assert.deepEqual([all.positions, all.kept], [2, 1]);
+  const none = okAllTargets(positionsOf([{ ...LIST, items: [{ ...MOVE, first: true }] }], () => ({ state: 'open' }))[0]!.positions);
+  assert.deepEqual([none.items.length, none.positions, none.kept], [0, 0, 1]);
 });

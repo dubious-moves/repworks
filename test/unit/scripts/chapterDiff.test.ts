@@ -14,6 +14,9 @@
 // Positions (§5.218), controls run 2026-11-28:
 // - the list written in the report's order → "a position's items are written next to each other";
 // - `answered` giving each list its own items only → "the answers by position".
+// "Look first" (§5.220), controls run 2026-11-28:
+// - a note's `first` not carried to its item → "look first";
+// - `corrected` counting an OK → the same test.
 // (A link written by hand, the SANs joined unencoded, reads back the same: the links are the
 // router's own `modeHash` so that they stay its addresses, not because a test would catch it.)
 import { test } from 'node:test';
@@ -25,7 +28,7 @@ import { join } from 'node:path';
 import { parseHash } from '../../../src/core/app/fsm.ts';
 import { parseChapterFile } from '../../../src/core/pgn/parse.ts';
 import { newestFirst, parseReviewList, reviewCard, writeReviewList, type ReviewList } from '../../../src/core/study/reviewList.ts';
-import { answered, answersMarkdown, appended, markdown, pairChapters, report, reviewList, SITE, type Version } from '../../../scripts/chapter-diff-lib.ts';
+import { answered, answersMarkdown, appended, corrected, markdown, pairChapters, report, reviewList, SITE, type Version } from '../../../scripts/chapter-diff-lib.ts';
 
 const pgn = (name: string, movetext: string) => `[Event "Test"]\n[ChapterName "${name}"]\n[Orientation "white"]\n\n${movetext} *\n`;
 function version(label: string, chapters: [cid: string | undefined, name: string, movetext: string][], sid?: string): Version {
@@ -266,6 +269,46 @@ test('the answers by position: one answer given to the items at a move, an item 
   assert.ok(answersMarkdown(answered([high, low], files, chapters)).includes('1 OK, 1 No, 0 with a note only, 0 changed in the chapter since, 2 not answered. 1 more position answered in part: 3 positions still open in the app.'));
 });
 
+test('"look first" (§5.220): a note\'s mark goes to its item, a change or a question; the answers say which positions were marked and how many of those he corrected', () => {
+  const [old, now] = reviewSides();
+  const made = reviewList(report(old, now), now, {
+    name: 'batch-6',
+    created: '2026-11-28T18:00:00.000Z',
+    notes: [
+      { moves: '1. Nc3 d5 2. d4 Bf5 3. f3', text: 'Your 3. e3 changed.', first: true },
+      { moves: '1.Nc3 d5 2.d4 g6 3.Bf4 a6', text: 'Not drilled: you play e4 there.' },
+      { moves: '1. Nc3 d5 2. d4 Bf5 3. f3 e6 4. e4 Bg6 5. h4', text: 'Drill 5... h5 too?', first: true },
+      { chapter: 'Other', moves: '1. Nc3 e5', text: 'Keep this chapter?', first: false },
+    ],
+  });
+  assert.ok(made.ok, made.ok ? '' : made.error);
+  const { list } = made;
+  assert.deepEqual(list.items.filter((i) => i.first).map((i) => [i.kind, i.part]), [['move', '3. f3'], ['question', '5. h4']]);
+  const read = parseReviewList(writeReviewList(list));
+  assert.ok(read.ok);
+  assert.deepEqual(read.list, list);
+  // He says No to the changed move and OK to the question; nothing else is answered.
+  const card = (kind: string) => reviewCard(list.sid, list.name, list.items.find((i) => i.kind === kind && i.first)!.id);
+  const files = new Map([['progress/Phone001/2026-11-28.jsonl', [JSON.stringify({ v: 1, n: 1, t: '2026-11-28T19:00:00.000Z', k: 'answer', card: card('move'), a: 'no', note: 'keep 3. e3' }), JSON.stringify({ v: 1, n: 2, t: '2026-11-28T19:01:00.000Z', k: 'answer', card: card('question'), a: 'ok' })].join('\n') + '\n']]);
+  const [got] = answered([list], files, new Map(now.chapters.map((c) => [c.cid!, c.chapter] as const)));
+  // The marked positions first, then the file's order.
+  assert.deepEqual(got!.positions.map((p) => [p.line, p.first, p.state]).slice(0, 3), [
+    ['1. Nc3 d5 2. d4 Bf5 3. f3', true, 'no'],
+    ['1. Nc3 d5 2. d4 Bf5 3. f3 e6 4. e4 Bg6 5. h4', true, 'ok'],
+    ['1. Nc3 d5 2. d4 g6 3. Bf4', false, 'open'],
+  ]);
+  assert.deepEqual(got!.first, { positions: 2, corrected: 1, open: 0 });
+  assert.equal(corrected('no') && corrected('noted') && corrected('moved') && !corrected('ok') && !corrected('open'), true);
+  const md = answersMarkdown([got!]);
+  assert.ok(md.includes('Marked "look first": 2 positions, 1 of them corrected (a No, a note or his own edit).\n'), md);
+  assert.ok(md.includes('### No (1)\n\n- [look first] Jobava: 1. Nc3 d5 2. d4 Bf5 3. f3\n'), md);
+  assert.ok(md.includes('- [look first] Jobava, question: 1. Nc3 d5 2. d4 Bf5 3. f3 e6 4. e4 Bg6 5. h4\n'), md);
+  assert.ok(!md.includes('[look first] Jobava, removed'), md);
+  // A list with no mark says nothing of marks.
+  const plainList = reviewList(report(old, now), now, { name: 'batch-6', created: 't' });
+  assert.ok(plainList.ok && !answersMarkdown(answered([plainList.list], new Map(), new Map())).includes('look first'));
+});
+
 // ---- The script, over a scratch data repo ----
 
 const script = new URL('../../../scripts/chapter-diff.ts', import.meta.url).pathname;
@@ -356,16 +399,19 @@ test('the scripts: --review writes the list into the checkout, which validates; 
     git(repo, 'add', '.');
     git(repo, 'commit', '-q', '-m', 'session: Jobava batch 4');
     const notes = join(dir, 'notes.json');
-    writeFileSync(notes, JSON.stringify([{ moves: '1. Nc3 d5 2. d4 Bf5 3. f3', text: 'The system move.' }]));
+    writeFileSync(notes, JSON.stringify([{ moves: '1. Nc3 d5 2. d4 Bf5 3. f3', text: 'The system move.', first: true }]));
 
     const made = run(`${repo}@HEAD~1`, `${repo}@HEAD`, '--study', 'Nc3Jobav', '--review', 'batch-4', '--title', 'Jobava batch 4', '--notes', notes);
     assert.equal(made.status, 0, made.stderr);
-    assert.match(made.stderr, /wrote .*review\/Nc3Jobav\/batch-4\.json: 3 item\(s\) at 2 position\(s\), 1 with your words\. Commit it with the study\./);
+    assert.match(made.stderr, /wrote .*review\/Nc3Jobav\/batch-4\.json: 3 item\(s\) at 2 position\(s\), 1 with your words, 1 position\(s\) marked "look first"\. Commit it with the study\./);
     assert.match(made.stdout, /^# What changed/, 'the list for the chat is still printed');
     const file = join(repo, 'review', 'Nc3Jobav', 'batch-4.json');
     const read = parseReviewList(readFileSync(file, 'utf8'));
     assert.ok(read.ok);
-    assert.deepEqual(read.list.items.map((i) => [i.kind, i.text ?? '']), [['move', 'The system move.'], ['added', ''], ['removed', '']]);
+    assert.deepEqual(read.list.items.map((i) => [i.kind, i.text ?? '', i.first ?? false]), [['move', 'The system move.', true], ['added', '', false], ['removed', '', false]]);
+    const badNotes = join(dir, 'bad-notes.json');
+    writeFileSync(badNotes, JSON.stringify([{ moves: '1. Nc3 d5 2. d4 Bf5 3. f3', text: 'x', first: 'yes' }]));
+    assert.match(run(`${repo}@HEAD~1`, `${repo}@HEAD`, '--study', 'Nc3Jobav', '--review', 'batch-4', '--notes', badNotes).stderr, /"first"\?: true/);
     const validate = spawnSync(process.execPath, [new URL('../../../scripts/validate-data.ts', import.meta.url).pathname, repo], { encoding: 'utf8' });
     assert.equal(validate.status, 0, validate.stdout + validate.stderr);
     assert.match(validate.stdout + validate.stderr, /0 error\(s\)/);
@@ -377,7 +423,8 @@ test('the scripts: --review writes the list into the checkout, which validates; 
     const got = spawnSync(process.execPath, [answers, repo, '--study', 'nc3 + jobava'], { encoding: 'utf8' });
     assert.equal(got.status, 0, got.stderr);
     assert.ok(got.stdout.includes('2 positions (3 items): 0 OK, 1 No, 0 with a note only, 0 changed in the chapter since, 1 not answered. 1 more position answered in part: 2 positions still open in the app.'), got.stdout);
-    assert.ok(got.stdout.includes('- Jobava: 1. Nc3 d5 2. d4 Bf5 3. f3\n  - move, No\n  - added: 3. f3 e6 4. e4 Bg6 5. h4, not answered\n  - note:\n    > e3 stays my move\n'), got.stdout);
+    assert.ok(got.stdout.includes('Marked "look first": 1 position, 1 of them corrected (a No, a note or his own edit).'), got.stdout);
+    assert.ok(got.stdout.includes('- [look first] Jobava: 1. Nc3 d5 2. d4 Bf5 3. f3\n  - move, No\n  - added: 3. f3 e6 4. e4 Bg6 5. h4, not answered\n  - note:\n    > e3 stays my move\n'), got.stdout);
     const json = JSON.parse(spawnSync(process.execPath, [answers, repo, '--study', 'Nc3Jobav', '--list', 'batch-4', '--json'], { encoding: 'utf8' }).stdout) as { counts: { no: number }; positionCounts: { no: number; open: number }; positions: { items: unknown[] }[] }[];
     assert.equal(json[0]!.counts.no, 1, 'the items as before');
     assert.deepEqual([json[0]!.positionCounts.no, json[0]!.positionCounts.open, json[0]!.positions.map((p) => p.items.length)], [1, 1, [2, 1]]);

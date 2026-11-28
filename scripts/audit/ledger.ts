@@ -5,7 +5,7 @@
 // number in them is never typed by hand. Pure: the state, the counts and the file's text in.
 import type { Chapter } from '../../src/core/study/model.ts';
 import type { AnsweredList } from '../chapter-diff-lib.ts';
-import type { AuditState, SubtreeState } from './state.ts';
+import type { AuditState, BatchTally, SubtreeState } from './state.ts';
 import { chapterName, subtreeCounts, type SubtreeCount } from './study.ts';
 
 const WHOLE = '(the whole chapter)';
@@ -53,9 +53,12 @@ export function subtreeTable(rows: readonly LedgerRow[]): string {
   return out.join('\n');
 }
 
+/** What is left to audit, most single-move branches first. */
+export const todoOrder = (rows: readonly LedgerRow[]): LedgerRow[] => rows.filter((r) => r.state.state === 'todo' && r.positions > 0).sort((a, b) => b.single - a.single || b.replies - a.replies);
+
 /** What is left, most single-move branches first. */
 export function suggestedOrder(rows: readonly LedgerRow[]): string {
-  const todo = rows.filter((r) => r.state.state === 'todo' && r.positions > 0).sort((a, b) => b.single - a.single || b.replies - a.replies);
+  const todo = todoOrder(rows);
   if (!todo.length) return 'Nothing is left to audit.';
   return todo.map((r, i) => `${i + 1}. ${r.line === WHOLE ? `the chapter "${r.chapter}"` : r.line} (${r.single})`).join('\n');
 }
@@ -77,6 +80,39 @@ export function listsTable(lists: readonly AnsweredList[]): string {
     out.push(`| ${cell(l.list.name)} (${cell(l.list.title)}) | ${l.positions.length} | ${c.ok} | ${c.no} | ${c.noted} | ${c.moved} | ${c.open} | ${l.waiting} | ${l.items.length} (${l.counts.open}) |`);
   }
   out.push('', `${waiting} position(s) still open in the app; ${items} item(s) not answered.`);
+  return out.join('\n');
+}
+
+/** A list as it stands when its answers are merged: the batch's tally (§5.220). Positions as the panel counts them. */
+export function tallyOf(l: AnsweredList, date: string): BatchTally {
+  const c = l.positionCounts;
+  return { name: l.list.name, title: l.list.title, date, positions: l.positions.length, ok: c.ok, no: c.no, notes: c.noted, edited: c.moved, open: c.open, first: l.first.positions, firstCorrected: l.first.corrected };
+}
+
+/** The positions of a batch he corrected: a No, a note alone, or his own edit. Undefined when a number is not known. */
+export function correctedOf(b: BatchTally): number | undefined {
+  return b.no === undefined || b.notes === undefined || b.edited === undefined ? undefined : b.no + b.notes + b.edited;
+}
+
+/**
+ * Every batch's review as it came out, oldest first, with the share of positions the owner
+ * corrected: whether the worker is getting closer to what he wants. A number not known is "?".
+ */
+export function batchesTable(batches: readonly BatchTally[]): string {
+  const n = (x: number | undefined) => (x === undefined ? '?' : String(x));
+  // A batch nobody counted (from before the tally) is told in words, not as a row of question marks.
+  const counted = batches.filter((b) => b.positions !== undefined);
+  const told = batches.filter((b) => b.positions === undefined);
+  const out = counted.length ? ['| Batch | Merged | Positions | OK | No | A note only | Edited by him | Not answered | Corrected | “Look first”: marked, corrected |', '|---|---|---|---|---|---|---|---|---|---|'] : ['No batch has been tallied yet (`audit.ts tally` when a list’s answers are merged).'];
+  for (const b of counted) {
+    const corrected = correctedOf(b);
+    const share = corrected === undefined || !b.positions ? '?' : `${corrected} of ${b.positions} (${Math.round((100 * corrected) / b.positions)}%)`;
+    const first = b.first === undefined ? '?' : b.first === 0 ? 'none marked' : `${b.first}, ${n(b.firstCorrected)}`;
+    out.push(`| ${cell(b.title && b.title !== b.name ? `${b.name} (${b.title})` : b.name)}${b.source === 'journal' ? ' *(from the journal)*' : ''} | ${b.date} | ${n(b.positions)} | ${n(b.ok)} | ${n(b.no)} | ${n(b.notes)} | ${n(b.edited)} | ${n(b.open)} | ${share} | ${first} |`);
+  }
+  const notes = counted.filter((b) => b.note);
+  if (notes.length) out.push('', ...notes.map((b) => `- ${b.name}: ${b.note}`));
+  if (told.length) out.push('', 'Not counted by position:', ...told.map((b) => `- **${b.name}** (${b.date}${b.source === 'journal' ? ', from the journal' : ''}): ${b.note ?? 'nothing is known of it.'}`));
   return out.join('\n');
 }
 

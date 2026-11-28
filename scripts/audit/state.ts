@@ -24,6 +24,44 @@ export interface SubtreeState {
   note?: string;
 }
 
+/**
+ * How one batch's review came out (§5.220): counted by `audit.ts tally` from the list and the
+ * owner's answers when they are merged, before the list is removed. Positions as the panel counts
+ * them. A number that is not known (a batch from before the tally, taken from the old session's
+ * journal) is left out.
+ */
+export interface BatchTally {
+  /** The list's name, or the batch's. */
+  name: string;
+  title?: string;
+  /** The day its answers were merged (YYYY-MM-DD). */
+  date: string;
+  positions?: number;
+  ok?: number;
+  no?: number;
+  /** A note alone. */
+  notes?: number;
+  /** Positions he edited himself in the chapter. */
+  edited?: number;
+  /** Not answered when merged. */
+  open?: number;
+  /** Positions marked "look first", and those of them he corrected (a No, a note, his own edit). */
+  first?: number;
+  firstCorrected?: number;
+  /** `journal`: not counted by the tool, taken from the old session's journal. */
+  source?: 'journal';
+  note?: string;
+}
+
+/** An exploration of ChessDB asked for (§5.220): a subtree, or a chapter (`line` empty), and the session started for it. */
+export interface ExploreAsked {
+  name: string;
+  chapter: string;
+  line: string;
+  started: string;
+  session?: string;
+}
+
 export interface AuditState {
   v: 1;
   /** The study's id. */
@@ -45,6 +83,10 @@ export interface AuditState {
   exceptions: string[];
   /** Lines to examine when their subtree is audited, each with why. */
   flags: { line: string; note: string }[];
+  /** Each batch's review as it came out, oldest first: written by `audit.ts tally`. */
+  batches?: BatchTally[];
+  /** The explorations of ChessDB asked for, oldest first: written by `audit.ts explore-start`. */
+  explored?: ExploreAsked[];
 }
 
 /** What `audit.ts practical` gives itself: not to be fixed in audit.json. */
@@ -89,8 +131,14 @@ export function parseAuditState(text: string): ReadState {
   if (!Array.isArray(o.flags) || !o.flags.every((x) => isMap(x) && typeof x['line'] === 'string' && typeof x['note'] === 'string')) errors.push('flags must be a list of { line, note }');
   if (o.practical !== undefined && (!Array.isArray(o.practical) || !o.practical.every((x) => typeof x === 'string') || o.practical.some((x) => PRACTICAL_OWN.includes(x)))) errors.push(`practical must be a list of flags for scripts/practical.ts, without ${PRACTICAL_OWN.join(', ')} (the command gives those)`);
   if (o.deck !== undefined && (!isMap(o.deck) || typeof o.deck.study !== 'string' || !Number.isInteger(o.deck.cards))) errors.push('deck needs study and cards');
+  const count = (x: unknown) => x === undefined || (Number.isInteger(x) && (x as number) >= 0);
+  if (o.batches !== undefined && (!Array.isArray(o.batches) || !o.batches.every((b) => isMap(b) && typeof b['name'] === 'string' && /^\d{4}-\d\d-\d\d$/.test(String(b['date'])) && ['positions', 'ok', 'no', 'notes', 'edited', 'open', 'first', 'firstCorrected'].every((k) => count(b[k]))))) errors.push('batches must be a list of { name, date (YYYY-MM-DD), and whole numbers for positions, ok, no, notes, edited, open, first, firstCorrected where known }');
+  if (o.explored !== undefined && (!Array.isArray(o.explored) || !o.explored.every((e) => isMap(e) && typeof e['name'] === 'string' && typeof e['chapter'] === 'string' && typeof e['line'] === 'string' && Number.isFinite(Date.parse(String(e['started'])))))) errors.push('explored must be a list of { name, chapter, line, started (a time) }');
   return errors.length ? { ok: false, errors } : { ok: true, state: o as AuditState };
 }
+
+/** audit.json's text: the form the file is kept in, so a script's change is a small diff. */
+export const auditStateText = (state: AuditState): string => `${JSON.stringify(state, null, 2)}\n`;
 
 export const auditStatePath = (sid: string) => `notes/${sid}/audit.json`;
 export const ledgerPath = (sid: string) => `notes/${sid}/ledger.md`;

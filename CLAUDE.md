@@ -57,8 +57,11 @@ for a robotic board (the Chessnut Move), built only when the owner asks.
 - The review of the owner's opening repertoire (the "repertoire audit") is the skill
   `.claude/skills/repertoire-audit`: one batch from his answers to the push. The repertoire's own
   rules and state are in the data repo, `notes/<study id>/` (`rules.md`, `ledger.md`, `audit.json`,
-  `corrections.md`, `batches/`): read them first. Only one session writes to a study at a time, and
-  none while the owner is reviewing its lists. PLAN.md §5.219.
+  `corrections.md`, `batches/`, `cdbexplore/`): read them first. Only one session writes to a study
+  at a time (the lock, `notes/<study id>/lock.json`), and none while the owner is reviewing its
+  lists: `audit.ts status` says whether there is work, and a session a scheduled task started
+  runs it first and stops on a no (the skill's "An unattended run"). A session never creates,
+  changes or fires a scheduled task. PLAN.md §5.219, §5.220.
 
 - A testing data repo, only for Claude sessions' live checks, is named in the environment
   variable `REPWORKS_TESTING_DATA` (owner/repo) with a fine-grained token in
@@ -162,14 +165,25 @@ Stockfish over the cloud's positions not yet scored: `--score-only --score-minut
 every device's positions scored, not only the cloud's: `--all-devices`; one study or chapter,
 walked and scored: `--study "Scandi Gambit" --chapter "Accepted - Main lines"`.
 
-The repertoire audit's tools (PLAN.md §5.219; the skill says when each is used), on a study of a
-data repo checkout: `node scripts/audit/audit.ts <command> ../repworks-data --study <id>`. `check`
+The repertoire audit's tools (PLAN.md §5.219 and §5.220; the skill says when each is used), on a study of a
+data repo checkout: `node scripts/audit/audit.ts <command> ../repworks-data --study <id>`. `status`
+(is there work: the open lists, the owner's last commit, the lock, what is next; `--json`), `lock
+--session <id> --for <batch>` and `unlock` (one session writes to a study at a time: `apply` and
+`chapter-diff.ts --review` refuse without the lock), `check`
 (every check against the study's targets; `--deck --cache <dir>` for the idea deck's too), `ledger`
 (the ledger's tables; `--check`), `base`, `practical --positions P.json --cache <dir> --out X.json`
 (Practical with the study's own flags, all of them), `inventory --chapter C --line "<moves>" --cache <dir>`
 (`--offline`), `screen`, `difficulty` (`--moves "<a full line>"` without a study), `judge`, `lines
 --since <rev> --sf`, `apply --ops ops.json --base <rev>` (`--dry-run`), `lint`, `scan` (before every
-push to the data repo), `rep`, `close-calls`, `add-chapters`. `--cache` is a `scripts/practical.ts`
+push to the data repo), `rep`, `close-calls`, `add-chapters`, `tally --list <name>` (a list's
+answers counted into `audit.json` before the list is removed). ChessDB explored with q_extension's
+cdbexplore (beside repworks at commit a396b4d of its branch `claude/gifted-cori-2whjds`, read-only):
+`explore-start --chapter C [--line "<moves>"] --cache <dir>` (the file it wants, into
+`notes/<sid>/cdbexplore/`), `explore-run --names a,b --hours 1.9 --push` (the tool on each file,
+its report after each; a background command, again until it prints `NOTHING LEFT`), `explore-pgn`,
+`explore-report --name N`, and `chessdb --moves "<a full line>" --candidates "a,b" --cache <dir>
+[--fresh] [--sf]` (ChessDB at one position, `SHALLOW` when its eval is not deep enough to decide
+on). `--cache` is a `scripts/practical.ts`
 cache folder; the answers are kept between sessions in the testing data repo's `audit-cache/`
 (`cache-pull --store <that folder> --cache <dir>` at the start, `cache-push` and a push of that repo
 at the end). Stockfish runs at a fixed node count on one thread: for `screen` and `lines` the repo's

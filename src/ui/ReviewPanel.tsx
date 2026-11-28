@@ -8,11 +8,15 @@
 // row of buttons that answers them all (an event per item); "One by one" gives each its own. The
 // counts are positions. "OK all open" on a list answers every item still waiting under it, after
 // a confirmation.
+//
+// "Look first" (§5.220): a position the session marked says so, comes first in its list and is
+// where "Next open" goes first; the list's head counts those still waiting, and "OK all open"
+// leaves them waiting, saying how many stay.
 import type { ComponentChildren } from 'preact';
 import { useState } from 'preact/hooks';
 import { signal } from '@preact/signals';
 import { modeHash } from '../core/app/fsm.ts';
-import { answerTargets, sharedAnswer, type ItemKind, type ItemState, type Placed, type ReviewPosition } from '../core/study/reviewList.ts';
+import { answerTargets, okAllTargets, sharedAnswer, type ItemKind, type ItemState, type Placed, type ReviewPosition } from '../core/study/reviewList.ts';
 import { samePath } from '../core/study/tree.ts';
 import { afterEdits, at, study } from '../app/editor.ts';
 import { open } from '../app/mode.ts';
@@ -36,6 +40,7 @@ export function ReviewPanel() {
   if (!s || !lists.length) return null;
   const waiting = lists.reduce((n, l) => n + l.open, 0);
   const total = lists.reduce((n, l) => n + l.total, 0);
+  const firstOpen = lists.reduce((n, l) => n + l.firstOpen, 0);
   const go = (p: ReviewPosition) => {
     visited.value = p.key;
     // The open chapter's edits are saved before another chapter is read in its place.
@@ -45,7 +50,8 @@ export function ReviewPanel() {
   const next = () => {
     const from = all.findIndex((p) => p.key === visited.value);
     const order = [...all.slice(from + 1), ...all.slice(0, from + 1)];
-    const to = order.find((p) => p.waiting);
+    // What the session marked "look first" before the rest.
+    const to = order.find((p) => p.waiting && p.first) ?? order.find((p) => p.waiting);
     if (to) go(to);
   };
   return (
@@ -56,6 +62,7 @@ export function ReviewPanel() {
           {waiting ? `${positions(waiting)} open` : 'all answered'}
         </span>{' '}
         <span class="muted">of {total}</span>
+        {firstOpen > 0 && <span class="review-first-count"> · {firstOpen} to look at first</span>}
       </summary>
       {waiting > 0 && (
         <p class="review-next">
@@ -76,10 +83,11 @@ function List(props: { shown: ShownList; sid: string; cid: string; go: (p: Revie
   // Open while it has something to answer, as found when first shown; then as the owner leaves it.
   const [unfolded, setUnfolded] = useState(shown.open > 0);
   const [asking, setAsking] = useState(false);
+  // Every item still waiting under this list, whichever list it is in; what has an answer, a note or an edit stays,
+  // and so does a position the session marked "look first": that one is read, not waved through.
+  const all = okAllTargets(shown.chapters.flatMap((c) => c.positions));
   const okAll = () => {
-    // Every item still waiting under this list, whichever list it is in; what has an answer, a note or an edit stays.
-    const waiting = shown.chapters.flatMap((c) => c.positions.flatMap((p) => p.items.filter((i) => i.state === 'open')));
-    answerItems(waiting, () => ({ a: 'ok' }));
+    answerItems(all.items, () => ({ a: 'ok' }));
     setAsking(false);
   };
   return (
@@ -89,15 +97,16 @@ function List(props: { shown: ShownList; sid: string; cid: string; go: (p: Revie
         <span class="muted">
           {shown.open ? `${positions(shown.open)} open of ${shown.total}` : `${positions(shown.total)}, all answered`}
         </span>
+        {shown.firstOpen > 0 && <span class="review-first-count"> · {shown.firstOpen} to look at first</span>}
       </summary>
-      {shown.open > 0 &&
+      {all.positions > 0 &&
         (asking ? (
           <p class="review-all" role="group" aria-label="OK all open">
             <span>
-              OK for the {positions(shown.open)} still open in this list? Each can be taken back.
+              OK for the {positions(all.positions)} still open in this list?{all.kept > 0 && ` The ${all.kept} marked “Look first” ${all.kept === 1 ? 'stays' : 'stay'} open.`} Each can be taken back.
             </span>
             <button type="button" class="primary" onClick={okAll}>
-              OK all {shown.open}
+              OK all {all.positions}
             </button>
             <button type="button" onClick={() => setAsking(false)}>
               Cancel
@@ -133,7 +142,7 @@ function PositionRow(props: { position: ReviewPosition; list: string; sid: strin
   // Each item's own buttons: asked for, or there from the start when the items already have different answers.
   const [each, setEach] = useState(() => !one && new Set(targets.map((i) => i.answer?.a ?? 'open')).size > 1);
   return (
-    <li class={`review-item is-${p.common ?? 'mixed'}${p.waiting ? ' is-waiting' : ''}${props.here ? ' here' : ''}`} data-kind={one ? one.item.kind : 'position'}>
+    <li class={`review-item is-${p.common ?? 'mixed'}${p.waiting ? ' is-waiting' : ''}${p.first ? ' is-first' : ''}${props.here ? ' here' : ''}`} data-kind={one ? one.item.kind : 'position'}>
       <a
         class="review-go"
         href={modeHash({ name: 'chapter', sid: props.sid, cid: p.cid, at: [...p.at] })}
@@ -143,6 +152,7 @@ function PositionRow(props: { position: ReviewPosition; list: string; sid: strin
           props.go(p);
         }}
       >
+        {p.first && <span class="review-first">Look first</span>}
         {one && <span class="review-kind">{LABEL[one.item.kind]}</span>}
         {(one ? one.item.lead : p.lead) && <span class="review-lead">{one ? one.item.lead : p.lead} </span>}
         <strong class="review-part">{one ? one.item.part : p.part}</strong>

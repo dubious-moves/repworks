@@ -2943,3 +2943,44 @@ The technical calls, each with its reason:
   "you decide"), for the whole 1.Nc3 repertoire. Stockfish 19 is a second opinion on a move within
   about 1 of a limit, never the class.
 
+## Revision of 2026-11-28 (the audit's workflow: PLAN.md §5.220)
+
+- **A review item may carry `first: true`**, the session's "look first" mark: a new optional field
+  of a list file of format 1 (`review/<sid>/<name>.json`). Only ever `true`; a file without it is
+  unchanged, and an app before this one reads past it. Written from a note's `"first": true`
+  (`chapter-diff.ts --notes`), never by a device. In the panel a marked position comes first, the
+  heads count those waiting, "Next open" goes to them first, and **"OK all open" no longer answers
+  them** (the one thing an earlier decision gives up: §5.218 had it on every waiting item). Why a
+  field and not a second list: a batch has one list since §5.218, and a list by priority split the
+  two halves of a decision.
+- **One session writes to a study at a time, by a lock in the data repo**: `notes/<sid>/lock.json`
+  (`{ v, session, at, for }`), committed and pushed by `audit.ts lock` before anything under
+  `studies/` or `review/` is written, removed by `unlock`. Younger than six hours it stops every
+  other session; older it is stale and is taken over. `audit.ts apply` and `chapter-diff.ts
+  --review` (for a study that has an `audit.json`) refuse unless the checkout itself took the
+  lock. Why a file in the repo and not a branch or the hosting's own locks: every session already
+  reads and pushes this repo, and the owner can read and delete the file. Six hours: a batch takes
+  one to three; a dead session must not block the next day.
+- **A session nobody started runs the audit** (the skill's "An unattended run"): `audit.ts status`
+  first, and nothing else when it says no. Work means no list with a position waiting, the owner's
+  device quiet for 30 minutes, no other session's lock, something to merge or audit, and the next
+  subtree's exploration not still running (for at most 24 hours). With nobody to ask, a question
+  that can wait becomes a question in the list marked "look first", and one that cannot stops the
+  run with what is needed. The scheduled task itself is the owner's: a session never creates,
+  changes or fires one.
+- **`audit.json` gains `batches` and `explored`**, both written by commands (`tally`,
+  `explore-start`), the rest of the file still by hand; the ledger gains the regions `batches` and
+  `explored`. **`notes/<sid>/cdbexplore/`** holds each exploration's PGN, the tool's record and
+  log, and its report: written by the exploring session alone, which writes nothing else.
+- **cdbexplore is part of the audit**: ahead of each batch for the next two subtrees, in a session
+  of its own on a smaller model at low effort, and on demand where a decision hangs on a shallow
+  ChessDB eval. q_extension stays a read-only reference, used at its commit a396b4d (branch
+  `claude/gifted-cori-2whjds`, which logs ChessDB's refusals and is not on its main). **A ChessDB
+  answer cached before the study's last explored position is stale** and is dropped by the
+  commands that would decide on it: a time, not a set of positions.
+- **A batch waits for the exploration of its own subtree** (up to 24 hours from its start), then
+  goes on with what there is and says so. The owner may shorten or drop the wait.
+- **The audit's lookups stamp an answer with the time it was fetched** (they had set their clock
+  back 60 days to read explorer answers for 90, which also let a ChessDB answer live 67 days and
+  made Practical ask again for what the audit had just fetched). Only the reading of explorer
+  answers is stretched.
